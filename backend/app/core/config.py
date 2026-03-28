@@ -3,7 +3,7 @@ from typing import List
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql://fieldpulse:password@localhost:5432/fieldpulse"
+    DATABASE_URL: str = "postgresql+pg8000://fieldpulse:password@localhost:5432/fieldpulse"
     REDIS_URL: str = "redis://localhost:6379"
     JWT_SECRET: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
