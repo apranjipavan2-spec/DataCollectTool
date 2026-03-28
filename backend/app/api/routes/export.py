@@ -5,7 +5,12 @@ import io
 from datetime import datetime
 from typing import Optional
 
-import pandas as pd
+try:
+    import pandas as pd
+    HAS_PANDAS = True
+except ImportError:
+    HAS_PANDAS = False
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -169,6 +174,9 @@ def export_dta(
     db: Session = Depends(get_db),
 ):
     """Export submissions for a form as Stata .dta file."""
+    if not HAS_PANDAS:
+        raise HTTPException(status_code=501, detail="Stata export requires pandas. Install pandas to enable this feature.")
+
     form = db.query(Form).filter(
         Form.id == form_id, Form.tenant_id == user["tenant_id"]
     ).first()
