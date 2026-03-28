@@ -4,6 +4,14 @@ from typing import List
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+pg8000://fieldpulse:password@localhost:5432/fieldpulse"
+
+    @property
+    def db_url(self) -> str:
+        """Ensure pg8000 driver prefix regardless of what Railway provides."""
+        url = self.DATABASE_URL
+        if url.startswith("postgresql://") or url.startswith("postgres://"):
+            url = "postgresql+pg8000://" + url.split("://", 1)[1]
+        return url
     REDIS_URL: str = "redis://localhost:6379"
     JWT_SECRET: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"

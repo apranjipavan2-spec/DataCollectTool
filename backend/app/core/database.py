@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 engine = create_engine(
-    settings.DATABASE_URL,
+    settings.db_url,
     pool_pre_ping=True,     # test connections before use — prevents stale-connection 500s
     pool_size=10,            # connection pool size
     max_overflow=20,         # extra connections when pool is full
