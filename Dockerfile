@@ -2,9 +2,11 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-# Install system dependencies (minimal)
+# Install system dependencies (needed for pandas, numpy, etc.)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     gcc \
+    g++ \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
