@@ -35,4 +35,4 @@ ENV PYTHONPATH=/app
 
 EXPOSE ${PORT:-8000}
 
-CMD ["sh", "-c", "cd /app && alembic upgrade head 2>/dev/null || true && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "cd /app && alembic upgrade head 2>/dev/null || true && python scripts/seed_dev.py 2>/dev/null || true && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
