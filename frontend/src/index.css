@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+/* ── Catalan Dark Theme ─────────────────────────────────────── */
+@theme {
+  /* Colors */
+  --color-catalan-bg: #11111b;
+  --color-catalan-surface: #1e1e2e;
+  --color-catalan-hover: #262637;
+  --color-catalan-border: #2a2a3e;
+  --color-catalan-text: #cdd6f4;
+  --color-catalan-textSecondary: #a6adc8;
+  --color-catalan-textMuted: #6c7086;
+  --color-catalan-primary: #89b4fa;
+  --color-catalan-primaryDark: #457dd1;
+  --color-catalan-primaryLight: #b3d7ff;
+  --color-catalan-success: #a6e3a1;
+  --color-catalan-warning: #f9e2af;
+  --color-catalan-error: #f38ba8;
+  --color-catalan-info: #89b4fa;
+}
+
+/* ── Base Styles ────────────────────────────────────────────── */
+@layer base {
+  body {
+    background-color: var(--color-catalan-bg);
+    color: var(--color-catalan-text);
+    font-family: system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  *, *::before, *::after {
+    border-color: var(--color-catalan-border);
+  }
+}
+
+/* ── Light Theme Overrides ─────────────────────────────────── */
+[data-theme="light"] {
+  --color-catalan-bg: #f5f5f9;
+  --color-catalan-surface: #ffffff;
+  --color-catalan-hover: #e8e8f0;
+  --color-catalan-border: #d4d4de;
+  --color-catalan-text: #1e1e2e;
+  --color-catalan-textSecondary: #4a4a5e;
+  --color-catalan-textMuted: #6c7086;
+  --color-catalan-primary: #2563eb;
+  --color-catalan-primaryDark: #1d4ed8;
+  --color-catalan-primaryLight: #60a5fa;
+  --color-catalan-success: #16a34a;
+  --color-catalan-warning: #ca8a04;
+  --color-catalan-error: #dc2626;
+  --color-catalan-info: #2563eb;
+}
+
+@layer base {
+  [data-theme="light"] body {
+    background-color: var(--color-catalan-bg);
+    color: var(--color-catalan-text);
+  }
+
+  [data-theme="light"] *, [data-theme="light"] *::before, [data-theme="light"] *::after {
+    border-color: var(--color-catalan-border);
+  }
+}
+
+/* ── Component Classes ──────────────────────────────────────── */
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 bg-catalan-primary text-catalan-bg font-semibold rounded-lg hover:bg-catalan-primaryDark transition-colors;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-catalan-surface text-catalan-text border border-catalan-border font-semibold rounded-lg hover:bg-catalan-hover transition-colors;
+  }
+
+  .btn-danger {
+    @apply px-4 py-2 bg-catalan-error text-white font-semibold rounded-lg hover:opacity-90 transition-opacity;
+  }
+
+  .btn-ghost {
+    @apply px-4 py-2 text-catalan-primary hover:bg-catalan-hover rounded-lg transition-colors;
+  }
+
+  .card {
+    @apply bg-catalan-surface border border-catalan-border rounded-lg p-6;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 bg-catalan-hover border border-catalan-border rounded-lg text-catalan-text placeholder-catalan-textMuted;
+  }
+
+  .badge {
+    @apply inline-block px-2 py-1 rounded-full text-xs font-semibold;
+  }
+
+  .badge-success {
+    @apply bg-catalan-success/20 text-catalan-success;
+  }
+
+  .badge-warning {
+    @apply bg-catalan-warning/20 text-catalan-warning;
+  }
+
+  .badge-error {
+    @apply bg-catalan-error/20 text-catalan-error;
+  }
+
+  .badge-info {
+    @apply bg-catalan-info/20 text-catalan-info;
+  }
+}

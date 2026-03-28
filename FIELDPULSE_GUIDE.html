@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FieldPulse - Complete Feature Guide</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .nav {
+            display: flex;
+            gap: 10px;
+            padding: 20px;
+            background: #f5f5f5;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .nav button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.3s;
+        }
+
+        .nav button:hover {
+            background: #764ba2;
+        }
+
+        .nav button.active {
+            background: #764ba2;
+            box-shadow: 0 0 10px rgba(118, 75, 162, 0.5);
+        }
+
+        .content {
+            padding: 40px;
+            min-height: 500px;
+        }
+
+        section {
+            display: none;
+        }
+
+        section.active {
+            display: block;
+        }
+
+        h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        h3 {
+            color: #764ba2;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .feature-card {
+            background: #f9f9f9;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            border-radius: 5px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+        }
+
+        .feature-card h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            margin: 10px 0;
+        }
+
+        .status.done {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.inprogress {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.planned {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status.future {
+            background: #e7e7e7;
+            color: #333;
+        }
+
+        .user-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .user-table thead {
+            background: #667eea;
+            color: white;
+        }
+
+        .user-table th, .user-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .user-table tbody tr:hover {
+            background: #f5f5f5;
+        }
+
+        .cred-section {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+
+        .cred-section h4 {
+            color: #856404;
+            margin-bottom: 15px;
+        }
+
+        .cred-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 3px;
+            border-left: 3px solid #ffc107;
+        }
+
+        .cred-item label {
+            font-weight: bold;
+            color: #333;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .cred-item code {
+            background: #f5f5f5;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            display: block;
+            margin-top: 5px;
+            word-break: break-all;
+        }
+
+        .download-btn {
+            background: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 10px 0;
+        }
+
+        .download-btn:hover {
+            background: #218838;
+        }
+
+        .guide-text {
+            background: #f0f0f0;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 15px 0;
+            line-height: 1.8;
+        }
+
+        .step {
+            background: white;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 3px;
+        }
+
+        .step strong {
+            color: #667eea;
+        }
+
+        footer {
+            background: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #ddd;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            margin-right: 5px;
+        }
+
+        .badge.admin {
+            background: #007bff;
+            color: white;
+        }
+
+        .badge.supervisor {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .badge.enumerator {
+            background: #28a745;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 FieldPulse</h1>
+            <p>Offline-First Field Data Collection SaaS for India</p>
+            <p style="font-size: 0.9em; margin-top: 10px;">Compete with SurveyCTO at ₹18,000/month with better UX & true offline capability</p>
+        </header>
+
+        <div class="nav">
+            <button class="tab-btn active" data-tab="overview">Overview</button>
+            <button class="tab-btn" data-tab="completed">Completed Features</button>
+            <button class="tab-btn" data-tab="roadmap">Roadmap</button>
+            <button class="tab-btn" data-tab="guide">User Guide</button>
+            <button class="tab-btn" data-tab="credentials">Test Credentials</button>
+            <button class="tab-btn" data-tab="api">API Reference</button>
+        </div>
+
+        <div class="content">
+            <!-- OVERVIEW -->
+            <section id="overview" class="active">
+                <h2>📋 Project Overview</h2>
+
+                <div class="guide-text">
+                    <strong>FieldPulse</strong> is a B2B offline-first SaaS platform designed for field data collection in India.
+                    It competes directly with SurveyCTO ($225-630/month) but costs only <strong>₹18,000/month (~$215)</strong>.
+                </div>
+
+                <h3>Key Advantages</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>✅ True Offline</h4>
+                        <p>Works perfectly without internet. All data saved locally. Auto-syncs when reconnected.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📸 Smart Media</h4>
+                        <p>Automatic photo compression (5MB→200KB). Audio recording built-in. Supports barcode scanning.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>⚡ Background Sync</h4>
+                        <p>Service Worker syncs data in background. App doesn't need to be open. Works on 2G speeds.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🗂️ Form Flexibility</h4>
+                        <p>15 field types. Complex skip logic. Repeat groups. Multi-language support (EN/HI/KN/TE).</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>👥 Team Management</h4>
+                        <p>Assign specific forms to specific enumerators. Real-time dashboard. Submission flagging.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📊 Export Ready</h4>
+                        <p>CSV, Stata (.dta), and other formats. Works with research teams and data analysts.</p>
+                    </div>
+                </div>
+
+                <h3>Tech Stack</h3>
+                <div class="guide-text">
+                    <strong>Frontend:</strong> React 18 + TypeScript + Vite + PWA<br>
+                    <strong>Backend:</strong> FastAPI + SQLAlchemy + PostgreSQL<br>
+                    <strong>Storage:</strong> wa-sqlite (OPFS) + Dexie.js (IndexedDB)<br>
+                    <strong>Cloud:</strong> Google Drive for media, Firebase for 2FA (future)
+                </div>
+
+                <h3>Competitive Matrix</h3>
+                <table class="user-table">
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>SurveyCTO</th>
+                            <th>FieldPulse</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Price</td>
+                            <td>$225-630/mo</td>
+                            <td>₹18,000/mo (~$215)</td>
+                        </tr>
+                        <tr>
+                            <td>Offline</td>
+                            <td>Yes (Java app)</td>
+                            <td>✅ Yes (PWA, no install)</td>
+                        </tr>
+                        <tr>
+                            <td>Photo compression</td>
+                            <td>Manual</td>
+                            <td>✅ Automatic</td>
+                        </tr>
+                        <tr>
+                            <td>Background sync</td>
+                            <td>No</td>
+                            <td>✅ Yes (Service Worker)</td>
+                        </tr>
+                        <tr>
+                            <td>Audio recording</td>
+                            <td>Separate app</td>
+                            <td>✅ Built-in</td>
+                        </tr>
+                        <tr>
+                            <td>Real-time dashboard</td>
+                            <td>Delayed</td>
+                            <td>✅ Instant on sync</td>
+                        </tr>
+                        <tr>
+                            <td>India support</td>
+                            <td>Email only</td>
+                            <td>✅ Local team</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- COMPLETED FEATURES -->
+            <section id="completed">
+                <h2>✅ Completed Features</h2>
+
+                <h3>Phase 1A - Backend & Admin</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>🔐 Authentication</h4>
+                        <span class="status done">Done</span>
+                        <p>Phone + Password login. JWT tokens. Role-based access (Master Admin, Org Admin, Supervisor, Enumerator).</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📝 Form Builder</h4>
+                        <span class="status done">Done</span>
+                        <p>15 field types (Text, Number, Single/Multiple Choice, GPS, Audio, Photo, Barcode, Rating, Date, DateTime, Note, Repeat Group). Skip logic. Sections.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🗄️ Backend API</h4>
+                        <span class="status done">Done</span>
+                        <p>Full CRUD for forms, submissions, users. Sync endpoints. Export (CSV, Stata). Pagination. Rate limiting.</p>
+                    </div>
+                </div>
+
+                <h3>Phase 1B - Offline PWA</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>💾 Local Storage</h4>
+                        <span class="status done">Done</span>
+                        <p>StorageAdapter interface. OPFS (wa-sqlite) for Chrome/Android. IndexedDB (Dexie) for Safari/iOS.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📋 Form Renderer</h4>
+                        <span class="status done">Done</span>
+                        <p>One-field-per-page. Auto-save every 300ms. GPS capture. Field validation. Progress bar.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🔄 Sync Engine</h4>
+                        <span class="status done">Done</span>
+                        <p>Push submissions to server. Mark as synced. Outbox tracking. Offline-first workflow.</p>
+                    </div>
+                </div>
+
+                <h3>Phase 2B - Background Sync</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>🔌 Auto-Reconnect</h4>
+                        <span class="status done">Done</span>
+                        <p>Detects when device comes online. Auto-syncs pending submissions. Works on 2G/3G.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>⏰ Service Worker Sync</h4>
+                        <span class="status done">Done</span>
+                        <p>Background Sync API. App doesn't need to be open. Syncs even after close.</p>
+                    </div>
+                </div>
+
+                <h3>Phase 2C - Chunked Media Uploads</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>📸 Photo Upload</h4>
+                        <span class="status done">Done</span>
+                        <p>Two-phase sync: Text-only first (~2KB), then photos individually (~200KB each). Automatic compression. Retry-safe with ID mapping.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>☁️ Google Drive Storage</h4>
+                        <span class="status done">Done</span>
+                        <p>OAuth2 authentication. Auto-organized into tenant/submission/field folders. Web-accessible URLs.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🎵 Audio Recording</h4>
+                        <span class="status done">Done</span>
+                        <p>MediaRecorder API. Low bitrate (24kbps). ~60-100KB per 30s. Same upload pipeline as photos.</p>
+                    </div>
+                </div>
+
+                <h3>Phase 3 - Dashboard & Team</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>📊 Dashboard</h4>
+                        <span class="status done">Done</span>
+                        <p>4 tabs: Overview, Data, Forms, Team. Real-time submission count. Charts. Filters.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>👥 Team Management</h4>
+                        <span class="status done">Done</span>
+                        <p>Add/remove users. Assign forms to enumerators. Role badges. Deactivate users.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🚩 Submission Flagging</h4>
+                        <span class="status done">Done</span>
+                        <p>Flag/unflag submissions. Add notes. View in detail modal. Real-time UI updates.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ROADMAP -->
+            <section id="roadmap">
+                <h2>🗺️ Roadmap & Status</h2>
+
+                <h3>🟢 Priority 1 - Pilot Ready (Weeks 1-2)</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>Form Assignments</h4>
+                        <span class="status done">✅ Done</span>
+                        <p>Supervisors assign specific forms to specific enumerators. Enumerators see only assigned forms.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Password Auth</h4>
+                        <span class="status done">✅ Done</span>
+                        <p>Phone + password login. OTP kept as fallback. Password hashing with bcrypt.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Repeat Groups</h4>
+                        <span class="status done">✅ Done</span>
+                        <p>Dynamic field arrays. Expandable rows. Add/remove items. Full validation.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Barcode Scanning</h4>
+                        <span class="status done">✅ Done</span>
+                        <p>BarcodeDetector API (Chrome/Android). Camera viewfinder. Manual text fallback.</p>
+                    </div>
+                </div>
+
+                <h3>🟡 Priority 2 - Production Hardening (Weeks 2-3)</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>S3/R2 Media Storage</h4>
+                        <span class="status planned">📋 Planned</span>
+                        <p>Move from Google Drive to AWS S3 or Cloudflare R2 for scale. Async uploads.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Conflict Detection</h4>
+                        <span class="status done">✅ Done</span>
+                        <p>Server-side deduplication. Idempotent sync via local_id. No duplicate submissions.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>CSV/Stata Export</h4>
+                        <span class="status done">✅ Done</span>
+                        <p>Export submissions as CSV or Stata .dta format. Compatible with research teams.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>API Pagination</h4>
+                        <span class="status done">✅ Done</span>
+                        <p>Page/page_size parameters on /submissions and /users endpoints.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Rate Limiting</h4>
+                        <span class="status done">✅ Done</span>
+                        <p>In-memory rate limiting via slowapi. Protects auth and sync endpoints.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Error Boundary</h4>
+                        <span class="status done">✅ Done</span>
+                        <p>React ErrorBoundary. Crash reporting. Sentry placeholder for production.</p>
+                    </div>
+                </div>
+
+                <h3>🔵 Priority 3 - Scale & Polish (Weeks 4-6)</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>Multi-Language Support</h4>
+                        <span class="status done">✅ Done</span>
+                        <p>Toggle field labels/hints between English, Hindi, Kannada, Telugu during collection.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Submission History</h4>
+                        <span class="status done">✅ Done</span>
+                        <p>Audit trail. Track who changed what and when. Revert to previous versions.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Supervisor Review</h4>
+                        <span class="status done">✅ Done</span>
+                        <p>Supervisors approve/reject submissions. Add reason. Status badges.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Form Versioning</h4>
+                        <span class="status planned">📋 Planned</span>
+                        <p>Handle schema changes when form version bumps. Map old→new fields.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Dashboard Charts</h4>
+                        <span class="status done">✅ Done</span>
+                        <p>Submission trends line chart. Top enumerators bar chart. Real-time updates.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Bulk User Import</h4>
+                        <span class="status done">✅ Done</span>
+                        <p>Upload CSV of phone/name/role/password. Create users in bulk.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Push Notifications</h4>
+                        <span class="status planned">📋 Planned</span>
+                        <p>Notify enumerators of new form assignments via Web Push API.</p>
+                    </div>
+                </div>
+
+                <h3>🟣 Priority 4 - Distribution & Growth (Weeks 7-10)</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>TWA (Google Play)</h4>
+                        <span class="status planned">📋 Planned</span>
+                        <p>Wrap PWA as Trusted Web Activity. Distribute on Google Play Store.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Multi-Tenant Admin</h4>
+                        <span class="status planned">📋 Planned</span>
+                        <p>Master admin panel. Create/manage tenants. Billing. Usage metrics.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>White-Labeling</h4>
+                        <span class="status future">💡 Future</span>
+                        <p>Custom branding per tenant. Logo, colors, app name.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Advanced Skip Logic</h4>
+                        <span class="status done">✅ Done</span>
+                        <p>Cross-field conditions. Nested AND/OR groups. Calculated skip rules.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>Webhook Integrations</h4>
+                        <span class="status future">💡 Future</span>
+                        <p>POST submission data to external URLs on sync.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>API Key Auth</h4>
+                        <span class="status future">💡 Future</span>
+                        <p>Programmatic access to submission data. Third-party integrations.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- USER GUIDE -->
+            <section id="guide">
+                <h2>📖 How to Use FieldPulse</h2>
+
+                <h3>For Enumerators (Field Staff)</h3>
+
+                <div class="step">
+                    <strong>Step 1: Download & Install</strong>
+                    <p>Open the app link on your phone (Android 8+). Add to home screen or download from Play Store (via TWA). No need for Play Store account.</p>
+                </div>
+
+                <div class="step">
+                    <strong>Step 2: Login</strong>
+                    <p>Enter your phone number and password. Keep your password secure — don't share it with anyone.</p>
+                </div>
+
+                <div class="step">
+                    <strong>Step 3: View Assigned Forms</strong>
+                    <p>You'll see only the forms assigned to you by your supervisor. Other forms are hidden.</p>
+                </div>
+
+                <div class="step">
+                    <strong>Step 4: Collect Data</strong>
+                    <p>Tap a form → answer questions one at a time → auto-saves to your phone. Complete it offline, with or without internet.</p>
+                </div>
+
+                <div class="step">
+                    <strong>Step 5: Submit</strong>
+                    <p>When ready, tap "Submit". Data is saved locally first. When you have internet, it automatically syncs to the server.</p>
+                </div>
+
+                <div class="step">
+                    <strong>Step 6: Check Sync Status</strong>
+                    <p>Look for the sync icon — if it's spinning, data is uploading. If it's green, all good. If red, you'll retry automatically when connected.</p>
+                </div>
+
+                <h3>For Supervisors</h3>
+
+                <div class="step">
+                    <strong>Step 1: Access Dashboard</strong>
+                    <p>Login with your supervisor account. You'll see the dashboard with all submissions from your team.</p>
+                </div>
+
+                <div class="step">
+                    <strong>Step 2: Monitor Submissions</strong>
+                    <p>View count by enumerator. Click any submission to see full details, GPS location, timestamps, and photos.</p>
+                </div>
+
+                <div class="step">
+                    <strong>Step 3: Flag & Review</strong>
+                    <p>Click the flag icon on any submission. Add a note (e.g., "Needs clarification", "Rejected"). Enumerator will see your feedback.</p>
+                </div>
+
+                <div class="step">
+                    <strong>Step 4: Assign Forms</strong>
+                    <p>Go to Forms tab → click "Assign". Select form → select enumerators → save. Only those enumerators will see this form.</p>
+                </div>
+
+                <div class="step">
+                    <strong>Step 5: Manage Team</strong>
+                    <p>Team tab → Add/remove users → assign roles (Enumerator, Supervisor, Admin). Deactivate inactive staff.</p>
+                </div>
+
+                <div class="step">
+                    <strong>Step 6: Export Data</strong>
+                    <p>Select submissions → Download as CSV or Stata (.dta). Ready to analyze in Excel or R.</p>
+                </div>
+
+                <h3>For Admins</h3>
+
+                <div class="step">
+                    <strong>Step 1: Create Forms</strong>
+                    <p>Go to Form Builder. Add fields (text, photos, audio, GPS, rating, etc.). Set skip logic. Create sections.</p>
+                </div>
+
+                <div class="step">
+                    <strong>Step 2: Configure Permissions</strong>
+                    <p>Admin panel → Users → set roles (Enumerator, Supervisor, Admin). Only admins can delete forms.</p>
+                </div>
+
+                <div class="step">
+                    <strong>Step 3: View Analytics</strong>
+                    <p>Dashboard → Overview → see submission counts, top enumerators, submission trends over time.</p>
+                </div>
+
+                <h3>Feature Highlights</h3>
+
+                <h4>📸 Taking Photos</h4>
+                <div class="guide-text">
+                    Tap the camera icon. Take a photo. Auto-compressed to 200KB for fast upload. Can retake if needed. Works offline — stored locally, syncs when connected.
+                </div>
+
+                <h4>🎵 Recording Audio</h4>
+                <div class="guide-text">
+                    Tap the microphone icon. Record your voice. Low bitrate keeps file size small (~60KB per 30s). Playback before submit. Same sync as photos.
+                </div>
+
+                <h4>📍 GPS Location</h4>
+                <div class="guide-text">
+                    When asking for location, app captures GPS coordinates. Works with no internet (uses device GPS). View on map in the dashboard.
+                </div>
+
+                <h4>🔄 Repeat Groups</h4>
+                <div class="guide-text">
+                    Some forms have repeating sections (e.g., list 5 household members). Tap "Add" to create rows. Fill each row. Remove if needed.
+                </div>
+
+                <h4>📊 Skip Logic</h4>
+                <div class="guide-text">
+                    Questions appear/hide based on previous answers. E.g., "Do you have a phone?" → If No, skip the next 3 questions.
+                </div>
+            </section>
+
+            <!-- CREDENTIALS -->
+            <section id="credentials">
+                <h2>🔑 Test Credentials</h2>
+
+                <div class="cred-section">
+                    <h4>📝 Pre-Configured Test Users</h4>
+                    <p>These users are pre-seeded in the database for testing. Use these to demo the app.</p>
+
+                    <div class="cred-item">
+                        <label>Admin Account</label>
+                        <div><span class="badge admin">Master Admin</span></div>
+                        <code>Phone: +919999990001 | Password: test@123</code>
+                        <p style="margin-top: 5px; font-size: 0.9em;">Can manage all tenants, users, forms, and see all submissions.</p>
+                    </div>
+
+                    <div class="cred-item">
+                        <label>Supervisor Account</label>
+                        <div><span class="badge supervisor">Supervisor</span></div>
+                        <code>Phone: +919999990002 | Password: test@123</code>
+                        <p style="margin-top: 5px; font-size: 0.9em;">Can assign forms to enumerators, review submissions, flag data.</p>
+                    </div>
+
+                    <div class="cred-item">
+                        <label>Enumerator Account</label>
+                        <div><span class="badge enumerator">Enumerator</span></div>
+                        <code>Phone: +919999990003 | Password: test@123</code>
+                        <p style="margin-top: 5px; font-size: 0.9em;">Collects data. Sees only assigned forms. Cannot manage users or forms.</p>
+                    </div>
+                </div>
+
+                <h3>💾 Credentials CSV</h3>
+                <p>All test credentials are also saved in <strong>credentials.csv</strong> in the root folder.</p>
+                <button class="download-btn" onclick="downloadCredentials()">📥 Download credentials.csv</button>
+
+                <h3>🔐 Environment Setup</h3>
+
+                <div class="cred-item">
+                    <label>Google Drive Configuration</label>
+                    <code>OAuth Token saved at: credentials/gdrive-token.json</code>
+                    <p style="margin-top: 10px;">Media uploads are automatically stored in your shared Google Drive folder:<br>
+                    <code style="font-size: 0.9em;">https://drive.google.com/drive/folders/1397LHY_x8KMvkAaq-_9LaepszN1a8Thp</code></p>
+                </div>
+
+                <h3>🚀 Development Servers</h3>
+
+                <div class="cred-section">
+                    <h4>Start Services</h4>
+
+                    <div class="cred-item">
+                        <label>PostgreSQL + Redis (Docker)</label>
+                        <code>docker compose up -d</code>
+                        <p style="margin-top: 5px;">Starts PostgreSQL on :5432 and Redis on :6379</p>
+                    </div>
+
+                    <div class="cred-item">
+                        <label>Backend API (Port 8000)</label>
+                        <code>cd backend && python -m uvicorn app.main:app --port 8000</code>
+                        <p style="margin-top: 5px;">Swagger docs at http://localhost:8000/docs</p>
+                    </div>
+
+                    <div class="cred-item">
+                        <label>Frontend (Port 5173)</label>
+                        <code>cd frontend && npm run dev</code>
+                        <p style="margin-top: 5px;">PWA with offline capability. Visit http://localhost:5173</p>
+                    </div>
+                </div>
+
+                <h3>📋 Database & Migration</h3>
+                <div class="guide-text">
+                    <strong>Run migrations:</strong><br>
+                    <code>cd backend && alembic upgrade head</code><br><br>
+                    <strong>Seed test data:</strong><br>
+                    <code>cd backend && python scripts/seed_dev.py</code><br><br>
+                    All test users above will be created automatically.
+                </div>
+            </section>
+
+            <!-- API REFERENCE -->
+            <section id="api">
+                <h2>🔗 API Reference</h2>
+
+                <h3>Base URL</h3>
+                <div class="guide-text">
+                    <code>http://localhost:8000/api/v1</code>
+                </div>
+
+                <h3>🔐 Authentication</h3>
+                <div class="step">
+                    <strong>POST /auth/login</strong>
+                    <p>Login with phone and password. Returns JWT token.</p>
+                    <code style="display: block; margin-top: 10px; background: #f5f5f5; padding: 10px;">
+{<br>
+  "phone": "+919999990001",<br>
+  "password": "test@123"<br>
+}<br>
+<br>
+Response:<br>
+{<br>
+  "access_token": "eyJ0eXAi...",<br>
+  "token_type": "bearer",<br>
+  "user": { "id": "...", "phone": "...", "role": "master_admin" }<br>
+}
+                    </code>
+                </div>
+
+                <h3>📋 Forms</h3>
+                <div class="step">
+                    <strong>GET /forms/</strong>
+                    <p>List all forms (for enumerator: only assigned forms). Supports pagination.</p>
+                    <code>Query params: page=1, page_size=10</code>
+                </div>
+
+                <div class="step">
+                    <strong>POST /forms/</strong>
+                    <p>Create a new form. Admin only.</p>
+                </div>
+
+                <h3>📝 Submissions</h3>
+                <div class="step">
+                    <strong>GET /submissions/</strong>
+                    <p>List submissions. Supervisors see their team's data. Enumerators see only their submissions.</p>
+                    <code>Query params: page=1, page_size=20, date_from=2026-01-01, date_to=2026-12-31</code>
+                </div>
+
+                <div class="step">
+                    <strong>POST /submissions/</strong>
+                    <p>Create a new submission (locally saved first, then synced).</p>
+                </div>
+
+                <div class="step">
+                    <strong>PATCH /submissions/{id}</strong>
+                    <p>Flag a submission or update its status.</p>
+                    <code style="display: block; margin-top: 10px; background: #f5f5f5; padding: 10px;">
+{<br>
+  "flag_note": "Needs clarification",<br>
+  "status": "flagged"<br>
+}
+                    </code>
+                </div>
+
+                <h3>🔄 Sync</h3>
+                <div class="step">
+                    <strong>POST /sync/push</strong>
+                    <p>Push submissions to server. Two-phase: text-only first (photos removed), then media.</p>
+                </div>
+
+                <div class="step">
+                    <strong>POST /sync/media</strong>
+                    <p>Upload a single photo or audio file (multipart form data).</p>
+                    <code>Fields: submission_id, field_name, file_type (photo/audio), file (binary)</code>
+                </div>
+
+                <h3>👥 Users & Team</h3>
+                <div class="step">
+                    <strong>GET /users/</strong>
+                    <p>List team members. Pagination supported.</p>
+                    <code>Query params: page=1, page_size=50</code>
+                </div>
+
+                <div class="step">
+                    <strong>POST /users/</strong>
+                    <p>Create a new user. Admin/Supervisor only.</p>
+                    <code style="display: block; margin-top: 10px; background: #f5f5f5; padding: 10px;">
+{<br>
+  "phone": "+919999990099",<br>
+  "name": "Rahul Kumar",<br>
+  "role": "enumerator",<br>
+  "password": "secure_password_here"<br>
+}
+                    </code>
+                </div>
+
+                <h3>📊 Export</h3>
+                <div class="step">
+                    <strong>GET /export/{form_id}/csv</strong>
+                    <p>Export all submissions for a form as CSV.</p>
+                </div>
+
+                <div class="step">
+                    <strong>GET /export/{form_id}/stata</strong>
+                    <p>Export as Stata .dta format for research analysis.</p>
+                </div>
+
+                <h3>🎯 Form Assignments</h3>
+                <div class="step">
+                    <strong>GET /assignments/</strong>
+                    <p>List all form assignments.</p>
+                </div>
+
+                <div class="step">
+                    <strong>POST /assignments/</strong>
+                    <p>Assign a form to enumerators.</p>
+                    <code style="display: block; margin-top: 10px; background: #f5f5f5; padding: 10px;">
+{<br>
+  "form_id": "uuid-here",<br>
+  "enumerator_ids": ["uuid1", "uuid2", "uuid3"]<br>
+}
+                    </code>
+                </div>
+
+                <h3>📚 Full API Docs</h3>
+                <div class="guide-text">
+                    When backend is running, visit <strong>http://localhost:8000/docs</strong> for interactive Swagger UI with all endpoints, parameters, and example responses.
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            <p>FieldPulse © 2026 | Offline-First Field Data Collection for India</p>
+            <p style="margin-top: 10px; font-size: 0.9em;">For questions or issues, contact: support@fieldpulse.local</p>
+        </footer>
+    </div>
+
+    <script>
+        // Tab navigation
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Remove active from all buttons and sections
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+
+                // Add active to clicked button and corresponding section
+                btn.classList.add('active');
+                const tabId = btn.getAttribute('data-tab');
+                document.getElementById(tabId).classList.add('active');
+
+                // Scroll to top
+                window.scrollTo(0, 0);
+            });
+        });
+
+        // Download credentials CSV
+        function downloadCredentials() {
+            const csv = `Role,Phone,Password,Description
+Master Admin,+919999990001,test@123,Can manage all tenants and users
+Supervisor,+919999990002,test@123,Can assign forms and review submissions
+Enumerator,+919999990003,test@123,Collects data for assigned forms`;
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'fieldpulse-credentials.csv';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+    </script>
+</body>
+</html>

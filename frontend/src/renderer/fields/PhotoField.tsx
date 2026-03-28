@@ -1,0 +1,110 @@
+import React, { useRef, useState } from 'react'
+import type { FormField } from '@/types/form'
+import { labelCls, hintCls, captureButtonCls, fieldHintCls, requiredCls } from './styles'
+
+interface Props { field: FormField; value: string | null; onChange: (v: string) => void }
+
+// ── Optimal compression settings for field data collection ─────────────────
+const MAX_DIMENSION = 1280   // longest edge in px (good enough for ID docs / field photos)
+const TARGET_KB     = 150    // target file size after compression
+const MIN_QUALITY   = 0.4    // lowest JPEG quality we'll try
+const QUALITY_STEP  = 0.1    // step down per iteration
+
+/**
+ * Multi-pass compression:
+ * 1. Resize to fit within MAX_DIMENSION
+ * 2. Start at quality 0.75, step down until < TARGET_KB or MIN_QUALITY hit
+ * Returns a compact JPEG data URI (~80-150KB from a 5MB phone camera shot)
+ */
+async function compressImage(file: File): Promise<{ dataUri: string; sizeKB: number }> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+
+      let w = img.width
+      let h = img.height
+      if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
+        const ratio = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h)
+        w = Math.round(w * ratio)
+        h = Math.round(h * ratio)
+      }
+
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, w, h)
+
+      let quality = 0.75
+      let dataUri = canvas.toDataURL('image/jpeg', quality)
+      let sizeKB  = Math.round((dataUri.length - 'data:image/jpeg;base64,'.length) * 0.75 / 1024)
+
+      while (sizeKB > TARGET_KB && quality > MIN_QUALITY) {
+        quality   -= QUALITY_STEP
+        dataUri    = canvas.toDataURL('image/jpeg', quality)
+        sizeKB     = Math.round((dataUri.length - 'data:image/jpeg;base64,'.length) * 0.75 / 1024)
+      }
+
+      resolve({ dataUri, sizeKB })
+    }
+    img.src = url
+  })
+}
+
+export default function PhotoField({ field, value, onChange }: Props) {
+  const ref          = useRef<HTMLInputElement>(null)
+  const [sizeInfo, setSizeInfo]       = useState<string>('')
+  const [compressing, setCompressing] = useState(false)
+
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCompressing(true)
+    try {
+      const origKB = Math.round(file.size / 1024)
+      const { dataUri, sizeKB } = await compressImage(file)
+      setSizeInfo(`${origKB.toLocaleString()} KB → ${sizeKB} KB`)
+      onChange(dataUri)
+    } finally {
+      setCompressing(false)
+    }
+  }
+
+  return (
+    <div>
+      <label className={labelCls}>
+        {field.label}
+        {field.required && <span className={requiredCls}> *</span>}
+      </label>
+      {field.hint && <div className={hintCls}>{field.hint}</div>}
+
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleChange}
+      />
+      <button
+        onClick={() => ref.current?.click()}
+        disabled={compressing}
+        className={captureButtonCls}
+      >
+        <span className="text-3xl">📷</span>
+        <span>{compressing ? 'Compressing…' : value ? 'Retake Photo' : 'Take Photo'}</span>
+      </button>
+
+      {sizeInfo && (
+        <div className={`${fieldHintCls} text-catalan-success`}>
+          Compressed: {sizeInfo}
+        </div>
+      )}
+      {value && (
+        <img src={value} alt="captured" className="w-full rounded-xl mt-2.5" />
+      )}
+    </div>
+  )
+}

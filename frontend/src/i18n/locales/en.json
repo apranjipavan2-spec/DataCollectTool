@@ -1,0 +1,22 @@
+{
+  "app_name": "FieldPulse",
+  "sync": {
+    "pending": "{{count}} submissions waiting to sync",
+    "syncing": "Syncing...",
+    "synced": "All synced",
+    "error": "Sync failed — tap to retry",
+    "low_storage": "Low storage! Sync now and free space on your phone."
+  },
+  "form": {
+    "next": "Next",
+    "previous": "Previous",
+    "submit": "Submit",
+    "draft_saved": "Draft saved",
+    "required": "This field is required"
+  },
+  "nav": {
+    "drafts": "Drafts",
+    "outbox": "Outbox",
+    "sent": "Sent"
+  }
+}

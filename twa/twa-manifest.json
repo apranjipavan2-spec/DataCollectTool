@@ -1,0 +1,38 @@
+{
+  "packageId": "app.fieldpulse.twa",
+  "host": "fieldpulse.app",
+  "name": "FieldPulse",
+  "launcherName": "FieldPulse",
+  "display": "standalone",
+  "themeColor": "#89b4fa",
+  "navigationColor": "#11111b",
+  "navigationColorDark": "#11111b",
+  "navigationDividerColor": "#2a2a3e",
+  "navigationDividerColorDark": "#2a2a3e",
+  "backgroundColor": "#11111b",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://fieldpulse.app/icons/icon-512x512.png",
+  "maskableIconUrl": "https://fieldpulse.app/icons/icon-512x512.png",
+  "shortcuts": [
+    {
+      "name": "Collect Data",
+      "shortName": "Collect",
+      "url": "/collect",
+      "chosenIconUrl": "https://fieldpulse.app/icons/icon-96x96.png"
+    }
+  ],
+  "signing": {
+    "keyPath": "./android.keystore",
+    "alias": "fieldpulse"
+  },
+  "appVersionCode": 1,
+  "appVersionName": "1.0.0",
+  "signingMode": "new",
+  "isChromeOSOnly": false,
+  "fallbackType": "customtabs",
+  "enableSiteSettingsShortcut": true,
+  "splashScreenFadeOutDuration": 300,
+  "minSdkVersion": 19,
+  "orientation": "portrait"
+}
