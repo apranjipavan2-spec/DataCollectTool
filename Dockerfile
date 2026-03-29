@@ -28,6 +28,7 @@ COPY backend /app
 COPY --from=frontend-builder /frontend/dist /app/static
 
 RUN mkdir -p /app/uploads
+RUN chmod +x /app/scripts/startup.sh
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -35,4 +36,4 @@ ENV PYTHONPATH=/app
 
 EXPOSE ${PORT:-8000}
 
-CMD ["sh", "-c", "cd /app && alembic upgrade head && python scripts/seed_dev.py || true && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["/app/scripts/startup.sh"]
