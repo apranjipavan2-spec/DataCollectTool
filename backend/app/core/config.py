@@ -3,14 +3,17 @@ from typing import List
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql+pg8000://fieldpulse:password@localhost:5432/fieldpulse"
+    DATABASE_URL: str = "postgresql://fieldpulse:password@localhost:5432/fieldpulse"
 
     @property
     def db_url(self) -> str:
-        """Ensure pg8000 driver prefix regardless of what Railway provides."""
+        """Normalize DB URL to use psycopg2 driver (handles Railway SSL automatically)."""
         url = self.DATABASE_URL
-        if url.startswith("postgresql://") or url.startswith("postgres://"):
-            url = "postgresql+pg8000://" + url.split("://", 1)[1]
+        # Strip any existing driver prefix and replace with psycopg2
+        for prefix in ("postgresql+pg8000://", "postgresql+psycopg2://", "postgresql://", "postgres://"):
+            if url.startswith(prefix):
+                url = "postgresql+psycopg2://" + url[len(prefix):]
+                break
         return url
     REDIS_URL: str = "redis://localhost:6379"
     JWT_SECRET: str = "change-me-in-production"
