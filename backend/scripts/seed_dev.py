@@ -7,20 +7,28 @@ Default password for all seed users: test@123
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+import app.models  # noqa: F401 — register all models for create_all
 from app.core.database import SessionLocal, engine, Base
 from app.core.security import hash_password
 from app.models.tenant import Tenant
 from app.models.user import User
 import uuid
 
+# Create all tables (idempotent — skips existing)
+print("Creating tables...")
 Base.metadata.create_all(bind=engine)
+print("Tables ready.")
 
 db = SessionLocal()
 
-# Wipe existing seed data
-db.query(User).filter(User.phone.like('+91999999%')).delete()
-db.query(Tenant).filter(Tenant.name == 'Demo Org').delete()
-db.commit()
+try:
+    # Wipe existing seed data
+    db.query(User).filter(User.phone.like('+91999999%')).delete(synchronize_session=False)
+    db.query(Tenant).filter(Tenant.name == 'Demo Org').delete(synchronize_session=False)
+    db.commit()
+except Exception as e:
+    print(f"Cleanup warning (OK on first run): {e}")
+    db.rollback()
 
 DEFAULT_PASSWORD = 'test@123'
 hashed = hash_password(DEFAULT_PASSWORD)
