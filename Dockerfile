@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     postgresql-client \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt ./requirements.txt
@@ -35,4 +36,4 @@ ENV PYTHONPATH=/app
 
 EXPOSE ${PORT:-8000}
 
-CMD ["sh", "-c", "echo '=== FieldPulse Startup ===' && echo \"DB URL set: $(test -n \"$DATABASE_URL\" && echo YES || echo EMPTY)\" && cd /app && python -c \"from app.core.config import settings, normalize_db_url; print('Effective URL prefix:', normalize_db_url(settings.DATABASE_URL)[:40])\" && alembic upgrade head && echo '=== Migrations done ===' && python scripts/seed_dev.py && echo '=== Seed done ===' && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "cd /app && echo 'Starting FieldPulse...' && python -c 'from app.core.config import settings, normalize_db_url; u=normalize_db_url(settings.DATABASE_URL); print(\"DB:\", u[:45]+\"...\")' && alembic upgrade head && python scripts/seed_dev.py || true && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
