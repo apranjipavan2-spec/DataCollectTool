@@ -1,12 +1,18 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
-from app.core.config import settings
+from app.core.config import settings, normalize_db_url
 import logging
 
 logger = logging.getLogger(__name__)
 
+_db_url = normalize_db_url(settings.DATABASE_URL)
+# Log the effective DB URL (mask password) for debugging
+_masked = _db_url.split("@")[0].rsplit(":", 1)[0] + ":***@" + _db_url.split("@", 1)[1] if "@" in _db_url else _db_url
+logger.info("Connecting to database: %s", _masked)
+
 engine = create_engine(
-    settings.db_url,
+    _db_url,
+    normalize_db_url(settings.DATABASE_URL),
     pool_pre_ping=True,     # test connections before use — prevents stale-connection 500s
     pool_size=10,            # connection pool size
     max_overflow=20,         # extra connections when pool is full

@@ -5,7 +5,7 @@ import os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from app.core.config import settings
+from app.core.config import settings, normalize_db_url
 from app.core.database import Base
 import app.models.tenant
 import app.models.user
@@ -14,7 +14,7 @@ import app.models.submission
 import app.models.sync_log
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.db_url)
+config.set_main_option("sqlalchemy.url", normalize_db_url(settings.DATABASE_URL))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
