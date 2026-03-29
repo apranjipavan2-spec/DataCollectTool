@@ -1,17 +1,30 @@
+import os
 from pydantic_settings import BaseSettings
 from typing import List
 
 
 def normalize_db_url(url: str) -> str:
     """Normalize any PostgreSQL URL to use psycopg2 driver."""
+    if not url:
+        return url
     for prefix in ("postgresql+pg8000://", "postgresql+psycopg2://", "postgres://", "postgresql://"):
         if url.startswith(prefix):
             return "postgresql+psycopg2://" + url.split("://", 1)[1]
     return url
 
 
+def _resolve_database_url() -> str:
+    """Get DATABASE_URL from env, falling back to DATABASE_PUBLIC_URL if empty."""
+    url = os.environ.get("DATABASE_URL", "")
+    if not url:
+        url = os.environ.get("DATABASE_PUBLIC_URL", "")
+    if not url:
+        url = "postgresql://fieldpulse:password@localhost:5432/fieldpulse"
+    return url
+
+
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql://fieldpulse:password@localhost:5432/fieldpulse"
+    DATABASE_URL: str = _resolve_database_url()
     REDIS_URL: str = "redis://localhost:6379"
     JWT_SECRET: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
