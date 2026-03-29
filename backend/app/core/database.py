@@ -12,7 +12,6 @@ logger.info("Connecting to database: %s", _masked)
 
 engine = create_engine(
     _db_url,
-    normalize_db_url(settings.DATABASE_URL),
     pool_pre_ping=True,     # test connections before use — prevents stale-connection 500s
     pool_size=10,            # connection pool size
     max_overflow=20,         # extra connections when pool is full
