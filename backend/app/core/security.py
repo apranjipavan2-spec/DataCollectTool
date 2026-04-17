@@ -1,9 +1,7 @@
 from datetime import datetime, timedelta
+import bcrypt as _bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from app.core.config import settings
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def create_access_token(data: dict) -> str:
@@ -13,33 +11,43 @@ def create_access_token(data: dict) -> str:
     return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
 
+def create_refresh_token(user_id: str) -> str:
+    """Long-lived signed JWT (30 days) used only to obtain a new access token."""
+    expire = datetime.utcnow() + timedelta(days=30)
+    payload = {"sub": user_id, "type": "refresh", "exp": expire}
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+
+
 def decode_token(token: str) -> dict:
     return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return _bcrypt.hashpw(password.encode(), _bcrypt.gensalt(12)).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    try:
+        return _bcrypt.checkpw(plain.encode(), hashed.encode())
+    except Exception:
+        return False
 
 
 # API Key helpers
 def hash_api_key(api_key: str) -> str:
     """Hash an API key for secure storage."""
-    return pwd_context.hash(api_key)
+    return hash_password(api_key)
 
 
 def verify_api_key(plain: str, hashed: str) -> bool:
     """Verify an API key against its hash."""
-    return pwd_context.verify(plain, hashed)
+    return verify_password(plain, hashed)
 
 
 # Legacy OTP helpers (kept for future 2FA)
 def hash_otp(otp: str) -> str:
-    return pwd_context.hash(otp)
+    return hash_password(otp)
 
 
 def verify_otp(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return verify_password(plain, hashed)

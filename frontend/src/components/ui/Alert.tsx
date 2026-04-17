@@ -34,7 +34,7 @@ const Alert: React.FC<AlertProps> = ({
       <div className="flex justify-between items-start">
         <div>
           {title && <h4 className={`font-semibold ${textColor[type]}`}>{title}</h4>}
-          <p className="text-sm mt-1 text-catalan-textSecondary">{message}</p>
+          <p className={`text-sm mt-1 ${textColor[type]} opacity-90`}>{message}</p>
         </div>
         {onClose && (
           <button

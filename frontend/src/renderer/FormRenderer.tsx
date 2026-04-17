@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { FormSchema, FormField } from '@/types/form'
-import { shouldShow, evalFormula } from '@/lib/formUtils'
+import { shouldShow, shouldShowSection, evalFormula, getAllFieldsInOrder } from '@/lib/formUtils'
 import { v4 as uuidv4 } from 'uuid'
 import { useLanguage, getLocalizedLabel } from '@/i18n/LanguageContext'
 
@@ -65,18 +65,31 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
     id: uuidv4(), formVersion: schema.version,
     values: {}, gpsOpen: null, gpsSubmit: null, status: 'draft', startedAt: new Date().toISOString(),
   })
-  const [page, setPage]       = useState(0)          // index into visibleFields
+  const [page, setPage]       = useState(0)
   const [errors, setErrors]   = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [syncStatus, setSyncStatus] = useState<'saved' | 'saving' | 'error'>('saved')
-  const saveTimer = useRef<ReturnType<typeof setTimeout>>()
+  const saveTimer  = useRef<ReturnType<typeof setTimeout>>()
+  const scrollRef  = useRef<HTMLDivElement>(null)
 
-  // Flatten all visible fields respecting skip logic
-  const allFields: FormField[] = schema.sections.flatMap(s =>
-    s.fields.filter(f => shouldShow(f, draft.values))
-  )
+  // Flatten visible fields — respects both section-level and field-level skip logic
+  const allFields: FormField[] = (() => {
+    const result: FormField[] = []
+    const traverse = (secs: typeof schema.sections) => {
+      for (const sec of secs) {
+        // Skip entire section if its condition says to hide it
+        if (!shouldShowSection(sec, draft.values)) continue
+        for (const f of sec.fields) {
+          if (shouldShow(f, draft.values)) result.push(f)
+        }
+        if (sec.subsections?.length) traverse(sec.subsections)
+      }
+    }
+    traverse(schema.sections)
+    return result
+  })()
 
-  // Auto-compute calculated fields on every change
+  // Auto-compute calculated fields in document order so later calcs can use earlier ones
   const valuesWithCalc = { ...draft.values }
   allFields.filter(f => f.type === 'calculated' && f.formula).forEach(f => {
     const result = evalFormula(f.formula!, valuesWithCalc)
@@ -125,6 +138,23 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
     setErrors(e => ({ ...e, [name]: '' }))
   }
 
+  // Scroll content area to top whenever the page changes
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'instant' })
+  }, [page])
+
+  // Keyboard: Enter/ArrowRight = Next, ArrowLeft = Back
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return
+      if (e.key === 'ArrowRight' || e.key === 'Enter') goNext()
+      if (e.key === 'ArrowLeft') goPrev()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  })
+
   const goNext = () => {
     if (!currentField) return
     const err = validate(currentField, draft.values[currentField.name])
@@ -133,6 +163,11 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
   }
 
   const goPrev = () => { if (page > 0) setPage(p => p - 1) }
+
+  const handleSaveExit = async () => {
+    try { await onSave({ ...draft, status: 'draft' }) } catch { }
+    onCancel?.()
+  }
 
   const handleSubmit = async () => {
     // Validate current field first
@@ -163,33 +198,53 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
   }
 
   return (
-    <div className="min-h-screen bg-catalan-bg flex flex-col font-sans max-w-[540px] mx-auto">
+    <div className="min-h-screen bg-catalan-bg flex flex-col font-sans">
 
       {/* ── Header ── */}
-      <div className="px-5 py-3.5 border-b border-catalan-border">
-        <div className="flex justify-between items-center mb-2.5">
-          <div className="flex items-center gap-2">
+      <div className="px-4 pt-3 pb-3 border-b border-catalan-border bg-catalan-surface sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto">
+          {/* Row 1: Back button + form title + save status */}
+          <div className="flex items-center gap-2 mb-2">
             {onCancel && (
-              <button onClick={onCancel} className="bg-transparent border-none text-catalan-primary text-lg cursor-pointer px-1.5 py-0.5 leading-none" title="Exit form">✕</button>
+              <button
+                onClick={handleSaveExit}
+                className="flex items-center gap-1 min-w-[44px] min-h-[44px] -ml-2 px-2 rounded-lg text-catalan-primary hover:bg-catalan-primary/10 transition-colors text-sm font-medium"
+                title="Save draft and go back"
+              >
+                ← <span className="hidden sm:inline">Save &amp; Exit</span>
+              </button>
             )}
-            <span className="text-catalan-textMuted text-[13px]">{page + 1} / {allFields.length}</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-catalan-text truncate">{schema.title}</div>
+              <div className="text-xs text-catalan-textMuted">
+                Question {page + 1} of {allFields.length}
+                {' · '}
+                {getAllFieldsInOrder(schema.sections).find(f => f.id === currentField.id) && (() => {
+                  const findSec = (secs: typeof schema.sections): string => {
+                    for (const s of secs) {
+                      if (s.fields.some(f => f.id === currentField.id)) return s.title
+                      if (s.subsections?.length) { const t = findSec(s.subsections); if (t) return t }
+                    }
+                    return ''
+                  }
+                  return findSec(schema.sections)
+                })()}
+              </div>
+            </div>
+            <span className={`text-xs flex-shrink-0 ${syncStatus === 'saved' ? 'text-catalan-success' : syncStatus === 'saving' ? 'text-catalan-warning' : 'text-catalan-error'}`}>
+              {syncStatus === 'saved' ? '● Saved' : syncStatus === 'saving' ? '●' : '⚠'}
+            </span>
           </div>
-          {/* Sync traffic light */}
-          <span className={`text-xs ${syncStatus === 'saved' ? 'text-catalan-success' : syncStatus === 'saving' ? 'text-catalan-warning' : 'text-catalan-error'}`}>
-            {syncStatus === 'saved' ? '● Saved' : syncStatus === 'saving' ? '● Saving…' : '● Save error'}
-          </span>
-        </div>
-        {/* Progress bar */}
-        <div className="bg-catalan-hover rounded h-1">
-          <div className="bg-catalan-primary rounded h-1 transition-[width] duration-200" style={{ width: `${progress}%` }} />
-        </div>
-        <div className="text-catalan-textMuted text-xs mt-1.5">
-          {schema.sections.find(s => s.fields.some(f => f.id === currentField.id))?.title}
+          {/* Progress bar */}
+          <div className="bg-catalan-hover rounded-full h-1.5">
+            <div className="bg-catalan-primary rounded-full h-1.5 transition-[width] duration-300" style={{ width: `${progress}%` }} />
+          </div>
         </div>
       </div>
 
       {/* ── Field ── */}
-      <div className="flex-1 px-5 py-7 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <div className="max-w-2xl mx-auto px-5 py-7 md:py-12">
         {localizedField.type === 'text' && (
           <TextField field={localizedField} value={draft.values[currentField.name] as string ?? ''} onChange={v => setValue(currentField.name, v)} />
         )}
@@ -226,35 +281,74 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
         {localizedField.type === 'note' && <NoteField field={localizedField} />}
         {localizedField.type === 'calculated' && (
           <div>
-            <div style={{ color: '#a6adc8', fontSize: 12, marginBottom: 6 }}>{localizedField.label}</div>
-            <div style={{ color: '#a6e3a1', fontSize: 28, fontWeight: 700, textAlign: 'center', padding: 20 }}>
-              {valuesWithCalc[currentField.name] ?? '—'}
+            {/* Question label */}
+            <h2 className="text-xl font-semibold text-catalan-text mb-1 leading-snug">{localizedField.label}</h2>
+            {localizedField.hint && <p className="text-sm text-catalan-textMuted mb-4">{localizedField.hint}</p>}
+
+            {/* Auto-calculated badge */}
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xs bg-catalan-primary/10 text-catalan-primary border border-catalan-primary/20 px-2.5 py-0.5 rounded-full font-medium">
+                ∑ Auto-calculated
+              </span>
+              <span className="text-xs text-catalan-textMuted">Updates as you fill in earlier answers</span>
             </div>
-            <div style={{ color: '#45475a', fontSize: 11, textAlign: 'center' }}>{currentField.formula}</div>
+
+            {/* Value display */}
+            <div className="bg-catalan-surface border-2 border-catalan-primary/30 rounded-2xl p-6 text-center">
+              {valuesWithCalc[currentField.name] != null && valuesWithCalc[currentField.name] !== '' ? (
+                <div className="text-4xl font-bold text-catalan-primary tracking-tight">
+                  {String(valuesWithCalc[currentField.name])}
+                </div>
+              ) : (
+                <div className="text-3xl text-catalan-textMuted/40 font-light">—</div>
+              )}
+              <div className="text-xs text-catalan-textMuted mt-3 font-mono opacity-60">
+                {currentField.formula}
+              </div>
+            </div>
+
+            <p className="text-xs text-catalan-textMuted text-center mt-3">
+              This value is computed automatically. Press <strong>Next</strong> to continue.
+            </p>
           </div>
         )}
 
         {errors[currentField.name] && (
-          <div style={{ color: '#f38ba8', fontSize: 13, marginTop: 10 }}>⚠ {errors[currentField.name]}</div>
+          <div className="text-catalan-error text-sm mt-3 flex items-center gap-1.5">
+            <span>⚠</span> {errors[currentField.name]}
+          </div>
         )}
+      </div>
       </div>
 
       {/* ── Navigation ── */}
-      <div className="px-5 py-4 border-t border-catalan-border flex gap-2.5">
-        {page > 0 && (
-          <button onClick={goPrev} className="flex-1 bg-catalan-hover border border-catalan-border text-catalan-text rounded-[10px] py-3.5 text-[15px] cursor-pointer hover:bg-catalan-surface transition-colors">
-            ← Back
-          </button>
-        )}
-        {isLast ? (
-          <button onClick={handleSubmit} disabled={submitting} className={`flex-[2] bg-catalan-success border-none text-catalan-bg rounded-[10px] py-3.5 text-base font-bold ${submitting ? 'cursor-wait opacity-70' : 'cursor-pointer hover:brightness-110'} transition-all`}>
-            {submitting ? 'Submitting…' : 'Submit ✓'}
-          </button>
-        ) : (
-          <button onClick={goNext} className="flex-[2] bg-catalan-primary border-none text-white rounded-[10px] py-3.5 text-[15px] font-semibold cursor-pointer hover:brightness-110 transition-all">
-            Next →
-          </button>
-        )}
+      <div className="border-t border-catalan-border bg-catalan-surface">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex gap-2.5">
+          {page > 0 ? (
+            <button
+              onClick={goPrev}
+              className="flex-1 bg-catalan-hover border border-catalan-border text-catalan-text rounded-xl py-4 text-[15px] font-medium cursor-pointer hover:bg-catalan-surface active:scale-[0.98] transition-all min-h-[56px]"
+            >
+              ← Back
+            </button>
+          ) : null}
+          {isLast ? (
+            <button
+              onClick={handleSubmit}
+              disabled={submitting}
+              className={`flex-[2] bg-catalan-success text-catalan-bg rounded-xl py-4 text-base font-bold min-h-[56px] active:scale-[0.98] transition-all ${submitting ? 'cursor-wait opacity-70' : 'cursor-pointer hover:brightness-110'}`}
+            >
+              {submitting ? 'Submitting…' : 'Submit ✓'}
+            </button>
+          ) : (
+            <button
+              onClick={goNext}
+              className="flex-[2] bg-catalan-primary text-white rounded-xl py-4 text-[15px] font-semibold cursor-pointer hover:brightness-110 active:scale-[0.98] transition-all min-h-[56px]"
+            >
+              Next →
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

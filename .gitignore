@@ -24,3 +24,12 @@ dist/
 # Misc
 *.log
 .pytest_cache/
+
+# Sensitive — never commit real credentials
+credentials.csv
+export_credentials.py
+create_forms.py
+e2e_test.py
+
+# Claude Code local settings
+.claude/settings.local.json

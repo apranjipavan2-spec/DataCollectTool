@@ -26,12 +26,22 @@ export function newSchema(title = 'Untitled Form'): FormSchema {
   return { title, sections: [newSection()], version: 1 }
 }
 
-/** Evaluate skip logic — returns true if the field SHOULD be shown. */
-export function shouldShow(field: FormField, values: Record<string, unknown>): boolean {
-  if (!field.skipLogic) return true
-  const { logic, conditions, action } = field.skipLogic
+/** Core skip-logic evaluator — returns true if the item SHOULD be shown. */
+function evalSkipLogic(skipLogic: SkipLogic | undefined, values: Record<string, unknown>): boolean {
+  if (!skipLogic) return true
+  const { logic, conditions, action } = skipLogic
   const match = evaluateGroup({ logic, conditions }, values)
   return action === 'show' ? match : !match
+}
+
+/** Evaluate skip logic — returns true if the field SHOULD be shown. */
+export function shouldShow(field: FormField, values: Record<string, unknown>): boolean {
+  return evalSkipLogic(field.skipLogic, values)
+}
+
+/** Evaluate section-level skip logic — returns true if the section SHOULD be shown. */
+export function shouldShowSection(section: FormSection, values: Record<string, unknown>): boolean {
+  return evalSkipLogic(section.skipLogic, values)
 }
 
 /** Recursively evaluate a condition group (AND/OR of conditions and nested groups). */
@@ -59,16 +69,73 @@ function evaluateCondition(c: SkipCondition, values: Record<string, unknown>): b
   }
 }
 
-/** Evaluate a simple arithmetic formula string: "farm_income + wage_income" */
-export function evalFormula(formula: string, values: Record<string, unknown>): number | null {
+/**
+ * Evaluate a formula string against field values.
+ * Supports: arithmetic, string comparisons, if(cond, then, else),
+ * sum(), round(), abs(), max(), min().
+ * Returns a string or number (or null on error).
+ */
+export function evalFormula(formula: string, values: Record<string, unknown>): string | number | null {
   try {
-    // Replace variable names with their numeric values
-    const expr = formula.replace(/[a-zA-Z_][a-zA-Z0-9_]*/g, (v) => String(Number(values[v] ?? 0)))
+    // Build scope: field values + built-in helpers
+    const scope: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(values)) {
+      // Keep strings as strings; coerce empty/null to 0 for numeric ops
+      scope[k] = v ?? ''
+    }
+    // Helper functions available in formulas
+    scope['if']    = (cond: unknown, t: unknown, f: unknown) => cond ? t : f
+    scope['sum']   = (...a: unknown[]) => a.reduce((acc: number, x) => acc + Number(x), 0)
+    scope['round'] = (n: unknown, d = 0) => Number(Number(n).toFixed(Number(d)))
+    scope['abs']   = (n: unknown) => Math.abs(Number(n))
+    scope['max']   = (...a: unknown[]) => Math.max(...a.map(Number))
+    scope['min']   = (...a: unknown[]) => Math.min(...a.map(Number))
+    scope['concat']   = (...a: unknown[]) => a.join('')
+    scope['len']      = (s: unknown) => String(s ?? '').length
+    scope['contains'] = (hay: unknown, needle: unknown) =>
+      String(hay ?? '').toLowerCase().includes(String(needle ?? '').toLowerCase())
+    scope['num']   = (s: unknown) => Number(s)
+    scope['text']  = (n: unknown) => String(n ?? '')
+
+    const keys = Object.keys(scope)
+    const vals = keys.map(k => scope[k])
     // eslint-disable-next-line no-new-func
-    return Function(`"use strict"; return (${expr})`)() as number
+    const result = new Function(...keys, `"use strict"; return (${formula})`)(...vals)
+    if (result === null || result === undefined) return null
+    // Trim trailing decimals for clean display
+    if (typeof result === 'number' && !isNaN(result)) {
+      return parseFloat(result.toFixed(6))
+    }
+    return result as string | number
   } catch {
     return null
   }
+}
+
+/** Recursively map a section by id (handles subsections). */
+export function mapSectionById(
+  sections: FormSection[],
+  sectionId: string,
+  updater: (sec: FormSection) => FormSection,
+): FormSection[] {
+  return sections.map(sec => {
+    if (sec.id === sectionId) return updater(sec)
+    if (sec.subsections?.length) return { ...sec, subsections: mapSectionById(sec.subsections, sectionId, updater) }
+    return sec
+  })
+}
+
+/** Return all fields in document order, traversing subsections depth-first. */
+export function getAllFieldsInOrder(sections: FormSection[]): FormField[] {
+  const result: FormField[] = []
+  const traverse = (secs: FormSection[]) => {
+    for (const sec of secs) {
+      result.push(...sec.fields)
+      if (sec.subsections?.length) traverse(sec.subsections)
+    }
+  }
+  traverse(sections)
+  return result
 }
 
 /** Deep update a field inside sections by id */
@@ -80,11 +147,9 @@ export function updateFieldInSchema(
 ): FormSchema {
   return {
     ...schema,
-    sections: schema.sections.map(sec =>
-      sec.id !== sectionId ? sec : {
-        ...sec,
-        fields: sec.fields.map(f => f.id !== fieldId ? f : { ...f, ...patch }),
-      }
-    ),
+    sections: mapSectionById(schema.sections, sectionId, sec => ({
+      ...sec,
+      fields: sec.fields.map(f => f.id !== fieldId ? f : { ...f, ...patch }),
+    })),
   }
 }

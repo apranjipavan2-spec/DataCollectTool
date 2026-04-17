@@ -12,9 +12,23 @@
 /// <reference lib="WebWorker" />
 /// <reference types="vite-plugin-pwa/info" />
 import { precacheAndRoute } from 'workbox-precaching'
+import { registerRoute } from 'workbox-routing'
+import { CacheFirst } from 'workbox-strategies'
+import { ExpirationPlugin } from 'workbox-expiration'
 
 // ── Precache app shell (populated by vite-plugin-pwa at build time) ──────────
 precacheAndRoute(self.__WB_MANIFEST)
+
+// ── Map tile caching (cache-first, max 2000 tiles, 30-day TTL) ───────────────
+registerRoute(
+  ({ url }) => url.hostname === 'tile.openstreetmap.org',
+  new CacheFirst({
+    cacheName: 'fieldpulse-map-tiles-v1',
+    plugins: [
+      new ExpirationPlugin({ maxEntries: 2000, maxAgeSeconds: 30 * 24 * 60 * 60 }),
+    ],
+  })
+)
 
 // ── Background Sync ───────────────────────────────────────────────────────────
 // When the device regains network the browser fires a 'sync' event even if

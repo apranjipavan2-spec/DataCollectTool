@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Any, Optional
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import require_enumerator, require_supervisor
+from app.core.rate_limit import limiter
 from app.models.submission import Submission
 from app.models.submission_history import SubmissionHistory
 from app.models.form import Form
@@ -42,6 +43,7 @@ def list_submissions(
     status: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    q: Optional[str] = None,          # full-text search: enumerator name or data_json
     page: int = 1,
     page_size: int = 50,
     user=Depends(require_supervisor),
@@ -49,22 +51,33 @@ def list_submissions(
 ):
     try:
         page_size = min(page_size, 200)  # cap at 200
-        q = db.query(Submission, User.name).outerjoin(
+        query = db.query(Submission, User.name).outerjoin(
             User, Submission.enumerator_id == User.id
         ).filter(Submission.tenant_id == user["tenant_id"])
         if form_id:
-            q = q.filter(Submission.form_id == form_id)
+            query = query.filter(Submission.form_id == form_id)
         if enumerator_id:
-            q = q.filter(Submission.enumerator_id == enumerator_id)
+            query = query.filter(Submission.enumerator_id == enumerator_id)
         if status:
-            q = q.filter(Submission.status == status)
+            query = query.filter(Submission.status == status)
         if date_from:
-            q = q.filter(Submission.server_received_at >= datetime.fromisoformat(date_from))
+            query = query.filter(Submission.server_received_at >= datetime.fromisoformat(date_from))
         if date_to:
             end = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
-            q = q.filter(Submission.server_received_at <= end)
-        total = q.count()
-        rows = q.order_by(Submission.server_received_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+            query = query.filter(Submission.server_received_at <= end)
+        if q:
+            # Case-insensitive search: enumerator name/phone OR data_json cast to text
+            from sqlalchemy import or_, func, Text
+            term = f"%{q}%"
+            query = query.filter(
+                or_(
+                    User.name.ilike(term),
+                    User.phone.ilike(term),
+                    func.cast(Submission.data_json, Text).ilike(term),
+                )
+            )
+        total = query.count()
+        rows = query.order_by(Submission.server_received_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
         return {
             "items": [
                 {
@@ -89,7 +102,8 @@ def list_submissions(
 
 
 @router.post("/", status_code=201)
-def create_submission(body: SubmissionCreate, user=Depends(require_enumerator), db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def create_submission(request: Request, body: SubmissionCreate, user=Depends(require_enumerator), db: Session = Depends(get_db)):
     try:
         sub = Submission(
             tenant_id=user["tenant_id"],
@@ -213,7 +227,7 @@ def update_submission(submission_id: str, body: SubmissionUpdate, user=Depends(r
                     # Notify all supervisors / admins in the tenant who have email
                     supervisors = db.query(User).filter(
                         User.tenant_id == user["tenant_id"],
-                        User.role.in_(["master_admin", "org_admin", "supervisor"]),
+                        User.role.in_(["org_admin", "supervisor"]),
                         User.is_active == True,
                     ).all()
                     for sup in supervisors:
@@ -251,3 +265,132 @@ def update_submission(submission_id: str, body: SubmissionUpdate, user=Depends(r
         db.rollback()
         logger.exception("Error updating submission %s", submission_id)
         raise HTTPException(status_code=500, detail=f"Failed to update submission: {type(e).__name__}: {str(e)}")
+
+
+@router.get("/potential-duplicates")
+def list_potential_duplicates(
+    form_id: Optional[str] = None,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Return submission IDs that appear to be duplicates.
+
+    A 'potential duplicate' is any submission where the same enumerator
+    submitted the same form more than once on the same calendar day
+    (local_created_at date).  Returns up to 200 groups.
+    """
+    from sqlalchemy import func, cast, Date, text
+
+    q = (
+        db.query(
+            Submission.enumerator_id,
+            Submission.form_id,
+            cast(Submission.local_created_at, Date).label("day"),
+            func.count(Submission.id).label("cnt"),
+            func.array_agg(Submission.id).label("ids"),
+        )
+        .filter(Submission.tenant_id == user["tenant_id"])
+    )
+    if form_id:
+        q = q.filter(Submission.form_id == form_id)
+
+    q = (
+        q.group_by(
+            Submission.enumerator_id,
+            Submission.form_id,
+            cast(Submission.local_created_at, Date),
+        )
+        .having(func.count(Submission.id) > 1)
+        .order_by(func.count(Submission.id).desc())
+        .limit(200)
+    )
+
+    rows = q.all()
+
+    # Enrich with names
+    user_map = {
+        str(u.id): u.name or u.phone
+        for u in db.query(User).filter(User.tenant_id == user["tenant_id"]).all()
+    }
+    form_map = {
+        str(f.id): f.title
+        for f in db.query(Form).filter(Form.tenant_id == user["tenant_id"]).all()
+    }
+
+    return [
+        {
+            "enumerator_id": str(row.enumerator_id) if row.enumerator_id else None,
+            "enumerator_name": user_map.get(str(row.enumerator_id), "Unknown"),
+            "form_id": str(row.form_id),
+            "form_title": form_map.get(str(row.form_id), "Unknown"),
+            "day": str(row.day),
+            "count": row.cnt,
+            "submission_ids": [str(sid) for sid in (row.ids or [])],
+        }
+        for row in rows
+    ]
+
+
+class BulkUpdateBody(BaseModel):
+    ids: list[str]
+    status: str          # approved | rejected | flagged | synced
+    flag_note: Optional[str] = None
+
+
+@router.post("/bulk")
+def bulk_update_submissions(
+    body: BulkUpdateBody,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Bulk approve / reject / flag a set of submissions by ID.
+
+    Returns {"updated": int, "skipped": int} — skipped means IDs not owned by
+    this tenant or already in the target status.
+    """
+    if body.status not in VALID_STATUSES:
+        raise HTTPException(status_code=422, detail=f"Invalid status. Must be one of: {', '.join(sorted(VALID_STATUSES))}")
+    if not body.ids:
+        raise HTTPException(status_code=422, detail="ids list must not be empty")
+    if len(body.ids) > 200:
+        raise HTTPException(status_code=422, detail="Maximum 200 IDs per bulk operation")
+
+    subs = db.query(Submission).filter(
+        Submission.id.in_(body.ids),
+        Submission.tenant_id == user["tenant_id"],
+    ).all()
+
+    reviewer = user.get("name") or user.get("sub", "reviewer")
+    updated = 0
+    history_entries = []
+
+    for sub in subs:
+        old_status = sub.status
+        if old_status == body.status:
+            continue  # already in target state
+
+        sub.status = body.status
+        if body.status == "approved":
+            sub.flag_note = f"Approved by {reviewer}"
+        elif body.status == "rejected":
+            reason = body.flag_note or "No reason provided"
+            sub.flag_note = f"Rejected by {reviewer}: {reason}"
+        elif body.flag_note is not None:
+            sub.flag_note = body.flag_note
+
+        history_entries.append(SubmissionHistory(
+            submission_id=sub.id,
+            changed_by=user.get("sub"),
+            action=body.status,
+            old_data={"status": old_status},
+            new_data={"status": sub.status, "flag_note": sub.flag_note},
+            note=f"Bulk action by {reviewer}",
+        ))
+        updated += 1
+
+    db.add_all(history_entries)
+    db.commit()
+
+    skipped = len(body.ids) - len(subs)  # IDs that didn't belong to this tenant
+    logger.info("Bulk %s: updated=%d skipped=%d by %s", body.status, updated, skipped, reviewer)
+    return {"updated": updated, "skipped": skipped}

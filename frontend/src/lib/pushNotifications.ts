@@ -2,12 +2,24 @@
  * Web Push Notification helpers.
  *
  * Call `subscribeToPush()` after login to register the browser for push
- * notifications. The VAPID public key must be set in the environment as
- * VITE_VAPID_PUBLIC_KEY.
+ * notifications. The VAPID public key is loaded from:
+ *   1. VITE_VAPID_PUBLIC_KEY build-time env var (fastest — no extra request)
+ *   2. GET /api/v1/notifications/vapid-public-key  (runtime fallback — works
+ *      without a frontend rebuild after VAPID keys are configured)
  */
 import api from '@/lib/api'
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined
+const VAPID_PUBLIC_KEY_ENV = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined
+
+async function getVapidPublicKey(): Promise<string | null> {
+  if (VAPID_PUBLIC_KEY_ENV) return VAPID_PUBLIC_KEY_ENV
+  try {
+    const { data } = await api.get<{ public_key: string }>('/notifications/vapid-public-key')
+    return data.public_key || null
+  } catch {
+    return null
+  }
+}
 
 /**
  * Convert a URL-safe base64 string to a Uint8Array (for applicationServerKey).
@@ -32,13 +44,15 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
  */
 export async function subscribeToPush(): Promise<boolean> {
   try {
-    // Guard: need VAPID key, service worker support, and notification API
-    if (!VAPID_PUBLIC_KEY) {
-      console.warn('[Push] VITE_VAPID_PUBLIC_KEY not set — skipping push subscription')
-      return false
-    }
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       console.warn('[Push] Push notifications not supported in this browser')
+      return false
+    }
+
+    // Load VAPID key — from env var or backend API
+    const VAPID_PUBLIC_KEY = await getVapidPublicKey()
+    if (!VAPID_PUBLIC_KEY) {
+      console.warn('[Push] VAPID public key not available — skipping push subscription')
       return false
     }
 

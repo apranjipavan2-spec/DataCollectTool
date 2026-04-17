@@ -8,6 +8,7 @@ Tenant management endpoints.
 - GET /tenants/{id}/stats — Admin: usage statistics
 """
 import uuid as _uuid
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -27,6 +28,19 @@ router = APIRouter()
 
 require_master = require_role("master_admin")
 
+# ── Plan limits ───────────────────────────────────────────────────────────────
+# -1 = unlimited
+
+PLAN_LIMITS: dict[str, dict] = {
+    "free":         {"submissions_per_month": 500,   "users": 5,   "forms": 3},
+    "starter":      {"submissions_per_month": 5_000, "users": 25,  "forms": 20},
+    "professional": {"submissions_per_month": 50_000,"users": 100, "forms": 100},
+    "enterprise":   {"submissions_per_month": -1,    "users": -1,  "forms": -1},
+}
+
+def _limits_for(plan_tier: str) -> dict:
+    return PLAN_LIMITS.get(plan_tier, PLAN_LIMITS["free"])
+
 
 # ── Branding (public-ish, needs auth) ─────────────────────────────────────
 
@@ -43,6 +57,45 @@ def get_branding(user=Depends(get_current_user), db: Session = Depends(get_db)):
         "primary_color": tenant.primary_color or "#2563EB",
         "app_name": tenant.app_name if hasattr(tenant, "app_name") and tenant.app_name else tenant.name,
         "plan_tier": tenant.plan_tier,
+    }
+
+
+# ── Usage (org_admin / supervisor — own tenant) ───────────────────────────
+
+@router.get("/me/usage")
+def get_my_usage(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Return current-month usage vs plan limits for the caller's tenant."""
+    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    limits = _limits_for(tenant.plan_tier)
+
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    subs_this_month = db.query(func.count(Submission.id)).filter(
+        Submission.tenant_id == user["tenant_id"],
+        Submission.server_received_at >= month_start,
+    ).scalar() or 0
+
+    users_count = db.query(func.count(User.id)).filter(
+        User.tenant_id == user["tenant_id"],
+        User.is_active == True,
+    ).scalar() or 0
+
+    forms_count = db.query(func.count(Form.id)).filter(
+        Form.tenant_id == user["tenant_id"],
+    ).scalar() or 0
+
+    return {
+        "plan_tier": tenant.plan_tier,
+        "limits": limits,
+        "usage": {
+            "submissions_this_month": subs_this_month,
+            "users": users_count,
+            "forms": forms_count,
+        },
     }
 
 
@@ -154,7 +207,7 @@ def update_tenant(
     if user["role"] not in ("master_admin", "org_admin"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
-    # Org admins can only update their own tenant
+    # Org admins can only update their own tenant; master_admin can update any
     if user["role"] == "org_admin" and str(user["tenant_id"]) != tenant_id:
         raise HTTPException(status_code=403, detail="Cannot update another tenant")
 

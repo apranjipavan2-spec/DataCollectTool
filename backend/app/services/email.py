@@ -118,6 +118,100 @@ def send_flagged_submission_email(
     return send_email(to, f"Submission Flagged: {form_title}", html)
 
 
+def send_daily_digest_email(
+    to: str,
+    recipient_name: str,
+    org_name: str,
+    date_label: str,           # e.g. "April 15, 2026"
+    total_yesterday: int,
+    total_alltime: int,
+    flagged_open: int,
+    top_enumerators: list,     # [{"name": str, "count": int}, ...]
+    form_breakdown: list,      # [{"title": str, "count": int}, ...]
+) -> bool:
+    """Daily digest email for supervisors / admins."""
+    url = f"{settings.APP_URL}/"
+
+    top_enum_rows = "".join(
+        f'<tr><td style="padding:6px 0;color:#cdd6f4;">{e["name"]}</td>'
+        f'<td style="padding:6px 0;text-align:right;font-weight:600;color:#89b4fa;">{e["count"]}</td></tr>'
+        for e in top_enumerators[:5]
+    ) or '<tr><td colspan="2" style="padding:8px 0;color:#6c7086;font-style:italic;">No submissions yesterday</td></tr>'
+
+    form_rows = "".join(
+        f'<tr><td style="padding:6px 0;color:#cdd6f4;">{f["title"]}</td>'
+        f'<td style="padding:6px 0;text-align:right;font-weight:600;color:#89b4fa;">{f["count"]}</td></tr>'
+        for f in form_breakdown[:8]
+    ) or '<tr><td colspan="2" style="padding:8px 0;color:#6c7086;font-style:italic;">No activity</td></tr>'
+
+    flagged_badge = (
+        f'<span style="background:#f38ba8;color:#1e1e2e;padding:2px 10px;border-radius:99px;'
+        f'font-size:13px;font-weight:700;">{flagged_open} flagged</span>'
+        if flagged_open else
+        '<span style="background:#a6e3a1;color:#1e1e2e;padding:2px 10px;border-radius:99px;'
+        'font-size:13px;font-weight:700;">All clear</span>'
+    )
+
+    html = f"""
+    <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;
+                background:#1e1e2e;color:#cdd6f4;padding:28px;border-radius:12px;">
+      <div style="margin-bottom:20px;">
+        <span style="font-size:22px;font-weight:700;color:#cba6f7;">FieldPulse</span>
+        <span style="font-size:13px;color:#6c7086;margin-left:8px;">Daily Digest</span>
+      </div>
+
+      <h2 style="margin:0 0 4px;font-size:18px;color:#cdd6f4;">Hi {recipient_name},</h2>
+      <p style="margin:0 0 20px;color:#6c7086;font-size:14px;">
+        Here's what happened in <strong style="color:#cdd6f4;">{org_name}</strong> on {date_label}.
+      </p>
+
+      <!-- KPI row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:24px;">
+        <div style="background:#313244;padding:16px;border-radius:8px;text-align:center;">
+          <div style="font-size:28px;font-weight:700;color:#89b4fa;">{total_yesterday}</div>
+          <div style="font-size:11px;color:#6c7086;margin-top:2px;">Yesterday</div>
+        </div>
+        <div style="background:#313244;padding:16px;border-radius:8px;text-align:center;">
+          <div style="font-size:28px;font-weight:700;color:#a6e3a1;">{total_alltime}</div>
+          <div style="font-size:11px;color:#6c7086;margin-top:2px;">All-time</div>
+        </div>
+        <div style="background:#313244;padding:16px;border-radius:8px;text-align:center;">
+          {flagged_badge}
+          <div style="font-size:11px;color:#6c7086;margin-top:6px;">Review queue</div>
+        </div>
+      </div>
+
+      <!-- Top enumerators -->
+      <div style="background:#313244;padding:16px;border-radius:8px;margin-bottom:12px;">
+        <div style="font-size:13px;font-weight:600;color:#cba6f7;margin-bottom:10px;">Top Enumerators (yesterday)</div>
+        <table style="width:100%;border-collapse:collapse;">
+          {top_enum_rows}
+        </table>
+      </div>
+
+      <!-- Form breakdown -->
+      <div style="background:#313244;padding:16px;border-radius:8px;margin-bottom:24px;">
+        <div style="font-size:13px;font-weight:600;color:#cba6f7;margin-bottom:10px;">By Form (yesterday)</div>
+        <table style="width:100%;border-collapse:collapse;">
+          {form_rows}
+        </table>
+      </div>
+
+      <a href="{url}"
+         style="display:block;background:#89b4fa;color:#1e1e2e;text-align:center;
+                padding:12px;border-radius:8px;text-decoration:none;font-weight:700;
+                font-size:14px;">
+        Open Dashboard →
+      </a>
+
+      <p style="margin:20px 0 0;font-size:11px;color:#45475a;text-align:center;">
+        FieldPulse · You're receiving this because you're an admin or supervisor.
+      </p>
+    </div>
+    """
+    return send_email(to, f"FieldPulse Daily Digest — {date_label}", html)
+
+
 def send_assignment_email(to: str, enumerator_name: str, form_title: str) -> bool:
     """Notify an enumerator that a new form has been assigned to them."""
     url = f"{settings.APP_URL}/collect"

@@ -1,16 +1,56 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import api from '@/lib/api'
+import api, { getStoredUser } from '@/lib/api'
 import type { FormSchema } from '@/types/form'
 import FormRenderer, { type SubmissionDraft } from '@/renderer/FormRenderer'
 import { getStorage } from '@/storage'
 import { v4 as uuidv4 } from 'uuid'
 import { useLanguage, LANGUAGE_OPTIONS } from '@/i18n/LanguageContext'
 import { compressImage } from '@/utils/imageCompress'
-import { Button, Card, Alert } from '@/components/ui'
+import { Button } from '@/components/ui'
+import Sidebar from '@/components/Sidebar'
+import { getNavItems } from '@/lib/navigation'
 
-type Screen = 'list' | 'drafts' | 'collecting' | 'submitted'
+// ── Tile pre-cache helpers ─────────────────────────────────────────────────
+
+function latLngToTile(lat: number, lng: number, zoom: number): [number, number] {
+  const n = Math.pow(2, zoom)
+  const x = Math.floor((lng + 180) / 360 * n)
+  const latRad = lat * Math.PI / 180
+  const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n)
+  return [x, y]
+}
+
+function computeTileUrls(lat: number, lng: number, radiusKm: number, zoomLevels: number[]): string[] {
+  // 1 degree lat ≈ 111km, 1 degree lng ≈ 111km * cos(lat)
+  const deltaLat = radiusKm / 111
+  const deltaLng = radiusKm / (111 * Math.cos(lat * Math.PI / 180))
+  const urls: string[] = []
+
+  for (const zoom of zoomLevels) {
+    const [x1, y1] = latLngToTile(lat + deltaLat, lng - deltaLng, zoom)
+    const [x2, y2] = latLngToTile(lat - deltaLat, lng + deltaLng, zoom)
+    const maxTile = Math.pow(2, zoom) - 1
+    for (let x = Math.max(0, x1); x <= Math.min(maxTile, x2); x++) {
+      for (let y = Math.max(0, y1); y <= Math.min(maxTile, y2); y++) {
+        urls.push(`https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`)
+      }
+    }
+  }
+  return urls
+}
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+type Screen = 'list' | 'drafts' | 'collecting' | 'submitted' | 'history'
 
 interface FormMeta { id: string; title: string; version: number }
+
+interface DraftEntry {
+  id: string
+  formId: string
+  formTitle: string
+  updatedAt: string
+}
 
 export default function FieldApp() {
   const [screen, setScreen] = useState<Screen>('list')
@@ -19,10 +59,23 @@ export default function FieldApp() {
   const [outboxCount, setOutboxCount] = useState(0)
   const [mediaQueueCount, setMediaQueueCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const [schedules, setSchedules] = useState<any[]>([])
+  const [myStats, setMyStats] = useState<{ today: number; total: number } | null>(null)
+  const [cachingTiles, setCachingTiles] = useState(false)
+  const [tilesCacheMsg, setTilesCacheMsg] = useState('')
+  const [drafts, setDrafts] = useState<DraftEntry[]>([])
+  const [loadingDrafts, setLoadingDrafts] = useState(false)
+  const [failedMediaCount, setFailedMediaCount] = useState(0)
+  const [retryingMedia, setRetryingMedia] = useState(false)
+  const [myHistory, setMyHistory] = useState<any[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+  const [lowStorage, setLowStorage] = useState(false)
+  const [resumingDraft, setResumingDraft] = useState<SubmissionDraft | null>(null)
   const syncRef = useRef<() => Promise<void>>()
+  const loadFormsRef = useRef<() => Promise<void>>()
   const { language, setLanguage } = useLanguage()
 
   // ── Sync to server ─────────────────────────────────────────
@@ -110,6 +163,7 @@ export default function FieldApp() {
     if (mediaUploaded > 0) parts.push(`${mediaUploaded} photo(s) uploaded`)
     if (mediaFailed > 0) parts.push(`${mediaFailed} photo(s) failed`)
 
+    setFailedMediaCount(mediaFailed)
     setSyncMsg(parts.length > 0 ? `✓ ${parts.join(', ')}` : '')
     setTimeout(() => setSyncMsg(''), 4000)
 
@@ -119,6 +173,79 @@ export default function FieldApp() {
   }, [])
 
   useEffect(() => { syncRef.current = syncToServer }, [syncToServer])
+
+  // ── Load drafts from local storage ─────────────────────────────────────
+  const loadDrafts = useCallback(async () => {
+    setLoadingDrafts(true)
+    try {
+      const store = await getStorage()
+      const cached = await store.listFormCache()
+      const allDrafts: DraftEntry[] = []
+      for (const form of cached) {
+        const subs = await store.listSubmissions(form.id, 'draft')
+        for (const s of subs) {
+          allDrafts.push({ id: s.id, formId: form.id, formTitle: form.title, updatedAt: s.updatedAt })
+        }
+      }
+      allDrafts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      setDrafts(allDrafts)
+    } finally {
+      setLoadingDrafts(false)
+    }
+  }, [])
+
+  // ── Resume a draft ──────────────────────────────────────────────────────
+  const resumeDraft = async (draft: DraftEntry) => {
+    const store = await getStorage()
+    const record = await store.getSubmission(draft.id)
+    const cachedForm = await store.getFormCache(draft.formId)
+    if (!record || !cachedForm) { setSyncMsg('Draft data not found'); return }
+    const meta: FormMeta = { id: draft.formId, title: draft.formTitle, version: cachedForm.version }
+    setActiveForm({ meta, schema: JSON.parse(cachedForm.schema) as FormSchema })
+    // Restore saved draft values into FormRenderer
+    setResumingDraft({
+      id: record.id,
+      formVersion: record.formVersion,
+      values: record.data,
+      gpsOpen: record.gpsOpen ?? null,
+      gpsSubmit: null,
+      status: 'draft',
+      startedAt: record.createdAt,
+    })
+    setScreen('collecting')
+  }
+
+  // ── Delete a draft ──────────────────────────────────────────────────────
+  const deleteDraft = async (id: string) => {
+    const store = await getStorage()
+    await store.deleteSubmission(id)
+    setDrafts(prev => prev.filter(d => d.id !== id))
+  }
+
+  // ── Retry failed media ──────────────────────────────────────────────────
+  const retryFailedMedia = async () => {
+    setRetryingMedia(true)
+    const store = await getStorage()
+    const queue = await store.getMediaQueue()
+    for (const item of queue.filter(m => m.status === 'failed')) {
+      await store.updateMediaStatus(item.id, 'pending')
+    }
+    setFailedMediaCount(0)
+    setRetryingMedia(false)
+    syncToServer()
+  }
+
+  const loadHistory = async () => {
+    setLoadingHistory(true)
+    try {
+      const { data } = await api.get('/submissions/?page_size=50')
+      setMyHistory(data.items ?? data.submissions ?? [])
+    } catch {
+      setMyHistory([])
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
 
   // Auto-sync on reconnect
   useEffect(() => {
@@ -143,11 +270,28 @@ export default function FieldApp() {
       const store = await getStorage()
       const outbox = await store.getOutbox()
       const pendingMedia = await store.getMediaQueueCount()
+      const allMedia = await store.getMediaQueue()
       setOutboxCount(outbox.length)
       setMediaQueueCount(pendingMedia)
+      setFailedMediaCount(allMedia.filter(m => m.status === 'failed').length)
       if ((outbox.length > 0 || pendingMedia > 0) && navigator.onLine) syncToServer()
 
+      // Storage quota warning
+      try {
+        const info = await store.getStorageInfo()
+        const freeMB = (info.quotaBytes - info.usedBytes) / 1024 / 1024
+        setLowStorage(freeMB < 200)
+      } catch { }
+
       api.get('/schedules/').then(r => setSchedules(r.data)).catch(() => {})
+
+      // Enumerator stats
+      api.get('/submissions/?page_size=200').then(r => {
+        const items = r.data.items ?? r.data.submissions ?? []
+        const today = new Date().toISOString().slice(0, 10)
+        const todayCount = items.filter((s: any) => s.server_received_at?.slice(0, 10) === today).length
+        setMyStats({ today: todayCount, total: r.data.total ?? items.length })
+      }).catch(() => {})
 
       try {
         const { data } = await api.get<Array<{ id: string; title: string; version: number }>>('/forms/?status=active')
@@ -167,10 +311,56 @@ export default function FieldApp() {
         setForms(cached.map(c => ({ id: c.id, title: c.title, version: c.version })))
       } finally {
         setLoading(false)
+        setRefreshing(false)
       }
     }
+    loadFormsRef.current = loadForms
     loadForms()
   }, [syncToServer])
+
+  const handleRefreshForms = async () => {
+    if (isOffline) { setSyncMsg('Cannot refresh — offline'); return }
+    setRefreshing(true)
+    setSyncMsg('')
+    await loadFormsRef.current?.()
+    setSyncMsg('✓ Forms updated')
+    setTimeout(() => setSyncMsg(''), 3000)
+  }
+
+  // ── Offline tile pre-caching ───────────────────────────────────────────
+  const handleCacheTiles = async () => {
+    setCachingTiles(true)
+    setTilesCacheMsg('Getting location…')
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000, enableHighAccuracy: true })
+      )
+      const { latitude: lat, longitude: lng } = pos.coords
+      setTilesCacheMsg('Caching map tiles…')
+
+      const tilesToCache = computeTileUrls(lat, lng, 15, [12, 13, 14, 15])
+      const cache = await caches.open('fieldpulse-map-tiles-v1')
+      let done = 0
+
+      // Batch in groups of 10 to avoid overwhelming the browser
+      for (let i = 0; i < tilesToCache.length; i += 10) {
+        const batch = tilesToCache.slice(i, i + 10)
+        await Promise.allSettled(batch.map(url =>
+          fetch(url, { mode: 'no-cors' }).then(resp => cache.put(url, resp)).catch(() => {})
+        ))
+        done += batch.length
+        setTilesCacheMsg(`Caching tiles… ${done}/${tilesToCache.length}`)
+      }
+
+      setTilesCacheMsg(`✓ ${tilesToCache.length} tiles cached for offline use`)
+      setTimeout(() => setTilesCacheMsg(''), 4000)
+    } catch (err: any) {
+      setTilesCacheMsg(err?.code === 1 ? '⚠ Location permission denied' : '⚠ Could not cache tiles')
+      setTimeout(() => setTilesCacheMsg(''), 4000)
+    } finally {
+      setCachingTiles(false)
+    }
+  }
 
   const openForm = async (meta: FormMeta) => {
     try {
@@ -230,33 +420,146 @@ export default function FieldApp() {
     setScreen('submitted')
   }
 
+  const storedUser = getStoredUser()
+  const sidebarItems = getNavItems(storedUser?.role ?? '')
+
+  // Shared layout wrapper with sidebar
+  const WithSidebar = ({ children }: { children: React.ReactNode }) => (
+    <div className="flex h-screen bg-catalan-bg overflow-hidden">
+      <Sidebar items={sidebarItems} role={storedUser?.role} />
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">{children}</div>
+    </div>
+  )
+
+  // Shared sub-page wrapper
+  const SubPage = ({ title, onBack, children }: { title: string; onBack: () => void; children: React.ReactNode }) => (
+    <WithSidebar>
+      <div className="bg-catalan-surface border-b border-catalan-border sticky top-0 z-10">
+        <div className="px-4 sm:px-6 py-3 flex items-center gap-3">
+          <button
+            onClick={onBack}
+            className="flex items-center justify-center w-9 h-9 rounded-lg bg-catalan-hover text-catalan-textMuted hover:text-catalan-primary hover:bg-catalan-primary/10 transition-all flex-shrink-0"
+          >
+            &larr;
+          </button>
+          <h1 className="text-lg font-bold text-catalan-text">{title}</h1>
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <div className="px-4 sm:px-6 py-5">{children}</div>
+      </div>
+    </WithSidebar>
+  )
+
+  // History screen
+  if (screen === 'history') {
+    const statusColors: Record<string, string> = {
+      approved: 'text-catalan-success bg-catalan-success/10',
+      flagged:  'text-catalan-warning bg-catalan-warning/10',
+      rejected: 'text-catalan-error bg-catalan-error/10',
+      pending:  'text-catalan-info bg-catalan-info/10',
+    }
+    return (
+      <SubPage title="My Submissions" onBack={() => setScreen('list')}>
+        {loadingHistory ? (
+          <div className="text-center py-12 text-catalan-textMuted text-sm">Loading…</div>
+        ) : myHistory.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="text-5xl mb-4">📭</div>
+            <p className="text-catalan-textMuted">No submissions yet.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {myHistory.map((s: any) => (
+              <div key={s.id} className="bg-catalan-surface border border-catalan-border rounded-xl p-4">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-catalan-text text-sm truncate">
+                      {s.form_title ?? s.form_id ?? 'Unknown form'}
+                    </div>
+                    <div className="text-xs text-catalan-textMuted mt-0.5">
+                      {s.server_received_at
+                        ? new Date(s.server_received_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+                        : s.local_created_at?.slice(0, 10) ?? '—'}
+                    </div>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${statusColors[s.status] ?? 'text-catalan-textMuted bg-catalan-hover'}`}>
+                    {s.status ?? 'pending'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </SubPage>
+    )
+  }
+
+  // Drafts screen
+  if (screen === 'drafts') {
+    return (
+      <SubPage title="Saved Drafts" onBack={() => setScreen('list')}>
+        {loadingDrafts ? (
+          <div className="text-center py-12 text-catalan-textMuted text-sm">Loading drafts…</div>
+        ) : drafts.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="text-5xl mb-4">📝</div>
+            <p className="text-catalan-textMuted">No saved drafts.</p>
+            <p className="text-catalan-textMuted text-sm mt-1">Start filling a form and save it as a draft to continue later.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {drafts.map(draft => (
+              <div key={draft.id} className="bg-catalan-surface border border-catalan-border rounded-xl p-4 flex flex-col gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-catalan-text truncate">{draft.formTitle}</div>
+                  <div className="text-xs text-catalan-textMuted mt-0.5">
+                    Last edited {new Date(draft.updatedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => resumeDraft(draft)}
+                    className="flex-1 text-xs px-3 py-2 rounded-lg border border-catalan-primary/40 text-catalan-primary hover:bg-catalan-primary/10 transition-colors font-medium"
+                  >
+                    Resume
+                  </button>
+                  <button
+                    onClick={() => deleteDraft(draft.id)}
+                    className="text-xs px-3 py-2 rounded-lg border border-catalan-error/30 text-catalan-error hover:bg-catalan-error/10 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </SubPage>
+    )
+  }
+
   // Submitted confirmation screen
   if (screen === 'submitted') {
     return (
-      <div className="min-h-screen bg-catalan-bg flex flex-col items-center justify-center p-6">
-        <div className="text-center">
-          <div className="text-6xl mb-6">✅</div>
-          <h2 className="text-2xl font-bold text-catalan-success mb-3">Submitted!</h2>
-          <p className="text-catalan-textMuted mb-2">
-            {outboxCount > 0
-              ? `${outboxCount} submission(s) in outbox — keep app open to sync`
-              : 'Synced to server'}
-          </p>
-          {syncMsg && <p className="text-catalan-info text-sm mb-6">{syncMsg}</p>}
-          <div className="flex gap-3 justify-center flex-col sm:flex-row">
-            <Button onClick={() => setScreen('list')} size="lg">
-              Fill Another Form
-            </Button>
-            <Button
-              onClick={() => window.location.href = '/'}
-              variant="secondary"
-              size="lg"
-            >
-              Home
-            </Button>
+      <WithSidebar>
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center max-w-sm w-full">
+            <div className="text-6xl mb-6">✅</div>
+            <h2 className="text-2xl font-bold text-catalan-success mb-3">Submitted!</h2>
+            <p className="text-catalan-textMuted mb-2">
+              {outboxCount > 0
+                ? `${outboxCount} submission(s) in outbox — keep app open to sync`
+                : 'Synced to server'}
+            </p>
+            {syncMsg && <p className="text-catalan-info text-sm mb-6">{syncMsg}</p>}
+            <div className="flex gap-3 justify-center flex-col sm:flex-row mt-6">
+              <Button onClick={() => setScreen('list')} size="lg">Fill Another Form</Button>
+              <Button onClick={() => window.location.href = '/'} variant="secondary" size="lg">Home</Button>
+            </div>
           </div>
         </div>
-      </div>
+      </WithSidebar>
     )
   }
 
@@ -267,138 +570,262 @@ export default function FieldApp() {
         schema={activeForm.schema}
         onSave={handleSave}
         onSubmit={handleSubmit}
-        onCancel={() => { setScreen('list'); setActiveForm(null) }}
+        initialDraft={resumingDraft ?? undefined}
+        onCancel={() => { setScreen('list'); setActiveForm(null); setResumingDraft(null) }}
       />
     )
   }
 
-  // Form list screen
+  // ── Main form list screen ────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-catalan-bg flex flex-col max-w-2xl mx-auto">
-      {/* Header */}
-      <div className="bg-catalan-surface border-b border-catalan-border p-4 sticky top-0 z-10">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-3">
-            <a
-              href="/"
-              className="flex items-center justify-center w-8 h-8 rounded-lg bg-catalan-hover text-catalan-textMuted hover:text-catalan-primary hover:bg-catalan-primary/10 transition-all duration-200"
-              title="Back to Dashboard"
-            >
-              <span className="text-lg leading-none">&larr;</span>
-            </a>
-            <h1 className="text-2xl font-bold text-catalan-text">FieldPulse</h1>
-          </div>
-          <div className="flex gap-2 items-center">
-            {isOffline && (
-              <span className="text-xs text-catalan-warning bg-catalan-warning/10 px-2 py-1 rounded-full font-medium">
-                📡 Offline
-              </span>
-            )}
-          </div>
-        </div>
+    <WithSidebar>
+    <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-        {/* Language Toggle & Sync Status */}
-        <div className="flex justify-between items-center gap-4">
-          <div className="flex bg-catalan-hover rounded-full p-0.5 border border-catalan-border">
-            {LANGUAGE_OPTIONS.map(opt => (
+      {/* ── Top header ── */}
+      <div className="bg-catalan-surface border-b border-catalan-border sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          {/* Row 1: logo + nav actions */}
+          <div className="flex justify-between items-center py-3 gap-4">
+            <div className="flex items-center gap-3">
+              <div>
+                <h1 className="text-lg font-bold text-catalan-text leading-tight">FieldPulse</h1>
+                {myStats !== null && (
+                  <p className="text-xs text-catalan-textMuted hidden sm:block">
+                    {myStats.today} today · {myStats.total} total · {outboxCount} pending
+                  </p>
+                )}
+              </div>
+              {isOffline && (
+                <span className="text-xs text-catalan-warning bg-catalan-warning/10 px-2 py-1 rounded-full font-medium hidden sm:inline">
+                  📡 Offline
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {isOffline && (
+                <span className="text-xs text-catalan-warning bg-catalan-warning/10 px-2 py-1 rounded-full font-medium sm:hidden">
+                  📡
+                </span>
+              )}
+              {/* Always-visible action buttons */}
               <button
-                key={opt.code}
-                onClick={() => setLanguage(opt.code)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200 ${
-                  language === opt.code
-                    ? 'bg-catalan-primary text-catalan-bg shadow-sm'
-                    : 'text-catalan-textMuted hover:text-catalan-text'
-                }`}
+                onClick={() => { loadHistory(); setScreen('history') }}
+                className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-catalan-hover border border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50 transition-all"
+                title="My submissions"
               >
-                {opt.label}
+                <span>📋</span>
+                <span className="hidden sm:inline">History</span>
               </button>
-            ))}
+              <button
+                onClick={() => { loadDrafts(); setScreen('drafts') }}
+                className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-catalan-hover border border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50 transition-all"
+                title="Saved drafts"
+              >
+                <span>📝</span>
+                <span className="hidden sm:inline">Drafts</span>
+                {drafts.length > 0 && (
+                  <span className="bg-catalan-primary text-catalan-bg text-[10px] font-bold rounded-full px-1.5 leading-4">{drafts.length}</span>
+                )}
+              </button>
+              <button
+                onClick={handleRefreshForms}
+                disabled={refreshing || isOffline}
+                className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-catalan-hover border border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50 transition-all disabled:opacity-40"
+                title="Refresh forms"
+              >
+                <span>{refreshing ? '⏳' : '↻'}</span>
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+            </div>
           </div>
 
-          <div className="flex gap-3 items-center text-sm">
-            {(outboxCount > 0 || mediaQueueCount > 0) && (
-              <button
-                onClick={syncToServer}
-                className="text-catalan-warning bg-catalan-warning/10 px-3 py-1 rounded border border-catalan-warning/30 hover:bg-catalan-warning/20 transition-colors"
-              >
-                ↑ {outboxCount > 0 ? `${outboxCount}` : ''}{outboxCount > 0 && mediaQueueCount > 0 ? ' · ' : ''}{mediaQueueCount > 0 ? `${mediaQueueCount} 📷` : ''}
-              </button>
-            )}
-            {syncMsg && <span className="text-catalan-info text-xs">{syncMsg}</span>}
+          {/* Row 2: language + sync status */}
+          <div className="flex items-center justify-between gap-3 pb-3">
+            <div className="flex bg-catalan-hover rounded-full p-0.5 border border-catalan-border">
+              {LANGUAGE_OPTIONS.map(opt => (
+                <button
+                  key={opt.code}
+                  onClick={() => setLanguage(opt.code)}
+                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 ${
+                    language === opt.code
+                      ? 'bg-catalan-primary text-catalan-bg shadow-sm'
+                      : 'text-catalan-textMuted hover:text-catalan-text'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-2 items-center flex-wrap">
+              {(outboxCount > 0 || mediaQueueCount > 0) && (
+                <button
+                  onClick={syncToServer}
+                  className="text-catalan-warning bg-catalan-warning/10 px-3 py-1 rounded-full border border-catalan-warning/30 hover:bg-catalan-warning/20 transition-colors text-xs font-medium"
+                >
+                  ↑ Sync {outboxCount > 0 ? `${outboxCount}` : ''}{mediaQueueCount > 0 ? ` · ${mediaQueueCount} 📷` : ''}
+                </button>
+              )}
+              {failedMediaCount > 0 && (
+                <button
+                  onClick={retryFailedMedia}
+                  disabled={retryingMedia}
+                  className="text-catalan-error bg-catalan-error/10 px-3 py-1 rounded-full border border-catalan-error/30 hover:bg-catalan-error/20 transition-colors text-xs disabled:opacity-50"
+                >
+                  {retryingMedia ? '⏳' : `⚠ ${failedMediaCount} failed`}
+                </button>
+              )}
+              {syncMsg && <span className="text-catalan-info text-xs">{syncMsg}</span>}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {/* Schedules */}
-        {schedules.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-catalan-primary font-semibold mb-3">Your Schedules</h2>
-            <div className="space-y-3">
-              {schedules.filter(s => s.status === 'active' || s.status === 'upcoming').map((s: any) => (
-                <Card key={s.id}>
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="font-medium text-catalan-text mb-1">{s.form_title}</h3>
-                      <p className="text-xs text-catalan-textMuted">
-                        {s.location && <span>{s.location} · </span>}
-                        {s.start_date} → {s.end_date}
-                        {s.target_count > 0 && <span> · Target: {s.target_count}</span>}
-                      </p>
-                      {s.notes && <p className="text-xs text-catalan-textMuted italic mt-2">{s.notes}</p>}
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ml-3 ${
-                      s.status === 'active'
-                        ? 'bg-catalan-success/10 text-catalan-success'
-                        : 'bg-catalan-info/10 text-catalan-info'
-                    }`}>
-                      {s.status}
-                    </span>
-                  </div>
-                </Card>
-              ))}
-            </div>
+      {/* Low storage banner */}
+      {lowStorage && (
+        <div className="bg-catalan-warning/10 border-b border-catalan-warning/30 text-catalan-warning text-xs px-4 py-2.5 flex items-center gap-2">
+          <div className="max-w-5xl mx-auto w-full flex items-center gap-2">
+            <span>⚠️</span>
+            <span><strong>Low storage.</strong> Sync now and free space on your device.</span>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Forms */}
-        <div>
-          <h2 className="text-catalan-textMuted text-sm font-medium mb-4">Select a form to collect</h2>
+      {/* ── Main content ── */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5">
 
-          {loading && (
-            <div className="text-center py-12">
-              <div className="text-catalan-textMuted">Loading forms…</div>
-            </div>
-          )}
+          {/* Desktop 2-col: forms on left, sidebar on right */}
+          <div className="lg:grid lg:grid-cols-[1fr_280px] lg:gap-6">
 
-          {!loading && forms.length === 0 && (
-            <div className="text-center py-12">
-              <div className="text-5xl mb-4">📋</div>
-              <p className="text-catalan-textMuted">No active forms assigned to you.</p>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {forms.map(f => (
-              <button
-                key={f.id}
-                onClick={() => openForm(f)}
-                className="w-full p-4 bg-catalan-surface border border-catalan-border rounded-lg hover:border-catalan-primary hover:shadow-lg hover:shadow-catalan-primary/5 transition-all duration-200 text-left group"
-              >
-                <div className="flex justify-between items-center">
-                  <div className="flex-1">
-                    <div className="font-medium text-catalan-text group-hover:text-catalan-primary transition-colors">{f.title}</div>
-                    <div className="text-xs text-catalan-textMuted mt-1">v{f.version}</div>
+            {/* ── Left: Schedules + Forms ── */}
+            <div>
+              {/* Schedules */}
+              {schedules.length > 0 && (
+                <div className="mb-6">
+                  <h2 className="text-xs font-semibold text-catalan-textMuted uppercase tracking-wider mb-3">Your Schedules</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
+                    {schedules.filter(s => s.status === 'active' || s.status === 'upcoming').map((s: any) => (
+                      <div key={s.id} className="bg-catalan-surface border border-catalan-border rounded-xl p-4">
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-catalan-text text-sm mb-1 truncate">{s.form_title}</h3>
+                            <p className="text-xs text-catalan-textMuted">
+                              {s.location && <span>{s.location} · </span>}
+                              {s.start_date} → {s.end_date}
+                              {s.target_count > 0 && <span> · 🎯 {s.target_count}</span>}
+                            </p>
+                            {s.notes && <p className="text-xs text-catalan-textMuted italic mt-1 truncate">{s.notes}</p>}
+                          </div>
+                          <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-medium ${
+                            s.status === 'active' ? 'bg-catalan-success/10 text-catalan-success' : 'bg-catalan-info/10 text-catalan-info'
+                          }`}>{s.status}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <span className="text-catalan-primary text-xl ml-3 group-hover:translate-x-1 transition-transform duration-200">&rarr;</span>
                 </div>
-              </button>
-            ))}
+              )}
+
+              {/* Forms */}
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs font-semibold text-catalan-textMuted uppercase tracking-wider">
+                  {loading ? 'Loading forms…' : `Your Forms (${forms.length})`}
+                </h2>
+              </div>
+
+              {loading && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className="h-20 bg-catalan-surface border border-catalan-border rounded-xl animate-pulse" />
+                  ))}
+                </div>
+              )}
+
+              {!loading && forms.length === 0 && (
+                <div className="text-center py-16 bg-catalan-surface border border-catalan-border rounded-xl">
+                  <div className="text-5xl mb-4">📋</div>
+                  <p className="text-catalan-textMuted font-medium">No forms assigned yet</p>
+                  <p className="text-catalan-textMuted text-sm mt-1">Your supervisor will assign forms to you.</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {forms.map(f => (
+                  <button
+                    key={f.id}
+                    onClick={() => openForm(f)}
+                    className="w-full p-4 bg-catalan-surface border border-catalan-border rounded-xl hover:border-catalan-primary hover:bg-catalan-primary/5 active:scale-[0.99] transition-all duration-150 text-left group"
+                  >
+                    <div className="flex justify-between items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-catalan-text group-hover:text-catalan-primary transition-colors truncate text-sm">{f.title}</div>
+                        <div className="text-xs text-catalan-textMuted mt-0.5">Version {f.version}</div>
+                      </div>
+                      <span className="text-catalan-primary text-lg group-hover:translate-x-1 transition-transform duration-200 flex-shrink-0">&rarr;</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Right sidebar (desktop) / Bottom section (mobile) ── */}
+            <div className="mt-6 lg:mt-0 space-y-4">
+
+              {/* Stats */}
+              {myStats !== null && (
+                <div className="bg-catalan-surface border border-catalan-border rounded-xl p-4">
+                  <h3 className="text-xs font-semibold text-catalan-textMuted uppercase tracking-wider mb-3">Your Progress</h3>
+                  <div className="grid grid-cols-3 lg:grid-cols-1 gap-3">
+                    {[
+                      { label: 'Today', value: myStats.today, color: 'text-catalan-primary' },
+                      { label: 'All time', value: myStats.total, color: 'text-catalan-success' },
+                      { label: 'Pending sync', value: outboxCount, color: 'text-catalan-warning' },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} className="flex lg:flex-row flex-col lg:items-center lg:justify-between items-center text-center lg:text-left">
+                        <span className="text-xs text-catalan-textMuted lg:order-1 order-2">{label}</span>
+                        <span className={`text-2xl lg:text-xl font-bold ${color} lg:order-2 order-1`}>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Quick actions */}
+              <div className="bg-catalan-surface border border-catalan-border rounded-xl p-4">
+                <h3 className="text-xs font-semibold text-catalan-textMuted uppercase tracking-wider mb-3">Quick Actions</h3>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => { loadHistory(); setScreen('history') }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-catalan-hover hover:bg-catalan-primary/10 hover:text-catalan-primary text-catalan-text text-sm transition-colors text-left"
+                  >
+                    <span>📋</span> My Submissions
+                  </button>
+                  <button
+                    onClick={() => { loadDrafts(); setScreen('drafts') }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-catalan-hover hover:bg-catalan-primary/10 hover:text-catalan-primary text-catalan-text text-sm transition-colors text-left"
+                  >
+                    <span>📝</span> Saved Drafts
+                    {drafts.length > 0 && <span className="ml-auto bg-catalan-primary text-catalan-bg text-xs font-bold rounded-full px-2 py-0.5">{drafts.length}</span>}
+                  </button>
+                  <button
+                    onClick={handleCacheTiles}
+                    disabled={cachingTiles}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-catalan-hover hover:bg-catalan-primary/10 hover:text-catalan-primary text-catalan-textMuted text-sm transition-colors text-left disabled:opacity-50"
+                  >
+                    <span>🗺</span>
+                    {cachingTiles ? 'Caching map…' : 'Cache map offline'}
+                  </button>
+                </div>
+                {tilesCacheMsg && <p className="text-xs text-catalan-info mt-2 px-1">{tilesCacheMsg}</p>}
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
+    </WithSidebar>
   )
 }
 

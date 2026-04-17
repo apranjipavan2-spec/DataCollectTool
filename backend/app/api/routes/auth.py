@@ -5,8 +5,10 @@ from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from jose import JWTError
 from app.core.security import (
-    hash_otp, verify_otp, hash_password, verify_password, create_access_token
+    hash_otp, verify_otp, hash_password, verify_password,
+    create_access_token, create_refresh_token, decode_token,
 )
 from app.core.rate_limit import limiter
 from app.core.deps import get_current_user
@@ -55,17 +57,23 @@ def _generate_otp() -> str:
     return "".join(random.choices(string.digits, k=6))
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
 def _make_token(user: User) -> dict:
-    """Generate JWT and return auth response payload."""
-    token = create_access_token({
+    """Generate access + refresh JWTs and return auth response payload."""
+    access = create_access_token({
         "sub": str(user.id),
         "tenant_id": str(user.tenant_id),
         "role": user.role,
         "name": user.name,
         "email": user.email,
     })
+    refresh = create_refresh_token(str(user.id))
     return {
-        "access_token": token,
+        "access_token": access,
+        "refresh_token": refresh,
         "token_type": "bearer",
         "role": user.role,
         "name": user.name,
@@ -86,6 +94,26 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid phone or password")
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid phone or password")
+    return _make_token(user)
+
+
+# ── Token refresh ────────────────────────────────────────────────────────
+
+@router.post("/refresh")
+def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
+    """Exchange a valid refresh token for a new access token (+ rotated refresh token)."""
+    try:
+        payload = decode_token(body.refresh_token)
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    if payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Invalid token type")
+
+    user = db.query(User).filter(User.id == payload["sub"], User.is_active == True).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found or deactivated")
+
     return _make_token(user)
 
 

@@ -54,7 +54,8 @@ async function compressImage(file: File): Promise<{ dataUri: string; sizeKB: num
 }
 
 export default function PhotoField({ field, value, onChange }: Props) {
-  const ref          = useRef<HTMLInputElement>(null)
+  const cameraRef  = useRef<HTMLInputElement>(null)
+  const galleryRef = useRef<HTMLInputElement>(null)
   const [sizeInfo, setSizeInfo]       = useState<string>('')
   const [compressing, setCompressing] = useState(false)
 
@@ -69,6 +70,8 @@ export default function PhotoField({ field, value, onChange }: Props) {
       onChange(dataUri)
     } finally {
       setCompressing(false)
+      // Reset so the same file can be re-selected
+      e.target.value = ''
     }
   }
 
@@ -80,30 +83,42 @@ export default function PhotoField({ field, value, onChange }: Props) {
       </label>
       {field.hint && <div className={hintCls}>{field.hint}</div>}
 
-      <input
-        ref={ref}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleChange}
-      />
-      <button
-        onClick={() => ref.current?.click()}
-        disabled={compressing}
-        className={captureButtonCls}
-      >
-        <span className="text-3xl">📷</span>
-        <span>{compressing ? 'Compressing…' : value ? 'Retake Photo' : 'Take Photo'}</span>
-      </button>
+      {/* Hidden inputs */}
+      <input ref={cameraRef}  type="file" accept="image/*" capture="environment" className="hidden" onChange={handleChange} />
+      <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={handleChange} />
 
-      {sizeInfo && (
-        <div className={`${fieldHintCls} text-catalan-success`}>
-          Compressed: {sizeInfo}
+      {compressing ? (
+        <div className={captureButtonCls}>
+          <span className="text-3xl">⏳</span>
+          <span>Compressing photo…</span>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={() => cameraRef.current?.click()} className={captureButtonCls}>
+            <span className="text-3xl">📷</span>
+            <span className="text-sm">{value ? 'Retake' : 'Take Photo'}</span>
+          </button>
+          <button onClick={() => galleryRef.current?.click()} className={captureButtonCls}>
+            <span className="text-3xl">🖼</span>
+            <span className="text-sm">From Gallery</span>
+          </button>
         </div>
       )}
+
+      {sizeInfo && (
+        <div className={`${fieldHintCls} text-catalan-success`}>Compressed: {sizeInfo}</div>
+      )}
       {value && (
-        <img src={value} alt="captured" className="w-full rounded-xl mt-2.5" />
+        <div className="mt-3 relative">
+          <img src={value} alt="captured" className="w-full rounded-xl" />
+          <button
+            onClick={() => { onChange(''); setSizeInfo('') }}
+            className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center text-lg hover:bg-black/80 transition-colors"
+            title="Remove photo"
+          >
+            ×
+          </button>
+        </div>
       )}
     </div>
   )

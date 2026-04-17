@@ -88,6 +88,10 @@ def get_current_user_api_key(
 
 
 # Convenience role guards
-require_org_admin   = require_role("master_admin", "org_admin")
-require_supervisor  = require_role("master_admin", "org_admin", "supervisor")
-require_enumerator  = require_role("master_admin", "org_admin", "supervisor", "enumerator")
+# master_admin is platform-level only — he manages tenants via /tenants routes,
+# not org-level data (forms, submissions, users). Keeping him out of these guards
+# ensures complete tenant isolation.
+require_master_admin = require_role("master_admin")
+require_org_admin    = require_role("org_admin")
+require_supervisor   = require_role("org_admin", "supervisor")
+require_enumerator   = require_role("org_admin", "supervisor", "enumerator")

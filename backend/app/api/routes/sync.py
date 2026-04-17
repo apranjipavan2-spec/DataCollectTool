@@ -34,9 +34,19 @@ class PushRequest(BaseModel):
 
 
 @router.post("/push")
-@limiter.limit("30/minute")
+@limiter.limit("60/minute")
 def push(request: Request, body: PushRequest, user=Depends(require_enumerator), db: Session = Depends(get_db)):
     """Receive batched offline submissions from enumerator device."""
+    # ── Plan enforcement — check before accepting any submissions ────────
+    if body.submissions:
+        from app.models.tenant import Tenant
+        from app.services.plan_enforcement import check_submission_limit
+        tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+        plan_tier = tenant.plan_tier if tenant else "free"
+        check = check_submission_limit(db, str(user["tenant_id"]), plan_tier)
+        if not check["allowed"]:
+            raise HTTPException(status_code=402, detail=check["reason"])
+
     results = []
     for item in body.submissions:
         # Idempotency: check if this local_id was already synced

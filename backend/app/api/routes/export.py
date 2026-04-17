@@ -1,4 +1,4 @@
-"""Export endpoints — CSV and Stata .dta for form submissions."""
+"""Export endpoints — CSV, Stata .dta, and Google Sheets for form submissions."""
 
 import csv
 import io
@@ -111,7 +111,7 @@ def _sanitize_stata_colname(name: str) -> str:
 # CSV export
 # ---------------------------------------------------------------------------
 
-@router.get("/submissions/{form_id}/csv")
+@router.get("/{form_id}/csv")
 def export_csv(
     form_id: str,
     date_from: Optional[datetime] = Query(None, description="Filter: local_created_at >="),
@@ -164,7 +164,7 @@ def export_csv(
 # Stata .dta export
 # ---------------------------------------------------------------------------
 
-@router.get("/submissions/{form_id}/dta")
+@router.get("/{form_id}/dta")
 def export_dta(
     form_id: str,
     date_from: Optional[datetime] = Query(None, description="Filter: local_created_at >="),
@@ -243,5 +243,192 @@ def export_dta(
     return StreamingResponse(
         buf,
         media_type="application/x-stata-dta",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Google Sheets — connection status check
+# ---------------------------------------------------------------------------
+
+@router.get("/sheets/status")
+def sheets_status(user: dict = Depends(require_supervisor)):
+    """Return whether Google Drive/Sheets OAuth is configured for this server."""
+    import os
+    from app.core.config import settings
+    token_path = settings.GDRIVE_TOKEN_PATH
+    configured = os.path.exists(token_path)
+    return {"configured": configured}
+
+
+# ---------------------------------------------------------------------------
+# Google Sheets export
+# ---------------------------------------------------------------------------
+
+@router.post("/{form_id}/sheets")
+def export_sheets(
+    form_id: str,
+    date_from: Optional[datetime] = Query(None, description="Filter: local_created_at >="),
+    date_to: Optional[datetime] = Query(None, description="Filter: local_created_at <="),
+    status: Optional[str] = Query(None, description="Filter by submission status"),
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Export submissions to a new Google Sheet and return its URL.
+
+    Requires Google Drive + Sheets OAuth to be configured
+    (run scripts/gdrive_auth.py with the updated scopes).
+    """
+    try:
+        from app.services.sheets import export_to_sheets
+    except ImportError as e:
+        from fastapi import HTTPException as _HTTPException
+        raise _HTTPException(status_code=501, detail=f"Google Sheets service unavailable: {e}")
+
+    from fastapi import HTTPException
+
+    form = db.query(Form).filter(
+        Form.id == form_id, Form.tenant_id == user["tenant_id"]
+    ).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    subs = _query_submissions(db, form_id, user["tenant_id"], date_from, date_to, status)
+    enum_map = _build_enumerator_map(db, user["tenant_id"])
+    rows_dicts = _build_rows(subs, enum_map)
+
+    if not rows_dicts:
+        raise HTTPException(status_code=422, detail="No submissions match the selected filters")
+
+    # Build headers (union across all rows)
+    all_keys: list[str] = []
+    seen: set[str] = set()
+    for row in rows_dicts:
+        for k in row:
+            if k not in seen:
+                all_keys.append(k)
+                seen.add(k)
+
+    # Convert to list-of-lists for the Sheets API
+    value_rows = [[str(row.get(k, "")) for k in all_keys] for row in rows_dicts]
+
+    date_str = datetime.utcnow().strftime("%Y-%m-%d")
+    sheet_title = f"{form.title} — {date_str}"
+
+    try:
+        url = export_to_sheets(
+            title=sheet_title,
+            headers=all_keys,
+            rows=value_rows,
+            tenant_id=str(user["tenant_id"]),
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sheets export failed: {e}")
+
+    return {"url": url, "rows": len(value_rows), "title": sheet_title}
+
+
+# ---------------------------------------------------------------------------
+# Excel (.xlsx) export
+# ---------------------------------------------------------------------------
+
+@router.get("/{form_id}/xlsx")
+def export_xlsx(
+    form_id: str,
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    status: Optional[str] = Query(None),
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Export submissions as a formatted Excel .xlsx workbook."""
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        from fastapi import HTTPException as _E
+        raise _E(status_code=501, detail="openpyxl not installed — run: pip install openpyxl")
+
+    from fastapi import HTTPException
+
+    form = db.query(Form).filter(
+        Form.id == form_id, Form.tenant_id == user["tenant_id"]
+    ).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    subs = _query_submissions(db, form_id, user["tenant_id"], date_from, date_to, status)
+    enum_map = _build_enumerator_map(db, user["tenant_id"])
+    rows_dicts = _build_rows(subs, enum_map)
+
+    # Build unified column list
+    all_keys: list[str] = []
+    seen: set[str] = set()
+    for row in rows_dicts:
+        for k in row:
+            if k not in seen:
+                all_keys.append(k)
+                seen.add(k)
+
+    # ── Create workbook ──────────────────────────────────────────────────
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Submissions"
+
+    # Header style
+    header_fill = PatternFill(start_color="1E1E2E", end_color="1E1E2E", fill_type="solid")
+    header_font = Font(name="Calibri", bold=True, color="CBA6F7", size=11)
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    thin = Side(style="thin", color="313244")
+    header_border = Border(bottom=Side(style="medium", color="89B4FA"))
+
+    # Alternate row fills
+    fill_odd  = PatternFill(start_color="1E1E2E", end_color="1E1E2E", fill_type="solid")
+    fill_even = PatternFill(start_color="181825", end_color="181825", fill_type="solid")
+    cell_font = Font(name="Calibri", color="CDD6F4", size=10)
+
+    # Write headers
+    for col_idx, key in enumerate(all_keys, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=key)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = header_border
+
+    ws.row_dimensions[1].height = 22
+    ws.freeze_panes = "A2"
+
+    # Write data rows
+    for row_idx, row_dict in enumerate(rows_dicts, start=2):
+        fill = fill_odd if row_idx % 2 == 0 else fill_even
+        for col_idx, key in enumerate(all_keys, start=1):
+            val = row_dict.get(key, "")
+            # Coerce None to empty string for display
+            if val is None:
+                val = ""
+            cell = ws.cell(row=row_idx, column=col_idx, value=str(val) if not isinstance(val, (int, float)) else val)
+            cell.font = cell_font
+            cell.fill = fill
+            cell.alignment = Alignment(vertical="center")
+
+    # Auto-size columns (cap at 50 chars wide)
+    for col_idx, key in enumerate(all_keys, start=1):
+        col_letter = get_column_letter(col_idx)
+        max_len = max(len(str(key)), *(len(str(r.get(key, "") or "")) for r in rows_dicts) if rows_dicts else [0])
+        ws.column_dimensions[col_letter].width = min(max_len + 2, 50)
+
+    # ── Stream response ──────────────────────────────────────────────────
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    safe_title = "".join(c for c in form.title if c.isalnum() or c in " _-")
+    filename = f"{safe_title}.xlsx"
+
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

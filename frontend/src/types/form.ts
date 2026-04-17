@@ -63,6 +63,8 @@ export interface FormSection {
   id: string
   title: string
   fields: FormField[]
+  subsections?: FormSection[]
+  skipLogic?: SkipLogic   // if set, entire section is shown/skipped based on this condition
 }
 
 export interface FormSchema {

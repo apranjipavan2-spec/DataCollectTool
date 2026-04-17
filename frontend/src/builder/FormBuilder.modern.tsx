@@ -1,14 +1,17 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import type { FormSchema, FormSection, FormField, FieldType } from '@/types/form'
-import { newField, newSection, newSchema, updateFieldInSchema } from '@/lib/formUtils'
+import { v4 as uuidv4 } from 'uuid'
+import type { FormSchema, FormSection, FormField, FieldType, FieldOption } from '@/types/form'
+import { newField, newSection, newSchema, updateFieldInSchema, mapSectionById, getAllFieldsInOrder } from '@/lib/formUtils'
+import type { SkipLogic } from '@/types/form'
 import { saveFormDraft, loadFormDraft, clearFormDraft, draftAgeLabel, type FormDraft } from '@/lib/formDraft'
 import FieldTypeMenu from './FieldTypeMenu'
 import FieldEditor from './FieldEditor'
+import SkipLogicEditor from './SkipLogicEditor'
 import VersionHistoryPanel from './VersionHistoryPanel'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
-import { Button, Alert, Card, SkeletonBlock } from '@/components/ui'
+import { Button, Alert, SkeletonBlock } from '@/components/ui'
 import { getNavItems } from '@/lib/navigation'
 import api, { getStoredUser } from '@/lib/api'
 import { useToast } from '@/lib/ToastContext'
@@ -19,11 +22,11 @@ const FIELD_TYPE_ICONS: Record<string, string> = {
   calculated: '∑', repeat_group: '⟳', note: 'ℹ', rating: '★',
 }
 
-const FIELD_TYPE_LABELS: Record<string, string> = {
-  text: 'Text', number: 'Number', decimal: 'Decimal', single_choice: 'Single Choice',
-  multiple_choice: 'Multiple Choice', date: 'Date', time: 'Time', gps: 'GPS',
-  photo: 'Photo', audio: 'Audio', barcode: 'Barcode', calculated: 'Calculated',
-  repeat_group: 'Repeat Group', note: 'Note', rating: 'Rating',
+interface DeleteConfirm {
+  kind: 'section' | 'field'
+  sectionId: string
+  fieldId?: string
+  label: string
 }
 
 export default function FormBuilder() {
@@ -45,22 +48,81 @@ export default function FormBuilder() {
   const [showLeftPanel, setShowLeftPanel]     = useState(false)
   const [showVersions, setShowVersions]       = useState(tabFromUrl === 'versions')
 
+  // ── Collapse, inline-edit & delete-confirm state ─────────────────────────
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+  const [editingSectionId, setEditingSectionId]   = useState<string | null>(null)
+  const [deleteConfirm, setDeleteConfirm]         = useState<DeleteConfirm | null>(null)
+
   // ── Load / draft state ───────────────────────────────────────────────────
   const [formLoading, setFormLoading]     = useState(!!formIdFromUrl)
   const [formLoadError, setFormLoadError] = useState('')
   const [draft, setDraft]                 = useState<FormDraft | null>(null)
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout>>()
-  const isInitRef        = useRef(true)   // skip auto-save on very first render
+  const isInitRef        = useRef(true)
 
-  const currentSection = schema.sections.find(s => s.id === selectedSection)!
-  const currentField   = selectedField
-    ? schema.sections.find(s => s.id === selectedField.sectionId)?.fields.find(f => f.id === selectedField.fieldId)
+  // ── Drag state ───────────────────────────────────────────────────────────
+  const [dragSrc, setDragSrc] = useState<{ sectionId: string; fieldId: string } | null>(null)
+  const [dragOver, setDragOver] = useState<{ sectionId: string; fieldId: string } | null>(null)
+
+  // ── Left panel resize ────────────────────────────────────────────────────
+  const [panelWidth, setPanelWidth] = useState(256)   // px — default 256 (w-64)
+  const resizingRef = useRef(false)
+  const resizeStartX = useRef(0)
+  const resizeStartW = useRef(0)
+
+  const onResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    resizingRef.current = true
+    resizeStartX.current = e.clientX
+    resizeStartW.current = panelWidth
+
+    const onMove = (ev: MouseEvent) => {
+      if (!resizingRef.current) return
+      const delta = ev.clientX - resizeStartX.current
+      const next = Math.min(520, Math.max(180, resizeStartW.current + delta))
+      setPanelWidth(next)
+    }
+    const onUp = () => {
+      resizingRef.current = false
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  // ── Excel import state ───────────────────────────────────────────────────
+  const [importingExcel, setImportingExcel] = useState(false)
+  const [importSummary, setImportSummary]   = useState<{ title: string; sections: number; fields: number } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const currentSection = (() => {
+    const find = (secs: FormSection[]): FormSection | undefined => {
+      for (const s of secs) {
+        if (s.id === selectedSection) return s
+        if (s.subsections?.length) { const f = find(s.subsections); if (f) return f }
+      }
+    }
+    return find(schema.sections)
+  })()
+
+  const currentField = selectedField
+    ? (() => {
+        const find = (secs: FormSection[]): FormField | undefined => {
+          for (const s of secs) {
+            const f = s.fields.find(f => f.id === selectedField.fieldId)
+            if (f) return f
+            if (s.subsections?.length) { const ff = find(s.subsections); if (ff) return ff }
+          }
+        }
+        return find(schema.sections)
+      })()
     : null
 
   const user         = getStoredUser() || { name: '', role: '' }
   const sidebarItems = getNavItems(user.role)
 
-  // ── Load form from URL ?id= param ─────────────────────────────────────────
+  // ── Load form from URL ?id= ───────────────────────────────────────────────
   useEffect(() => {
     if (formIdFromUrl) {
       setFormLoading(true)
@@ -73,28 +135,20 @@ export default function FormBuilder() {
           setSelectedSection(loaded.sections[0]?.id ?? '')
           setSelectedField(null)
         })
-        .catch(err => {
-          setFormLoadError(err.response?.data?.detail ?? 'Failed to load form')
-        })
-        .finally(() => {
-          setFormLoading(false)
-          isInitRef.current = false
-        })
+        .catch(err => setFormLoadError(err.response?.data?.detail ?? 'Failed to load form'))
+        .finally(() => { setFormLoading(false); isInitRef.current = false })
     } else {
-      // No ?id= — offer to restore any saved draft
       const saved = loadFormDraft()
       if (saved && saved.schema?.sections?.length) setDraft(saved)
       isInitRef.current = false
     }
   }, [formIdFromUrl])
 
-  // ── Auto-save draft to localStorage (debounced 2 s) ───────────────────────
+  // ── Auto-save draft ───────────────────────────────────────────────────────
   useEffect(() => {
     if (isInitRef.current || formLoading) return
     clearTimeout(autoSaveTimerRef.current)
-    autoSaveTimerRef.current = setTimeout(() => {
-      saveFormDraft(schema, formId)
-    }, 2000)
+    autoSaveTimerRef.current = setTimeout(() => saveFormDraft(schema, formId), 2000)
     return () => clearTimeout(autoSaveTimerRef.current)
   }, [schema, formId, formLoading])
 
@@ -108,11 +162,17 @@ export default function FormBuilder() {
     setDraft(null)
     toast.success('Draft restored')
   }
+  const handleDismissDraft = () => { clearFormDraft(); setDraft(null) }
 
-  const handleDismissDraft = () => {
-    clearFormDraft()
-    setDraft(null)
-  }
+  // ── Section helpers ───────────────────────────────────────────────────────
+  const toggleCollapse = (id: string) =>
+    setCollapsedSections(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  const updateSections = useCallback((sectionId: string, updater: (s: FormSection) => FormSection) =>
+    setSchema(s => ({ ...s, sections: mapSectionById(s.sections, sectionId, updater) })), [])
+
+  const updateSectionTitleById = (id: string, title: string) =>
+    updateSections(id, sec => ({ ...sec, title }))
 
   const addSection = () => {
     const sec = newSection()
@@ -121,76 +181,171 @@ export default function FormBuilder() {
     setSelectedField(null)
   }
 
-  const updateSectionTitle = (sectionId: string, title: string) => {
-    setSchema(s => ({ ...s, sections: s.sections.map(sec => sec.id === sectionId ? { ...sec, title } : sec) }))
-  }
-
-  const deleteSection = (sectionId: string) => {
-    if (schema.sections.length === 1) return
-    setSchema(s => ({ ...s, sections: s.sections.filter(sec => sec.id !== sectionId) }))
-    setSelectedSection(schema.sections.find(s => s.id !== sectionId)!.id)
+  const addSubsection = (parentId: string) => {
+    const sub: FormSection = { id: uuidv4(), title: 'Sub-section', fields: [] }
+    updateSections(parentId, sec => ({ ...sec, subsections: [...(sec.subsections ?? []), sub] }))
+    setSelectedSection(sub.id)
     setSelectedField(null)
   }
 
+  // ── Delete with confirmation ──────────────────────────────────────────────
+  const requestDeleteSection = (sectionId: string, label: string) =>
+    setDeleteConfirm({ kind: 'section', sectionId, label })
+
+  const requestDeleteField = (sectionId: string, fieldId: string, label: string) =>
+    setDeleteConfirm({ kind: 'field', sectionId, fieldId, label })
+
+  const cancelDelete = () => setDeleteConfirm(null)
+
+  const executeDelete = () => {
+    if (!deleteConfirm) return
+    if (deleteConfirm.kind === 'field') {
+      updateSections(deleteConfirm.sectionId, sec => ({
+        ...sec,
+        fields: sec.fields.filter(f => f.id !== deleteConfirm.fieldId),
+      }))
+      if (selectedField?.fieldId === deleteConfirm.fieldId) setSelectedField(null)
+    } else {
+      const removeSection = (secs: FormSection[]): FormSection[] =>
+        secs
+          .filter(s => s.id !== deleteConfirm.sectionId)
+          .map(s => s.subsections?.length ? { ...s, subsections: removeSection(s.subsections) } : s)
+      setSchema(s => {
+        const next = removeSection(s.sections)
+        return { ...s, sections: next }
+      })
+      setSelectedSection(prev => {
+        if (prev !== deleteConfirm.sectionId) return prev
+        const allSecs = getAllSectionIds(schema.sections).filter(id => id !== deleteConfirm.sectionId)
+        return allSecs[0] ?? ''
+      })
+      setSelectedField(null)
+    }
+    setDeleteConfirm(null)
+  }
+
+  // ── Field helpers ─────────────────────────────────────────────────────────
   const addField = (type: FieldType) => {
     const field = newField(type)
-    setSchema(s => ({
-      ...s,
-      sections: s.sections.map(sec =>
-        sec.id === selectedSection ? { ...sec, fields: [...sec.fields, field] } : sec
-      ),
-    }))
+    updateSections(selectedSection, sec => ({ ...sec, fields: [...sec.fields, field] }))
     setSelectedField({ sectionId: selectedSection, fieldId: field.id })
     setShowTypeMenu(false)
     setShowLeftPanel(false)
   }
 
-  const updateField = useCallback((sectionId: string, fieldId: string, patch: Partial<FormField>) => {
-    setSchema(s => updateFieldInSchema(s, sectionId, fieldId, patch))
-  }, [])
+  const updateField = useCallback((sectionId: string, fieldId: string, patch: Partial<FormField>) =>
+    setSchema(s => updateFieldInSchema(s, sectionId, fieldId, patch)), [])
 
-  const deleteField = (sectionId: string, fieldId: string) => {
-    setSchema(s => ({
-      ...s,
-      sections: s.sections.map(sec =>
-        sec.id !== sectionId ? sec : { ...sec, fields: sec.fields.filter(f => f.id !== fieldId) }
-      ),
-    }))
-    setSelectedField(null)
+  const moveField = (sectionId: string, fieldId: string, dir: -1 | 1) =>
+    updateSections(sectionId, sec => {
+      const idx = sec.fields.findIndex(f => f.id === fieldId)
+      const next = idx + dir
+      if (next < 0 || next >= sec.fields.length) return sec
+      const fields = [...sec.fields]
+      ;[fields[idx], fields[next]] = [fields[next], fields[idx]]
+      return { ...sec, fields }
+    })
+
+  const moveFieldToIndex = (srcSecId: string, srcFieldId: string, dstSecId: string, dstFieldId: string) => {
+    if (srcFieldId === dstFieldId) return
+    let draggedField: FormField | null = null
+    // Remove from source
+    const withoutSrc = (secs: FormSection[]): FormSection[] =>
+      secs.map(sec => {
+        if (sec.id === srcSecId) {
+          const f = sec.fields.find(f => f.id === srcFieldId)
+          if (f) draggedField = f
+          return { ...sec, fields: sec.fields.filter(f => f.id !== srcFieldId) }
+        }
+        return sec.subsections?.length ? { ...sec, subsections: withoutSrc(sec.subsections) } : sec
+      })
+    // Insert before target
+    const withInsert = (secs: FormSection[]): FormSection[] =>
+      secs.map(sec => {
+        if (sec.id === dstSecId) {
+          const dstIdx = sec.fields.findIndex(f => f.id === dstFieldId)
+          const fields = [...sec.fields]
+          fields.splice(dstIdx >= 0 ? dstIdx : fields.length, 0, draggedField!)
+          return { ...sec, fields }
+        }
+        return sec.subsections?.length ? { ...sec, subsections: withInsert(sec.subsections) } : sec
+      })
+    setSchema(s => {
+      const step1 = withoutSrc(s.sections)
+      if (!draggedField) return s
+      return { ...s, sections: withInsert(step1) }
+    })
   }
 
-  const moveField = (sectionId: string, fieldId: string, dir: -1 | 1) => {
-    setSchema(s => ({
-      ...s,
-      sections: s.sections.map(sec => {
-        if (sec.id !== sectionId) return sec
-        const idx = sec.fields.findIndex(f => f.id === fieldId)
-        const next = idx + dir
-        if (next < 0 || next >= sec.fields.length) return sec
-        const fields = [...sec.fields]
-        ;[fields[idx], fields[next]] = [fields[next], fields[idx]]
-        return { ...sec, fields }
-      }),
-    }))
+  // ── Excel import ──────────────────────────────────────────────────────────
+  const toFieldType = (t: string): FieldType => {
+    const MAP: Record<string, FieldType> = {
+      select: 'single_choice', number: 'number', date: 'date',
+      text: 'text', textarea: 'text', gps: 'gps', photo: 'photo',
+    }
+    return (MAP[t] as FieldType) ?? 'text'
   }
 
+  const toOptions = (opts?: string[]): FieldOption[] | undefined => {
+    if (!opts || opts.length === 0) return undefined
+    return opts.map(o => ({ value: o, label: o }))
+  }
+
+  const handleImportExcel = async (file: File) => {
+    setImportingExcel(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const { data } = await api.post('/forms/import-excel', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      const sections: FormSection[] = (data.sections ?? []).map((sec: any) => ({
+        id: uuidv4(),
+        title: sec.title || 'Section',
+        fields: (sec.fields ?? []).map((f: any): FormField => {
+          const ft = toFieldType(f.type)
+          const opts = toOptions(f.options)
+          return {
+            id: uuidv4(),
+            name: f.id || uuidv4(),
+            label: f.label || '',
+            type: ft,
+            required: !!f.required,
+            ...(opts ? { options: opts } : {}),
+          }
+        }),
+      })).filter((s: FormSection) => s.fields.length > 0)
+
+      if (sections.length === 0) { toast.error('No fields found in this Excel file'); return }
+
+      const imported: FormSchema = { title: data.title || file.name.replace(/\.[^.]+$/, ''), version: 1, sections }
+      setSchema(imported)
+      setFormId(null)
+      setSelectedSection(sections[0].id)
+      setSelectedField(null)
+      setDraft(null)
+      clearFormDraft()
+      const totalFields = sections.reduce((n, s) => n + s.fields.length, 0)
+      setImportSummary({ title: imported.title, sections: sections.length, fields: totalFields })
+      toast.success(`Imported: ${sections.length} sections, ${totalFields} fields`)
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail ?? 'Import failed — check the file format')
+    } finally {
+      setImportingExcel(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
-    // ── Validation ────────────────────────────────────────────────────────
     const errs: string[] = []
     if (!schema.title.trim()) errs.push('Form title is required')
-    const allFields = schema.sections.flatMap(s => s.fields)
+    const allFields = getAllFieldsInOrder(schema.sections)
     const emptyLabelFields = allFields.filter(f => !f.label.trim())
-    if (emptyLabelFields.length > 0) {
-      errs.push(
-        `${emptyLabelFields.length} field${emptyLabelFields.length > 1 ? 's are' : ' is'} missing a label`
-      )
-    }
+    if (emptyLabelFields.length > 0)
+      errs.push(`${emptyLabelFields.length} field${emptyLabelFields.length > 1 ? 's are' : ' is'} missing a label`)
     if (allFields.length === 0) errs.push('Add at least one question before saving')
-
-    if (errs.length > 0) {
-      setValidationErrors(errs)
-      return
-    }
+    if (errs.length > 0) { setValidationErrors(errs); return }
     setValidationErrors([])
     setSaving(true)
     setSaveError('')
@@ -214,7 +369,183 @@ export default function FormBuilder() {
     }
   }
 
-  // ── Loading state ───────────────────────────────────────────────────────
+  // ── Recursive left panel renderers ────────────────────────────────────────
+  const renderFieldRow = (sectionId: string, field: FormField, depth: number) => {
+    const isSelected  = selectedField?.fieldId === field.id
+    const isDragOver  = dragOver?.fieldId === field.id && dragSrc?.fieldId !== field.id
+    const isDragging  = dragSrc?.fieldId === field.id
+    const confirmThis = deleteConfirm?.kind === 'field' && deleteConfirm.fieldId === field.id
+
+    return (
+      <React.Fragment key={field.id}>
+        <div
+          draggable
+          onDragStart={e => { setDragSrc({ sectionId, fieldId: field.id }); e.dataTransfer.effectAllowed = 'move' }}
+          onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOver({ sectionId, fieldId: field.id }) }}
+          onDragLeave={() => setDragOver(null)}
+          onDrop={e => { e.preventDefault(); if (dragSrc) moveFieldToIndex(dragSrc.sectionId, dragSrc.fieldId, sectionId, field.id); setDragSrc(null); setDragOver(null) }}
+          onDragEnd={() => { setDragSrc(null); setDragOver(null) }}
+          onClick={() => { setSelectedSection(sectionId); setSelectedField({ sectionId, fieldId: field.id }); setShowLeftPanel(false) }}
+          style={{ paddingLeft: `${16 + depth * 12}px` }}
+          className={`flex items-center gap-2 pr-2 py-2 text-sm cursor-pointer transition-colors border-l-2 ${
+            isSelected    ? 'bg-catalan-hover border-catalan-primary' :
+            isDragOver    ? 'bg-catalan-primary/10 border-catalan-primary/60' :
+                            'border-transparent hover:bg-catalan-hover/50'
+          } ${isDragging ? 'opacity-40' : ''}`}
+        >
+          <span className="text-catalan-textMuted/40 text-xs cursor-grab active:cursor-grabbing flex-shrink-0 select-none">⠿</span>
+          <span className="text-catalan-textMuted text-xs w-4 text-center flex-shrink-0">{FIELD_TYPE_ICONS[field.type] ?? '?'}</span>
+          <span className={`flex-1 text-xs leading-snug break-words min-w-0 ${field.label ? 'text-catalan-text' : 'text-catalan-error/80'}`}>
+            {field.label || '⚠ label missing'}
+          </span>
+          <button
+            onClick={e => { e.stopPropagation(); requestDeleteField(sectionId, field.id, field.label || 'this field') }}
+            className="text-catalan-textMuted hover:text-catalan-error text-xs transition-colors px-0.5 flex-shrink-0"
+            title="Delete field"
+          >✕</button>
+        </div>
+
+        {/* Inline delete confirmation */}
+        {confirmThis && (
+          <div
+            style={{ paddingLeft: `${16 + depth * 12}px` }}
+            className="pr-2 py-1.5 bg-catalan-error/10 border-l-2 border-catalan-error/40"
+          >
+            <p className="text-xs text-catalan-error mb-1 truncate">Delete "{deleteConfirm.label}"?</p>
+            <div className="flex gap-2">
+              <button onClick={executeDelete} className="text-xs px-2 py-0.5 bg-catalan-error text-white rounded">Delete</button>
+              <button onClick={cancelDelete} className="text-xs text-catalan-textMuted hover:text-catalan-text">Cancel</button>
+            </div>
+          </div>
+        )}
+      </React.Fragment>
+    )
+  }
+
+  const renderSectionNode = (sec: FormSection, depth: number, isTopLevel: boolean): React.ReactNode => {
+    const isCollapsed    = collapsedSections.has(sec.id)
+    const isActive       = selectedSection === sec.id && !selectedField
+    const isEditingTitle = editingSectionId === sec.id
+    const confirmThis    = deleteConfirm?.kind === 'section' && deleteConfirm.sectionId === sec.id
+    const fieldCount     = sec.fields.length + (sec.subsections?.reduce((n, s) => n + s.fields.length, 0) ?? 0)
+    const canDelete      = isTopLevel ? schema.sections.length > 1 : true
+    const hasCondition   = !!sec.skipLogic
+
+    return (
+      <div key={sec.id}>
+        {/* Section / Sub-section header */}
+        <div
+          onClick={() => { setSelectedSection(sec.id); setSelectedField(null) }}
+          style={{ paddingLeft: `${depth === 0 ? 8 : 4 + depth * 12}px` }}
+          className={`flex items-center gap-1 pr-2 py-2 cursor-pointer transition-colors group ${
+            isActive ? 'bg-catalan-hover' : 'hover:bg-catalan-hover/50'
+          } ${depth > 0 ? 'border-l-2 border-catalan-border/40 ml-2' : ''}`}
+        >
+          {/* Collapse toggle */}
+          <button
+            onClick={e => { e.stopPropagation(); toggleCollapse(sec.id) }}
+            title={isCollapsed ? 'Expand section' : 'Collapse section'}
+            className="w-5 h-5 flex items-center justify-center text-catalan-primary text-xs flex-shrink-0 rounded hover:bg-catalan-primary/10 transition-colors"
+          >
+            {isCollapsed ? '▶' : '▼'}
+          </button>
+
+          {/* Title — label normally, input when editing */}
+          {isEditingTitle ? (
+            <input
+              autoFocus
+              value={sec.title}
+              onChange={e => updateSectionTitleById(sec.id, e.target.value)}
+              onBlur={() => setEditingSectionId(null)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === 'Escape') {
+                  e.preventDefault()
+                  setEditingSectionId(null)
+                }
+              }}
+              onClick={e => e.stopPropagation()}
+              className={`flex-1 min-w-0 bg-catalan-bg border border-catalan-primary rounded px-1.5 py-0.5 outline-none ${
+                depth === 0 ? 'text-sm font-medium text-catalan-text' : 'text-xs font-medium text-catalan-textMuted'
+              }`}
+            />
+          ) : (
+            <span
+              onDoubleClick={e => { e.stopPropagation(); setEditingSectionId(sec.id) }}
+              title="Double-click to rename"
+              className={`flex-1 min-w-0 truncate select-none ${
+                depth === 0 ? 'text-sm font-medium text-catalan-text' : 'text-xs font-medium text-catalan-textMuted'
+              }`}
+            >
+              {sec.title || 'Untitled'}
+            </span>
+          )}
+
+          {/* Field count */}
+          {fieldCount > 0 && !isEditingTitle && (
+            <span className="text-xs text-catalan-textMuted/50 flex-shrink-0 tabular-nums">{fieldCount}</span>
+          )}
+
+          {/* ⚡ Condition indicator — always visible when section has a condition */}
+          {hasCondition && (
+            <span
+              title="This section has a visibility condition — click section to edit"
+              className="flex-shrink-0 text-catalan-warning text-xs px-0.5"
+            >
+              ⚡
+            </span>
+          )}
+
+          {/* Action buttons — visible on hover (or always when active) */}
+          <div className={`flex items-center gap-0.5 flex-shrink-0 ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+            {/* Add sub-section (top-level only) */}
+            {depth === 0 && (
+              <button
+                onClick={e => { e.stopPropagation(); addSubsection(sec.id) }}
+                title="Add sub-section inside this section"
+                className="w-5 h-5 flex items-center justify-center rounded text-catalan-textMuted hover:text-catalan-primary hover:bg-catalan-primary/10 transition-colors text-xs"
+              >
+                ⊕
+              </button>
+            )}
+            {/* Delete section */}
+            {canDelete && (
+              <button
+                onClick={e => { e.stopPropagation(); requestDeleteSection(sec.id, sec.title) }}
+                title="Delete this section"
+                className="w-5 h-5 flex items-center justify-center rounded text-catalan-textMuted hover:text-catalan-error hover:bg-catalan-error/10 transition-colors text-xs"
+              >
+                ␡
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Inline delete confirmation for section */}
+        {confirmThis && (
+          <div
+            style={{ paddingLeft: `${12 + depth * 12}px` }}
+            className="pr-2 py-1.5 bg-catalan-error/10 border-l-2 border-catalan-error/40"
+          >
+            <p className="text-xs text-catalan-error mb-1 truncate">Delete "{deleteConfirm.label}"?</p>
+            <div className="flex gap-2">
+              <button onClick={executeDelete} className="text-xs px-2 py-0.5 bg-catalan-error text-white rounded">Delete</button>
+              <button onClick={cancelDelete} className="text-xs text-catalan-textMuted hover:text-catalan-text">Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {/* Collapsed content */}
+        {!isCollapsed && (
+          <div>
+            {sec.fields.map(f => renderFieldRow(sec.id, f, depth + 1))}
+            {sec.subsections?.map(sub => renderSectionNode(sub, depth + 1, false))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Loading state ─────────────────────────────────────────────────────────
   if (formLoading) {
     return (
       <div className="flex h-screen bg-catalan-bg">
@@ -229,14 +560,10 @@ export default function FormBuilder() {
             </div>
             <div className="flex gap-4 flex-1">
               <div className="w-64 space-y-3">
-                {[...Array(8)].map((_, i) => (
-                  <SkeletonBlock key={i} className="h-9" style={{ opacity: 1 - i * 0.08 }} />
-                ))}
+                {[...Array(8)].map((_, i) => <SkeletonBlock key={i} className="h-9" style={{ opacity: 1 - i * 0.08 }} />)}
               </div>
               <div className="flex-1 space-y-4">
-                {[...Array(5)].map((_, i) => (
-                  <SkeletonBlock key={i} className="h-14" style={{ opacity: 1 - i * 0.12 }} />
-                ))}
+                {[...Array(5)].map((_, i) => <SkeletonBlock key={i} className="h-14" style={{ opacity: 1 - i * 0.12 }} />)}
               </div>
             </div>
           </div>
@@ -247,38 +574,32 @@ export default function FormBuilder() {
 
   return (
     <div className="flex h-screen bg-catalan-bg">
-      {/* Sidebar */}
       <Sidebar items={sidebarItems} role={user.role} />
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-auto">
-        {/* Top Navigation */}
-        <TopNav
-          breadcrumbs={[
-            { label: 'Dashboard', path: '/' },
-            { label: schema.title.trim() || 'Form Builder' },
-          ]}
-        />
+        <TopNav breadcrumbs={[{ label: 'Dashboard', path: '/' }, { label: schema.title.trim() || 'Form Builder' }]} />
 
-        {/* Content - 3 Panel Layout */}
+        <div className="md:hidden flex items-center gap-2 px-4 py-2 bg-catalan-warning/10 border-b border-catalan-warning/30 text-xs text-catalan-warning">
+          <span>⚠</span><span>Form Builder works best on a larger screen.</span>
+        </div>
+
         <div className="flex-1 flex overflow-hidden relative">
-          {/* Mobile overlay for left panel */}
           {showLeftPanel && (
-            <div
-              className="md:hidden fixed inset-0 bg-black/50 z-20 backdrop-blur-sm"
-              onClick={() => setShowLeftPanel(false)}
-            />
+            <div className="md:hidden fixed inset-0 bg-black/50 z-20 backdrop-blur-sm" onClick={() => setShowLeftPanel(false)} />
           )}
 
-          {/* Left Panel: Sections & Fields */}
-          <div className={`
-            fixed md:relative left-0 top-0 h-full z-30
-            w-64 border-r border-catalan-border bg-catalan-surface flex flex-col overflow-hidden
-            transition-transform duration-300 md:translate-x-0
-            ${showLeftPanel ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-          `}>
+          {/* Left Panel */}
+          <div
+            style={{ width: panelWidth, minWidth: panelWidth, maxWidth: panelWidth }}
+            className={`
+              fixed md:relative left-0 top-0 h-full z-30
+              border-r border-catalan-border bg-catalan-surface flex flex-col overflow-hidden
+              transition-transform duration-300 md:translate-x-0
+              ${showLeftPanel ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+            `}
+          >
 
-            {/* ── Draft restore banner ── */}
+            {/* Draft banner */}
             {draft && (
               <div className="px-3 pt-2.5 pb-2 bg-catalan-warning/10 border-b border-catalan-warning/30 flex-shrink-0">
                 <div className="flex items-center gap-1.5 mb-1">
@@ -289,23 +610,13 @@ export default function FormBuilder() {
                   "{draft.schema.title || 'Untitled'}" — {draftAgeLabel(draft.savedAt)}
                 </p>
                 <div className="flex gap-2">
-                  <button
-                    onClick={handleRestoreDraft}
-                    className="px-2.5 py-1 rounded-lg bg-catalan-warning/20 text-catalan-warning text-xs font-medium hover:bg-catalan-warning/30 transition-colors"
-                  >
-                    Restore
-                  </button>
-                  <button
-                    onClick={handleDismissDraft}
-                    className="px-2.5 py-1 rounded-lg text-catalan-textMuted hover:text-catalan-text text-xs transition-colors"
-                  >
-                    Dismiss
-                  </button>
+                  <button onClick={handleRestoreDraft} className="px-2.5 py-1 rounded-lg bg-catalan-warning/20 text-catalan-warning text-xs font-medium hover:bg-catalan-warning/30 transition-colors">Restore</button>
+                  <button onClick={handleDismissDraft} className="px-2.5 py-1 rounded-lg text-catalan-textMuted hover:text-catalan-text text-xs transition-colors">Dismiss</button>
                 </div>
               </div>
             )}
 
-            {/* Form Info */}
+            {/* Form info */}
             <div className="p-4 border-b border-catalan-border flex-shrink-0">
               <input
                 value={schema.title}
@@ -318,110 +629,63 @@ export default function FormBuilder() {
                 placeholder="Form title (required)"
               />
               <div className="text-xs text-catalan-textMuted">
-                v{schema.version} · {schema.sections.flatMap(s => s.fields).length} fields
+                v{schema.version} · {getAllFieldsInOrder(schema.sections).length} fields
               </div>
             </div>
 
-            {/* Sections & Fields */}
+            {/* Sections & Fields tree */}
             <div className="flex-1 overflow-y-auto">
-              {schema.sections.map((sec, secIdx) => (
+              {schema.sections.map((sec, i) => (
                 <div key={sec.id}>
-                  {/* Section separator */}
-                  {secIdx > 0 && <div className="mx-3 border-t border-catalan-border/50" />}
-                  {/* Section Header */}
-                  <div
-                    onClick={() => { setSelectedSection(sec.id); setSelectedField(null) }}
-                    className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
-                      selectedSection === sec.id && !selectedField
-                        ? 'bg-catalan-hover'
-                        : 'hover:bg-catalan-hover/50'
-                    }`}
-                  >
-                    <span className="text-catalan-primary text-xs">▶</span>
-                    <input
-                      value={sec.title}
-                      onChange={e => { e.stopPropagation(); updateSectionTitle(sec.id, e.target.value) }}
-                      onClick={e => e.stopPropagation()}
-                      className="flex-1 bg-transparent border-none text-catalan-text text-sm font-medium outline-none"
-                    />
-                    {schema.sections.length > 1 && (
-                      <button
-                        onClick={e => { e.stopPropagation(); deleteSection(sec.id) }}
-                        className="text-catalan-textMuted hover:text-catalan-error text-sm transition-colors"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Fields */}
-                  {sec.fields.map(field => (
-                    <div
-                      key={field.id}
-                      onClick={() => { setSelectedSection(sec.id); setSelectedField({ sectionId: sec.id, fieldId: field.id }); setShowLeftPanel(false) }}
-                      className={`flex items-center gap-2 px-4 py-2 text-sm cursor-pointer transition-colors border-l-2 ml-2 ${
-                        selectedField?.fieldId === field.id
-                          ? 'bg-catalan-hover border-catalan-primary'
-                          : 'border-transparent hover:bg-catalan-hover/50'
-                      }`}
-                    >
-                      <span className="text-catalan-textMuted text-xs w-4 text-center flex-shrink-0">
-                        {FIELD_TYPE_ICONS[field.type]}
-                      </span>
-                      <span className={`flex-1 truncate ${field.label ? 'text-catalan-text' : 'text-catalan-error/80'}`}>
-                        {field.label || `⚠ label missing`}
-                      </span>
-                      <div className="flex gap-1 flex-shrink-0">
-                        <button
-                          onClick={e => { e.stopPropagation(); moveField(sec.id, field.id, -1) }}
-                          className="text-catalan-textMuted hover:text-catalan-primary text-xs transition-colors"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          onClick={e => { e.stopPropagation(); moveField(sec.id, field.id, 1) }}
-                          className="text-catalan-textMuted hover:text-catalan-primary text-xs transition-colors"
-                        >
-                          ▼
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                  {i > 0 && <div className="mx-3 border-t border-catalan-border/50" />}
+                  {renderSectionNode(sec, 0, true)}
                 </div>
               ))}
             </div>
 
             {/* Bottom Actions */}
             <div className="p-3 border-t border-catalan-border space-y-2 flex-shrink-0">
-              <Button
-                onClick={() => setShowTypeMenu(true)}
-                size="sm"
-                fullWidth
+              <Button onClick={() => setShowTypeMenu(true)} size="sm" fullWidth>+ Add Question</Button>
+              <Button onClick={addSection} variant="secondary" size="sm" fullWidth>+ Add Section</Button>
+
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importingExcel}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-dashed border-catalan-primary/50 text-catalan-primary text-xs font-medium hover:bg-catalan-primary/10 hover:border-catalan-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                + Add Question
-              </Button>
-              <Button
-                onClick={addSection}
-                variant="secondary"
-                size="sm"
-                fullWidth
-              >
-                + Add Section
-              </Button>
+                {importingExcel ? <><span className="animate-spin">⟳</span><span>Importing…</span></> : <><span>📊</span><span>Import from Excel</span></>}
+              </button>
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleImportExcel(f) }} />
+
+              {importSummary && (
+                <div className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-catalan-success/10 border border-catalan-success/30">
+                  <span className="text-catalan-success text-xs mt-0.5">✓</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium text-catalan-success truncate">{importSummary.title}</div>
+                    <div className="text-xs text-catalan-textMuted">{importSummary.sections} sections · {importSummary.fields} fields</div>
+                  </div>
+                  <button onClick={() => setImportSummary(null)} className="text-catalan-textMuted hover:text-catalan-text text-xs">×</button>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Right Panel: Field Editor or Preview */}
+          {/* Resize handle */}
+          <div
+            onMouseDown={onResizeMouseDown}
+            className="hidden md:flex w-1 flex-shrink-0 cursor-col-resize items-center justify-center hover:bg-catalan-primary/40 active:bg-catalan-primary/60 transition-colors group relative z-10"
+            title="Drag to resize"
+          >
+            <div className="w-0.5 h-8 rounded-full bg-catalan-border group-hover:bg-catalan-primary/60 transition-colors" />
+          </div>
+
+          {/* Right Panel */}
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Top Bar */}
             <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-catalan-border bg-catalan-surface flex-shrink-0">
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowLeftPanel(!showLeftPanel)}
-                  className="md:hidden p-1.5 rounded bg-catalan-hover text-catalan-primary text-sm"
-                >
-                  ☰
-                </button>
+                <button onClick={() => setShowLeftPanel(!showLeftPanel)} className="md:hidden p-1.5 rounded bg-catalan-hover text-catalan-primary text-sm">☰</button>
                 <span className="text-sm text-catalan-textMuted truncate">
                   {currentField
                     ? `${currentSection?.title} › ${currentField.label || 'Untitled field'}`
@@ -435,53 +699,25 @@ export default function FormBuilder() {
                     <button onClick={() => setFormLoadError('')} className="ml-1 text-catalan-error/60 hover:text-catalan-error">×</button>
                   </div>
                 )}
-                {validationErrors.length > 0 && (
-                  <div className="flex flex-col gap-0.5">
-                    {validationErrors.map((e, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-xs text-catalan-error bg-catalan-error/10 border border-catalan-error/30 rounded-lg px-2.5 py-1">
-                        <span>⚠</span>
-                        <span>{e}</span>
-                        <button onClick={() => setValidationErrors([])} className="ml-1 text-catalan-error/60 hover:text-catalan-error leading-none">×</button>
-                      </div>
-                    ))}
+                {validationErrors.length > 0 && validationErrors.map((e, i) => (
+                  <div key={i} className="flex items-center gap-1.5 text-xs text-catalan-error bg-catalan-error/10 border border-catalan-error/30 rounded-lg px-2.5 py-1">
+                    <span>⚠</span><span>{e}</span>
+                    <button onClick={() => setValidationErrors([])} className="ml-1 text-catalan-error/60 hover:text-catalan-error leading-none">×</button>
                   </div>
-                )}
-                {saveError && (
-                  <Alert
-                    type="error"
-                    title="Error"
-                    message={saveError}
-                    onClose={() => setSaveError('')}
-                  />
+                ))}
+                {saveError && <Alert type="error" title="Error" message={saveError} onClose={() => setSaveError('')} />}
+                {formId && (
+                  <span className="text-xs text-catalan-textMuted font-mono bg-catalan-hover px-2 py-1 rounded">{formId.slice(0, 8)}</span>
                 )}
                 {formId && (
-                  <span className="text-xs text-catalan-textMuted font-mono bg-catalan-hover px-2 py-1 rounded">
-                    {formId.slice(0, 8)}
-                  </span>
-                )}
-                {formId && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setShowVersions(v => !v)}
-                    className={showVersions ? '!border-catalan-primary !text-catalan-primary' : ''}
-                  >
+                  <Button variant="secondary" size="sm" onClick={() => setShowVersions(v => !v)}
+                    className={showVersions ? '!border-catalan-primary !text-catalan-primary' : ''}>
                     {showVersions ? '✕ Versions' : `v${schema.version} History`}
                   </Button>
                 )}
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => window.location.href = '/collect'}
-                >
-                  Preview
-                </Button>
-                <Button
-                  onClick={handleSave}
-                  disabled={saving}
-                  size="sm"
-                  className={saved ? '!bg-catalan-success !text-catalan-bg !border-catalan-success hover:!bg-catalan-success' : ''}
-                >
+                <Button variant="secondary" size="sm" onClick={() => window.location.href = '/collect'}>Preview</Button>
+                <Button onClick={handleSave} disabled={saving} size="sm"
+                  className={saved ? '!bg-catalan-success !text-catalan-bg !border-catalan-success hover:!bg-catalan-success' : ''}>
                   {saving ? '...' : saved ? '✓ Saved' : 'Save'}
                 </Button>
               </div>
@@ -490,11 +726,7 @@ export default function FormBuilder() {
             {/* Main Area */}
             <div className="flex-1 overflow-hidden">
               {showVersions && formId ? (
-                <VersionHistoryPanel
-                  formId={formId}
-                  currentVersion={schema.version}
-                  onClose={() => setShowVersions(false)}
-                />
+                <VersionHistoryPanel formId={formId} currentVersion={schema.version} onClose={() => setShowVersions(false)} />
               ) : currentField ? (
                 <div className="h-full overflow-y-auto">
                   <FieldEditor
@@ -502,19 +734,21 @@ export default function FormBuilder() {
                     sectionId={selectedField!.sectionId}
                     sections={schema.sections}
                     onChange={patch => updateField(selectedField!.sectionId, selectedField!.fieldId, patch)}
-                    onDelete={() => deleteField(selectedField!.sectionId, selectedField!.fieldId)}
+                    onDelete={() => requestDeleteField(selectedField!.sectionId, selectedField!.fieldId, currentField.label || 'this field')}
                   />
                 </div>
+              ) : currentSection ? (
+                <SectionEditor
+                  section={currentSection}
+                  schema={schema}
+                  onTitleChange={t => updateSectionTitleById(currentSection.id, t)}
+                  onSkipLogicChange={sl => updateSections(currentSection.id, sec => ({ ...sec, skipLogic: sl }))}
+                  onAddField={() => setShowTypeMenu(true)}
+                />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-catalan-textMuted">
                   <div className="text-7xl mb-6">📋</div>
-                  <div className="text-xl font-semibold mb-2 text-catalan-text">No field selected</div>
-                  <div className="text-sm mb-6 text-center max-w-xs">
-                    Select a field from the left panel to edit its properties, or add a new question to get started.
-                  </div>
-                  <Button onClick={() => setShowTypeMenu(true)} size="sm">
-                    + Add Question
-                  </Button>
+                  <div className="text-xl font-semibold mb-2 text-catalan-text">Select a section or field</div>
                 </div>
               )}
             </div>
@@ -522,8 +756,170 @@ export default function FormBuilder() {
         </div>
       </div>
 
-      {/* Field Type Menu Modal */}
       {showTypeMenu && <FieldTypeMenu onSelect={addField} onClose={() => setShowTypeMenu(false)} />}
     </div>
   )
+}
+
+// ── Section Editor (right panel when a section is selected) ─────────────────
+function SectionEditor({ section, schema, onTitleChange, onSkipLogicChange, onAddField }: {
+  section: FormSection
+  schema: FormSchema
+  onTitleChange: (t: string) => void
+  onSkipLogicChange: (sl: SkipLogic | undefined) => void
+  onAddField: () => void
+}) {
+  // All fields that appear in sections/subsections strictly before this section
+  const prevFields = (() => {
+    const result: FormField[] = []
+    const traverse = (secs: FormSection[]): boolean => {
+      for (const sec of secs) {
+        if (sec.id === section.id) return true
+        result.push(...sec.fields)
+        if (sec.subsections?.length && traverse(sec.subsections)) return true
+      }
+      return false
+    }
+    traverse(schema.sections)
+    return result
+  })()
+
+  const totalFields  = section.fields.length + (section.subsections?.reduce((n, s) => n + s.fields.length, 0) ?? 0)
+  const hasCondition = !!section.skipLogic
+
+  // ⚠ Critical: pass section.skipLogic into the synthetic field so SkipLogicEditor
+  // loads the existing conditions rather than always showing "+ Add Skip Logic".
+  const syntheticField: FormField = {
+    id: `__section_${section.id}`,
+    type: 'text',
+    name: section.id,
+    label: section.title,
+    skipLogic: section.skipLogic,   // ← loads existing logic into the editor
+  }
+
+  const inputCls = 'w-full bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text placeholder-catalan-textMuted focus:outline-none focus:border-catalan-primary transition-colors'
+  const labelCls = 'block text-xs font-medium text-catalan-textMuted mb-1.5 uppercase tracking-wider'
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="p-5 sm:p-6 max-w-2xl">
+
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-catalan-border">
+          <div className="w-9 h-9 rounded-xl bg-catalan-primary/10 flex items-center justify-center text-catalan-primary font-bold flex-shrink-0 text-base">§</div>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs text-catalan-textMuted mb-0.5">Section settings</div>
+            <div className="text-base font-semibold text-catalan-text truncate">{section.title || 'Untitled section'}</div>
+          </div>
+          <div className="text-xs text-catalan-textMuted bg-catalan-hover px-2 py-1 rounded-lg border border-catalan-border flex-shrink-0">
+            {totalFields} field{totalFields !== 1 ? 's' : ''}
+          </div>
+        </div>
+
+        {/* Title */}
+        <div className="mb-6">
+          <label className={labelCls}>Section title</label>
+          <input
+            className={inputCls}
+            value={section.title}
+            onChange={e => onTitleChange(e.target.value)}
+            placeholder="Section name"
+          />
+          <p className="text-xs text-catalan-textMuted mt-1">Or double-click the section name in the left panel to rename inline.</p>
+        </div>
+
+        {/* ── Section visibility condition ── */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <label className={labelCls + ' mb-0'}>When to show this section</label>
+          </div>
+
+          {/* Active condition banner with clear remove button */}
+          {hasCondition && (
+            <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-catalan-warning/10 border border-catalan-warning/30 rounded-xl">
+              <span className="text-catalan-warning">⚡</span>
+              <span className="flex-1 text-xs text-catalan-warning font-medium">
+                Visibility condition is active — this section is conditionally shown.
+              </span>
+              <button
+                onClick={() => onSkipLogicChange(undefined)}
+                className="flex-shrink-0 text-xs px-2.5 py-1 bg-catalan-error/10 border border-catalan-error/30 text-catalan-error hover:bg-catalan-error/20 rounded-lg font-medium transition-colors flex items-center gap-1"
+                title="Remove the condition — section will always be shown"
+              >
+                ✕ Remove condition
+              </button>
+            </div>
+          )}
+
+          {prevFields.length === 0 ? (
+            /* First section — nothing precedes it */
+            <div className="flex items-start gap-3 p-4 bg-catalan-hover border border-catalan-border rounded-xl">
+              <span className="text-2xl flex-shrink-0">📋</span>
+              <div>
+                <p className="text-sm font-medium text-catalan-text mb-0.5">No preceding questions</p>
+                <p className="text-xs text-catalan-textMuted">This is the first section, so there are no earlier questions to base a condition on. Move it after another section if you need conditional visibility.</p>
+              </div>
+            </div>
+          ) : (
+            <div>
+              {/* Context — show which fields can be used */}
+              <div className="mb-3 p-3 bg-catalan-surface border border-catalan-border rounded-xl">
+                <p className="text-xs font-medium text-catalan-text mb-2">
+                  {prevFields.length} preceding question{prevFields.length !== 1 ? 's' : ''} available for conditions:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {prevFields.slice(0, 8).map(f => (
+                    <span key={f.id} className="text-xs bg-catalan-hover border border-catalan-border px-2 py-0.5 rounded-full text-catalan-textMuted font-mono truncate max-w-[140px]" title={f.label}>
+                      {f.label || f.name}
+                    </span>
+                  ))}
+                  {prevFields.length > 8 && (
+                    <span className="text-xs text-catalan-textMuted px-1">+{prevFields.length - 8} more</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Skip logic editor */}
+              <div className="border border-catalan-border rounded-xl overflow-hidden">
+                <div className="px-3 py-2 bg-catalan-surface border-b border-catalan-border flex items-center gap-2">
+                  <span className="text-xs font-semibold text-catalan-text">Visibility rule</span>
+                  <span className="text-xs text-catalan-textMuted">— set when this section should appear</span>
+                </div>
+                <div className="p-3 bg-catalan-hover">
+                  <SkipLogicEditor
+                    field={syntheticField}
+                    sections={schema.sections}
+                    prevFieldsOverride={prevFields}
+                    onChange={onSkipLogicChange}
+                  />
+                </div>
+              </div>
+
+              {/* Hint when no condition set yet */}
+              {!hasCondition && (
+                <p className="mt-2 text-xs text-catalan-textMuted">
+                  Example: show <em>Business Details</em> only when <em>started_business</em> = <strong>Yes</strong>. The entire section is skipped otherwise.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Add question shortcut */}
+        <Button onClick={onAddField} size="sm" fullWidth>
+          + Add Question to this section
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// Helper: collect all section IDs recursively
+function getAllSectionIds(sections: FormSection[]): string[] {
+  const result: string[] = []
+  const traverse = (secs: FormSection[]) => {
+    for (const s of secs) { result.push(s.id); if (s.subsections?.length) traverse(s.subsections) }
+  }
+  traverse(sections)
+  return result
 }

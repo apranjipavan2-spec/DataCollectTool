@@ -11,3 +11,4 @@ from app.models.schedule import Schedule
 from app.models.form_version import FormVersion
 from app.models.push_subscription import PushSubscription
 from app.models.webhook import Webhook
+from app.models.api_key import ApiKey

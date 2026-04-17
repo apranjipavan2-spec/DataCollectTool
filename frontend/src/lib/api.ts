@@ -1,6 +1,6 @@
 /**
  * Axios instance — automatically attaches JWT from localStorage.
- * All API calls go through here.
+ * Handles silent token refresh on 401 using the stored refresh token.
  */
 import axios from 'axios'
 
@@ -12,26 +12,102 @@ api.interceptors.request.use(cfg => {
   return cfg
 })
 
+// ── Refresh-token machinery ───────────────────────────────────────────────
+let isRefreshing = false
+let refreshQueue: ((token: string) => void)[] = []
+
+function drainQueue(token: string) {
+  refreshQueue.forEach(cb => cb(token))
+  refreshQueue = []
+}
+
 api.interceptors.response.use(
   r => r,
-  err => {
-    // Only redirect to login on 401 from auth endpoints.
-    // Field app data endpoints may 401 when offline — don't kill the session.
-    const isAuthEndpoint = err.config?.url?.includes('/auth/')
-    if (err.response?.status === 401 && isAuthEndpoint) {
-      localStorage.removeItem('fp_token')
-      localStorage.removeItem('fp_user')
-      window.location.href = '/login'
+  async (err) => {
+    const original = err.config as typeof err.config & { _retry?: boolean }
+
+    // ── 401 handling: attempt silent refresh ──────────────────────────────
+    if (err.response?.status === 401 && !original._retry) {
+      // Auth endpoints themselves: don't recurse — just clear session
+      if (original.url?.includes('/auth/')) {
+        _clearSession()
+        return Promise.reject(err)
+      }
+
+      // If another refresh is already in-flight, queue this request
+      if (isRefreshing) {
+        return new Promise(resolve => {
+          refreshQueue.push(token => {
+            original.headers.Authorization = `Bearer ${token}`
+            resolve(api(original))
+          })
+        })
+      }
+
+      original._retry = true
+      isRefreshing = true
+
+      const storedRefresh = localStorage.getItem('fp_refresh_token')
+      if (!storedRefresh) {
+        isRefreshing = false
+        _clearSession()
+        return Promise.reject(err)
+      }
+
+      try {
+        // Use raw axios (not the intercepted instance) to avoid loops
+        const { data } = await axios.post('/api/v1/auth/refresh', {
+          refresh_token: storedRefresh,
+        })
+
+        localStorage.setItem('fp_token', data.access_token)
+        if (data.refresh_token) {
+          localStorage.setItem('fp_refresh_token', data.refresh_token)
+        }
+
+        // Update the stored user object (preserve all existing fields)
+        const stored = getStoredUser()
+        if (stored) {
+          localStorage.setItem('fp_user', JSON.stringify({ ...stored, access_token: data.access_token }))
+        }
+
+        original.headers.Authorization = `Bearer ${data.access_token}`
+        drainQueue(data.access_token)
+        return api(original)
+      } catch {
+        // Refresh failed — session is truly dead
+        drainQueue('')
+        _clearSession()
+        return Promise.reject(err)
+      } finally {
+        isRefreshing = false
+      }
     }
+
+    // ── 402 — plan limit exceeded ─────────────────────────────────────────
+    if (err.response?.status === 402) {
+      window.dispatchEvent(new CustomEvent('fieldpulse:plan-limit', {
+        detail: { message: err.response.data?.detail ?? 'Plan limit reached. Upgrade to continue.' },
+      }))
+    }
+
     return Promise.reject(err)
   }
 )
+
+function _clearSession() {
+  localStorage.removeItem('fp_token')
+  localStorage.removeItem('fp_refresh_token')
+  localStorage.removeItem('fp_user')
+  window.location.href = '/login'
+}
 
 export default api
 
 // ── Auth helpers ──────────────────────────────────────────────────────────
 export interface AuthUser {
   access_token: string
+  refresh_token?: string
   role: string
   name: string
   id?: string
@@ -45,11 +121,13 @@ export function getStoredUser(): AuthUser | null {
 
 export function storeUser(user: AuthUser) {
   localStorage.setItem('fp_token', user.access_token)
+  if (user.refresh_token) localStorage.setItem('fp_refresh_token', user.refresh_token)
   localStorage.setItem('fp_user', JSON.stringify(user))
 }
 
 export function logout() {
   localStorage.removeItem('fp_token')
+  localStorage.removeItem('fp_refresh_token')
   localStorage.removeItem('fp_user')
   window.location.href = '/login'
 }

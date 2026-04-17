@@ -2,17 +2,16 @@ import React, { useState } from 'react'
 import api, { storeUser } from '@/lib/api'
 import { useNavigate } from 'react-router-dom'
 import { subscribeToPush } from '@/lib/pushNotifications'
-import { Button, Input, Alert } from '@/components/ui'
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const [phone, setPhone] = useState('')
+  const [phone, setPhone]       = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [phoneError, setPhoneError] = useState('')
-  const [passwordError, setPasswordError] = useState('')
-  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [showPwd, setShowPwd]   = useState(false)
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState('')
+  const [phoneErr, setPhoneErr] = useState('')
+  const [pwdErr, setPwdErr]     = useState('')
 
   const normalizePhone = (raw: string) => {
     const digits = raw.replace(/\D/g, '')
@@ -21,169 +20,214 @@ export default function LoginPage() {
     return raw.trim()
   }
 
-  const validateForm = () => {
-    let isValid = true
-    setPhoneError('')
-    setPasswordError('')
-
-    const normalized = normalizePhone(phone)
-    if (!phone.trim()) {
-      setPhoneError('Mobile number is required')
-      isValid = false
-    } else if (normalized.length < 10) {
-      setPhoneError('Enter a valid phone number')
-      isValid = false
-    }
-
-    if (!password) {
-      setPasswordError('Password is required')
-      isValid = false
-    }
-
-    return isValid
+  const validate = () => {
+    let ok = true
+    setPhoneErr(''); setPwdErr('')
+    if (!phone.trim()) { setPhoneErr('Mobile number is required'); ok = false }
+    if (!password)     { setPwdErr('Password is required'); ok = false }
+    return ok
   }
 
   const handleLogin = async () => {
-    if (!validateForm()) return
-
-    const normalized = normalizePhone(phone)
-    setLoading(true)
-    setError('')
+    if (!validate()) return
+    setLoading(true); setError('')
     try {
-      const { data } = await api.post('/auth/login', { phone: normalized, password })
+      const { data } = await api.post('/auth/login', { phone: normalizePhone(phone), password })
       storeUser(data)
       subscribeToPush().catch(() => {})
-      const dest = data.role === 'enumerator' ? '/collect' : '/'
+      const dest = data.role === 'master_admin' ? '/admin'
+                 : data.role === 'enumerator'   ? '/collect'
+                 : '/'
       navigate(dest, { replace: true })
     } catch (err: any) {
-      const detail = err.response?.data?.detail
-      setError(detail ?? 'Invalid phone or password')
+      setError(err.response?.data?.detail ?? 'Invalid phone or password')
     } finally {
       setLoading(false)
     }
   }
 
-  const features = [
-    { icon: '📱', title: 'Offline First', description: 'Collect data without internet connection' },
-    { icon: '🔒', title: 'Secure', description: 'End-to-end encryption for all data' },
-    { icon: '⚡', title: 'Fast Sync', description: 'Automatic background synchronization' },
-    { icon: '🌍', title: 'Multi-Language', description: 'English, Hindi, Kannada, Telugu' },
-  ]
-
   return (
-    <div className="min-h-screen bg-catalan-bg flex">
-      {/* Left Side - Hero Section */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-catalan-primary to-catalan-primaryDark p-12 flex-col justify-between text-white">
-        <div>
-          <h1 className="text-4xl font-bold mb-4">FieldPulse</h1>
-          <p className="text-lg opacity-90">Offline-first field data collection for India</p>
+    <div className="min-h-screen flex bg-white">
+
+      {/* ── Left branding panel ── */}
+      <div className="hidden lg:flex lg:w-[480px] xl:w-[520px] flex-shrink-0 flex-col p-12 relative overflow-hidden"
+           style={{ background: 'linear-gradient(160deg, #eff6ff 0%, #dbeafe 40%, #bfdbfe 100%)' }}>
+
+        {/* Decorative blobs */}
+        <div className="absolute top-[-80px] right-[-80px] w-[320px] h-[320px] rounded-full opacity-30"
+             style={{ background: 'radial-gradient(circle, #3b82f6, transparent 70%)' }} />
+        <div className="absolute bottom-[-60px] left-[-60px] w-[240px] h-[240px] rounded-full opacity-20"
+             style={{ background: 'radial-gradient(circle, #6366f1, transparent 70%)' }} />
+
+        {/* Logo */}
+        <div className="relative z-10 flex items-center gap-3 mb-auto">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-lg shadow-md"
+               style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}>
+            FP
+          </div>
+          <span className="text-slate-800 text-xl font-bold tracking-tight">FieldPulse</span>
         </div>
 
-        <div className="space-y-6">
-          {features.map((feature, i) => (
-            <div key={i} className="flex gap-4">
-              <div className="text-3xl">{feature.icon}</div>
-              <div>
-                <h3 className="font-semibold text-lg">{feature.title}</h3>
-                <p className="text-sm opacity-80">{feature.description}</p>
+        {/* Headline */}
+        <div className="relative z-10 mt-16 mb-auto">
+          <h2 className="text-[2.6rem] font-extrabold text-slate-900 leading-tight mb-4">
+            Field data,<br />
+            <span style={{ background: 'linear-gradient(90deg, #2563eb, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              done right.
+            </span>
+          </h2>
+          <p className="text-slate-500 text-base leading-relaxed max-w-xs">
+            Offline-first surveys built for ground-level work across India.
+          </p>
+
+          {/* Feature cards */}
+          <div className="mt-10 space-y-3">
+            {[
+              { icon: '📡', label: 'Works offline',      sub: 'Auto-syncs when back online' },
+              { icon: '📋', label: 'Smart skip logic',   sub: 'Conditionals, calculations, branching' },
+              { icon: '👥', label: 'Role-based teams',   sub: 'Admins, supervisors, enumerators' },
+              { icon: '📊', label: 'Instant exports',    sub: 'CSV, Excel, live dashboards' },
+            ].map(f => (
+              <div key={f.label} className="flex items-center gap-3 bg-white/60 backdrop-blur rounded-xl px-4 py-3 shadow-sm border border-white/80">
+                <span className="text-xl">{f.icon}</span>
+                <div>
+                  <div className="text-slate-800 text-sm font-semibold leading-none">{f.label}</div>
+                  <div className="text-slate-400 text-xs mt-0.5">{f.sub}</div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
-        <div className="text-sm opacity-75">
-          <p>© 2026 FieldPulse. All rights reserved.</p>
-        </div>
+        <p className="relative z-10 text-slate-400 text-xs mt-10">© 2026 FieldPulse</p>
       </div>
 
-      {/* Right Side - Login Form */}
-      <div className="w-full lg:w-1/2 bg-catalan-bg flex items-center justify-center p-6">
-        <div className="w-full max-w-md">
-          {/* Mobile Header */}
-          <div className="lg:hidden mb-8 text-center">
-            <h1 className="text-3xl font-bold text-catalan-primary">FieldPulse</h1>
-            <p className="text-catalan-textMuted mt-2">Offline-first field data collection</p>
+      {/* ── Right form panel ── */}
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-12" style={{ background: '#dbeafe' }}>
+        <div className="w-full max-w-[420px]">
+
+          {/* Mobile logo */}
+          <div className="lg:hidden flex items-center gap-2 mb-8">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-base shadow"
+                 style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}>FP</div>
+            <span className="text-slate-800 text-xl font-bold">FieldPulse</span>
           </div>
 
-          <div className="space-y-6">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-catalan-text">Welcome Back</h2>
-              <p className="text-catalan-textMuted mt-2">Sign in to your account to continue</p>
+          {/* Card */}
+          <div className="bg-white rounded-2xl border border-blue-100 p-8"
+               style={{ boxShadow: '0 8px 32px rgba(37, 99, 235, 0.12), 0 2px 8px rgba(0,0,0,0.06)' }}>
+
+            {/* Heading */}
+            <div className="mb-7 pb-6 border-b border-slate-100 text-center">
+              <div className="flex items-center justify-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-base flex-shrink-0"
+                     style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', boxShadow: '0 4px 12px rgba(37,99,235,0.35)' }}>
+                  FP
+                </div>
+                <h1 className="text-2xl font-bold text-black tracking-tight">Welcome back</h1>
+              </div>
+              <p className="text-slate-500 text-sm">Sign in to continue to FieldPulse</p>
             </div>
 
+            {/* Error */}
             {error && (
-              <Alert
-                type="error"
-                title="Login Failed"
-                message={error}
-                onClose={() => setError('')}
-              />
+              <div className="flex items-start gap-3 mb-5 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+                <span className="mt-0.5 flex-shrink-0">⚠</span>
+                <span className="flex-1">{error}</span>
+                <button onClick={() => setError('')} className="text-red-400 hover:text-red-600 flex-shrink-0 ml-1">✕</button>
+              </div>
             )}
 
-            {showForgotPassword && (
-              <Alert
-                type="info"
-                title="Password Reset"
-                message="Contact your administrator to reset your password."
-                onClose={() => setShowForgotPassword(false)}
-              />
-            )}
+            {/* Form */}
+            <div className="space-y-4 mb-4">
 
-            <div className="space-y-4">
-              <Input
-                label="Mobile Number"
-                type="tel"
-                placeholder="+91 98765 43210"
-                value={phone}
-                error={phoneError}
-                onChange={(e) => {
-                  setPhone(e.target.value)
-                  if (phoneError) setPhoneError('')
-                  if (error) setError('')
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') document.getElementById('pwd-input')?.focus()
-                }}
-                autoFocus
-              />
+              {/* Phone */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
+                  Mobile Number
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm select-none">📱</span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="98765 43210"
+                    value={phone}
+                    autoFocus
+                    onChange={e => { setPhone(e.target.value); setPhoneErr(''); setError('') }}
+                    onKeyDown={e => e.key === 'Enter' && document.getElementById('pwd')?.focus()}
+                    className={`w-full bg-slate-50 border rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white transition-all duration-150 ${
+                      phoneErr ? 'border-red-400 focus:border-red-400 focus:ring-2 focus:ring-red-100'
+                               : 'border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'}`}
+                    style={{ boxShadow: phoneErr ? undefined : '0 1px 4px rgba(0,0,0,0.06)' }}
+                  />
+                </div>
+                {phoneErr && <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1"><span>⚠</span>{phoneErr}</p>}
+              </div>
 
-              <Input
-                id="pwd-input"
-                label="Password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                error={passwordError}
-                onChange={(e) => {
-                  setPassword(e.target.value)
-                  if (passwordError) setPasswordError('')
-                  if (error) setError('')
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleLogin()
-                }}
-              />
+              {/* Password */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm select-none">🔒</span>
+                  <input
+                    id="pwd"
+                    type={showPwd ? 'text' : 'password'}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={e => { setPassword(e.target.value); setPwdErr(''); setError('') }}
+                    onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                    className={`w-full bg-slate-50 border rounded-xl pl-10 pr-16 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white transition-all duration-150 ${
+                      pwdErr ? 'border-red-400 focus:border-red-400 focus:ring-2 focus:ring-red-100'
+                             : 'border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'}`}
+                    style={{ boxShadow: pwdErr ? undefined : '0 1px 4px rgba(0,0,0,0.06)' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPwd(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-blue-500 hover:text-blue-700 transition-colors px-1.5 py-0.5 rounded"
+                    tabIndex={-1}
+                  >
+                    {showPwd ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                {pwdErr && <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1"><span>⚠</span>{pwdErr}</p>}
+              </div>
             </div>
 
-            <Button
-              onClick={handleLogin}
-              disabled={loading}
-              isLoading={loading}
-              fullWidth
-              size="lg"
-            >
-              Sign In
-            </Button>
-
-            <div className="text-center">
+            {/* Forgot */}
+            <div className="flex justify-end mb-6">
               <button
-                onClick={() => setShowForgotPassword(!showForgotPassword)}
-                className="text-catalan-primary hover:text-catalan-primaryLight text-sm transition-colors"
+                onClick={() => navigate('/forgot-password')}
+                className="text-xs text-blue-600 hover:text-blue-800 hover:underline transition-colors font-semibold"
               >
                 Forgot password?
               </button>
             </div>
+
+            {/* Submit */}
+            <button
+              onClick={handleLogin}
+              disabled={loading}
+              className="w-full py-3.5 rounded-xl font-bold text-sm text-white transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
+              style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', boxShadow: '0 4px 16px rgba(37,99,235,0.35)' }}
+            >
+              {loading ? (
+                <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Signing in…</span></>
+              ) : (
+                <>Sign In &nbsp;→</>
+              )}
+            </button>
+
+            <div className="mt-5 pt-5 border-t border-slate-100 text-center">
+              <p className="text-xs text-slate-400">
+                Having trouble? Contact your supervisor or administrator.
+              </p>
+            </div>
           </div>
+
         </div>
       </div>
     </div>

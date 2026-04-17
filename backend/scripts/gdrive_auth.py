@@ -1,9 +1,10 @@
 """
-One-time Google Drive OAuth2 authorization.
+One-time Google Drive + Sheets OAuth2 authorization.
 
 Run:  cd backend && python scripts/gdrive_auth.py
 
 A browser opens → sign in → grant access → token is saved automatically.
+Grants both Drive (media uploads) and Sheets (export to Google Sheets).
 """
 import sys
 import os
@@ -13,7 +14,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-SCOPES = ["https://www.googleapis.com/auth/drive.file"]
+SCOPES = [
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/spreadsheets",
+]
 CLIENT_SECRET = Path("credentials/gdrive-oauth-client.json")
 TOKEN_PATH = Path("credentials/gdrive-token.json")
 

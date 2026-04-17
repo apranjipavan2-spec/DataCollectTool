@@ -26,7 +26,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
           fixed left-0 top-0 h-screen bg-catalan-surface border-r border-catalan-border
           transition-all duration-300 z-40
           hidden md:flex md:flex-col
-          md:w-20 lg:w-64
+          md:w-14 lg:w-48
         "
       >
         {/* Header */}
@@ -142,7 +142,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
       </div>
 
       {/* Spacer for desktop */}
-      <div className="hidden md:block transition-all duration-300 md:w-20 lg:w-64" />
+      <div className="hidden md:block transition-all duration-300 md:w-14 lg:w-48" />
     </>
   )
 }

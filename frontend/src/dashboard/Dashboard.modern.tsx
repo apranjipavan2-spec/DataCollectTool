@@ -308,6 +308,7 @@ function AssignModal({
   onClose: () => void
 }) {
   const [busy, setBusy] = useState('')
+  const [assigningAll, setAssigningAll] = useState(false)
   const assignedIds = new Set(assignments.map(a => a.enumerator_id))
   const unassigned = team.filter(u => u.role === 'enumerator' && !assignedIds.has(u.id))
 
@@ -319,6 +320,15 @@ function AssignModal({
   const handleUnassign = async (assignment: Assignment) => {
     setBusy(assignment.enumerator_id)
     try { await onUnassign(assignment.id) } catch {} finally { setBusy('') }
+  }
+
+  const handleAssignAll = async () => {
+    if (unassigned.length === 0) return
+    setAssigningAll(true)
+    for (const u of unassigned) {
+      try { await onAssign(u.id) } catch {}
+    }
+    setAssigningAll(false)
   }
 
   return (
@@ -349,9 +359,20 @@ function AssignModal({
         </div>
 
         <div>
-          <h4 className="text-xs font-medium text-catalan-textMuted uppercase tracking-wider mb-2">
-            Available ({unassigned.length})
-          </h4>
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-xs font-medium text-catalan-textMuted uppercase tracking-wider">
+              Available ({unassigned.length})
+            </h4>
+            {unassigned.length > 1 && (
+              <button
+                onClick={handleAssignAll}
+                disabled={assigningAll || !!busy}
+                className="text-xs px-2.5 py-1 rounded border border-catalan-success/30 text-catalan-success hover:bg-catalan-success/10 disabled:opacity-50 transition-colors"
+              >
+                {assigningAll ? 'Assigning…' : 'Assign All'}
+              </button>
+            )}
+          </div>
           {unassigned.length === 0 ? (
             <p className="text-sm text-catalan-textMuted">All enumerators assigned</p>
           ) : (
@@ -386,7 +407,7 @@ const TEAM_PAGE_SIZE = 20
 
 export default function Dashboard() {
   const toast = useToast()
-  const [tab, setTab] = useState<'overview' | 'submissions' | 'forms' | 'team'>('overview')
+  const [tab, setTab] = useState<'overview' | 'submissions' | 'forms' | 'team' | 'integrations'>('overview')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -430,8 +451,102 @@ export default function Dashboard() {
   const [csvResult, setCsvResult] = useState<{ created: number; skipped: number; errors: string[] } | null>(null)
   const csvInputRef = useRef<HTMLInputElement>(null)
 
+  // Usage tracking
+  interface UsageData {
+    plan_tier: string
+    limits: Record<string, number>
+    usage: Record<string, number>
+  }
+  const [usageData, setUsageData] = useState<UsageData | null>(null)
+
+  // Sheets export
+  const [exportingSheets, setExportingSheets] = useState(false)
+  const [sheetsConfigured, setSheetsConfigured] = useState<boolean | null>(null)
+
+  // Digest
+  const [sendingDigest, setSendingDigest] = useState(false)
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+
+  // Excel export
+  const [exportingXlsx, setExportingXlsx] = useState(false)
+
+  // Duplicates view
+  const [showDuplicates, setShowDuplicates] = useState(false)
+  interface DuplicateGroup {
+    enumerator_name: string; form_title: string; day: string; count: number; submission_ids: string[]
+  }
+  const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([])
+  const [loadingDuplicates, setLoadingDuplicates] = useState(false)
+
+  // Form templates
+  const [formsSubTab, setFormsSubTab] = useState<'my-forms' | 'templates'>('my-forms')
+  interface Template { slug: string; title: string; description: string; category: string; icon: string; field_count: number }
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
+  const [cloningSlug, setCloningSlug] = useState<string | null>(null)
+
+  // Schedules
+  interface ScheduleItem {
+    id: string; form_id: string; form_title: string
+    enumerator_id: string; enumerator_name: string
+    start_date: string; end_date: string; location: string
+    target_count: number; notes: string; status: string
+  }
+  const [schedules, setSchedules] = useState<ScheduleItem[]>([])
+  const [loadingSchedules, setLoadingSchedules] = useState(false)
+  const [showScheduleForm, setShowScheduleForm] = useState(false)
+  const [newSchedule, setNewSchedule] = useState({
+    form_id: '', enumerator_id: '', start_date: '', end_date: '',
+    location: '', target_count: 0, notes: '',
+  })
+  const [savingSchedule, setSavingSchedule] = useState(false)
+
+  // Integrations — Webhooks
+  interface WebhookItem {
+    id: string; name: string; url: string; events: string[]
+    is_active: boolean; created_at: string; secret: string | null
+  }
+  const [webhooks, setWebhooks] = useState<WebhookItem[]>([])
+  const [loadingWebhooks, setLoadingWebhooks] = useState(false)
+  const [showWebhookForm, setShowWebhookForm] = useState(false)
+  const [newWebhook, setNewWebhook] = useState({ name: '', url: '', secret: '', events: [] as string[] })
+  const [savingWebhook, setSavingWebhook] = useState(false)
+  const [testingWebhook, setTestingWebhook] = useState('')
+  const [testResult, setTestResult] = useState<{ id: string; success: boolean; status_code: number | null } | null>(null)
+
+  const WEBHOOK_EVENTS = [
+    'submission.created', 'submission.synced', 'submission.flagged',
+    'submission.approved', 'submission.rejected',
+  ]
+
+  // Integrations — API Keys
+  interface ApiKeyItem { id: string; name: string; created_at: string; last_used_at: string | null; is_active: boolean }
+  const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>([])
+  const [loadingApiKeys, setLoadingApiKeys] = useState(false)
+  const [showApiKeyForm, setShowApiKeyForm] = useState(false)
+  const [newKeyName, setNewKeyName] = useState('')
+  const [creatingKey, setCreatingKey] = useState(false)
+  const [newKeyPlaintext, setNewKeyPlaintext] = useState('')
+
+  // Plan limit banner
+  const [planLimitMsg, setPlanLimitMsg] = useState('')
+
   const user = getStoredUser() || { name: '', role: '' }
   const sidebarItems = getNavItems(user.role)
+
+  // Listen for 402 plan-limit events fired by api.ts interceptor
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const msg = (e as CustomEvent).detail?.message ?? 'Plan limit reached. Upgrade to continue.'
+      setPlanLimitMsg(msg)
+      toast.warning(msg)
+    }
+    window.addEventListener('fieldpulse:plan-limit', handler)
+    return () => window.removeEventListener('fieldpulse:plan-limit', handler)
+  }, [toast])
 
   useEffect(() => {
     Promise.allSettled([
@@ -439,6 +554,8 @@ export default function Dashboard() {
       api.get('/submissions/?page_size=200').then(r => setSubmissions(r.data.items ?? r.data.submissions ?? [])),
       api.get('/users/?page_size=200').then(r => setTeam(r.data.items ?? r.data.users ?? [])),
       api.get('/assignments/').then(r => setAssignments(r.data ?? [])),
+      api.get('/tenants/me/usage').then(r => setUsageData(r.data)).catch(() => {}),
+      api.get('/export/sheets/status').then(r => setSheetsConfigured(r.data.configured)).catch(() => setSheetsConfigured(false)),
     ]).then(results => {
       const failed = results.filter(r => r.status === 'rejected')
       if (failed.length > 0) setError('Some data failed to load')
@@ -556,6 +673,120 @@ export default function Dashboard() {
     }
   }
 
+  const handleExportXlsx = async () => {
+    if (!filterForm) { toast.warning('Select a form to export'); return }
+    setExportingXlsx(true)
+    try {
+      const params: Record<string, string> = {}
+      if (dateFrom) params.date_from = dateFrom
+      if (dateTo) params.date_to = dateTo
+      const res = await api.get(`/export/${filterForm}/xlsx`, { responseType: 'blob', params })
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a'); a.href = url
+      a.download = `export_${new Date().toISOString().slice(0,10)}.xlsx`
+      a.click(); URL.revokeObjectURL(url)
+      toast.success('Excel file downloaded')
+    } catch {
+      toast.error('Excel export failed')
+    } finally {
+      setExportingXlsx(false)
+    }
+  }
+
+  const handleLoadDuplicates = async () => {
+    setLoadingDuplicates(true)
+    try {
+      const params: Record<string, string> = {}
+      if (filterForm) params.form_id = filterForm
+      const { data } = await api.get('/submissions/potential-duplicates', { params })
+      setDuplicates(data)
+    } catch {
+      toast.error('Failed to load duplicates')
+    } finally {
+      setLoadingDuplicates(false)
+    }
+  }
+
+  const handleLoadTemplates = async () => {
+    if (templates.length > 0) return // already loaded
+    setLoadingTemplates(true)
+    try {
+      const { data } = await api.get('/templates/')
+      setTemplates(data)
+    } catch {
+      toast.error('Failed to load templates')
+    } finally {
+      setLoadingTemplates(false)
+    }
+  }
+
+  const handleCloneTemplate = async (slug: string, title: string) => {
+    setCloningSlug(slug)
+    try {
+      const { data } = await api.post(`/templates/${slug}/clone`)
+      toast.success(`"${title}" added to your forms`)
+      setForms(prev => [...prev, { id: data.id, title: data.title, version: data.version, status: data.status, updated_at: new Date().toISOString() }])
+      setFormsSubTab('my-forms')
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail ?? 'Clone failed')
+    } finally {
+      setCloningSlug(null)
+    }
+  }
+
+  const handleExportSheets = async () => {
+    if (!filterForm) { toast.warning('Select a form to export to Sheets'); return }
+    setExportingSheets(true)
+    try {
+      const params: Record<string, string> = {}
+      if (dateFrom) params.date_from = dateFrom
+      if (dateTo) params.date_to = dateTo
+      const { data } = await api.post(`/export/${filterForm}/sheets`, null, { params })
+      toast.success(`Exported ${data.rows} rows to Google Sheets`)
+      window.open(data.url, '_blank', 'noopener')
+    } catch (err: any) {
+      const detail = err.response?.data?.detail ?? 'Sheets export failed'
+      toast.error(detail)
+    } finally {
+      setExportingSheets(false)
+    }
+  }
+
+  const handleSendDigest = async () => {
+    setSendingDigest(true)
+    try {
+      const { data } = await api.post('/reports/digest')
+      toast.success(`Digest sent to ${data.sent} recipient${data.sent !== 1 ? 's' : ''}${data.skipped > 0 ? ` (${data.skipped} skipped — no email set)` : ''}`)
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail ?? 'Failed to send digest')
+    } finally {
+      setSendingDigest(false)
+    }
+  }
+
+  const handleBulkAction = async (status: string) => {
+    if (selectedIds.size === 0) return
+    const label = status.charAt(0).toUpperCase() + status.slice(1)
+    if (!confirm(`${label} ${selectedIds.size} submission${selectedIds.size > 1 ? 's' : ''}?`)) return
+    setBulkBusy(true)
+    try {
+      const { data } = await api.post('/submissions/bulk', {
+        ids: Array.from(selectedIds),
+        status,
+      })
+      toast.success(`${label}d ${data.updated} submission${data.updated !== 1 ? 's' : ''}`)
+      // Refresh updated rows in local state
+      setSubmissions(prev => prev.map(s =>
+        selectedIds.has(s.id) ? { ...s, status } : s
+      ))
+      setSelectedIds(new Set())
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail ?? `Bulk ${label.toLowerCase()} failed`)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   const handleAddUser = async () => {
     if (!newUser.phone || !newUser.name) { toast.warning('Phone and name are required'); return }
     if (!newUser.password) { toast.warning('Password is required'); return }
@@ -608,6 +839,115 @@ export default function Dashboard() {
     }
   }
 
+  const loadSchedules = async () => {
+    setLoadingSchedules(true)
+    try { const { data } = await api.get('/schedules/'); setSchedules(data ?? []) }
+    catch { toast.error('Failed to load schedules') }
+    finally { setLoadingSchedules(false) }
+  }
+
+  const handleCreateSchedule = async () => {
+    if (!newSchedule.form_id || !newSchedule.enumerator_id || !newSchedule.start_date || !newSchedule.end_date) {
+      toast.warning('Form, enumerator, start date, and end date are required')
+      return
+    }
+    setSavingSchedule(true)
+    try {
+      const { data } = await api.post('/schedules/', newSchedule)
+      toast.success('Schedule created')
+      setShowScheduleForm(false)
+      setNewSchedule({ form_id: '', enumerator_id: '', start_date: '', end_date: '', location: '', target_count: 0, notes: '' })
+      loadSchedules()
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail ?? 'Failed to create schedule')
+    } finally { setSavingSchedule(false) }
+  }
+
+  const handleDeleteSchedule = async (id: string) => {
+    if (!confirm('Cancel this schedule?')) return
+    try {
+      await api.delete(`/schedules/${id}`)
+      setSchedules(s => s.filter(x => x.id !== id))
+      toast.success('Schedule cancelled')
+    } catch { toast.error('Failed to cancel schedule') }
+  }
+
+  const loadWebhooks = async () => {
+    setLoadingWebhooks(true)
+    try { const { data } = await api.get('/webhooks/'); setWebhooks(data.items ?? []) }
+    catch { toast.error('Failed to load webhooks') }
+    finally { setLoadingWebhooks(false) }
+  }
+
+  const loadApiKeys = async () => {
+    setLoadingApiKeys(true)
+    try { const { data } = await api.get('/api-keys/'); setApiKeys(data ?? []) }
+    catch { toast.error('Failed to load API keys') }
+    finally { setLoadingApiKeys(false) }
+  }
+
+  const handleCreateWebhook = async () => {
+    if (!newWebhook.name || !newWebhook.url) { toast.warning('Name and URL are required'); return }
+    setSavingWebhook(true)
+    try {
+      const { data } = await api.post('/webhooks/', {
+        name: newWebhook.name, url: newWebhook.url,
+        secret: newWebhook.secret || undefined,
+        events: newWebhook.events, is_active: true,
+      })
+      setWebhooks(w => [data, ...w])
+      setNewWebhook({ name: '', url: '', secret: '', events: [] })
+      setShowWebhookForm(false)
+      toast.success('Webhook created')
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail ?? 'Failed to create webhook')
+    } finally { setSavingWebhook(false) }
+  }
+
+  const handleDeleteWebhook = async (id: string) => {
+    if (!confirm('Delete this webhook?')) return
+    try {
+      await api.delete(`/webhooks/${id}`)
+      setWebhooks(w => w.filter(x => x.id !== id))
+      toast.success('Webhook deleted')
+    } catch { toast.error('Failed to delete webhook') }
+  }
+
+  const handleTestWebhook = async (id: string) => {
+    setTestingWebhook(id)
+    setTestResult(null)
+    try {
+      const { data } = await api.post(`/webhooks/${id}/test`)
+      setTestResult({ id, success: data.success, status_code: data.status_code })
+      toast[data.success ? 'success' : 'error'](`Test ${data.success ? 'succeeded' : 'failed'}: HTTP ${data.status_code ?? 'error'}`)
+    } catch { toast.error('Test request failed') }
+    finally { setTestingWebhook('') }
+  }
+
+  const handleCreateApiKey = async () => {
+    if (!newKeyName.trim()) { toast.warning('Key name is required'); return }
+    setCreatingKey(true)
+    try {
+      const { data } = await api.post('/api-keys/', { name: newKeyName.trim() })
+      setApiKeys(k => [{ ...data }, ...k])
+      setNewKeyPlaintext(data.key)
+      setNewKeyName('')
+      setShowApiKeyForm(false)
+      toast.success('API key created — copy it now, it won\'t be shown again')
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail ?? 'Failed to create API key')
+    } finally { setCreatingKey(false) }
+  }
+
+  const handleRevokeApiKey = async (id: string, name: string) => {
+    if (!confirm(`Revoke API key "${name}"? It will stop working immediately.`)) return
+    try {
+      await api.delete(`/api-keys/${id}`)
+      setApiKeys(k => k.filter(x => x.id !== id))
+      toast.success('API key revoked')
+    } catch { toast.error('Failed to revoke key') }
+  }
+
   return (
     <div className="flex h-screen bg-catalan-bg">
       {/* Submission detail modal */}
@@ -651,16 +991,23 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — desktop only */}
       <Sidebar items={sidebarItems} role={user.role} />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-auto">
         <TopNav title="Dashboard" />
 
-        <div className="flex-1 p-6 space-y-6">
+        <div className="flex-1 p-3 sm:p-6 space-y-4 sm:space-y-6 pb-20 md:pb-6">
           {error && (
             <Alert type="warning" message={error} onClose={() => setError('')} />
+          )}
+          {planLimitMsg && (
+            <div className="flex items-start gap-3 px-4 py-3 bg-catalan-error/10 border border-catalan-error/30 rounded-lg text-sm">
+              <span className="text-catalan-error font-medium">Plan limit reached</span>
+              <span className="text-catalan-textMuted flex-1">{planLimitMsg}</span>
+              <button onClick={() => setPlanLimitMsg('')} className="text-catalan-textMuted hover:text-catalan-text text-lg leading-none">×</button>
+            </div>
           )}
 
           {/* ── Loading skeleton ── */}
@@ -691,11 +1038,15 @@ export default function Dashboard() {
           </div>}
 
           {/* Tabs + Content (hidden while loading) */}
-          {!loading && <><div className="flex gap-1 bg-catalan-surface rounded-lg p-1 w-fit">
-            {(['overview', 'submissions', 'forms', 'team'] as const).map(t => (
+          {!loading && <><div className="hidden sm:flex gap-1 bg-catalan-surface rounded-lg p-1 w-fit flex-wrap">
+            {(['overview', 'submissions', 'forms', 'team', 'integrations'] as const).map(t => (
               <button
                 key={t}
-                onClick={() => setTab(t)}
+                onClick={() => {
+                  setTab(t)
+                  if (t === 'integrations') { loadWebhooks(); loadApiKeys() }
+                  if (t === 'team') loadSchedules()
+                }}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
                   tab === t
                     ? 'bg-catalan-primary text-catalan-bg shadow-sm'
@@ -787,6 +1138,73 @@ export default function Dashboard() {
                   )}
                 </Card>
               </div>
+
+              {/* Usage + Quick Actions */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Plan Usage */}
+                {usageData && (
+                  <Card title={`Plan Usage — ${usageData.plan_tier.charAt(0).toUpperCase() + usageData.plan_tier.slice(1)}`}>
+                    <div className="space-y-4">
+                      {[
+                        {
+                          label: 'Submissions this month',
+                          used: usageData.usage.submissions_this_month,
+                          limit: usageData.limits.submissions_per_month,
+                        },
+                        {
+                          label: 'Active users',
+                          used: usageData.usage.users,
+                          limit: usageData.limits.users,
+                        },
+                        {
+                          label: 'Forms',
+                          used: usageData.usage.forms,
+                          limit: usageData.limits.forms,
+                        },
+                      ].map(({ label, used, limit }) => {
+                        const pct = limit < 0 ? 0 : Math.min(100, Math.round((used / Math.max(limit, 1)) * 100))
+                        const isUnlimited = limit < 0
+                        const isOver80 = pct >= 80
+                        const barColor = pct >= 100 ? 'bg-catalan-error' : pct >= 80 ? 'bg-catalan-warning' : 'bg-catalan-primary'
+                        return (
+                          <div key={label}>
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-sm text-catalan-textMuted">{label}</span>
+                              <span className={`text-sm font-medium ${isOver80 && !isUnlimited ? 'text-catalan-warning' : 'text-catalan-text'}`}>
+                                {used.toLocaleString()}{isUnlimited ? '' : ` / ${limit.toLocaleString()}`}
+                                {isUnlimited && <span className="text-xs text-catalan-textMuted ml-1">unlimited</span>}
+                              </span>
+                            </div>
+                            {!isUnlimited && (
+                              <div className="h-1.5 bg-catalan-hover rounded-full overflow-hidden">
+                                <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Quick Actions */}
+                <Card title="Quick Actions">
+                  <div className="space-y-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleSendDigest}
+                      disabled={sendingDigest}
+                      className="w-full justify-start"
+                    >
+                      {sendingDigest ? 'Sending…' : '📧 Send Daily Digest Now'}
+                    </Button>
+                    <p className="text-xs text-catalan-textMuted pl-1">
+                      Emails yesterday's summary to all supervisors &amp; admins with email set.
+                    </p>
+                  </div>
+                </Card>
+              </div>
             </div>
           )}
 
@@ -795,8 +1213,9 @@ export default function Dashboard() {
             <div className="space-y-4">
               {/* Filter bar */}
               <Card>
-                <div className="flex flex-wrap gap-3 items-end">
-                  <div className="flex-1 min-w-[160px]">
+                {/* Row 1: Search + Form — always visible */}
+                <div className="flex gap-3 items-end mb-3">
+                  <div className="flex-1 min-w-0">
                     <label className="text-xs text-catalan-textMuted block mb-1">Search</label>
                     <input
                       value={search}
@@ -805,7 +1224,7 @@ export default function Dashboard() {
                       className="w-full bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text placeholder-catalan-textMuted focus:outline-none focus:border-catalan-primary"
                     />
                   </div>
-                  <div className="min-w-[160px]">
+                  <div className="flex-1 min-w-0">
                     <label className="text-xs text-catalan-textMuted block mb-1">Form</label>
                     <select
                       value={filterForm}
@@ -816,53 +1235,164 @@ export default function Dashboard() {
                       {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className="text-xs text-catalan-textMuted block mb-1">From</label>
-                    <input
-                      type="date"
-                      value={dateFrom}
-                      onChange={e => setDateFrom(e.target.value)}
-                      className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
-                    />
+                </div>
+                {/* Row 2: Dates + actions — wrap naturally */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  <div className="flex gap-2 items-end">
+                    <div>
+                      <label className="text-xs text-catalan-textMuted block mb-1">From</label>
+                      <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={e => setDateFrom(e.target.value)}
+                        className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-catalan-textMuted block mb-1">To</label>
+                      <input
+                        type="date"
+                        value={dateTo}
+                        onChange={e => setDateTo(e.target.value)}
+                        className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+                      />
+                    </div>
+                    {(dateFrom || dateTo || search || filterForm) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => { setSearch(''); setFilterForm(''); setDateFrom(''); setDateTo(''); setSubPage(1) }}
+                      >
+                        Clear
+                      </Button>
+                    )}
                   </div>
-                  <div>
-                    <label className="text-xs text-catalan-textMuted block mb-1">To</label>
-                    <input
-                      type="date"
-                      value={dateTo}
-                      onChange={e => setDateTo(e.target.value)}
-                      className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
-                    />
-                  </div>
-                  {(dateFrom || dateTo || search || filterForm) && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => { setSearch(''); setFilterForm(''); setDateFrom(''); setDateTo(''); setSubPage(1) }}
-                    >
-                      Clear
+                  <div className="flex gap-2 flex-wrap ml-auto">
+                    <Button variant="secondary" size="sm" onClick={handleExport} disabled={exportingCsv}>
+                      {exportingCsv ? 'Exporting…' : '↓ CSV'}
                     </Button>
-                  )}
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleExport}
-                    disabled={exportingCsv}
-                  >
-                    {exportingCsv ? 'Exporting…' : '↓ Export CSV'}
-                  </Button>
+                    <Button variant="secondary" size="sm" onClick={handleExportXlsx} disabled={exportingXlsx} title="Download as Excel (.xlsx)">
+                      {exportingXlsx ? 'Creating…' : '↓ Excel'}
+                    </Button>
+                    {sheetsConfigured === false ? (
+                      <button
+                        title="Google Drive not connected — run scripts/gdrive_auth.py on the server"
+                        className="text-xs px-3 py-1.5 rounded border border-catalan-border text-catalan-textMuted opacity-60 cursor-not-allowed"
+                        disabled
+                      >
+                        ↗ Sheets
+                      </button>
+                    ) : (
+                      <Button variant="secondary" size="sm" onClick={handleExportSheets} disabled={exportingSheets || sheetsConfigured === null} title="Export to Google Sheets">
+                        {exportingSheets ? 'Creating…' : '↗ Sheets'}
+                      </Button>
+                    )}
+                    <Button
+                      variant={showDuplicates ? 'primary' : 'secondary'}
+                      size="sm"
+                      onClick={() => { const next = !showDuplicates; setShowDuplicates(next); if (next) handleLoadDuplicates() }}
+                      title="Show potential duplicate submissions"
+                    >
+                      ⚠ Dupes
+                    </Button>
+                  </div>
                 </div>
               </Card>
 
-              {/* Submissions table */}
+              {/* Duplicates panel */}
+              {showDuplicates && (
+                <Card title="Potential Duplicate Submissions">
+                  {loadingDuplicates ? (
+                    <div className="text-sm text-catalan-textMuted py-4 text-center">Loading…</div>
+                  ) : duplicates.length === 0 ? (
+                    <div className="text-sm text-catalan-success py-4 text-center">No potential duplicates found</div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs text-catalan-textMuted mb-3">
+                        Groups where the same enumerator submitted the same form more than once on the same day.
+                      </p>
+                      {duplicates.map((group, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 bg-catalan-hover rounded border border-catalan-warning/30">
+                          <div>
+                            <span className="text-sm font-medium text-catalan-text">{group.enumerator_name}</span>
+                            <span className="text-xs text-catalan-textMuted mx-2">·</span>
+                            <span className="text-sm text-catalan-textMuted">{group.form_title}</span>
+                            <span className="text-xs text-catalan-textMuted mx-2">·</span>
+                            <span className="text-xs text-catalan-textMuted">{group.day}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs font-bold text-catalan-warning bg-catalan-warning/10 px-2 py-0.5 rounded">
+                              {group.count}×
+                            </span>
+                            <button
+                              className="text-xs text-catalan-primary hover:underline"
+                              onClick={() => {
+                                setShowDuplicates(false)
+                                setSelectedIds(new Set(group.submission_ids))
+                                setTab('submissions')
+                              }}
+                            >
+                              View all →
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              {/* Bulk action bar */}
+              {selectedIds.size > 0 && (
+                <div className="flex items-center gap-3 px-4 py-2.5 bg-catalan-primary/10 border border-catalan-primary/30 rounded-lg">
+                  <span className="text-sm font-medium text-catalan-primary">
+                    {selectedIds.size} selected
+                  </span>
+                  <div className="flex gap-2 ml-auto">
+                    <Button size="sm" variant="secondary" onClick={() => handleBulkAction('approved')} disabled={bulkBusy}>
+                      Approve all
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => handleBulkAction('rejected')} disabled={bulkBusy}>
+                      Reject all
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => handleBulkAction('flagged')} disabled={bulkBusy}>
+                      Flag all
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} disabled={bulkBusy}>
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Submissions — desktop table + mobile cards */}
               <Card>
                 {detailLoading && (
                   <div className="text-xs text-catalan-textMuted mb-2">Loading detail…</div>
                 )}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+
+                {/* ── Desktop table ── */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-sm min-w-[640px]">
                     <thead>
                       <tr className="border-b border-catalan-border">
+                        <th className="px-3 py-2 w-10">
+                          <label className="flex items-center justify-center w-10 h-10 cursor-pointer -my-2">
+                            <input
+                              type="checkbox"
+                              checked={paginatedSubs.length > 0 && paginatedSubs.every(s => selectedIds.has(s.id))}
+                              onChange={e => {
+                                setSelectedIds(prev => {
+                                  const next = new Set(prev)
+                                  if (e.target.checked) paginatedSubs.forEach(s => next.add(s.id))
+                                  else paginatedSubs.forEach(s => next.delete(s.id))
+                                  return next
+                                })
+                              }}
+                              className="accent-catalan-primary cursor-pointer w-4 h-4"
+                            />
+                          </label>
+                        </th>
                         {[
                           { key: 'id',                    label: 'ID' },
                           { key: 'form_id',               label: 'Form' },
@@ -889,7 +1419,7 @@ export default function Dashboard() {
                     <tbody>
                       {filteredSubs.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="text-center py-10 text-catalan-textMuted text-sm">
+                          <td colSpan={7} className="text-center py-10 text-catalan-textMuted text-sm">
                             {submissions.length === 0 ? 'No submissions yet' : 'No submissions match your filters'}
                           </td>
                         </tr>
@@ -897,26 +1427,90 @@ export default function Dashboard() {
                         paginatedSubs.map(sub => (
                           <tr
                             key={sub.id}
-                            onClick={() => openDetail(sub.id)}
-                            className="border-b border-catalan-border hover:bg-catalan-hover cursor-pointer transition-colors"
+                            className={`border-b border-catalan-border hover:bg-catalan-hover transition-colors ${selectedIds.has(sub.id) ? 'bg-catalan-primary/5' : ''}`}
                           >
-                            <td className="px-3 py-2 font-mono text-xs text-catalan-textMuted">{sub.id.slice(0, 8)}…</td>
-                            <td className="px-3 py-2 text-catalan-text">{forms.find(f => f.id === sub.form_id)?.title ?? sub.form_id.slice(0, 8)}</td>
-                            <td className="px-3 py-2 text-catalan-text">{sub.enumerator_name}</td>
-                            <td className="px-3 py-2"><StatusBadge status={sub.status} /></td>
-                            <td className="px-3 py-2 text-catalan-textMuted text-xs">{new Date(sub.server_received_at).toLocaleString()}</td>
-                            <td className="px-3 py-2 text-catalan-primary text-xs">View →</td>
+                            <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                              <label className="flex items-center justify-center w-10 h-10 cursor-pointer -my-2 -mx-1">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedIds.has(sub.id)}
+                                  onChange={e => {
+                                    setSelectedIds(prev => {
+                                      const next = new Set(prev)
+                                      if (e.target.checked) next.add(sub.id)
+                                      else next.delete(sub.id)
+                                      return next
+                                    })
+                                  }}
+                                  className="accent-catalan-primary cursor-pointer w-4 h-4"
+                                />
+                              </label>
+                            </td>
+                            <td className="px-3 py-2 font-mono text-xs text-catalan-textMuted cursor-pointer" onClick={() => openDetail(sub.id)}>{sub.id.slice(0, 8)}…</td>
+                            <td className="px-3 py-2 text-catalan-text cursor-pointer" onClick={() => openDetail(sub.id)}>{forms.find(f => f.id === sub.form_id)?.title ?? sub.form_id.slice(0, 8)}</td>
+                            <td className="px-3 py-2 text-catalan-text cursor-pointer" onClick={() => openDetail(sub.id)}>{sub.enumerator_name}</td>
+                            <td className="px-3 py-2 cursor-pointer" onClick={() => openDetail(sub.id)}><StatusBadge status={sub.status} /></td>
+                            <td className="px-3 py-2 text-catalan-textMuted text-xs cursor-pointer" onClick={() => openDetail(sub.id)}>{new Date(sub.server_received_at).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-catalan-primary text-xs cursor-pointer" onClick={() => openDetail(sub.id)}>View →</td>
                           </tr>
                         ))
                       )}
                     </tbody>
                   </table>
                 </div>
+
+                {/* ── Mobile card list ── */}
+                <div className="sm:hidden">
+                  {filteredSubs.length === 0 ? (
+                    <p className="text-center py-10 text-catalan-textMuted text-sm">
+                      {submissions.length === 0 ? 'No submissions yet' : 'No submissions match your filters'}
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-catalan-border">
+                      {paginatedSubs.map(sub => (
+                        <div
+                          key={sub.id}
+                          className={`flex items-center gap-3 py-3 px-1 ${selectedIds.has(sub.id) ? 'bg-catalan-primary/5' : ''}`}
+                        >
+                          {/* Large touch checkbox */}
+                          <label className="flex-shrink-0 w-11 h-11 flex items-center justify-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(sub.id)}
+                              onChange={e => {
+                                setSelectedIds(prev => {
+                                  const next = new Set(prev)
+                                  if (e.target.checked) next.add(sub.id)
+                                  else next.delete(sub.id)
+                                  return next
+                                })
+                              }}
+                              className="accent-catalan-primary w-5 h-5"
+                            />
+                          </label>
+                          <button className="flex-1 min-w-0 text-left" onClick={() => openDetail(sub.id)}>
+                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                              <span className="font-medium text-catalan-text text-sm truncate">
+                                {forms.find(f => f.id === sub.form_id)?.title ?? 'Unknown form'}
+                              </span>
+                              <StatusBadge status={sub.status} />
+                            </div>
+                            <div className="text-xs text-catalan-textMuted">
+                              {sub.enumerator_name} · {new Date(sub.server_received_at).toLocaleDateString()}
+                            </div>
+                          </button>
+                          <button onClick={() => openDetail(sub.id)} className="flex-shrink-0 text-catalan-primary text-lg px-2">→</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <Pagination
                   page={subPage}
                   pageSize={SUB_PAGE_SIZE}
                   total={filteredSubs.length}
-                  onChange={p => setSubPage(p)}
+                  onChange={p => { setSubPage(p); setSelectedIds(new Set()) }}
                 />
               </Card>
             </div>
@@ -924,12 +1518,76 @@ export default function Dashboard() {
 
           {/* ── FORMS ── */}
           {tab === 'forms' && (
-            <Card>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-medium text-catalan-text">{forms.length} form{forms.length !== 1 ? 's' : ''}</h3>
+            <div className="space-y-4">
+            {/* Sub-tab bar */}
+            <div className="flex gap-2 items-center">
+              <div className="flex gap-1 bg-catalan-surface rounded-lg p-1">
+                {(['my-forms', 'templates'] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => { setFormsSubTab(t); if (t === 'templates') handleLoadTemplates() }}
+                    className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all duration-200 ${
+                      formsSubTab === t
+                        ? 'bg-catalan-primary text-catalan-bg shadow-sm'
+                        : 'text-catalan-textMuted hover:text-catalan-text hover:bg-catalan-hover'
+                    }`}
+                  >
+                    {t === 'my-forms' ? `My Forms (${forms.length})` : '📚 Template Library'}
+                  </button>
+                ))}
+              </div>
+              {formsSubTab === 'my-forms' && (
                 <Button variant="primary" size="sm" onClick={() => window.location.href = '/builder'}>
                   + New Form
                 </Button>
+              )}
+            </div>
+
+            {/* Templates sub-tab */}
+            {formsSubTab === 'templates' && (
+              <div>
+                <p className="text-sm text-catalan-textMuted mb-4">
+                  Ready-made form templates. Click "Use Template" to add an editable copy to your forms.
+                </p>
+                {loadingTemplates ? (
+                  <div className="text-center py-12 text-catalan-textMuted">Loading templates…</div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {templates.map(tpl => (
+                      <Card key={tpl.slug}>
+                        <div className="flex items-start gap-3">
+                          <span className="text-3xl">{tpl.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold text-catalan-text text-sm">{tpl.title}</h3>
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-catalan-primary/10 text-catalan-primary">{tpl.category}</span>
+                            </div>
+                            <p className="text-xs text-catalan-textMuted mb-3 leading-relaxed">{tpl.description}</p>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-catalan-textMuted">{tpl.field_count} fields</span>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => handleCloneTemplate(tpl.slug, tpl.title)}
+                                disabled={cloningSlug === tpl.slug}
+                              >
+                                {cloningSlug === tpl.slug ? 'Adding…' : '+ Use Template'}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* My Forms sub-tab */}
+            {formsSubTab === 'my-forms' && (
+            <Card>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-sm font-medium text-catalan-text">{forms.length} form{forms.length !== 1 ? 's' : ''}</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -994,6 +1652,213 @@ export default function Dashboard() {
                 </table>
               </div>
             </Card>
+            )}
+            </div>
+          )}
+
+          {/* ── INTEGRATIONS ── */}
+          {tab === 'integrations' && (
+            <div className="space-y-6">
+
+              {/* ── API Keys ── */}
+              <Card title="API Keys">
+                <p className="text-sm text-catalan-textMuted mb-4">
+                  Use API keys for server-to-server access. Keys are shown only once — store them securely.
+                </p>
+
+                {/* New key reveal */}
+                {newKeyPlaintext && (
+                  <div className="mb-4 p-4 bg-catalan-success/10 border border-catalan-success/30 rounded-lg">
+                    <div className="text-xs font-medium text-catalan-success mb-2">New API key — copy it now:</div>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 bg-catalan-bg px-3 py-2 rounded text-sm font-mono text-catalan-text break-all">{newKeyPlaintext}</code>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(newKeyPlaintext); toast.success('Copied!') }}
+                        className="text-xs px-3 py-2 rounded border border-catalan-success/40 text-catalan-success hover:bg-catalan-success/10 flex-shrink-0"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <button onClick={() => setNewKeyPlaintext('')} className="text-xs text-catalan-textMuted mt-2 hover:text-catalan-text">
+                      ✓ I've saved it — dismiss
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-sm text-catalan-textMuted">{apiKeys.length} key{apiKeys.length !== 1 ? 's' : ''}</span>
+                  <Button variant="primary" size="sm" onClick={() => setShowApiKeyForm(v => !v)}>
+                    {showApiKeyForm ? 'Cancel' : '+ New Key'}
+                  </Button>
+                </div>
+
+                {showApiKeyForm && (
+                  <div className="flex gap-2 mb-4">
+                    <input
+                      value={newKeyName}
+                      onChange={e => setNewKeyName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleCreateApiKey() }}
+                      placeholder="Key name (e.g. Production Server)"
+                      className="flex-1 bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text placeholder-catalan-textMuted focus:outline-none focus:border-catalan-primary"
+                      autoFocus
+                    />
+                    <Button variant="primary" size="sm" onClick={handleCreateApiKey} disabled={creatingKey}>
+                      {creatingKey ? 'Creating…' : 'Create'}
+                    </Button>
+                  </div>
+                )}
+
+                {loadingApiKeys ? (
+                  <div className="text-sm text-catalan-textMuted py-4 text-center">Loading…</div>
+                ) : apiKeys.length === 0 ? (
+                  <p className="text-sm text-catalan-textMuted text-center py-6">No API keys yet</p>
+                ) : (
+                  <div className="space-y-2">
+                    {apiKeys.map(k => (
+                      <div key={k.id} className="flex items-center justify-between p-3 bg-catalan-hover rounded-lg border border-catalan-border">
+                        <div className="min-w-0">
+                          <div className="font-medium text-catalan-text text-sm">{k.name}</div>
+                          <div className="text-xs text-catalan-textMuted mt-0.5">
+                            Created {new Date(k.created_at).toLocaleDateString()}
+                            {k.last_used_at && <> · Last used {new Date(k.last_used_at).toLocaleDateString()}</>}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleRevokeApiKey(k.id, k.name)}
+                          className="text-xs px-2.5 py-1.5 rounded border border-catalan-error/30 text-catalan-error hover:bg-catalan-error/10 transition-colors flex-shrink-0 ml-3"
+                        >
+                          Revoke
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+
+              {/* ── Webhooks ── */}
+              <Card title="Webhooks">
+                <p className="text-sm text-catalan-textMuted mb-4">
+                  FieldPulse will POST a JSON payload to your URL when the selected events occur.
+                </p>
+
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-sm text-catalan-textMuted">{webhooks.length} webhook{webhooks.length !== 1 ? 's' : ''}</span>
+                  <Button variant="primary" size="sm" onClick={() => setShowWebhookForm(v => !v)}>
+                    {showWebhookForm ? 'Cancel' : '+ New Webhook'}
+                  </Button>
+                </div>
+
+                {showWebhookForm && (
+                  <div className="mb-6 p-4 bg-catalan-hover rounded-lg border border-catalan-border space-y-3">
+                    <div>
+                      <label className="text-xs text-catalan-textMuted block mb-1">Name</label>
+                      <input
+                        value={newWebhook.name}
+                        onChange={e => setNewWebhook(w => ({ ...w, name: e.target.value }))}
+                        placeholder="e.g. Zapier Trigger"
+                        className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-catalan-textMuted block mb-1">URL</label>
+                      <input
+                        value={newWebhook.url}
+                        onChange={e => setNewWebhook(w => ({ ...w, url: e.target.value }))}
+                        placeholder="https://hooks.zapier.com/…"
+                        className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-catalan-textMuted block mb-1">Secret (optional — used to sign payloads)</label>
+                      <input
+                        type="password"
+                        value={newWebhook.secret}
+                        onChange={e => setNewWebhook(w => ({ ...w, secret: e.target.value }))}
+                        placeholder="Leave blank to skip signing"
+                        className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-catalan-textMuted block mb-2">Events</label>
+                      <div className="flex flex-wrap gap-2">
+                        {WEBHOOK_EVENTS.map(ev => (
+                          <label key={ev} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={newWebhook.events.includes(ev)}
+                              onChange={e => setNewWebhook(w => ({
+                                ...w,
+                                events: e.target.checked
+                                  ? [...w.events, ev]
+                                  : w.events.filter(x => x !== ev),
+                              }))}
+                              className="accent-catalan-primary"
+                            />
+                            <code className="text-catalan-textMuted">{ev}</code>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <Button variant="primary" size="sm" onClick={handleCreateWebhook} disabled={savingWebhook}>
+                        {savingWebhook ? 'Creating…' : 'Create Webhook'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {loadingWebhooks ? (
+                  <div className="text-sm text-catalan-textMuted py-4 text-center">Loading…</div>
+                ) : webhooks.length === 0 ? (
+                  <p className="text-sm text-catalan-textMuted text-center py-6">No webhooks yet</p>
+                ) : (
+                  <div className="space-y-3">
+                    {webhooks.map(wh => (
+                      <div key={wh.id} className="p-4 bg-catalan-hover rounded-lg border border-catalan-border">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-catalan-text text-sm">{wh.name}</span>
+                              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${wh.is_active ? 'text-catalan-success bg-catalan-success/10' : 'text-catalan-textMuted bg-catalan-hover'}`}>
+                                {wh.is_active ? 'active' : 'inactive'}
+                              </span>
+                            </div>
+                            <code className="text-xs text-catalan-textMuted truncate block">{wh.url}</code>
+                            {wh.events.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {wh.events.map(ev => (
+                                  <code key={ev} className="text-xs bg-catalan-surface px-1.5 py-0.5 rounded text-catalan-textMuted">{ev}</code>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => handleTestWebhook(wh.id)}
+                              disabled={testingWebhook === wh.id}
+                              className="text-xs px-2.5 py-1.5 rounded border border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50 transition-colors disabled:opacity-50"
+                            >
+                              {testingWebhook === wh.id ? '…' : 'Test'}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteWebhook(wh.id)}
+                              className="text-xs px-2.5 py-1.5 rounded border border-catalan-error/30 text-catalan-error hover:bg-catalan-error/10 transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                        {testResult?.id === wh.id && (
+                          <div className={`mt-2 text-xs px-2.5 py-1.5 rounded ${testResult.success ? 'bg-catalan-success/10 text-catalan-success' : 'bg-catalan-error/10 text-catalan-error'}`}>
+                            {testResult.success ? `✓ Test succeeded (HTTP ${testResult.status_code})` : `⚠ Test failed (HTTP ${testResult.status_code ?? 'error'})`}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </div>
           )}
 
           {/* ── TEAM ── */}
@@ -1188,11 +2053,183 @@ export default function Dashboard() {
                   onChange={p => setTeamPage(p)}
                 />
               </Card>
+
+              {/* ── Schedules ── */}
+              <Card title="Field Schedules">
+                <div className="flex justify-between items-center mb-4">
+                  <p className="text-sm text-catalan-textMuted">
+                    Assign enumerators to forms with date ranges and targets.
+                  </p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setShowScheduleForm(v => !v)}
+                  >
+                    {showScheduleForm ? 'Cancel' : '+ New Schedule'}
+                  </Button>
+                </div>
+
+                {showScheduleForm && (
+                  <div className="mb-6 p-4 bg-catalan-hover rounded-lg border border-catalan-border space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-catalan-textMuted block mb-1">Form *</label>
+                        <select
+                          value={newSchedule.form_id}
+                          onChange={e => setNewSchedule(s => ({ ...s, form_id: e.target.value }))}
+                          className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+                        >
+                          <option value="">Select form…</option>
+                          {forms.filter(f => f.status !== 'archived').map(f => (
+                            <option key={f.id} value={f.id}>{f.title}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-catalan-textMuted block mb-1">Enumerator *</label>
+                        <select
+                          value={newSchedule.enumerator_id}
+                          onChange={e => setNewSchedule(s => ({ ...s, enumerator_id: e.target.value }))}
+                          className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+                        >
+                          <option value="">Select enumerator…</option>
+                          {team.filter(u => u.role === 'enumerator').map(u => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-catalan-textMuted block mb-1">Start Date *</label>
+                        <input
+                          type="date"
+                          value={newSchedule.start_date}
+                          onChange={e => setNewSchedule(s => ({ ...s, start_date: e.target.value }))}
+                          className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-catalan-textMuted block mb-1">End Date *</label>
+                        <input
+                          type="date"
+                          value={newSchedule.end_date}
+                          onChange={e => setNewSchedule(s => ({ ...s, end_date: e.target.value }))}
+                          className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-catalan-textMuted block mb-1">Location</label>
+                        <input
+                          value={newSchedule.location}
+                          onChange={e => setNewSchedule(s => ({ ...s, location: e.target.value }))}
+                          placeholder="Village / district…"
+                          className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-catalan-textMuted block mb-1">Target Count</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={newSchedule.target_count || ''}
+                          onChange={e => setNewSchedule(s => ({ ...s, target_count: parseInt(e.target.value) || 0 }))}
+                          placeholder="0"
+                          className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-catalan-textMuted block mb-1">Notes</label>
+                      <textarea
+                        value={newSchedule.notes}
+                        onChange={e => setNewSchedule(s => ({ ...s, notes: e.target.value }))}
+                        rows={2}
+                        placeholder="Any special instructions…"
+                        className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary resize-none"
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <Button variant="primary" size="sm" onClick={handleCreateSchedule} disabled={savingSchedule}>
+                        {savingSchedule ? 'Saving…' : 'Create Schedule'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {loadingSchedules ? (
+                  <div className="text-sm text-catalan-textMuted py-6 text-center">Loading…</div>
+                ) : schedules.length === 0 ? (
+                  <p className="text-sm text-catalan-textMuted text-center py-6">No schedules yet</p>
+                ) : (
+                  <div className="space-y-2">
+                    {schedules.map(sc => (
+                      <div key={sc.id} className="flex items-start justify-between gap-3 p-3 bg-catalan-hover rounded-lg border border-catalan-border">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                            <span className="font-medium text-catalan-text text-sm">{sc.form_title}</span>
+                            <span className="text-catalan-textMuted text-xs">→</span>
+                            <span className="text-catalan-text text-sm">{sc.enumerator_name}</span>
+                            <StatusBadge status={sc.status} />
+                          </div>
+                          <div className="text-xs text-catalan-textMuted flex flex-wrap gap-3">
+                            <span>📅 {sc.start_date} – {sc.end_date}</span>
+                            {sc.location && <span>📍 {sc.location}</span>}
+                            {sc.target_count > 0 && <span>🎯 {sc.target_count} target</span>}
+                          </div>
+                          {sc.notes && (
+                            <p className="text-xs text-catalan-textMuted mt-1 italic">{sc.notes}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleDeleteSchedule(sc.id)}
+                          className="text-xs px-2.5 py-1.5 rounded border border-catalan-error/30 text-catalan-error hover:bg-catalan-error/10 transition-colors flex-shrink-0"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
             </div>
           )}
           </>}
         </div>
       </div>
+
+      {/* ── Mobile bottom nav (sm and below) ── */}
+      {!loading && (
+        <nav className="sm:hidden fixed bottom-0 left-0 right-0 bg-catalan-surface border-t border-catalan-border z-40 flex">
+          {([
+            { key: 'overview',      label: 'Overview',  icon: '◻' },
+            { key: 'submissions',   label: 'Data',      icon: '📋' },
+            { key: 'forms',         label: 'Forms',     icon: '📝' },
+            { key: 'team',          label: 'Team',      icon: '👥' },
+            { key: 'integrations',  label: 'Connect',   icon: '🔗' },
+          ] as const).map(({ key, label, icon }) => (
+            <button
+              key={key}
+              onClick={() => {
+                setTab(key)
+                if (key === 'integrations') { loadWebhooks(); loadApiKeys() }
+                if (key === 'team') loadSchedules()
+              }}
+              className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] text-[10px] font-medium transition-colors ${
+                tab === key
+                  ? 'text-catalan-primary'
+                  : 'text-catalan-textMuted hover:text-catalan-text'
+              }`}
+            >
+              <span className="text-base leading-none">{icon}</span>
+              <span>{label}</span>
+              {key === 'submissions' && stats.flagged > 0 && tab !== 'submissions' && (
+                <span className="absolute top-1.5 right-1/4 translate-x-2 w-4 h-4 text-[10px] font-bold bg-catalan-warning text-catalan-bg rounded-full flex items-center justify-center leading-none">
+                  {stats.flagged > 9 ? '9+' : stats.flagged}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+      )}
     </div>
   )
 }

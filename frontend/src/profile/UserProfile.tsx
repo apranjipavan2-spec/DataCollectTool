@@ -5,7 +5,7 @@ import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
-import { Card, Button, Input, Alert } from '@/components/ui'
+import { Card, Button, Alert } from '@/components/ui'
 import NotificationSettings from '@/components/NotificationSettings'
 
 const ROLE_LABELS: Record<string, string> = {
@@ -58,8 +58,9 @@ export default function UserProfile() {
     setSaving(true)
     setProfileError('')
     try {
-      const { data } = await api.patch(`/users/${user.id}`, { name: name.trim(), phone: phone.trim() })
-      storeUser({ ...user, name: name.trim(), phone: phone.trim() })
+      await api.patch(`/users/${user.id}`, { name: name.trim(), phone: phone.trim() })
+      const current = getStoredUser()
+      if (current) storeUser({ ...current, name: name.trim(), phone: phone.trim() })
       toast.success('Profile updated')
       setEditing(false)
     } catch (err: any) {

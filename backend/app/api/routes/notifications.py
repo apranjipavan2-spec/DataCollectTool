@@ -91,6 +91,14 @@ def unsubscribe(
     return {"status": "unsubscribed", "removed": deleted}
 
 
+@router.get("/vapid-public-key")
+def get_vapid_public_key():
+    """Return the VAPID public key so the frontend can subscribe without a build-time env var."""
+    if not settings.VAPID_PUBLIC_KEY:
+        raise HTTPException(status_code=503, detail="Push notifications not configured on this server")
+    return {"public_key": settings.VAPID_PUBLIC_KEY}
+
+
 @router.post("/send")
 def send_notification(
     body: SendRequest,

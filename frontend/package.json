@@ -9,6 +9,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@sentry/react": "^10.48.0",
     "@tailwindcss/postcss": "^4.2.2",
     "@tailwindcss/vite": "^4.2.2",
     "axios": "^1.7.2",

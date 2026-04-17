@@ -12,6 +12,7 @@
  */
 
 import React, { Component } from 'react'
+import * as Sentry from '@sentry/react'
 
 interface Props {
   children: React.ReactNode
@@ -36,6 +37,8 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     this.setState({ errorInfo: info.componentStack ?? '' })
     console.error('[ErrorBoundary]', error, info)
+    // Report to Sentry if configured (no-ops when DSN is absent)
+    Sentry.captureException(error, { extra: { componentStack: info.componentStack } })
   }
 
   handleReset = () => this.setState({ error: null, errorInfo: '' })

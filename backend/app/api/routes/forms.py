@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from app.core.rate_limit import limiter
 from pydantic import BaseModel
 from typing import Any, Optional
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import require_org_admin, require_enumerator
@@ -8,6 +10,7 @@ from app.models.form import Form
 from app.models.form_assignment import FormAssignment
 from app.models.form_version import FormVersion
 from app.models.submission import Submission
+from app.models.tenant import Tenant
 
 router = APIRouter()
 
@@ -154,7 +157,21 @@ def list_forms(
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-def create_form(body: FormCreate, user=Depends(require_org_admin), db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+def create_form(request: Request, body: FormCreate, user=Depends(require_org_admin), db: Session = Depends(get_db)):
+    # Enforce plan form limit
+    from app.api.routes.tenants import PLAN_LIMITS
+    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+    if tenant:
+        limit = PLAN_LIMITS.get(tenant.plan_tier, PLAN_LIMITS["free"])["forms"]
+        if limit >= 0:
+            current_count = db.query(func.count(Form.id)).filter(Form.tenant_id == user["tenant_id"]).scalar() or 0
+            if current_count >= limit:
+                raise HTTPException(
+                    status_code=402,
+                    detail=f"Form limit reached ({current_count}/{limit}). Upgrade your plan to create more forms.",
+                )
+
     form = Form(
         tenant_id=user["tenant_id"],
         title=body.title,
@@ -187,11 +204,10 @@ def update_form(form_id: str, body: FormUpdate, user=Depends(require_org_admin),
         form.title = body.title
 
     if body.json_schema is not None:
-        # Snapshot the *current* schema before overwriting
-        _snapshot_version(db, form)
-
-        form.json_schema = body.json_schema
+        # Increment version and snapshot the new schema
         form.version += 1
+        form.json_schema = body.json_schema
+        _snapshot_version(db, form)
 
     if body.status is not None:
         form.status = body.status

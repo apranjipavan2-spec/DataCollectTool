@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import Dashboard      from '@/dashboard/Dashboard.modern'
-import FormBuilder    from '@/builder/FormBuilder.modern'
-import LoginPage      from '@/auth/LoginPage'
-import RequireAuth    from '@/auth/RequireAuth'
+import Dashboard           from '@/dashboard/Dashboard.modern'
+import FormBuilder         from '@/builder/FormBuilder.modern'
+import LoginPage           from '@/auth/LoginPage'
+import ForgotPasswordPage  from '@/auth/ForgotPasswordPage'
+import ResetPasswordPage   from '@/auth/ResetPasswordPage'
+import RequireAuth         from '@/auth/RequireAuth'
 import FieldApp       from '@/collect/FieldApp.modern'
 import AdminPanel     from '@/admin/AdminPanel.modern'
 import OrgAdminPanel  from '@/admin/OrgAdminPanel.modern'
@@ -64,9 +66,11 @@ export default function App() {
             <SessionTimeoutManager />
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
 
               <Route path="/" element={
-                <RequireAuth roles={['master_admin', 'org_admin', 'supervisor']}>
+                <RequireAuth roles={['org_admin', 'supervisor']}>
                   <ErrorBoundary>
                     <Dashboard />
                   </ErrorBoundary>
@@ -74,7 +78,7 @@ export default function App() {
               } />
 
               <Route path="/builder" element={
-                <RequireAuth roles={['master_admin', 'org_admin']}>
+                <RequireAuth roles={['org_admin']}>
                   <ErrorBoundary>
                     <FormBuilder />
                   </ErrorBoundary>
