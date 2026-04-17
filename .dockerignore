@@ -1,14 +1,52 @@
+# Dependencies
 node_modules
-npm-debug.log
-.git
-.gitignore
-README.md
-.DS_Store
-__pycache__
-*.pyc
-.env
-.env.local
-*.db
-*.sqlite
+frontend/node_modules
 .venv
 venv
+backend/venv
+
+# Git & IDE
+.git
+.gitignore
+.claude
+.idea
+.vscode
+
+# Build artifacts
+frontend/dist
+__pycache__
+*.pyc
+*.pyo
+
+# Local env & secrets
+.env
+.env.local
+backend/.env
+credentials.csv
+export_credentials.py
+TEST_CREDENTIALS.csv
+
+# Local databases
+*.db
+*.sqlite
+backend/fieldpulse_dev.db
+
+# Uploads (not baked into image)
+backend/uploads
+
+# Docs and local scripts not needed in container
+*.md
+*.html
+*.docx
+*.txt
+twa
+launcher.py
+startup.py
+start.bat
+create_forms.py
+e2e_test.py
+
+# Logs
+*.log
+npm-debug.log
+.DS_Store

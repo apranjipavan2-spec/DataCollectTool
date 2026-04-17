@@ -36,4 +36,4 @@ ENV PYTHONPATH=/app
 
 EXPOSE ${PORT:-8000}
 
-CMD ["sh", "-c", "cd /app && echo 'Starting FieldPulse...' && python -c 'from app.core.config import settings, normalize_db_url; u=normalize_db_url(settings.DATABASE_URL); print(\"DB:\", u[:45]+\"...\")' && (alembic upgrade head || echo 'Alembic failed, using create_all fallback') && python scripts/seed_dev.py || true && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "cd /app && (alembic upgrade head || echo 'Alembic failed, using create_all fallback') && (python scripts/seed_dev.py || true) && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
