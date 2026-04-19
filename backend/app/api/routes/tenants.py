@@ -32,7 +32,7 @@ require_master = require_role("master_admin")
 # -1 = unlimited
 
 PLAN_LIMITS: dict[str, dict] = {
-    "free":         {"submissions_per_month": 500,   "users": 5,   "forms": 3},
+    "free":         {"submissions_per_month": 100,   "users": 5,   "forms": 3},
     "starter":      {"submissions_per_month": 5_000, "users": 25,  "forms": 20},
     "professional": {"submissions_per_month": 50_000,"users": 100, "forms": 100},
     "enterprise":   {"submissions_per_month": -1,    "users": -1,  "forms": -1},
