@@ -26,7 +26,9 @@ print("Tables ready.")
 
 db = SessionLocal()
 DEFAULT_PASSWORD = 'test@123'
+SUPER_ADMIN_PASSWORD = 'superadmin@4991'
 hashed = hash_password(DEFAULT_PASSWORD)
+hashed_super = hash_password(SUPER_ADMIN_PASSWORD)
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -39,11 +41,12 @@ def get_or_create_tenant(name, plan_tier='starter'):
     db.flush()
     return t, True
 
-def get_or_create_user(tenant_id, phone, role, name):
+def get_or_create_user(tenant_id, phone, role, name, pw_hash=None):
     u = db.query(User).filter(User.phone == phone).first()
     if u:
         return u, False
-    u = User(tenant_id=tenant_id, role=role, phone=phone, name=name, password_hash=hashed)
+    u = User(tenant_id=tenant_id, role=role, phone=phone, name=name,
+             password_hash=pw_hash or hashed)
     db.add(u)
     db.flush()
     return u, True
@@ -256,22 +259,38 @@ try:
     # Tenants
     platform_tenant, _ = get_or_create_tenant('FieldPulse Platform', 'enterprise')
     demo_tenant, _ = get_or_create_tenant('Demo Org', 'professional')
+    dataworx_tenant, _ = get_or_create_tenant('Dataworx', 'starter')
 
-    # Users
-    user_specs = [
-        (platform_tenant.id, '+919999990000', 'master_admin', 'Master Admin'),
-        (demo_tenant.id,     '+919999990001', 'org_admin',    'Org Admin'),
-        (demo_tenant.id,     '+919999990002', 'supervisor',   'Supervisor User'),
-        (demo_tenant.id,     '+919999990003', 'enumerator',   'Rajesh Kumar'),
-        (demo_tenant.id,     '+919999990004', 'enumerator',   'Priya Sharma'),
+    # Users — Demo Org
+    demo_user_specs = [
+        (platform_tenant.id, '+919999990000', 'master_admin', 'Master Admin',        None),
+        (demo_tenant.id,     '+918317390926', 'master_admin', 'Super Admin',          hashed_super),
+        (demo_tenant.id,     '+919999990001', 'org_admin',    'Admin User',           None),
+        (demo_tenant.id,     '+918123105186', 'org_admin',    'PavanDeshetty',        None),
+        (demo_tenant.id,     '+919999990002', 'supervisor',   'Supervisor User',      None),
+        (demo_tenant.id,     '+919222222222', 'supervisor',   'New Supervisor',       None),
+        (demo_tenant.id,     '+919999990003', 'enumerator',   'Rajesh Kumar',         None),
+        (demo_tenant.id,     '+919999990004', 'enumerator',   'Priya Sharma',         None),
+        (demo_tenant.id,     '+919333333331', 'enumerator',   'BulkUser1',            None),
+        (demo_tenant.id,     '+919333333332', 'enumerator',   'BulkUser2',            None),
+        (demo_tenant.id,     '+919111111111', 'enumerator',   'Test Field Worker',    None),
     ]
+    # Users — Dataworx tenant
+    dataworx_user_specs = [
+        (dataworx_tenant.id, '+919999991001', 'org_admin',    'Dataworx Admin',   None),
+        (dataworx_tenant.id, '+919999991002', 'supervisor',   'Manjunath',        None),
+        (dataworx_tenant.id, '+919999991003', 'enumerator',   'Ninganna',         None),
+        (dataworx_tenant.id, '+919999991004', 'enumerator',   'Babasaheb',        None),
+        (dataworx_tenant.id, '+919999991005', 'enumerator',   'Rohit',            None),
+    ]
+
     user_objs = {}
-    for tenant_id, phone, role, name in user_specs:
-        u, _ = get_or_create_user(tenant_id, phone, role, name)
+    for tenant_id, phone, role, name, pw in demo_user_specs + dataworx_user_specs:
+        u, _ = get_or_create_user(tenant_id, phone, role, name, pw_hash=pw)
         user_objs[phone] = u
 
-    enum1 = user_objs['+919999990003']
-    enum2 = user_objs['+919999990004']
+    enum1    = user_objs['+919999990003']
+    enum2    = user_objs['+919999990004']
     org_admin = user_objs['+919999990001']
 
     db.flush()
@@ -319,11 +338,14 @@ try:
     db.commit()
 
     print("\n✓ Seed complete (idempotent — skipped existing records)")
-    print(f"\nPlatform tenant : {platform_tenant.name}")
-    print(f"Demo tenant     : {demo_tenant.name}")
-    print(f"\nDefault password: {DEFAULT_PASSWORD}")
-    print("\nDemo accounts:")
-    for _, phone, role, name in user_specs:
+    print(f"\nTenants : FieldPulse Platform · Demo Org · Dataworx")
+    print(f"\nDefault password  : {DEFAULT_PASSWORD}")
+    print(f"Super Admin pass  : {SUPER_ADMIN_PASSWORD}  (+918317390926)")
+    print("\nDemo Org accounts:")
+    for _, phone, role, name, _ in demo_user_specs:
+        print(f"  {role:15s}  {phone}  ({name})")
+    print("\nDataworx accounts:")
+    for _, phone, role, name, _ in dataworx_user_specs:
         print(f"  {role:15s}  {phone}  ({name})")
     print(f"\nForms seeded    : {hs_form.title} (v{hs_form.version}) · {ha_form.title} (v{ha_form.version})")
     subs = db.query(Submission).filter(Submission.tenant_id == demo_tenant.id).count()
