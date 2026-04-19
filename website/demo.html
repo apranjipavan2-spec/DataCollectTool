@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FieldPulse — Live Demo Access</title>
+  <meta name="description" content="Try FieldPulse for free. Pre-loaded demo with real forms, submissions, GPS data, and all 4 user roles." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: { 50:'#f0f9ff', 500:'#0ea5e9', 600:'#0284c7', 700:'#0369a1' },
+            accent: { 400:'#a78bfa', 500:'#8b5cf6', 600:'#7c3aed' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .role-card { transition: all 0.2s; cursor: pointer; }
+    .role-card:hover { transform: translateY(-2px); }
+    .role-card.selected { border-color: #0ea5e9 !important; background: rgba(14,165,233,0.1) !important; }
+    .copy-btn { transition: all 0.2s; }
+    .copy-btn:active { transform: scale(0.95); }
+    .badge { display:inline-flex; align-items:center; gap:6px; background:rgba(14,165,233,0.15); border:1px solid rgba(14,165,233,0.3); border-radius:999px; padding:4px 14px; font-size:0.8rem; color:#38bdf8; }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+
+  <!-- NAV -->
+  <nav class="fixed top-0 w-full z-50 bg-gray-950/90 backdrop-blur border-b border-gray-800">
+    <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-2 font-bold text-xl">
+        <div class="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center text-white font-black text-sm">FP</div>
+        FieldPulse
+      </a>
+      <a href="index.html" class="text-sm text-gray-400 hover:text-white">← Back to Home</a>
+    </div>
+  </nav>
+
+  <div class="pt-24 pb-16 px-6">
+    <div class="max-w-4xl mx-auto">
+
+      <!-- Header -->
+      <div class="text-center mb-12">
+        <div class="badge mb-4">Live Demo — No Signup Required</div>
+        <h1 class="text-4xl sm:text-5xl font-black text-white mb-4">Try FieldPulse Right Now</h1>
+        <p class="text-gray-400 text-lg max-w-2xl mx-auto">
+          Pick any role below, copy the credentials, and log in to the live demo app.
+          Pre-loaded with real forms, GPS submissions, photos, and team data.
+        </p>
+      </div>
+
+      <!-- App URL -->
+      <div class="bg-gray-800 border border-brand-500/40 rounded-2xl p-6 mb-8 text-center">
+        <p class="text-gray-400 text-sm mb-2">Demo App URL</p>
+        <div class="flex items-center justify-center gap-3 flex-wrap">
+          <code id="app-url" class="text-brand-400 text-lg font-mono bg-gray-900 px-4 py-2 rounded-lg">https://datacollecttool-production.up.railway.app</code>
+          <button onclick="copyText('app-url', this)" class="copy-btn bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold px-4 py-2 rounded-lg">Copy URL</button>
+          <a id="open-app" href="https://datacollecttool-production.up.railway.app" target="_blank" class="bg-green-600 hover:bg-green-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">Open App ↗</a>
+        </div>
+        <p class="text-gray-500 text-xs mt-3">⚠️ Demo resets every 24 hours. Data you enter may be cleared.</p>
+      </div>
+
+      <!-- Role Selector -->
+      <h2 class="text-xl font-bold text-white mb-4">Choose a Role to Explore</h2>
+      <div class="grid sm:grid-cols-2 gap-4 mb-8">
+
+        <!-- Org Admin -->
+        <div class="role-card bg-gray-800 border-2 border-gray-700 rounded-2xl p-6 selected" onclick="selectRole(this, 'admin')">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <div class="text-brand-400 font-bold text-sm uppercase tracking-wide mb-1">Org Admin</div>
+              <h3 class="text-white font-bold text-lg">Full platform access</h3>
+            </div>
+            <div class="text-3xl">🏢</div>
+          </div>
+          <ul class="text-gray-400 text-sm space-y-1 mb-4">
+            <li>✓ Build and edit forms</li>
+            <li>✓ Manage all users and roles</li>
+            <li>✓ View all submissions</li>
+            <li>✓ Generate API keys</li>
+            <li>✓ Configure white-label branding</li>
+          </ul>
+          <div class="bg-gray-900 rounded-lg p-3 font-mono text-sm">
+            <div class="text-gray-500 text-xs mb-1">Phone</div>
+            <div class="text-green-400 font-bold" id="admin-phone">+919999990002</div>
+            <div class="text-gray-500 text-xs mt-2 mb-1">Password</div>
+            <div class="text-green-400 font-bold">test@123</div>
+          </div>
+        </div>
+
+        <!-- Supervisor -->
+        <div class="role-card bg-gray-800 border-2 border-gray-700 rounded-2xl p-6" onclick="selectRole(this, 'supervisor')">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <div class="text-green-400 font-bold text-sm uppercase tracking-wide mb-1">Supervisor</div>
+              <h3 class="text-white font-bold text-lg">Team lead view</h3>
+            </div>
+            <div class="text-3xl">👔</div>
+          </div>
+          <ul class="text-gray-400 text-sm space-y-1 mb-4">
+            <li>✓ Real-time dashboard</li>
+            <li>✓ Flag / approve / reject submissions</li>
+            <li>✓ Assign forms to enumerators</li>
+            <li>✓ Export CSV and Stata</li>
+            <li>✓ View GPS map per submission</li>
+          </ul>
+          <div class="bg-gray-900 rounded-lg p-3 font-mono text-sm">
+            <div class="text-gray-500 text-xs mb-1">Phone</div>
+            <div class="text-green-400 font-bold">+919999990003</div>
+            <div class="text-gray-500 text-xs mt-2 mb-1">Password</div>
+            <div class="text-green-400 font-bold">test@123</div>
+          </div>
+        </div>
+
+        <!-- Enumerator -->
+        <div class="role-card bg-gray-800 border-2 border-gray-700 rounded-2xl p-6" onclick="selectRole(this, 'enumerator')">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <div class="text-accent-400 font-bold text-sm uppercase tracking-wide mb-1">Enumerator</div>
+              <h3 class="text-white font-bold text-lg">Field data collector</h3>
+            </div>
+            <div class="text-3xl">📱</div>
+          </div>
+          <ul class="text-gray-400 text-sm space-y-1 mb-4">
+            <li>✓ Fill assigned forms offline</li>
+            <li>✓ Capture GPS coordinates</li>
+            <li>✓ Take and compress photos</li>
+            <li>✓ Background sync when online</li>
+            <li>✓ View own submission history</li>
+          </ul>
+          <div class="bg-gray-900 rounded-lg p-3 font-mono text-sm">
+            <div class="text-gray-500 text-xs mb-1">Phone</div>
+            <div class="text-green-400 font-bold">+919999990004</div>
+            <div class="text-gray-500 text-xs mt-2 mb-1">Password</div>
+            <div class="text-green-400 font-bold">test@123</div>
+          </div>
+        </div>
+
+        <!-- Master Admin -->
+        <div class="role-card bg-gray-800 border-2 border-gray-700 rounded-2xl p-6" onclick="selectRole(this, 'master')">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <div class="text-yellow-400 font-bold text-sm uppercase tracking-wide mb-1">Master Admin</div>
+              <h3 class="text-white font-bold text-lg">Platform owner</h3>
+            </div>
+            <div class="text-3xl">🌐</div>
+          </div>
+          <ul class="text-gray-400 text-sm space-y-1 mb-4">
+            <li>✓ Manage all organizations</li>
+            <li>✓ Create new tenant accounts</li>
+            <li>✓ View platform-wide stats</li>
+            <li>✓ Assign plan tiers</li>
+            <li>✓ Platform health monitoring</li>
+          </ul>
+          <div class="bg-gray-900 rounded-lg p-3 font-mono text-sm">
+            <div class="text-gray-500 text-xs mb-1">Phone</div>
+            <div class="text-green-400 font-bold">+919999990001</div>
+            <div class="text-gray-500 text-xs mt-2 mb-1">Password</div>
+            <div class="text-green-400 font-bold">test@123</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Login Panel -->
+      <div class="bg-gray-800 border border-gray-700 rounded-2xl p-6 mb-8">
+        <h3 class="text-white font-bold text-lg mb-4">Quick Login Details</h3>
+        <div class="grid sm:grid-cols-3 gap-4">
+          <div>
+            <p class="text-gray-500 text-xs mb-1 uppercase tracking-wide">App URL</p>
+            <div class="flex items-center gap-2">
+              <span class="text-brand-400 font-mono text-sm">fieldpulse.up.railway.app</span>
+            </div>
+          </div>
+          <div>
+            <p class="text-gray-500 text-xs mb-1 uppercase tracking-wide">Selected Phone</p>
+            <div class="flex items-center gap-2">
+              <span id="selected-phone" class="text-white font-mono text-sm font-bold">+919999990002</span>
+              <button onclick="copyText('selected-phone', this)" class="copy-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300">Copy</button>
+            </div>
+          </div>
+          <div>
+            <p class="text-gray-500 text-xs mb-1 uppercase tracking-wide">Password</p>
+            <div class="flex items-center gap-2">
+              <span id="selected-pass" class="text-white font-mono text-sm font-bold">test@123</span>
+              <button onclick="copyText('selected-pass', this)" class="copy-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300">Copy</button>
+            </div>
+          </div>
+        </div>
+        <div class="mt-4 pt-4 border-t border-gray-700 flex flex-col sm:flex-row gap-3">
+          <a href="https://datacollecttool-production.up.railway.app" target="_blank"
+             class="flex-1 bg-brand-500 hover:bg-brand-600 text-white font-bold py-3 rounded-xl transition text-center">
+            Open FieldPulse Demo ↗
+          </a>
+          <button onclick="copyAll()" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 rounded-xl transition">
+            Copy All Credentials
+          </button>
+        </div>
+      </div>
+
+      <!-- What's in the Demo -->
+      <div class="bg-gray-900 border border-gray-700 rounded-2xl p-8 mb-8">
+        <h3 class="text-xl font-bold text-white mb-6">What's pre-loaded in the demo</h3>
+        <div class="grid sm:grid-cols-2 gap-6">
+          <div>
+            <h4 class="text-brand-400 font-semibold mb-3">📋 Sample Forms</h4>
+            <ul class="text-gray-400 text-sm space-y-1">
+              <li>• Household Survey (15 fields, skip logic)</li>
+              <li>• Health Assessment (GPS + photo + rating)</li>
+              <li>• Agricultural Plot Survey (repeat groups)</li>
+              <li>• Quick Field Audit (barcode + audio)</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="text-green-400 font-semibold mb-3">📊 Sample Submissions</h4>
+            <ul class="text-gray-400 text-sm space-y-1">
+              <li>• 50+ pre-seeded submissions</li>
+              <li>• GPS coordinates (map view)</li>
+              <li>• Flagged + approved + pending statuses</li>
+              <li>• Submission history / audit trail</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="text-accent-400 font-semibold mb-3">👥 Team Data</h4>
+            <ul class="text-gray-400 text-sm space-y-1">
+              <li>• 7 users across all roles</li>
+              <li>• Form assignments set up</li>
+              <li>• Activity timeline visible</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="text-yellow-400 font-semibold mb-3">🔧 Admin Features</h4>
+            <ul class="text-gray-400 text-sm space-y-1">
+              <li>• Custom org branding configured</li>
+              <li>• API keys generated (view them)</li>
+              <li>• Plan usage dashboard</li>
+              <li>• Webhook config visible</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Offline Test -->
+      <div class="bg-gray-800 border border-brand-500/30 rounded-2xl p-6 mb-8">
+        <h3 class="text-white font-bold mb-3">🔌 Test Offline Mode</h3>
+        <p class="text-gray-400 text-sm mb-4">The best way to see FieldPulse's #1 feature:</p>
+        <ol class="text-gray-300 text-sm space-y-2">
+          <li><span class="text-brand-400 font-bold">1.</span> Log in as Enumerator → open an assigned form</li>
+          <li><span class="text-brand-400 font-bold">2.</span> Open Chrome DevTools → Network tab → select "Offline"</li>
+          <li><span class="text-brand-400 font-bold">3.</span> Fill the form completely and submit</li>
+          <li><span class="text-brand-400 font-bold">4.</span> Go back online → watch the sync badge update automatically</li>
+          <li><span class="text-brand-400 font-bold">5.</span> Switch to Supervisor login → your submission is there ✓</li>
+        </ol>
+      </div>
+
+      <!-- CTA -->
+      <div class="text-center">
+        <p class="text-gray-500 text-sm mb-4">Ready to use FieldPulse for real?</p>
+        <a href="mailto:hello@fieldpulse.in" class="inline-block bg-brand-500 hover:bg-brand-600 text-white font-bold px-8 py-3 rounded-xl transition">
+          Contact Us for a Custom Org Setup →
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const roles = {
+      admin:      { phone: '+919999990002', pass: 'test@123' },
+      supervisor: { phone: '+919999990003', pass: 'test@123' },
+      enumerator: { phone: '+919999990004', pass: 'test@123' },
+      master:     { phone: '+919999990001', pass: 'test@123' },
+    };
+
+    function selectRole(card, role) {
+      document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      document.getElementById('selected-phone').textContent = roles[role].phone;
+      document.getElementById('selected-pass').textContent = roles[role].pass;
+    }
+
+    function copyText(id, btn) {
+      const text = document.getElementById(id).textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        btn.style.background = '#16a34a';
+        setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
+      });
+    }
+
+    function copyAll() {
+      const phone = document.getElementById('selected-phone').textContent;
+      const pass = document.getElementById('selected-pass').textContent;
+      const url = 'https://datacollecttool-production.up.railway.app';
+      const text = `FieldPulse Demo\nURL: ${url}\nPhone: ${phone}\nPassword: ${pass}`;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target;
+        btn.textContent = '✓ All Copied!';
+        setTimeout(() => { btn.textContent = 'Copy All Credentials'; }, 1500);
+      });
+    }
+  </script>
+</body>
+</html>

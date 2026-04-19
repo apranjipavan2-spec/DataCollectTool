@@ -240,7 +240,16 @@ Installed globally at `~/.claude/plugins/marketplaces/thedotmack/`. Captures too
 
 **Source**: `C:\Life\DataCollectTool\claude-mem-main\claude-mem-main\`
 
-### 3. Hermes Agent (Nous Research)
+### 3. Graphify (`/graphify`)
+Installed globally at `~/.claude/skills/graphify/SKILL.md`. Builds a knowledge graph of any codebase — interactive HTML + queryable JSON. 71.5x fewer tokens per query vs reading raw files.
+- `/graphify .` — build graph of entire project
+- `/graphify backend/` — graph of backend only
+- Output: `graphify-out/graph.html`, `GRAPH_REPORT.md`, `graph.json`
+- Install: `pip install graphifyy && graphify install`
+
+**Source**: `C:\Life\DataCollectTool\graphify-4\graphify-4\`
+
+### 4. Hermes Agent (Nous Research)
 Separate self-improving agent framework at `C:\Life\DataCollectTool\hermes-agent-main\hermes-agent-main\`. NOT a Claude Code plugin — runs independently. Relevant capabilities:
 - **Docker management** skill (`optional-skills/devops/docker-management/`) — useful for Railway/Docker ops
 - **Scheduled automations** — cron jobs, nightly backups
