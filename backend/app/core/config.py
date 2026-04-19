@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     AWS_S3_BUCKET: str = "fieldpulse-media"
     AWS_REGION: str = "ap-south-1"
     MEDIA_DIR: str = "uploads"  # local disk fallback for media files
-    STORAGE_BACKEND: str = "drive"  # "local" | "drive" | "s3"
+    STORAGE_BACKEND: str = "local"  # "local" | "drive" | "s3"
     GDRIVE_FOLDER_ID: str = "1397LHY_x8KMvkAaq-_9LaepszN1a8Thp"  # target Google Drive folder
     GDRIVE_CLIENT_SECRET_PATH: str = "credentials/gdrive-oauth-client.json"
     GDRIVE_TOKEN_PATH: str = "credentials/gdrive-token.json"
@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = True
     APP_URL: str = "http://localhost:5173"
 
-    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:4173", "https://dct.up.railway.app"]
+    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:4173", "https://dct.up.railway.app", "https://datacollecttool-production.up.railway.app"]
 
     class Config:
         env_file = ".env"

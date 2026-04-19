@@ -90,6 +90,7 @@
           <div class="bg-gray-900 rounded-lg p-3 font-mono text-sm">
             <div class="text-gray-500 text-xs mb-1">Phone</div>
             <div class="text-green-400 font-bold" id="admin-phone">+919999990002</div>
+            <!-- Seed: 0001=master_admin, 0002=org_admin, 0003=supervisor, 0004=enumerator -->
             <div class="text-gray-500 text-xs mt-2 mb-1">Password</div>
             <div class="text-green-400 font-bold">test@123</div>
           </div>
@@ -277,6 +278,7 @@
       enumerator: { phone: '+919999990004', pass: 'test@123' },
       master:     { phone: '+919999990001', pass: 'test@123' },
     };
+    // Phone mapping: 0001=master_admin 0002=org_admin 0003=supervisor 0004=enumerator
 
     function selectRole(card, role) {
       document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
