@@ -41,7 +41,7 @@ function computeTileUrls(lat: number, lng: number, radiusKm: number, zoomLevels:
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type Screen = 'list' | 'drafts' | 'collecting' | 'submitted' | 'history'
+type Screen = 'list' | 'drafts' | 'collecting' | 'submitted' | 'history' | 'editing'
 
 interface FormMeta { id: string; title: string; version: number }
 
@@ -74,6 +74,8 @@ export default function FieldApp() {
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [lowStorage, setLowStorage] = useState(false)
   const [resumingDraft, setResumingDraft] = useState<SubmissionDraft | null>(null)
+  const [editingSubmission, setEditingSubmission] = useState<{ id: string; formId: string; dataJson: Record<string, unknown>; formTitle: string } | null>(null)
+  const [editMsg, setEditMsg] = useState('')
   const syncRef = useRef<() => Promise<void>>()
   const loadFormsRef = useRef<() => Promise<void>>()
   const { language, setLanguage } = useLanguage()
@@ -244,6 +246,53 @@ export default function FieldApp() {
       setMyHistory([])
     } finally {
       setLoadingHistory(false)
+    }
+  }
+
+  const openEdit = async (submission: any) => {
+    try {
+      setSyncMsg('Loading…')
+      const { data } = await api.get(`/submissions/${submission.id}`)
+      const formId = data.form_id
+      let schema: FormSchema | null = null
+      try {
+        const r = await api.get<{ json_schema: FormSchema }>(`/forms/${formId}`)
+        schema = r.data.json_schema
+      } catch {
+        const store = await getStorage()
+        const cached = await store.getFormCache(formId)
+        if (cached) schema = JSON.parse(cached.schema) as FormSchema
+      }
+      if (!schema) { setSyncMsg('Form schema not available'); return }
+      const cachedForm = forms.find(f => f.id === formId)
+      setEditingSubmission({
+        id: submission.id,
+        formId,
+        dataJson: data.data_json ?? {},
+        formTitle: cachedForm?.title ?? submission.form_title ?? 'Edit Submission',
+      })
+      setActiveForm({ meta: { id: formId, title: cachedForm?.title ?? 'Form', version: data.form_version ?? 1 }, schema })
+      setSyncMsg('')
+      setScreen('editing')
+    } catch {
+      setSyncMsg('Failed to load submission')
+      setTimeout(() => setSyncMsg(''), 3000)
+    }
+  }
+
+  const handleEditSubmit = async (draft: SubmissionDraft) => {
+    if (!editingSubmission) return
+    try {
+      await api.patch(`/submissions/${editingSubmission.id}/data`, { data_json: draft.values })
+      setMyHistory(prev => prev.map(s => s.id === editingSubmission.id ? { ...s, ...draft.values } : s))
+      setEditMsg('✓ Changes saved')
+      setScreen('history')
+      setEditingSubmission(null)
+      setActiveForm(null)
+      setTimeout(() => setEditMsg(''), 3000)
+    } catch {
+      setEditMsg('⚠ Failed to save changes')
+      setTimeout(() => setEditMsg(''), 4000)
     }
   }
 
@@ -461,6 +510,11 @@ export default function FieldApp() {
     }
     return (
       <SubPage title="My Submissions" onBack={() => setScreen('list')}>
+        {editMsg && (
+          <div className={`mb-4 text-sm px-4 py-2.5 rounded-lg ${editMsg.startsWith('✓') ? 'bg-catalan-success/10 text-catalan-success' : 'bg-catalan-warning/10 text-catalan-warning'}`}>
+            {editMsg}
+          </div>
+        )}
         {loadingHistory ? (
           <div className="text-center py-12 text-catalan-textMuted text-sm">Loading…</div>
         ) : myHistory.length === 0 ? (
@@ -471,22 +525,31 @@ export default function FieldApp() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {myHistory.map((s: any) => (
-              <div key={s.id} className="bg-catalan-surface border border-catalan-border rounded-xl p-4">
+              <div key={s.id} className="bg-catalan-surface border border-catalan-border rounded-xl p-4 flex flex-col gap-3">
                 <div className="flex justify-between items-start gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-catalan-text text-sm truncate">
                       {s.form_title ?? s.form_id ?? 'Unknown form'}
                     </div>
-                    <div className="text-xs text-catalan-textMuted mt-0.5">
-                      {s.server_received_at
-                        ? new Date(s.server_received_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
-                        : s.local_created_at?.slice(0, 10) ?? '—'}
+                    <div className="text-xs text-catalan-textMuted mt-0.5 flex items-center gap-2">
+                      {s.serial_no && <span className="font-mono">#{s.serial_no}</span>}
+                      <span>
+                        {s.server_received_at
+                          ? new Date(s.server_received_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+                          : s.local_created_at?.slice(0, 10) ?? '—'}
+                      </span>
                     </div>
                   </div>
                   <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${statusColors[s.status] ?? 'text-catalan-textMuted bg-catalan-hover'}`}>
                     {s.status ?? 'pending'}
                   </span>
                 </div>
+                <button
+                  onClick={() => openEdit(s)}
+                  className="w-full text-xs px-3 py-2 rounded-lg border border-catalan-primary/40 text-catalan-primary hover:bg-catalan-primary/10 transition-colors font-medium"
+                >
+                  ✏ Edit
+                </button>
               </div>
             ))}
           </div>
@@ -560,6 +623,28 @@ export default function FieldApp() {
           </div>
         </div>
       </WithSidebar>
+    )
+  }
+
+  // Edit existing submission screen
+  if (screen === 'editing' && activeForm && editingSubmission) {
+    const editDraft: SubmissionDraft = {
+      id: editingSubmission.id,
+      formVersion: activeForm.meta.version,
+      values: editingSubmission.dataJson,
+      gpsOpen: null,
+      gpsSubmit: null,
+      status: 'draft',
+      startedAt: new Date().toISOString(),
+    }
+    return (
+      <FormRenderer
+        schema={activeForm.schema}
+        onSave={async () => {}}
+        onSubmit={handleEditSubmit}
+        initialDraft={editDraft}
+        onCancel={() => { setScreen('history'); setEditingSubmission(null); setActiveForm(null) }}
+      />
     )
   }
 

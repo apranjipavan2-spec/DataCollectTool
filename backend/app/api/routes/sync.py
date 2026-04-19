@@ -58,6 +58,14 @@ def push(request: Request, body: PushRequest, user=Depends(require_enumerator), 
             results.append({"local_id": item.local_id, "server_id": str(existing.id), "status": "duplicate"})
             continue
 
+        # Auto-assign next serial_no for this tenant
+        from sqlalchemy import func as _func
+        next_serial = (
+            db.query(_func.coalesce(_func.max(Submission.serial_no), 0) + 1)
+            .filter(Submission.tenant_id == user["tenant_id"])
+            .scalar()
+        ) or 1
+
         sub = Submission(
             tenant_id=user["tenant_id"],
             form_id=item.form_id,
@@ -68,10 +76,11 @@ def push(request: Request, body: PushRequest, user=Depends(require_enumerator), 
             gps_open=item.gps_open,
             gps_submit=item.gps_submit,
             local_created_at=datetime.fromisoformat(item.local_created_at),
+            serial_no=next_serial,
         )
         db.add(sub)
         db.flush()  # get sub.id before commit
-        results.append({"local_id": item.local_id, "server_id": str(sub.id), "status": "synced"})
+        results.append({"local_id": item.local_id, "server_id": str(sub.id), "status": "synced", "serial_no": next_serial})
 
     # Log sync event
     log = SyncLog(

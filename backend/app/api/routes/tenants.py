@@ -57,6 +57,7 @@ def get_branding(user=Depends(get_current_user), db: Session = Depends(get_db)):
         "primary_color": tenant.primary_color or "#2563EB",
         "app_name": tenant.app_name if hasattr(tenant, "app_name") and tenant.app_name else tenant.name,
         "plan_tier": tenant.plan_tier,
+        "allow_enumerator_edit": getattr(tenant, "allow_enumerator_edit", True),
     }
 
 
@@ -120,6 +121,7 @@ class TenantUpdate(BaseModel):
     app_name: Optional[str] = None
     plan_tier: Optional[str] = None
     subscription_status: Optional[str] = None
+    allow_enumerator_edit: Optional[bool] = None
 
 
 @router.get("/")

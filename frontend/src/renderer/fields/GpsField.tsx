@@ -1,11 +1,11 @@
 import React, { useState, lazy, Suspense } from 'react'
 import type { FormField } from '@/types/form'
-import { labelCls, hintCls, captureButtonCls, fieldErrorCls, fieldSuccessCls, requiredCls } from './styles'
+import { labelCls, hintCls, captureButtonCls, fieldErrorCls, requiredCls } from './styles'
 
 const MiniMap = lazy(() => import('./MiniMap'))
 
 interface GpsValue { lat: number; lng: number; accuracy: number }
-interface Props { field: FormField; value: GpsValue | null; onChange: (v: GpsValue) => void }
+interface Props { field: FormField; value: GpsValue | null; onChange: (v: GpsValue | null) => void }
 
 export default function GpsField({ field, value, onChange }: Props) {
   const [loading, setLoading] = useState(false)
@@ -42,8 +42,17 @@ export default function GpsField({ field, value, onChange }: Props) {
       </button>
 
       {value && (
-        <div className={fieldSuccessCls}>
-          {value.lat.toFixed(6)}, {value.lng.toFixed(6)} · ±{value.accuracy}m
+        <div className="flex items-center gap-2 mt-2">
+          <div className="text-catalan-success text-sm flex-1">
+            {value.lat.toFixed(6)}, {value.lng.toFixed(6)} · ±{value.accuracy}m
+          </div>
+          <button
+            onClick={() => onChange(null)}
+            className="flex-shrink-0 text-xs px-2.5 py-1.5 rounded-lg border border-catalan-error/30 text-catalan-error hover:bg-catalan-error/10 transition-colors"
+            title="Clear GPS"
+          >
+            × Clear
+          </button>
         </div>
       )}
       {value && (

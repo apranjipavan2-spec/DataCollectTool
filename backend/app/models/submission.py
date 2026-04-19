@@ -21,3 +21,4 @@ class Submission(Base):
     flag_note = Column(String)                  # reason for flagging (set by supervisor)
     local_created_at = Column(DateTime(timezone=True))
     server_received_at = Column(DateTime(timezone=True), server_default=func.now())
+    serial_no = Column(Integer, nullable=True)   # auto-assigned on sync; only master_admin can change

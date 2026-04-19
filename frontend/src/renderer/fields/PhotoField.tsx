@@ -109,14 +109,22 @@ export default function PhotoField({ field, value, onChange }: Props) {
         <div className={`${fieldHintCls} text-catalan-success`}>Compressed: {sizeInfo}</div>
       )}
       {value && (
-        <div className="mt-3 relative">
-          <img src={value} alt="captured" className="w-full rounded-xl" />
+        <div className="mt-3">
+          <div className="relative">
+            <img src={value} alt="captured" className="w-full rounded-xl" />
+            <button
+              onClick={() => { onChange(''); setSizeInfo('') }}
+              className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center text-lg hover:bg-black/80 transition-colors"
+              title="Remove photo"
+            >
+              ×
+            </button>
+          </div>
           <button
             onClick={() => { onChange(''); setSizeInfo('') }}
-            className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center text-lg hover:bg-black/80 transition-colors"
-            title="Remove photo"
+            className="mt-2 w-full text-xs px-3 py-2 rounded-lg border border-catalan-error/30 text-catalan-error hover:bg-catalan-error/10 transition-colors"
           >
-            ×
+            🗑 Delete Photo
           </button>
         </div>
       )}

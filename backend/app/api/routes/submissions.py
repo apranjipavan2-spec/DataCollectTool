@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Any, Optional
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.deps import require_enumerator, require_supervisor
+from app.core.deps import get_current_user, require_enumerator, require_supervisor
 from app.core.rate_limit import limiter
 from app.models.submission import Submission
 from app.models.submission_history import SubmissionHistory
@@ -46,17 +46,23 @@ def list_submissions(
     q: Optional[str] = None,          # full-text search: enumerator name or data_json
     page: int = 1,
     page_size: int = 50,
-    user=Depends(require_supervisor),
+    user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    role = user.get("role", "")
+    if role not in ("org_admin", "supervisor", "enumerator", "master_admin"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
     try:
         page_size = min(page_size, 200)  # cap at 200
         query = db.query(Submission, User.name).outerjoin(
             User, Submission.enumerator_id == User.id
         ).filter(Submission.tenant_id == user["tenant_id"])
+        # Enumerators can only see their own submissions
+        if role == "enumerator":
+            query = query.filter(Submission.enumerator_id == user["sub"])
         if form_id:
             query = query.filter(Submission.form_id == form_id)
-        if enumerator_id:
+        if enumerator_id and role != "enumerator":
             query = query.filter(Submission.enumerator_id == enumerator_id)
         if status:
             query = query.filter(Submission.status == status)
@@ -86,6 +92,8 @@ def list_submissions(
                     "enumerator_id": str(s.enumerator_id) if s.enumerator_id else None,
                     "enumerator_name": name or "Unknown",
                     "status": s.status,
+                    "serial_no": s.serial_no,
+                    "local_created_at": s.local_created_at.isoformat() if s.local_created_at else None,
                     "server_received_at": s.server_received_at.isoformat() if s.server_received_at else None,
                 }
                 for s, name in rows
@@ -141,7 +149,10 @@ def create_submission(request: Request, body: SubmissionCreate, user=Depends(req
 
 
 @router.get("/{submission_id}")
-def get_submission(submission_id: str, user=Depends(require_supervisor), db: Session = Depends(get_db)):
+def get_submission(submission_id: str, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    role = user.get("role", "")
+    if role not in ("org_admin", "supervisor", "enumerator", "master_admin"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
     try:
         row = db.query(Submission, User.name).outerjoin(
             User, Submission.enumerator_id == User.id
@@ -151,12 +162,16 @@ def get_submission(submission_id: str, user=Depends(require_supervisor), db: Ses
         if not row:
             raise HTTPException(status_code=404, detail="Submission not found")
         sub, enumerator_name = row
+        # Enumerators can only view their own submissions
+        if role == "enumerator" and str(sub.enumerator_id) != str(user["sub"]):
+            raise HTTPException(status_code=403, detail="You can only view your own submissions")
         return {
             "id": str(sub.id),
             "form_id": str(sub.form_id),
             "enumerator_id": str(sub.enumerator_id) if sub.enumerator_id else None,
             "enumerator_name": enumerator_name or "Unknown",
             "form_version": sub.form_version,
+            "serial_no": sub.serial_no,
             "data_json": sub.data_json,
             "gps_open": sub.gps_open,
             "gps_submit": sub.gps_submit,
@@ -394,3 +409,80 @@ def bulk_update_submissions(
     skipped = len(body.ids) - len(subs)  # IDs that didn't belong to this tenant
     logger.info("Bulk %s: updated=%d skipped=%d by %s", body.status, updated, skipped, reviewer)
     return {"updated": updated, "skipped": skipped}
+
+
+# ── Edit submission data (enumerator edits own record; admin edits any) ─────
+
+class SubmissionDataEdit(BaseModel):
+    data_json: dict[str, Any]
+
+
+@router.patch("/{submission_id}/data")
+def edit_submission_data(
+    submission_id: str,
+    body: SubmissionDataEdit,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Edit the data_json of an existing submission.
+
+    - Enumerators can only edit their own submissions, and only when the
+      tenant setting allow_enumerator_edit is True (default).
+    - Supervisors, org_admin, and master_admin can always edit any submission
+      within their tenant.
+    """
+    role = user.get("role", "")
+
+    # Fetch the submission
+    sub = db.query(Submission).filter(
+        Submission.id == submission_id,
+        Submission.tenant_id == user["tenant_id"],
+    ).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    if role == "enumerator":
+        # Must be their own record
+        if str(sub.enumerator_id) != str(user["sub"]):
+            raise HTTPException(status_code=403, detail="You can only edit your own submissions")
+        # Check tenant permission
+        from app.models.tenant import Tenant
+        tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+        if tenant and not getattr(tenant, "allow_enumerator_edit", True):
+            raise HTTPException(
+                status_code=403,
+                detail="Your administrator has disabled enumerator editing. Contact your supervisor."
+            )
+    elif role not in ("org_admin", "supervisor", "master_admin"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    sub.data_json = body.data_json
+    db.commit()
+    return {"id": str(sub.id), "status": "updated", "serial_no": sub.serial_no}
+
+
+# ── Serial number — master_admin only ────────────────────────────────────────
+
+class SerialNoUpdate(BaseModel):
+    serial_no: int
+
+
+@router.patch("/{submission_id}/serial-no")
+def update_serial_no(
+    submission_id: str,
+    body: SerialNoUpdate,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update the serial number of a submission — master_admin only."""
+    if user.get("role") != "master_admin":
+        raise HTTPException(status_code=403, detail="Only master_admin can change serial numbers")
+
+    sub = db.query(Submission).filter(Submission.id == submission_id).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    sub.serial_no = body.serial_no
+    db.commit()
+    return {"id": str(sub.id), "serial_no": sub.serial_no}
