@@ -28,11 +28,13 @@ interface Submission {
   enumerator_id: string
   enumerator_name: string
   status: string
+  serial_no: number | null
   server_received_at: string
 }
 
 interface SubDetail extends Submission {
   form_version: string
+  serial_no: number | null
   data_json: Record<string, unknown>
   gps_open: { lat: number; lng: number; accuracy: number } | null
   gps_submit: { lat: number; lng: number; accuracy: number } | null
@@ -159,7 +161,7 @@ function SubmissionDetailModal({
         <div className="px-5 py-4 border-b border-catalan-border flex justify-between items-start">
           <div>
             <h2 className="text-base font-semibold text-catalan-text">Submission Detail</h2>
-            <p className="text-xs text-catalan-textMuted mt-0.5">{formTitle} · v{sub.form_version}</p>
+            <p className="text-xs text-catalan-textMuted mt-0.5">{formTitle} · v{sub.form_version}{sub.serial_no ? ` · #${sub.serial_no}` : ''}</p>
           </div>
           <div className="flex items-center gap-2">
             <StatusBadge status={sub.status} />
@@ -474,6 +476,11 @@ export default function Dashboard() {
   // Excel export
   const [exportingXlsx, setExportingXlsx] = useState(false)
 
+  // Org settings
+  const [allowEnumeratorEdit, setAllowEnumeratorEdit] = useState(true)
+  const [savingEnumEdit, setSavingEnumEdit] = useState(false)
+  const [myTenantId, setMyTenantId] = useState('')
+
   // Duplicates view
   const [showDuplicates, setShowDuplicates] = useState(false)
   interface DuplicateGroup {
@@ -557,6 +564,7 @@ export default function Dashboard() {
       api.get('/assignments/').then(r => setAssignments(r.data ?? [])),
       api.get('/tenants/me/usage').then(r => setUsageData(r.data)).catch(() => {}),
       api.get('/export/sheets/status').then(r => setSheetsConfigured(r.data.configured)).catch(() => setSheetsConfigured(false)),
+      api.get('/tenants/branding').then(r => { if (r.data.id) setMyTenantId(r.data.id); if (typeof r.data.allow_enumerator_edit === 'boolean') setAllowEnumeratorEdit(r.data.allow_enumerator_edit) }).catch(() => {}),
     ]).then(results => {
       const failed = results.filter(r => r.status === 'rejected')
       if (failed.length > 0) setError('Some data failed to load')
@@ -1397,6 +1405,7 @@ export default function Dashboard() {
                           </label>
                         </th>
                         {[
+                          { key: 'serial_no',             label: '#',          sortable: true },
                           { key: 'id',                    label: 'ID' },
                           { key: 'form_id',               label: 'Form' },
                           { key: 'enumerator_name',       label: 'Enumerator', sortable: true },
@@ -1422,7 +1431,7 @@ export default function Dashboard() {
                     <tbody>
                       {filteredSubs.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="text-center py-10 text-catalan-textMuted text-sm">
+                          <td colSpan={8} className="text-center py-10 text-catalan-textMuted text-sm">
                             {submissions.length === 0 ? 'No submissions yet' : 'No submissions match your filters'}
                           </td>
                         </tr>
@@ -1449,6 +1458,7 @@ export default function Dashboard() {
                                 />
                               </label>
                             </td>
+                            <td className="px-3 py-2 font-mono text-xs text-catalan-textMuted cursor-pointer" onClick={() => openDetail(sub.id)}>{sub.serial_no ?? '—'}</td>
                             <td className="px-3 py-2 font-mono text-xs text-catalan-textMuted cursor-pointer" onClick={() => openDetail(sub.id)}>{sub.id.slice(0, 8)}…</td>
                             <td className="px-3 py-2 text-catalan-text cursor-pointer" onClick={() => openDetail(sub.id)}>{forms.find(f => f.id === sub.form_id)?.title ?? sub.form_id.slice(0, 8)}</td>
                             <td className="px-3 py-2 text-catalan-text cursor-pointer" onClick={() => openDetail(sub.id)}>{sub.enumerator_name}</td>
@@ -1740,6 +1750,40 @@ export default function Dashboard() {
                   </div>
                 )}
               </Card>
+
+              {/* ── Org Settings ── */}
+              {user?.role && ['org_admin', 'master_admin'].includes(user.role) && (
+                <Card title="Organisation Settings">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-medium text-catalan-text">Allow enumerators to edit their submissions</div>
+                      <div className="text-xs text-catalan-textMuted mt-0.5">
+                        When enabled, enumerators can edit data in their own previously submitted records. Supervisors and admins can always edit.
+                      </div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const next = !allowEnumeratorEdit
+                        setSavingEnumEdit(true)
+                        try {
+                          await api.patch(`/tenants/${myTenantId}`, { allow_enumerator_edit: next })
+                          setAllowEnumeratorEdit(next)
+                          toast.success(next ? 'Enumerator editing enabled' : 'Enumerator editing disabled')
+                        } catch {
+                          toast.error('Failed to save setting')
+                        } finally {
+                          setSavingEnumEdit(false)
+                        }
+                      }}
+                      disabled={savingEnumEdit || !myTenantId}
+                      className={`relative flex-shrink-0 w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${allowEnumeratorEdit ? 'bg-catalan-primary' : 'bg-catalan-border'}`}
+                      title={allowEnumeratorEdit ? 'Click to disable' : 'Click to enable'}
+                    >
+                      <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${allowEnumeratorEdit ? 'translate-x-6' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                </Card>
+              )}
 
               {/* ── Webhooks ── */}
               <Card title="Webhooks">
