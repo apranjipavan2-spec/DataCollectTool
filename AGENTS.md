@@ -3,7 +3,7 @@
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
 You are a coding assistant with full knowledge of this codebase.
-Below are the code signatures extracted by SigMap v5.8.0 on 2026-04-19T10:36:58.900Z.
+Below are the code signatures extracted by SigMap v5.8.0 on 2026-04-19T13:15:20.151Z.
 
 Use these signatures to answer questions about the code accurately.
 
@@ -16,110 +16,29 @@ Use these signatures to answer questions about the code accurately.
 
 ## deps
 ```
-backend\app\api\routes\auth.py ← fastapi, pydantic, sqlalchemy, app, jose
-backend\app\api\routes\export.py ← fastapi, sqlalchemy, app
-backend\app\api\routes\forms.py ← fastapi, app, pydantic, sqlalchemy
-backend\app\api\routes\import_excel.py ← __future__, fastapi, sqlalchemy, app, openpyxl
-backend\app\api\routes\notifications.py ← fastapi, pydantic, pywebpush, sqlalchemy, app
-backend\app\api\routes\reports.py ← fastapi, sqlalchemy, app
+backend\app\api\routes\bulk_upload.py ← __future__, fastapi, openpyxl, pydantic, sqlalchemy
 backend\app\api\routes\submissions.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\api\routes\sync.py ← fastapi, pydantic, sqlalchemy, app
-backend\app\api\routes\templates.py ← fastapi, sqlalchemy, app
 backend\app\api\routes\tenants.py ← fastapi, pydantic, sqlalchemy, app
-backend\app\api\routes\users.py ← fastapi, pydantic, sqlalchemy, app
-backend\app\core\config.py ← pydantic_settings
-backend\app\core\database.py ← sqlalchemy, app
-backend\app\core\deps.py ← fastapi, sqlalchemy, jose, app
-backend\app\core\scheduler.py ← apscheduler
-backend\app\core\security.py ← jose, app, bcrypt
-backend\app\main.py ← fastapi, slowapi, app
-backend\app\services\digest.py ← sqlalchemy, app
-backend\app\services\email.py ← app, smtplib
-backend\app\services\plan_enforcement.py ← sqlalchemy, app
-backend\app\services\sheets.py ← google, googleapiclient, app
-frontend\src\builder\FieldEditor.tsx ← SkipLogicEditor
+backend\app\models\submission.py ← sqlalchemy, app
+backend\app\models\tenant.py ← sqlalchemy, app
 frontend\src\builder\FormBuilder.modern.tsx ← FieldTypeMenu, FieldEditor, SkipLogicEditor, VersionHistoryPanel
-frontend\src\components\ui\Modal.tsx ← Button
+frontend\src\help\HelpPanel.tsx ← HelpContext, helpContent
+frontend\src\help\HelpSpotlight.tsx ← HelpContext, helpContent
+frontend\src\help\InfoButton.tsx ← HelpContext, helpContent
+frontend\src\renderer\fields\GpsField.tsx ← styles
 frontend\src\renderer\fields\PhotoField.tsx ← styles
 frontend\src\renderer\FormRenderer.tsx ← fields/TextField, fields/NumberField, fields/SingleChoiceField, fields/MultipleChoiceField, fields/DateTimeField
 ```
 
-## todos
-```
-backend\app\api\routes\auth.py:225  # TODO: integrate SMS gateway (MSG91 / Kaleyra)
-```
-
 ## backend
 
-### backend\app\api\routes\auth.py
+### backend\app\api\routes\bulk_upload.py
 ```
-class LoginRequest(BaseModel) {phone*, password*}
-class SendOTPRequest(BaseModel) {phone*}
-class VerifyOTPRequest(BaseModel) {phone*, otp*}
-class SetPasswordRequest(BaseModel) {password*}
-class ForgotPasswordRequest(BaseModel) {phone*}
-class ResetPasswordRequest(BaseModel) {token*, new_password*}
-class ChangePasswordRequest(BaseModel) {current_password*, new_password*}
-class RefreshRequest(BaseModel) {refresh_token*}
-POST /login  →  login()
-POST /refresh  →  refresh()
-POST /forgot-password  →  forgot_password()
-POST /reset-password  →  reset_password()
-POST /change-password  →  change_password()
-POST /set-password  →  set_password()
-POST /send-otp  →  send_otp()
-POST /verify-otp  →  verify_otp_route()
-```
-
-### backend\app\api\routes\export.py
-```
-GET /{form_id}/csv  →  export_csv()
-GET /{form_id}/dta  →  export_dta()
-GET /sheets/status  →  sheets_status()
-POST /{form_id}/sheets  →  export_sheets()
-GET /{form_id}/xlsx  →  export_xlsx()
-```
-
-### backend\app\api\routes\forms.py
-```
-class FormCreate(BaseModel) {title*, json_schema*}
-class FormUpdate(BaseModel) {title?, json_schema?, status?}
-class MigrateRequest(BaseModel) {from_version*, to_version*}
-class ApplyMigrateRequest(BaseModel) {from_version*, to_version*}
-GET /  →  list_forms()
-POST /  →  create_form()
-GET /{form_id}  →  get_form()
-PUT /{form_id}  →  update_form()
-DELETE /{form_id}  →  archive_form()
-GET /{form_id}/versions  →  list_form_versions()
-GET /{form_id}/versions/{version}  →  get_form_version()
-POST /{form_id}/migrate  →  preview_submission_migration()
-POST /{form_id}/migrate/apply  →  apply_submission_migration()
-```
-
-### backend\app\api\routes\import_excel.py
-```
-def parse_excel_to_schema(file_bytes: bytes, title_hint: str) → dict
-POST /import-excel  →  import_excel()
-```
-
-### backend\app\api\routes\notifications.py
-```
-class PushKeys(BaseModel) {p256dh*, auth*}
-class SubscribeRequest(BaseModel) {endpoint*, keys*}
-class SendRequest(BaseModel) {user_ids*, title*, body*, url?}
-def get_vapid_public_key()  # Return the VAPID public key so the frontend can subscribe wi
-def send_push(db: Session, user_id: str, title: str, body: str, url: str) → bool  # Send a Web Push notification to all subscriptions for a give
-POST /subscribe  →  subscribe()
-POST /unsubscribe  →  unsubscribe()
-GET /vapid-public-key  →  get_vapid_public_key()
-POST /send  →  send_notification()
-```
-
-### backend\app\api\routes\reports.py
-```
-POST /digest  →  trigger_digest()
-POST /digest/all  →  trigger_digest_all()
+class ApplyRequest(BaseModel) {upload_token*, form_id*, mapping*, meta_lat?, meta_lng?, meta_datetime?}
+POST /parse  →  bulk_upload_parse()
+POST /apply  →  bulk_upload_apply()
+GET /template/{form_id}  →  download_template()
 ```
 
 ### backend\app\api\routes\submissions.py
@@ -127,12 +46,16 @@ POST /digest/all  →  trigger_digest_all()
 class SubmissionCreate(BaseModel) {form_id*, form_version*, data_json*, gps_open?, gps_submit?, local_created_at?}
 class SubmissionUpdate(BaseModel) {status?, flag_note?, reviewer_name?}
 class BulkUpdateBody(BaseModel) {ids*, status*, flag_note?}
+class SubmissionDataEdit(BaseModel) {data_json*}
+class SerialNoUpdate(BaseModel) {serial_no*}
 GET /  →  list_submissions()
 POST /  →  create_submission()
 GET /{submission_id}  →  get_submission()
 PATCH /{submission_id}  →  update_submission()
 GET /potential-duplicates  →  list_potential_duplicates()
 POST /bulk  →  bulk_update_submissions()
+PATCH /{submission_id}/data  →  edit_submission_data()
+PATCH /{submission_id}/serial-no  →  update_serial_no()
 ```
 
 ### backend\app\api\routes\sync.py
@@ -142,13 +65,6 @@ class PushRequest(BaseModel) {submissions*}
 POST /push  →  push()
 POST /media  →  upload_media()
 GET /pull  →  pull()
-```
-
-### backend\app\api\routes\templates.py
-```
-GET /  →  list_templates()
-GET /{slug}  →  get_template()
-POST /{slug}/clone  →  clone_template()
 ```
 
 ### backend\app\api\routes\tenants.py
@@ -163,85 +79,14 @@ PATCH /{tenant_id}  →  update_tenant()
 GET /{tenant_id}/stats  →  get_tenant_stats()
 ```
 
-### backend\app\api\routes\users.py
+### backend\app\models\submission.py
 ```
-class UserCreate(BaseModel) {phone*, name*, role*, password?, language_pref?, email?}
-class UserUpdate(BaseModel) {name?, phone?, email?, language_pref?}
-GET /me  →  get_me()
-GET /  →  list_users()
-POST /  →  create_user()
-POST /bulk-import  →  bulk_import_users()
-PATCH /{user_id}  →  update_user()
-DELETE /{user_id}  →  deactivate_user()
+class Submission(Base)
 ```
 
-### backend\app\core\config.py
+### backend\app\models\tenant.py
 ```
-class Settings(BaseSettings) {DATABASE_URL?, REDIS_URL?, JWT_SECRET?, JWT_ALGORITHM?, JWT_EXPIRE_MINUTES?, AWS_ACCESS_KEY_ID?}
-def normalize_db_url(url: str) → str  # Normalize any PostgreSQL URL to use psycopg2 driver
-```
-
-### backend\app\core\database.py
-```
-class Base(DeclarativeBase)
-def get_db()
-def set_tenant_context(db, tenant_id: str)  # Set RLS tenant context for the current DB session
-```
-
-### backend\app\core\deps.py
-```
-def require_role(*roles: str)  # Dependency factory — raises 403 if user's role is not in all
-```
-
-### backend\app\core\scheduler.py
-```
-def start_scheduler()  # Start the background scheduler
-def stop_scheduler()  # Gracefully stop the scheduler
-```
-
-### backend\app\core\security.py
-```
-def create_access_token(data: dict) → str
-def create_refresh_token(user_id: str) → str  # Long-lived signed JWT (30 days) used only to obtain a new ac
-def decode_token(token: str) → dict
-def hash_password(password: str) → str
-def verify_password(plain: str, hashed: str) → bool
-def hash_api_key(api_key: str) → str  # Hash an API key for secure storage
-def verify_api_key(plain: str, hashed: str) → bool  # Verify an API key against its hash
-def hash_otp(otp: str) → str
-def verify_otp(plain: str, hashed: str) → bool
-```
-
-### backend\app\main.py
-```
-async def lifespan(app: FastAPI)
-def health()
-GET /health  →  health()
-```
-
-### backend\app\services\digest.py
-```
-def send_digest_for_tenant(db: Session, tenant_id: str) → dict  # Compute stats and email all admins/supervisors with an email
-def send_digest_all_tenants(db: Session) → list[dict]  # Send digest to every active tenant
-```
-
-### backend\app\services\email.py
-```
-def send_email(to: str, subject: str, html_body: str) → bool  # Send an email via SMTP
-def send_password_reset_email(to: str, name: str, reset_token: str) → bool  # Send a password-reset link to the user
-def send_flagged_submission_email(to: str, supervisor_name: str, form_title: str, enumerator_name: str, flag_note: str, submission_id: str) → bool  # Notify supervisors / admins that a submission has been flagg
-def send_daily_digest_email(to: str, recipient_name: str, org_name: str, date_label: str, total_yesterday: int, total_alltime: int, flagged_open: int, top_enumerators: list, form_breakdown: list) → bool
-def send_assignment_email(to: str, enumerator_name: str, form_title: str) → bool  # Notify an enumerator that a new form has been assigned to th
-```
-
-### backend\app\services\plan_enforcement.py
-```
-def check_submission_limit(db: Session, tenant_id: str, plan_tier: str) → dict  # Return {"allowed": bool, "reason": str, "used": int, "limit"
-```
-
-### backend\app\services\sheets.py
-```
-def export_to_sheets(title: str, headers: list[str], rows: list[list], tenant_id: str) → str  # Create a Google Sheet with the given data and return its URL
+class Tenant(Base)
 ```
 
 ## frontend
@@ -254,16 +99,6 @@ hook useSessionTimeout
 handler onExtend
 ```
 
-### frontend\src\auth\ForgotPasswordPage.tsx
-```
-component ForgotPasswordPage
-hook useNavigate
-hook useState
-handler onChange
-handler onKeyDown
-handler onClick
-```
-
 ### frontend\src\auth\LoginPage.tsx
 ```
 component LoginPage
@@ -271,36 +106,6 @@ hook useNavigate
 hook useState
 handler onChange
 handler onKeyDown
-handler onClick
-```
-
-### frontend\src\auth\ResetPasswordPage.tsx
-```
-component ResetPasswordPage
-hook useNavigate
-hook useSearchParams
-hook useState
-handler onChange
-handler onKeyDown
-handler onClick
-```
-
-### frontend\src\builder\FieldEditor.tsx
-```
-component CompareValueInput
-component ExprInput
-component FormulaBuilder
-component FieldEditor
-props Props
-hook useState
-handler onChange
-handler onClick
-```
-
-### frontend\src\builder\FieldTypeMenu.tsx
-```
-component FieldTypeMenu
-props Props
 handler onClick
 ```
 
@@ -332,17 +137,6 @@ handler onSkipLogicChange
 handler onSelect
 ```
 
-### frontend\src\builder\SkipLogicEditor.tsx
-```
-component ConditionRow
-component GroupEditor
-component SkipLogicEditor
-props Props
-handler onChange
-handler onClick
-handler onUpdate
-```
-
 ### frontend\src\collect\FieldApp.modern.tsx
 ```
 component FieldApp
@@ -352,18 +146,9 @@ hook useCallback
 hook useEffect
 handler onMsg
 handler onClick
+handler onDraft
 handler onSave
 handler onSubmit
-```
-
-### frontend\src\components\ErrorBoundary.tsx
-```
-component DefaultErrorUI
-props Props
-hook useState
-export ErrorBoundary
-handler onReset
-handler onClick
 ```
 
 ### frontend\src\components\Sidebar.tsx
@@ -372,21 +157,8 @@ props SidebarProps
 hook useState
 hook useNavigate
 hook useLocation
+hook useHelp
 export Sidebar
-```
-
-### frontend\src\components\ui\Alert.tsx
-```
-props AlertProps
-export Alert
-handler onClick
-```
-
-### frontend\src\components\ui\Modal.tsx
-```
-props ModalProps
-hook useEffect
-export Modal
 handler onClick
 ```
 
@@ -412,41 +184,68 @@ handler onAssign
 handler onUnassign
 ```
 
-### frontend\src\lib\api.ts
+### frontend\src\help\helpContent.ts
 ```
-export interface AuthUser
-export function getStoredUser() → AuthUser | null
-export function storeUser(user)
-export function logout()
-```
-
-### frontend\src\lib\formUtils.ts
-```
-export function newField(type) → FormField
-export function newSection() → FormSection
-export function newSchema(title = 'Untitled Form') → FormSchema
-export function shouldShow(field, values, unknown>) → boolean
-export function shouldShowSection(section, values, unknown>) → boolean
-export function evalFormula(formula, values, unknown>) → string | number | null
-export function getAllFieldsInOrder(sections) → FormField[]
-export function updateFieldInSchema(schema, sectionId, fieldId, patch,) → FormSchema
+export interface HelpStep
+export interface HelpTopic
+export interface HelpSection
+export function getTopicById(id) → HelpTopic | undefined
+export function getSectionsForRole(role) → HelpSection[]
 ```
 
-### frontend\src\lib\pushNotifications.ts
+### frontend\src\help\HelpContext.tsx
 ```
-export async function subscribeToPush() → Promise<boolean>
-export async function unsubscribeFromPush() → Promise<boolean>
-```
-
-### frontend\src\profile\UserProfile.tsx
-```
-component UserProfile
-hook useNavigate
-hook useToast
+component HelpProvider
 hook useState
-handler onChange
+hook useCallback
+hook useEffect
+hook useHelp
+hook useContext
+export HelpProvider
+```
+
+### frontend\src\help\HelpPanel.tsx
+```
+component TopicCard
+component SectionBlock
+component HelpPanel
+hook useState
+hook useHelp
+hook useRef
+hook useEffect
 handler onClick
-handler onKeyDown
+handler onChange
+handler onTopicClick
+handler onHighlight
+```
+
+### frontend\src\help\HelpSpotlight.tsx
+```
+component HelpSpotlight
+hook useHelp
+hook useState
+hook useRef
+hook useEffect
+handler onClick
+```
+
+### frontend\src\help\InfoButton.tsx
+```
+component InfoButton
+props InfoButtonProps
+hook useHelp
+hook useState
+hook useRef
+hook useEffect
+handler onClick
+```
+
+### frontend\src\renderer\fields\GpsField.tsx
+```
+component GpsField
+props Props
+hook useState
+handler onClick
 ```
 
 ### frontend\src\renderer\fields\PhotoField.tsx
@@ -473,31 +272,27 @@ handler onClick
 handler onChange
 ```
 
-### frontend\src\types\form.ts
-```
-export interface SkipCondition
-export interface ConditionGroup
-export interface SkipLogic
-export interface ValidationRule
-export interface FieldOption
-export interface FormField
-  id: string type: FieldType name: string
-export interface FormSection
-export interface FormSchema
-export type FieldType
-export function isConditionGroup(c) → c is ConditionGroup
-```
-
 ## website
 
 ### website\demo.html
 ```
-title: FieldPulse — Live Demo Access
+title: FieldPulse — Live Demo
+input#urlInput
+span#roleName
+input#pUrl
+input#pPhone
+input#pPass
+div#toast
 ```
 
 ### website\index.html
 ```
-title: FieldPulse — Offline-First Field Data Collection
+title: FieldPulse — Offline-First Field Data Collection for India
+nav#navbar
+canvas#particleCanvas
+div#mockBars
+span#syncPct
+div#syncBar
 section#features
 section#compare
 section#pricing
