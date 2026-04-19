@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>FieldPulse — Live Demo</title>
+  <meta name="description" content="Try FieldPulse for free. Pre-loaded demo with real forms, GPS data, and all 4 user roles. No signup required."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    :root{
+      --brand:#0ea5e9;--brand-dark:#0369a1;--accent:#7c3aed;--green:#10b981;
+      --bg:#f8fafc;--card:#ffffff;--text:#0f172a;--text2:#334155;--text3:#64748b;
+      --border:#e2e8f0;--border2:#cbd5e1;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(14,165,233,0.4)}70%{box-shadow:0 0 0 12px rgba(14,165,233,0)}}
+    @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    @keyframes slideIn{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:translateX(0)}}
+    .animate-fade-up{animation:fadeUp 0.6s ease forwards}
+    .delay-1{animation-delay:0.1s;opacity:0}
+    .delay-2{animation-delay:0.2s;opacity:0}
+    .delay-3{animation-delay:0.3s;opacity:0}
+    .delay-4{animation-delay:0.4s;opacity:0}
+
+    /* NAV */
+    nav{background:white;border-bottom:1px solid var(--border);padding:0 24px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 1px 12px rgba(0,0,0,0.04)}
+    .nav-logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.1rem;color:var(--text);text-decoration:none}
+    .logo-icon{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--accent));display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:0.8rem}
+    .nav-back{display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--text3);text-decoration:none;border:1px solid var(--border);border-radius:8px;padding:6px 14px;transition:all 0.2s}
+    .nav-back:hover{border-color:var(--brand);color:var(--brand);background:rgba(14,165,233,0.04)}
+
+    /* MAIN LAYOUT */
+    .page-wrap{max-width:960px;margin:0 auto;padding:40px 24px 80px}
+
+    /* HERO BANNER */
+    .demo-hero{background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#0c4a6e 100%);border-radius:20px;padding:40px;margin-bottom:32px;position:relative;overflow:hidden;text-align:center}
+    .demo-hero::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at 2px 2px,rgba(255,255,255,0.05) 1px,transparent 0);background-size:32px 32px}
+    .demo-hero .live-dot{width:10px;height:10px;background:#22c55e;border-radius:50%;display:inline-block;animation:pulse 2s infinite;margin-right:6px}
+    .demo-hero .badge{display:inline-flex;align-items:center;background:rgba(14,165,233,0.2);border:1px solid rgba(14,165,233,0.3);border-radius:999px;padding:5px 14px;font-size:0.78rem;font-weight:600;color:#7dd3fc;margin-bottom:16px}
+    .demo-hero h1{font-size:2rem;font-weight:900;color:white;margin-bottom:10px}
+    .demo-hero p{color:rgba(255,255,255,0.65);font-size:0.95rem;margin-bottom:24px;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.6}
+    .app-url-bar{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+    .url-code{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:10px 20px;font-family:monospace;font-size:0.9rem;color:#7dd3fc;display:flex;align-items:center;gap:8px}
+    .btn{border:none;border-radius:10px;padding:10px 20px;font-weight:600;font-size:0.85rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all 0.25s}
+    .btn-copy{background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2)}
+    .btn-copy:hover{background:rgba(255,255,255,0.2)}
+    .btn-open{background:var(--green);color:white;box-shadow:0 4px 16px rgba(16,185,129,0.3)}
+    .btn-open:hover{background:#059669;transform:translateY(-2px);box-shadow:0 8px 24px rgba(16,185,129,0.4)}
+
+    /* QUICKSTART STEPS */
+    .quickstart{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
+    .qs-card{background:white;border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;transition:all 0.3s;position:relative}
+    .qs-card:hover{border-color:var(--brand);box-shadow:0 8px 24px rgba(14,165,233,0.08);transform:translateY(-3px)}
+    .qs-num{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--accent));color:white;font-weight:800;font-size:0.85rem;display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+    .qs-card h4{font-size:0.88rem;font-weight:700;color:var(--text);margin-bottom:6px}
+    .qs-card p{font-size:0.78rem;color:var(--text3);line-height:1.5}
+
+    /* ROLE CARDS */
+    .roles-section h2{font-size:1.2rem;font-weight:800;color:var(--text);margin-bottom:6px}
+    .roles-section p{font-size:0.85rem;color:var(--text3);margin-bottom:20px}
+    .roles-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:24px}
+    .role-card{background:white;border:2px solid var(--border);border-radius:16px;padding:20px;cursor:pointer;transition:all 0.3s;position:relative;overflow:hidden}
+    .role-card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity 0.3s}
+    .role-card:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(14,165,233,0.1)}
+    .role-card.active{border-color:var(--brand);box-shadow:0 8px 28px rgba(14,165,233,0.15)}
+    .role-card.active::before{background:linear-gradient(135deg,rgba(14,165,233,0.04),rgba(124,58,237,0.04));opacity:1}
+    .role-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+    .role-icon{font-size:2rem}
+    .role-name-badge{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;padding:3px 10px;border-radius:999px}
+    .badge-admin{background:#dbeafe;color:#1d4ed8}
+    .badge-supervisor{background:#dcfce7;color:#15803d}
+    .badge-enumerator{background:#ede9fe;color:#6d28d9}
+    .badge-master{background:#fef9c3;color:#b45309}
+    .role-card h3{font-size:0.95rem;font-weight:700;color:var(--text);margin-bottom:8px}
+    .role-perms{list-style:none;display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+    .role-perms li{font-size:0.78rem;color:var(--text2);display:flex;align-items:flex-start;gap:6px;line-height:1.4}
+    .role-perms li::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
+    .cred-box{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px}
+    .cred-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+    .cred-row:last-child{margin-bottom:0}
+    .cred-label{font-size:0.7rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;min-width:60px}
+    .cred-val{font-family:monospace;font-size:0.82rem;font-weight:700;color:var(--text);flex:1}
+    .copy-small{background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:3px 8px;font-size:0.7rem;font-weight:600;color:var(--text3);cursor:pointer;transition:all 0.2s;white-space:nowrap}
+    .copy-small:hover{border-color:var(--brand);color:var(--brand)}
+    .active-indicator{position:absolute;top:14px;right:14px;width:10px;height:10px;background:var(--brand);border-radius:50%;display:none}
+    .role-card.active .active-indicator{display:block;animation:pulse 2s infinite}
+
+    /* LOGIN PANEL */
+    .login-panel{background:white;border:2px solid var(--brand);border-radius:16px;padding:24px;margin-bottom:24px;position:relative;overflow:hidden}
+    .login-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(to right,var(--brand),var(--accent))}
+    .login-panel h3{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+    .login-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px}
+    .login-field{display:flex;flex-direction:column;gap:4px}
+    .login-field label{font-size:0.72rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em}
+    .login-field .val{font-family:monospace;font-size:0.9rem;font-weight:700;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .btn-cta{background:linear-gradient(135deg,var(--brand),var(--accent));color:white;border:none;border-radius:12px;padding:14px 28px;font-weight:700;font-size:0.95rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px;transition:all 0.3s;box-shadow:0 4px 16px rgba(14,165,233,0.3);animation:pulse 3s infinite}
+    .btn-cta:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(14,165,233,0.4)}
+    .btn-secondary{background:var(--bg);border:1px solid var(--border2);color:var(--text2);border-radius:10px;padding:12px 20px;font-weight:600;font-size:0.88rem;cursor:pointer;transition:all 0.2s}
+    .btn-secondary:hover{border-color:var(--brand);color:var(--brand)}
+    .login-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+
+    /* WHAT'S IN THE DEMO */
+    .demo-contents{background:white;border:1px solid var(--border);border-radius:16px;padding:28px;margin-bottom:24px}
+    .demo-contents h3{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:20px;display:flex;align-items:center;gap:8px}
+    .contents-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+    .content-group h4{font-size:0.82rem;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+    .content-group ul{list-style:none;display:flex;flex-direction:column;gap:6px}
+    .content-group li{font-size:0.8rem;color:var(--text2);display:flex;align-items:flex-start;gap:8px;line-height:1.4}
+    .content-group li::before{content:'•';color:var(--brand);font-weight:700;flex-shrink:0}
+
+    /* OFFLINE TEST */
+    .offline-test{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid rgba(16,185,129,0.3);border-radius:16px;padding:24px;margin-bottom:24px}
+    .offline-test h3{font-size:0.95rem;font-weight:700;color:#065f46;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+    .offline-steps{display:flex;flex-direction:column;gap:8px}
+    .offline-step{display:flex;align-items:flex-start;gap:12px;font-size:0.82rem;color:#064e3b;line-height:1.5}
+    .step-num{width:22px;height:22px;border-radius:50%;background:var(--green);color:white;font-size:0.72rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+
+    /* TOAST */
+    .toast{position:fixed;bottom:24px;right:24px;background:#0f172a;color:white;border-radius:12px;padding:12px 20px;font-size:0.85rem;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,0.2);z-index:999;transform:translateY(100px);opacity:0;transition:all 0.4s cubic-bezier(.16,1,.3,1);display:flex;align-items:center;gap:8px}
+    .toast.show{transform:translateY(0);opacity:1}
+
+    @media(max-width:640px){
+      .quickstart{grid-template-columns:1fr}
+      .roles-grid{grid-template-columns:1fr}
+      .login-grid{grid-template-columns:1fr}
+      .contents-grid{grid-template-columns:1fr}
+      .demo-hero h1{font-size:1.5rem}
+      .login-actions{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-logo">
+    <div class="logo-icon">FP</div>
+    FieldPulse
+  </a>
+  <a href="index.html" class="nav-back">← Back to Home</a>
+</nav>
+
+<div class="page-wrap">
+
+  <!-- HERO BANNER -->
+  <div class="demo-hero animate-fade-up">
+    <div class="badge"><span class="live-dot"></span>Live Demo · No Signup Required</div>
+    <h1>Try FieldPulse Right Now</h1>
+    <p>Pick a role, copy the credentials, open the app. Pre-loaded with real forms, GPS data, photos, and submissions across all 4 user roles.</p>
+    <div class="app-url-bar">
+      <div class="url-code">🌐 <span id="appUrl">https://dct.up.railway.app</span></div>
+      <button class="btn btn-copy" onclick="copyText('appUrl',this)">📋 Copy URL</button>
+      <a href="https://dct.up.railway.app" target="_blank" class="btn btn-open">Open App ↗</a>
+    </div>
+  </div>
+
+  <!-- QUICKSTART STEPS -->
+  <div class="quickstart">
+    <div class="qs-card animate-fade-up delay-1">
+      <div class="qs-num">1</div>
+      <h4>Pick a Role</h4>
+      <p>Choose from Org Admin, Supervisor, Enumerator, or Master Admin below</p>
+    </div>
+    <div class="qs-card animate-fade-up delay-2">
+      <div class="qs-num">2</div>
+      <h4>Copy Credentials</h4>
+      <p>Copy the phone number and password with one click</p>
+    </div>
+    <div class="qs-card animate-fade-up delay-3">
+      <div class="qs-num">3</div>
+      <h4>Log In &amp; Explore</h4>
+      <p>Open the app, paste credentials, explore all features instantly</p>
+    </div>
+  </div>
+
+  <!-- ROLE SELECTOR -->
+  <div class="roles-section animate-fade-up delay-2">
+    <h2>Choose a Role to Explore</h2>
+    <p>Each role shows a different view of FieldPulse — click to select, then use the login panel below.</p>
+    <div class="roles-grid">
+
+      <!-- Org Admin -->
+      <div class="role-card active" onclick="selectRole(this,'admin')" data-phone="+919999990001" data-pass="test@123">
+        <div class="active-indicator"></div>
+        <div class="role-top">
+          <span class="role-icon">🏢</span>
+          <span class="role-name-badge badge-admin">Org Admin</span>
+        </div>
+        <h3>Full Organization Access</h3>
+        <ul class="role-perms">
+          <li>Build &amp; edit forms with skip logic</li>
+          <li>Manage all users and roles</li>
+          <li>View every submission in real time</li>
+          <li>Generate API keys for integrations</li>
+          <li>Configure custom branding &amp; logo</li>
+        </ul>
+        <div class="cred-box">
+          <div class="cred-row">
+            <span class="cred-label">Phone</span>
+            <span class="cred-val">+919999990001</span>
+            <button class="copy-small" onclick="copyInline('+919999990001',this,event)">Copy</button>
+          </div>
+          <div class="cred-row">
+            <span class="cred-label">Password</span>
+            <span class="cred-val">test@123</span>
+            <button class="copy-small" onclick="copyInline('test@123',this,event)">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Supervisor -->
+      <div class="role-card" onclick="selectRole(this,'supervisor')" data-phone="+919999990002" data-pass="test@123">
+        <div class="active-indicator"></div>
+        <div class="role-top">
+          <span class="role-icon">👔</span>
+          <span class="role-name-badge badge-supervisor">Supervisor</span>
+        </div>
+        <h3>Team Lead View</h3>
+        <ul class="role-perms">
+          <li>Live dashboard — submissions in real time</li>
+          <li>Flag, approve, or reject submissions</li>
+          <li>View GPS map for each submission</li>
+          <li>Assign forms to specific enumerators</li>
+          <li>Export data as CSV or Stata .dta</li>
+        </ul>
+        <div class="cred-box">
+          <div class="cred-row">
+            <span class="cred-label">Phone</span>
+            <span class="cred-val">+919999990002</span>
+            <button class="copy-small" onclick="copyInline('+919999990002',this,event)">Copy</button>
+          </div>
+          <div class="cred-row">
+            <span class="cred-label">Password</span>
+            <span class="cred-val">test@123</span>
+            <button class="copy-small" onclick="copyInline('test@123',this,event)">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Enumerator -->
+      <div class="role-card" onclick="selectRole(this,'enumerator')" data-phone="+919999990003" data-pass="test@123">
+        <div class="active-indicator"></div>
+        <div class="role-top">
+          <span class="role-icon">📱</span>
+          <span class="role-name-badge badge-enumerator">Enumerator</span>
+        </div>
+        <h3>Field Data Collector</h3>
+        <ul class="role-perms">
+          <li>Fill assigned forms on any phone</li>
+          <li>Works completely offline — no internet needed</li>
+          <li>Capture GPS, photos (auto-compressed), audio</li>
+          <li>Auto-syncs when signal is restored</li>
+          <li>View personal submission history</li>
+        </ul>
+        <div class="cred-box">
+          <div class="cred-row">
+            <span class="cred-label">Phone</span>
+            <span class="cred-val">+919999990003</span>
+            <button class="copy-small" onclick="copyInline('+919999990003',this,event)">Copy</button>
+          </div>
+          <div class="cred-row">
+            <span class="cred-label">Password</span>
+            <span class="cred-val">test@123</span>
+            <button class="copy-small" onclick="copyInline('test@123',this,event)">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Master Admin -->
+      <div class="role-card" onclick="selectRole(this,'master')" data-phone="+919999990000" data-pass="test@123">
+        <div class="active-indicator"></div>
+        <div class="role-top">
+          <span class="role-icon">🌐</span>
+          <span class="role-name-badge badge-master">Master Admin</span>
+        </div>
+        <h3>Platform Owner</h3>
+        <ul class="role-perms">
+          <li>Manage all organizations on the platform</li>
+          <li>Create and configure new tenant accounts</li>
+          <li>View platform-wide usage statistics</li>
+          <li>Assign plan tiers to organizations</li>
+          <li>Platform health &amp; audit monitoring</li>
+        </ul>
+        <div class="cred-box">
+          <div class="cred-row">
+            <span class="cred-label">Phone</span>
+            <span class="cred-val">+919999990000</span>
+            <button class="copy-small" onclick="copyInline('+919999990000',this,event)">Copy</button>
+          </div>
+          <div class="cred-row">
+            <span class="cred-label">Password</span>
+            <span class="cred-val">test@123</span>
+            <button class="copy-small" onclick="copyInline('test@123',this,event)">Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUICK LOGIN PANEL -->
+  <div class="login-panel animate-fade-up delay-3">
+    <h3>⚡ Quick Login — <span id="selected-role-name" style="color:var(--brand)">Org Admin</span></h3>
+    <div class="login-grid">
+      <div class="login-field">
+        <label>App URL</label>
+        <div class="val" style="font-size:0.78rem;font-family:monospace">
+          dct.up.railway.app
+          <button class="copy-small" onclick="copyInline('https://dct.up.railway.app',this,event)">Copy</button>
+        </div>
+      </div>
+      <div class="login-field">
+        <label>Phone Number</label>
+        <div class="val">
+          <span id="panel-phone">+919999990001</span>
+          <button class="copy-small" onclick="copyEl('panel-phone',this,event)">Copy</button>
+        </div>
+      </div>
+      <div class="login-field">
+        <label>Password</label>
+        <div class="val">
+          <span id="panel-pass">test@123</span>
+          <button class="copy-small" onclick="copyEl('panel-pass',this,event)">Copy</button>
+        </div>
+      </div>
+    </div>
+    <div class="login-actions">
+      <a href="https://dct.up.railway.app" target="_blank" class="btn-cta">Open FieldPulse &amp; Login →</a>
+      <button class="btn-secondary" onclick="copyAll()">📋 Copy All Credentials</button>
+    </div>
+  </div>
+
+  <!-- WHAT'S IN THE DEMO -->
+  <div class="demo-contents animate-fade-up delay-4">
+    <h3>📦 What's Pre-Loaded in the Demo</h3>
+    <div class="contents-grid">
+      <div class="content-group">
+        <h4 style="color:var(--brand)">📋 Sample Forms</h4>
+        <ul>
+          <li>Household Survey (15 fields, skip logic)</li>
+          <li>Health Assessment (GPS + photo + rating)</li>
+          <li>Agricultural Plot Survey (repeat groups)</li>
+          <li>Quick Field Audit (barcode + audio)</li>
+        </ul>
+      </div>
+      <div class="content-group">
+        <h4 style="color:var(--green)">📊 Sample Submissions</h4>
+        <ul>
+          <li>50+ pre-seeded submissions across all forms</li>
+          <li>GPS coordinates visible on map</li>
+          <li>Mix of synced, flagged, approved, pending</li>
+          <li>Full audit trail of status changes</li>
+        </ul>
+      </div>
+      <div class="content-group">
+        <h4 style="color:var(--accent)">👥 Team Data</h4>
+        <ul>
+          <li>5 users across all 4 roles</li>
+          <li>Forms assigned to specific enumerators</li>
+          <li>Activity timeline visible to supervisors</li>
+        </ul>
+      </div>
+      <div class="content-group">
+        <h4 style="color:#f59e0b">🔧 Admin Features</h4>
+        <ul>
+          <li>Custom org branding configured</li>
+          <li>API keys generated (view as Org Admin)</li>
+          <li>Plan usage meter active (Starter plan)</li>
+          <li>Webhook endpoints visible</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- OFFLINE TEST -->
+  <div class="offline-test animate-fade-up delay-4">
+    <h3>🔌 Test Offline Mode — FieldPulse's #1 Feature</h3>
+    <div class="offline-steps">
+      <div class="offline-step"><div class="step-num">1</div>Log in as <strong>Enumerator</strong> (+919999990003) → open an assigned form</div>
+      <div class="offline-step"><div class="step-num">2</div>Open Chrome DevTools (F12) → Network tab → set to <strong>"Offline"</strong></div>
+      <div class="offline-step"><div class="step-num">3</div>Fill the entire form and hit <strong>Submit</strong> — it saves locally with zero internet</div>
+      <div class="offline-step"><div class="step-num">4</div>Set Network back to <strong>"Online"</strong> — watch the sync badge update automatically</div>
+      <div class="offline-step"><div class="step-num">5</div>Log in as <strong>Supervisor</strong> (+919999990002) → your submission appears on the dashboard ✓</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">✓ Copied!</div>
+
+<script>
+  const roles = {
+    admin:      { phone: '+919999990001', pass: 'test@123', name: 'Org Admin' },
+    supervisor: { phone: '+919999990002', pass: 'test@123', name: 'Supervisor' },
+    enumerator: { phone: '+919999990003', pass: 'test@123', name: 'Enumerator' },
+    master:     { phone: '+919999990000', pass: 'test@123', name: 'Master Admin' },
+  };
+  let activeRole = 'admin';
+
+  function selectRole(card, role) {
+    document.querySelectorAll('.role-card').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+    activeRole = role;
+    const r = roles[role];
+    document.getElementById('panel-phone').textContent = r.phone;
+    document.getElementById('panel-pass').textContent = r.pass;
+    document.getElementById('selected-role-name').textContent = r.name;
+    showToast('Switched to ' + r.name);
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = '✓ ' + msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 2000);
+  }
+
+  function copyText(id, btn) {
+    const text = document.getElementById(id).textContent.trim();
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = '✓ Copied!';
+      btn.style.background = 'rgba(16,185,129,0.2)';
+      btn.style.color = '#065f46';
+      setTimeout(() => { btn.textContent = orig; btn.style.background = ''; btn.style.color = ''; }, 1500);
+    });
+  }
+
+  function copyEl(id, btn, e) {
+    if (e) e.stopPropagation();
+    const text = document.getElementById(id).textContent.trim();
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '✓';
+      btn.style.borderColor = 'var(--green)';
+      btn.style.color = 'var(--green)';
+      setTimeout(() => { btn.textContent = 'Copy'; btn.style.borderColor = ''; btn.style.color = ''; }, 1500);
+    });
+    showToast('Copied!');
+  }
+
+  function copyInline(text, btn, e) {
+    if (e) e.stopPropagation();
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '✓';
+      btn.style.borderColor = 'var(--green)';
+      btn.style.color = 'var(--green)';
+      setTimeout(() => { btn.textContent = 'Copy'; btn.style.borderColor = ''; btn.style.color = ''; }, 1500);
+    });
+    showToast('Copied!');
+  }
+
+  function copyAll() {
+    const r = roles[activeRole];
+    const text = `FieldPulse Demo Login\nURL: https://dct.up.railway.app\nPhone: ${r.phone}\nPassword: ${r.pass}\nRole: ${r.name}`;
+    navigator.clipboard.writeText(text).then(() => showToast('All credentials copied!'));
+  }
+</script>
+</body>
+</html>
