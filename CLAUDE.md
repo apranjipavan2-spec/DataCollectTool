@@ -240,7 +240,15 @@ Installed globally at `~/.claude/plugins/marketplaces/thedotmack/`. Captures too
 
 **Source**: `C:\Life\DataCollectTool\claude-mem-main\claude-mem-main\`
 
-### 3. Graphify (`/graphify`)
+### 3. SigMap (signature context — always active)
+Config: `gen-context.config.json`. Output: `.github/copilot-instructions.md` (hot, auto-injected) + `.github/context-cold.md` (on-demand via MCP).
+- **98% token reduction**: 215,031 → 3,479 tokens. 593 symbols across 118 files.
+- Hot-cold strategy: 44 recently-changed files auto-injected every session; 74 cold files fetched on demand.
+- MCP server registered in `.claude/settings.local.json` → `read_context({ module: "backend/app/api" })` to fetch cold files.
+- Regenerate after schema/route changes: `npx sigmap`
+- Source: `https://github.com/manojmallick/sigmap`
+
+### 4. Graphify (`/graphify`)
 Installed globally at `~/.claude/skills/graphify/SKILL.md`. Builds a knowledge graph of any codebase — interactive HTML + queryable JSON. 71.5x fewer tokens per query vs reading raw files.
 - `/graphify .` — build graph of entire project
 - `/graphify backend/` — graph of backend only
