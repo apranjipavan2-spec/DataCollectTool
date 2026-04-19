@@ -3,6 +3,12 @@ import api, { storeUser } from '@/lib/api'
 import { useNavigate } from 'react-router-dom'
 import { subscribeToPush } from '@/lib/pushNotifications'
 
+const DEMO_ACCOUNTS = [
+  { role: 'Admin',       icon: '🛡',  phone: '+919999990001', password: 'test@123', color: '#2563eb' },
+  { role: 'Supervisor',  icon: '👁',  phone: '+919999990002', password: 'test@123', color: '#7c3aed' },
+  { role: 'Enumerator',  icon: '📋',  phone: '+919999990003', password: 'test@123', color: '#059669' },
+]
+
 export default function LoginPage() {
   const navigate = useNavigate()
   const [phone, setPhone]       = useState('')
@@ -12,6 +18,8 @@ export default function LoginPage() {
   const [error, setError]       = useState('')
   const [phoneErr, setPhoneErr] = useState('')
   const [pwdErr, setPwdErr]     = useState('')
+  const [showDemo, setShowDemo] = useState(false)
+  const [filledRole, setFilledRole] = useState('')
 
   const normalizePhone = (raw: string) => {
     const digits = raw.replace(/\D/g, '')
@@ -221,10 +229,58 @@ export default function LoginPage() {
               )}
             </button>
 
-            <div className="mt-5 pt-5 border-t border-slate-100 text-center">
-              <p className="text-xs text-slate-400">
-                Having trouble? Contact your supervisor or administrator.
-              </p>
+            <div className="mt-5 pt-5 border-t border-slate-100">
+              {/* Demo accounts toggle */}
+              <button
+                type="button"
+                onClick={() => setShowDemo(v => !v)}
+                className="w-full flex items-center justify-center gap-1.5 text-xs text-blue-500 hover:text-blue-700 font-semibold transition-colors py-1 rounded-lg hover:bg-blue-50"
+              >
+                <span className="text-sm">🔑</span>
+                Try a demo account
+                <span className={`transition-transform duration-200 ${showDemo ? 'rotate-180' : ''}`}>▾</span>
+              </button>
+
+              {showDemo && (
+                <div className="mt-3 space-y-2">
+                  {DEMO_ACCOUNTS.map(acc => (
+                    <button
+                      key={acc.role}
+                      type="button"
+                      onClick={() => {
+                        setPhone(acc.phone)
+                        setPassword(acc.password)
+                        setPhoneErr(''); setPwdErr(''); setError('')
+                        setFilledRole(acc.role)
+                        setShowDemo(false)
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-blue-300 hover:shadow-sm transition-all text-left group"
+                    >
+                      <span className="text-lg w-7 text-center flex-shrink-0">{acc.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-slate-800 group-hover:text-blue-700 transition-colors">{acc.role}</div>
+                        <div className="text-xs text-slate-400 font-mono truncate">{acc.phone} · {acc.password}</div>
+                      </div>
+                      <span className="text-xs text-blue-400 group-hover:text-blue-600 flex-shrink-0 font-medium">Use →</span>
+                    </button>
+                  ))}
+                  <p className="text-[11px] text-slate-400 text-center pt-1">
+                    These are read-only demo accounts — data is shared.
+                  </p>
+                </div>
+              )}
+
+              {filledRole && !showDemo && (
+                <p className="text-xs text-center mt-2 text-emerald-600 font-medium">
+                  ✓ Filled as {filledRole} — press Sign In
+                </p>
+              )}
+
+              {!showDemo && !filledRole && (
+                <p className="text-xs text-slate-400 text-center mt-2">
+                  Having trouble? Contact your supervisor or administrator.
+                </p>
+              )}
             </div>
           </div>
 
