@@ -129,6 +129,9 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
     }, 300)
   }, [onSave])
 
+  // Field types that auto-advance to the next question on selection
+  const AUTO_ADVANCE_TYPES = new Set(['single_choice', 'date', 'time', 'rating'])
+
   const setValue = (name: string, value: unknown) => {
     setDraft(d => {
       const next = { ...d, values: { ...d.values, [name]: value } }
@@ -136,6 +139,16 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
       return next
     })
     setErrors(e => ({ ...e, [name]: '' }))
+
+    // Auto-advance for simple one-tap selections
+    if (currentField && AUTO_ADVANCE_TYPES.has(currentField.type) && value !== '' && value != null) {
+      setTimeout(() => {
+        setPage(p => {
+          if (p < allFields.length - 1) return p + 1
+          return p
+        })
+      }, 320)
+    }
   }
 
   // Scroll content area to top whenever the page changes
