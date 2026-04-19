@@ -60,9 +60,9 @@
       <div class="bg-gray-800 border border-brand-500/40 rounded-2xl p-6 mb-8 text-center">
         <p class="text-gray-400 text-sm mb-2">Demo App URL</p>
         <div class="flex items-center justify-center gap-3 flex-wrap">
-          <code id="app-url" class="text-brand-400 text-lg font-mono bg-gray-900 px-4 py-2 rounded-lg">https://datacollecttool-production.up.railway.app</code>
+          <code id="app-url" class="text-brand-400 text-lg font-mono bg-gray-900 px-4 py-2 rounded-lg">https://dct.up.railway.app</code>
           <button onclick="copyText('app-url', this)" class="copy-btn bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold px-4 py-2 rounded-lg">Copy URL</button>
-          <a id="open-app" href="https://datacollecttool-production.up.railway.app" target="_blank" class="bg-green-600 hover:bg-green-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">Open App ↗</a>
+          <a id="open-app" href="https://dct.up.railway.app" target="_blank" class="bg-green-600 hover:bg-green-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">Open App ↗</a>
         </div>
         <p class="text-gray-500 text-xs mt-3">⚠️ Demo resets every 24 hours. Data you enter may be cleared.</p>
       </div>
@@ -89,8 +89,7 @@
           </ul>
           <div class="bg-gray-900 rounded-lg p-3 font-mono text-sm">
             <div class="text-gray-500 text-xs mb-1">Phone</div>
-            <div class="text-green-400 font-bold" id="admin-phone">+919999990002</div>
-            <!-- Seed: 0001=master_admin, 0002=org_admin, 0003=supervisor, 0004=enumerator -->
+            <div class="text-green-400 font-bold" id="admin-phone">+919999990001</div>
             <div class="text-gray-500 text-xs mt-2 mb-1">Password</div>
             <div class="text-green-400 font-bold">test@123</div>
           </div>
@@ -114,7 +113,7 @@
           </ul>
           <div class="bg-gray-900 rounded-lg p-3 font-mono text-sm">
             <div class="text-gray-500 text-xs mb-1">Phone</div>
-            <div class="text-green-400 font-bold">+919999990003</div>
+            <div class="text-green-400 font-bold">+919999990002</div>
             <div class="text-gray-500 text-xs mt-2 mb-1">Password</div>
             <div class="text-green-400 font-bold">test@123</div>
           </div>
@@ -138,7 +137,7 @@
           </ul>
           <div class="bg-gray-900 rounded-lg p-3 font-mono text-sm">
             <div class="text-gray-500 text-xs mb-1">Phone</div>
-            <div class="text-green-400 font-bold">+919999990004</div>
+            <div class="text-green-400 font-bold">+919999990003</div>
             <div class="text-gray-500 text-xs mt-2 mb-1">Password</div>
             <div class="text-green-400 font-bold">test@123</div>
           </div>
@@ -162,7 +161,7 @@
           </ul>
           <div class="bg-gray-900 rounded-lg p-3 font-mono text-sm">
             <div class="text-gray-500 text-xs mb-1">Phone</div>
-            <div class="text-green-400 font-bold">+919999990001</div>
+            <div class="text-green-400 font-bold">+919999990000</div>
             <div class="text-gray-500 text-xs mt-2 mb-1">Password</div>
             <div class="text-green-400 font-bold">test@123</div>
           </div>
@@ -176,13 +175,13 @@
           <div>
             <p class="text-gray-500 text-xs mb-1 uppercase tracking-wide">App URL</p>
             <div class="flex items-center gap-2">
-              <span class="text-brand-400 font-mono text-sm">fieldpulse.up.railway.app</span>
+              <span class="text-brand-400 font-mono text-sm">dct.up.railway.app</span>
             </div>
           </div>
           <div>
             <p class="text-gray-500 text-xs mb-1 uppercase tracking-wide">Selected Phone</p>
             <div class="flex items-center gap-2">
-              <span id="selected-phone" class="text-white font-mono text-sm font-bold">+919999990002</span>
+              <span id="selected-phone" class="text-white font-mono text-sm font-bold">+919999990001</span>
               <button onclick="copyText('selected-phone', this)" class="copy-btn text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300">Copy</button>
             </div>
           </div>
@@ -195,7 +194,7 @@
           </div>
         </div>
         <div class="mt-4 pt-4 border-t border-gray-700 flex flex-col sm:flex-row gap-3">
-          <a href="https://datacollecttool-production.up.railway.app" target="_blank"
+          <a href="https://dct.up.railway.app" target="_blank"
              class="flex-1 bg-brand-500 hover:bg-brand-600 text-white font-bold py-3 rounded-xl transition text-center">
             Open FieldPulse Demo ↗
           </a>
@@ -272,13 +271,13 @@
   </div>
 
   <script>
+    // Mapping matches seed_dev.py: 0000=master_admin 0001=org_admin 0002=supervisor 0003=enumerator
     const roles = {
-      admin:      { phone: '+919999990002', pass: 'test@123' },
-      supervisor: { phone: '+919999990003', pass: 'test@123' },
-      enumerator: { phone: '+919999990004', pass: 'test@123' },
-      master:     { phone: '+919999990001', pass: 'test@123' },
+      admin:      { phone: '+919999990001', pass: 'test@123' },
+      supervisor: { phone: '+919999990002', pass: 'test@123' },
+      enumerator: { phone: '+919999990003', pass: 'test@123' },
+      master:     { phone: '+919999990000', pass: 'test@123' },
     };
-    // Phone mapping: 0001=master_admin 0002=org_admin 0003=supervisor 0004=enumerator
 
     function selectRole(card, role) {
       document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
@@ -300,7 +299,7 @@
     function copyAll() {
       const phone = document.getElementById('selected-phone').textContent;
       const pass = document.getElementById('selected-pass').textContent;
-      const url = 'https://datacollecttool-production.up.railway.app';
+      const url = 'https://dct.up.railway.app';
       const text = `FieldPulse Demo\nURL: ${url}\nPhone: ${phone}\nPassword: ${pass}`;
       navigator.clipboard.writeText(text).then(() => {
         const btn = event.target;

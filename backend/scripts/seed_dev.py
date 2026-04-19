@@ -48,11 +48,11 @@ try:
     demo_tenant, _ = get_or_create_tenant('Demo Org', 'professional')
 
     users = [
-        (platform_tenant.id, '+919999990001', 'master_admin', 'Master Admin'),
-        (demo_tenant.id,     '+919999990002', 'org_admin',    'Org Admin'),
-        (demo_tenant.id,     '+919999990003', 'supervisor',   'Supervisor User'),
-        (demo_tenant.id,     '+919999990004', 'enumerator',   'Enumerator User'),
-        (demo_tenant.id,     '+919999990005', 'enumerator',   'Enumerator 2'),
+        (platform_tenant.id, '+919999990000', 'master_admin', 'Master Admin'),
+        (demo_tenant.id,     '+919999990001', 'org_admin',    'Org Admin'),
+        (demo_tenant.id,     '+919999990002', 'supervisor',   'Supervisor User'),
+        (demo_tenant.id,     '+919999990003', 'enumerator',   'Enumerator User'),
+        (demo_tenant.id,     '+919999990004', 'enumerator',   'Enumerator 2'),
     ]
 
     created = []
