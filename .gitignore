@@ -30,6 +30,11 @@ credentials.csv
 export_credentials.py
 create_forms.py
 e2e_test.py
+TEST_CREDENTIALS.csv
+
+# Google OAuth credentials
+backend/credentials/
+credentials/
 
 # Claude Code local settings
 .claude/settings.local.json
