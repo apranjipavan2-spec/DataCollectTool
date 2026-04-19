@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import api, { getStoredUser } from '@/lib/api'
+import { homeForRole } from '@/auth/RequireAuth'
 import type { FormSchema } from '@/types/form'
 import FormRenderer, { type SubmissionDraft } from '@/renderer/FormRenderer'
 import { getStorage } from '@/storage'
@@ -618,7 +619,7 @@ export default function FieldApp() {
             {syncMsg && <p className="text-catalan-info text-sm mb-6">{syncMsg}</p>}
             <div className="flex gap-3 justify-center flex-col sm:flex-row mt-6">
               <Button onClick={() => setScreen('list')} size="lg">Fill Another Form</Button>
-              <Button onClick={() => window.location.href = '/'} variant="secondary" size="lg">Home</Button>
+              <Button onClick={() => window.location.href = homeForRole(storedUser?.role ?? 'enumerator')} variant="secondary" size="lg">Home</Button>
             </div>
           </div>
         </div>

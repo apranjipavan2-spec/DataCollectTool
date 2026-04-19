@@ -6,7 +6,7 @@ import io
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.deps import get_current_user, require_org_admin
+from app.core.deps import get_current_user, require_org_admin, require_supervisor
 from app.core.security import hash_password
 from app.core.rate_limit import limiter
 from app.models.user import User
@@ -42,7 +42,7 @@ def get_me(user=Depends(get_current_user), db: Session = Depends(get_db)):
 
 
 @router.get("/")
-def list_users(page: int = 1, page_size: int = 50, user=Depends(require_org_admin), db: Session = Depends(get_db)):
+def list_users(page: int = 1, page_size: int = 50, user=Depends(require_supervisor), db: Session = Depends(get_db)):
     page_size = min(page_size, 200)
     q = db.query(User).filter(User.tenant_id == user["tenant_id"], User.is_active == True)
     total = q.count()

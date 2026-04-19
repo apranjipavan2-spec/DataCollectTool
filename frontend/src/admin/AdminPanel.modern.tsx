@@ -201,7 +201,7 @@ export default function AdminPanel() {
             </Card>
           ) : (
             <Card>
-              <Table<TenantRow>
+              <Table
                 columns={[
                   { key: 'name', label: 'Organization' },
                   { key: 'app_name', label: 'App Name' },
@@ -250,6 +250,7 @@ export default function AdminPanel() {
       {/* Create Tenant Modal */}
       {showCreateModal && (
         <Modal
+          isOpen={showCreateModal}
           title="Create New Tenant"
           onClose={() => setShowCreateModal(false)}
           footer={
@@ -325,6 +326,7 @@ export default function AdminPanel() {
       {/* Edit Tenant Modal */}
       {showEditModal && editingTenant && (
         <Modal
+          isOpen={showEditModal}
           title={`Edit Tenant: ${editingTenant.name}`}
           onClose={() => {
             setShowEditModal(false)

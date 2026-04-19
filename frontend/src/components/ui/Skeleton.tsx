@@ -2,9 +2,9 @@ import React from 'react'
 
 // ── Base animated block ──────────────────────────────────────────────────────
 
-export function SkeletonBlock({ className = '' }: { className?: string }) {
+export function SkeletonBlock({ className = '', style }: { className?: string; style?: React.CSSProperties }) {
   return (
-    <div className={`animate-pulse bg-catalan-hover rounded ${className}`} />
+    <div className={`animate-pulse bg-catalan-hover rounded ${className}`} style={style} />
   )
 }
 

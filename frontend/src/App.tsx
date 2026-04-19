@@ -4,7 +4,7 @@ import FormBuilder         from '@/builder/FormBuilder.modern'
 import LoginPage           from '@/auth/LoginPage'
 import ForgotPasswordPage  from '@/auth/ForgotPasswordPage'
 import ResetPasswordPage   from '@/auth/ResetPasswordPage'
-import RequireAuth         from '@/auth/RequireAuth'
+import RequireAuth, { homeForRole } from '@/auth/RequireAuth'
 import FieldApp       from '@/collect/FieldApp.modern'
 import AdminPanel     from '@/admin/AdminPanel.modern'
 import OrgAdminPanel  from '@/admin/OrgAdminPanel.modern'
@@ -20,6 +20,11 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 import { HelpProvider } from '@/help/HelpContext'
 import HelpPanel from '@/help/HelpPanel'
 import HelpSpotlight from '@/help/HelpSpotlight'
+
+function RoleHome() {
+  const user = getStoredUser()
+  return <Navigate to={user ? homeForRole(user.role) : '/login'} replace />
+}
 
 // ── Session timeout manager ─────────────────────────────────────────────────
 // Lives inside BrowserRouter so it can read location (for future use)
@@ -123,7 +128,7 @@ export default function App() {
                 </RequireAuth>
               } />
 
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<RoleHome />} />
             </Routes>
           </BrowserRouter>
           </HelpProvider>
