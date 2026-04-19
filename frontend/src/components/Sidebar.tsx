@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useHelp } from '@/help/HelpContext'
 
 interface SidebarItem {
   label: string
@@ -16,6 +17,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
   const [mobileOpen, setMobileOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  const { togglePanel, isPanelOpen } = useHelp()
 
   return (
     <>
@@ -58,9 +60,28 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
           ))}
         </nav>
 
+        {/* Help button */}
+        <div className="p-3 border-t border-catalan-border">
+          <button
+            onClick={togglePanel}
+            title="Help & Guide (press ? anytime)"
+            className={`
+              w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200
+              md:justify-center lg:justify-start
+              ${isPanelOpen
+                ? 'bg-catalan-primary text-white'
+                : 'text-catalan-textMuted hover:bg-catalan-hover hover:text-catalan-text'
+              }
+            `}
+          >
+            <span className="text-base flex-shrink-0 font-bold">?</span>
+            <span className="text-xs hidden lg:inline font-medium">Help & Guide</span>
+          </button>
+        </div>
+
         {/* Role Badge */}
         {role && (
-          <div className="p-4 border-t border-catalan-border hidden lg:block">
+          <div className="px-4 pb-4 hidden lg:block">
             <div className="p-3 bg-catalan-hover rounded-lg text-xs text-catalan-textMuted border border-catalan-border">
               <p className="font-semibold text-catalan-text capitalize">{role?.replace('_', ' ')}</p>
               <p className="mt-1">Logged in</p>
@@ -130,15 +151,25 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
           ))}
         </nav>
 
-        {/* Role Badge - Mobile */}
-        {role && (
-          <div className="absolute bottom-4 left-4 right-4">
+        {/* Help & Role - Mobile */}
+        <div className="absolute bottom-4 left-4 right-4 space-y-2">
+          <button
+            onClick={() => { setMobileOpen(false); togglePanel() }}
+            className={`
+              w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-sm font-medium
+              ${isPanelOpen ? 'bg-catalan-primary text-white' : 'bg-catalan-hover text-catalan-textMuted border border-catalan-border hover:text-catalan-text'}
+            `}
+          >
+            <span className="font-bold">?</span>
+            <span>Help & Guide</span>
+          </button>
+          {role && (
             <div className="p-3 bg-catalan-hover rounded-lg text-xs text-catalan-textMuted border border-catalan-border">
               <p className="font-semibold text-catalan-text capitalize">{role?.replace('_', ' ')}</p>
               <p className="mt-1">Logged in</p>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Spacer for desktop */}

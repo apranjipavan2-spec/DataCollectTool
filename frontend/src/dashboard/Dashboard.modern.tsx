@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
+import InfoButton from '@/help/InfoButton'
 import api, { getStoredUser } from '@/lib/api'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
@@ -1212,9 +1213,10 @@ export default function Dashboard() {
           {tab === 'submissions' && (
             <div className="space-y-4">
               {/* Filter bar */}
-              <Card>
+              <Card data-help-id="filter-bar">
                 {/* Row 1: Search + Form — always visible */}
                 <div className="flex gap-3 items-end mb-3">
+                  <InfoButton topicId="filter-submissions" className="mb-0.5" />
                   <div className="flex-1 min-w-0">
                     <label className="text-xs text-catalan-textMuted block mb-1">Search</label>
                     <input
@@ -1267,7 +1269,8 @@ export default function Dashboard() {
                       </Button>
                     )}
                   </div>
-                  <div className="flex gap-2 flex-wrap ml-auto">
+                  <div className="flex gap-2 flex-wrap ml-auto items-center" data-help-id="export-btn">
+                    <InfoButton topicId="export-data" />
                     <Button variant="secondary" size="sm" onClick={handleExport} disabled={exportingCsv}>
                       {exportingCsv ? 'Exporting…' : '↓ CSV'}
                     </Button>
@@ -1636,12 +1639,15 @@ export default function Dashboard() {
                                     v{form.version}
                                   </a>
                                 )}
-                                <button
-                                  onClick={() => setAssignForm(form)}
-                                  className="text-xs text-catalan-success hover:underline"
-                                >
-                                  Assign
-                                </button>
+                                <span className="inline-flex items-center gap-1" data-help-id="assign-form-btn">
+                                  <InfoButton topicId="assign-forms" />
+                                  <button
+                                    onClick={() => setAssignForm(form)}
+                                    className="text-xs text-catalan-success hover:underline"
+                                  >
+                                    Assign
+                                  </button>
+                                </span>
                               </div>
                             </td>
                           </tr>
@@ -1875,13 +1881,16 @@ export default function Dashboard() {
                   >
                     {showCsvImport ? 'Cancel Import' : 'Import CSV'}
                   </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => { setShowAddUser(v => !v); setShowCsvImport(false) }}
-                  >
-                    {showAddUser ? 'Cancel' : '+ Add User'}
-                  </Button>
+                  <div className="flex items-center gap-2" data-help-id="add-user-btn">
+                    <InfoButton topicId="add-user" />
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => { setShowAddUser(v => !v); setShowCsvImport(false) }}
+                    >
+                      {showAddUser ? 'Cancel' : '+ Add User'}
+                    </Button>
+                  </div>
                 </div>
               </div>
 

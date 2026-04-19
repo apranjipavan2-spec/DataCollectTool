@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
+import InfoButton from '@/help/InfoButton'
 import { useSearchParams } from 'react-router-dom'
 import { v4 as uuidv4 } from 'uuid'
 import type { FormSchema, FormSection, FormField, FieldType, FieldOption } from '@/types/form'
@@ -648,6 +649,10 @@ export default function FormBuilder() {
               <Button onClick={() => setShowTypeMenu(true)} size="sm" fullWidth>+ Add Question</Button>
               <Button onClick={addSection} variant="secondary" size="sm" fullWidth>+ Add Section</Button>
 
+              <div className="flex items-center gap-1.5 mb-1" data-help-id="import-excel-btn">
+                <InfoButton topicId="import-excel" />
+                <span className="text-xs text-catalan-textMuted">Import form from Excel</span>
+              </div>
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={importingExcel}
@@ -710,10 +715,13 @@ export default function FormBuilder() {
                   <span className="text-xs text-catalan-textMuted font-mono bg-catalan-hover px-2 py-1 rounded">{formId.slice(0, 8)}</span>
                 )}
                 {formId && (
-                  <Button variant="secondary" size="sm" onClick={() => setShowVersions(v => !v)}
-                    className={showVersions ? '!border-catalan-primary !text-catalan-primary' : ''}>
-                    {showVersions ? '✕ Versions' : `v${schema.version} History`}
-                  </Button>
+                  <span className="inline-flex items-center gap-1" data-help-id="version-history-btn">
+                    <InfoButton topicId="form-versions" />
+                    <Button variant="secondary" size="sm" onClick={() => setShowVersions(v => !v)}
+                      className={showVersions ? '!border-catalan-primary !text-catalan-primary' : ''}>
+                      {showVersions ? '✕ Versions' : `v${schema.version} History`}
+                    </Button>
+                  </span>
                 )}
                 <Button variant="secondary" size="sm" onClick={() => window.location.href = '/collect'}>Preview</Button>
                 <Button onClick={handleSave} disabled={saving} size="sm"
@@ -829,9 +837,12 @@ function SectionEditor({ section, schema, onTitleChange, onSkipLogicChange, onAd
         </div>
 
         {/* ── Section visibility condition ── */}
-        <div className="mb-6">
+        <div className="mb-6" data-help-id="skip-logic-btn">
           <div className="flex items-center justify-between mb-3">
-            <label className={labelCls + ' mb-0'}>When to show this section</label>
+            <div className="flex items-center gap-2">
+              <label className={labelCls + ' mb-0'}>When to show this section</label>
+              <InfoButton topicId="skip-logic" />
+            </div>
           </div>
 
           {/* Active condition banner with clear remove button */}

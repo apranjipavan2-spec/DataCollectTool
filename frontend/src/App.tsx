@@ -17,6 +17,9 @@ import { saveFormDraft, loadFormDraft } from '@/lib/formDraft'
 import { logout, getStoredUser } from '@/lib/api'
 import SessionTimeoutModal from '@/components/SessionTimeoutModal'
 import ErrorBoundary from '@/components/ErrorBoundary'
+import { HelpProvider } from '@/help/HelpContext'
+import HelpPanel from '@/help/HelpPanel'
+import HelpSpotlight from '@/help/HelpSpotlight'
 
 // ── Session timeout manager ─────────────────────────────────────────────────
 // Lives inside BrowserRouter so it can read location (for future use)
@@ -62,8 +65,11 @@ export default function App() {
       <ThemeProvider>
       <ToastProvider>
         <LanguageProvider>
+          <HelpProvider>
           <BrowserRouter>
             <SessionTimeoutManager />
+            <HelpPanel />
+            <HelpSpotlight />
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -120,6 +126,7 @@ export default function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
+          </HelpProvider>
         </LanguageProvider>
       </ToastProvider>
       </ThemeProvider>
