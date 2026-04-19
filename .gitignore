@@ -38,3 +38,13 @@ credentials/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# External tool sources (not part of FieldPulse)
+caveman-main/
+caveman-main.zip
+claude-mem-main/
+claude-mem-main.zip
+hermes-agent-main/
+hermes-agent-main.zip
+graphify-4/
+graphify-4.zip

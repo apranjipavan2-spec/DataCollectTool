@@ -218,6 +218,40 @@ Migration files go in `backend/alembic/versions/`. Follow the `0001_`, `0002_` n
 
 ---
 
+## AI Tools Active in This Project
+
+Three tools are integrated and available in every session:
+
+### 1. Caveman (`/caveman`)
+Skill at `.claude/skills/caveman/SKILL.md`. Ultra-compressed token-saving mode (~75% reduction).
+- `/caveman` — activate full mode
+- `/caveman lite` — terse but full sentences
+- `/caveman ultra` — maximum compression
+- `/caveman:compress CLAUDE.md` — compress this file to save tokens every session
+- `stop caveman` / `normal mode` — deactivate
+
+### 2. Claude-mem (persistent memory)
+Installed globally at `~/.claude/plugins/marketplaces/thedotmack/`. Captures tool usage, compresses observations, injects context at session start. Worker runs on port 37777.
+- `/mem-search` — search past sessions ("did we fix X before?", "how did we do Y?")
+- `/make-plan` — phased implementation plan with documentation discovery
+- `/do` — execute a plan using subagents
+- `/smart-explore` — intelligent codebase exploration
+- `/timeline-report` — what changed across sessions
+
+**Source**: `C:\Life\DataCollectTool\claude-mem-main\claude-mem-main\`
+
+### 3. Hermes Agent (Nous Research)
+Separate self-improving agent framework at `C:\Life\DataCollectTool\hermes-agent-main\hermes-agent-main\`. NOT a Claude Code plugin — runs independently. Relevant capabilities:
+- **Docker management** skill (`optional-skills/devops/docker-management/`) — useful for Railway/Docker ops
+- **Scheduled automations** — cron jobs, nightly backups
+- **Multi-platform messaging** — Telegram, Discord, Slack integration
+- **Subagent parallelization** — spawn isolated agents for parallel workstreams
+- Install: `curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash` (WSL2 required on Windows)
+
+**When to use Hermes**: When you need an autonomous agent running outside Claude Code sessions (e.g., nightly data exports, monitoring, multi-platform notifications for FieldPulse events).
+
+---
+
 ## Code Conventions
 
 - **Backend**: FastAPI dependency injection via `Depends()`. All DB queries filtered by `tenant_id`. Use `get_db` and `get_current_user` from `core/deps.py`.
