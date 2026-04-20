@@ -25,7 +25,7 @@ const Alert: React.FC<AlertProps> = ({
   const textColor = {
     info: 'text-catalan-info',
     success: 'text-catalan-success',
-    warning: 'text-catalan-warning',
+    warning: 'text-catalan-text',   // black in light, white in dark — warning amber is illegible
     error: 'text-catalan-error',
   }
 

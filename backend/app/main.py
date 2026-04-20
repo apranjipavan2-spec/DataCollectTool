@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -56,7 +57,17 @@ def health():
     return {"status": "ok"}
 
 
-# Serve React frontend (must be last — catches all non-API routes)
+# Serve React frontend — SPA fallback (must be last)
 static_dir = Path(__file__).parent.parent / "static"
 if static_dir.exists():
-    app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="frontend")
+    assets_dir = static_dir / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+    @app.get("/{full_path:path}")
+    def serve_spa(full_path: str):
+        file_path = static_dir / full_path
+        if file_path.is_file():
+            return FileResponse(str(file_path))
+        index = static_dir / "index.html"
+        return FileResponse(str(index)) if index.exists() else {"detail": "Not Found"}
