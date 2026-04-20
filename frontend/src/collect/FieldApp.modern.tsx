@@ -323,8 +323,14 @@ export default function FieldApp() {
       const allMedia = await store.getMediaQueue()
       setOutboxCount(outbox.length)
       setMediaQueueCount(pendingMedia)
-      setFailedMediaCount(allMedia.filter(m => m.status === 'failed').length)
-      if ((outbox.length > 0 || pendingMedia > 0) && navigator.onLine) syncToServer()
+      const failedMedia = allMedia.filter(m => m.status === 'failed')
+      setFailedMediaCount(failedMedia.length)
+      // Auto-reset failed media to pending on every startup so they retry automatically
+      if (failedMedia.length > 0 && navigator.onLine) {
+        for (const item of failedMedia) await store.updateMediaStatus(item.id, 'pending')
+        setFailedMediaCount(0)
+      }
+      if ((outbox.length > 0 || pendingMedia > 0 || failedMedia.length > 0) && navigator.onLine) syncToServer()
 
       // Storage quota warning
       try {

@@ -39,7 +39,7 @@ export default function AdminPanel() {
     logo_url: '',
     admin_phone: '',
     admin_name: '',
-    admin_password: 'fieldpulse123',
+    admin_password: '',
   })
 
   const user = getStoredUser() || { name: '', role: '' }
@@ -81,7 +81,7 @@ export default function AdminPanel() {
         logo_url: '',
         admin_phone: '',
         admin_name: '',
-        admin_password: 'fieldpulse123',
+        admin_password: '',
       })
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to create tenant')
@@ -116,7 +116,7 @@ export default function AdminPanel() {
       logo_url: tenant.logo_url,
       admin_phone: '',
       admin_name: '',
-      admin_password: 'fieldpulse123',
+      admin_password: '',
     })
     setShowEditModal(true)
   }

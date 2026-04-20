@@ -25,6 +25,14 @@ Base.metadata.create_all(bind=engine)
 print("Tables ready.")
 
 db = SessionLocal()
+
+# Guard: skip if demo data already seeded (safe on every deploy)
+_existing = db.query(Tenant).filter(Tenant.name == 'Demo Org').first()
+if _existing:
+    print("✓ Demo data already present — skipping seed")
+    db.close()
+    sys.exit(0)
+
 DEFAULT_PASSWORD = 'test@123'
 SUPER_ADMIN_PASSWORD = 'superadmin@4991'
 hashed = hash_password(DEFAULT_PASSWORD)

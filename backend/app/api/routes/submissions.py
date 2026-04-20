@@ -261,6 +261,22 @@ def update_submission(submission_id: str, body: SubmissionUpdate, user=Depends(r
 
         db.commit()
 
+        # Push notification to enumerator on approve/reject
+        if body.status in ("approved", "rejected") and body.status != old_status and sub.enumerator_id:
+            try:
+                from app.api.routes.notifications import send_push
+                action_label = "approved" if body.status == "approved" else "rejected"
+                note_text = (sub.flag_note or "").strip()
+                send_push(
+                    db,
+                    str(sub.enumerator_id),
+                    f"Submission {action_label.capitalize()}",
+                    f"Your submission was {action_label}.{' ' + note_text if note_text else ''}",
+                    url="/collect",
+                )
+            except Exception:
+                logger.warning("Push to enumerator failed for submission %s", sub.id)
+
         # Fire webhooks on status change (never blocks response)
         if body.status and body.status != old_status:
             try:

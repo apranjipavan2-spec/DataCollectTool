@@ -3,7 +3,7 @@
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
 You are a coding assistant with full knowledge of this codebase.
-Below are the code signatures extracted by SigMap v5.8.0 on 2026-04-20T03:55:57.434Z.
+Below are the code signatures extracted by SigMap v5.8.0 on 2026-04-20T04:18:20.348Z.
 
 Use these signatures to answer questions about the code accurately.
 

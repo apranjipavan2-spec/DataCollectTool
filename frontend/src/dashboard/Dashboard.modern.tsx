@@ -1056,7 +1056,10 @@ export default function Dashboard() {
 
           {/* Tabs + Content (hidden while loading) */}
           {!loading && <><div className="hidden sm:flex gap-1 bg-catalan-surface rounded-lg p-1 w-fit flex-wrap">
-            {(['overview', 'submissions', 'forms', ...(isEnumerator ? [] : ['team', 'integrations'])] as const).map(t => (
+            {(isEnumerator
+              ? (['overview', 'submissions', 'forms'] as const)
+              : (['overview', 'submissions', 'forms', 'team', 'integrations'] as const)
+            ).map(t => (
               <button
                 key={t}
                 onClick={() => {
@@ -1439,7 +1442,7 @@ export default function Dashboard() {
                     <tbody>
                       {filteredSubs.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="text-center py-10 text-catalan-textMuted text-sm">
+                          <td colSpan={isEnumerator ? 7 : 8} className="text-center py-10 text-catalan-textMuted text-sm">
                             {submissions.length === 0 ? 'No submissions yet' : 'No submissions match your filters'}
                           </td>
                         </tr>
