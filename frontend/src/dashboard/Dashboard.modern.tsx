@@ -108,12 +108,13 @@ function renderFieldValue(val: unknown): React.ReactNode {
 // ── Submission Detail Modal ────────────────────────────────────────────────
 
 function SubmissionDetailModal({
-  sub, forms, onClose, onFlag,
+  sub, forms, onClose, onFlag, isEnumerator = false,
 }: {
   sub: SubDetail
   forms: Form[]
   onClose: () => void
   onFlag: (id: string, status: string, note: string) => Promise<void>
+  isEnumerator?: boolean
 }) {
   const formTitle = forms.find(f => f.id === sub.form_id)?.title ?? 'Unknown Form'
   const [flagNote, setFlagNote] = useState(sub.flag_note ?? '')
@@ -199,8 +200,8 @@ function SubmissionDetailModal({
           </div>
         </div>
 
-        {/* Supervisor Review */}
-        <div className={`px-5 py-3 border-b border-catalan-border ${isReviewed && sub.status === 'approved' ? 'bg-catalan-success/5' : isReviewed ? 'bg-catalan-error/5' : isFlagged ? 'bg-catalan-warning/5' : ''}`}>
+        {/* Supervisor Review — hidden for enumerators */}
+        {!isEnumerator && <div className={`px-5 py-3 border-b border-catalan-border ${isReviewed && sub.status === 'approved' ? 'bg-catalan-success/5' : isReviewed ? 'bg-catalan-error/5' : isFlagged ? 'bg-catalan-warning/5' : ''}`}>
           <div className="text-xs font-medium text-catalan-textMuted uppercase tracking-wider mb-2">Supervisor Review</div>
 
           {isReviewed && sub.flag_note && (
@@ -269,7 +270,7 @@ function SubmissionDetailModal({
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Response Data */}
         <div className="px-5 py-3">
@@ -543,6 +544,7 @@ export default function Dashboard() {
   const [planLimitMsg, setPlanLimitMsg] = useState('')
 
   const user = getStoredUser() || { name: '', role: '' }
+  const isEnumerator = user.role === 'enumerator'
   const sidebarItems = getNavItems(user.role)
 
   // Listen for 402 plan-limit events fired by api.ts interceptor
@@ -557,15 +559,20 @@ export default function Dashboard() {
   }, [toast])
 
   useEffect(() => {
-    Promise.allSettled([
+    const calls: Promise<unknown>[] = [
       api.get('/forms/').then(r => setForms(r.data.forms ?? r.data ?? [])),
       api.get('/submissions/?page_size=200').then(r => setSubmissions(r.data.items ?? r.data.submissions ?? [])),
-      api.get('/users/?page_size=200').then(r => setTeam(r.data.items ?? r.data.users ?? [])),
-      api.get('/assignments/').then(r => setAssignments(r.data ?? [])),
-      api.get('/tenants/me/usage').then(r => setUsageData(r.data)).catch(() => {}),
-      api.get('/export/sheets/status').then(r => setSheetsConfigured(r.data.configured)).catch(() => setSheetsConfigured(false)),
       api.get('/tenants/branding').then(r => { if (r.data.id) setMyTenantId(r.data.id); if (typeof r.data.allow_enumerator_edit === 'boolean') setAllowEnumeratorEdit(r.data.allow_enumerator_edit) }).catch(() => {}),
-    ]).then(results => {
+    ]
+    if (!isEnumerator) {
+      calls.push(
+        api.get('/users/?page_size=200').then(r => setTeam(r.data.items ?? r.data.users ?? [])),
+        api.get('/assignments/').then(r => setAssignments(r.data ?? [])),
+        api.get('/tenants/me/usage').then(r => setUsageData(r.data)).catch(() => {}),
+        api.get('/export/sheets/status').then(r => setSheetsConfigured(r.data.configured)).catch(() => setSheetsConfigured(false)),
+      )
+    }
+    Promise.allSettled(calls).then(results => {
       const failed = results.filter(r => r.status === 'rejected')
       if (failed.length > 0) setError('Some data failed to load')
     }).finally(() => setLoading(false))
@@ -964,6 +971,7 @@ export default function Dashboard() {
         <SubmissionDetailModal
           sub={detailSub}
           forms={forms}
+          isEnumerator={user.role === 'enumerator'}
           onClose={() => setDetailSub(null)}
           onFlag={async (id, status, note) => {
             await api.patch(`/submissions/${id}`, { status, flag_note: note })
@@ -1048,7 +1056,7 @@ export default function Dashboard() {
 
           {/* Tabs + Content (hidden while loading) */}
           {!loading && <><div className="hidden sm:flex gap-1 bg-catalan-surface rounded-lg p-1 w-fit flex-wrap">
-            {(['overview', 'submissions', 'forms', 'team', 'integrations'] as const).map(t => (
+            {(['overview', 'submissions', 'forms', ...(isEnumerator ? [] : ['team', 'integrations'])] as const).map(t => (
               <button
                 key={t}
                 onClick={() => {
@@ -1196,8 +1204,8 @@ export default function Dashboard() {
                   </Card>
                 )}
 
-                {/* Quick Actions */}
-                <Card title="Quick Actions">
+                {/* Quick Actions — hidden for enumerators */}
+                {!isEnumerator && <Card title="Quick Actions">
                   <div className="space-y-2">
                     <Button
                       variant="secondary"
@@ -1212,7 +1220,7 @@ export default function Dashboard() {
                       Emails yesterday's summary to all supervisors &amp; admins with email set.
                     </p>
                   </div>
-                </Card>
+                </Card>}
               </div>
             </div>
           )}
@@ -1277,7 +1285,7 @@ export default function Dashboard() {
                       </Button>
                     )}
                   </div>
-                  <div className="flex gap-2 flex-wrap ml-auto items-center" data-help-id="export-btn">
+                  {!isEnumerator && <div className="flex gap-2 flex-wrap ml-auto items-center" data-help-id="export-btn">
                     <InfoButton topicId="export-data" />
                     <Button variant="secondary" size="sm" onClick={handleExport} disabled={exportingCsv}>
                       {exportingCsv ? 'Exporting…' : '↓ CSV'}
@@ -1306,7 +1314,7 @@ export default function Dashboard() {
                     >
                       ⚠ Dupes
                     </Button>
-                  </div>
+                  </div>}
                 </div>
               </Card>
 
@@ -1354,7 +1362,7 @@ export default function Dashboard() {
               )}
 
               {/* Bulk action bar */}
-              {selectedIds.size > 0 && (
+              {selectedIds.size > 0 && !isEnumerator && (
                 <div className="flex items-center gap-3 px-4 py-2.5 bg-catalan-primary/10 border border-catalan-primary/30 rounded-lg">
                   <span className="text-sm font-medium text-catalan-primary">
                     {selectedIds.size} selected
@@ -1387,7 +1395,7 @@ export default function Dashboard() {
                   <table className="w-full text-sm min-w-[640px]">
                     <thead>
                       <tr className="border-b border-catalan-border">
-                        <th className="px-3 py-2 w-10">
+                        {!isEnumerator && <th className="px-3 py-2 w-10">
                           <label className="flex items-center justify-center w-10 h-10 cursor-pointer -my-2">
                             <input
                               type="checkbox"
@@ -1403,7 +1411,7 @@ export default function Dashboard() {
                               className="accent-catalan-primary cursor-pointer w-4 h-4"
                             />
                           </label>
-                        </th>
+                        </th>}
                         {[
                           { key: 'serial_no',             label: '#',          sortable: true },
                           { key: 'id',                    label: 'ID' },
@@ -1441,7 +1449,7 @@ export default function Dashboard() {
                             key={sub.id}
                             className={`border-b border-catalan-border hover:bg-catalan-hover transition-colors ${selectedIds.has(sub.id) ? 'bg-catalan-primary/5' : ''}`}
                           >
-                            <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                            {!isEnumerator && <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                               <label className="flex items-center justify-center w-10 h-10 cursor-pointer -my-2 -mx-1">
                                 <input
                                   type="checkbox"
@@ -1457,7 +1465,7 @@ export default function Dashboard() {
                                   className="accent-catalan-primary cursor-pointer w-4 h-4"
                                 />
                               </label>
-                            </td>
+                            </td>}
                             <td className="px-3 py-2 font-mono text-xs text-catalan-textMuted cursor-pointer" onClick={() => openDetail(sub.id)}>{sub.serial_no ?? '—'}</td>
                             <td className="px-3 py-2 font-mono text-xs text-catalan-textMuted cursor-pointer" onClick={() => openDetail(sub.id)}>{sub.id.slice(0, 8)}…</td>
                             <td className="px-3 py-2 text-catalan-text cursor-pointer" onClick={() => openDetail(sub.id)}>{forms.find(f => f.id === sub.form_id)?.title ?? sub.form_id.slice(0, 8)}</td>
@@ -1485,8 +1493,8 @@ export default function Dashboard() {
                           key={sub.id}
                           className={`flex items-center gap-3 py-3 px-1 ${selectedIds.has(sub.id) ? 'bg-catalan-primary/5' : ''}`}
                         >
-                          {/* Large touch checkbox */}
-                          <label className="flex-shrink-0 w-11 h-11 flex items-center justify-center cursor-pointer">
+                          {/* Large touch checkbox — hidden for enumerators */}
+                          {!isEnumerator && <label className="flex-shrink-0 w-11 h-11 flex items-center justify-center cursor-pointer">
                             <input
                               type="checkbox"
                               checked={selectedIds.has(sub.id)}
@@ -1500,7 +1508,7 @@ export default function Dashboard() {
                               }}
                               className="accent-catalan-primary w-5 h-5"
                             />
-                          </label>
+                          </label>}
                           <button className="flex-1 min-w-0 text-left" onClick={() => openDetail(sub.id)}>
                             <div className="flex items-center justify-between gap-2 mb-0.5">
                               <span className="font-medium text-catalan-text text-sm truncate">
@@ -1535,7 +1543,7 @@ export default function Dashboard() {
             {/* Sub-tab bar */}
             <div className="flex gap-2 items-center">
               <div className="flex gap-1 bg-catalan-surface rounded-lg p-1">
-                {(['my-forms', 'templates'] as const).map(t => (
+                {(isEnumerator ? ['my-forms'] : ['my-forms', 'templates'] as const).map(t => (
                   <button
                     key={t}
                     onClick={() => { setFormsSubTab(t); if (t === 'templates') handleLoadTemplates() }}
@@ -1549,7 +1557,7 @@ export default function Dashboard() {
                   </button>
                 ))}
               </div>
-              {formsSubTab === 'my-forms' && (
+              {formsSubTab === 'my-forms' && !isEnumerator && (
                 <Button variant="primary" size="sm" onClick={() => window.location.href = '/builder'}>
                   + New Form
                 </Button>
@@ -1642,6 +1650,9 @@ export default function Dashboard() {
                               {form.updated_at ? new Date(form.updated_at).toLocaleDateString() : '—'}
                             </td>
                             <td className="px-3 py-2">
+                              {isEnumerator ? (
+                                <span className="text-xs text-catalan-textMuted">Read-only</span>
+                              ) : (
                               <div className="flex gap-3">
                                 <a href={`/builder?id=${form.id}`} className="text-xs text-catalan-primary hover:underline">Edit</a>
                                 {form.version > 1 && (
@@ -1659,6 +1670,7 @@ export default function Dashboard() {
                                   </button>
                                 </span>
                               </div>
+                              )}
                             </td>
                           </tr>
                         )

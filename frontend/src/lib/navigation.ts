@@ -21,7 +21,7 @@ export const getNavItems = (role: string): NavItem[] => {
     case 'supervisor':
       return [ALL_ITEMS.dashboard, ALL_ITEMS.collect, ALL_ITEMS.settings]
     case 'enumerator':
-      return [ALL_ITEMS.collect]
+      return [ALL_ITEMS.dashboard, ALL_ITEMS.collect]
     default:
       return [ALL_ITEMS.collect]
   }

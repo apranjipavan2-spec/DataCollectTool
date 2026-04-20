@@ -81,7 +81,7 @@ export default function App() {
               <Route path="/reset-password" element={<ResetPasswordPage />} />
 
               <Route path="/" element={
-                <RequireAuth roles={['org_admin', 'supervisor']}>
+                <RequireAuth roles={['org_admin', 'supervisor', 'enumerator']}>
                   <ErrorBoundary>
                     <Dashboard />
                   </ErrorBoundary>

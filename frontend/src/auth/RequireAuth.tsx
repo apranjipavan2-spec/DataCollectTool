@@ -3,7 +3,7 @@ import { getStoredUser } from '@/lib/api'
 
 export function homeForRole(role: string): string {
   if (role === 'master_admin') return '/admin'
-  if (role === 'enumerator')   return '/collect'
+  if (role === 'enumerator')   return '/'
   return '/'   // org_admin, supervisor
 }
 

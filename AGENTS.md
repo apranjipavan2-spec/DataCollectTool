@@ -3,7 +3,7 @@
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
 You are a coding assistant with full knowledge of this codebase.
-Below are the code signatures extracted by SigMap v5.8.0 on 2026-04-19T13:15:20.151Z.
+Below are the code signatures extracted by SigMap v5.8.0 on 2026-04-20T03:55:57.434Z.
 
 Use these signatures to answer questions about the code accurately.
 
@@ -20,6 +20,7 @@ backend\app\api\routes\bulk_upload.py ← __future__, fastapi, openpyxl, pydanti
 backend\app\api\routes\submissions.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\api\routes\sync.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\api\routes\tenants.py ← fastapi, pydantic, sqlalchemy, app
+backend\app\api\routes\users.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\models\submission.py ← sqlalchemy, app
 backend\app\models\tenant.py ← sqlalchemy, app
 frontend\src\builder\FormBuilder.modern.tsx ← FieldTypeMenu, FieldEditor, SkipLogicEditor, VersionHistoryPanel
@@ -79,6 +80,18 @@ PATCH /{tenant_id}  →  update_tenant()
 GET /{tenant_id}/stats  →  get_tenant_stats()
 ```
 
+### backend\app\api\routes\users.py
+```
+class UserCreate(BaseModel) {phone*, name*, role*, password?, language_pref?, email?}
+class UserUpdate(BaseModel) {name?, phone?, email?, language_pref?}
+GET /me  →  get_me()
+GET /  →  list_users()
+POST /  →  create_user()
+POST /bulk-import  →  bulk_import_users()
+PATCH /{user_id}  →  update_user()
+DELETE /{user_id}  →  deactivate_user()
+```
+
 ### backend\app\models\submission.py
 ```
 class Submission(Base)
@@ -91,8 +104,19 @@ class Tenant(Base)
 
 ## frontend
 
+### frontend\src\admin\AdminPanel.modern.tsx
+```
+component AdminPanel
+hook useState
+hook useMemo
+hook useEffect
+handler onClick
+handler onChange
+```
+
 ### frontend\src\App.tsx
 ```
+component RoleHome
 component SessionTimeoutManager
 component App
 hook useSessionTimeout
@@ -107,6 +131,12 @@ hook useState
 handler onChange
 handler onKeyDown
 handler onClick
+```
+
+### frontend\src\auth\RequireAuth.tsx
+```
+component RequireAuth
+props Props
 ```
 
 ### frontend\src\builder\FormBuilder.modern.tsx
@@ -160,6 +190,22 @@ hook useLocation
 hook useHelp
 export Sidebar
 handler onClick
+```
+
+### frontend\src\components\ui\Skeleton.tsx
+```
+component SkeletonBlock
+component StatCardsSkeleton
+component TableRowsSkeleton
+component TabsSkeleton
+component CardTableSkeleton
+component DashboardSkeleton
+export SkeletonBlock
+export StatCardsSkeleton
+export TableRowsSkeleton
+export TabsSkeleton
+export CardTableSkeleton
+export DashboardSkeleton
 ```
 
 ### frontend\src\dashboard\Dashboard.modern.tsx
@@ -240,6 +286,12 @@ hook useEffect
 handler onClick
 ```
 
+### frontend\src\lib\navigation.ts
+```
+export interface NavItem
+export const getNavItems = (role) =>
+```
+
 ### frontend\src\renderer\fields\GpsField.tsx
 ```
 component GpsField
@@ -270,30 +322,4 @@ hook useCallback
 export SubmissionDraft
 handler onClick
 handler onChange
-```
-
-## website
-
-### website\demo.html
-```
-title: FieldPulse — Live Demo
-input#urlInput
-span#roleName
-input#pUrl
-input#pPhone
-input#pPass
-div#toast
-```
-
-### website\index.html
-```
-title: FieldPulse — Offline-First Field Data Collection for India
-nav#navbar
-canvas#particleCanvas
-div#mockBars
-span#syncPct
-div#syncBar
-section#features
-section#compare
-section#pricing
 ```
