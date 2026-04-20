@@ -542,7 +542,7 @@ def export_progress_pdf(
                     "at_risk": "#FEF3C7", "overdue": "#FEE2E2"}
 
     row_html = "".join(
-        f"<tr style='background:{STATUS_COLOR.get(r[\"status\"],\"#fff\")}'>"
+        f"<tr style='background:{STATUS_COLOR.get(r['status'], '#fff')}'>"
         f"<td>{r['questionnaire_name']}</td><td>{r['participant_type_name']}</td>"
         f"<td>{r['district']}</td><td>{r['block']}</td><td>{r['village']}</td>"
         f"<td style='text-align:center'>{r['target']}</td>"
@@ -550,7 +550,7 @@ def export_progress_pdf(
         f"<td style='text-align:center'>{r['remaining']}</td>"
         f"<td style='text-align:center'>{r['pct']}%</td>"
         f"<td style='text-align:center'><span style='padding:2px 8px;border-radius:4px;font-size:11px;"
-        f"background:{STATUS_COLOR.get(r[\"status\"],\"#eee\")}'>{r['status'].replace('_',' ').title()}</span></td>"
+        f"background:{STATUS_COLOR.get(r['status'], '#eee')}'>{r['status'].replace('_', ' ').title()}</span></td>"
         f"<td style='text-align:center'>{r['deadline'] or '—'}</td>"
         f"</tr>"
         for r in rows
