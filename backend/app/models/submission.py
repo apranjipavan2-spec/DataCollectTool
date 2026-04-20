@@ -22,3 +22,8 @@ class Submission(Base):
     local_created_at = Column(DateTime(timezone=True))
     server_received_at = Column(DateTime(timezone=True), server_default=func.now())
     serial_no = Column(Integer, nullable=True)   # auto-assigned on sync; only master_admin can change
+    # Program tracking (set on sync when enumerator collects under a program)
+    program_id = Column(UUID(as_uuid=True), nullable=True)
+    participant_type_id = Column(UUID(as_uuid=True), nullable=True)
+    questionnaire_id = Column(UUID(as_uuid=True), nullable=True)
+    location_id = Column(UUID(as_uuid=True), nullable=True)

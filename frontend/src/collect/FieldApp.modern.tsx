@@ -77,6 +77,12 @@ export default function FieldApp() {
   const [resumingDraft, setResumingDraft] = useState<SubmissionDraft | null>(null)
   const [editingSubmission, setEditingSubmission] = useState<{ id: string; formId: string; dataJson: Record<string, unknown>; formTitle: string } | null>(null)
   const [editMsg, setEditMsg] = useState('')
+  const [programContext, setProgramContext] = useState<null | {
+    program_id: string; program_name: string; scheme_name: string; questionnaire_id: string;
+    participant_type_name: string; location_id: string; location_district: string; location_block: string; location_village: string;
+  }>(null)
+  const [locations, setLocations] = useState<any[]>([])
+  const [selectedLocationId, setSelectedLocationId] = useState('')
   const syncRef = useRef<() => Promise<void>>()
   const loadFormsRef = useRef<() => Promise<void>>()
   const { language, setLanguage } = useLanguage()
@@ -106,10 +112,19 @@ export default function FieldApp() {
               dataClean[k] = v
             }
           }
+          let progCtx: Record<string, string | null> = {}
+          try {
+            const raw = localStorage.getItem(`fieldpulse_prog_ctx_${s.formId}`)
+            if (raw) progCtx = JSON.parse(raw)
+          } catch { }
           return {
             local_id: s.id, form_id: s.formId, form_version: s.formVersion,
             data_json: dataClean, gps_open: s.gpsOpen ?? null, gps_submit: s.gpsSubmit ?? null,
             local_created_at: s.createdAt,
+            program_id: progCtx.program_id ?? null,
+            participant_type_id: progCtx.participant_type_id ?? null,
+            questionnaire_id: progCtx.questionnaire_id ?? null,
+            location_id: progCtx.location_id ?? null,
           }
         })
         const { data } = await api.post('/sync/push', { submissions: payload })
@@ -340,6 +355,7 @@ export default function FieldApp() {
       } catch { }
 
       api.get('/schedules/').then(r => setSchedules(r.data)).catch(() => {})
+      api.get('/programs/locations').then(r => setLocations(r.data)).catch(() => {})
 
       // Enumerator stats
       api.get('/submissions/?page_size=200').then(r => {
@@ -418,7 +434,7 @@ export default function FieldApp() {
     }
   }
 
-  const openForm = async (meta: FormMeta) => {
+  const openForm = async (meta: FormMeta, schedCtx?: { programContext: any; locationContext?: any; locationId?: string }) => {
     try {
       const { data } = await api.get<{ json_schema: FormSchema }>(`/forms/${meta.id}`)
       setActiveForm({ meta, schema: data.json_schema })
@@ -427,6 +443,25 @@ export default function FieldApp() {
       const cached = await store.getFormCache(meta.id)
       if (!cached) { setSyncMsg('Form not available offline'); return }
       setActiveForm({ meta, schema: JSON.parse(cached.schema) as FormSchema })
+    }
+    if (schedCtx?.programContext) {
+      const pc = schedCtx.programContext
+      const lc = schedCtx.locationContext ?? {}
+      const locId = schedCtx.locationId ?? pc.location_id ?? lc.location_id ?? ''
+      setProgramContext({
+        program_id: pc.program_id, program_name: pc.program_name, scheme_name: pc.scheme_name,
+        questionnaire_id: pc.questionnaire_id, participant_type_name: pc.participant_type_name,
+        location_id: locId, location_district: lc.district ?? '', location_block: lc.block ?? '', location_village: lc.village ?? '',
+      })
+      setSelectedLocationId(locId)
+      try {
+        localStorage.setItem(`fieldpulse_prog_ctx_${meta.id}`, JSON.stringify({
+          program_id: pc.program_id, participant_type_id: pc.participant_type_id,
+          questionnaire_id: pc.questionnaire_id, location_id: locId,
+        }))
+      } catch { }
+    } else {
+      setProgramContext(null); setSelectedLocationId('')
     }
     setScreen('collecting')
   }
@@ -657,14 +692,47 @@ export default function FieldApp() {
 
   // Form collection screen
   if (screen === 'collecting' && activeForm) {
+    const clearProg = () => { setProgramContext(null); setSelectedLocationId('') }
     return (
-      <FormRenderer
-        schema={activeForm.schema}
-        onSave={handleSave}
-        onSubmit={handleSubmit}
-        initialDraft={resumingDraft ?? undefined}
-        onCancel={() => { setScreen('list'); setActiveForm(null); setResumingDraft(null) }}
-      />
+      <div className="flex flex-col h-screen">
+        {programContext && (
+          <div className="bg-blue-700 text-white px-4 py-2 text-xs flex items-center gap-3 flex-wrap shrink-0 z-50">
+            <span className="font-medium truncate">
+              🗂️ {programContext.scheme_name ? `${programContext.scheme_name} › ` : ''}{programContext.program_name}
+              {programContext.participant_type_name ? ` · 👤 ${programContext.participant_type_name}` : ''}
+            </span>
+            {programContext.location_id ? (
+              <span className="text-blue-200 truncate">📍 {[programContext.location_district, programContext.location_block, programContext.location_village].filter(Boolean).join(' › ')}</span>
+            ) : (
+              <select className="ml-auto text-blue-900 bg-white text-xs rounded px-2 py-0.5 border-0"
+                value={selectedLocationId}
+                onChange={e => {
+                  const lid = e.target.value
+                  setSelectedLocationId(lid)
+                  const loc = locations.find((l: any) => l.id === lid)
+                  if (loc) setProgramContext(p => p ? { ...p, location_id: lid, location_district: loc.district, location_block: loc.block, location_village: loc.village } : p)
+                  try {
+                    const raw = localStorage.getItem(`fieldpulse_prog_ctx_${activeForm.meta.id}`)
+                    const ctx = raw ? JSON.parse(raw) : {}
+                    localStorage.setItem(`fieldpulse_prog_ctx_${activeForm.meta.id}`, JSON.stringify({ ...ctx, location_id: lid }))
+                  } catch { }
+                }}>
+                <option value="">📍 Pick collection location…</option>
+                {locations.map((l: any) => <option key={l.id} value={l.id}>{[l.district, l.block, l.village].filter(Boolean).join(' › ')}</option>)}
+              </select>
+            )}
+          </div>
+        )}
+        <div className="flex-1 overflow-auto">
+          <FormRenderer
+            schema={activeForm.schema}
+            onSave={handleSave}
+            onSubmit={async (draft) => { await handleSubmit(draft); clearProg() }}
+            initialDraft={resumingDraft ?? undefined}
+            onCancel={() => { setScreen('list'); setActiveForm(null); setResumingDraft(null); clearProg() }}
+          />
+        </div>
+      </div>
     )
   }
 
@@ -798,24 +866,41 @@ export default function FieldApp() {
                 <div className="mb-6">
                   <h2 className="text-xs font-semibold text-catalan-textMuted uppercase tracking-wider mb-3">Your Schedules</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
-                    {schedules.filter(s => s.status === 'active' || s.status === 'upcoming').map((s: any) => (
-                      <div key={s.id} className="bg-catalan-surface border border-catalan-border rounded-xl p-4">
-                        <div className="flex justify-between items-start gap-2">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-catalan-text text-sm mb-1 truncate">{s.form_title}</h3>
-                            <p className="text-xs text-catalan-textMuted">
-                              {s.location && <span>{s.location} · </span>}
-                              {s.start_date} → {s.end_date}
-                              {s.target_count > 0 && <span> · 🎯 {s.target_count}</span>}
-                            </p>
-                            {s.notes && <p className="text-xs text-catalan-textMuted italic mt-1 truncate">{s.notes}</p>}
+                    {schedules.filter(s => s.status === 'active' || s.status === 'upcoming').map((s: any) => {
+                      const pc = s.program_context; const lc = s.location_context
+                      const formMeta = forms.find(f => f.id === s.form_id) ?? { id: s.form_id, title: s.form_title, version: 1 }
+                      return (
+                        <div key={s.id} className="bg-catalan-surface border border-catalan-border rounded-xl p-4">
+                          {pc && (
+                            <div className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 rounded-lg px-2 py-1 mb-2 flex-wrap">
+                              <span>🗂️ {pc.scheme_name ? `${pc.scheme_name} › ` : ''}{pc.program_name}</span>
+                              {pc.participant_type_name && <span>· 👤 {pc.participant_type_name}</span>}
+                              {lc && <span>· 📍 {[lc.district, lc.block, lc.village].filter(Boolean).join(' › ')}</span>}
+                            </div>
+                          )}
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-catalan-text text-sm mb-1 truncate">{s.form_title}</h3>
+                              <p className="text-xs text-catalan-textMuted">
+                                {s.location && <span>{s.location} · </span>}
+                                {s.start_date} → {s.end_date}
+                                {s.target_count > 0 && <span> · 🎯 {s.target_count}</span>}
+                              </p>
+                              {s.notes && <p className="text-xs text-catalan-textMuted italic mt-1 truncate">{s.notes}</p>}
+                            </div>
+                            <div className="flex flex-col items-end gap-2">
+                              <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-medium ${
+                                s.status === 'active' ? 'bg-catalan-success/10 text-catalan-success' : 'bg-catalan-info/10 text-catalan-info'
+                              }`}>{s.status}</span>
+                              <button onClick={() => openForm(formMeta, pc ? { programContext: pc, locationContext: lc, locationId: s.location_id } : undefined)}
+                                className="text-xs px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                Collect →
+                              </button>
+                            </div>
                           </div>
-                          <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-medium ${
-                            s.status === 'active' ? 'bg-catalan-success/10 text-catalan-success' : 'bg-catalan-info/10 text-catalan-info'
-                          }`}>{s.status}</span>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}

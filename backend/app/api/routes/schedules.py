@@ -16,6 +16,7 @@ from app.core.deps import require_enumerator
 from app.models.schedule import Schedule
 from app.models.form import Form
 from app.models.user import User
+from app.models.program import ProgramQuestionnaire, ProgramParticipantType, Program, ProgramLocation
 from app.api.routes.notifications import send_push
 
 router = APIRouter()
@@ -29,6 +30,8 @@ class ScheduleCreate(BaseModel):
     location: str = ""
     target_count: int = 0
     notes: str = ""
+    program_questionnaire_id: Optional[str] = None
+    location_id: Optional[str] = None
 
 
 class ScheduleUpdate(BaseModel):
@@ -38,6 +41,8 @@ class ScheduleUpdate(BaseModel):
     target_count: Optional[int] = None
     notes: Optional[str] = None
     status: Optional[str] = None
+    program_questionnaire_id: Optional[str] = None
+    location_id: Optional[str] = None
 
 
 @router.get("/")
@@ -76,6 +81,34 @@ def list_schedules(
         users = db.query(User.id, User.name).filter(User.id.in_(user_ids)).all()
         user_map = {str(u.id): u.name for u in users}
 
+    # Batch-fetch program context for schedules that have one
+    pq_ids = {s.program_questionnaire_id for s in schedules if s.program_questionnaire_id}
+    loc_ids = {s.location_id for s in schedules if s.location_id}
+
+    pq_map: dict = {}
+    if pq_ids:
+        pqs = db.query(ProgramQuestionnaire).filter(ProgramQuestionnaire.id.in_(pq_ids)).all()
+        prog_ids = {pq.program_id for pq in pqs}
+        pt_ids = {pq.participant_type_id for pq in pqs if pq.participant_type_id}
+        prog_map = {str(p.id): p for p in db.query(Program).filter(Program.id.in_(prog_ids)).all()} if prog_ids else {}
+        pt_map = {str(t.id): t.name for t in db.query(ProgramParticipantType).filter(ProgramParticipantType.id.in_(pt_ids)).all()} if pt_ids else {}
+        for pq in pqs:
+            prog = prog_map.get(str(pq.program_id))
+            pq_map[str(pq.id)] = {
+                "questionnaire_id": str(pq.id),
+                "questionnaire_name": pq.name,
+                "program_id": str(pq.program_id),
+                "program_name": prog.name if prog else "",
+                "scheme_name": prog.scheme_name if prog else "",
+                "participant_type_id": str(pq.participant_type_id) if pq.participant_type_id else None,
+                "participant_type_name": pt_map.get(str(pq.participant_type_id), "") if pq.participant_type_id else "",
+            }
+
+    loc_map: dict = {}
+    if loc_ids:
+        locs = db.query(ProgramLocation).filter(ProgramLocation.id.in_(loc_ids)).all()
+        loc_map = {str(l.id): {"location_id": str(l.id), "district": l.district, "block": l.block, "village": l.village, "state": l.state} for l in locs}
+
     return [
         {
             "id": str(s.id),
@@ -90,6 +123,10 @@ def list_schedules(
             "notes": s.notes,
             "status": s.status,
             "created_at": s.created_at.isoformat() if s.created_at else "",
+            "program_questionnaire_id": str(s.program_questionnaire_id) if s.program_questionnaire_id else None,
+            "location_id": str(s.location_id) if s.location_id else None,
+            "program_context": pq_map.get(str(s.program_questionnaire_id)) if s.program_questionnaire_id else None,
+            "location_context": loc_map.get(str(s.location_id)) if s.location_id else None,
         }
         for s in schedules
     ]
@@ -115,6 +152,8 @@ def create_schedule(
         target_count=body.target_count,
         notes=body.notes,
         status="upcoming" if body.start_date > date.today() else "active",
+        program_questionnaire_id=body.program_questionnaire_id or None,
+        location_id=body.location_id or None,
     )
     db.add(schedule)
     db.commit()

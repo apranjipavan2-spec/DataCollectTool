@@ -27,6 +27,11 @@ class SubmissionPayload(BaseModel):
     gps_open: Optional[dict] = None
     gps_submit: Optional[dict] = None
     local_created_at: str
+    # Program tracking (optional — set when collecting under a program)
+    program_id: Optional[str] = None
+    participant_type_id: Optional[str] = None
+    questionnaire_id: Optional[str] = None
+    location_id: Optional[str] = None
 
 
 class PushRequest(BaseModel):
@@ -77,6 +82,10 @@ def push(request: Request, body: PushRequest, user=Depends(require_enumerator), 
             gps_submit=item.gps_submit,
             local_created_at=datetime.fromisoformat(item.local_created_at),
             serial_no=next_serial,
+            program_id=item.program_id,
+            participant_type_id=item.participant_type_id,
+            questionnaire_id=item.questionnaire_id,
+            location_id=item.location_id,
         )
         db.add(sub)
         db.flush()  # get sub.id before commit

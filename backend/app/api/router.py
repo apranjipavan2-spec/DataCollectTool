@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     auth, forms, submissions, users, sync, export, assignments, history,
     schedules, tenants, notifications, api_keys, webhooks, reports,
-    templates, import_excel, bulk_upload,
+    templates, import_excel, bulk_upload, programs,
 )
 
 router = APIRouter()
@@ -24,3 +24,4 @@ router.include_router(reports.router, prefix="/reports", tags=["reports"])
 router.include_router(templates.router, prefix="/templates", tags=["templates"])
 router.include_router(import_excel.router, prefix="/forms", tags=["forms"])
 router.include_router(bulk_upload.router, prefix="/bulk-upload", tags=["bulk-upload"])
+router.include_router(programs.router, prefix="/programs", tags=["programs"])

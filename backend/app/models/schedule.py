@@ -7,6 +7,7 @@ Enumerators see their upcoming schedules on the Collect screen.
 """
 import uuid
 from sqlalchemy import Column, String, Integer, Date, DateTime, ForeignKey, Text, Boolean
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -40,6 +41,10 @@ class Schedule(Base):
     # Status
     status = Column(String, default="upcoming")  # upcoming, active, completed, cancelled
     is_active = Column(Boolean, default=True)
+
+    # Optional program context (set by admin when creating schedule)
+    program_questionnaire_id = Column(PGUUID(as_uuid=True), nullable=True)
+    location_id = Column(PGUUID(as_uuid=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

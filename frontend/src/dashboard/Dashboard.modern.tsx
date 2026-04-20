@@ -510,8 +510,11 @@ export default function Dashboard() {
   const [newSchedule, setNewSchedule] = useState({
     form_id: '', enumerator_id: '', start_date: '', end_date: '',
     location: '', target_count: 0, notes: '',
+    program_questionnaire_id: '', location_id: '',
   })
   const [savingSchedule, setSavingSchedule] = useState(false)
+  const [scheduleQuestionnaires, setScheduleQuestionnaires] = useState<{ id: string; name: string; program_name: string }[]>([])
+  const [scheduleLocations, setScheduleLocations] = useState<{ id: string; district: string; block: string; village: string }[]>([])
 
   // Integrations — Webhooks
   interface WebhookItem {
@@ -857,8 +860,26 @@ export default function Dashboard() {
 
   const loadSchedules = async () => {
     setLoadingSchedules(true)
-    try { const { data } = await api.get('/schedules/'); setSchedules(data ?? []) }
-    catch { toast.error('Failed to load schedules') }
+    try {
+      const [schRes, locRes] = await Promise.all([
+        api.get('/schedules/'),
+        api.get('/programs/locations').catch(() => ({ data: [] })),
+      ])
+      setSchedules(schRes.data ?? [])
+      setScheduleLocations(locRes.data ?? [])
+      // Load questionnaires from all active programs
+      const progs = await api.get('/programs/?status=active').catch(() => ({ data: [] }))
+      const qList: { id: string; name: string; program_name: string }[] = []
+      for (const p of (progs.data ?? []).slice(0, 20)) {
+        try {
+          const { data } = await api.get(`/programs/${p.id}`)
+          for (const q of (data.questionnaires ?? [])) {
+            qList.push({ id: q.id, name: q.name, program_name: p.name })
+          }
+        } catch { }
+      }
+      setScheduleQuestionnaires(qList)
+    } catch { toast.error('Failed to load schedules') }
     finally { setLoadingSchedules(false) }
   }
 
@@ -872,7 +893,7 @@ export default function Dashboard() {
       const { data } = await api.post('/schedules/', newSchedule)
       toast.success('Schedule created')
       setShowScheduleForm(false)
-      setNewSchedule({ form_id: '', enumerator_id: '', start_date: '', end_date: '', location: '', target_count: 0, notes: '' })
+      setNewSchedule({ form_id: '', enumerator_id: '', start_date: '', end_date: '', location: '', target_count: 0, notes: '', program_questionnaire_id: '', location_id: '' })
       loadSchedules()
     } catch (err: any) {
       toast.error(err.response?.data?.detail ?? 'Failed to create schedule')
@@ -2205,6 +2226,28 @@ export default function Dashboard() {
                         />
                       </div>
                     </div>
+                      {scheduleQuestionnaires.length > 0 && (
+                        <div>
+                          <label className="text-xs text-catalan-textMuted block mb-1">Link to Program Questionnaire <span className="text-catalan-textMuted">(optional)</span></label>
+                          <select value={newSchedule.program_questionnaire_id}
+                            onChange={e => setNewSchedule(s => ({ ...s, program_questionnaire_id: e.target.value }))}
+                            className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary">
+                            <option value="">— None —</option>
+                            {scheduleQuestionnaires.map(q => <option key={q.id} value={q.id}>{q.program_name} › {q.name}</option>)}
+                          </select>
+                        </div>
+                      )}
+                      {scheduleLocations.length > 0 && (
+                        <div>
+                          <label className="text-xs text-catalan-textMuted block mb-1">Collection Location <span className="text-catalan-textMuted">(optional)</span></label>
+                          <select value={newSchedule.location_id}
+                            onChange={e => setNewSchedule(s => ({ ...s, location_id: e.target.value }))}
+                            className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary">
+                            <option value="">— None —</option>
+                            {scheduleLocations.map(l => <option key={l.id} value={l.id}>{[l.district, l.block, l.village].filter(Boolean).join(' › ')}</option>)}
+                          </select>
+                        </div>
+                      )}
                     <div>
                       <label className="text-xs text-catalan-textMuted block mb-1">Notes</label>
                       <textarea
