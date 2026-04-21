@@ -24,6 +24,96 @@ print("Creating tables...")
 Base.metadata.create_all(bind=engine)
 print("Tables ready.")
 
+# ── Schema repair: apply any missing columns/tables that alembic may have missed ──
+# Uses IF NOT EXISTS so this is fully idempotent on every deploy.
+print("Applying schema patches...")
+_PATCHES = [
+    # 0016
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS serial_no INTEGER",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS allow_enumerator_edit BOOLEAN NOT NULL DEFAULT true",
+    # 0013
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS app_name VARCHAR",
+    # 0014
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR",
+    # 0016 backfill serial_no for existing rows
+    """
+    UPDATE submissions SET serial_no = sub.rn
+    FROM (
+        SELECT id, ROW_NUMBER() OVER (PARTITION BY tenant_id ORDER BY server_received_at ASC, id ASC) AS rn
+        FROM submissions WHERE serial_no IS NULL
+    ) sub WHERE submissions.id = sub.id AND submissions.serial_no IS NULL
+    """,
+    # 0017 — program tables (CREATE TABLE IF NOT EXISTS)
+    """CREATE TABLE IF NOT EXISTS program_locations (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        state VARCHAR DEFAULT '',
+        district VARCHAR NOT NULL DEFAULT '',
+        block VARCHAR DEFAULT '',
+        village VARCHAR DEFAULT '',
+        gps_lat FLOAT,
+        gps_lng FLOAT,
+        created_at TIMESTAMPTZ DEFAULT now()
+    )""",
+    """CREATE TABLE IF NOT EXISTS programs (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        name VARCHAR NOT NULL,
+        scheme_name VARCHAR DEFAULT '',
+        description TEXT DEFAULT '',
+        start_date DATE,
+        end_date DATE,
+        status VARCHAR DEFAULT 'active',
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ DEFAULT now()
+    )""",
+    """CREATE TABLE IF NOT EXISTS program_participant_types (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        program_id UUID NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        name VARCHAR NOT NULL,
+        description TEXT DEFAULT '',
+        sort_order INTEGER DEFAULT 0
+    )""",
+    """CREATE TABLE IF NOT EXISTS program_questionnaires (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        program_id UUID NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+        participant_type_id UUID REFERENCES program_participant_types(id) ON DELETE SET NULL,
+        form_id UUID REFERENCES forms(id) ON DELETE SET NULL,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        name VARCHAR NOT NULL,
+        total_target INTEGER DEFAULT 0,
+        start_date DATE,
+        end_date DATE,
+        status VARCHAR DEFAULT 'active',
+        created_at TIMESTAMPTZ DEFAULT now()
+    )""",
+    """CREATE TABLE IF NOT EXISTS questionnaire_location_targets (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        questionnaire_id UUID NOT NULL REFERENCES program_questionnaires(id) ON DELETE CASCADE,
+        location_id UUID NOT NULL REFERENCES program_locations(id) ON DELETE CASCADE,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        target_count INTEGER DEFAULT 0,
+        deadline DATE,
+        created_at TIMESTAMPTZ DEFAULT now()
+    )""",
+    # 0018
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS program_id UUID REFERENCES programs(id) ON DELETE SET NULL",
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS participant_type_id UUID REFERENCES program_participant_types(id) ON DELETE SET NULL",
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS questionnaire_id UUID REFERENCES program_questionnaires(id) ON DELETE SET NULL",
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES program_locations(id) ON DELETE SET NULL",
+]
+
+from sqlalchemy import text as _text
+with engine.begin() as _conn:
+    for _sql in _PATCHES:
+        try:
+            _conn.execute(_text(_sql.strip()))
+        except Exception as _e:
+            print(f"  patch warning (ignored): {_e}")
+print("Schema patches done.")
+
 db = SessionLocal()
 
 DEFAULT_PASSWORD = 'test@123'
