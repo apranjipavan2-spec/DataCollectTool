@@ -1,5 +1,7 @@
 import os
+import json
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from typing import List
 
 
@@ -53,6 +55,16 @@ class Settings(BaseSettings):
     APP_URL: str = "http://localhost:5173"
 
     CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:4173", "https://app.fieldgovern.com"]
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("["):
+                return json.loads(v)
+            return [o.strip() for o in v.split(",") if o.strip()]
+        return v
 
     class Config:
         env_file = ".env"
