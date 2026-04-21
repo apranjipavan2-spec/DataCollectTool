@@ -12,6 +12,7 @@ import LineChart from '@/components/charts/LineChart'
 import AuditLog from '@/components/AuditLog'
 
 const MiniMap = lazy(() => import('@/renderer/fields/MiniMap'))
+const SubmissionsMap = lazy(() => import('@/dashboard/SubmissionsMap'))
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -412,7 +413,7 @@ const TEAM_PAGE_SIZE = 20
 
 export default function Dashboard() {
   const toast = useToast()
-  const [tab, setTab] = useState<'overview' | 'submissions' | 'forms' | 'team' | 'integrations'>('overview')
+  const [tab, setTab] = useState<'overview' | 'submissions' | 'map' | 'analytics' | 'forms' | 'team' | 'integrations'>('overview')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -545,6 +546,15 @@ export default function Dashboard() {
   const [creatingKey, setCreatingKey] = useState(false)
   const [newKeyPlaintext, setNewKeyPlaintext] = useState('')
 
+  // Map
+  interface MapPoint { id: string; lat: number; lng: number; status: string; enumerator_name: string; form_title: string; collected_at: string | null }
+  const [mapPoints, setMapPoints] = useState<MapPoint[]>([])
+  const [loadingMap, setLoadingMap] = useState(false)
+  const [mapLoaded, setMapLoaded] = useState(false)
+
+  // PDF export
+  const [exportingPdf, setExportingPdf] = useState(false)
+
   // Plan limit banner
   const [planLimitMsg, setPlanLimitMsg] = useState('')
 
@@ -665,6 +675,22 @@ export default function Dashboard() {
     flagged: submissions.filter(s => s.status === 'flagged').length,
   }), [submissions, forms, team])
 
+  const enumeratorStats = useMemo(() => {
+    const map: Record<string, { name: string; total: number; approved: number; flagged: number; rejected: number; synced: number; last_at: string }> = {}
+    for (const s of submissions) {
+      if (!map[s.enumerator_id]) {
+        map[s.enumerator_id] = { name: s.enumerator_name, total: 0, approved: 0, flagged: 0, rejected: 0, synced: 0, last_at: '' }
+      }
+      map[s.enumerator_id].total++
+      const st = s.status as 'approved' | 'flagged' | 'rejected' | 'synced'
+      if (st in map[s.enumerator_id]) map[s.enumerator_id][st]++
+      if (!map[s.enumerator_id].last_at || s.server_received_at > map[s.enumerator_id].last_at) {
+        map[s.enumerator_id].last_at = s.server_received_at
+      }
+    }
+    return Object.values(map).sort((a, b) => b.total - a.total)
+  }, [submissions])
+
   const openDetail = async (id: string) => {
     setDetailLoading(true)
     try {
@@ -770,6 +796,43 @@ export default function Dashboard() {
       toast.error(detail)
     } finally {
       setExportingSheets(false)
+    }
+  }
+
+  const handleLoadMapPoints = async (forceFormId?: string) => {
+    setLoadingMap(true)
+    setMapLoaded(false)
+    try {
+      const params: Record<string, string> = {}
+      const fid = forceFormId ?? filterForm
+      if (fid) params.form_id = fid
+      const { data } = await api.get('/submissions/map-points', { params })
+      setMapPoints(data)
+      setMapLoaded(true)
+    } catch {
+      toast.error('Failed to load map data')
+    } finally {
+      setLoadingMap(false)
+    }
+  }
+
+  const handleExportPdf = async () => {
+    if (!filterForm) { toast.warning('Select a form first'); return }
+    setExportingPdf(true)
+    try {
+      const params: Record<string, string> = {}
+      if (dateFrom) params.date_from = dateFrom
+      if (dateTo) params.date_to = dateTo
+      const res = await api.get(`/export/${filterForm}/pdf`, { responseType: 'blob', params })
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a'); a.href = url
+      a.download = `report_${new Date().toISOString().slice(0, 10)}.pdf`
+      a.click(); URL.revokeObjectURL(url)
+      toast.success('PDF report downloaded')
+    } catch {
+      toast.error('PDF export failed')
+    } finally {
+      setExportingPdf(false)
     }
   }
 
@@ -1084,7 +1147,7 @@ export default function Dashboard() {
           {!loading && <><div className="hidden sm:flex gap-1 bg-catalan-surface rounded-lg p-1 w-fit flex-wrap">
             {(isEnumerator
               ? (['overview', 'submissions', 'forms'] as const)
-              : (['overview', 'submissions', 'forms', 'team', 'integrations'] as const)
+              : (['overview', 'submissions', 'map', 'analytics', 'forms', 'team', 'integrations'] as const)
             ).map(t => (
               <button
                 key={t}
@@ -1092,6 +1155,7 @@ export default function Dashboard() {
                   setTab(t)
                   if (t === 'integrations') { loadWebhooks(); loadApiKeys() }
                   if (t === 'team') loadSchedules()
+                  if (t === 'map') handleLoadMapPoints()
                 }}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
                   tab === t
@@ -1321,6 +1385,9 @@ export default function Dashboard() {
                     </Button>
                     <Button variant="secondary" size="sm" onClick={handleExportXlsx} disabled={exportingXlsx} title="Download as Excel (.xlsx)">
                       {exportingXlsx ? 'Creating…' : '↓ Excel'}
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={handleExportPdf} disabled={exportingPdf} title="Download PDF summary report">
+                      {exportingPdf ? 'Building…' : '↓ PDF'}
                     </Button>
                     {sheetsConfigured === false ? (
                       <button
@@ -1563,6 +1630,208 @@ export default function Dashboard() {
                   onChange={p => { setSubPage(p); setSelectedIds(new Set()) }}
                 />
               </Card>
+            </div>
+          )}
+
+          {/* ── MAP ── */}
+          {tab === 'map' && (
+            <div className="space-y-4">
+              <Card>
+                <div className="flex flex-wrap gap-3 items-end mb-4">
+                  <div className="flex-1 min-w-[160px]">
+                    <label className="text-xs text-catalan-textMuted block mb-1">Filter by Form</label>
+                    <select
+                      value={filterForm}
+                      onChange={e => { setFilterForm(e.target.value); setMapLoaded(false) }}
+                      className="w-full bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+                    >
+                      <option value="">All forms</option>
+                      {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
+                    </select>
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleLoadMapPoints(filterForm)}
+                    disabled={loadingMap}
+                  >
+                    {loadingMap ? 'Loading…' : mapLoaded ? '↺ Refresh' : 'Load Map'}
+                  </Button>
+                </div>
+
+                {loadingMap && (
+                  <div className="h-[500px] flex items-center justify-center text-catalan-textMuted text-sm">
+                    Loading GPS points…
+                  </div>
+                )}
+
+                {!loadingMap && !mapLoaded && (
+                  <div className="h-[500px] flex flex-col items-center justify-center text-catalan-textMuted gap-3">
+                    <div className="text-4xl">🗺️</div>
+                    <p className="text-sm">Click "Load Map" to visualise submission locations</p>
+                  </div>
+                )}
+
+                {!loadingMap && mapLoaded && mapPoints.length === 0 && (
+                  <div className="h-[500px] flex flex-col items-center justify-center text-catalan-textMuted gap-3">
+                    <div className="text-4xl">📍</div>
+                    <p className="text-sm">No GPS data found for this filter. Ensure GPS fields are used in your forms.</p>
+                  </div>
+                )}
+
+                {!loadingMap && mapLoaded && mapPoints.length > 0 && (
+                  <Suspense fallback={<div className="h-[500px] bg-catalan-surface rounded-lg animate-pulse" />}>
+                    <SubmissionsMap points={mapPoints} />
+                  </Suspense>
+                )}
+              </Card>
+            </div>
+          )}
+
+          {/* ── ANALYTICS ── */}
+          {tab === 'analytics' && (
+            <div className="space-y-6">
+
+              {/* Status breakdown */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: 'Synced', key: 'synced', color: 'catalan-primary' },
+                  { label: 'Approved', key: 'approved', color: 'catalan-success' },
+                  { label: 'Flagged', key: 'flagged', color: 'catalan-warning' },
+                  { label: 'Rejected', key: 'rejected', color: 'catalan-error' },
+                ].map(({ label, key, color }) => {
+                  const cnt = submissions.filter(s => s.status === key).length
+                  const pct = submissions.length > 0 ? Math.round((cnt / submissions.length) * 100) : 0
+                  return (
+                    <Card key={key} className={`border-l-4 border-l-${color}`}>
+                      <div className="text-xs text-catalan-textMuted mb-1">{label}</div>
+                      <div className={`text-3xl font-bold text-${color}`}>{cnt}</div>
+                      <div className="text-xs text-catalan-textMuted mt-1">{pct}% of total</div>
+                    </Card>
+                  )
+                })}
+              </div>
+
+              {/* Enumerator performance table */}
+              <Card title="Enumerator Performance">
+                <p className="text-xs text-catalan-textMuted mb-3">Based on most recent {submissions.length} submissions loaded.</p>
+                {enumeratorStats.length === 0 ? (
+                  <p className="text-sm text-catalan-textMuted text-center py-8">No data yet</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[560px]">
+                      <thead>
+                        <tr className="border-b border-catalan-border">
+                          {['Enumerator', 'Total', 'Approved', 'Flagged', 'Rejected', 'Last Active'].map(h => (
+                            <th key={h} className="text-left px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {enumeratorStats.map((e, i) => (
+                          <tr key={i} className="border-b border-catalan-border hover:bg-catalan-hover">
+                            <td className="px-3 py-2 font-medium text-catalan-text">{e.name}</td>
+                            <td className="px-3 py-2 font-bold text-catalan-primary">{e.total}</td>
+                            <td className="px-3 py-2 text-catalan-success">{e.approved || '—'}</td>
+                            <td className="px-3 py-2 text-catalan-warning">{e.flagged || '—'}</td>
+                            <td className="px-3 py-2 text-catalan-error">{e.rejected || '—'}</td>
+                            <td className="px-3 py-2 text-catalan-textMuted text-xs">
+                              {e.last_at ? new Date(e.last_at).toLocaleDateString() : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
+
+              {/* Duplicate detection */}
+              <Card title="Duplicate Detection">
+                <p className="text-xs text-catalan-textMuted mb-3">
+                  Submissions where the same enumerator submitted the same form more than once on the same day.
+                </p>
+                <div className="flex gap-3 items-center mb-4 flex-wrap">
+                  <select
+                    value={filterForm}
+                    onChange={e => setFilterForm(e.target.value)}
+                    className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+                  >
+                    <option value="">All forms</option>
+                    {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
+                  </select>
+                  <Button variant="secondary" size="sm" onClick={handleLoadDuplicates} disabled={loadingDuplicates}>
+                    {loadingDuplicates ? 'Scanning…' : 'Scan for Duplicates'}
+                  </Button>
+                </div>
+                {loadingDuplicates ? (
+                  <div className="text-sm text-catalan-textMuted py-4 text-center">Scanning…</div>
+                ) : duplicates.length === 0 && showDuplicates ? (
+                  <div className="text-sm text-catalan-success py-4 text-center">No duplicates found</div>
+                ) : duplicates.length > 0 ? (
+                  <div className="space-y-2">
+                    {duplicates.map((group, i) => (
+                      <div key={i} className="flex items-center justify-between p-3 bg-catalan-hover rounded border border-catalan-warning/30">
+                        <div>
+                          <span className="text-sm font-medium text-catalan-text">{group.enumerator_name}</span>
+                          <span className="text-xs text-catalan-textMuted mx-2">·</span>
+                          <span className="text-sm text-catalan-textMuted">{group.form_title}</span>
+                          <span className="text-xs text-catalan-textMuted mx-2">·</span>
+                          <span className="text-xs text-catalan-textMuted">{group.day}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-bold text-catalan-warning bg-catalan-warning/10 px-2 py-0.5 rounded">
+                            {group.count}× duplicates
+                          </span>
+                          <button
+                            className="text-xs text-catalan-primary hover:underline"
+                            onClick={() => {
+                              setSelectedIds(new Set(group.submission_ids))
+                              setTab('submissions')
+                            }}
+                          >
+                            Review →
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </Card>
+
+              {/* PDF Report */}
+              <Card title="Generate PDF Report">
+                <p className="text-xs text-catalan-textMuted mb-3">
+                  Download a formatted summary report with status breakdown and enumerator performance table.
+                </p>
+                <div className="flex gap-3 items-end flex-wrap">
+                  <div>
+                    <label className="text-xs text-catalan-textMuted block mb-1">Form</label>
+                    <select
+                      value={filterForm}
+                      onChange={e => setFilterForm(e.target.value)}
+                      className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+                    >
+                      <option value="">Select form…</option>
+                      {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-catalan-textMuted block mb-1">From</label>
+                    <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                      className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-catalan-textMuted block mb-1">To</label>
+                    <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                      className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary" />
+                  </div>
+                  <Button variant="primary" size="sm" onClick={handleExportPdf} disabled={exportingPdf || !filterForm}>
+                    {exportingPdf ? 'Generating…' : '↓ Download PDF Report'}
+                  </Button>
+                </div>
+              </Card>
+
             </div>
           )}
 

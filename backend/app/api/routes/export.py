@@ -161,6 +161,125 @@ def export_csv(
 
 
 # ---------------------------------------------------------------------------
+# PDF summary report
+# ---------------------------------------------------------------------------
+
+@router.get("/{form_id}/pdf")
+def export_pdf(
+    form_id: str,
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    status: Optional[str] = Query(None),
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Generate a PDF summary report for a form."""
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        raise HTTPException(status_code=501, detail="fpdf2 not installed — run: pip install fpdf2")
+
+    form = db.query(Form).filter(Form.id == form_id, Form.tenant_id == user["tenant_id"]).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    subs = _query_submissions(db, form_id, user["tenant_id"], date_from, date_to, status)
+    enum_map = _build_enumerator_map(db, user["tenant_id"])
+
+    total = len(subs)
+    status_counts: dict = {}
+    enum_stats: dict = {}
+
+    for s in subs:
+        status_counts[s.status] = status_counts.get(s.status, 0) + 1
+        ename = enum_map.get(s.enumerator_id, "Unknown")
+        if ename not in enum_stats:
+            enum_stats[ename] = {"total": 0, "approved": 0, "flagged": 0, "rejected": 0, "synced": 0}
+        enum_stats[ename]["total"] += 1
+        enum_stats[ename][s.status] = enum_stats[ename].get(s.status, 0) + 1
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    # Title block
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_text_color(14, 165, 233)
+    pdf.cell(0, 12, "FieldPulse Data Report", ln=True)
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.set_text_color(30, 30, 46)
+    title = form.title[:80]
+    pdf.cell(0, 8, title, ln=True)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(100, 100, 120)
+    pdf.cell(0, 6, f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}", ln=True)
+    if date_from:
+        to_str = date_to.strftime("%Y-%m-%d") if date_to else "present"
+        pdf.cell(0, 6, f"Period: {date_from.strftime('%Y-%m-%d')} to {to_str}", ln=True)
+    pdf.ln(3)
+    pdf.set_draw_color(14, 165, 233)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(4)
+
+    # Summary
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(30, 30, 46)
+    pdf.cell(0, 7, "Summary", ln=True)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(60, 60, 80)
+    pdf.cell(60, 6, "Total Submissions:")
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(0, 6, str(total), ln=True)
+    pdf.set_font("Helvetica", "", 10)
+    for st in ["approved", "synced", "flagged", "rejected"]:
+        cnt = status_counts.get(st, 0)
+        if cnt > 0:
+            pdf.cell(60, 6, f"  {st.capitalize()}:")
+            pdf.cell(0, 6, str(cnt), ln=True)
+    pdf.ln(4)
+
+    # Enumerator performance table
+    if enum_stats:
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.set_text_color(30, 30, 46)
+        pdf.cell(0, 7, "Enumerator Performance", ln=True)
+        pdf.ln(1)
+
+        col_w = [72, 22, 25, 22, 22]
+        headers = ["Enumerator", "Total", "Approved", "Flagged", "Rejected"]
+        pdf.set_fill_color(14, 165, 233)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 9)
+        for i, h in enumerate(headers):
+            pdf.cell(col_w[i], 7, h, border=0, align="C" if i > 0 else "L", fill=True)
+        pdf.ln()
+
+        pdf.set_text_color(30, 30, 46)
+        pdf.set_font("Helvetica", "", 9)
+        for idx, (ename, st) in enumerate(sorted(enum_stats.items(), key=lambda x: -x[1]["total"])):
+            fill = idx % 2 == 0
+            if fill:
+                pdf.set_fill_color(235, 245, 255)
+            pdf.cell(col_w[0], 6, ename[:42], border=0, fill=fill)
+            pdf.cell(col_w[1], 6, str(st["total"]), border=0, align="C", fill=fill)
+            pdf.cell(col_w[2], 6, str(st.get("approved", 0)), border=0, align="C", fill=fill)
+            pdf.cell(col_w[3], 6, str(st.get("flagged", 0)), border=0, align="C", fill=fill)
+            pdf.cell(col_w[4], 6, str(st.get("rejected", 0)), border=0, align="C", fill=fill)
+            pdf.ln()
+
+    buf = io.BytesIO()
+    pdf.output(buf)
+    buf.seek(0)
+    safe_title = "".join(c for c in form.title if c.isalnum() or c in " _-")
+
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}_report.pdf"'},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Stata .dta export
 # ---------------------------------------------------------------------------
 
