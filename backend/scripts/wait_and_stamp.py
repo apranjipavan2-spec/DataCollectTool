@@ -8,6 +8,8 @@ import time
 import psycopg2
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
+if  DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 
 def wait_for_db():
