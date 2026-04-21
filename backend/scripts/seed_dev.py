@@ -26,19 +26,12 @@ print("Tables ready.")
 
 db = SessionLocal()
 
-# Guard: skip if demo data already seeded (safe on every deploy)
-_existing = db.query(Tenant).filter(Tenant.name == 'Demo Org').first()
-if _existing:
-    print("✓ Demo data already present — skipping seed")
-    db.close()
-    sys.exit(0)
-
 DEFAULT_PASSWORD = 'test@123'
 SUPER_ADMIN_PASSWORD = 'superadmin@4991'
 hashed = hash_password(DEFAULT_PASSWORD)
 hashed_super = hash_password(SUPER_ADMIN_PASSWORD)
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+# ── helpers (upsert — always syncs role, name, password, active status) ──────
 
 def get_or_create_tenant(name, plan_tier='starter'):
     t = db.query(Tenant).filter(Tenant.name == name).first()
@@ -49,12 +42,18 @@ def get_or_create_tenant(name, plan_tier='starter'):
     db.flush()
     return t, True
 
-def get_or_create_user(tenant_id, phone, role, name, pw_hash=None):
+def upsert_user(tenant_id, phone, role, name, pw_hash=None):
+    """Create or update a seed user — keeps role/password/name in sync."""
     u = db.query(User).filter(User.phone == phone).first()
     if u:
+        u.role = role
+        u.name = name
+        u.is_active = True
+        if pw_hash:
+            u.password_hash = pw_hash  # always reset seeded passwords
         return u, False
     u = User(tenant_id=tenant_id, role=role, phone=phone, name=name,
-             password_hash=pw_hash or hashed)
+             password_hash=pw_hash or hashed, is_active=True)
     db.add(u)
     db.flush()
     return u, True
@@ -272,12 +271,12 @@ try:
     # Users — Demo Org
     demo_user_specs = [
         (platform_tenant.id, '+919999990000', 'master_admin', 'Master Admin',        None),
-        (demo_tenant.id,     '+918317390926', 'master_admin', 'Super Admin',          hashed_super),
+        (demo_tenant.id,     '+918317390926', 'org_admin',    'Super Admin',          hashed_super),
         (demo_tenant.id,     '+919999990001', 'org_admin',    'Admin User',           None),
         (demo_tenant.id,     '+918123105186', 'org_admin',    'PavanDeshetty',        None),
         (demo_tenant.id,     '+919999990002', 'supervisor',   'Supervisor User',      None),
         (demo_tenant.id,     '+919222222222', 'supervisor',   'New Supervisor',       None),
-        (demo_tenant.id,     '+919999990003', 'enumerator',   'Rajesh Kumar',         None),
+        (demo_tenant.id,     '+919999990003', 'enumerator',   'Enumerator User',      None),
         (demo_tenant.id,     '+919999990004', 'enumerator',   'Priya Sharma',         None),
         (demo_tenant.id,     '+919333333331', 'enumerator',   'BulkUser1',            None),
         (demo_tenant.id,     '+919333333332', 'enumerator',   'BulkUser2',            None),
@@ -294,7 +293,7 @@ try:
 
     user_objs = {}
     for tenant_id, phone, role, name, pw in demo_user_specs + dataworx_user_specs:
-        u, _ = get_or_create_user(tenant_id, phone, role, name, pw_hash=pw)
+        u, _ = upsert_user(tenant_id, phone, role, name, pw_hash=pw)
         user_objs[phone] = u
 
     enum1    = user_objs['+919999990003']

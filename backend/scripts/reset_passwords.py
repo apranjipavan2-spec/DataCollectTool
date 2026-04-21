@@ -15,7 +15,7 @@ from app.models.user import User
 
 SEED_PHONES = {
     '+919999990000': ('test@123',        'Master Admin — FieldPulse Platform'),
-    '+918317390926': ('superadmin@4991', 'Super Admin — Demo Org'),
+    '+918317390926': ('superadmin@4991', 'Super Admin (org_admin) — Demo Org'),
     '+919999990001': ('test@123',        'Admin User — Demo Org'),
     '+918123105186': ('test@123',        'PavanDeshetty — Demo Org'),
     '+919999990002': ('test@123',        'Supervisor User — Demo Org'),
