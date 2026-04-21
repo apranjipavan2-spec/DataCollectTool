@@ -37,6 +37,6 @@ ENV PYTHONPATH=/app
 EXPOSE ${PORT:-8000}
 
 COPY backend/start.sh /app/start.sh
-RUN chmod +x /app/start.sh
+RUN sed -i 's/\r//' /app/start.sh && chmod +x /app/start.sh
 
 CMD ["/app/start.sh"]
