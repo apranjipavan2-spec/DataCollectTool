@@ -98,15 +98,26 @@ def list_submissions(
             )
         total = query.count()
         rows = query.order_by(Submission.server_received_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+
+        # Build form title lookup for this page's form_ids
+        from app.models.form import Form as FormModel
+        fids = list({s.form_id for s, _ in rows})
+        form_title_map = {}
+        if fids:
+            for f in db.query(FormModel.id, FormModel.title).filter(FormModel.id.in_(fids)).all():
+                form_title_map[f.id] = f.title
+
         return {
             "items": [
                 {
                     "id": str(s.id),
                     "form_id": str(s.form_id),
+                    "form_title": form_title_map.get(s.form_id, ""),
                     "enumerator_id": str(s.enumerator_id) if s.enumerator_id else None,
                     "enumerator_name": name or "Unknown",
                     "status": s.status,
                     "serial_no": s.serial_no,
+                    "data_json": s.data_json,
                     "local_created_at": s.local_created_at.isoformat() if s.local_created_at else None,
                     "server_received_at": s.server_received_at.isoformat() if s.server_received_at else None,
                 }

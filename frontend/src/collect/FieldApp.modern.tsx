@@ -11,6 +11,25 @@ import { Button } from '@/components/ui'
 import Sidebar from '@/components/Sidebar'
 import { getNavItems } from '@/lib/navigation'
 
+// ── Extract beneficiary name from data_json ────────────────────────────────
+// Looks for the first text-like field whose key or label suggests a person's name.
+const NAME_KEYS = ['name', 'full_name', 'respondent_name', 'beneficiary_name',
+  'hh_name', 'hs_hh_name', 'ha_name', 'participant_name', 'patient_name',
+  'farmer_name', 'student_name', 'head_name', 'contact_name']
+
+function extractBeneficiaryName(dataJson: Record<string, unknown> | null | undefined): string | null {
+  if (!dataJson) return null
+  for (const key of NAME_KEYS) {
+    const val = dataJson[key]
+    if (typeof val === 'string' && val.trim()) return val.trim()
+  }
+  // Fallback: first value whose key contains 'name' and is a non-empty string
+  for (const [k, v] of Object.entries(dataJson)) {
+    if (k.toLowerCase().includes('name') && typeof v === 'string' && v.trim()) return v.trim()
+  }
+  return null
+}
+
 // ── Tile pre-cache helpers ─────────────────────────────────────────────────
 
 function latLngToTile(lat: number, lng: number, zoom: number): [number, number] {
@@ -566,12 +585,17 @@ export default function FieldApp() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {myHistory.map((s: any) => (
+            {myHistory.map((s: any) => {
+              const beneficiary = extractBeneficiaryName(s.data_json)
+              return (
               <div key={s.id} className="bg-catalan-surface border border-catalan-border rounded-xl p-4 flex flex-col gap-3">
                 <div className="flex justify-between items-start gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-catalan-text text-sm truncate">
-                      {s.form_title ?? s.form_id ?? 'Unknown form'}
+                      {beneficiary ?? s.form_title ?? 'Unknown'}
+                    </div>
+                    <div className="text-xs text-catalan-textMuted mt-0.5 truncate">
+                      {s.form_title && beneficiary ? s.form_title : null}
                     </div>
                     <div className="text-xs text-catalan-textMuted mt-0.5 flex items-center gap-2">
                       {s.serial_no && <span className="font-mono">#{s.serial_no}</span>}
@@ -593,7 +617,7 @@ export default function FieldApp() {
                   ✏ Edit
                 </button>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </SubPage>
