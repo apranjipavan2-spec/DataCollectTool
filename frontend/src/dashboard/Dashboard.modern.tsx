@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
 import InfoButton from '@/help/InfoButton'
+import NewFormWizard from '@/builder/NewFormWizard'
 import api, { getStoredUser } from '@/lib/api'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
@@ -539,6 +540,7 @@ export default function Dashboard() {
   const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>([])
   const [loadingApiKeys, setLoadingApiKeys] = useState(false)
   const [showApiKeyForm, setShowApiKeyForm] = useState(false)
+  const [showNewFormWizard, setShowNewFormWizard] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
   const [creatingKey, setCreatingKey] = useState(false)
   const [newKeyPlaintext, setNewKeyPlaintext] = useState('')
@@ -987,6 +989,9 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-screen bg-catalan-bg">
+      {/* New form wizard */}
+      {showNewFormWizard && <NewFormWizard onClose={() => setShowNewFormWizard(false)} />}
+
       {/* Submission detail modal */}
       {detailSub && (
         <SubmissionDetailModal
@@ -1160,9 +1165,9 @@ export default function Dashboard() {
                     <div className="text-center py-8">
                       <div className="text-4xl mb-2">📝</div>
                       <p className="text-sm text-catalan-textMuted">No forms yet</p>
-                      <a href="/builder" className="text-xs text-catalan-primary hover:underline mt-1 inline-block">
+                      <button onClick={() => setShowNewFormWizard(true)} className="text-xs text-catalan-primary hover:underline mt-1 inline-block">
                         Create your first form →
-                      </a>
+                      </button>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -1582,7 +1587,7 @@ export default function Dashboard() {
                 ))}
               </div>
               {formsSubTab === 'my-forms' && !isEnumerator && (
-                <Button variant="primary" size="sm" onClick={() => window.location.href = '/builder'}>
+                <Button variant="primary" size="sm" onClick={() => setShowNewFormWizard(true)}>
                   + New Form
                 </Button>
               )}
@@ -1650,7 +1655,7 @@ export default function Dashboard() {
                     {forms.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="text-center py-10 text-catalan-textMuted text-sm">
-                          No forms yet — <a href="/builder" className="text-catalan-primary hover:underline">create one</a>
+                          No forms yet — <button onClick={() => setShowNewFormWizard(true)} className="text-catalan-primary hover:underline">create one</button>
                         </td>
                       </tr>
                     ) : (
