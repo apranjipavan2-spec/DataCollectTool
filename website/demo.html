@@ -140,7 +140,7 @@
 
 <nav>
   <a href="index.html" class="logo">
-    <div class="logo-mark">FP</div>
+    <img src="logo.png" alt="FieldGovern" style="width:32px;height:32px;border-radius:8px;object-fit:contain"/>
     FieldGovern
   </a>
   <a href="index.html" class="nav-back">← Back to Home</a>
@@ -169,7 +169,7 @@
     <div class="qs-card" style="animation-delay:.05s">
       <div class="qs-num">1</div>
       <h4>Pick a Role</h4>
-      <p>Choose Admin, Supervisor, Enumerator, or Master Admin</p>
+      <p>Choose Admin, Supervisor, or Enumerator</p>
     </div>
     <div class="qs-card" style="animation-delay:.12s">
       <div class="qs-num">2</div>
@@ -269,33 +269,6 @@
       </div>
     </div>
 
-    <div class="rc" onclick="pick(this,'master')">
-      <div class="rc-indicator">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline class="rc-check" points="2,6 5,9 10,3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </div>
-      <div class="rc-top"><span class="rc-emoji">🌐</span><span class="rc-badge badge-master">Master Admin</span></div>
-      <h3>Platform Owner</h3>
-      <ul>
-        <li>Manage all organizations on the platform</li>
-        <li>Create &amp; configure tenant accounts</li>
-        <li>View platform-wide usage statistics</li>
-        <li>Assign plan tiers to organizations</li>
-        <li>Platform health &amp; audit monitoring</li>
-      </ul>
-      <div class="cred">
-        <div class="cred-row">
-          <span class="cred-label">Phone</span>
-          <input class="cred-input" type="text" value="+919999990000" readonly onclick="this.select()"/>
-          <button class="cpy" onclick="cp('+919999990000',this,event)">Copy</button>
-        </div>
-        <div class="cred-row">
-          <span class="cred-label">Password</span>
-          <input class="cred-input" type="text" value="test@123" readonly onclick="this.select()"/>
-          <button class="cpy" onclick="cp('test@123',this,event)">Copy</button>
-        </div>
-      </div>
-    </div>
-
   </div>
 
   <!-- LOGIN PANEL -->
@@ -348,7 +321,6 @@
         <li><strong>+919999990001</strong> · test@123 · Org Admin</li>
         <li><strong>+919999990002</strong> · test@123 · Supervisor</li>
         <li><strong>+919999990003</strong> · test@123 · Enumerator</li>
-        <li><strong>+919999990000</strong> · test@123 · Master Admin</li>
         <li>Password is the same for all: <strong>test@123</strong></li>
       </ul>
     </div>
@@ -372,10 +344,9 @@
 
 <script>
   const roles = {
-    admin:      { name:'Org Admin',    phone:'+919999990001', pass:'test@123' },
-    supervisor: { name:'Supervisor',   phone:'+919999990002', pass:'test@123' },
-    enumerator: { name:'Enumerator',   phone:'+919999990003', pass:'test@123' },
-    master:     { name:'Master Admin', phone:'+919999990000', pass:'test@123' },
+    admin:      { name:'Org Admin',  phone:'+919999990001', pass:'test@123' },
+    supervisor: { name:'Supervisor', phone:'+919999990002', pass:'test@123' },
+    enumerator: { name:'Enumerator', phone:'+919999990003', pass:'test@123' },
   };
   let cur = 'admin';
 
