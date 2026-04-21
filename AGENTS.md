@@ -3,7 +3,7 @@
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
 You are a coding assistant with full knowledge of this codebase.
-Below are the code signatures extracted by SigMap v5.8.0 on 2026-04-21T06:25:22.221Z.
+Below are the code signatures extracted by SigMap v5.8.0 on 2026-04-21T06:52:21.855Z.
 
 Use these signatures to answer questions about the code accurately.
 
@@ -17,14 +17,10 @@ Use these signatures to answer questions about the code accurately.
 ## deps
 ```
 backend\app\api\routes\admin_monitor.py ← fastapi, sqlalchemy, app
+backend\app\api\routes\export.py ← fastapi, sqlalchemy, app
 backend\app\api\routes\programs.py ← fastapi, pydantic, sqlalchemy, app
-backend\app\api\routes\schedules.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\api\routes\submissions.py ← fastapi, pydantic, sqlalchemy, app
-backend\app\api\routes\sync.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\main.py ← fastapi, slowapi, app
-backend\app\models\program.py ← sqlalchemy, app
-backend\app\models\schedule.py ← sqlalchemy, app
-backend\app\models\submission.py ← sqlalchemy, app
 ```
 
 ## backend
@@ -33,6 +29,16 @@ backend\app\models\submission.py ← sqlalchemy, app
 ```
 GET /overview  →  get_overview()
 GET /programs  →  get_all_programs()
+```
+
+### backend\app\api\routes\export.py
+```
+GET /{form_id}/csv  →  export_csv()
+GET /{form_id}/pdf  →  export_pdf()
+GET /{form_id}/dta  →  export_dta()
+GET /sheets/status  →  sheets_status()
+POST /{form_id}/sheets  →  export_sheets()
+GET /{form_id}/xlsx  →  export_xlsx()
 ```
 
 ### backend\app\api\routes\programs.py
@@ -66,16 +72,6 @@ GET /{prog_id}/progress/xlsx  →  export_progress_xlsx()
 GET /{prog_id}/progress/pdf  →  export_progress_pdf()
 ```
 
-### backend\app\api\routes\schedules.py
-```
-class ScheduleCreate(BaseModel) {form_id*, enumerator_id*, start_date*, end_date*, location?, target_count?}
-class ScheduleUpdate(BaseModel) {start_date?, end_date?, location?, target_count?, notes?, status?}
-GET /  →  list_schedules()
-POST /  →  create_schedule()
-PATCH /{schedule_id}  →  update_schedule()
-DELETE /{schedule_id}  →  delete_schedule()
-```
-
 ### backend\app\api\routes\submissions.py
 ```
 class SubmissionCreate(BaseModel) {form_id*, form_version*, data_json*, gps_open?, gps_submit?, local_created_at?}
@@ -84,22 +80,15 @@ class BulkUpdateBody(BaseModel) {ids*, status*, flag_note?}
 class SubmissionDataEdit(BaseModel) {data_json*}
 class SerialNoUpdate(BaseModel) {serial_no*}
 GET /  →  list_submissions()
+GET /map-points  →  get_map_points()
+GET /enumerator-stats  →  get_enumerator_stats()
+GET /potential-duplicates  →  list_potential_duplicates()
 POST /  →  create_submission()
+POST /bulk  →  bulk_update_submissions()
 GET /{submission_id}  →  get_submission()
 PATCH /{submission_id}  →  update_submission()
-GET /potential-duplicates  →  list_potential_duplicates()
-POST /bulk  →  bulk_update_submissions()
 PATCH /{submission_id}/data  →  edit_submission_data()
 PATCH /{submission_id}/serial-no  →  update_serial_no()
-```
-
-### backend\app\api\routes\sync.py
-```
-class SubmissionPayload(BaseModel) {local_id*, form_id*, form_version*, data_json*, gps_open?, gps_submit?}
-class PushRequest(BaseModel) {submissions*}
-POST /push  →  push()
-POST /media  →  upload_media()
-GET /pull  →  pull()
 ```
 
 ### backend\app\main.py
@@ -110,36 +99,7 @@ GET /health  →  health()
 GET /{full_path:path}  →  serve_spa()
 ```
 
-### backend\app\models\program.py
-```
-class ProgramLocation(Base)
-class Program(Base)
-class ProgramParticipantType(Base)
-class ProgramQuestionnaire(Base)
-class QuestionnaireLocationTarget(Base)
-```
-
-### backend\app\models\schedule.py
-```
-class Schedule(Base)
-```
-
-### backend\app\models\submission.py
-```
-class Submission(Base)
-```
-
 ## frontend
-
-### frontend\src\admin\AdminPanel.modern.tsx
-```
-component AdminPanel
-hook useState
-hook useMemo
-hook useEffect
-handler onClick
-handler onChange
-```
 
 ### frontend\src\admin\SuperAdminMonitor.tsx
 ```
@@ -159,12 +119,6 @@ hook useSessionTimeout
 handler onExtend
 ```
 
-### frontend\src\auth\RequireAuth.tsx
-```
-component RequireAuth
-props Props
-```
-
 ### frontend\src\builder\NewFormWizard.tsx
 ```
 component NewFormWizard
@@ -176,21 +130,6 @@ hook useEffect
 handler onClick
 handler onChange
 handler onKeyDown
-```
-
-### frontend\src\collect\FieldApp.modern.tsx
-```
-component FieldApp
-hook useState
-hook useLanguage
-hook useCallback
-hook useEffect
-handler onMsg
-handler onClick
-handler onDraft
-handler onSave
-handler onSubmit
-handler onChange
 ```
 
 ### frontend\src\components\ui\Alert.tsx
@@ -220,6 +159,16 @@ handler onClose
 handler onFlag
 handler onAssign
 handler onUnassign
+```
+
+### frontend\src\dashboard\SubmissionsMap.tsx
+```
+component FitBounds
+component SubmissionsMap
+props Props
+hook useMap
+hook useEffect
+export MapPoint
 ```
 
 ### frontend\src\lib\navigation.ts
@@ -254,4 +203,20 @@ component ProgressDashboard
 hook useState
 hook useEffect
 handler onChange
+```
+
+## website
+
+### website\index.html
+```
+title: FieldPulse — Offline-First Field Data Collection & Analysis for India
+nav#navbar
+canvas#particleCanvas
+div#mockBars
+span#syncPct
+div#syncBar
+section#features
+section#compare
+section#analytics
+section#pricing
 ```
