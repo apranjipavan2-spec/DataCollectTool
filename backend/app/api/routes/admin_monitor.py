@@ -1,5 +1,5 @@
 """Cross-tenant monitoring endpoints — master_admin only."""
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 import uuid as _uuid
@@ -7,6 +7,7 @@ import uuid as _uuid
 from app.core.database import get_db
 from app.core.deps import require_master_admin
 from app.models.tenant import Tenant
+from app.models.form import Form
 from app.models.program import Program, ProgramQuestionnaire
 from app.models.submission import Submission
 from app.models.user import User
@@ -104,7 +105,7 @@ def get_all_programs(
             )
 
         result.append({
-            "id": str(prog.id),
+            "id":  str(prog.id),
             "tenant_id": str(prog.tenant_id),
             "tenant_name": tenant.name,
             "name": prog.name,
@@ -119,3 +120,35 @@ def get_all_programs(
             "pct": round(sub_count / total_target * 100, 1) if total_target else 0,
         })
     return result
+
+def _resolve_tenant(tenant_id: str, db: Session) -> Tenant:
+    try:
+        tid = _uuid.UUID(tenant_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid tenant_id")
+    t = db.query(Tenant).filter(Tenant.id == tid).first()
+    if not t:
+        raise HTTPException(404, "Tenant not found")
+    return t
+
+
+@router.get("/tenant/{tenant_id}/users")
+def get_tenant_users(tenant_id: str, user=Depends(require_master_admin), db: Session = Depends(get_db)):
+    t = _resolve_tenant(tenant_id, db)
+    users = db.query(User).filter(User.tenant_id == t.id, User.is_active == True).order_by(User.name).all()
+    return [{"id": str(u.id), "name": u.name or u.phone, "phone": u.phone, "role": u.role, "email": u.email, "created_at": u.created_at.isoformat() if u.created_at else None} for u in users]
+
+
+@router.get("/tenant/{tenant_id}/submissions")
+def get_tenant_submissions(tenant_id: str, page: int = Query(1, ge=1), page_size: int = Query(50, le=200), user=Depends(require_master_admin), db: Session = Depends(get_db)):
+    t = _resolve_tenant(tenant_id, db)
+    total = db.query(func.count(Submission.id)).filter(Submission.tenant_id == t.id).scalar() or 0
+    rows = (db.query(Submission, User, Form).outerjoin(User, User.id == Submission.enumerator_id).outerjoin(Form, Form.id == Submission.form_id).filter(Submission.tenant_id == t.id).order_by(Submission.server_received_at.desc()).offset((page - 1) * page_size).limit(page_size).all())
+    return {"total": total, "items": [{"id": str(s.id), "serial_no": s.serial_no, "form_title": f.title if f else str(s.form_id)[:8], "enumerator_name": u.name if u else "Unknown", "status": s.status, "server_received_at": s.server_received_at.isoformat() if s.server_received_at else None} for s, u, f in rows], "page": page, "page_size": page_size}
+
+
+@router.get("/tenant/{tenant_id}/enumerator-stats")
+def get_tenant_enumerator_stats(tenant_id: str, user=Depends(require_master_admin), db: Session = Depends(get_db)):
+    t = _resolve_tenant(tenant_id, db)
+    rows = (db.query(User.id, User.name, func.count(Submission.id).label("total"), func.sum((Submission.status == "approved").cast("int")).label("approved"), func.sum((Submission.status == "flagged").cast("int")).label("flagged"), func.sum((Submission.status == "rejected").cast("int")).label("rejected"), func.max(Submission.server_received_at).label("last_sub")).join(Submission, Submission.enumerator_id == User.id).filter(User.tenant_id == t.id, Submission.tenant_id == t.id).group_by(User.id, User.name).order_by(func.count(Submission.id).desc()).all())
+    return [{"id": str(r.id), "name": r.name or "Unknown", "total": r.total, "approved": int(r.approved or 0), "flagged": int(r.flagged or 0), "rejected": int(r.rejected or 0), "synced": r.total - int(r.approved or 0) - int(r.flagged or 0) - int(r.rejected or 0), "last_submission": r.last_sub.isoformat() if r.last_sub else None} for r in rows]
