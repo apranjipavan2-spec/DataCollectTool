@@ -148,7 +148,7 @@ Seeded by `scripts/seed_dev.py` (idempotent, runs on every Railway deploy).
 ### Demo Org (tenant: "Demo Org", plan: professional)
 | Phone | Password | Role |
 |-------|----------|------|
-| +918317390926 | superadmin@4991 | master_admin (Super Admin) |
+| +918317390926 | superadmin@4991 | master_admin (Pavan Deshetty — platform super admin) |
 | +919999990001 | test@123 | org_admin (Admin User) |
 | +918123105186 | test@123 | org_admin (PavanDeshetty) |
 | +919999990002 | test@123 | supervisor |
@@ -156,9 +156,10 @@ Seeded by `scripts/seed_dev.py` (idempotent, runs on every Railway deploy).
 | +919999990004 | test@123 | enumerator (Priya Sharma) |
 
 ### Platform (tenant: "FieldPulse Platform")
-| Phone | Password | Role |
-|-------|----------|------|
-| +919999990000 | test@123 | master_admin |
+| Phone | Password | Role | Name |
+|-------|----------|------|------|
+| +919999990000 | test@123 | master_admin | Master Admin |
+| +918317390926 | superadmin@4991 | master_admin | Pavan Deshetty |
 
 Login page has a **"Try a demo account"** quick-fill button for Admin / Supervisor / Enumerator.
 

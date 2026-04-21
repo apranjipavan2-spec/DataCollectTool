@@ -271,7 +271,7 @@ try:
     # Users — Demo Org
     demo_user_specs = [
         (platform_tenant.id, '+919999990000', 'master_admin', 'Master Admin',        None),
-        (demo_tenant.id,     '+918317390926', 'org_admin',    'Super Admin',          hashed_super),
+        (platform_tenant.id, '+918317390926', 'master_admin', 'Pavan Deshetty',       hashed_super),
         (demo_tenant.id,     '+919999990001', 'org_admin',    'Admin User',           None),
         (demo_tenant.id,     '+918123105186', 'org_admin',    'PavanDeshetty',        None),
         (demo_tenant.id,     '+919999990002', 'supervisor',   'Supervisor User',      None),
