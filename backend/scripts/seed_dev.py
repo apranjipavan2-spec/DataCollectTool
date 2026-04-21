@@ -263,57 +263,69 @@ def rand_sub_ha(enum_id, form_id, tenant_id, days_ago):
 
 random.seed(42)
 
+# ── Stage 1: tenants + users (committed immediately so login always works) ────
 try:
-    # Tenants
     platform_tenant, _ = get_or_create_tenant('FieldPulse Platform', 'enterprise')
     demo_tenant, _ = get_or_create_tenant('Demo Org', 'professional')
     dataworx_tenant, _ = get_or_create_tenant('Dataworx', 'starter')
+    db.commit()
+    print("Stage 1a: tenants OK")
+except Exception as e:
+    db.rollback()
+    print(f"Seed error (tenants): {e}")
+    raise
 
-    # Users — Demo Org
-    demo_user_specs = [
-        (platform_tenant.id, '+919999990000', 'master_admin', 'Master Admin',        None),
-        (platform_tenant.id, '+918317390926', 'master_admin', 'Pavan Deshetty',       hashed_super),
-        (demo_tenant.id,     '+919999990001', 'org_admin',    'Admin User',           None),
-        (demo_tenant.id,     '+918123105186', 'org_admin',    'PavanDeshetty',        None),
-        (demo_tenant.id,     '+919999990002', 'supervisor',   'Supervisor User',      None),
-        (demo_tenant.id,     '+919222222222', 'supervisor',   'New Supervisor',       None),
-        (demo_tenant.id,     '+919999990003', 'enumerator',   'Enumerator User',      None),
-        (demo_tenant.id,     '+919999990004', 'enumerator',   'Priya Sharma',         None),
-        (demo_tenant.id,     '+919333333331', 'enumerator',   'BulkUser1',            None),
-        (demo_tenant.id,     '+919333333332', 'enumerator',   'BulkUser2',            None),
-        (demo_tenant.id,     '+919111111111', 'enumerator',   'Test Field Worker',    None),
-    ]
-    # Users — Dataworx tenant
-    dataworx_user_specs = [
-        (dataworx_tenant.id, '+919999991001', 'org_admin',    'Dataworx Admin',   None),
-        (dataworx_tenant.id, '+919999991002', 'supervisor',   'Manjunath',        None),
-        (dataworx_tenant.id, '+919999991003', 'enumerator',   'Ninganna',         None),
-        (dataworx_tenant.id, '+919999991004', 'enumerator',   'Babasaheb',        None),
-        (dataworx_tenant.id, '+919999991005', 'enumerator',   'Rohit',            None),
-    ]
+demo_user_specs = [
+    (platform_tenant.id, '+919999990000', 'master_admin', 'Master Admin',        None),
+    (platform_tenant.id, '+918317390926', 'master_admin', 'Pavan Deshetty',       hashed_super),
+    (demo_tenant.id,     '+919999990001', 'org_admin',    'Admin User',           None),
+    (demo_tenant.id,     '+918123105186', 'org_admin',    'PavanDeshetty',        None),
+    (demo_tenant.id,     '+919999990002', 'supervisor',   'Supervisor User',      None),
+    (demo_tenant.id,     '+919222222222', 'supervisor',   'New Supervisor',       None),
+    (demo_tenant.id,     '+919999990003', 'enumerator',   'Enumerator User',      None),
+    (demo_tenant.id,     '+919999990004', 'enumerator',   'Priya Sharma',         None),
+    (demo_tenant.id,     '+919333333331', 'enumerator',   'BulkUser1',            None),
+    (demo_tenant.id,     '+919333333332', 'enumerator',   'BulkUser2',            None),
+    (demo_tenant.id,     '+919111111111', 'enumerator',   'Test Field Worker',    None),
+]
+dataworx_user_specs = [
+    (dataworx_tenant.id, '+919999991001', 'org_admin',    'Dataworx Admin',   None),
+    (dataworx_tenant.id, '+919999991002', 'supervisor',   'Manjunath',        None),
+    (dataworx_tenant.id, '+919999991003', 'enumerator',   'Ninganna',         None),
+    (dataworx_tenant.id, '+919999991004', 'enumerator',   'Babasaheb',        None),
+    (dataworx_tenant.id, '+919999991005', 'enumerator',   'Rohit',            None),
+]
 
+try:
     user_objs = {}
     for tenant_id, phone, role, name, pw in demo_user_specs + dataworx_user_specs:
-        u, _ = upsert_user(tenant_id, phone, role, name, pw_hash=pw)
+        u, created = upsert_user(tenant_id, phone, role, name, pw_hash=pw)
         user_objs[phone] = u
+        print(f"  {'+ ' if created else '~ '}{phone} ({role})")
+    db.commit()
+    print("Stage 1b: users OK")
+except Exception as e:
+    db.rollback()
+    print(f"Seed error (users): {e}")
+    raise
 
+print(f"\nDefault password  : {DEFAULT_PASSWORD}")
+print(f"Super Admin pass  : {SUPER_ADMIN_PASSWORD}  (+918317390926)")
+
+# ── Stage 2: forms + assignments + sample data (non-critical) ─────────────────
+try:
     enum1    = user_objs['+919999990003']
     enum2    = user_objs['+919999990004']
     org_admin = user_objs['+919999990001']
 
-    db.flush()
-
-    # Forms
     hs_form, hs_new = get_or_create_form(
         demo_tenant.id, 'Household Survey', HOUSEHOLD_SURVEY_SCHEMA, org_admin.id
     )
     ha_form, ha_new = get_or_create_form(
         demo_tenant.id, 'Health Assessment', HEALTH_ASSESSMENT_SCHEMA, org_admin.id
     )
-
     db.flush()
 
-    # Form assignments (enumerators assigned to both forms)
     for enum in [enum1, enum2]:
         for form in [hs_form, ha_form]:
             exists = db.query(FormAssignment).filter(
@@ -328,7 +340,6 @@ try:
                     assigned_by=org_admin.id,
                 ))
 
-    # Sample submissions (only if forms were just created)
     if hs_new:
         for i in range(35):
             days_ago = random.randint(0, 30)
@@ -344,24 +355,15 @@ try:
             db.add(Submission(**d))
 
     db.commit()
-
-    print("\n✓ Seed complete (idempotent — skipped existing records)")
-    print(f"\nTenants : FieldPulse Platform · Demo Org · Dataworx")
-    print(f"\nDefault password  : {DEFAULT_PASSWORD}")
-    print(f"Super Admin pass  : {SUPER_ADMIN_PASSWORD}  (+918317390926)")
-    print("\nDemo Org accounts:")
-    for _, phone, role, name, _ in demo_user_specs:
-        print(f"  {role:15s}  {phone}  ({name})")
-    print("\nDataworx accounts:")
-    for _, phone, role, name, _ in dataworx_user_specs:
-        print(f"  {role:15s}  {phone}  ({name})")
-    print(f"\nForms seeded    : {hs_form.title} (v{hs_form.version}) · {ha_form.title} (v{ha_form.version})")
+    print("Stage 2: forms + submissions OK")
     subs = db.query(Submission).filter(Submission.tenant_id == demo_tenant.id).count()
     print(f"Submissions     : {subs} total in Demo Org")
 
 except Exception as e:
     db.rollback()
-    print(f"Seed error: {e}")
-    raise
+    print(f"Stage 2 warning (sample data skipped): {e}")
+
 finally:
     db.close()
+
+print("\n✓ Seed complete")
