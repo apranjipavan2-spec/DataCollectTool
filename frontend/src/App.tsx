@@ -9,8 +9,9 @@ import FieldApp       from '@/collect/FieldApp.modern'
 import AdminPanel     from '@/admin/AdminPanel.modern'
 import OrgAdminPanel  from '@/admin/OrgAdminPanel.modern'
 import UserProfile    from '@/profile/UserProfile'
-import ProgramsPage   from '@/programs/ProgramsPage'
-import ProgressDashboard from '@/programs/ProgressDashboard'
+import ProgramsPage        from '@/programs/ProgramsPage'
+import ProgressDashboard   from '@/programs/ProgressDashboard'
+import SuperAdminMonitor   from '@/admin/SuperAdminMonitor'
 import { LanguageProvider } from '@/i18n/LanguageContext'
 import { ToastProvider } from '@/lib/ToastContext'
 import { ThemeProvider } from '@/lib/ThemeContext'
@@ -134,6 +135,14 @@ export default function App() {
                 <RequireAuth roles={['org_admin', 'supervisor']}>
                   <ErrorBoundary>
                     <ProgressDashboard />
+                  </ErrorBoundary>
+                </RequireAuth>
+              } />
+
+              <Route path="/monitor" element={
+                <RequireAuth roles={['master_admin']}>
+                  <ErrorBoundary>
+                    <SuperAdminMonitor />
                   </ErrorBoundary>
                 </RequireAuth>
               } />
