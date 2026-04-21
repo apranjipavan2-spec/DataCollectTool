@@ -1,5 +1,5 @@
 """
-Server-side image compression for FieldPulse.
+Server-side image compression for FieldGovern.
 
 Compresses photos to an optimal size for field data collection:
   - Max resolution: 1920px on longest side (enough for detail, small file)

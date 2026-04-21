@@ -1,4 +1,4 @@
-"""APScheduler setup for FieldPulse.
+"""APScheduler setup for FieldGovern.
 
 Runs background jobs inside the FastAPI process — no separate worker needed.
 For multi-process deployments (e.g. multiple Uvicorn workers) you'd want

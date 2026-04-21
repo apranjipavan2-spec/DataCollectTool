@@ -1,6 +1,6 @@
 {
-  "name": "FieldPulse",
-  "short_name": "FieldPulse",
+  "name": "FieldGovern",
+  "short_name": "FieldGovern",
   "description": "Offline field data collection for teams",
   "start_url": "/",
   "scope": "/",

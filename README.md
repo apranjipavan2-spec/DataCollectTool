@@ -1,6 +1,6 @@
-# FieldPulse - Offline-First Field Data Collection SaaS
+# FieldGovern - Offline-First Field Data Collection SaaS
 
-**FieldPulse** is a B2B SaaS platform for offline field data collection in India. It competes with SurveyCTO at just **₹18,000/month** (~$215) with better UX and true offline capability.
+**FieldGovern** is a B2B SaaS platform for offline field data collection in India. It competes with SurveyCTO at just **₹18,000/month** (~$215) with better UX and true offline capability.
 
 ## 🎯 Quick Facts
 
@@ -89,7 +89,7 @@ See `DEPLOYMENT_GUIDE.html` for:
 |------|---------|
 | **QUICK_START.md** | 3-step setup (this repository) |
 | **DEPLOYMENT_GUIDE.html** | Complete deployment guide (open in browser) |
-| **FIELDPULSE_GUIDE.html** | Feature guide & API reference (open in browser) |
+| **FIELDGOVERN_GUIDE.html** | Feature guide & API reference (open in browser) |
 | **IMPLEMENTATION_SUMMARY.md** | Technical summary of what was built |
 | **TEST_CREDENTIALS.csv** | All test user logins |
 
@@ -283,10 +283,10 @@ See **DEPLOYMENT_GUIDE.html** for detailed instructions.
 
 ### Environment Variables (.env)
 ```
-DATABASE_URL=postgresql://user:pass@localhost/fieldpulse
+DATABASE_URL=postgresql://user:pass@localhost/fieldgovern
 REDIS_URL=redis://localhost:6379
 JWT_SECRET=your-secret-key-min-32-chars
-CORS_ORIGINS=http://localhost:5173,https://fieldpulse.com
+CORS_ORIGINS=http://localhost:5173,https://fieldgovern.com
 GDRIVE_FOLDER_ID=your-google-drive-folder-id
 GDRIVE_TOKEN_PATH=/path/to/gdrive-token.json
 LOG_LEVEL=info
@@ -307,12 +307,12 @@ WORKERS=4
 
 - **API Interactive Docs**: http://localhost:8000/docs
 - **Deployment Guide**: Open `DEPLOYMENT_GUIDE.html` in browser
-- **Feature Guide**: Open `FIELDPULSE_GUIDE.html` in browser
+- **Feature Guide**: Open `FIELDGOVERN_GUIDE.html` in browser
 - **Quick Start**: See `QUICK_START.md`
 
 ## 🎯 Competitive Advantages vs SurveyCTO
 
-| Feature | SurveyCTO | FieldPulse |
+| Feature | SurveyCTO | FieldGovern |
 |---------|-----------|-----------|
 | Price | $225-630/month | ₹18,000/month |
 | Offline | Java app (install needed) | **PWA (no install)** |

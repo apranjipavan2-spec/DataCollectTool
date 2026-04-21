@@ -33,15 +33,15 @@ def fire_webhooks(db: Session, tenant_id: str, event: str, payload: dict) -> int
         try:
             headers = dict(hook.headers or {})
             headers["Content-Type"] = "application/json"
-            headers["X-FieldPulse-Event"] = event
-            headers["X-FieldPulse-Timestamp"] = datetime.now(timezone.utc).isoformat()
+            headers["X-FieldGovern-Event"] = event
+            headers["X-FieldGovern-Timestamp"] = datetime.now(timezone.utc).isoformat()
 
             body = json.dumps(payload, default=str)
 
             # HMAC signature if secret is configured
             if hook.secret:
                 sig = hmac.new(hook.secret.encode(), body.encode(), hashlib.sha256).hexdigest()
-                headers["X-FieldPulse-Signature"] = f"sha256={sig}"
+                headers["X-FieldGovern-Signature"] = f"sha256={sig}"
 
             with httpx.Client(timeout=10.0) as client:
                 resp = client.post(hook.url, content=body, headers=headers)

@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * FieldPulse Service Worker
+ * FieldGovern Service Worker
  *
  * Built with Workbox (injected by vite-plugin-pwa injectManifest strategy).
  * Handles:
@@ -23,7 +23,7 @@ precacheAndRoute(self.__WB_MANIFEST)
 registerRoute(
   ({ url }) => url.hostname === 'tile.openstreetmap.org',
   new CacheFirst({
-    cacheName: 'fieldpulse-map-tiles-v1',
+    cacheName: 'fieldgovern-map-tiles-v1',
     plugins: [
       new ExpirationPlugin({ maxEntries: 2000, maxAgeSeconds: 30 * 24 * 60 * 60 }),
     ],
@@ -56,7 +56,7 @@ self.addEventListener('push', (event) => {
   try {
     payload = event.data.json()
   } catch {
-    payload = { title: 'FieldPulse', body: event.data.text() }
+    payload = { title: 'FieldGovern', body: event.data.text() }
   }
 
   const options = {
@@ -68,7 +68,7 @@ self.addEventListener('push', (event) => {
   }
 
   event.waitUntil(
-    self.registration.showNotification(payload.title || 'FieldPulse', options)
+    self.registration.showNotification(payload.title || 'FieldGovern', options)
   )
 })
 

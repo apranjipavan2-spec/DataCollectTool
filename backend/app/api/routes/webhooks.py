@@ -161,7 +161,7 @@ def test_webhook(webhook_id: str, user=Depends(require_org_admin), db: Session =
         "submission_id": "00000000-0000-0000-0000-000000000000",
         "form_id": "00000000-0000-0000-0000-000000000000",
         "enumerator_id": "00000000-0000-0000-0000-000000000000",
-        "data_json": {"_test": True, "sample_field": "Hello from FieldPulse!"},
+        "data_json": {"_test": True, "sample_field": "Hello from FieldGovern!"},
         "status": "synced",
     }
 
@@ -171,14 +171,14 @@ def test_webhook(webhook_id: str, user=Depends(require_org_admin), db: Session =
 
     headers = dict(hook.headers or {})
     headers["Content-Type"] = "application/json"
-    headers["X-FieldPulse-Event"] = "webhook.test"
-    headers["X-FieldPulse-Timestamp"] = datetime.now(timezone.utc).isoformat()
+    headers["X-FieldGovern-Event"] = "webhook.test"
+    headers["X-FieldGovern-Timestamp"] = datetime.now(timezone.utc).isoformat()
 
     body = json.dumps(test_payload, default=str)
 
     if hook.secret:
         sig = hmac.new(hook.secret.encode(), body.encode(), hashlib.sha256).hexdigest()
-        headers["X-FieldPulse-Signature"] = f"sha256={sig}"
+        headers["X-FieldGovern-Signature"] = f"sha256={sig}"
 
     try:
         with httpx.Client(timeout=10.0) as client:

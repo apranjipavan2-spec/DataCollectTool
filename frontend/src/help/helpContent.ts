@@ -154,7 +154,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       {
         id: 'import-excel',
         title: 'Importing Form from Excel',
-        description: 'Convert an existing Excel data sheet into a FieldPulse form automatically.',
+        description: 'Convert an existing Excel data sheet into a FieldGovern form automatically.',
         steps: [
           { icon: '📂', text: 'Click "Import from Excel" in the Form Builder toolbar.' },
           { icon: '📊', text: 'Upload your .xlsx file — the first rows are treated as headers.' },
@@ -190,7 +190,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       {
         id: 'offline-mode',
         title: 'How Offline Mode Works',
-        description: 'FieldPulse saves data locally on the device — no internet required to collect.',
+        description: 'FieldGovern saves data locally on the device — no internet required to collect.',
         steps: [
           { icon: '💾', text: 'Every field answer is auto-saved to the browser\'s local storage every 300ms.' },
           { icon: '📵', text: 'Turn off WiFi/data — the app continues to work completely normally.' },

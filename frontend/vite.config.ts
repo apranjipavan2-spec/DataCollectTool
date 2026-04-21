@@ -17,8 +17,8 @@ export default defineConfig({
       // Manifest is also served as public/manifest.webmanifest for TWA/Bubblewrap.
       // Keep these values in sync with manifest.webmanifest and twa/twa-manifest.json.
       manifest: {
-        name: 'FieldPulse',
-        short_name: 'FieldPulse',
+        name: 'FieldGovern',
+        short_name: 'FieldGovern',
         description: 'Offline field data collection for teams',
         theme_color: '#89b4fa',
         background_color: '#11111b',

@@ -133,7 +133,7 @@ export default function FieldApp() {
           }
           let progCtx: Record<string, string | null> = {}
           try {
-            const raw = localStorage.getItem(`fieldpulse_prog_ctx_${s.formId}`)
+            const raw = localStorage.getItem(`fieldgovern_prog_ctx_${s.formId}`)
             if (raw) progCtx = JSON.parse(raw)
           } catch { }
           return {
@@ -430,7 +430,7 @@ export default function FieldApp() {
       setTilesCacheMsg('Caching map tiles…')
 
       const tilesToCache = computeTileUrls(lat, lng, 15, [12, 13, 14, 15])
-      const cache = await caches.open('fieldpulse-map-tiles-v1')
+      const cache = await caches.open('fieldgovern-map-tiles-v1')
       let done = 0
 
       // Batch in groups of 10 to avoid overwhelming the browser
@@ -474,7 +474,7 @@ export default function FieldApp() {
       })
       setSelectedLocationId(locId)
       try {
-        localStorage.setItem(`fieldpulse_prog_ctx_${meta.id}`, JSON.stringify({
+        localStorage.setItem(`fieldgovern_prog_ctx_${meta.id}`, JSON.stringify({
           program_id: pc.program_id, participant_type_id: pc.participant_type_id,
           questionnaire_id: pc.questionnaire_id, location_id: locId,
         }))
@@ -736,9 +736,9 @@ export default function FieldApp() {
                   const loc = locations.find((l: any) => l.id === lid)
                   if (loc) setProgramContext(p => p ? { ...p, location_id: lid, location_district: loc.district, location_block: loc.block, location_village: loc.village } : p)
                   try {
-                    const raw = localStorage.getItem(`fieldpulse_prog_ctx_${activeForm.meta.id}`)
+                    const raw = localStorage.getItem(`fieldgovern_prog_ctx_${activeForm.meta.id}`)
                     const ctx = raw ? JSON.parse(raw) : {}
-                    localStorage.setItem(`fieldpulse_prog_ctx_${activeForm.meta.id}`, JSON.stringify({ ...ctx, location_id: lid }))
+                    localStorage.setItem(`fieldgovern_prog_ctx_${activeForm.meta.id}`, JSON.stringify({ ...ctx, location_id: lid }))
                   } catch { }
                 }}>
                 <option value="">📍 Pick collection location…</option>
@@ -772,7 +772,7 @@ export default function FieldApp() {
           <div className="flex justify-between items-center py-3 gap-4">
             <div className="flex items-center gap-3">
               <div>
-                <h1 className="text-lg font-bold text-catalan-text leading-tight">FieldPulse</h1>
+                <h1 className="text-lg font-bold text-catalan-text leading-tight">FieldGovern</h1>
                 {myStats !== null && (
                   <p className="text-xs text-catalan-textMuted hidden sm:block">
                     {myStats.today} today · {myStats.total} total · {outboxCount} pending

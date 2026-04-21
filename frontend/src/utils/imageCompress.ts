@@ -1,5 +1,5 @@
 /**
- * Client-side image compression for FieldPulse.
+ * Client-side image compression for FieldGovern.
  *
  * Compresses photos BEFORE uploading to save bandwidth on 2G networks.
  * Uses Canvas API (works in all modern browsers including mobile).

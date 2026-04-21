@@ -1,4 +1,4 @@
-# CLAUDE.md — FieldPulse (DataCollectTool)
+# CLAUDE.md — FieldGovern (DataCollectTool)
 
 This file is the authoritative guide for Claude Code when working in this repository.
 
@@ -6,7 +6,7 @@ This file is the authoritative guide for Claude Code when working in this reposi
 
 ## Project Overview
 
-**FieldPulse** is a B2B SaaS platform for offline-first field data collection, targeting research teams in India. Competes directly with SurveyCTO at ₹18,000/month vs SurveyCTO's $225–630/month.
+**FieldGovern** is a B2B SaaS platform for offline-first field data collection, targeting research teams in India. Competes directly with SurveyCTO at ₹18,000/month vs SurveyCTO's $225–630/month.
 
 **Repo**: https://github.com/apranjipavan2-spec/DataCollectTool  
 **Deployment**: Railway.app (Docker, single container, auto-deploy on push to `main`)  
@@ -160,7 +160,7 @@ The Railway PostgreSQL DB was originally set up using `Base.metadata.create_all`
 
 Seeded by `scripts/seed_dev.py` (idempotent, runs on every Railway deploy).
 
-### Platform (tenant: "FieldPulse Platform") — master_admin
+### Platform (tenant: "FieldGovern Platform") — master_admin
 | Phone | Password | Name |
 |-------|----------|------|
 | +918317390926 | superadmin@4991 | Pavan Deshetty (primary super admin) |

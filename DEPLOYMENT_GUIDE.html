@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FieldPulse - Deployment & Operations Guide</title>
+    <title>FieldGovern - Deployment & Operations Guide</title>
     <style>
         * {
             margin: 0;
@@ -352,7 +352,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>🚀 FieldPulse</h1>
+            <h1>🚀 FieldGovern</h1>
             <p>Offline-First Field Data Collection SaaS</p>
             <p style="font-size: 0.95em; margin-top: 10px;">Complete Deployment & Operations Guide</p>
         </header>
@@ -374,7 +374,7 @@
 
                 <h3>For Users (Enumerators)</h3>
                 <ol>
-                    <li><strong>Access the app</strong>: Open browser → <code>http://app.fieldpulse.local</code> (or production URL)</li>
+                    <li><strong>Access the app</strong>: Open browser → <code>http://app.fieldgovern.local</code> (or production URL)</li>
                     <li><strong>Login</strong>: Enter phone number + password</li>
                     <li><strong>Collect data</strong>: Open assigned form → answer questions → submit (works offline)</li>
                     <li><strong>Auto-sync</strong>: When online, data syncs automatically in background</li>
@@ -503,7 +503,7 @@ Media Storage (Photos, Audio)
                     <strong>Use Kubernetes for auto-scaling, load balancing, self-healing</strong>
                     <div class="code-block">kubectl apply -f k8s/
 kubectl get pods
-kubectl logs deployment/fieldpulse-backend</div>
+kubectl logs deployment/fieldgovern-backend</div>
                 </div>
 
                 <h3>Option 3: Cloud Platforms</h3>
@@ -541,14 +541,14 @@ kubectl logs deployment/fieldpulse-backend</div>
                 <h3>SSL/HTTPS Setup</h3>
                 <p>Use Let's Encrypt + Certbot or load balancer native SSL</p>
                 <div class="code-block"># On Nginx reverse proxy
-ssl_certificate /etc/letsencrypt/live/fieldpulse.com/fullchain.pem;
-ssl_certificate_key /etc/letsencrypt/live/fieldpulse.com/privkey.pem;</div>
+ssl_certificate /etc/letsencrypt/live/fieldgovern.com/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/fieldgovern.com/privkey.pem;</div>
 
                 <h3>Environment Variables (.env.prod)</h3>
-                <div class="code-block">DATABASE_URL=postgresql://user:pass@db.example.com/fieldpulse
+                <div class="code-block">DATABASE_URL=postgresql://user:pass@db.example.com/fieldgovern
 REDIS_URL=redis://redis.example.com:6379
 JWT_SECRET=your-super-secret-key-min-32-chars
-CORS_ORIGINS=https://fieldpulse.com,https://app.fieldpulse.com
+CORS_ORIGINS=https://fieldgovern.com,https://app.fieldgovern.com
 GDRIVE_FOLDER_ID=your-folder-id
 GDRIVE_TOKEN_PATH=/secrets/gdrive-token.json
 LOG_LEVEL=info
@@ -572,7 +572,7 @@ WORKERS=4</div>
 
                 <h3>How Offline Collection Works</h3>
                 <div class="info">
-                    <strong>FieldPulse is designed to work without internet:</strong>
+                    <strong>FieldGovern is designed to work without internet:</strong>
                     <ol>
                         <li>Data stored locally on device (phone storage)</li>
                         <li>Auto-saves every 300ms as you type</li>
@@ -612,7 +612,7 @@ WORKERS=4</div>
                 <h4>4. When You Come Online</h4>
                 <div class="step">
                     <strong>Automatic sync (no action needed)</strong>
-                    <p>Detection: When your phone reconnects to internet, FieldPulse automatically:</p>
+                    <p>Detection: When your phone reconnects to internet, FieldGovern automatically:</p>
                     <ol>
                         <li>Syncs all pending submissions (text data)</li>
                         <li>Uploads all photos/audio files</li>
@@ -699,7 +699,7 @@ WORKERS=4</div>
 
                 <div class="step">
                     <strong>Check database health</strong>
-                    <div class="code-block">psql postgresql://user:pass@localhost/fieldpulse -c "SELECT count(*) FROM submissions;"</div>
+                    <div class="code-block">psql postgresql://user:pass@localhost/fieldgovern -c "SELECT count(*) FROM submissions;"</div>
                 </div>
 
                 <div class="step">
@@ -730,15 +730,15 @@ redis-cli INFO memory</div>
                 <div class="step">
                     <strong>Daily backup</strong>
                     <div class="code-block"># Run daily via cron job
-pg_dump postgresql://user:pass@localhost/fieldpulse > /backups/fieldpulse-$(date +%Y-%m-%d).sql
+pg_dump postgresql://user:pass@localhost/fieldgovern > /backups/fieldgovern-$(date +%Y-%m-%d).sql
 
 # Upload to S3
-aws s3 cp /backups/fieldpulse-*.sql s3://my-bucket/backups/</div>
+aws s3 cp /backups/fieldgovern-*.sql s3://my-bucket/backups/</div>
                 </div>
 
                 <div class="step">
                     <strong>Restore from backup</strong>
-                    <div class="code-block">psql postgresql://user:pass@localhost/fieldpulse < /backups/fieldpulse-2026-03-25.sql</div>
+                    <div class="code-block">psql postgresql://user:pass@localhost/fieldgovern < /backups/fieldgovern-2026-03-25.sql</div>
                 </div>
 
                 <h3>Scaling for More Users</h3>
@@ -983,9 +983,9 @@ python scripts/seed_dev.py  # Resets test users and data</div>
         </div>
 
         <footer>
-            <p><strong>FieldPulse</strong> © 2026 | Offline-First Field Data Collection for India</p>
+            <p><strong>FieldGovern</strong> © 2026 | Offline-First Field Data Collection for India</p>
             <p style="margin-top: 10px; font-size: 0.9em;">Deployment & Operations Guide | Last Updated: March 25, 2026</p>
-            <p style="margin-top: 10px; font-size: 0.85em; color: #999;">📧 Support: support@fieldpulse.local | 📱 Docs: localhost:8000/docs</p>
+            <p style="margin-top: 10px; font-size: 0.85em; color: #999;">📧 Support: support@fieldgovern.local | 📱 Docs: localhost:8000/docs</p>
         </footer>
     </div>
 
@@ -1016,7 +1016,7 @@ Enumerator,+919999990003,test@123,Data collection,Collect + submit + sync`;
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'fieldpulse-test-credentials.csv';
+            a.download = 'fieldgovern-test-credentials.csv';
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);

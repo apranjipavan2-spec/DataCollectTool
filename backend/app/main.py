@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
     stop_scheduler()
 
 
-app = FastAPI(title="FieldPulse API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="FieldGovern API", version="0.1.0", lifespan=lifespan)
 
 # ── Rate limiting (in-memory, no Redis needed) ───────────────────────────────
 app.state.limiter = limiter

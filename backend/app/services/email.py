@@ -55,7 +55,7 @@ def send_password_reset_email(to: str, name: str, reset_token: str) -> bool:
     <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
       <h2 style="color: #1e1e2e;">Reset Your Password</h2>
       <p>Hi {name},</p>
-      <p>You requested a password reset for your FieldPulse account.
+      <p>You requested a password reset for your FieldGovern account.
          Click the button below to set a new password:</p>
       <a href="{url}"
          style="display: inline-block; background: #2563eb; color: white;
@@ -67,10 +67,10 @@ def send_password_reset_email(to: str, name: str, reset_token: str) -> bool:
         This link expires in 1 hour. If you didn't request this, ignore this email.
       </p>
       <hr style="border: none; border-top: 1px solid #d4d4de; margin: 24px 0;">
-      <p style="color: #6c7086; font-size: 12px;">FieldPulse — Field Data Collection</p>
+      <p style="color: #6c7086; font-size: 12px;">FieldGovern — Field Data Collection</p>
     </div>
     """
-    return send_email(to, "Reset Your FieldPulse Password", html)
+    return send_email(to, "Reset Your FieldGovern Password", html)
 
 
 def send_flagged_submission_email(
@@ -112,7 +112,7 @@ def send_flagged_submission_email(
         Review in Dashboard
       </a>
       <hr style="border: none; border-top: 1px solid #d4d4de; margin: 24px 0;">
-      <p style="color: #6c7086; font-size: 12px;">FieldPulse — Field Data Collection</p>
+      <p style="color: #6c7086; font-size: 12px;">FieldGovern — Field Data Collection</p>
     </div>
     """
     return send_email(to, f"Submission Flagged: {form_title}", html)
@@ -156,7 +156,7 @@ def send_daily_digest_email(
     <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;
                 background:#1e1e2e;color:#cdd6f4;padding:28px;border-radius:12px;">
       <div style="margin-bottom:20px;">
-        <span style="font-size:22px;font-weight:700;color:#cba6f7;">FieldPulse</span>
+        <span style="font-size:22px;font-weight:700;color:#cba6f7;">FieldGovern</span>
         <span style="font-size:13px;color:#6c7086;margin-left:8px;">Daily Digest</span>
       </div>
 
@@ -205,11 +205,11 @@ def send_daily_digest_email(
       </a>
 
       <p style="margin:20px 0 0;font-size:11px;color:#45475a;text-align:center;">
-        FieldPulse · You're receiving this because you're an admin or supervisor.
+        FieldGovern · You're receiving this because you're an admin or supervisor.
       </p>
     </div>
     """
-    return send_email(to, f"FieldPulse Daily Digest — {date_label}", html)
+    return send_email(to, f"FieldGovern Daily Digest — {date_label}", html)
 
 
 def send_assignment_email(to: str, enumerator_name: str, form_title: str) -> bool:
@@ -224,10 +224,10 @@ def send_assignment_email(to: str, enumerator_name: str, form_title: str) -> boo
          style="display: inline-block; background: #2563eb; color: white;
                 padding: 12px 24px; border-radius: 8px; text-decoration: none;
                 font-weight: 600; margin: 16px 0;">
-        Open FieldPulse
+        Open FieldGovern
       </a>
       <hr style="border: none; border-top: 1px solid #d4d4de; margin: 24px 0;">
-      <p style="color: #6c7086; font-size: 12px;">FieldPulse — Field Data Collection</p>
+      <p style="color: #6c7086; font-size: 12px;">FieldGovern — Field Data Collection</p>
     </div>
     """
     return send_email(to, f"New Form: {form_title}", html)

@@ -79,7 +79,7 @@ export default function NotificationSettings() {
 
   const handleTest = async () => {
     if (!('Notification' in window)) return
-    new Notification('FieldPulse Test', {
+    new Notification('FieldGovern Test', {
       body: 'Notifications are working correctly!',
       icon: '/icons/icon-192x192.png',
     })

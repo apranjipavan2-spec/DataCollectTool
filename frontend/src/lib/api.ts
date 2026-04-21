@@ -86,7 +86,7 @@ api.interceptors.response.use(
 
     // ── 402 — plan limit exceeded ─────────────────────────────────────────
     if (err.response?.status === 402) {
-      window.dispatchEvent(new CustomEvent('fieldpulse:plan-limit', {
+      window.dispatchEvent(new CustomEvent('fieldgovern:plan-limit', {
         detail: { message: err.response.data?.detail ?? 'Plan limit reached. Upgrade to continue.' },
       }))
     }

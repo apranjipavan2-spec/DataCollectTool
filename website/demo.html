@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>FieldPulse — Live Demo</title>
-  <meta name="description" content="Try FieldPulse free. All 4 roles pre-loaded. No signup."/>
+  <title>FieldGovern — Live Demo</title>
+  <meta name="description" content="Try FieldGovern free. All 4 roles pre-loaded. No signup."/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
   <style>
     :root{--brand:#0ea5e9;--brand-dk:#0369a1;--accent:#7c3aed;--green:#10b981;--amber:#f59e0b;--red:#ef4444;--bg:#f1f5f9;--card:#fff;--text:#0f172a;--text2:#334155;--text3:#64748b;--border:#e2e8f0}
@@ -141,7 +141,7 @@
 <nav>
   <a href="index.html" class="logo">
     <div class="logo-mark">FP</div>
-    FieldPulse
+    FieldGovern
   </a>
   <a href="index.html" class="nav-back">← Back to Home</a>
 </nav>
@@ -151,16 +151,16 @@
   <!-- HERO -->
   <div class="hero">
     <div class="live-badge"><span class="live-dot"></span> Live App · No Signup Required</div>
-    <h1>Try FieldPulse — Right Now</h1>
+    <h1>Try FieldGovern — Right Now</h1>
     <p>Select a role below, copy the credentials, and log in to the live app. Pre-loaded with real forms, submissions, GPS data, and team data across all 4 user roles.</p>
 
     <div class="url-bar">
       <div class="url-input-wrap">
         <span class="url-icon">🌐</span>
-        <input id="urlInput" type="text" value="https://dct.up.railway.app" readonly onclick="this.select()" title="Click to select, then Ctrl+C to copy"/>
+        <input id="urlInput" type="text" value="https://app.fieldgovern.com" readonly onclick="this.select()" title="Click to select, then Ctrl+C to copy"/>
       </div>
       <button class="btn btn-copy" onclick="copyUrl(this)">📋 Copy URL</button>
-      <a href="https://dct.up.railway.app" target="_blank" rel="noopener noreferrer" class="btn btn-open">🚀 Open App ↗</a>
+      <a href="https://app.fieldgovern.com" target="_blank" rel="noopener noreferrer" class="btn btn-open">🚀 Open App ↗</a>
     </div>
   </div>
 
@@ -305,8 +305,8 @@
       <div class="pf">
         <label>App URL</label>
         <div class="pf-val">
-          <input class="pf-input" type="text" id="pUrl" value="https://dct.up.railway.app" readonly onclick="this.select()"/>
-          <button class="cpy" onclick="cp('https://dct.up.railway.app',this,event)">Copy</button>
+          <input class="pf-input" type="text" id="pUrl" value="https://app.fieldgovern.com" readonly onclick="this.select()"/>
+          <button class="cpy" onclick="cp('https://app.fieldgovern.com',this,event)">Copy</button>
         </div>
       </div>
       <div class="pf">
@@ -325,7 +325,7 @@
       </div>
     </div>
     <div class="panel-actions">
-      <a href="https://dct.up.railway.app" target="_blank" rel="noopener noreferrer" class="btn-main">Open FieldPulse &amp; Login →</a>
+      <a href="https://app.fieldgovern.com" target="_blank" rel="noopener noreferrer" class="btn-main">Open FieldGovern &amp; Login →</a>
       <button class="btn-sec" onclick="cpAll()">📋 Copy All Credentials</button>
     </div>
   </div>
@@ -356,7 +356,7 @@
 
   <!-- OFFLINE TEST -->
   <div class="offline">
-    <h3>🔌 Test Offline Mode — FieldPulse's #1 Feature</h3>
+    <h3>🔌 Test Offline Mode — FieldGovern's #1 Feature</h3>
     <div class="os">
       <div class="os-row"><div class="os-n">1</div>Log in as <strong>Enumerator</strong> (+919999990003) → open an assigned form</div>
       <div class="os-row"><div class="os-n">2</div>Open Chrome DevTools (F12) → Network tab → set dropdown to <strong>"Offline"</strong></div>
@@ -424,7 +424,7 @@
   }
 
   function copyUrl(btn) {
-    safeCopy('https://dct.up.railway.app').then(() => {
+    safeCopy('https://app.fieldgovern.com').then(() => {
       btn.textContent = '✓ Copied!';
       btn.classList.add('copied');
       setTimeout(() => { btn.textContent = '📋 Copy URL'; btn.classList.remove('copied'); }, 1600);
@@ -434,7 +434,7 @@
 
   function cpAll() {
     const r = roles[cur];
-    const text = `FieldPulse Demo\nURL: https://dct.up.railway.app\nPhone: ${r.phone}\nPassword: ${r.pass}\nRole: ${r.name}`;
+    const text = `FieldGovern Demo\nURL: https://app.fieldgovern.com\nPhone: ${r.phone}\nPassword: ${r.pass}\nRole: ${r.name}`;
     safeCopy(text);
     toast('All credentials copied!');
   }

@@ -4,9 +4,9 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: fieldpulse
+      POSTGRES_USER: fieldgovern
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: fieldpulse
+      POSTGRES_DB: fieldgovern
     ports:
       - "5432:5432"
     volumes:

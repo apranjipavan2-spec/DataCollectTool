@@ -1,5 +1,5 @@
 {
-  "app_name": "FieldPulse",
+  "app_name": "FieldGovern",
   "sync": {
     "pending": "{{count}} submissions waiting to sync",
     "syncing": "Syncing...",

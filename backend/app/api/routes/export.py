@@ -205,7 +205,7 @@ def export_pdf(
     # Title block
     pdf.set_font("Helvetica", "B", 18)
     pdf.set_text_color(14, 165, 233)
-    pdf.cell(0, 12, "FieldPulse Data Report", ln=True)
+    pdf.cell(0, 12, "FieldGovern Data Report", ln=True)
     pdf.set_font("Helvetica", "B", 13)
     pdf.set_text_color(30, 30, 46)
     title = form.title[:80]

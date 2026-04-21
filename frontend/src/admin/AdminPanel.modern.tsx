@@ -446,7 +446,7 @@ export default function AdminPanel() {
           footer={<div className="flex gap-3"><Button variant="secondary" onClick={() => setShowCreateModal(false)}>Cancel</Button><Button onClick={createTenant}>Create</Button></div>}>
           <div className="space-y-4">
             <Input label="Organization Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="e.g., Health Ministry" />
-            <Input label="App Name" value={formData.app_name} onChange={e => setFormData({...formData, app_name: e.target.value})} placeholder="e.g., FieldPulse Health" />
+            <Input label="App Name" value={formData.app_name} onChange={e => setFormData({...formData, app_name: e.target.value})} placeholder="e.g., FieldGovern Health" />
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-catalan-text mb-2">Plan Tier</label>

@@ -891,7 +891,7 @@ export default function Dashboard() {
             {showCsvImport && (
               <div style={{ ...card, marginBottom: 16, padding: 16 }}>
                 <div style={{ color: theme.muted, fontSize: 12, marginBottom: 10 }}>
-                  CSV format: <code>phone, name, role, password</code> (password is optional, defaults to &quot;fieldpulse123&quot;)
+                  CSV format: <code>phone, name, role, password</code> (password is optional, defaults to &quot;fieldgovern123&quot;)
                 </div>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                   <input

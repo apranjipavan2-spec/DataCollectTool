@@ -150,11 +150,11 @@ def upgrade():
 
     # App role for API connections (bypasses RLS only for master_admin via superuser)
     # Note: Role creation is idempotent via grant statements. Role must be created separately:
-    # CREATE ROLE fieldpulse_app LOGIN PASSWORD 'apppassword' NOINHERIT
+    # CREATE ROLE fieldgovern_app LOGIN PASSWORD 'apppassword' NOINHERIT
     try:
-        op.execute("GRANT CONNECT ON DATABASE fieldpulse TO fieldpulse_app")
-        op.execute("GRANT USAGE ON SCHEMA public TO fieldpulse_app")
-        op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO fieldpulse_app")
+        op.execute("GRANT CONNECT ON DATABASE fieldgovern TO fieldgovern_app")
+        op.execute("GRANT USAGE ON SCHEMA public TO fieldgovern_app")
+        op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO fieldgovern_app")
     except:
         pass  # Role may already exist with grants
 
@@ -164,4 +164,4 @@ def downgrade():
               'media_files', 'submissions', 'forms', 'users', 'tenants']
     for t in tables:
         op.drop_table(t)
-    op.execute("DROP ROLE IF EXISTS fieldpulse_app")
+    op.execute("DROP ROLE IF EXISTS fieldgovern_app")

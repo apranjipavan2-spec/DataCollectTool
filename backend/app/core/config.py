@@ -19,7 +19,7 @@ def _resolve_database_url() -> str:
     if not url:
         url = os.environ.get("DATABASE_PUBLIC_URL", "")
     if not url:
-        url = "postgresql://fieldpulse:password@localhost:5432/fieldpulse"
+        url = "postgresql://fieldgovern:password@localhost:5432/fieldgovern"
     return url
 
 
@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 60 * 2  # 2 hours — client-side session timeout is 30 min; this is the server-side backstop
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
-    AWS_S3_BUCKET: str = "fieldpulse-media"
+    AWS_S3_BUCKET: str = "fieldgovern-media"
     AWS_REGION: str = "ap-south-1"
     MEDIA_DIR: str = "uploads"  # local disk fallback for media files
     STORAGE_BACKEND: str = "local"  # "local" | "drive" | "s3"
@@ -40,19 +40,19 @@ class Settings(BaseSettings):
     GDRIVE_TOKEN_PATH: str = "credentials/gdrive-token.json"
     VAPID_PUBLIC_KEY: str = ""
     VAPID_PRIVATE_KEY: str = ""
-    VAPID_CLAIM_EMAIL: str = "mailto:admin@fieldpulse.app"
+    VAPID_CLAIM_EMAIL: str = "mailto:admin@fieldgovern.app"
 
     # Email / SMTP
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    SMTP_FROM_EMAIL: str = "noreply@fieldpulse.app"
-    SMTP_FROM_NAME: str = "FieldPulse"
+    SMTP_FROM_EMAIL: str = "noreply@fieldgovern.app"
+    SMTP_FROM_NAME: str = "FieldGovern"
     SMTP_USE_TLS: bool = True
     APP_URL: str = "http://localhost:5173"
 
-    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:4173", "https://dct.up.railway.app"]
+    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:4173", "https://app.fieldgovern.com"]
 
     class Config:
         env_file = ".env"

@@ -1,7 +1,7 @@
-# FieldPulse Implementation Summary — Phase 1-2 Complete
+# FieldGovern Implementation Summary — Phase 1-2 Complete
 
 ## Overview
-FieldPulse is a B2B offline-first SaaS for field data collection in India. This document summarizes work completed through March 25, 2026.
+FieldGovern is a B2B offline-first SaaS for field data collection in India. This document summarizes work completed through March 25, 2026.
 
 ---
 
@@ -66,7 +66,7 @@ frontend/src/admin/ApiKeyManager.tsx              — API key generation & manag
 
 ### Documentation
 ```
-FIELDPULSE_GUIDE.html                            — Interactive feature guide
+FIELDGOVERN_GUIDE.html                            — Interactive feature guide
 credentials.csv                                  — Test user credentials
 IMPLEMENTATION_SUMMARY.md                        — This file
 ```
@@ -152,7 +152,7 @@ Indices:
 
 ## 📊 Feature Matrix: Competitive Positioning
 
-| Feature | SurveyCTO | FieldPulse |
+| Feature | SurveyCTO | FieldGovern |
 |---------|-----------|-----------|
 | Price | $225-630/mo | ₹18,000/mo (~$215) |
 | Offline | Yes (Java app) | ✅ Yes (PWA, no install) |
@@ -208,11 +208,11 @@ Indices:
 
 | Document | Purpose |
 |----------|---------|
-| `FIELDPULSE_GUIDE.html` | Interactive guide (6 tabs: overview, completed, roadmap, guide, credentials, API) |
+| `FIELDGOVERN_GUIDE.html` | Interactive guide (6 tabs: overview, completed, roadmap, guide, credentials, API) |
 | `credentials.csv` | Test user credentials (admin, supervisor, enumerator) |
 | `IMPLEMENTATION_SUMMARY.md` | This file — project status and architecture |
 | `/c/Life/DataCollectTool/memory/roadmap.md` | Full feature roadmap (37 items) |
-| `/c/Life/DataCollectTool/memory/project_fieldpulse.md` | Project context & tech stack |
+| `/c/Life/DataCollectTool/memory/project_fieldgovern.md` | Project context & tech stack |
 
 ---
 

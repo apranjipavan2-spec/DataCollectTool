@@ -12,14 +12,14 @@ import type { StorageAdapter, SubmissionRecord, StorageInfo, FormCache, MediaQue
 
 interface IdMapping { localId: string; serverId: string }
 
-class FieldPulseDB extends Dexie {
+class FieldGovernDB extends Dexie {
   submissions!: Table<SubmissionRecord>
   formCache!: Table<FormCache>
   mediaQueue!: Table<MediaQueueItem>
   idMap!: Table<IdMapping>
 
   constructor() {
-    super('fieldpulse')
+    super('fieldgovern')
     this.version(1).stores({
       submissions: 'id, formId, status, createdAt',
     })
@@ -36,7 +36,7 @@ class FieldPulseDB extends Dexie {
   }
 }
 
-const db = new FieldPulseDB()
+const db = new FieldGovernDB()
 
 export class IndexedDbAdapter implements StorageAdapter {
   async init(): Promise<void> {

@@ -19,7 +19,7 @@ const LanguageContext = createContext<LanguageContextValue>({
   setLanguage: () => {},
 })
 
-const STORAGE_KEY = 'fieldpulse_language'
+const STORAGE_KEY = 'fieldgovern_language'
 
 function loadSaved(): AppLanguage {
   try {

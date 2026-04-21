@@ -43,7 +43,7 @@ export default function ForgotPasswordPage() {
         <div className="flex items-center justify-center gap-2.5 mb-10">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-lg shadow-md"
                style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}>FP</div>
-          <span className="text-slate-800 text-xl font-bold tracking-tight">FieldPulse</span>
+          <span className="text-slate-800 text-xl font-bold tracking-tight">FieldGovern</span>
         </div>
 
         {/* Card */}

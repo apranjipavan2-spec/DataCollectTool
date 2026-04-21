@@ -26,7 +26,7 @@ export default function AdminPanel() {
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState({
     name: '', plan_tier: 'starter', primary_color: '#2563EB', logo_url: '',
-    app_name: '', admin_phone: '', admin_name: '', admin_password: 'fieldpulse123',
+    app_name: '', admin_phone: '', admin_name: '', admin_password: 'fieldgovern123',
   })
   const [editForm, setEditForm] = useState({
     name: '', app_name: '', primary_color: '', logo_url: '', plan_tier: '', subscription_status: '',
@@ -42,7 +42,7 @@ export default function AdminPanel() {
       const r = await api.get('/tenants/')
       setTenants(r.data)
       setShowCreate(false)
-      setForm({ name: '', plan_tier: 'starter', primary_color: '#2563EB', logo_url: '', app_name: '', admin_phone: '', admin_name: '', admin_password: 'fieldpulse123' })
+      setForm({ name: '', plan_tier: 'starter', primary_color: '#2563EB', logo_url: '', app_name: '', admin_phone: '', admin_name: '', admin_password: 'fieldgovern123' })
     } catch (e: any) {
       alert(e.response?.data?.detail || 'Failed to create tenant')
     }

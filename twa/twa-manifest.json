@@ -1,8 +1,8 @@
 {
-  "packageId": "app.fieldpulse.twa",
-  "host": "fieldpulse.app",
-  "name": "FieldPulse",
-  "launcherName": "FieldPulse",
+  "packageId": "app.fieldgovern.twa",
+  "host": "fieldgovern.app",
+  "name": "FieldGovern",
+  "launcherName": "FieldGovern",
   "display": "standalone",
   "themeColor": "#89b4fa",
   "navigationColor": "#11111b",
@@ -12,19 +12,19 @@
   "backgroundColor": "#11111b",
   "enableNotifications": true,
   "startUrl": "/",
-  "iconUrl": "https://fieldpulse.app/icons/icon-512x512.png",
-  "maskableIconUrl": "https://fieldpulse.app/icons/icon-512x512.png",
+  "iconUrl": "https://fieldgovern.app/icons/icon-512x512.png",
+  "maskableIconUrl": "https://fieldgovern.app/icons/icon-512x512.png",
   "shortcuts": [
     {
       "name": "Collect Data",
       "shortName": "Collect",
       "url": "/collect",
-      "chosenIconUrl": "https://fieldpulse.app/icons/icon-96x96.png"
+      "chosenIconUrl": "https://fieldgovern.app/icons/icon-96x96.png"
     }
   ],
   "signing": {
     "keyPath": "./android.keystore",
-    "alias": "fieldpulse"
+    "alias": "fieldgovern"
   },
   "appVersionCode": 1,
   "appVersionName": "1.0.0",

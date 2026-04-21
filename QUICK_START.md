@@ -1,4 +1,4 @@
-# FieldPulse - Quick Start Guide
+# FieldGovern - Quick Start Guide
 
 ## 🚀 Start in 3 Steps
 
@@ -43,7 +43,7 @@ Open: **http://localhost:5173** (PWA with hot reload)
 ## 📖 Full Guides
 
 - **DEPLOYMENT_GUIDE.html** — Setup, deployment, operations, offline usage (complete guide)
-- **FIELDPULSE_GUIDE.html** — Features, API reference, roadmap
+- **FIELDGOVERN_GUIDE.html** — Features, API reference, roadmap
 - **TEST_CREDENTIALS.csv** — All test user credentials
 
 ---

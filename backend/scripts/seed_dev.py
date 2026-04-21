@@ -355,7 +355,7 @@ random.seed(42)
 
 # ── Stage 1: tenants + users (committed immediately so login always works) ────
 try:
-    platform_tenant, _ = get_or_create_tenant('FieldPulse Platform', 'enterprise')
+    platform_tenant, _ = get_or_create_tenant('FieldGovern Platform', 'enterprise')
     demo_tenant, _ = get_or_create_tenant('Demo Org', 'professional')
     dataworx_tenant, _ = get_or_create_tenant('Dataworx', 'starter')
     db.commit()

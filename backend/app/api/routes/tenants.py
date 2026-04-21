@@ -49,7 +49,7 @@ def get_branding(user=Depends(get_current_user), db: Session = Depends(get_db)):
     """Return tenant branding for the current user's tenant."""
     tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
     if not tenant:
-        return {"name": "FieldPulse", "logo_url": "", "primary_color": "#2563EB", "app_name": "FieldPulse"}
+        return {"name": "FieldGovern", "logo_url": "", "primary_color": "#2563EB", "app_name": "FieldGovern"}
     return {
         "id": str(tenant.id),
         "name": tenant.name,
@@ -111,7 +111,7 @@ class TenantCreate(BaseModel):
     # First admin user
     admin_phone: str
     admin_name: str
-    admin_password: str = "fieldpulse123"
+    admin_password: str = "fieldgovern123"
 
 
 class TenantUpdate(BaseModel):

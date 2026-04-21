@@ -1,9 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pandoc --track-changes=all \"FieldPulse_v6_Final_with_iOS_Strategy.docx\" -o /tmp/fieldpulse_content.md)",
+      "Bash(pandoc --track-changes=all \"FieldGovern_v6_Final_with_iOS_Strategy.docx\" -o /tmp/fieldgovern_content.md)",
       "Read(//tmp/**)",
-      "Bash(python \"C:/Users/apran/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/c8f8e4a3-c612-41fc-8826-5352b99b6aa9/77af8a7c-55ec-468a-ab49-c14c2d4889ec/skills/docx/scripts/office/unpack.py\" \"FieldPulse_v6_Final_with_iOS_Strategy.docx\" \"/tmp/fieldpulse_unpacked/\")",
+      "Bash(python \"C:/Users/apran/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/c8f8e4a3-c612-41fc-8826-5352b99b6aa9/77af8a7c-55ec-468a-ab49-c14c2d4889ec/skills/docx/scripts/office/unpack.py\" \"FieldGovern_v6_Final_with_iOS_Strategy.docx\" \"/tmp/fieldgovern_unpacked/\")",
       "Bash(python -c \":*)",
       "Bash(npm install:*)",
       "Bash(npm show:*)",

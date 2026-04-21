@@ -574,8 +574,8 @@ export default function Dashboard() {
       setPlanLimitMsg(msg)
       toast.warning(msg)
     }
-    window.addEventListener('fieldpulse:plan-limit', handler)
-    return () => window.removeEventListener('fieldpulse:plan-limit', handler)
+    window.addEventListener('fieldgovern:plan-limit', handler)
+    return () => window.removeEventListener('fieldgovern:plan-limit', handler)
   }, [toast])
 
   // Load local sync queue counts from offline storage
@@ -2131,7 +2131,7 @@ export default function Dashboard() {
               {/* ── Webhooks ── */}
               <Card title="Webhooks">
                 <p className="text-sm text-catalan-textMuted mb-4">
-                  FieldPulse will POST a JSON payload to your URL when the selected events occur.
+                  FieldGovern will POST a JSON payload to your URL when the selected events occur.
                 </p>
 
                 <div className="flex justify-between items-center mb-4">
@@ -2286,7 +2286,7 @@ export default function Dashboard() {
                 <Card>
                   <p className="text-xs text-catalan-textMuted mb-3">
                     CSV format: <code className="bg-catalan-hover px-1 rounded">phone, name, role, password</code>
-                    {' '}(password optional — defaults to &quot;fieldpulse123&quot;)
+                    {' '}(password optional — defaults to &quot;fieldgovern123&quot;)
                   </p>
                   <div className="flex gap-3 items-center flex-wrap">
                     <input

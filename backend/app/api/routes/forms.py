@@ -43,7 +43,7 @@ class ApplyMigrateRequest(BaseModel):
 
 
 def _extract_field_keys(schema: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Return a flat mapping of field_key -> field_definition from a FieldPulse
+    """Return a flat mapping of field_key -> field_definition from a FieldGovern
     form JSON schema.  Handles both top-level ``fields`` lists and
     ``sections[].fields`` lists."""
     fields: dict[str, dict[str, Any]] = {}

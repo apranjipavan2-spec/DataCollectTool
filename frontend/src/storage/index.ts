@@ -17,7 +17,7 @@ export async function getStorage(): Promise<StorageAdapter> {
   const info = await _adapter.getStorageInfo()
   const freeMB = (info.quotaBytes - info.usedBytes) / 1024 / 1024
   if (freeMB < 200) {
-    console.warn(`[FieldPulse] Low storage: only ${freeMB.toFixed(0)}MB free. Sync immediately.`)
+    console.warn(`[FieldGovern] Low storage: only ${freeMB.toFixed(0)}MB free. Sync immediately.`)
   }
 
   return _adapter

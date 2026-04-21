@@ -1,4 +1,4 @@
-"""Google Sheets export service for FieldPulse.
+"""Google Sheets export service for FieldGovern.
 
 Creates a new Google Sheet in the configured Drive folder, writes submission
 rows, sets column headers, and returns the public editor URL.

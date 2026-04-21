@@ -1,5 +1,5 @@
 /**
- * SQLite Web Worker — OPFS-backed storage for FieldPulse.
+ * SQLite Web Worker — OPFS-backed storage for FieldGovern.
  *
  * Uses wa-sqlite (sync WASM) + AccessHandlePoolVFS which exploits
  * FileSystemSyncAccessHandle — a high-performance OPFS API that is
@@ -35,11 +35,11 @@ async function init(): Promise<void> {
 
   const sqlite3 = SQLite.Factory(module as Parameters<typeof SQLite.Factory>[0])
 
-  const vfs = new AccessHandlePoolVFS('/fieldpulse-db')
+  const vfs = new AccessHandlePoolVFS('/fieldgovern-db')
   await vfs.isReady
   sqlite3.vfs_register(vfs as unknown as SQLiteVFS, true) // register as default VFS
 
-  const db = await sqlite3.open_v2('fieldpulse.db')
+  const db = await sqlite3.open_v2('fieldgovern.db')
   tag = createTag(sqlite3, db) as TagFn
 
   // Schema — idempotent

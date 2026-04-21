@@ -73,7 +73,7 @@ export default function LoginPage() {
                style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}>
             FP
           </div>
-          <span className="text-slate-800 text-xl font-bold tracking-tight">FieldPulse</span>
+          <span className="text-slate-800 text-xl font-bold tracking-tight">FieldGovern</span>
         </div>
 
         {/* Headline */}
@@ -107,7 +107,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="relative z-10 text-slate-400 text-xs mt-10">© 2026 FieldPulse</p>
+        <p className="relative z-10 text-slate-400 text-xs mt-10">© 2026 FieldGovern</p>
       </div>
 
       {/* ── Right form panel ── */}
@@ -118,7 +118,7 @@ export default function LoginPage() {
           <div className="lg:hidden flex items-center gap-2 mb-8">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-base shadow"
                  style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}>FP</div>
-            <span className="text-slate-800 text-xl font-bold">FieldPulse</span>
+            <span className="text-slate-800 text-xl font-bold">FieldGovern</span>
           </div>
 
           {/* Card */}
@@ -134,7 +134,7 @@ export default function LoginPage() {
                 </div>
                 <h1 className="text-2xl font-bold text-black tracking-tight">Welcome back</h1>
               </div>
-              <p className="text-slate-500 text-sm">Sign in to continue to FieldPulse</p>
+              <p className="text-slate-500 text-sm">Sign in to continue to FieldGovern</p>
             </div>
 
             {/* Error */}

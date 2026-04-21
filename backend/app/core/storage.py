@@ -1,4 +1,4 @@
-"""Modular storage backend for FieldPulse.
+"""Modular storage backend for FieldGovern.
 
 Supports: local disk, Google Drive, S3 (future).
 Selected via STORAGE_BACKEND env var (default: "drive").

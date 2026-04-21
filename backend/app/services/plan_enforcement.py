@@ -1,4 +1,4 @@
-"""Plan limit enforcement for FieldPulse.
+"""Plan limit enforcement for FieldGovern.
 
 Checks current-month usage against the tenant's plan limits before allowing
 writes (sync push, submission create).  Returns a dict with `allowed: bool`

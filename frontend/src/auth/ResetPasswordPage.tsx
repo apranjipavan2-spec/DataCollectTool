@@ -70,7 +70,7 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen bg-catalan-bg flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-catalan-primary mb-2">FieldPulse</h1>
+          <h1 className="text-3xl font-bold text-catalan-primary mb-2">FieldGovern</h1>
           <h2 className="text-xl font-semibold text-catalan-text">Set New Password</h2>
           <p className="text-catalan-textMuted mt-2 text-sm">Enter your new password below.</p>
         </div>

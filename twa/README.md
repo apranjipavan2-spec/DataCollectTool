@@ -1,4 +1,4 @@
-# FieldPulse TWA — Google Play Store Distribution
+# FieldGovern TWA — Google Play Store Distribution
 
 ## Prerequisites
 - Node.js 18+
@@ -15,7 +15,7 @@ npm install -g @nicolo-ribaudo/bubblewrap-cli
 ### 2. Initialize TWA project
 ```bash
 cd twa
-npx bubblewrap init --manifest https://fieldpulse.app/manifest.webmanifest
+npx bubblewrap init --manifest https://fieldgovern.app/manifest.webmanifest
 ```
 
 This generates the full Android project from `twa-manifest.json`.
@@ -23,12 +23,12 @@ This generates the full Android project from `twa-manifest.json`.
 ### 3. Digital Asset Links
 
 The file `frontend/public/.well-known/assetlinks.json` must be served at
-`https://fieldpulse.app/.well-known/assetlinks.json` with the correct SHA-256
+`https://fieldgovern.app/.well-known/assetlinks.json` with the correct SHA-256
 fingerprint from your signing keystore.
 
 Get the fingerprint:
 ```bash
-keytool -list -v -keystore android.keystore -alias fieldpulse
+keytool -list -v -keystore android.keystore -alias fieldgovern
 ```
 
 Copy the `SHA256` value and replace `__REPLACE_WITH_YOUR_KEYSTORE_SHA256_FINGERPRINT__`
@@ -48,7 +48,7 @@ Output files:
 
 ### 5. Upload to Play Store
 1. Go to https://play.google.com/console
-2. Create new app -> "FieldPulse"
+2. Create new app -> "FieldGovern"
 3. Upload the `.aab` file under **Production** (or Internal Testing first)
 4. Fill in store listing (screenshots, description, etc.)
 5. Set pricing (free)
@@ -82,7 +82,7 @@ Edit `twa-manifest.json` to change:
 
 Since TWA wraps your PWA, most updates happen on the web side:
 
-1. Deploy updated frontend to `fieldpulse.app`
+1. Deploy updated frontend to `fieldgovern.app`
 2. The service worker auto-updates on user devices
 3. Only bump `appVersionCode`/`appVersionName` and rebuild the APK when
    changing TWA-specific config (icons, splash, permissions, etc.)

@@ -1,5 +1,5 @@
 """
-Google Drive media storage for FieldPulse.
+Google Drive media storage for FieldGovern.
 
 Uses OAuth2 (personal account) instead of service account, because Google
 no longer allows service accounts to create files in personal Drive

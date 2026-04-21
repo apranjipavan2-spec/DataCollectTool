@@ -91,7 +91,7 @@ def create_user(request: Request, body: UserCreate, user=Depends(require_org_adm
 
 
 VALID_ROLES = {"org_admin", "supervisor", "enumerator"}
-DEFAULT_PASSWORD = "fieldpulse123"
+DEFAULT_PASSWORD = "fieldgovern123"
 
 
 @router.post("/bulk-import")

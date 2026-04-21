@@ -1,5 +1,5 @@
 /**
- * Global navigation bar for FieldPulse.
+ * Global navigation bar for FieldGovern.
  *
  * Shows on all authenticated pages. Adapts to user role:
  *   - Enumerators: Collect, (no dashboard/builder)

@@ -16,10 +16,10 @@ export interface Branding {
 }
 
 const DEFAULT_BRANDING: Branding = {
-  name: 'FieldPulse',
+  name: 'FieldGovern',
   logo_url: '',
   primary_color: '#2563EB',
-  app_name: 'FieldPulse',
+  app_name: 'FieldGovern',
   plan_tier: 'free',
 }
 

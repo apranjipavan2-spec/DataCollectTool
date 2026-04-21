@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FieldPulse Launcher - Starts both frontend and backend servers
+FieldGovern Launcher - Starts both frontend and backend servers
 Usage: python launcher.py
 """
 import os
@@ -15,7 +15,7 @@ def main():
     frontend_dir = project_root / "frontend"
 
     print("=" * 70)
-    print("  FIELDPULSE - LAUNCHER")
+    print("  FIELDGOVERN - LAUNCHER")
     print("=" * 70)
     print()
 
@@ -73,7 +73,7 @@ def main():
     print()
 
     print("=" * 70)
-    print("  FieldPulse is running!")
+    print("  FieldGovern is running!")
     print("=" * 70)
     print()
     print("[WEB] FRONTEND: http://localhost:5173")

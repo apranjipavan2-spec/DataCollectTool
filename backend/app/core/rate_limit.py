@@ -1,5 +1,5 @@
 """
-In-memory rate limiting for FieldPulse API (no Redis required).
+In-memory rate limiting for FieldGovern API (no Redis required).
 
 Uses slowapi with the default in-memory backend.  Suitable for
 single-process / MVP deployments.  Swap to a Redis backend later

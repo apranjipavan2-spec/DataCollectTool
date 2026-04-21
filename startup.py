@@ -1,5 +1,5 @@
 """
-FieldPulse one-click local startup.
+FieldGovern one-click local startup.
 Double-click start.bat -> this script does the rest.
 """
 import os, sys, socket, subprocess, time, webbrowser, urllib.request, urllib.error, tempfile
@@ -83,7 +83,7 @@ def launch_window(title, command, cwd):
 
 print()
 print("  +--------------------------------------+")
-print("  |   FieldPulse  -  Starting up...      |")
+print("  |   FieldGovern  -  Starting up...      |")
 print("  +--------------------------------------+")
 print()
 
@@ -103,34 +103,34 @@ if not docker_ok:
 log("DB", "Starting PostgreSQL container...")
 
 running = subprocess.run(
-    ["docker", "ps", "--filter", "name=fieldpulse-pg",
+    ["docker", "ps", "--filter", "name=fieldgovern-pg",
      "--filter", "status=running", "--format", "{{.Names}}"],
     capture_output=True, text=True
 ).stdout.strip()
 
-if "fieldpulse-pg" not in running:
+if "fieldgovern-pg" not in running:
     exists = subprocess.run(
-        ["docker", "ps", "-a", "--filter", "name=fieldpulse-pg",
+        ["docker", "ps", "-a", "--filter", "name=fieldgovern-pg",
          "--format", "{{.Names}}"],
         capture_output=True, text=True
     ).stdout.strip()
 
-    if "fieldpulse-pg" in exists:
-        subprocess.call(["docker", "start", "fieldpulse-pg"],
+    if "fieldgovern-pg" in exists:
+        subprocess.call(["docker", "start", "fieldgovern-pg"],
                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
         subprocess.call([
-            "docker", "run", "-d", "--name", "fieldpulse-pg",
-            "-e", "POSTGRES_USER=fieldpulse",
+            "docker", "run", "-d", "--name", "fieldgovern-pg",
+            "-e", "POSTGRES_USER=fieldgovern",
             "-e", "POSTGRES_PASSWORD=password",
-            "-e", "POSTGRES_DB=fieldpulse",
+            "-e", "POSTGRES_DB=fieldgovern",
             "-p", "5432:5432", "postgres:16"
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 log("DB", "Waiting for PostgreSQL to be ready...")
 for attempt in range(20):
     rc = subprocess.call(
-        ["docker", "exec", "fieldpulse-pg", "pg_isready", "-U", "fieldpulse"],
+        ["docker", "exec", "fieldgovern-pg", "pg_isready", "-U", "fieldgovern"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
     if rc == 0:
@@ -192,7 +192,7 @@ with open(env_path, "w") as f:
 
 log("API", f"Starting backend on port {api_port}...")
 launch_window(
-    "FieldPulse API",
+    "FieldGovern API",
     f'"{VENV_UV}" app.main:app --host 0.0.0.0 --port {api_port} --reload',
     BACKEND
 )
@@ -208,7 +208,7 @@ else:
 # -- 6. Start frontend --------------------------------------------------------
 
 log("UI", "Starting frontend...")
-launch_window("FieldPulse UI", "npm run dev", FRONTEND)
+launch_window("FieldGovern UI", "npm run dev", FRONTEND)
 
 log("UI", "Waiting for UI to come online...")
 if wait_http(f"http://localhost:{ui_port}", timeout=60):
@@ -224,7 +224,7 @@ webbrowser.open(f"http://localhost:{ui_port}")
 
 print()
 print("  ============================================================")
-print("   FieldPulse is running!")
+print("   FieldGovern is running!")
 print("  ============================================================")
 print(f"   App      ->  http://localhost:{ui_port}")
 print(f"   API Docs ->  http://localhost:{api_port}/docs")

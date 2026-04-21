@@ -642,7 +642,7 @@ def download_template(
     # ── Instruction sheet ─────────────────────────────────────────────────────
     ws_info = wb.create_sheet("Instructions")
     instructions = [
-        ["FieldPulse Bulk Upload — Instructions"],
+        ["FieldGovern Bulk Upload — Instructions"],
         [""],
         ["COLUMN LEGEND"],
         ["* (asterisk) = required field — must not be blank"],
@@ -688,7 +688,7 @@ def download_template(
     buf.seek(0)
 
     safe_title = re.sub(r"[^\w\s-]", "", form.title).strip().replace(" ", "_")
-    filename = f"FieldPulse_Template_{safe_title}.xlsx"
+    filename = f"FieldGovern_Template_{safe_title}.xlsx"
 
     return StreamingResponse(
         buf,

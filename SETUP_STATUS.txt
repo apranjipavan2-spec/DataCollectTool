@@ -1,8 +1,8 @@
 ================================================================================
-                        FIELDPULSE - SETUP STATUS
+                        FIELDGOVERN - SETUP STATUS
 ================================================================================
 
-PROJECT: FieldPulse - Offline-First Field Data Collection SaaS for India
+PROJECT: FieldGovern - Offline-First Field Data Collection SaaS for India
 STATUS: MVP Complete & Production Ready
 DATE: March 25, 2026
 
@@ -85,7 +85,7 @@ DEPLOYMENT_GUIDE.html - OPEN IN BROWSER
   - API reference
   - Test credentials
 
-FIELDPULSE_GUIDE.html - OPEN IN BROWSER
+FIELDGOVERN_GUIDE.html - OPEN IN BROWSER
   Feature guide with:
   - All 20 completed features
   - Full roadmap (37 items)

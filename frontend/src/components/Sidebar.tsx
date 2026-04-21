@@ -33,7 +33,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
       >
         {/* Header */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-catalan-border">
-          <h1 className="text-xl font-bold text-catalan-primary hidden lg:block">FieldPulse</h1>
+          <h1 className="text-xl font-bold text-catalan-primary hidden lg:block">FieldGovern</h1>
           <span className="text-xl font-bold text-catalan-primary lg:hidden">FP</span>
         </div>
 
@@ -119,7 +119,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
         `}
       >
         <div className="h-16 flex items-center justify-between px-4 border-b border-catalan-border">
-          <h1 className="text-xl font-bold text-catalan-primary">FieldPulse</h1>
+          <h1 className="text-xl font-bold text-catalan-primary">FieldGovern</h1>
           <button
             onClick={() => setMobileOpen(false)}
             className="text-catalan-textMuted hover:text-catalan-text p-1"
