@@ -46,6 +46,7 @@ def upsert_user(tenant_id, phone, role, name, pw_hash=None):
     """Create or update a seed user — keeps role/password/name in sync."""
     u = db.query(User).filter(User.phone == phone).first()
     if u:
+        u.tenant_id = tenant_id
         u.role = role
         u.name = name
         u.is_active = True
