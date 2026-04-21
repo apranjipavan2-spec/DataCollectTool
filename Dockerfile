@@ -36,4 +36,7 @@ ENV PYTHONPATH=/app
 
 EXPOSE ${PORT:-8000}
 
-CMD ["sh", "-c", "cd /app && (alembic upgrade head || echo 'Alembic failed, using create_all fallback') && (python scripts/seed_dev.py || true) && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+COPY backend/start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+CMD ["/app/start.sh"]
