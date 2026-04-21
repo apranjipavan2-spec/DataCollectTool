@@ -101,7 +101,12 @@
       "Bash(./venv/Scripts/uvicorn.exe app.main:app --host 0.0.0.0 --port 8000)",
       "Bash(cat backend/Dockerfile)",
       "Bash(cat railway.toml)",
-      "Bash(cat Dockerfile)"
+      "Bash(cat Dockerfile)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git add *)",
+      "Bash(npm run *)",
+      "Bash(git commit *)"
     ]
   },
   "mcpServers": {
