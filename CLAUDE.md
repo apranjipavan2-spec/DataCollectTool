@@ -126,10 +126,12 @@ Base path: `/api/v1`
 
 ## Database Migrations
 
-Current: **0016** migrations (`backend/alembic/versions/0001_…0016_…`).
+Current: **0018** migrations (`backend/alembic/versions/0001_…0018_…`).
 
 Key additions:
-- **0016**: `submissions.serial_no` (auto-assigned per tenant on sync), `tenants.allow_enumerator_edit` (default true)
+- **0016**: `submissions.serial_no`, `tenants.allow_enumerator_edit`
+- **0017**: `programs`, `program_locations`, `program_participant_types`, `program_questionnaires`, `questionnaire_location_targets`
+- **0018**: `submissions.{program_id, participant_type_id, questionnaire_id, location_id}`, `schedules.{program_questionnaire_id, location_id}`
 
 To add a new migration:
 ```bash
@@ -139,27 +141,46 @@ python -m alembic upgrade head
 ```
 Follow `0001_`, `0002_` … naming pattern.
 
+### ⚠️ Railway Deployment — Known Issue & Fix
+
+The Railway PostgreSQL DB was originally set up using `Base.metadata.create_all` (not alembic), so `alembic_version` table was absent. Alembic would try to run from 0001, fail on existing tables, get silently swallowed, and new migrations never applied.
+
+**Fix in place (do not revert):**
+1. `backend/scripts/wait_and_stamp.py` — runs before alembic on every deploy; detects DB state by checking which columns/tables exist, creates `alembic_version` table and stamps to the correct revision if missing
+2. `backend/scripts/seed_dev.py` — applies `ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS` patches for all migrations 0013–0018 as a belt-and-suspenders fallback
+3. `backend/start.sh` — startup script; replaces old inline CMD; runs wait_and_stamp → alembic → seed → uvicorn
+4. `.gitattributes` — forces LF endings for `*.sh`/`*.py`/`Dockerfile` (CRLF broke heredocs in Docker Linux containers)
+5. `seed_dev.py` commits tenants → users in separate transactions so login always works even if sample-data creation fails
+
+**Never revert to single `db.commit()` at end of seed** — that pattern rolls back all new users when sample data fails.
+
 ---
 
 ## Demo / Test Credentials
 
 Seeded by `scripts/seed_dev.py` (idempotent, runs on every Railway deploy).
 
+### Platform (tenant: "FieldPulse Platform") — master_admin
+| Phone | Password | Name |
+|-------|----------|------|
+| +918317390926 | superadmin@4991 | Pavan Deshetty (primary super admin) |
+| +919999990000 | test@123 | Master Admin |
+
 ### Demo Org (tenant: "Demo Org", plan: professional)
 | Phone | Password | Role |
 |-------|----------|------|
-| +918317390926 | superadmin@4991 | master_admin (Pavan Deshetty — platform super admin) |
 | +919999990001 | test@123 | org_admin (Admin User) |
 | +918123105186 | test@123 | org_admin (PavanDeshetty) |
 | +919999990002 | test@123 | supervisor |
-| +919999990003 | test@123 | enumerator (Rajesh Kumar) |
+| +919999990003 | test@123 | enumerator (Enumerator User) |
 | +919999990004 | test@123 | enumerator (Priya Sharma) |
 
-### Platform (tenant: "FieldPulse Platform")
-| Phone | Password | Role | Name |
-|-------|----------|------|------|
-| +919999990000 | test@123 | master_admin | Master Admin |
-| +918317390926 | superadmin@4991 | master_admin | Pavan Deshetty |
+### Dataworx (tenant: "Dataworx", plan: starter)
+| Phone | Password | Role |
+|-------|----------|------|
+| +919999991001 | test@123 | org_admin (Dataworx Admin) |
+| +919999991002 | test@123 | supervisor (Manjunath) |
+| +919999991003–1005 | test@123 | enumerator |
 
 Login page has a **"Try a demo account"** quick-fill button for Admin / Supervisor / Enumerator.
 

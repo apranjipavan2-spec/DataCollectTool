@@ -52,3 +52,6 @@ graphify-out/
 
 # SigMap — cold context (large, auto-generated; regenerate with: npx sigmap)
 .github/context-cold.md
+
+# Railway data backups
+backend/backups/

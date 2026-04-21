@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
+import { getStorage } from '@/storage'
 import InfoButton from '@/help/InfoButton'
 import NewFormWizard from '@/builder/NewFormWizard'
 import api, { getStoredUser } from '@/lib/api'
@@ -27,6 +28,7 @@ interface Form {
 interface Submission {
   id: string
   form_id: string
+  form_title: string
   enumerator_id: string
   enumerator_name: string
   status: string
@@ -417,6 +419,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // Local sync queue (offline submissions not yet uploaded)
+  const [syncQueue, setSyncQueue] = useState({ outbox: 0, media: 0 })
+
   // Data
   const [forms, setForms] = useState<Form[]>([])
   const [submissions, setSubmissions] = useState<Submission[]>([])
@@ -572,6 +577,24 @@ export default function Dashboard() {
     window.addEventListener('fieldpulse:plan-limit', handler)
     return () => window.removeEventListener('fieldpulse:plan-limit', handler)
   }, [toast])
+
+  // Load local sync queue counts from offline storage
+  useEffect(() => {
+    getStorage().then(async store => {
+      const outbox = await store.getOutbox()
+      const media = await store.getMediaQueueCount()
+      setSyncQueue({ outbox: outbox.length, media })
+    }).catch(() => {})
+    // Refresh every 30s
+    const t = setInterval(() => {
+      getStorage().then(async store => {
+        const outbox = await store.getOutbox()
+        const media = await store.getMediaQueueCount()
+        setSyncQueue({ outbox: outbox.length, media })
+      }).catch(() => {})
+    }, 30_000)
+    return () => clearInterval(t)
+  }, [])
 
   useEffect(() => {
     const calls: Promise<unknown>[] = [
@@ -1120,7 +1143,7 @@ export default function Dashboard() {
           {loading && <DashboardSkeleton />}
 
           {/* Stat Cards */}
-          {!loading && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {!loading && <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <Card className="border-l-4 border-l-catalan-primary">
               <div className="text-sm font-medium text-catalan-textMuted mb-1">Total Submissions</div>
               <div className="text-xs text-catalan-textMuted/70 mb-3">All synced field data</div>
@@ -1140,6 +1163,16 @@ export default function Dashboard() {
               <div className="text-sm font-medium text-catalan-textMuted mb-1">Flagged</div>
               <div className="text-xs text-catalan-textMuted/70 mb-3">Requiring manual review</div>
               <div className="text-4xl font-bold text-catalan-warning">{stats.flagged}</div>
+            </Card>
+            <Card className={`border-l-4 ${syncQueue.outbox + syncQueue.media > 0 ? 'border-l-orange-400' : 'border-l-catalan-border'}`}>
+              <div className="text-sm font-medium text-catalan-textMuted mb-1">Pending Upload</div>
+              <div className="text-xs text-catalan-textMuted/70 mb-3">
+                {syncQueue.outbox > 0 ? `${syncQueue.outbox} form${syncQueue.outbox !== 1 ? 's' : ''}` : 'All synced'}
+                {syncQueue.media > 0 ? ` · ${syncQueue.media} photo${syncQueue.media !== 1 ? 's' : ''}` : ''}
+              </div>
+              <div className={`text-4xl font-bold ${syncQueue.outbox + syncQueue.media > 0 ? 'text-orange-500' : 'text-catalan-textMuted'}`}>
+                {syncQueue.outbox + syncQueue.media}
+              </div>
             </Card>
           </div>}
 
@@ -1564,7 +1597,7 @@ export default function Dashboard() {
                             </td>}
                             <td className="px-3 py-2 font-mono text-xs text-catalan-textMuted cursor-pointer" onClick={() => openDetail(sub.id)}>{sub.serial_no ?? '—'}</td>
                             <td className="px-3 py-2 font-mono text-xs text-catalan-textMuted cursor-pointer" onClick={() => openDetail(sub.id)}>{sub.id.slice(0, 8)}…</td>
-                            <td className="px-3 py-2 text-catalan-text cursor-pointer" onClick={() => openDetail(sub.id)}>{forms.find(f => f.id === sub.form_id)?.title ?? sub.form_id.slice(0, 8)}</td>
+                            <td className="px-3 py-2 text-catalan-text cursor-pointer" onClick={() => openDetail(sub.id)}>{sub.form_title || forms.find(f => f.id === sub.form_id)?.title || '—'}</td>
                             <td className="px-3 py-2 text-catalan-text cursor-pointer" onClick={() => openDetail(sub.id)}>{sub.enumerator_name}</td>
                             <td className="px-3 py-2 cursor-pointer" onClick={() => openDetail(sub.id)}><StatusBadge status={sub.status} /></td>
                             <td className="px-3 py-2 text-catalan-textMuted text-xs cursor-pointer" onClick={() => openDetail(sub.id)}>{new Date(sub.server_received_at).toLocaleString()}</td>
@@ -1608,7 +1641,7 @@ export default function Dashboard() {
                           <button className="flex-1 min-w-0 text-left" onClick={() => openDetail(sub.id)}>
                             <div className="flex items-center justify-between gap-2 mb-0.5">
                               <span className="font-medium text-catalan-text text-sm truncate">
-                                {forms.find(f => f.id === sub.form_id)?.title ?? 'Unknown form'}
+                                {sub.form_title || forms.find(f => f.id === sub.form_id)?.title || 'Unknown form'}
                               </span>
                               <StatusBadge status={sub.status} />
                             </div>
@@ -1841,7 +1874,7 @@ export default function Dashboard() {
             {/* Sub-tab bar */}
             <div className="flex gap-2 items-center">
               <div className="flex gap-1 bg-catalan-surface rounded-lg p-1">
-                {(isEnumerator ? ['my-forms'] : ['my-forms', 'templates'] as const).map(t => (
+                {(['my-forms', ...(isEnumerator ? [] : ['templates'])] as Array<'my-forms' | 'templates'>).map(t => (
                   <button
                     key={t}
                     onClick={() => { setFormsSubTab(t); if (t === 'templates') handleLoadTemplates() }}
