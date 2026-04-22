@@ -1,6 +1,9 @@
 #!/bin/bash
-# FieldGovern VPS Bootstrap — Ubuntu 24.04 LTS
-# Run once as root on a fresh DigitalOcean droplet:
+# FieldGovern VPS Bootstrap — Ubuntu 22.04 / 24.04 LTS
+# Works on: DigitalOcean, Hetzner, Oracle Cloud, Vultr, AWS EC2, any Ubuntu VPS
+# Supports both AMD64 and ARM64 (Oracle Cloud Ampere A1 free tier)
+#
+# Run once as root on a fresh server:
 #   curl -sL https://raw.githubusercontent.com/apranjipavan2-spec/DataCollectTool/main/deploy/server-setup.sh | bash
 set -euo pipefail
 
