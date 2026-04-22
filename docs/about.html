@@ -92,6 +92,17 @@
     .btn-primary::after { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); transition: 0.5s; }
     .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(99,102,241,0.4); }
     .btn-primary:hover::after { left: 100%; }
+    .logo-nav-img{filter:brightness(0) saturate(0);opacity:0.85;transition:filter 0.3s,opacity 0.3s}
+    .hamburger{display:none;flex-direction:column;justify-content:center;gap:5px;cursor:pointer;width:40px;height:40px;border-radius:9px;border:1.5px solid var(--slate-100);background:white;padding:8px;flex-shrink:0}
+    .hamburger span{display:block;width:100%;height:2px;background:var(--dark);border-radius:2px;transition:all 0.3s}
+    .hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+    .hamburger.open span:nth-child(2){opacity:0}
+    .hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+    #mobileMenu{display:none;position:fixed;top:68px;left:0;right:0;background:white;border-bottom:2px solid var(--slate-100);box-shadow:0 12px 40px rgba(0,0,0,0.12);z-index:98;padding:8px 0}
+    #mobileMenu.open{display:block}
+    #mobileMenu a{display:flex;align-items:center;padding:14px 24px;color:var(--slate-600);font-weight:500;font-size:0.95rem;text-decoration:none;border-bottom:1px solid var(--slate-100);transition:background 0.15s,color 0.15s}
+    #mobileMenu a:last-child{border-bottom:none}
+    #mobileMenu a:hover,#mobileMenu a:active{background:var(--bg);color:var(--primary)}
 
     /* --- HERO SECTION --- */
     .hero {
@@ -219,6 +230,8 @@
     @media (max-width: 768px) {
       nav { padding: 16px 24px; }
       .nav-links { display: none; }
+      .hamburger { display: flex; }
+      .nav-cta-secondary { display: none; }
       .grid-2, .grid-3 { grid-template-columns: 1fr; }
       .hero { padding: 140px 20px 80px; }
     }
@@ -233,20 +246,36 @@
 
 <nav id="navbar">
   <a href="index.html" class="logo">
-    <div class="logo-mark">F</div>
+    <img src="logo.png" alt="FieldGovern" class="logo-nav-img" style="width:36px;height:36px;border-radius:10px;object-fit:contain"/>
     FieldGovern
   </a>
   <ul class="nav-links">
     <li><a href="index.html#features">Features</a></li>
-    <li><a href="index.html#pricing">Pricing</a></li>
+    <li><a href="index.html#how-it-works">How It Works</a></li>
     <li><a href="index.html#compare">Compare</a></li>
-    <li><a href="about.html" style="color: var(--primary);">About Us</a></li>
+    <li><a href="index.html#pricing">Pricing</a></li>
+    <li><a href="about.html" style="color: var(--primary);">About</a></li>
+    <li><a href="about.html#contact">Contact</a></li>
   </ul>
-  <div style="display: flex; gap: 16px; align-items: center;">
-    <a href="demo.html" class="btn btn-outline">Demo</a>
+  <div style="display: flex; gap: 8px; align-items: center;">
+    <a href="demo.html" class="btn btn-outline nav-cta-secondary">Try Demo</a>
     <a href="https://app.fieldgovern.com" class="btn btn-primary">Open App →</a>
+    <button class="hamburger" id="hamburgerBtn" aria-label="Open menu" onclick="toggleMenu()">
+      <span></span><span></span><span></span>
+    </button>
   </div>
 </nav>
+
+<!-- Mobile navigation menu -->
+<div id="mobileMenu" role="navigation">
+  <a href="index.html#features">✦ Features</a>
+  <a href="index.html#how-it-works">⚙️ How It Works</a>
+  <a href="index.html#compare">📊 Compare</a>
+  <a href="index.html#pricing">💰 Pricing</a>
+  <a href="about.html">🏛️ About Us</a>
+  <a href="about.html#contact">✉️ Contact</a>
+  <a href="demo.html" style="color:var(--primary);font-weight:700">🚀 Try Free Demo</a>
+</div>
 
 <header class="hero">
   <div class="badge fade-up">🏛️ Our Story</div>
@@ -406,6 +435,26 @@
       nav.classList.remove('scrolled');
     }
   });
+
+  // Mobile hamburger menu
+  function toggleMenu() {
+    const btn = document.getElementById('hamburgerBtn');
+    const menu = document.getElementById('mobileMenu');
+    const isOpen = menu.classList.toggle('open');
+    btn.classList.toggle('open', isOpen);
+    btn.setAttribute('aria-expanded', isOpen);
+  }
+  document.querySelectorAll('#mobileMenu a').forEach(a => {
+    a.addEventListener('click', () => {
+      document.getElementById('mobileMenu').classList.remove('open');
+      document.getElementById('hamburgerBtn').classList.remove('open');
+    });
+  });
+  window.addEventListener('scroll', () => {
+    document.getElementById('mobileMenu').classList.remove('open');
+    const btn = document.getElementById('hamburgerBtn');
+    if (btn) btn.classList.remove('open');
+  }, { passive: true });
 
   // Intersection Observer for scroll reveal animations
   document.addEventListener("DOMContentLoaded", function() {

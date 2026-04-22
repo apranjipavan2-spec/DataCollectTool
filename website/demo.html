@@ -17,11 +17,29 @@
     @keyframes slideCheck{from{stroke-dashoffset:24}to{stroke-dashoffset:0}}
 
     /* NAV */
-    nav{background:#fff;border-bottom:1px solid var(--border);height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:100;box-shadow:0 1px 8px rgba(0,0,0,0.04)}
-    .logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:1.1rem;color:var(--text);text-decoration:none}
-    .logo-mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--brand),var(--accent));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:0.78rem}
+    nav{background:#fff;border-bottom:1px solid var(--border);height:68px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:100;box-shadow:0 1px 8px rgba(0,0,0,0.04)}
+    .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.2rem;color:var(--text);text-decoration:none}
+    .logo-nav-img{filter:brightness(0) saturate(0);opacity:0.85;transition:filter 0.3s,opacity 0.3s}
+    .nav-links{display:flex;align-items:center;gap:28px;list-style:none}
+    .nav-links a{text-decoration:none;color:var(--text2);font-weight:500;font-size:0.9rem;transition:color 0.2s;position:relative}
+    .nav-links a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;background:var(--brand);border-radius:2px;transition:width 0.3s}
+    .nav-links a:hover{color:var(--brand)}
+    .nav-links a:hover::after{width:100%}
+    .btn-primary{background:linear-gradient(135deg,var(--brand),var(--accent));color:white;border:none;border-radius:10px;padding:10px 22px;font-weight:600;font-size:0.9rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all 0.3s;box-shadow:0 4px 16px rgba(14,165,233,0.3)}
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(14,165,233,0.4)}
     .nav-back{font-size:0.84rem;color:var(--text3);text-decoration:none;border:1px solid var(--border);border-radius:8px;padding:6px 14px;transition:.2s;display:flex;align-items:center;gap:5px}
     .nav-back:hover{border-color:var(--brand);color:var(--brand)}
+    .hamburger{display:none;flex-direction:column;justify-content:center;gap:5px;cursor:pointer;width:40px;height:40px;border-radius:9px;border:1.5px solid var(--border);background:white;padding:8px;flex-shrink:0}
+    .hamburger span{display:block;width:100%;height:2px;background:var(--text);border-radius:2px;transition:all 0.3s}
+    .hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+    .hamburger.open span:nth-child(2){opacity:0}
+    .hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+    #mobileMenu{display:none;position:fixed;top:68px;left:0;right:0;background:white;border-bottom:2px solid var(--border);box-shadow:0 12px 40px rgba(0,0,0,0.12);z-index:98;padding:8px 0}
+    #mobileMenu.open{display:block}
+    #mobileMenu a{display:flex;align-items:center;padding:14px 24px;color:var(--text2);font-weight:500;font-size:0.95rem;text-decoration:none;border-bottom:1px solid var(--border);transition:background 0.15s,color 0.15s}
+    #mobileMenu a:last-child{border-bottom:none}
+    #mobileMenu a:hover,#mobileMenu a:active{background:#f8fafc;color:var(--brand)}
+    @media(max-width:640px){.nav-links{display:none}.hamburger{display:flex}.nav-back{display:none}}
 
     /* PAGE */
     .wrap{max-width:900px;margin:0 auto;padding:36px 20px 80px}
@@ -138,13 +156,38 @@
 </head>
 <body>
 
-<nav>
+<nav id="navbar">
   <a href="index.html" class="logo">
-    <img src="logo.png" alt="FieldGovern" style="width:32px;height:32px;border-radius:8px;object-fit:contain;filter:brightness(0) saturate(0);opacity:0.85"/>
+    <img src="logo.png" alt="FieldGovern" class="logo-nav-img" style="width:36px;height:36px;border-radius:10px;object-fit:contain"/>
     FieldGovern
   </a>
-  <a href="index.html" class="nav-back">← Back to Home</a>
+  <ul class="nav-links">
+    <li><a href="index.html#features">Features</a></li>
+    <li><a href="index.html#how-it-works">How It Works</a></li>
+    <li><a href="index.html#compare">Compare</a></li>
+    <li><a href="index.html#pricing">Pricing</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="about.html#contact">Contact</a></li>
+  </ul>
+  <div style="display:flex;gap:8px;align-items:center">
+    <a href="index.html" class="nav-back">← Home</a>
+    <a href="https://app.fieldgovern.com" class="btn-primary">Open App →</a>
+    <button class="hamburger" id="hamburgerBtn" aria-label="Open menu" onclick="toggleMenu()">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
 </nav>
+
+<!-- Mobile navigation menu -->
+<div id="mobileMenu" role="navigation">
+  <a href="index.html#features">✦ Features</a>
+  <a href="index.html#how-it-works">⚙️ How It Works</a>
+  <a href="index.html#compare">📊 Compare</a>
+  <a href="index.html#pricing">💰 Pricing</a>
+  <a href="about.html">🏛️ About Us</a>
+  <a href="about.html#contact">✉️ Contact</a>
+  <a href="https://app.fieldgovern.com" style="color:var(--brand);font-weight:700">🚀 Open App</a>
+</div>
 
 <div class="wrap">
 
@@ -417,6 +460,26 @@
     clearTimeout(t._t);
     t._t = setTimeout(() => t.classList.remove('show'), 2200);
   }
+
+  // Mobile hamburger menu
+  function toggleMenu() {
+    const btn = document.getElementById('hamburgerBtn');
+    const menu = document.getElementById('mobileMenu');
+    const isOpen = menu.classList.toggle('open');
+    btn.classList.toggle('open', isOpen);
+    btn.setAttribute('aria-expanded', isOpen);
+  }
+  document.querySelectorAll('#mobileMenu a').forEach(a => {
+    a.addEventListener('click', () => {
+      document.getElementById('mobileMenu').classList.remove('open');
+      document.getElementById('hamburgerBtn').classList.remove('open');
+    });
+  });
+  window.addEventListener('scroll', () => {
+    document.getElementById('mobileMenu').classList.remove('open');
+    const btn = document.getElementById('hamburgerBtn');
+    if (btn) btn.classList.remove('open');
+  }, { passive: true });
 </script>
 </body>
 </html>
