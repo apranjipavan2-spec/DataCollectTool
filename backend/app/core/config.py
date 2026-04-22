@@ -59,15 +59,30 @@ class Settings(BaseSettings):
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):
+        if isinstance(v, list):
+            return v
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("["):
-                return json.loads(v)
-            return [o.strip() for o in v.split(",") if o.strip()]
+                try:
+                    return json.loads(v)
+                except (json.JSONDecodeError, ValueError):
+                    pass  # fall through to comma-split
+            return [o.strip().strip("'\"") for o in v.split(",") if o.strip()]
         return v
 
     class Config:
         env_file = ".env"
 
 
-settings = Settings()
+try:
+    settings = Settings()
+except Exception as _e:
+    import logging as _logging
+    _logging.getLogger(__name__).error("Settings validation failed: %s — using defaults", _e)
+    settings = Settings.model_construct(
+        DATABASE_URL=_resolve_database_url(),
+        REDIS_URL=os.environ.get("REDIS_URL", "redis://localhost:6379"),
+        JWT_SECRET=os.environ.get("JWT_SECRET", "change-me-in-production"),
+        CORS_ORIGINS=["http://localhost:5173", "http://localhost:4173", "https://app.fieldgovern.com"],
+    )
