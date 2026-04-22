@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = True
     APP_URL: str = "http://localhost:5173"
 
+    # Sentry error monitoring
+    SENTRY_DSN: str = ""
+
+    # MSG91 — WhatsApp notifications (optional; stored per-tenant too but global fallback)
+    MSG91_AUTH_KEY: str = ""
+
     # Stored as plain str so pydantic-settings never tries JSON-list parsing on it.
     # Parsed into a list by the cors_origins property below.
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:4173,https://app.fieldgovern.com"

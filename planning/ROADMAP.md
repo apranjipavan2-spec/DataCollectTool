@@ -7,8 +7,8 @@
 |---|---------|--------|--------|--------|--------|
 | 1 | Repeat groups (nested field sets) | Research | High | Critical — blocks most serious surveys | planned |
 | 2 | XLSForm / ODK / Kobo / SurveyCTO import | Migration | Med | Acquisition — converts competitor users | **in-progress** |
-| 3 | Google Sheets live sync | Integrations | Low | High demand from NGOs | planned |
-| 4 | WhatsApp notifications (MSG91) | Comms | Low | High daily-use value | planned |
+| 3 | Google Sheets live sync | Integrations | Low | High demand from NGOs | **done** |
+| 4 | WhatsApp notifications (MSG91) | Comms | Low | High daily-use value | **done** |
 | 5 | Public survey URL (no login) | Collection | Med | Opens new user segment | planned |
 | 6 | AI report writer (Claude API) | Analytics | Med | Pricing tier differentiator | planned |
 | 7 | Back-check / QC audit forms | QC | Med | Unique vs competitors | planned |

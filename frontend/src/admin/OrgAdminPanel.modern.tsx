@@ -13,6 +13,7 @@ import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { Card } from '@/components/ui'
 import ApiKeyManager from './ApiKeyManager'
+import IntegrationsPanel from './IntegrationsPanel'
 
 export default function OrgAdminPanel() {
   const [activeTab, setActiveTab] = useState('users')
@@ -25,6 +26,7 @@ export default function OrgAdminPanel() {
     { id: 'api-keys', label: '🔑 API Keys', description: 'Integration access' },
     { id: 'forms', label: '📋 Forms', description: 'Form templates' },
     { id: 'migration', label: '🔄 Import', description: 'Kobo · SurveyCTO · XLSForm' },
+    { id: 'integrations', label: '🔗 Integrations', description: 'WhatsApp · Google Sheets' },
   ]
 
   return (
@@ -67,6 +69,12 @@ export default function OrgAdminPanel() {
             {activeTab === 'api-keys' && <ApiKeyManager />}
             {activeTab === 'forms' && <FormsTab />}
             {activeTab === 'migration' && <MigrationTab />}
+            {activeTab === 'integrations' && (
+              <div className="p-6">
+                <h3 className="text-lg font-semibold text-catalan-text mb-6">Integrations</h3>
+                <IntegrationsPanel />
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, DateTime, Boolean, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 import uuid
 from app.core.database import Base
 
@@ -16,4 +16,7 @@ class Tenant(Base):
     subscription_status = Column(String, default="active")
     free_submissions_used = Column(String, default=0)
     allow_enumerator_edit = Column(Boolean, default=True, nullable=False, server_default='true')
+    # notification_config: {whatsapp_enabled, msg91_auth_key, msg91_template_id,
+    #                        notify_events, notify_numbers, sheets_webhook_url}
+    notification_config = Column(JSONB, default=dict, server_default="'{}'::jsonb")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -12,7 +12,10 @@ from app.models.submission import Submission
 from app.models.media_file import MediaFile
 from app.models.form import Form
 from app.models.sync_log import SyncLog
+from app.models.tenant import Tenant
 from app.services.webhook import fire_webhooks
+from app.services.whatsapp import notify as wa_notify
+from app.services.sheets_sync import sync_submission
 import logging
 
 logger = logging.getLogger(__name__)
@@ -101,20 +104,45 @@ def push(request: Request, body: PushRequest, user=Depends(require_enumerator), 
     db.add(log)
     db.commit()
 
-    # Fire webhooks for each synced submission (never blocks response)
+    # Fire webhooks + WhatsApp + Sheets for each synced submission (never blocks response)
+    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+    synced_items = []
     for item in body.submissions:
         matching = [r for r in results if r["local_id"] == item.local_id and r["status"] == "synced"]
-        if matching:
-            try:
-                fire_webhooks(db, user["tenant_id"], "submission.created", {
-                    "submission_id": matching[0]["server_id"],
-                    "form_id": item.form_id,
-                    "enumerator_id": str(user["sub"]),
-                    "data_json": item.data_json,
-                    "status": "synced",
-                })
-            except Exception:
-                logger.warning("Webhook fire failed for synced submission %s", matching[0]["server_id"])
+        if not matching:
+            continue
+        synced_items.append((item, matching[0]))
+        try:
+            fire_webhooks(db, user["tenant_id"], "submission.created", {
+                "submission_id": matching[0]["server_id"],
+                "form_id": item.form_id,
+                "enumerator_id": str(user["sub"]),
+                "data_json": item.data_json,
+                "status": "synced",
+            })
+        except Exception:
+            logger.warning("Webhook fire failed for synced submission %s", matching[0]["server_id"])
+
+    # WhatsApp — batch notify (one message for all submissions in this push)
+    if synced_items and tenant:
+        first_form_id = synced_items[0][0].form_id
+        form_obj = db.query(Form).filter(Form.id == first_form_id).first()
+        wa_notify(tenant, "submission.created", {
+            "count": len(synced_items),
+            "form_title": form_obj.title if form_obj else first_form_id,
+            "enumerator": user.get("name", str(user["sub"])),
+        })
+
+    # Sheets sync — per-submission, per-form
+    for item, matched in synced_items:
+        form_obj = db.query(Form).filter(Form.id == item.form_id).first()
+        if form_obj:
+            sync_submission(form_obj, item.data_json, {
+                "_sheet": form_obj.title,
+                "_submission_id": matched["server_id"],
+                "_serial_no": matched.get("serial_no", ""),
+                "_synced_at": datetime.now(timezone.utc).isoformat(),
+            })
 
     return {"received": len(results), "results": results, "server_time": datetime.now(timezone.utc).isoformat()}
 

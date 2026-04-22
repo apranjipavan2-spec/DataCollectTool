@@ -1,6 +1,9 @@
 from pathlib import Path
 import logging
 from contextlib import asynccontextmanager
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -13,6 +16,15 @@ from app.core.config import settings
 from app.core.rate_limit import limiter
 from app.core.scheduler import start_scheduler, stop_scheduler
 import app.models  # noqa: F401 — ensures all FK relationships are registered
+
+# ── Sentry ────────────────────────────────────────────────────────────────────
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        integrations=[FastApiIntegration(), SqlalchemyIntegration()],
+        traces_sample_rate=0.2,
+        send_default_pii=False,
+    )
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(

@@ -266,3 +266,91 @@ def get_tenant_stats(tenant_id: str, user=Depends(get_current_user), db: Session
             for d in daily
         ],
     }
+
+
+# ── Integrations settings (notification_config + sheets per form) ─────────────
+
+class NotificationConfigUpdate(BaseModel):
+    whatsapp_enabled: bool = False
+    msg91_auth_key: str = ""
+    msg91_template_id: str = ""
+    notify_events: list[str] = ["submission.created", "submission.flagged", "import.complete"]
+    notify_numbers: list[str] = []
+
+
+@router.get("/integrations")
+def get_integrations(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Get current tenant's notification_config (org_admin only)."""
+    if user["role"] not in ("master_admin", "org_admin"):
+        raise HTTPException(403, "org_admin required")
+    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+    if not tenant:
+        raise HTTPException(404, "Tenant not found")
+    cfg = tenant.notification_config or {}
+    # Never expose auth key in full — mask it
+    masked = dict(cfg)
+    if masked.get("msg91_auth_key"):
+        masked["msg91_auth_key"] = "••••" + masked["msg91_auth_key"][-4:]
+    return masked
+
+
+@router.patch("/integrations/notifications")
+def update_notification_config(
+    body: NotificationConfigUpdate,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update WhatsApp notification config for the current tenant."""
+    if user["role"] not in ("master_admin", "org_admin"):
+        raise HTTPException(403, "org_admin required")
+    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+    if not tenant:
+        raise HTTPException(404, "Tenant not found")
+
+    existing = dict(tenant.notification_config or {})
+    new_key = body.msg91_auth_key
+    # If the submitted key starts with '••••', keep the existing one
+    if new_key.startswith("••••"):
+        new_key = existing.get("msg91_auth_key", "")
+
+    existing.update({
+        "whatsapp_enabled": body.whatsapp_enabled,
+        "msg91_auth_key": new_key,
+        "msg91_template_id": body.msg91_template_id,
+        "notify_events": body.notify_events,
+        "notify_numbers": body.notify_numbers,
+    })
+    tenant.notification_config = existing
+    db.commit()
+    return {"ok": True}
+
+
+class FormSheetsSyncUpdate(BaseModel):
+    form_id: str
+    enabled: bool = False
+    apps_script_url: str = ""
+    include_metadata: bool = True
+
+
+@router.patch("/integrations/sheets")
+def update_form_sheets_sync(
+    body: FormSheetsSyncUpdate,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update Google Sheets sync config for a specific form."""
+    if user["role"] not in ("master_admin", "org_admin"):
+        raise HTTPException(403, "org_admin required")
+    form = db.query(Form).filter(
+        Form.id == body.form_id,
+        Form.tenant_id == user["tenant_id"],
+    ).first()
+    if not form:
+        raise HTTPException(404, "Form not found")
+    form.sheets_sync_config = {
+        "enabled": body.enabled,
+        "apps_script_url": body.apps_script_url,
+        "include_metadata": body.include_metadata,
+    }
+    db.commit()
+    return {"ok": True}

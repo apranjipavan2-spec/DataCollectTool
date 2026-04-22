@@ -14,6 +14,8 @@ class Form(Base):
     version = Column(Integer, default=1, nullable=False)
     status = Column(String, default="draft")  # draft | active | archived
     is_template = Column(Boolean, default=False)
+    # sheets_sync_config: {enabled, apps_script_url, include_metadata}
+    sheets_sync_config = Column(JSONB, default=dict, server_default="'{}'::jsonb")
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

@@ -251,6 +251,10 @@ npm run dev            # → http://localhost:5173
 | Demo quick-fill on login | `auth/LoginPage.tsx` |
 | Unified website nav | `website/` — all pages (index, about, demo) share identical nav: logo.png image, Features / How It Works / Compare / Pricing / About / Contact links, Try Demo + Open App buttons, hamburger + mobile overlay |
 | Platform migration (XLSForm import) | `backend/app/api/routes/migration/` + `frontend/src/migration/` — imports XLSForm, Kobo, SurveyCTO, ODK Central forms + submissions |
+| WhatsApp notifications (MSG91) | `backend/app/services/whatsapp.py` — fires on submission.created/flagged/approved/rejected + import.complete; config in tenant.notification_config |
+| Google Sheets live sync | `backend/app/services/sheets_sync.py` — Apps Script webhook per form; config in forms.sheets_sync_config; fires on sync and migration import |
+| Sentry error monitoring | Frontend: `@sentry/react` init in `main.tsx` (VITE_SENTRY_DSN). Backend: `sentry-sdk[fastapi]` init in `main.py` (SENTRY_DSN). Both conditional on env var. |
+| Integrations settings UI | OrgAdminPanel → Integrations tab → `IntegrationsPanel.tsx` — WhatsApp config + per-form Sheets sync toggle |
 
 ---
 

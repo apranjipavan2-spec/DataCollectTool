@@ -10,8 +10,10 @@ from app.models.submission import Submission
 from app.models.submission_history import SubmissionHistory
 from app.models.form import Form
 from app.models.user import User
+from app.models.tenant import Tenant
 from app.services.email import send_flagged_submission_email
 from app.services.webhook import fire_webhooks
+from app.services.whatsapp import notify as wa_notify
 import logging
 
 logger = logging.getLogger(__name__)
@@ -527,6 +529,18 @@ def update_submission(submission_id: str, body: SubmissionUpdate, user=Depends(r
                 })
             except Exception:
                 logger.warning("Webhook fire failed for submission %s status change", sub.id)
+            # WhatsApp notification on status change
+            try:
+                tenant = db.query(Tenant).filter(Tenant.id == sub.tenant_id).first()
+                form_obj = db.query(Form).filter(Form.id == sub.form_id).first()
+                if tenant:
+                    wa_notify(tenant, f"submission.{sub.status}", {
+                        "serial": sub.serial_no or str(sub.id)[:8],
+                        "form_title": form_obj.title if form_obj else str(sub.form_id),
+                        "note": sub.flag_note or "",
+                    })
+            except Exception:
+                logger.warning("WhatsApp notify failed for submission %s", sub.id)
 
         return {"id": str(sub.id), "status": sub.status, "flag_note": sub.flag_note}
     except HTTPException:

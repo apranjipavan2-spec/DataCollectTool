@@ -16,6 +16,9 @@ from app.core.database import get_db
 from app.core.deps import require_org_admin
 from app.models.form import Form
 from app.models.submission import Submission
+from app.models.tenant import Tenant
+from app.services.whatsapp import notify as wa_notify
+from app.services.sheets_sync import bulk_sync_submissions
 
 from .xlsform_parser import parse_xlsform
 from .platform_clients import (
@@ -42,6 +45,25 @@ def _extract_field_names(sections: list[dict]) -> set[str]:
     return names
 
 
+def _post_import_hooks(db: Session, tenant_id: str, form: Form, platform: str, submissions_imported: int, saved_rows: list[dict]) -> None:
+    """Fire WhatsApp notification + Sheets sync after any platform import. Never raises."""
+    try:
+        tenant = db.query(Tenant).filter(Tenant.id == uuid.UUID(tenant_id)).first()
+        if tenant:
+            wa_notify(tenant, "import.complete", {
+                "platform": platform,
+                "form_count": 1,
+                "submission_count": submissions_imported,
+            })
+    except Exception:
+        pass
+    try:
+        if saved_rows:
+            bulk_sync_submissions(form, saved_rows)
+    except Exception:
+        pass
+
+
 def _save_form(db: Session, tenant_id: str, title: str, json_schema: dict) -> Form:
     form = Form(
         id=uuid.uuid4(),
@@ -63,8 +85,10 @@ def _save_submissions(
     user,
     raw_submissions: list[dict],
     field_names: set[str],
-) -> int:
+) -> tuple[int, list[dict]]:
+    """Returns (count_saved, list_of_data_jsons) for downstream Sheets sync."""
     saved = 0
+    data_rows: list[dict] = []
     for raw in raw_submissions:
         data = map_submission_data(raw, field_names)
         sub = Submission(
@@ -78,10 +102,11 @@ def _save_submissions(
             local_id=str(uuid.uuid4()),
         )
         db.add(sub)
+        data_rows.append(data)
         saved += 1
     if saved:
         db.commit()
-    return saved
+    return saved, data_rows
 
 
 # ── XLSForm ────────────────────────────────────────────────────────────────────
@@ -177,6 +202,7 @@ async def kobo_import(
     }
 
     # 4. Optionally import submissions
+    all_saved_rows: list[dict] = []
     if body.import_submissions:
         field_names = _extract_field_names(parsed["json_schema"].get("sections", []))
         page = 1
@@ -190,12 +216,15 @@ async def kobo_import(
             rows = data.get("results", [])
             if not rows:
                 break
-            total_imported += _save_submissions(db, form, user, rows, field_names)
+            count, saved_rows = _save_submissions(db, form, user, rows, field_names)
+            total_imported += count
+            all_saved_rows.extend(saved_rows)
             if not data.get("next"):
                 break
             page += 1
         result["submissions_imported"] = total_imported
 
+    _post_import_hooks(db, str(user.tenant_id), form, "KoboToolbox", result["submissions_imported"], all_saved_rows)
     return result
 
 
@@ -251,14 +280,17 @@ async def surveycto_import(
         "submissions_imported": 0,
     }
 
+    saved_rows: list[dict] = []
     if body.import_submissions:
         field_names = _extract_field_names(parsed["json_schema"].get("sections", []))
         try:
             rows = await client.get_submissions(body.form_id)
-            result["submissions_imported"] = _save_submissions(db, form, user, rows, field_names)
+            count, saved_rows = _save_submissions(db, form, user, rows, field_names)
+            result["submissions_imported"] = count
         except Exception as e:
             result["warnings"].append(f"Submission import error: {e}")
 
+    _post_import_hooks(db, str(user.tenant_id), form, "SurveyCTO", result["submissions_imported"], saved_rows)
     return result
 
 
@@ -316,12 +348,15 @@ async def odk_import(
         "submissions_imported": 0,
     }
 
+    saved_rows: list[dict] = []
     if body.import_submissions:
         field_names = _extract_field_names(parsed["json_schema"].get("sections", []))
         try:
             rows = await client.get_submissions(body.project_id, body.form_id)
-            result["submissions_imported"] = _save_submissions(db, form, user, rows, field_names)
+            count, saved_rows = _save_submissions(db, form, user, rows, field_names)
+            result["submissions_imported"] = count
         except Exception as e:
             result["warnings"].append(f"Submission import error: {e}")
 
+    _post_import_hooks(db, str(user.tenant_id), form, "ODK Central", result["submissions_imported"], saved_rows)
     return result
