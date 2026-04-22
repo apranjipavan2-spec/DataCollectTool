@@ -9,8 +9,8 @@ This file is the authoritative guide for Claude Code when working in this reposi
 **FieldGovern** is a B2B SaaS platform for offline-first field data collection, targeting research teams in India. Competes directly with SurveyCTO at ₹18,000/month vs SurveyCTO's $225–630/month.
 
 **Repo**: https://github.com/apranjipavan2-spec/DataCollectTool  
-**Deployment**: Railway.app (Docker, single container, auto-deploy on push to `main`)  
-**GitHub Pages**: `apranjipavan2-spec.github.io/DataCollectTool/` — served from `docs/` on `main`  
+**Deployment**: Private VPS — GitHub Actions (`.github/workflows/deploy-app.yml`) builds Docker image → pushes to `ghcr.io` → SSHes into VPS at `/opt/fieldgovern` → `docker compose pull && up`  
+**GitHub Pages**: `apranjipavan2-spec.github.io/DataCollectTool/` — served from `docs/` on `main`. Always edit `website/` and copy to `docs/` before pushing — never edit `docs/` directly.  
 **Status**: MVP complete, production-deployed
 
 ---
@@ -19,8 +19,9 @@ This file is the authoritative guide for Claude Code when working in this reposi
 
 ### Single-Container Deployment
 - Dockerfile builds frontend (Node 20) then serves static files from FastAPI backend (Python 3.13)
-- One Railway service handles everything; PostgreSQL and Redis are Railway plugins
+- Hosted on private VPS via Docker Compose; PostgreSQL and Redis run as separate containers
 - Startup: `alembic upgrade head` → `seed_dev.py` → `uvicorn`
+- VPS secrets required in GitHub repo → Settings → Environments → production: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `GHCR_PAT`
 
 ### Stack
 | Layer | Tech |
@@ -75,8 +76,10 @@ DataCollectTool/
 │   │   └── lib/                 # api.ts, formUtils, navigation, branding, push
 │   ├── vite.config.ts
 │   └── package.json
-├── docs/                        # GitHub Pages (synced from website/)
-├── website/                     # Marketing landing page
+├── docs/                        # GitHub Pages (synced from website/ — never edit directly)
+├── website/                     # Marketing pages: index.html, about.html, demo.html, privacy.html, terms.html
+│   │                            # All three main pages share identical nav (logo.png image, 6 links,
+│   │                            # Try Demo + Open App buttons, hamburger + mobile overlay)
 ├── Dockerfile                   # Multi-stage: Node build → Python serve
 ├── docker-compose.yml
 ├── railway.toml
@@ -141,9 +144,9 @@ python -m alembic upgrade head
 ```
 Follow `0001_`, `0002_` … naming pattern.
 
-### ⚠️ Railway Deployment — Known Issue & Fix
+### ⚠️ Deployment — Known Issue & Fix (originally Railway, now VPS)
 
-The Railway PostgreSQL DB was originally set up using `Base.metadata.create_all` (not alembic), so `alembic_version` table was absent. Alembic would try to run from 0001, fail on existing tables, get silently swallowed, and new migrations never applied.
+The PostgreSQL DB was originally set up using `Base.metadata.create_all` (not alembic), so `alembic_version` table was absent. Alembic would try to run from 0001, fail on existing tables, get silently swallowed, and new migrations never applied.
 
 **Fix in place (do not revert):**
 1. `backend/scripts/wait_and_stamp.py` — runs before alembic on every deploy; detects DB state by checking which columns/tables exist, creates `alembic_version` table and stamps to the correct revision if missing
@@ -188,10 +191,10 @@ Login page has a **"Try a demo account"** quick-fill button for Admin / Supervis
 
 ## Environment Variables
 
-**Required** (set as Railway env vars, never commit):
+**Required** (set as VPS Docker env vars, never commit):
 ```
-DATABASE_URL          # PostgreSQL (auto-set by Railway plugin)
-REDIS_URL             # Redis (auto-set by Railway plugin)
+DATABASE_URL          # PostgreSQL connection string
+REDIS_URL             # Redis connection string
 JWT_SECRET            # Min 32-char random string
 STORAGE_BACKEND       # local | drive | s3
 CORS_ORIGINS          # Comma-separated allowed origins
@@ -246,6 +249,7 @@ npm run dev            # → http://localhost:5173
 | Dashboard serial_no column | `dashboard/Dashboard.modern.tsx` |
 | Allow-enumerator-edit toggle | Dashboard → Integrations → Org Settings |
 | Demo quick-fill on login | `auth/LoginPage.tsx` |
+| Unified website nav | `website/` — all pages (index, about, demo) share identical nav: logo.png image, Features / How It Works / Compare / Pricing / About / Contact links, Try Demo + Open App buttons, hamburger + mobile overlay |
 
 ---
 
