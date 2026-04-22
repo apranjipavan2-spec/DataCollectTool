@@ -1,7 +1,5 @@
 import os
-import json
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
 from typing import List
 
 
@@ -25,19 +23,31 @@ def _resolve_database_url() -> str:
     return url
 
 
+def _parse_cors(raw: str) -> List[str]:
+    """Parse CORS_ORIGINS env var — handles comma-separated or JSON array formats."""
+    raw = raw.strip()
+    if raw.startswith("["):
+        import json
+        try:
+            return json.loads(raw)
+        except (ValueError, Exception):
+            pass
+    return [o.strip().strip("'\"") for o in raw.split(",") if o.strip()]
+
+
 class Settings(BaseSettings):
     DATABASE_URL: str = _resolve_database_url()
     REDIS_URL: str = "redis://localhost:6379"
     JWT_SECRET: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_MINUTES: int = 60 * 2  # 2 hours — client-side session timeout is 30 min; this is the server-side backstop
+    JWT_EXPIRE_MINUTES: int = 60 * 2
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_S3_BUCKET: str = "fieldgovern-media"
     AWS_REGION: str = "ap-south-1"
-    MEDIA_DIR: str = "uploads"  # local disk fallback for media files
-    STORAGE_BACKEND: str = "local"  # "local" | "drive" | "s3"
-    GDRIVE_FOLDER_ID: str = "1397LHY_x8KMvkAaq-_9LaepszN1a8Thp"  # target Google Drive folder
+    MEDIA_DIR: str = "uploads"
+    STORAGE_BACKEND: str = "local"
+    GDRIVE_FOLDER_ID: str = "1397LHY_x8KMvkAaq-_9LaepszN1a8Thp"
     GDRIVE_CLIENT_SECRET_PATH: str = "credentials/gdrive-oauth-client.json"
     GDRIVE_TOKEN_PATH: str = "credentials/gdrive-token.json"
     VAPID_PUBLIC_KEY: str = ""
@@ -54,35 +64,16 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = True
     APP_URL: str = "http://localhost:5173"
 
-    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:4173", "https://app.fieldgovern.com"]
+    # Stored as plain str so pydantic-settings never tries JSON-list parsing on it.
+    # Parsed into a list by the cors_origins property below.
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:4173,https://app.fieldgovern.com"
 
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v):
-        if isinstance(v, list):
-            return v
-        if isinstance(v, str):
-            v = v.strip()
-            if v.startswith("["):
-                try:
-                    return json.loads(v)
-                except (json.JSONDecodeError, ValueError):
-                    pass  # fall through to comma-split
-            return [o.strip().strip("'\"") for o in v.split(",") if o.strip()]
-        return v
+    @property
+    def cors_origins(self) -> List[str]:
+        return _parse_cors(self.CORS_ORIGINS)
 
     class Config:
         env_file = ".env"
 
 
-try:
-    settings = Settings()
-except Exception as _e:
-    import logging as _logging
-    _logging.getLogger(__name__).error("Settings validation failed: %s — using defaults", _e)
-    settings = Settings.model_construct(
-        DATABASE_URL=_resolve_database_url(),
-        REDIS_URL=os.environ.get("REDIS_URL", "redis://localhost:6379"),
-        JWT_SECRET=os.environ.get("JWT_SECRET", "change-me-in-production"),
-        CORS_ORIGINS=["http://localhost:5173", "http://localhost:4173", "https://app.fieldgovern.com"],
-    )
+settings = Settings()
