@@ -4,11 +4,14 @@
 
 | Provider | Region | Cost | RAM | CPU | Best For |
 |----------|--------|------|-----|-----|----------|
-| **Oracle Cloud Free** | Mumbai | **$0/month** | 24GB | 4 ARM | Zero cost, India latency |
-| **Hetzner Cloud** | Singapore | €3.79/month | 4GB | 2 AMD | Cheapest paid, reliable |
+| **Oracle Cloud Free** | Mumbai | **$0/month** | 24GB | 4 ARM | Zero cost, best free |
+| **Contabo** | EU / Singapore | **$3.96–6.86/month** | 8GB | 4 AMD | Best specs per dollar |
+| **Hetzner Cloud** | Singapore | €3.79/month | 4GB | 2 AMD | Most reliable paid |
 | **DigitalOcean** | Bangalore | $12/month | 2GB | 2 AMD | Best docs, easy UI |
 
-All three use the same setup — the Docker image supports both AMD64 and ARM64.
+All use the same setup — the Docker image supports both AMD64 and ARM64.
+
+**Recommended order:** Oracle Free → Contabo EU ($3.96/mo) → Hetzner Singapore
 
 ---
 
@@ -64,6 +67,50 @@ Add these in GitHub → your repo → Settings → Secrets → Actions:
 | `GHCR_PAT` | GitHub Personal Access Token with `read:packages` scope |
 
 Once secrets are set, every push to `main` auto-deploys.
+
+---
+
+## Option D — Contabo (Best specs per dollar)
+
+1. Sign up at contabo.com → **Cloud VPS 10**
+2. Select: **EU region** (free, 285ms — fine for offline-first app)
+3. Select: **75GB NVMe** (free, faster)
+4. Select: **Ubuntu 24.04 LTS**
+5. Skip Auto Backup (our script handles it)
+6. Term: **12 months** ($3.96/month, no setup fee)
+7. SSH in: `ssh root@<your-ip>`
+8. Run bootstrap: `curl -sL https://raw.githubusercontent.com/apranjipavan2-spec/DataCollectTool/main/deploy/server-setup.sh | bash`
+
+Total cost: **$3.96/month** for 4 vCPU, 8GB RAM, 75GB NVMe.
+
+---
+
+## Free Offsite Backup — Cloudflare R2
+
+Cloudflare R2 is free up to 10GB (your DB dumps will be a few MB each — permanently free).
+
+**Setup (one-time on server):**
+```bash
+# Install rclone
+curl https://rclone.org/install.sh | sudo bash
+
+# Configure R2
+rclone config
+# → New remote → name: r2 → type: s3 → provider: Cloudflare
+# → Enter R2 Account ID, Access Key ID, Secret (from Cloudflare Dashboard → R2 → Manage API Tokens)
+# → Location constraint: blank → ACL: private
+```
+
+**Create bucket in Cloudflare:**
+1. cloudflare.com → R2 → Create bucket → name: `fieldgovern-backups`
+
+**Enable in backup script:**
+```bash
+# On your server, add to /opt/fieldgovern/.env:
+R2_BUCKET=fieldgovern-backups
+```
+
+Backups now go: **local (7 days) + R2 (30 days)** — total cost $0.
 
 ---
 
