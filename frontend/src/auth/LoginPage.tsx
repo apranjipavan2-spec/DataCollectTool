@@ -67,16 +67,17 @@ export default function LoginPage() {
         <div className="absolute bottom-[-60px] left-[-60px] w-[240px] h-[240px] rounded-full opacity-20"
              style={{ background: 'radial-gradient(circle, #7c3aed, transparent 70%)' }} />
 
-        {/* Logo */}
+        {/* Logo — light background: darken logo */}
         <div className="relative z-10 flex items-center gap-3 mb-auto">
-          <img src="/logo.png" alt="FieldGovern" className="w-10 h-10 rounded-xl object-contain shadow-md" />
+          <img src="/logo.png" alt="FieldGovern" className="w-10 h-10 rounded-xl object-contain shadow-sm"
+               style={{ filter: 'brightness(0) saturate(0)', opacity: 0.85 }} />
           <span className="text-slate-800 text-xl font-bold tracking-tight">FieldGovern</span>
         </div>
 
         {/* Headline */}
         <div className="relative z-10 mt-16 mb-auto">
           <div className="inline-flex items-center gap-2 mb-4 px-3 py-1.5 rounded-full text-xs font-semibold border"
-               style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.12), rgba(124,58,237,0.12))', borderColor: 'rgba(14,165,233,0.25)', color: '#0369a1' }}>
+               style={{ background: 'linear-gradient(135deg,rgba(14,165,233,0.12),rgba(124,58,237,0.12))', borderColor: 'rgba(14,165,233,0.25)', color: '#0369a1' }}>
             <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
             New: Real-Time Tabulation &amp; Reports Coming Soon
           </div>
@@ -94,10 +95,10 @@ export default function LoginPage() {
           {/* Feature cards */}
           <div className="mt-10 space-y-3">
             {[
-              { icon: '📡', label: 'Works offline',         sub: 'Auto-syncs when back online' },
-              { icon: '📊', label: 'Real-time analytics',   sub: 'Cross-tabulation & live dashboards' },
-              { icon: '📋', label: 'Smart skip logic',      sub: 'Conditionals, calculations, branching' },
-              { icon: '👥', label: 'Role-based teams',      sub: 'Admins, supervisors, enumerators' },
+              { icon: '📡', label: 'Works offline',        sub: 'Auto-syncs when back online' },
+              { icon: '📊', label: 'Real-time analytics',  sub: 'Cross-tabulation & live dashboards' },
+              { icon: '📋', label: 'Smart skip logic',     sub: 'Conditionals, calculations, branching' },
+              { icon: '👥', label: 'Role-based teams',     sub: 'Admins, supervisors, enumerators' },
             ].map(f => (
               <div key={f.label} className="flex items-center gap-3 bg-white/60 backdrop-blur rounded-xl px-4 py-3 shadow-sm border border-white/80">
                 <span className="text-xl">{f.icon}</span>
@@ -110,28 +111,29 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="relative z-10 text-slate-400 text-xs mt-10">© 2026 FieldGovern · CEO: Pallavi</p>
+        <p className="relative z-10 text-slate-400 text-xs mt-10">© 2026 FieldGovern · CEO: Pallavi Deshetty</p>
       </div>
 
       {/* ── Right form panel ── */}
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12" style={{ background: '#e0f2fe' }}>
         <div className="w-full max-w-[420px]">
 
-          {/* Mobile logo */}
+          {/* Mobile logo — light background: darken logo */}
           <div className="lg:hidden flex items-center gap-2 mb-8">
-            <img src="/logo.png" alt="FieldGovern" className="w-9 h-9 rounded-xl object-contain shadow" />
+            <img src="/logo.png" alt="FieldGovern" className="w-9 h-9 rounded-xl object-contain"
+                 style={{ filter: 'brightness(0) saturate(0)', opacity: 0.85 }} />
             <span className="text-slate-800 text-xl font-bold">FieldGovern</span>
           </div>
 
           {/* Card */}
           <div className="bg-white rounded-2xl border border-blue-100 p-8"
-               style={{ boxShadow: '0 8px 32px rgba(37, 99, 235, 0.12), 0 2px 8px rgba(0,0,0,0.06)' }}>
+               style={{ boxShadow: '0 8px 32px rgba(14,165,233,0.12), 0 2px 8px rgba(0,0,0,0.06)' }}>
 
-            {/* Heading */}
+            {/* Heading — white card: darken logo */}
             <div className="mb-7 pb-6 border-b border-slate-100 text-center">
               <div className="flex items-center justify-center gap-3 mb-2">
                 <img src="/logo.png" alt="FieldGovern" className="w-10 h-10 rounded-xl object-contain flex-shrink-0"
-                     style={{ boxShadow: '0 4px 12px rgba(14,165,233,0.35)' }} />
+                     style={{ filter: 'brightness(0) saturate(0)', opacity: 0.85 }} />
                 <h1 className="text-2xl font-bold text-black tracking-tight">Welcome back</h1>
               </div>
               <p className="text-slate-500 text-sm">Sign in to continue to FieldGovern</p>
