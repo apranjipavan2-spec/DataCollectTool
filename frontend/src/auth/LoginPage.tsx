@@ -59,42 +59,45 @@ export default function LoginPage() {
 
       {/* ── Left branding panel ── */}
       <div className="hidden lg:flex lg:w-[480px] xl:w-[520px] flex-shrink-0 flex-col p-12 relative overflow-hidden"
-           style={{ background: 'linear-gradient(160deg, #eff6ff 0%, #dbeafe 40%, #bfdbfe 100%)' }}>
+           style={{ background: 'linear-gradient(160deg, #f0f9ff 0%, #e0f2fe 40%, #faf5ff 100%)' }}>
 
         {/* Decorative blobs */}
         <div className="absolute top-[-80px] right-[-80px] w-[320px] h-[320px] rounded-full opacity-30"
-             style={{ background: 'radial-gradient(circle, #3b82f6, transparent 70%)' }} />
+             style={{ background: 'radial-gradient(circle, #0ea5e9, transparent 70%)' }} />
         <div className="absolute bottom-[-60px] left-[-60px] w-[240px] h-[240px] rounded-full opacity-20"
-             style={{ background: 'radial-gradient(circle, #6366f1, transparent 70%)' }} />
+             style={{ background: 'radial-gradient(circle, #7c3aed, transparent 70%)' }} />
 
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3 mb-auto">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-lg shadow-md"
-               style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}>
-            FP
-          </div>
+          <img src="/logo.png" alt="FieldGovern" className="w-10 h-10 rounded-xl object-contain shadow-md" />
           <span className="text-slate-800 text-xl font-bold tracking-tight">FieldGovern</span>
         </div>
 
         {/* Headline */}
         <div className="relative z-10 mt-16 mb-auto">
-          <h2 className="text-[2.6rem] font-extrabold text-slate-900 leading-tight mb-4">
-            Field data,<br />
-            <span style={{ background: 'linear-gradient(90deg, #2563eb, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              done right.
+          <div className="inline-flex items-center gap-2 mb-4 px-3 py-1.5 rounded-full text-xs font-semibold border"
+               style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.12), rgba(124,58,237,0.12))', borderColor: 'rgba(14,165,233,0.25)', color: '#0369a1' }}>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+            New: Real-Time Tabulation &amp; Reports Coming Soon
+          </div>
+          <h2 className="text-[2.4rem] font-extrabold text-slate-900 leading-tight mb-4">
+            Collect, Analyze,<br />&amp; Report
+            <br />
+            <span style={{ background: 'linear-gradient(135deg, #0ea5e9, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              From the Field.
             </span>
           </h2>
-          <p className="text-slate-500 text-base leading-relaxed max-w-xs">
-            Offline-first surveys built for ground-level work across India.
+          <p className="text-slate-500 text-sm leading-relaxed max-w-xs">
+            India's most affordable offline-first field data platform. Collect with <strong>zero internet</strong>, auto-sync, and unlock <strong>real-time analysis &amp; automated reports</strong>.
           </p>
 
           {/* Feature cards */}
           <div className="mt-10 space-y-3">
             {[
-              { icon: '📡', label: 'Works offline',      sub: 'Auto-syncs when back online' },
-              { icon: '📋', label: 'Smart skip logic',   sub: 'Conditionals, calculations, branching' },
-              { icon: '👥', label: 'Role-based teams',   sub: 'Admins, supervisors, enumerators' },
-              { icon: '📊', label: 'Instant exports',    sub: 'CSV, Excel, live dashboards' },
+              { icon: '📡', label: 'Works offline',         sub: 'Auto-syncs when back online' },
+              { icon: '📊', label: 'Real-time analytics',   sub: 'Cross-tabulation & live dashboards' },
+              { icon: '📋', label: 'Smart skip logic',      sub: 'Conditionals, calculations, branching' },
+              { icon: '👥', label: 'Role-based teams',      sub: 'Admins, supervisors, enumerators' },
             ].map(f => (
               <div key={f.label} className="flex items-center gap-3 bg-white/60 backdrop-blur rounded-xl px-4 py-3 shadow-sm border border-white/80">
                 <span className="text-xl">{f.icon}</span>
@@ -107,17 +110,16 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="relative z-10 text-slate-400 text-xs mt-10">© 2026 FieldGovern</p>
+        <p className="relative z-10 text-slate-400 text-xs mt-10">© 2026 FieldGovern · CEO: Pallavi</p>
       </div>
 
       {/* ── Right form panel ── */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12" style={{ background: '#dbeafe' }}>
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-12" style={{ background: '#e0f2fe' }}>
         <div className="w-full max-w-[420px]">
 
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-base shadow"
-                 style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}>FP</div>
+            <img src="/logo.png" alt="FieldGovern" className="w-9 h-9 rounded-xl object-contain shadow" />
             <span className="text-slate-800 text-xl font-bold">FieldGovern</span>
           </div>
 
@@ -128,10 +130,8 @@ export default function LoginPage() {
             {/* Heading */}
             <div className="mb-7 pb-6 border-b border-slate-100 text-center">
               <div className="flex items-center justify-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-base flex-shrink-0"
-                     style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', boxShadow: '0 4px 12px rgba(37,99,235,0.35)' }}>
-                  FP
-                </div>
+                <img src="/logo.png" alt="FieldGovern" className="w-10 h-10 rounded-xl object-contain flex-shrink-0"
+                     style={{ boxShadow: '0 4px 12px rgba(14,165,233,0.35)' }} />
                 <h1 className="text-2xl font-bold text-black tracking-tight">Welcome back</h1>
               </div>
               <p className="text-slate-500 text-sm">Sign in to continue to FieldGovern</p>
@@ -220,7 +220,7 @@ export default function LoginPage() {
               onClick={handleLogin}
               disabled={loading}
               className="w-full py-3.5 rounded-xl font-bold text-sm text-white transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
-              style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', boxShadow: '0 4px 16px rgba(37,99,235,0.35)' }}
+              style={{ background: 'linear-gradient(135deg, #0ea5e9 0%, #7c3aed 100%)', boxShadow: '0 4px 16px rgba(14,165,233,0.35)' }}
             >
               {loading ? (
                 <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Signing in…</span></>
