@@ -97,6 +97,6 @@ jobs:
 
       - name: Health check
         run: |
-          sleep 10
+          sleep 30
           curl -f https://app.fieldgovern.com/health || exit 1
           echo "Health check passed"
