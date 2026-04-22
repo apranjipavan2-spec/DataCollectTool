@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Terms of Service — FieldGovern</title>
-  <meta name="description" content="FieldGovern Terms of Service — the rules governing use of our platform."/>
+  <meta name="description" content="FieldGovern Terms of Service — the terms governing use of our field data collection platform."/>
   <link rel="icon" type="image/png" href="logo.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
@@ -17,13 +17,16 @@
     .btn-primary{background:linear-gradient(135deg,#0ea5e9,#7c3aed);color:white;border:none;border-radius:10px;padding:9px 20px;font-weight:600;font-size:0.88rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all 0.3s}
     main{max-width:760px;margin:0 auto;padding:100px 24px 80px}
     h1{font-size:2.2rem;font-weight:900;color:#0f172a;margin-bottom:8px}
-    .updated{font-size:0.85rem;color:#64748b;margin-bottom:40px}
-    h2{font-size:1.15rem;font-weight:800;color:#0f172a;margin:32px 0 10px;padding-top:8px;border-top:1px solid #e2e8f0}
+    .updated{font-size:0.85rem;color:#64748b;margin-bottom:6px}
+    .team-note{font-size:0.85rem;color:#64748b;margin-bottom:40px}
+    h2{font-size:1.15rem;font-weight:800;color:#0f172a;margin:36px 0 10px;padding-top:8px;border-top:1px solid #e2e8f0}
     p{font-size:0.92rem;color:#334155;line-height:1.8;margin-bottom:12px}
-    ul{margin:10px 0 12px 20px;display:flex;flex-direction:column;gap:6px}
+    ul{margin:10px 0 14px 20px;display:flex;flex-direction:column;gap:7px}
     li{font-size:0.9rem;color:#334155;line-height:1.6}
     a{color:#0ea5e9;text-decoration:none}
     a:hover{text-decoration:underline}
+    .highlight-box{background:#f0f9ff;border:1px solid rgba(14,165,233,0.25);border-radius:12px;padding:20px 24px;margin:20px 0}
+    .highlight-box p{margin:0;font-size:0.88rem}
     footer-note{display:block;font-size:0.82rem;color:#64748b;margin-top:40px;padding-top:24px;border-top:1px solid #e2e8f0}
   </style>
 </head>
@@ -38,84 +41,164 @@
 
 <main>
   <h1>Terms of Service</h1>
-  <p class="updated">Last updated: April 21, 2025</p>
+  <p class="updated">Last updated: April 22, 2026</p>
+  <p class="team-note">Developed by <strong>Pavankumar Deshetty</strong> · In partnership with <strong>Dataworx</strong> (Manjunath YN, CEO)</p>
 
-  <p>These Terms of Service ("Terms") govern your use of the FieldGovern platform, operated by FieldGovern ("we", "our", "us"). By accessing or using our services, you agree to be bound by these Terms. If you are using FieldGovern on behalf of an organization, you represent that you have authority to bind that organization to these Terms.</p>
+  <p>These Terms of Service ("Terms") govern your use of the FieldGovern platform, operated by <strong>Pavankumar Deshetty</strong> ("we", "our", "us") in strategic partnership with <strong>Dataworx</strong> (led by <strong>Manjunath YN</strong>, CEO). By accessing or using our services, you agree to be bound by these Terms.</p>
+  <p>If you are registering FieldGovern on behalf of an organization — an NGO, research institute, government department, or corporate entity — you represent and warrant that you have the legal authority to bind that organization to these Terms, and that you accept these Terms on behalf of the organization.</p>
+
+  <div class="highlight-box">
+    <p><strong>Plain-language summary:</strong> You own your data. We provide the platform, you use it lawfully, and either party can end the relationship with proper notice. We are not liable for data collection decisions made by your organization. These terms are governed by Indian law, jurisdiction in Bengaluru, Karnataka.</p>
+  </div>
 
   <h2>1. The Service</h2>
-  <p>FieldGovern provides a B2B software-as-a-service (SaaS) platform for offline-first field data collection, management, and analysis. The service is available via a web application hosted at <a href="https://app.fieldgovern.com">app.fieldgovern.com</a> and as a Progressive Web App (PWA) installable on mobile devices.</p>
-
-  <h2>2. Accounts and Access</h2>
-  <p>Your organization ("tenant") receives a dedicated isolated account on the platform. The designated Org Admin is responsible for:</p>
+  <p>FieldGovern provides a B2B software-as-a-service (SaaS) platform for offline-first field data collection, monitoring &amp; evaluation (M&amp;E), and research data management. The service is accessible via:</p>
   <ul>
-    <li>Managing all user accounts within your organization</li>
-    <li>Ensuring all users comply with these Terms</li>
-    <li>Maintaining the security of API keys and credentials</li>
-    <li>Controlling access for supervisors and enumerators</li>
+    <li>A web application hosted at <a href="https://app.fieldgovern.com">app.fieldgovern.com</a></li>
+    <li>A Progressive Web App (PWA) installable on Android and iOS mobile devices</li>
+    <li>A REST API for programmatic integration with your organization's systems</li>
   </ul>
-  <p>You are responsible for all activity that occurs under your organization's account. Notify us immediately at <a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a> if you suspect unauthorized access.</p>
+  <p>FieldGovern is designed for India's research and development sector, including public health researchers, agricultural scientists, census teams, NGO field staff, and government program monitoring units. The platform's core capability is the ability to collect and store data completely offline, syncing to the central server when connectivity is restored.</p>
+  <p>The platform is developed by <strong>Pavankumar Deshetty</strong> (Research Associate &amp; Data Analyst, Kalike — Tata Trusts, Bengaluru) with the strategic guidance and domain expertise of <strong>Manjunath YN</strong> (CEO, Dataworx, Bengaluru) who serves as strategic growth partner.</p>
+
+  <h2>2. Account Registration and Tenant Access</h2>
+  <p>Each organization receives a dedicated, isolated account ("tenant") on the FieldGovern platform. Within your tenant, access is structured by roles:</p>
+  <ul>
+    <li><strong>Org Admin</strong> — Full administrative control over your organization's account, users, forms, and settings</li>
+    <li><strong>Supervisor</strong> — Can assign forms, review submissions, flag/approve/reject records, and export data</li>
+    <li><strong>Enumerator</strong> — Can access assigned forms, collect data in the field, and view their own submissions</li>
+  </ul>
+  <p>The designated Org Admin is responsible for:</p>
+  <ul>
+    <li>Creating and managing all user accounts within your organization</li>
+    <li>Ensuring all users read and comply with these Terms before using the platform</li>
+    <li>Maintaining the security of API keys, passwords, and access credentials</li>
+    <li>Promptly deactivating accounts of users who leave your organization</li>
+    <li>All data collection and research activities conducted under your organization's account</li>
+  </ul>
+  <p>Your organization is responsible for all activity that occurs under your tenant account, including activity by all users you have onboarded. If you suspect unauthorized access, notify us immediately at <a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a> and revoke affected API keys from the platform settings.</p>
 
   <h2>3. Acceptable Use</h2>
-  <p>You agree not to use FieldGovern to:</p>
+  <p>You may use FieldGovern only for lawful field data collection, research, program monitoring, and related activities. You agree not to use FieldGovern to:</p>
   <ul>
-    <li>Collect data from individuals without appropriate consent and legal authorization</li>
-    <li>Violate any applicable law, regulation, or research ethics guidelines</li>
-    <li>Store or transmit malicious code, viruses, or harmful content</li>
-    <li>Attempt to access another organization's data or systems</li>
-    <li>Reverse-engineer, decompile, or attempt to extract source code</li>
-    <li>Use the platform for purposes unrelated to legitimate field data collection and research</li>
-    <li>Resell or sublicense access to the platform without prior written consent</li>
+    <li>Collect data from individuals without appropriate informed consent and legal authorization</li>
+    <li>Collect, store, or process data in violation of any applicable law, regulation, or research ethics guideline — including India's Digital Personal Data Protection (DPDP) Act 2023</li>
+    <li>Store, transmit, or distribute malicious code, viruses, ransomware, or any content that could harm FieldGovern's systems or other users</li>
+    <li>Attempt to access, probe, or extract data belonging to another organization's tenant</li>
+    <li>Conduct penetration testing, security scanning, or vulnerability research on our systems without prior written authorization</li>
+    <li>Reverse-engineer, decompile, disassemble, or attempt to extract source code from the FieldGovern platform</li>
+    <li>Use automated scripts, bots, or crawlers against the platform in a manner that disrupts service availability</li>
+    <li>Use FieldGovern for purposes unrelated to legitimate field data collection, research, or program management</li>
+    <li>Resell, sublicense, or provide third-party access to the platform without prior written authorization from us</li>
+    <li>Create accounts to collect competitive intelligence about our platform features or pricing</li>
   </ul>
-  <p>We reserve the right to suspend accounts that violate these policies without refund.</p>
+  <p>We reserve the right to suspend or permanently terminate accounts that violate these policies, without refund, and to report illegal activity to relevant law enforcement or regulatory authorities.</p>
 
-  <h2>4. Data Ownership</h2>
-  <p>You retain full ownership of all data you collect and store on FieldGovern. We do not claim any rights to your form definitions, submission data, or media files. We process your data only as necessary to provide the service described in these Terms and our Privacy Policy.</p>
-
-  <h2>5. Data Responsibility</h2>
-  <p>As the data controller for information collected through your forms, your organization is responsible for:</p>
+  <h2>4. Data Ownership and Your Rights</h2>
+  <p>You retain full, exclusive ownership of all data your organization creates, collects, and stores on FieldGovern. This includes:</p>
   <ul>
-    <li>Obtaining informed consent from research subjects where required by law</li>
-    <li>Complying with applicable data protection laws (including India's DPDP Act 2023)</li>
-    <li>Ensuring the accuracy and lawful basis of data collection activities</li>
-    <li>Maintaining appropriate confidentiality for sensitive data (health, financial, biometric)</li>
+    <li>All form definitions and questionnaire schemas created by your organization</li>
+    <li>All submission records and field data collected by your enumerators</li>
+    <li>All media files (photographs, audio recordings) uploaded through the platform</li>
+    <li>All user-generated content and research outputs derived from FieldGovern data</li>
   </ul>
-  <p>FieldGovern acts as a data processor on your behalf. Our data processing practices are described in our <a href="privacy.html">Privacy Policy</a>.</p>
+  <p>FieldGovern claims no intellectual property rights over your data. We process your data solely as a service provider to deliver the platform functionality described in these Terms. You may export your data in CSV, JSON, or Excel format at any time. Upon account closure, you may request a complete data export before deletion.</p>
 
-  <h2>6. Subscription and Payment</h2>
-  <p>FieldGovern is offered on a monthly subscription basis. Pricing is as listed on the <a href="index.html#pricing">Pricing page</a>. Subscriptions renew automatically unless cancelled. No refunds are issued for partial months. Prices may change with 30 days' notice to the registered org admin email.</p>
-  <p>Enterprise plans are governed by a separate Master Service Agreement (MSA). Contact <a href="mailto:sales@fieldgovern.com">sales@fieldgovern.com</a>.</p>
+  <h2>5. Data Controller and Processor Responsibilities</h2>
+  <p>In the context of your field research activities, your organization is the <strong>data controller</strong> — you determine the purposes and means of processing personal data collected through your forms. FieldGovern acts as the <strong>data processor</strong> — we process data on your behalf according to your instructions and these Terms.</p>
+  <p>As data controller, your organization is responsible for:</p>
+  <ul>
+    <li>Obtaining valid, informed consent from all research participants in a language they understand, before collecting any personal data from them</li>
+    <li>Complying with India's Digital Personal Data Protection (DPDP) Act 2023, including maintaining consent records and honoring data principal rights</li>
+    <li>Complying with any sector-specific regulations applicable to your research (Clinical Trials Rules, ICMR guidelines, RBI data localization requirements, etc.)</li>
+    <li>Ensuring your data collection is authorized by the appropriate ethics committee or Institutional Review Board (IRB) where required</li>
+    <li>Maintaining appropriate security controls within your organization for sensitive data (health records, financial data, biometric data)</li>
+    <li>Anonymizing or pseudonymizing personally identifiable information (PII) before sharing or publishing research outputs</li>
+    <li>Promptly responding to data principal requests (access, correction, deletion) related to data your organization has collected</li>
+  </ul>
+  <p>FieldGovern's data processing practices are fully described in our <a href="privacy.html">Privacy Policy</a>.</p>
 
-  <h2>7. Service Availability</h2>
-  <p>We aim for 99.5% monthly uptime excluding scheduled maintenance. The offline-first architecture of FieldGovern means that data collection continues even when our servers are unreachable — enumerators can collect and store data locally and sync when connectivity is restored. We do not provide SLA guarantees unless specified in an Enterprise MSA.</p>
+  <h2>6. Subscription and Payment Terms</h2>
+  <p>FieldGovern is offered on a monthly subscription basis. Current pricing is listed on the <a href="index.html#pricing">Pricing page</a>. By subscribing, you agree to the following payment terms:</p>
+  <ul>
+    <li>Subscriptions are billed monthly in advance</li>
+    <li>Subscriptions auto-renew at the end of each billing period unless cancelled at least 3 business days before renewal</li>
+    <li>No partial-month refunds are issued upon cancellation; your access continues until the end of the paid period</li>
+    <li>Failed payments will result in a 7-day grace period. Access may be suspended if payment is not received within 7 days of the due date</li>
+    <li>Price changes will be communicated to registered Org Admins at least 30 days in advance</li>
+    <li>Annual prepayment discounts may be available — contact <a href="mailto:sales@fieldgovern.com">sales@fieldgovern.com</a></li>
+  </ul>
+  <p>Enterprise and government clients are governed by a separate Master Service Agreement (MSA) negotiated with Dataworx. Contact <a href="mailto:sales@fieldgovern.com">sales@fieldgovern.com</a> or <a href="mailto:pallavi@dataworx.co.in">pallavi@dataworx.co.in</a> for enterprise pricing.</p>
+
+  <h2>7. Service Availability and Uptime</h2>
+  <p>We aim to maintain 99.5% monthly uptime, measured excluding scheduled maintenance windows. Scheduled maintenance, when required, will be announced at least 24 hours in advance via the platform dashboard and email to registered Org Admins. We do not provide uptime SLA guarantees unless specified in a separate Enterprise MSA.</p>
+  <p>The offline-first architecture of FieldGovern means that field data collection continues uninterrupted even during server downtime or scheduled maintenance. Enumerators can collect and store data locally on their devices and sync when connectivity and server availability are restored. No data is lost due to server unavailability.</p>
 
   <h2>8. Intellectual Property</h2>
-  <p>All software, design, branding, and documentation of FieldGovern remain the exclusive intellectual property of FieldGovern. These Terms do not transfer any intellectual property rights to you. You may not copy, modify, or distribute the FieldGovern platform.</p>
+  <p>All software code, user interface design, branding, logos, documentation, and the FieldGovern platform as a whole are the exclusive intellectual property of Pavankumar Deshetty and FieldGovern. These Terms do not transfer any intellectual property rights to you. Your subscription grants you a limited, non-exclusive, non-transferable right to access and use the platform for its intended purpose during the subscription period.</p>
+  <p>You may not copy, reproduce, modify, distribute, sell, sublicense, or create derivative works based on the FieldGovern platform or any part thereof. The FieldGovern name, logo, and associated marks are proprietary and may not be used without written permission.</p>
 
-  <h2>9. Limitation of Liability</h2>
-  <p>To the maximum extent permitted by applicable law, FieldGovern shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of the platform, including loss of data, revenue, or research outcomes. Our total aggregate liability for any claim is limited to the amount you paid us in the 3 months preceding the claim.</p>
+  <h2>9. Confidentiality</h2>
+  <p>Both parties acknowledge that during the course of using FieldGovern, each may have access to the other's confidential information. FieldGovern will treat your organization's data, form designs, and research content as confidential, in accordance with our Privacy Policy. You agree to treat any non-public information about FieldGovern's platform, pricing, or roadmap that you become aware of as confidential and not disclose it to third parties without our consent.</p>
 
-  <h2>10. Indemnification</h2>
-  <p>You agree to indemnify and hold harmless FieldGovern from any claims, losses, or expenses (including legal fees) arising from your misuse of the platform, violation of these Terms, or infringement of any third-party rights through your data collection activities.</p>
-
-  <h2>11. Termination</h2>
-  <p>Either party may terminate the subscription at any time. Upon termination, your access to the platform will cease at the end of the current billing period. You may request a data export before termination. We will delete your data within 30 days of account closure upon written request.</p>
-  <p>We may terminate or suspend your account immediately for material breach of these Terms, illegal activity, or non-payment.</p>
-
-  <h2>12. Modifications to Terms</h2>
-  <p>We may update these Terms from time to time. We will notify registered org admins by email at least 14 days before material changes take effect. Continued use of the platform after the effective date constitutes acceptance of the updated Terms.</p>
-
-  <h2>13. Governing Law</h2>
-  <p>These Terms are governed by the laws of India. Any disputes arising from these Terms shall be subject to the exclusive jurisdiction of the courts in Bengaluru, Karnataka, India.</p>
-
-  <h2>14. Contact</h2>
-  <p>For legal notices or questions about these Terms:</p>
+  <h2>10. Limitation of Liability</h2>
+  <p>To the maximum extent permitted by applicable Indian law, FieldGovern (including its developer Pavankumar Deshetty and strategic partner Dataworx) shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising out of or related to your use of the platform, including but not limited to:</p>
   <ul>
-    <li>Email: <a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a></li>
-    <li>Website: <a href="https://www.fieldgovern.com">www.fieldgovern.com</a></li>
+    <li>Loss of research data due to device failure, user error, or force majeure</li>
+    <li>Research outcomes impacted by platform downtime or data sync failures</li>
+    <li>Loss of revenue, funding, or grant opportunities related to platform availability</li>
+    <li>Consequences arising from your organization's data collection practices or research ethics decisions</li>
+    <li>Third-party claims arising from data your organization has collected through the platform</li>
+  </ul>
+  <p>Our total aggregate liability for any claim arising from or related to your use of FieldGovern is limited to the total subscription fees you paid to us in the three (3) calendar months immediately preceding the event giving rise to the claim.</p>
+
+  <h2>11. Indemnification</h2>
+  <p>You agree to defend, indemnify, and hold harmless FieldGovern, its developer (Pavankumar Deshetty), and its strategic partner (Dataworx and Manjunath YN) from and against any claims, liabilities, damages, losses, costs, and expenses (including reasonable legal fees) arising from:</p>
+  <ul>
+    <li>Your violation of these Terms or applicable law</li>
+    <li>Your organization's data collection activities, including failure to obtain required consent</li>
+    <li>Any claim by a research participant or third party arising from data collected through your FieldGovern forms</li>
+    <li>Your misuse of the platform or breach of confidentiality obligations</li>
+    <li>Any infringement of third-party intellectual property rights through content you upload to the platform</li>
   </ul>
 
+  <h2>12. Termination</h2>
+  <p>Either party may terminate the subscription at any time:</p>
+  <ul>
+    <li><strong>By you:</strong> Cancel from your account settings or notify us at <a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a>. Access continues until the end of the current paid billing period. No refunds for unused days.</li>
+    <li><strong>By us:</strong> We may suspend or terminate your account immediately — without refund — for material breach of these Terms, illegal or unethical data collection activity, non-payment after the grace period, or repeated acceptable use violations. We will provide notice where legally permitted to do so.</li>
+  </ul>
+  <p>Upon termination for any reason, you may request a complete data export within 30 days of termination. After 30 days, data will be permanently deleted from our systems. Dataworx or FieldGovern does not bear any liability for data loss resulting from expiry of this export window.</p>
+
+  <h2>13. Force Majeure</h2>
+  <p>Neither party shall be liable for delays or failures in performance resulting from circumstances beyond their reasonable control, including but not limited to acts of God, natural disasters, government actions, internet infrastructure failures, third-party cloud provider outages, or civil unrest. The affected party shall notify the other as soon as practicable and shall use commercially reasonable efforts to minimize the impact and resume performance.</p>
+
+  <h2>14. Modifications to Terms</h2>
+  <p>We may update these Terms from time to time as the platform evolves or as legal requirements change. For material changes affecting your rights or obligations, we will notify registered Org Admins by email at least 14 days before the changes take effect. The updated Terms will be posted on this page with a revised "Last updated" date.</p>
+  <p>Your continued use of FieldGovern after the effective date of any updated Terms constitutes your acceptance of the changes. If you do not agree to the updated Terms, you must cease using the platform and may terminate your subscription under Section 12.</p>
+
+  <h2>15. Governing Law and Dispute Resolution</h2>
+  <p>These Terms are governed by and construed in accordance with the laws of the Republic of India, without regard to conflict of law principles. Any dispute, controversy, or claim arising out of or relating to these Terms or the use of the FieldGovern platform shall be subject to the exclusive jurisdiction of the competent courts in <strong>Bengaluru, Karnataka, India</strong>.</p>
+  <p>Before initiating formal legal proceedings, both parties agree to make a good-faith effort to resolve the dispute informally by contacting the other party in writing with a description of the dispute and the resolution sought. The parties will have 30 days to attempt informal resolution before either party may pursue formal legal action.</p>
+
+  <h2>16. Severability</h2>
+  <p>If any provision of these Terms is found to be unenforceable or invalid by a court of competent jurisdiction, that provision shall be limited or eliminated to the minimum extent necessary so that these Terms shall otherwise remain in full force and effect and enforceable.</p>
+
+  <h2>17. Entire Agreement</h2>
+  <p>These Terms, together with our <a href="privacy.html">Privacy Policy</a> and any separate Enterprise MSA or addenda executed between the parties, constitute the entire agreement between you and FieldGovern with respect to the platform and supersede all prior negotiations, representations, warranties, and understandings, whether written or oral.</p>
+
+  <h2>18. Contact for Legal Notices</h2>
+  <p>For legal notices, formal correspondence, or questions about these Terms:</p>
+  <ul>
+    <li><strong>Email:</strong> <a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a></li>
+    <li><strong>Developer:</strong> Pavankumar Deshetty — <a href="https://apranjipavan2-spec.github.io/portfolio/" target="_blank">apranjipavan2-spec.github.io/portfolio</a></li>
+    <li><strong>Strategic Partner:</strong> Dataworx (Manjunath YN, CEO) — <a href="mailto:pallavi@dataworx.co.in">pallavi@dataworx.co.in</a></li>
+    <li><strong>Website:</strong> <a href="https://www.fieldgovern.com">www.fieldgovern.com</a></li>
+  </ul>
+  <p>We aim to acknowledge all legal notices within 3 business days.</p>
+
   <footer-note>
-    <a href="index.html">← Back to Home</a> &nbsp;·&nbsp; <a href="privacy.html">Privacy Policy</a>
+    <a href="index.html">← Back to Home</a> &nbsp;·&nbsp; <a href="privacy.html">Privacy Policy</a> &nbsp;·&nbsp; <a href="about.html">About Us</a>
   </footer-note>
 </main>
 </body>

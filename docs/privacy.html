@@ -17,13 +17,16 @@
     .btn-primary{background:linear-gradient(135deg,#0ea5e9,#7c3aed);color:white;border:none;border-radius:10px;padding:9px 20px;font-weight:600;font-size:0.88rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all 0.3s}
     main{max-width:760px;margin:0 auto;padding:100px 24px 80px}
     h1{font-size:2.2rem;font-weight:900;color:#0f172a;margin-bottom:8px}
-    .updated{font-size:0.85rem;color:#64748b;margin-bottom:40px}
-    h2{font-size:1.15rem;font-weight:800;color:#0f172a;margin:32px 0 10px;padding-top:8px;border-top:1px solid #e2e8f0}
+    .updated{font-size:0.85rem;color:#64748b;margin-bottom:6px}
+    .team-note{font-size:0.85rem;color:#64748b;margin-bottom:40px}
+    h2{font-size:1.15rem;font-weight:800;color:#0f172a;margin:36px 0 10px;padding-top:8px;border-top:1px solid #e2e8f0}
     p{font-size:0.92rem;color:#334155;line-height:1.8;margin-bottom:12px}
-    ul{margin:10px 0 12px 20px;display:flex;flex-direction:column;gap:6px}
+    ul{margin:10px 0 14px 20px;display:flex;flex-direction:column;gap:7px}
     li{font-size:0.9rem;color:#334155;line-height:1.6}
     a{color:#0ea5e9;text-decoration:none}
     a:hover{text-decoration:underline}
+    .highlight-box{background:#f0f9ff;border:1px solid rgba(14,165,233,0.25);border-radius:12px;padding:20px 24px;margin:20px 0}
+    .highlight-box p{margin:0;font-size:0.88rem}
     footer-note{display:block;font-size:0.82rem;color:#64748b;margin-top:40px;padding-top:24px;border-top:1px solid #e2e8f0}
   </style>
 </head>
@@ -38,91 +41,137 @@
 
 <main>
   <h1>Privacy Policy</h1>
-  <p class="updated">Last updated: April 21, 2025</p>
+  <p class="updated">Last updated: April 22, 2026</p>
+  <p class="team-note">Developed by <strong>Pavankumar Deshetty</strong> · In partnership with <strong>Dataworx</strong> (Manjunath YN, CEO)</p>
 
-  <p>FieldGovern ("we", "our", or "us") is committed to protecting the privacy of organizations and individuals who use our field data collection platform. This Privacy Policy explains what information we collect, how we use it, and your rights with respect to that information.</p>
+  <p>FieldGovern ("we", "our", or "us") is committed to protecting the privacy of organizations and individuals who use our field data collection platform. FieldGovern is developed by <strong>Pavankumar Deshetty</strong> (Research Associate &amp; Data Analyst, Kalike — Tata Trusts) in strategic partnership with <strong>Dataworx</strong>, a Bengaluru-based data science and analytics firm led by <strong>Manjunath YN</strong> (CEO).</p>
 
-  <h2>1. Information We Collect</h2>
-  <p>We collect information you provide directly when you register an account, create forms, or contact us, including:</p>
+  <p>This Privacy Policy explains what information we collect, how we use it, how we protect it, and your rights with respect to that information. By using FieldGovern, you agree to the practices described in this policy.</p>
+
+  <div class="highlight-box">
+    <p><strong>Plain-language summary:</strong> We collect only what is necessary to provide the service. We never sell your data. Your organization's data is strictly isolated from all other organizations. You own your data and can export or delete it at any time.</p>
+  </div>
+
+  <h2>1. Who We Are</h2>
+  <p>FieldGovern is a B2B SaaS platform for offline-first field data collection, designed for India's research and development sector. The platform is operated by Pavankumar Deshetty, with strategic support from Dataworx. For all privacy-related queries, contact us at <a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a>.</p>
+
+  <h2>2. Information We Collect</h2>
+  <p>We collect information in two ways: information you provide directly, and information collected automatically.</p>
+
+  <p><strong>Information you provide:</strong></p>
   <ul>
-    <li>Account credentials (phone number, hashed password — we never store plain-text passwords)</li>
-    <li>Organization name, administrator name, and contact details</li>
-    <li>Form definitions and submission data you create and collect</li>
-    <li>Photos and audio files uploaded as part of field submissions</li>
-    <li>GPS coordinates captured during data collection (only when your form includes a GPS field)</li>
+    <li>Account credentials — phone number and hashed password (we never store plain-text passwords; bcrypt with cost factor 12 is used)</li>
+    <li>Organization details — organization name, administrator name, designation, and contact information</li>
+    <li>Form definitions — the survey/questionnaire forms your organization creates on the platform</li>
+    <li>Submission data — field data collected by your enumerators through FieldGovern forms</li>
+    <li>Media files — photographs and audio recordings uploaded as part of field submissions</li>
+    <li>GPS coordinates — captured only when your form includes a location/GPS field, and only during active data collection</li>
+    <li>Support communications — messages, emails, or queries you send to us</li>
   </ul>
-  <p>We also collect certain technical information automatically:</p>
+
+  <p><strong>Information collected automatically:</strong></p>
   <ul>
     <li>Browser type, device type, and operating system</li>
-    <li>IP address and general location (country/region)</li>
-    <li>Pages accessed, timestamps, and usage patterns within the platform</li>
-    <li>Service worker and PWA activity logs (for offline sync diagnostics)</li>
+    <li>IP address and approximate location (country/region level only)</li>
+    <li>Pages accessed, session timestamps, and usage patterns within the platform</li>
+    <li>Service worker and PWA activity logs, used exclusively for offline sync diagnostics and error detection</li>
+    <li>API request logs for security monitoring and abuse prevention</li>
   </ul>
 
-  <h2>2. How We Use Your Information</h2>
+  <h2>3. How We Use Your Information</h2>
+  <p>We use the information we collect for the following purposes:</p>
   <ul>
-    <li>To provide, operate, and improve the FieldGovern platform</li>
-    <li>To authenticate users and enforce role-based access controls</li>
-    <li>To sync offline-collected data between field devices and your organization's account</li>
-    <li>To send you important service notices (account changes, security alerts)</li>
-    <li>To respond to your support requests</li>
-    <li>To analyze aggregate usage trends (never individual-level without consent) to improve features</li>
+    <li>To provide, operate, maintain, and improve the FieldGovern platform and its features</li>
+    <li>To authenticate users and enforce role-based access control (enumerator / supervisor / org_admin / master_admin)</li>
+    <li>To synchronize offline-collected data between field devices and your organization's central account</li>
+    <li>To send important service notices — account changes, security alerts, billing events, and policy updates</li>
+    <li>To respond to support requests and technical queries</li>
+    <li>To analyze aggregate, anonymized usage patterns to guide product improvement decisions</li>
+    <li>To detect and prevent fraud, abuse, and unauthorized access</li>
+    <li>To comply with applicable legal obligations</li>
   </ul>
-  <p>We do not sell, rent, or share your personal data with third parties for marketing purposes.</p>
 
-  <h2>3. Multi-Tenant Data Isolation</h2>
-  <p>FieldGovern is a multi-tenant platform. Every piece of data — forms, submissions, users, media — is strictly isolated to your organization's tenant. Row-Level Security (RLS) is enforced at the database layer, meaning no organization can ever access another organization's data, even in the event of application-level misconfiguration.</p>
+  <p>We do <strong>not</strong> sell, rent, share, or otherwise monetize your personal data or your organization's research data with any third party for marketing, advertising, or commercial purposes.</p>
 
-  <h2>4. Data Storage and Security</h2>
-  <p>All data is stored on servers hosted by Railway.app (United States). Data in transit is encrypted using TLS 1.2+. Passwords are hashed using bcrypt with a cost factor of 12. JWT tokens expire after 2 hours. API keys are hashed before storage.</p>
-  <p>Media files (photos, audio) are stored on server local disk by default. Enterprise customers may configure Google Drive or AWS S3 storage with their own credentials.</p>
-  <p>While we implement industry-standard security practices, no system is 100% secure. We will notify affected organizations within 72 hours of discovering a data breach.</p>
-
-  <h2>5. Offline Data on Field Devices</h2>
-  <p>When enumerators use FieldGovern offline, form data and media are stored locally on the device using browser storage (OPFS on Chrome/Android, IndexedDB on Safari/iOS). This data remains on the device until sync is triggered. FieldGovern does not control what happens to a lost or stolen device — we recommend enumerators use device-level screen locks and remote wipe policies.</p>
-
-  <h2>6. Data Retention</h2>
-  <p>We retain your data for as long as your organization maintains an active account. Upon account termination, we will delete your data within 30 days upon written request to <a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a>. Aggregate, anonymized statistics may be retained indefinitely.</p>
-
-  <h2>7. Cookies</h2>
-  <p>The FieldGovern web app uses minimal browser storage: JWT tokens are stored in localStorage for session management, and offline data is stored in OPFS/IndexedDB for sync functionality. We do not use third-party tracking cookies. Our marketing website (fieldgovern.com) uses Google Fonts (a third-party request to fonts.googleapis.com).</p>
-
-  <h2>8. Third-Party Services</h2>
-  <p>FieldGovern may integrate with the following third-party services at your organization's option:</p>
+  <h2>4. Multi-Tenant Data Isolation</h2>
+  <p>FieldGovern is a multi-tenant platform. Every piece of data — forms, submissions, users, media files, API keys — is strictly isolated to your organization's tenant account. Data isolation is enforced at two independent layers:</p>
   <ul>
-    <li><strong>Google Drive</strong> — for media storage (requires your Google OAuth credentials)</li>
-    <li><strong>AWS S3</strong> — for media storage (requires your AWS credentials)</li>
-    <li><strong>Google Sheets</strong> — for export/sync (requires your authorization)</li>
-    <li><strong>SMTP providers</strong> — for email notifications (configured by your organization)</li>
+    <li><strong>Database layer</strong> — Row-Level Security (RLS) policies on PostgreSQL ensure that every query is scoped to the authenticated tenant. Even a misconfigured application query cannot cross tenant boundaries.</li>
+    <li><strong>Application layer</strong> — Every API endpoint validates the requesting user's tenant membership before processing any request.</li>
   </ul>
-  <p>Use of these integrations is governed by the respective third-party privacy policies.</p>
+  <p>This dual-layer isolation means no organization can ever access another organization's data, even in the event of a software defect in the application layer.</p>
 
-  <h2>9. Your Rights</h2>
-  <p>Depending on your jurisdiction, you may have the right to:</p>
+  <h2>5. Data Storage and Infrastructure</h2>
+  <p>All production data is hosted on servers operated by <strong>Contabo GmbH</strong> (EU-based infrastructure). Data in transit is encrypted using TLS 1.2 or higher. Passwords are stored as bcrypt hashes (cost factor 12) — plain-text passwords are never stored or logged anywhere in our system.</p>
+  <p>Authentication tokens (JWT) expire after 2 hours. API keys are hashed using SHA-256 before storage. Database backups are taken daily, compressed, and retained for 30 days. Backup files are encrypted at rest.</p>
+  <p>Media files (photos, audio recordings) uploaded by enumerators are stored on encrypted server local storage by default. Enterprise customers may configure their own Google Drive or AWS S3 bucket to store media under their own credentials and data governance policies.</p>
+  <p>While we implement industry-standard security measures, no system can be guaranteed 100% secure. In the event of a data breach, we will notify affected organization administrators within 72 hours of discovery.</p>
+
+  <h2>6. Offline Data on Field Devices</h2>
+  <p>A core feature of FieldGovern is its ability to work completely offline. When enumerators collect data without internet connectivity, form responses and media files are stored locally on their device using browser storage technologies — OPFS (Origin Private File System) on Chrome/Android, or IndexedDB on Safari/iOS. This data remains on the device and is uploaded to the server when connectivity is restored.</p>
+  <p>FieldGovern does not control the physical security of field devices. We strongly recommend that your organization enforce device-level screen locks, PIN protection, and remote wipe capability on all devices used for field data collection. Lost or stolen devices should be reported to your Org Admin immediately so API access can be revoked.</p>
+
+  <h2>7. Data Retention</h2>
+  <p>We retain your organization's data for as long as the account remains active. Inactive accounts (no login for 12+ months with no active subscription) may be flagged for deletion with 30 days' prior notice to the registered org admin email.</p>
+  <p>Upon account termination or cancellation, we will retain your data for 30 days to allow for final exports. After this grace period, data is permanently deleted from production systems within 7 days. Encrypted backup copies are cycled out within 30 days following the deletion. To request early deletion, email <a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a> with the subject line "Data Deletion Request".</p>
+  <p>Aggregate anonymized statistics (total form count, submission volumes, feature usage — never individual records) may be retained indefinitely for internal analytics.</p>
+
+  <h2>8. Cookies and Local Storage</h2>
+  <p>The FieldGovern web application uses minimal browser storage. JWT tokens (session credentials) are stored in <code>localStorage</code>. Offline form data and queued submissions are stored in OPFS or IndexedDB for sync functionality. We do not use any third-party tracking cookies, advertising cookies, or behavioral analytics scripts.</p>
+  <p>Our marketing website (fieldgovern.com) loads Google Fonts from <code>fonts.googleapis.com</code> — this is the only third-party request made by the marketing site. No other external tracking scripts are loaded.</p>
+
+  <h2>9. Third-Party Integrations</h2>
+  <p>FieldGovern supports optional integrations with third-party services. These are opt-in and configured by your organization's administrator:</p>
   <ul>
-    <li>Access the personal data we hold about you</li>
-    <li>Request correction of inaccurate data</li>
-    <li>Request deletion of your data</li>
-    <li>Object to or restrict processing of your data</li>
-    <li>Data portability (export in CSV or JSON format)</li>
+    <li><strong>Google Drive</strong> — for media file storage using your organization's own Google credentials</li>
+    <li><strong>AWS S3</strong> — for media file storage using your organization's own AWS credentials</li>
+    <li><strong>Google Sheets</strong> — for data export and live sync, requires your explicit OAuth authorization</li>
+    <li><strong>SMTP email providers</strong> — for automated digest emails and notifications, configured by your organization</li>
   </ul>
-  <p>To exercise any of these rights, contact us at <a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a>. We will respond within 30 days.</p>
+  <p>When you enable these integrations, data shared with those services is subject to their respective privacy policies. FieldGovern does not retain credentials beyond what is necessary to maintain the connection you have authorized.</p>
 
-  <h2>10. Children's Privacy</h2>
-  <p>FieldGovern is a B2B platform intended for use by organizations and their adult employees. We do not knowingly collect personal information from children under 18. If your research involves collecting data about minors as research subjects, your organization is responsible for obtaining appropriate consent under applicable law.</p>
-
-  <h2>11. Changes to This Policy</h2>
-  <p>We may update this Privacy Policy from time to time. We will notify registered org admins by email when material changes are made. Continued use of the platform after the effective date constitutes acceptance of the updated policy.</p>
-
-  <h2>12. Contact Us</h2>
-  <p>For privacy-related questions or requests:</p>
+  <h2>10. Your Rights</h2>
+  <p>As a user or administrator of a FieldGovern organization account, you have the following rights:</p>
   <ul>
-    <li>Email: <a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a></li>
-    <li>Website: <a href="https://www.fieldgovern.com">www.fieldgovern.com</a></li>
+    <li><strong>Access</strong> — Request a summary of personal data we hold about your account</li>
+    <li><strong>Correction</strong> — Request correction of inaccurate or incomplete data</li>
+    <li><strong>Deletion</strong> — Request permanent deletion of your personal data and your organization's account data</li>
+    <li><strong>Portability</strong> — Export your organization's data in CSV, JSON, or Excel format at any time from the platform dashboard</li>
+    <li><strong>Objection</strong> — Object to or request restriction of specific processing activities</li>
+    <li><strong>Withdrawal of consent</strong> — Withdraw consent for optional integrations (Google Drive, Sheets, etc.) at any time from the integrations settings page</li>
   </ul>
+  <p>To exercise any of these rights, contact us at <a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a>. We will acknowledge your request within 3 business days and fulfil it within 30 days.</p>
+
+  <h2>11. Children's Privacy</h2>
+  <p>FieldGovern is a B2B platform designed for use by organizations and their adult employees. We do not knowingly collect personal data from anyone under the age of 18 as account holders.</p>
+  <p>If your research involves collecting data <em>about</em> minors as research subjects through your forms, your organization acts as the data controller and is solely responsible for obtaining appropriate informed consent from parents or guardians in accordance with applicable law, including India's Digital Personal Data Protection Act (DPDP) 2023, the Protection of Children from Sexual Offences (POCSO) Act, and any ethics committee requirements applicable to your research.</p>
+
+  <h2>12. Research Ethics and Data Collection Responsibility</h2>
+  <p>FieldGovern is a tool. The ethical responsibility for how data is collected, from whom, and for what purpose rests entirely with the organizations and researchers using the platform. We strongly encourage all organizations using FieldGovern to:</p>
+  <ul>
+    <li>Obtain Institutional Review Board (IRB) or ethics committee approval where applicable</li>
+    <li>Provide informed consent to all research participants in their local language</li>
+    <li>Comply with India's DPDP Act 2023 and any sector-specific regulations (health data, financial data, biometric data)</li>
+    <li>Maintain participant confidentiality by anonymizing personally identifiable information (PII) before export or sharing</li>
+    <li>Implement appropriate data classification and access controls within your FieldGovern organization</li>
+  </ul>
+
+  <h2>13. Changes to This Policy</h2>
+  <p>We may update this Privacy Policy from time to time as the platform evolves or as legal requirements change. When we make material changes, we will notify all registered Org Admins by email at least 14 days before the changes take effect, and update the "Last updated" date at the top of this page. Your continued use of FieldGovern after the effective date constitutes acceptance of the updated policy.</p>
+  <p>For minor changes (corrections, clarifications that don't affect your rights), we may update this policy without individual notice. We encourage you to review this page periodically.</p>
+
+  <h2>14. Contact Us</h2>
+  <p>For privacy-related questions, data requests, or to report a concern:</p>
+  <ul>
+    <li><strong>Email:</strong> <a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a></li>
+    <li><strong>Developer:</strong> Pavankumar Deshetty — <a href="https://apranjipavan2-spec.github.io/portfolio/" target="_blank">apranjipavan2-spec.github.io/portfolio</a></li>
+    <li><strong>Strategic Partner:</strong> Dataworx — <a href="mailto:pallavi@dataworx.co.in">pallavi@dataworx.co.in</a></li>
+    <li><strong>Website:</strong> <a href="https://www.fieldgovern.com">www.fieldgovern.com</a></li>
+  </ul>
+  <p>We aim to respond to all privacy enquiries within 3 business days.</p>
 
   <footer-note>
-    <a href="index.html">← Back to Home</a> &nbsp;·&nbsp; <a href="terms.html">Terms of Service</a>
+    <a href="index.html">← Back to Home</a> &nbsp;·&nbsp; <a href="terms.html">Terms of Service</a> &nbsp;·&nbsp; <a href="about.html">About Us</a>
   </footer-note>
 </main>
 </body>
