@@ -24,6 +24,7 @@ export default function OrgAdminPanel() {
     { id: 'users', label: '👥 Users', description: 'Manage team members' },
     { id: 'api-keys', label: '🔑 API Keys', description: 'Integration access' },
     { id: 'forms', label: '📋 Forms', description: 'Form templates' },
+    { id: 'migration', label: '🔄 Import', description: 'Kobo · SurveyCTO · XLSForm' },
   ]
 
   return (
@@ -65,6 +66,7 @@ export default function OrgAdminPanel() {
             {activeTab === 'users' && <UsersTab />}
             {activeTab === 'api-keys' && <ApiKeyManager />}
             {activeTab === 'forms' && <FormsTab />}
+            {activeTab === 'migration' && <MigrationTab />}
           </div>
         </div>
       </div>
@@ -93,6 +95,25 @@ function UsersTab() {
             </a>
           </div>
         </div>
+      </div>
+    </Card>
+  )
+}
+
+function MigrationTab() {
+  return (
+    <Card>
+      <div className="p-6">
+        <h3 className="text-lg font-semibold text-catalan-text mb-2">Import from Other Platforms</h3>
+        <p className="text-catalan-textMuted mb-6">
+          Migrate your forms and historical data from KoboToolbox, SurveyCTO, ODK Central, or any standard XLSForm file.
+        </p>
+        <a
+          href="/migration"
+          className="inline-block px-5 py-2.5 bg-catalan-primary text-catalan-bg rounded-lg font-semibold hover:opacity-90 transition-opacity"
+        >
+          🔄 Open Migration Wizard →
+        </a>
       </div>
     </Card>
   )

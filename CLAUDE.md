@@ -250,6 +250,14 @@ npm run dev            # → http://localhost:5173
 | Allow-enumerator-edit toggle | Dashboard → Integrations → Org Settings |
 | Demo quick-fill on login | `auth/LoginPage.tsx` |
 | Unified website nav | `website/` — all pages (index, about, demo) share identical nav: logo.png image, Features / How It Works / Compare / Pricing / About / Contact links, Try Demo + Open App buttons, hamburger + mobile overlay |
+| Platform migration (XLSForm import) | `backend/app/api/routes/migration/` + `frontend/src/migration/` — imports XLSForm, Kobo, SurveyCTO, ODK Central forms + submissions |
+
+---
+
+## Roadmap & Planning
+
+Full future scope: `planning/ROADMAP.md`  
+Migration feature spec: `planning/MIGRATION_SPEC.md`
 
 ---
 

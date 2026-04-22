@@ -12,6 +12,7 @@ import UserProfile    from '@/profile/UserProfile'
 import ProgramsPage        from '@/programs/ProgramsPage'
 import ProgressDashboard   from '@/programs/ProgressDashboard'
 import SuperAdminMonitor   from '@/admin/SuperAdminMonitor'
+import MigrationPage      from '@/migration/MigrationPage'
 import { LanguageProvider } from '@/i18n/LanguageContext'
 import { ToastProvider } from '@/lib/ToastContext'
 import { ThemeProvider } from '@/lib/ThemeContext'
@@ -151,6 +152,14 @@ export default function App() {
                 <RequireAuth>
                   <ErrorBoundary>
                     <UserProfile />
+                  </ErrorBoundary>
+                </RequireAuth>
+              } />
+
+              <Route path="/migration" element={
+                <RequireAuth roles={['org_admin', 'master_admin']}>
+                  <ErrorBoundary>
+                    <MigrationPage />
                   </ErrorBoundary>
                 </RequireAuth>
               } />
