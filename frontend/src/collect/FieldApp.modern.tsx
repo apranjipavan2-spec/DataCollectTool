@@ -704,13 +704,15 @@ export default function FieldApp() {
       startedAt: new Date().toISOString(),
     }
     return (
-      <FormRenderer
-        schema={activeForm.schema}
-        onSave={async () => {}}
-        onSubmit={handleEditSubmit}
-        initialDraft={editDraft}
-        onCancel={() => { setScreen('history'); setEditingSubmission(null); setActiveForm(null) }}
-      />
+      <div className="h-screen flex flex-col">
+        <FormRenderer
+          schema={activeForm.schema}
+          onSave={async () => {}}
+          onSubmit={handleEditSubmit}
+          initialDraft={editDraft}
+          onCancel={() => { setScreen('history'); setEditingSubmission(null); setActiveForm(null) }}
+        />
+      </div>
     )
   }
 
@@ -747,7 +749,7 @@ export default function FieldApp() {
             )}
           </div>
         )}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 min-h-0">
           <FormRenderer
             schema={activeForm.schema}
             onSave={handleSave}

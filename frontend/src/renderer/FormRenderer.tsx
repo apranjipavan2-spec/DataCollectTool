@@ -211,7 +211,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
   }
 
   return (
-    <div className="min-h-screen bg-catalan-bg flex flex-col font-sans">
+    <div className="h-full bg-catalan-bg flex flex-col font-sans">
 
       {/* ── Header ── */}
       <div className="px-4 pt-3 pb-3 border-b border-catalan-border bg-catalan-surface sticky top-0 z-10">
@@ -335,7 +335,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
       </div>
 
       {/* ── Navigation ── */}
-      <div className="border-t border-catalan-border bg-catalan-surface">
+      <div className="border-t border-catalan-border bg-catalan-surface" style={{paddingBottom:'env(safe-area-inset-bottom)'}}>
         <div className="max-w-2xl mx-auto px-4 py-3 flex gap-2.5">
           {page > 0 ? (
             <button
