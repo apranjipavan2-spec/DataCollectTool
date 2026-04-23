@@ -1,6 +1,6 @@
 from uuid import uuid4
 from sqlalchemy import Column, String, Text, Date, ForeignKey, TIMESTAMP, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.core.database import Base
 
 
@@ -17,4 +17,5 @@ class RespondentRoster(Base):
     status = Column(String(20), default="pending")
     scheduled_date = Column(Date, nullable=True)
     notes = Column(Text)
+    extra_data = Column(JSONB, default=dict, server_default="'{}'::jsonb")
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())

@@ -10,6 +10,7 @@ import { compressImage } from '@/utils/imageCompress'
 import { Button } from '@/components/ui'
 import Sidebar from '@/components/Sidebar'
 import { getNavItems } from '@/lib/navigation'
+import BeneficiaryListScreen, { type RosterEntry } from './BeneficiaryListScreen'
 
 function _haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000
@@ -112,6 +113,9 @@ export default function FieldApp() {
   const [selectedLocationId, setSelectedLocationId] = useState('')
   const [assignedArm, setAssignedArm] = useState<string | null>(null)
   const [geofenceWarning, setGeofenceWarning] = useState(false)
+  const [rosterEntries, setRosterEntries] = useState<RosterEntry[]>([])
+  const [showBeneficiaryList, setShowBeneficiaryList] = useState(false)
+  const [rosterInitialValues, setRosterInitialValues] = useState<Record<string, unknown> | null>(null)
   const syncRef = useRef<() => Promise<void>>()
   const loadFormsRef = useRef<() => Promise<void>>()
   const { language, setLanguage } = useLanguage()
@@ -419,6 +423,37 @@ export default function FieldApp() {
     loadForms()
   }, [syncToServer])
 
+  const handleFormCardClick = async (meta: FormMeta) => {
+    if (!isOffline) {
+      try {
+        const { data } = await api.get<RosterEntry[]>(`/roster/with-status?form_id=${meta.id}`)
+        if (data.length > 0) {
+          setRosterEntries(data)
+          setActiveForm({ meta, schema: {} as FormSchema })
+          setShowBeneficiaryList(true)
+          setResumingDraft(null)
+          return
+        }
+      } catch { }
+    }
+    openForm(meta)
+  }
+
+  const handleBeneficiarySelect = async (entry: RosterEntry) => {
+    if (!activeForm) return
+    const meta = activeForm.meta
+    const initialValues: Record<string, unknown> = { _roster_id: entry.id }
+    if (entry.name) {
+      for (const key of ['name', 'full_name', 'respondent_name', 'beneficiary_name']) {
+        initialValues[key] = entry.name
+      }
+    }
+    if (entry.phone) initialValues['phone'] = entry.phone
+    setShowBeneficiaryList(false)
+    setRosterEntries([])
+    openForm(meta, undefined, initialValues)
+  }
+
   const handleRefreshForms = async () => {
     if (isOffline) { setSyncMsg('Cannot refresh — offline'); return }
     setRefreshing(true)
@@ -463,7 +498,7 @@ export default function FieldApp() {
     }
   }
 
-  const openForm = async (meta: FormMeta, schedCtx?: { programContext: any; locationContext?: any; locationId?: string }) => {
+  const openForm = async (meta: FormMeta, schedCtx?: { programContext: any; locationContext?: any; locationId?: string }, initialValues?: Record<string, unknown>) => {
     let schema: FormSchema | null = null
     try {
       const { data } = await api.get<{ json_schema: FormSchema }>(`/forms/${meta.id}`)
@@ -477,6 +512,7 @@ export default function FieldApp() {
     setActiveForm({ meta, schema })
     setAssignedArm(null)
     setGeofenceWarning(false)
+    setRosterInitialValues(initialValues ?? null)
 
     // Arm assignment
     const randCfg = schema.settings?.randomization
@@ -755,9 +791,21 @@ export default function FieldApp() {
     )
   }
 
+  // Beneficiary list screen
+  if (showBeneficiaryList && activeForm) {
+    return (
+      <BeneficiaryListScreen
+        formTitle={activeForm.meta.title}
+        entries={rosterEntries}
+        onSelect={handleBeneficiarySelect}
+        onBack={() => { setShowBeneficiaryList(false); setRosterEntries([]); setActiveForm(null) }}
+      />
+    )
+  }
+
   // Form collection screen
   if (screen === 'collecting' && activeForm) {
-    const clearProg = () => { setProgramContext(null); setSelectedLocationId(''); setAssignedArm(null); setGeofenceWarning(false) }
+    const clearProg = () => { setProgramContext(null); setSelectedLocationId(''); setAssignedArm(null); setGeofenceWarning(false); setRosterInitialValues(null) }
     return (
       <div className="flex flex-col h-screen">
         {assignedArm && (
@@ -803,8 +851,16 @@ export default function FieldApp() {
             schema={activeForm.schema}
             onSave={handleSave}
             onSubmit={async (draft) => { await handleSubmit(draft); clearProg() }}
-            initialDraft={resumingDraft ?? undefined}
-            onCancel={() => { setScreen('list'); setActiveForm(null); setResumingDraft(null); clearProg() }}
+            initialDraft={resumingDraft ?? (rosterInitialValues ? {
+              id: uuidv4(),
+              formVersion: activeForm.meta.version,
+              values: rosterInitialValues,
+              gpsOpen: null,
+              gpsSubmit: null,
+              status: 'draft',
+              startedAt: new Date().toISOString(),
+            } : undefined)}
+            onCancel={() => { setScreen('list'); setActiveForm(null); setResumingDraft(null); setRosterInitialValues(null); clearProg() }}
           />
         </div>
       </div>
@@ -1007,7 +1063,7 @@ export default function FieldApp() {
                 {forms.map(f => (
                   <button
                     key={f.id}
-                    onClick={() => openForm(f)}
+                    onClick={() => handleFormCardClick(f)}
                     className="w-full p-4 bg-catalan-surface border border-catalan-border rounded-xl hover:border-catalan-primary hover:bg-catalan-primary/5 active:scale-[0.99] transition-all duration-150 text-left group"
                   >
                     <div className="flex justify-between items-center gap-3">

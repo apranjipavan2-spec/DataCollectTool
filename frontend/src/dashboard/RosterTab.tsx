@@ -38,8 +38,46 @@ export default function RosterTab({ forms, team }: { forms: Form[]; team: TeamMe
     form_id: '', name: '', phone: '', address: '',
     target_enumerator_id: '', scheduled_date: '', notes: '',
   })
+  const [csvFormId, setCsvFormId] = useState('')
+  const [csvFile, setCsvFile] = useState<File | null>(null)
+  const [csvUploading, setCsvUploading] = useState(false)
+  const [csvResult, setCsvResult] = useState<string>('')
 
   const enumerators = team.filter(u => u.role === 'enumerator')
+
+  const handleCsvUpload = async () => {
+    if (!csvFormId) { toast.warning('Select a form first'); return }
+    if (!csvFile) { toast.warning('Select a file first'); return }
+    setCsvUploading(true)
+    setCsvResult('')
+    try {
+      const fd = new FormData()
+      fd.append('file', csvFile)
+      const { data } = await api.post(`/roster/upload-csv?form_id=${csvFormId}`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      const msg = `Created ${data.created} beneficiaries, skipped ${data.skipped}${data.errors?.length ? `, ${data.errors.length} error(s)` : ''}`
+      setCsvResult(msg)
+      toast.success(msg)
+      setCsvFile(null)
+      load()
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail ?? 'Upload failed')
+    } finally {
+      setCsvUploading(false)
+    }
+  }
+
+  const handleTemplateDownload = () => {
+    const csv = 'name,phone,address,enumerator_phone,scheduled_date,notes\nJohn Doe,+910000000000,Village Name,,2026-05-01,\n'
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'beneficiary_template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const load = async () => {
     setLoading(true)
@@ -111,6 +149,44 @@ export default function RosterTab({ forms, team }: { forms: Form[]; team: TeamMe
   return (
     <div className="space-y-4">
       <Card>
+        <div className="mb-6 p-4 bg-catalan-hover rounded-lg border border-catalan-border space-y-3">
+          <h3 className="text-sm font-semibold text-catalan-text">📂 Upload Beneficiary CSV</h3>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div>
+              <label className="text-xs text-catalan-textMuted block mb-1">Form *</label>
+              <select
+                value={csvFormId}
+                onChange={e => setCsvFormId(e.target.value)}
+                className="bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+              >
+                <option value="">Select form…</option>
+                {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-catalan-textMuted block mb-1">File (.csv or .xlsx)</label>
+              <input
+                type="file"
+                accept=".csv,.xlsx"
+                onChange={e => setCsvFile(e.target.files?.[0] ?? null)}
+                className="text-sm text-catalan-text file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-catalan-primary/10 file:text-catalan-primary file:text-xs file:font-medium hover:file:bg-catalan-primary/20 cursor-pointer"
+              />
+            </div>
+            <Button variant="primary" size="sm" onClick={handleCsvUpload} disabled={csvUploading}>
+              {csvUploading ? 'Uploading…' : 'Upload'}
+            </Button>
+            <button
+              onClick={handleTemplateDownload}
+              className="text-xs px-3 py-2 rounded-lg border border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50 transition-colors"
+            >
+              ⬇ CSV Template
+            </button>
+          </div>
+          {csvResult && (
+            <p className="text-xs text-catalan-success">{csvResult}</p>
+          )}
+        </div>
+
         <div className="flex flex-wrap gap-3 items-end mb-4">
           <div>
             <label className="text-xs text-catalan-textMuted block mb-1">Form</label>

@@ -1,11 +1,12 @@
 """Respondent roster endpoints."""
+import io
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import require_role, require_supervisor
+from app.core.deps import require_role, require_supervisor, require_enumerator
 from app.models.roster import RespondentRoster
 
 router = APIRouter()
@@ -156,3 +157,123 @@ def bulk_import_roster(
         created.append(r)
     db.commit()
     return {"created": len(created)}
+
+
+@router.post("/upload-csv")
+async def upload_roster_csv(
+    form_id: str,
+    file: UploadFile = File(...),
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    import pandas as pd
+    from datetime import date as _date
+    from app.models.user import User
+
+    filename = (file.filename or "").lower()
+    if not (filename.endswith(".csv") or filename.endswith(".xlsx")):
+        raise HTTPException(status_code=400, detail="Only .csv or .xlsx files are supported")
+
+    contents = await file.read()
+    try:
+        if filename.endswith(".xlsx"):
+            df = pd.read_excel(io.BytesIO(contents))
+        else:
+            df = pd.read_csv(io.BytesIO(contents))
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Could not parse file: {exc}")
+
+    if "name" not in df.columns:
+        raise HTTPException(status_code=422, detail="CSV must have a 'name' column")
+
+    known_cols = {"name", "phone", "address", "enumerator_phone", "scheduled_date", "notes"}
+    extra_cols = [c for c in df.columns if c not in known_cols]
+
+    created = 0
+    skipped = 0
+    errors: list[str] = []
+
+    for idx, row in df.iterrows():
+        name = str(row.get("name", "")).strip() if row.get("name") is not None else ""
+        if not name or name.lower() in ("nan", "none", ""):
+            skipped += 1
+            continue
+
+        enumerator_id = None
+        enumerator_phone = str(row.get("enumerator_phone", "")).strip() if row.get("enumerator_phone") is not None else ""
+        if enumerator_phone and enumerator_phone.lower() not in ("nan", "none", ""):
+            match = db.query(User).filter(
+                User.phone == enumerator_phone,
+                User.tenant_id == user["tenant_id"],
+            ).first()
+            if match:
+                enumerator_id = match.id
+            else:
+                errors.append(f"Row {idx + 2}: enumerator phone '{enumerator_phone}' not found")
+
+        sched_date = None
+        raw_date = str(row.get("scheduled_date", "")).strip() if row.get("scheduled_date") is not None else ""
+        if raw_date and raw_date.lower() not in ("nan", "none", ""):
+            try:
+                sched_date = _date.fromisoformat(raw_date[:10])
+            except ValueError:
+                errors.append(f"Row {idx + 2}: invalid scheduled_date '{raw_date}'")
+
+        extra = {}
+        for col in extra_cols:
+            val = row.get(col)
+            if val is not None and str(val).lower() not in ("nan", "none"):
+                extra[col] = str(val)
+
+        phone = str(row.get("phone", "")).strip() if row.get("phone") is not None else ""
+        address = str(row.get("address", "")).strip() if row.get("address") is not None else ""
+        notes = str(row.get("notes", "")).strip() if row.get("notes") is not None else ""
+
+        r = RespondentRoster(
+            form_id=form_id,
+            tenant_id=user["tenant_id"],
+            name=name,
+            phone=phone or None,
+            address=address or None,
+            target_enumerator_id=enumerator_id,
+            scheduled_date=sched_date,
+            notes=notes or None,
+            extra_data=extra if extra else {},
+        )
+        db.add(r)
+        created += 1
+
+    db.commit()
+    return {"created": created, "skipped": skipped, "errors": errors}
+
+
+@router.get("/with-status")
+def roster_with_status(
+    form_id: str,
+    user: dict = Depends(require_enumerator),
+    db: Session = Depends(get_db),
+):
+    from app.models.submission import Submission
+
+    q = db.query(RespondentRoster).filter(
+        RespondentRoster.form_id == form_id,
+        RespondentRoster.tenant_id == user["tenant_id"],
+    )
+    if user.get("role") == "enumerator":
+        q = q.filter(RespondentRoster.target_enumerator_id == user["sub"])
+
+    entries = q.order_by(RespondentRoster.created_at).all()
+
+    result = []
+    for entry in entries:
+        sub = db.query(Submission).filter(
+            Submission.roster_id == entry.id,
+        ).first()
+        collected = sub is not None or entry.status == "completed"
+        row = _roster_to_dict(entry)
+        row["extra_data"] = entry.extra_data or {}
+        row["collected"] = collected
+        row["submission_id"] = str(sub.id) if sub else None
+        result.append(row)
+
+    return result
