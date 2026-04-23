@@ -13,6 +13,7 @@ import LineChart from '@/components/charts/LineChart'
 import AuditLog from '@/components/AuditLog'
 import RosterTab from '@/dashboard/RosterTab'
 import ProgressTab from '@/dashboard/ProgressTab'
+import AiReportModal from '@/dashboard/AiReportModal'
 
 const MiniMap = lazy(() => import('@/renderer/fields/MiniMap'))
 const SubmissionsMap = lazy(() => import('@/dashboard/SubmissionsMap'))
@@ -582,11 +583,15 @@ export default function Dashboard() {
   // PDF export
   const [exportingPdf, setExportingPdf] = useState(false)
 
+  // AI Report modal
+  const [aiReportForm, setAiReportForm] = useState<{ id: string; title: string } | null>(null)
+
   // Plan limit banner
   const [planLimitMsg, setPlanLimitMsg] = useState('')
 
   const user = getStoredUser() || { name: '', role: '' }
   const isEnumerator = user.role === 'enumerator'
+  const isSupervisorPlus = user.role === 'supervisor' || user.role === 'org_admin' || user.role === 'master_admin'
   const sidebarItems = getNavItems(user.role)
 
   // Listen for 402 plan-limit events fired by api.ts interceptor
@@ -1228,6 +1233,14 @@ export default function Dashboard() {
         />
       )}
 
+      {aiReportForm && (
+        <AiReportModal
+          formId={aiReportForm.id}
+          formTitle={aiReportForm.title}
+          onClose={() => setAiReportForm(null)}
+        />
+      )}
+
       {/* Share modal */}
       {shareForm && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setShareForm(null)}>
@@ -1575,6 +1588,19 @@ export default function Dashboard() {
                     <Button variant="secondary" size="sm" onClick={handleExportSpss} disabled={exportingSpss} title="Download SPSS .sav file">
                       {exportingSpss ? 'Building…' : '↓ SPSS'}
                     </Button>
+                    {isSupervisorPlus && filterForm && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          const f = forms.find(x => x.id === filterForm)
+                          setAiReportForm({ id: filterForm, title: f?.title || 'Survey' })
+                        }}
+                        title="Generate AI summary report for this form"
+                      >
+                        🤖 AI Report
+                      </Button>
+                    )}
                     {sheetsConfigured === false ? (
                       <button
                         title="Google Drive not connected — run scripts/gdrive_auth.py on the server"

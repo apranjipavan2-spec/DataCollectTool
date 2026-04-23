@@ -19,4 +19,5 @@ class Tenant(Base):
     # notification_config: {whatsapp_enabled, msg91_auth_key, msg91_template_id,
     #                        notify_events, notify_numbers, sheets_webhook_url}
     notification_config = Column(JSONB, default=dict, server_default="'{}'::jsonb")
+    ai_config = Column(JSONB, default=dict, server_default="'{}'::jsonb")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     auth, forms, submissions, users, sync, export, assignments, history,
     schedules, tenants, notifications, api_keys, webhooks, reports,
-    templates, import_excel, bulk_upload, programs, admin_monitor,
+    templates, import_excel, bulk_upload, programs, admin_monitor, ai,
 )
 from app.api.routes.migration.router import router as migration_router
 from app.api.routes import public_survey, roster, analytics
@@ -32,3 +32,4 @@ router.include_router(migration_router, prefix="/migration", tags=["migration"])
 router.include_router(public_survey.router, tags=["public-survey"])
 router.include_router(roster.router, prefix="/roster", tags=["roster"])
 router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+router.include_router(ai.router, prefix="/ai", tags=["ai"])

@@ -14,6 +14,7 @@ import TopNav from '@/components/TopNav'
 import { Card } from '@/components/ui'
 import ApiKeyManager from './ApiKeyManager'
 import IntegrationsPanel from './IntegrationsPanel'
+import AiConfigPanel from './AiConfigPanel'
 
 export default function OrgAdminPanel() {
   const [activeTab, setActiveTab] = useState('users')
@@ -27,6 +28,7 @@ export default function OrgAdminPanel() {
     { id: 'forms', label: '📋 Forms', description: 'Form templates' },
     { id: 'migration', label: '🔄 Import', description: 'Kobo · SurveyCTO · XLSForm' },
     { id: 'integrations', label: '🔗 Integrations', description: 'WhatsApp · Google Sheets' },
+    { id: 'ai', label: '🤖 AI', description: 'OpenAI · Claude · Gemini' },
   ]
 
   return (
@@ -73,6 +75,13 @@ export default function OrgAdminPanel() {
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-catalan-text mb-6">Integrations</h3>
                 <IntegrationsPanel />
+              </div>
+            )}
+            {activeTab === 'ai' && (
+              <div className="p-6">
+                <h3 className="text-lg font-semibold text-catalan-text mb-2">AI Configuration</h3>
+                <p className="text-sm text-catalan-textMuted mb-6">Connect your own LLM API key to enable AI-powered report generation, skip logic suggestions, and label translation.</p>
+                <AiConfigPanel />
               </div>
             )}
           </div>
