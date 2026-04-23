@@ -18,6 +18,7 @@ from app.models.form import Form
 from app.models.submission import Submission
 from app.models.tenant import Tenant
 from app.services.whatsapp import notify as wa_notify
+from app.services.telegram import notify as tg_notify
 from app.services.sheets_sync import bulk_sync_submissions
 
 from .xlsform_parser import parse_xlsform
@@ -46,15 +47,23 @@ def _extract_field_names(sections: list[dict]) -> set[str]:
 
 
 def _post_import_hooks(db: Session, tenant_id: str, form: Form, platform: str, submissions_imported: int, saved_rows: list[dict]) -> None:
-    """Fire WhatsApp notification + Sheets sync after any platform import. Never raises."""
+    """Fire WhatsApp + Telegram notification + Sheets sync after any platform import. Never raises."""
     try:
+        import asyncio
         tenant = db.query(Tenant).filter(Tenant.id == uuid.UUID(tenant_id)).first()
         if tenant:
-            wa_notify(tenant, "import.complete", {
+            notify_params = {
                 "platform": platform,
-                "form_count": 1,
-                "submission_count": submissions_imported,
-            })
+                "form_title": form.title,
+                "count": submissions_imported,
+            }
+            wa_notify(tenant, "import.complete", notify_params)
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.ensure_future(tg_notify(tenant, "import.complete", notify_params))
+            except Exception:
+                pass
     except Exception:
         pass
     try:

@@ -16,6 +16,7 @@ from app.models.sync_log import SyncLog
 from app.models.tenant import Tenant
 from app.services.webhook import fire_webhooks
 from app.services.whatsapp import notify as wa_notify
+from app.services.telegram import notify as tg_notify
 from app.services.sheets_sync import sync_submission
 import logging
 
@@ -181,13 +182,16 @@ def push(request: Request, body: PushRequest, user=Depends(require_enumerator), 
             except ValueError:
                 pass
 
+        data_for_storage = dict(item.data_json)
+        roster_id = data_for_storage.pop("_roster_id", None)
+
         sub = Submission(
             tenant_id=user["tenant_id"],
             form_id=item.form_id,
             form_version=item.form_version,
             enumerator_id=user["sub"],
             local_id=item.local_id,
-            data_json=item.data_json,
+            data_json=data_for_storage,
             gps_open=item.gps_open,
             gps_submit=item.gps_submit,
             local_created_at=datetime.fromisoformat(item.local_created_at),
@@ -198,14 +202,24 @@ def push(request: Request, body: PushRequest, user=Depends(require_enumerator), 
             location_id=item.location_id,
             consent_given=item.consent_given if item.consent_given is not None else True,
             consent_timestamp=consent_ts,
+            roster_id=roster_id,
         )
         db.add(sub)
         db.flush()  # get sub.id before commit
 
+        if roster_id:
+            from app.models.roster import RespondentRoster
+            roster_entry = db.query(RespondentRoster).filter(
+                RespondentRoster.id == roster_id,
+                RespondentRoster.tenant_id == user["tenant_id"],
+            ).first()
+            if roster_entry and roster_entry.status in ("pending", "visited"):
+                roster_entry.status = "completed"
+
         # Validation rules
         form_obj_for_val = db.query(Form).filter(Form.id == item.form_id).first()
         if form_obj_for_val and form_obj_for_val.json_schema:
-            violations = _run_validation(form_obj_for_val.json_schema, item.data_json)
+            violations = _run_validation(form_obj_for_val.json_schema, data_for_storage)
             if violations:
                 data = dict(sub.data_json or {})
                 data["_validation_violations"] = violations
@@ -213,7 +227,7 @@ def push(request: Request, body: PushRequest, user=Depends(require_enumerator), 
                 sub.has_violations = True
 
         # Duplicate detection
-        is_dup = _check_duplicate(db, sub, item.data_json, str(user["sub"]))
+        is_dup = _check_duplicate(db, sub, data_for_storage, str(user["sub"]))
         if is_dup:
             data = dict(sub.data_json or {})
             data["_duplicate_suspect"] = True
@@ -224,7 +238,7 @@ def push(request: Request, body: PushRequest, user=Depends(require_enumerator), 
             geo = (form_obj_for_val.json_schema or {}).get("settings", {}).get("geofence", {})
             if geo.get("enabled") and geo.get("lat") is not None and geo.get("lng") is not None and geo.get("radius_meters"):
                 gps_val = next(
-                    (v for v in item.data_json.values() if isinstance(v, str) and "," in v and _is_coord_string(v)),
+                    (v for v in data_for_storage.values() if isinstance(v, str) and "," in v and _is_coord_string(v)),
                     None,
                 )
                 if gps_val:
@@ -269,15 +283,23 @@ def push(request: Request, body: PushRequest, user=Depends(require_enumerator), 
         except Exception:
             logger.warning("Webhook fire failed for synced submission %s", matching[0]["server_id"])
 
-    # WhatsApp — batch notify (one message for all submissions in this push)
+    # WhatsApp + Telegram — batch notify (one message for all submissions in this push)
     if synced_items and tenant:
         first_form_id = synced_items[0][0].form_id
         form_obj = db.query(Form).filter(Form.id == first_form_id).first()
-        wa_notify(tenant, "submission.created", {
+        notify_params = {
             "count": len(synced_items),
             "form_title": form_obj.title if form_obj else first_form_id,
             "enumerator": user.get("name", str(user["sub"])),
-        })
+        }
+        wa_notify(tenant, "submission.created", notify_params)
+        import asyncio as _asyncio
+        try:
+            loop = _asyncio.get_event_loop()
+            if loop.is_running():
+                _asyncio.ensure_future(tg_notify(tenant, "submission.created", notify_params))
+        except Exception:
+            pass
 
     # Sheets sync — per-submission, per-form
     for item, matched in synced_items:

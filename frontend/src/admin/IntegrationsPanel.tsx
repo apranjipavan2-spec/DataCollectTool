@@ -1,5 +1,5 @@
 /**
- * Integrations settings panel — WhatsApp notifications + Google Sheets sync.
+ * Integrations settings panel — Telegram/WhatsApp notifications + Google Sheets sync.
  * Embedded in OrgAdminPanel → Integrations tab.
  */
 import { useState, useEffect } from 'react'
@@ -48,6 +48,129 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
   )
 }
 
+// ── Telegram Section ──────────────────────────────────────────────────────────
+
+function TelegramSection() {
+  const [enabled, setEnabled] = useState(false)
+  const [botToken, setBotToken] = useState('')
+  const [chatIds, setChatIds] = useState('')
+  const [events, setEvents] = useState<string[]>(['submission.created', 'submission.flagged', 'import.complete'])
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    api.get('/tenants/integrations').then(r => {
+      const cfg = r.data
+      setEnabled(cfg.telegram_enabled ?? false)
+      setBotToken(cfg.telegram_bot_token ?? '')
+      setChatIds((cfg.telegram_chat_ids ?? []).join('\n'))
+      if (cfg.notify_events?.length) setEvents(cfg.notify_events)
+    }).catch(() => {})
+  }, [])
+
+  function toggleEvent(id: string) {
+    setEvents(prev => prev.includes(id) ? prev.filter(e => e !== id) : [...prev, id])
+  }
+
+  async function save() {
+    setSaving(true); setError(''); setSaved(false)
+    try {
+      const ids = chatIds.split(/[\n,]/).map(s => s.trim()).filter(Boolean)
+      await api.patch('/tenants/integrations/notifications', {
+        telegram_enabled: enabled,
+        telegram_bot_token: botToken,
+        telegram_chat_ids: ids,
+        notify_events: events,
+        whatsapp_enabled: false,
+        msg91_auth_key: '',
+        msg91_template_id: '',
+        notify_numbers: [],
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (e: any) {
+      setError(e.response?.data?.detail || 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start justify-between">
+        <div>
+          <h4 className="font-semibold text-catalan-text">✈️ Telegram Notifications</h4>
+          <p className="text-xs text-catalan-textMuted mt-0.5">Free, instant, no approval needed. Supervisors get notified on field events.</p>
+        </div>
+        <Toggle checked={enabled} onChange={setEnabled} label={enabled ? 'Enabled' : 'Disabled'} />
+      </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 space-y-1">
+        <p className="font-semibold">Setup:</p>
+        <ol className="list-decimal list-inside space-y-0.5">
+          <li>Create a bot via @BotFather on Telegram → copy the token</li>
+          <li>Each supervisor opens Telegram, messages your bot, and sends /start</li>
+          <li>Find their chat_id at: <code className="bg-blue-100 px-1 rounded">https://api.telegram.org/bot{'{'TOKEN{'}'}/getUpdates</code> — look for 'chat.id' in the response</li>
+          <li>Paste the token and chat IDs below</li>
+        </ol>
+      </div>
+
+      <div className="space-y-4 pl-2 border-l-2 border-catalan-primary/30">
+        <Input
+          label="Bot Token"
+          value={botToken}
+          onChange={setBotToken}
+          placeholder="7123456789:ABCDef..."
+          type="password"
+          hint="From @BotFather → /mybots → select bot → API Token"
+        />
+
+        <div>
+          <label className="block text-sm font-medium text-catalan-text mb-1">Chat IDs</label>
+          <p className="text-xs text-catalan-textMuted mb-1">One chat ID per line (or comma-separated). Get from getUpdates after supervisors send /start to your bot.</p>
+          <textarea
+            value={chatIds}
+            onChange={e => setChatIds(e.target.value)}
+            placeholder={"123456789\n987654321"}
+            rows={4}
+            className="w-full px-3 py-2 rounded-lg border border-catalan-border bg-catalan-surface text-catalan-text text-sm focus:outline-none focus:ring-2 focus:ring-catalan-primary/30 focus:border-catalan-primary font-mono"
+          />
+        </div>
+
+        <div>
+          <p className="text-sm font-medium text-catalan-text mb-2">Notify on events</p>
+          <div className="space-y-2">
+            {ALL_EVENTS.map(ev => (
+              <label key={ev.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={events.includes(ev.id)}
+                  onChange={() => toggleEvent(ev.id)}
+                  className="rounded accent-catalan-primary"
+                />
+                <span className="text-catalan-text">{ev.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="px-5 py-2 rounded-lg bg-catalan-primary text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
+        >
+          {saving ? 'Saving…' : 'Save Telegram Settings'}
+        </button>
+        {saved && <span className="text-green-600 text-sm">✅ Saved</span>}
+        {error && <span className="text-red-500 text-sm">{error}</span>}
+      </div>
+    </div>
+  )
+}
+
 // ── WhatsApp Section ──────────────────────────────────────────────────────────
 
 function WhatsAppSection() {
@@ -84,6 +207,9 @@ function WhatsAppSection() {
         msg91_template_id: templateId,
         notify_events: events,
         notify_numbers: numbers.split(',').map(n => n.trim()).filter(Boolean),
+        telegram_enabled: false,
+        telegram_bot_token: '',
+        telegram_chat_ids: [],
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
@@ -99,7 +225,7 @@ function WhatsAppSection() {
       <div className="flex items-start justify-between">
         <div>
           <h4 className="font-semibold text-catalan-text">🟢 WhatsApp Notifications</h4>
-          <p className="text-xs text-catalan-textMuted mt-0.5">Powered by MSG91 WABA. Supervisors get notified on field events.</p>
+          <p className="text-xs text-catalan-textMuted mt-0.5">Powered by MSG91 WABA. Requires Meta approval (may take days).</p>
         </div>
         <Toggle checked={enabled} onChange={setEnabled} label={enabled ? 'Enabled' : 'Disabled'} />
       </div>
@@ -269,12 +395,12 @@ function SheetsSection() {
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export default function IntegrationsPanel() {
-  const [section, setSection] = useState<'whatsapp' | 'sheets'>('whatsapp')
+  const [section, setSection] = useState<'telegram' | 'whatsapp' | 'sheets'>('telegram')
 
   return (
     <div className="space-y-6">
       <div className="flex gap-3">
-        {([['whatsapp', '🟢 WhatsApp'], ['sheets', '📊 Google Sheets']] as const).map(([id, label]) => (
+        {([['telegram', '✈️ Telegram'], ['whatsapp', '🟢 WhatsApp'], ['sheets', '📊 Google Sheets']] as const).map(([id, label]) => (
           <button
             key={id}
             onClick={() => setSection(id)}
@@ -288,8 +414,9 @@ export default function IntegrationsPanel() {
       </div>
 
       <div className="border-t border-catalan-border pt-6">
-        {section === 'whatsapp' && <WhatsAppSection />}
-        {section === 'sheets'   && <SheetsSection />}
+        {section === 'telegram'  && <TelegramSection />}
+        {section === 'whatsapp'  && <WhatsAppSection />}
+        {section === 'sheets'    && <SheetsSection />}
       </div>
     </div>
   )

@@ -276,6 +276,9 @@ class NotificationConfigUpdate(BaseModel):
     msg91_template_id: str = ""
     notify_events: list[str] = ["submission.created", "submission.flagged", "import.complete"]
     notify_numbers: list[str] = []
+    telegram_enabled: bool = False
+    telegram_bot_token: str = ""
+    telegram_chat_ids: list[str] = []
 
 
 @router.get("/integrations")
@@ -287,10 +290,12 @@ def get_integrations(user=Depends(get_current_user), db: Session = Depends(get_d
     if not tenant:
         raise HTTPException(404, "Tenant not found")
     cfg = tenant.notification_config or {}
-    # Never expose auth key in full — mask it
     masked = dict(cfg)
     if masked.get("msg91_auth_key"):
         masked["msg91_auth_key"] = "••••" + masked["msg91_auth_key"][-4:]
+    if masked.get("telegram_bot_token"):
+        token = masked["telegram_bot_token"]
+        masked["telegram_bot_token"] = token[:10] + "..." if len(token) > 10 else token
     return masked
 
 
@@ -300,7 +305,7 @@ def update_notification_config(
     user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Update WhatsApp notification config for the current tenant."""
+    """Update WhatsApp + Telegram notification config for the current tenant."""
     if user["role"] not in ("master_admin", "org_admin"):
         raise HTTPException(403, "org_admin required")
     tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
@@ -309,9 +314,12 @@ def update_notification_config(
 
     existing = dict(tenant.notification_config or {})
     new_key = body.msg91_auth_key
-    # If the submitted key starts with '••••', keep the existing one
     if new_key.startswith("••••"):
         new_key = existing.get("msg91_auth_key", "")
+
+    new_tg_token = body.telegram_bot_token
+    if new_tg_token.endswith("..."):
+        new_tg_token = existing.get("telegram_bot_token", "")
 
     existing.update({
         "whatsapp_enabled": body.whatsapp_enabled,
@@ -319,6 +327,9 @@ def update_notification_config(
         "msg91_template_id": body.msg91_template_id,
         "notify_events": body.notify_events,
         "notify_numbers": body.notify_numbers,
+        "telegram_enabled": body.telegram_enabled,
+        "telegram_bot_token": new_tg_token,
+        "telegram_chat_ids": body.telegram_chat_ids,
     })
     tenant.notification_config = existing
     db.commit()
