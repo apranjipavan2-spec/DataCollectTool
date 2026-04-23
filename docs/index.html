@@ -517,78 +517,78 @@
         <div class="feat-icon" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe)">📡</div>
         <h3>Offline-First Architecture</h3>
         <ul>
-          <li>Complete offline data collection</li>
+          <li>Complete offline data collection — no internet needed</li>
           <li>Auto-saves every 300ms — zero data loss</li>
           <li>Background sync when reconnected</li>
           <li>Two-phase sync (text first, media second)</li>
           <li>Works on OPFS + IndexedDB (all browsers)</li>
-          <li>Idempotent — no duplicate submissions</li>
+          <li>Geofencing — restrict collection to approved zones</li>
         </ul>
       </div>
       <div class="feature-card reveal delay-2">
         <div class="feat-icon" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe)">🏗️</div>
         <h3>Powerful Form Builder</h3>
         <ul>
-          <li>15 field types (text, GPS, photo, audio…)</li>
+          <li>17 field types incl. signature, GPS, photo, audio</li>
           <li>Advanced skip logic with AND/OR nesting</li>
           <li>Form versioning & schema migration</li>
-          <li>Reusable form templates</li>
-          <li>Import forms from Excel</li>
-          <li>Repeat groups & collapsible sections</li>
+          <li>Import from XLSForm, Kobo, SurveyCTO, ODK</li>
+          <li>Randomization / arm assignment for RCTs</li>
+          <li>Public survey URL — no login required</li>
         </ul>
       </div>
       <div class="feature-card reveal delay-3">
         <div class="feat-icon" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0)">📊</div>
-        <h3>Real-Time Dashboard</h3>
+        <h3>Supervisor Dashboard</h3>
         <ul>
           <li>Submissions appear instantly on sync</li>
-          <li>GPS map view per submission (Leaflet)</li>
-          <li>Flag / approve / reject workflows</li>
-          <li>Full-text search across all data</li>
-          <li>Filter by date, form, enumerator, status</li>
-          <li>Complete audit trail of all changes</li>
+          <li>Flag / approve / reject + back-check audit</li>
+          <li>Respondent roster with status tracking</li>
+          <li>Daily progress tracker per enumerator</li>
+          <li>Duplicate detection (GPS + same-day check)</li>
+          <li>Server-side validation rule violations</li>
         </ul>
       </div>
       <div class="feature-card reveal delay-1">
-        <div class="feat-icon" style="background:linear-gradient(135deg,#fef9c3,#fde68a)">📷</div>
-        <h3>Smart Media Handling</h3>
+        <div class="feat-icon" style="background:linear-gradient(135deg,#fef9c3,#fde68a)">🤖</div>
+        <h3>AI-Powered Features</h3>
         <ul>
-          <li>Auto-compress photos (5MB → 200KB, 96%)</li>
-          <li>Audio recording at 24kbps (~100KB/30s)</li>
-          <li>GPS coordinates captured at open + submit</li>
-          <li>Barcode & QR scanning support</li>
-          <li>Google Drive / AWS S3 / local storage</li>
-          <li>Batch media upload with retry</li>
+          <li>AI report writer — summarize submissions instantly</li>
+          <li>Supports OpenAI, Anthropic Claude, Google Gemini</li>
+          <li>Bring your own API key — stored per org</li>
+          <li>AI skip logic suggestions from plain English</li>
+          <li>Auto-translate labels to Hindi / Kannada / Telugu</li>
+          <li>No vendor lock-in — switch providers any time</li>
         </ul>
       </div>
       <div class="feature-card reveal delay-2">
         <div class="feat-icon" style="background:linear-gradient(135deg,#fce7f3,#fbcfe8)">👥</div>
-        <h3>Team Management</h3>
+        <h3>Team &amp; Field Management</h3>
         <ul>
-          <li>4 roles: Master Admin, Org Admin, Supervisor, Enumerator</li>
-          <li>Assign specific forms to enumerators</li>
+          <li>4 roles: Master Admin → Org Admin → Supervisor → Enumerator</li>
+          <li>QR code login — no passwords for field staff</li>
+          <li>WhatsApp alerts on sync, flag, approve, reject</li>
           <li>Push notifications for sync events</li>
-          <li>30-minute session timeout security</li>
-          <li>Bulk user import via CSV</li>
           <li>Multi-language: EN / HI / KN / TE</li>
+          <li>Digital consent + signature capture</li>
         </ul>
       </div>
       <div class="feature-card reveal delay-3">
         <div class="feat-icon" style="background:linear-gradient(135deg,#ffedd5,#fed7aa)">🔗</div>
-        <h3>Export & Integration</h3>
+        <h3>Export, Compliance &amp; Integration</h3>
         <ul>
-          <li>CSV & Stata .dta export (research-ready)</li>
-          <li>Google Sheets live sync</li>
-          <li>REST API with bcrypt-hashed API keys</li>
-          <li>Webhook support for external systems</li>
+          <li>CSV, Stata .dta, SPSS .sav export</li>
+          <li>Google Sheets live sync per form</li>
+          <li>DPDP 2023 compliant — consent log, data erasure</li>
+          <li>REST API + API keys + webhooks</li>
+          <li>DHIS2 push integration for health data</li>
           <li>White-label (custom logo, color, app name)</li>
-          <li>Plan-based usage enforcement</li>
         </ul>
       </div>
     </div>
     
     <div class="reveal" style="margin-top:48px">
-      <h3 style="text-align:center;font-size:1.3rem;font-weight:800;color:var(--text);margin-bottom:8px">15 Field Types</h3>
+      <h3 style="text-align:center;font-size:1.3rem;font-weight:800;color:var(--text);margin-bottom:8px">17 Field Types</h3>
       <p style="text-align:center;font-size:0.85rem;color:var(--text3);margin-bottom:24px">Every data type your survey needs — built-in, no configuration required</p>
       <div class="field-types-grid">
         <div class="field-type"><span class="icon">📝</span><span>Text</span></div>
@@ -605,6 +605,9 @@
         <div class="field-type"><span class="icon">🔁</span><span>Repeat Group</span></div>
         <div class="field-type"><span class="icon">📑</span><span>Section</span></div>
         <div class="field-type"><span class="icon">☑️</span><span>Checkbox</span></div>
+        <div class="field-type"><span class="icon">✍️</span><span>Signature</span></div>
+        <div class="field-type"><span class="icon">🔢</span><span>Decimal</span></div>
+        <div class="field-type"><span class="icon">🔣</span><span>Calculated</span></div>
         <div class="field-type"><span class="icon">⚡</span><span>Skip Logic</span></div>
       </div>
     </div>
