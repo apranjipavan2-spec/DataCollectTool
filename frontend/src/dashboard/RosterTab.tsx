@@ -13,11 +13,28 @@ interface RosterEntry {
   status: string
   scheduled_date: string | null
   notes: string | null
+  location_id: string | null
+  location_name: string | null
   created_at: string | null
 }
 
 interface Form { id: string; title: string }
 interface TeamMember { id: string; name: string; role: string }
+
+interface LocationOption {
+  id: string
+  name: string
+  type: string
+  parent_id: string | null
+}
+
+interface LocationNode {
+  id: string
+  name: string
+  type: string
+  parent_id: string | null
+  children: LocationNode[]
+}
 
 const STATUS_COLORS: Record<string, string> = {
   pending:   'text-catalan-textMuted bg-catalan-textMuted/10',
@@ -42,8 +59,31 @@ export default function RosterTab({ forms, team }: { forms: Form[]; team: TeamMe
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [csvUploading, setCsvUploading] = useState(false)
   const [csvResult, setCsvResult] = useState<string>('')
+  const [filterDistrict, setFilterDistrict] = useState('')
+  const [filterTaluka, setFilterTaluka] = useState('')
+  const [districts, setDistricts] = useState<LocationOption[]>([])
+  const [talukas, setTalukas] = useState<LocationOption[]>([])
+  const [locationTree, setLocationTree] = useState<LocationNode[]>([])
+  const [showTree, setShowTree] = useState(false)
 
   const enumerators = team.filter(u => u.role === 'enumerator')
+
+  useEffect(() => {
+    api.get('/locations?type=district').then(({ data }) => setDistricts(data)).catch(() => {})
+    api.get('/locations/tree').then(({ data }) => setLocationTree(data)).catch(() => {})
+  }, [])
+
+  const handleDistrictFilter = async (districtId: string) => {
+    setFilterDistrict(districtId)
+    setFilterTaluka('')
+    setTalukas([])
+    if (districtId) {
+      try {
+        const { data } = await api.get(`/locations?parent_id=${districtId}`)
+        setTalukas(data)
+      } catch {}
+    }
+  }
 
   const handleCsvUpload = async () => {
     if (!csvFormId) { toast.warning('Select a form first'); return }
@@ -69,7 +109,7 @@ export default function RosterTab({ forms, team }: { forms: Form[]; team: TeamMe
   }
 
   const handleTemplateDownload = () => {
-    const csv = 'name,phone,address,enumerator_phone,scheduled_date,notes\nJohn Doe,+910000000000,Village Name,,2026-05-01,\n'
+    const csv = 'name,phone,address,district,taluka,village,enumerator_phone,scheduled_date,notes\nJohn Doe,+910000000000,123 Main St,Pune,Haveli,Lohegaon,,2026-05-01,\n'
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -95,6 +135,14 @@ export default function RosterTab({ forms, team }: { forms: Form[]; team: TeamMe
   }
 
   useEffect(() => { load() }, [filterForm, filterStatus])
+
+  const filteredRoster = roster.filter(r => {
+    if (filterTaluka && r.location_id !== filterTaluka) return false
+    if (!filterTaluka && filterDistrict) {
+      return talukas.length === 0 || talukas.some(t => t.id === r.location_id)
+    }
+    return true
+  })
 
   const handleAdd = async () => {
     if (!newEntry.form_id || !newEntry.name) {
@@ -186,6 +234,61 @@ export default function RosterTab({ forms, team }: { forms: Form[]; team: TeamMe
             <p className="text-xs text-catalan-success">{csvResult}</p>
           )}
         </div>
+
+        {districts.length > 0 && (
+          <div className="mb-4 p-3 bg-catalan-hover rounded-lg border border-catalan-border">
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="flex items-center gap-2 text-xs font-medium text-catalan-textMuted">
+                📍 Location
+              </div>
+              <div>
+                <select
+                  value={filterDistrict}
+                  onChange={e => handleDistrictFilter(e.target.value)}
+                  className="bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+                >
+                  <option value="">All Districts</option>
+                  {districts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </div>
+              {talukas.length > 0 && (
+                <div>
+                  <select
+                    value={filterTaluka}
+                    onChange={e => setFilterTaluka(e.target.value)}
+                    className="bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
+                  >
+                    <option value="">All Talukas</option>
+                    {talukas.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+              )}
+              <button
+                onClick={() => setShowTree(v => !v)}
+                className="text-xs px-3 py-2 rounded-lg border border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50 transition-colors"
+              >
+                {showTree ? 'Hide Tree' : 'Location Tree'}
+              </button>
+            </div>
+            {showTree && locationTree.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-catalan-border space-y-1">
+                {locationTree.map(district => (
+                  <div key={district.id}>
+                    <div className="text-xs font-semibold text-catalan-text">📍 {district.name}</div>
+                    {district.children.map(taluka => (
+                      <div key={taluka.id} className="ml-4">
+                        <div className="text-xs text-catalan-textMuted">↳ {taluka.name}</div>
+                        {taluka.children.map(village => (
+                          <div key={village.id} className="ml-4 text-xs text-catalan-textMuted/70">· {village.name}</div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-3 items-end mb-4">
           <div>
@@ -289,24 +392,25 @@ export default function RosterTab({ forms, team }: { forms: Form[]; team: TeamMe
 
         {loading ? (
           <div className="text-sm text-catalan-textMuted py-8 text-center">Loading…</div>
-        ) : roster.length === 0 ? (
+        ) : filteredRoster.length === 0 ? (
           <div className="text-sm text-catalan-textMuted text-center py-8">No respondents found</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[680px]">
               <thead>
                 <tr className="border-b border-catalan-border">
-                  {['Name', 'Phone', 'Form', 'Enumerator', 'Date', 'Status', 'Actions'].map(h => (
+                  {['Name', 'Phone', 'Form', 'Location', 'Enumerator', 'Date', 'Status', 'Actions'].map(h => (
                     <th key={h} className="text-left px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {roster.map(r => (
+                {filteredRoster.map(r => (
                   <tr key={r.id} className="border-b border-catalan-border hover:bg-catalan-hover transition-colors">
                     <td className="px-3 py-2 font-medium text-catalan-text">{r.name}</td>
                     <td className="px-3 py-2 font-mono text-xs text-catalan-textMuted">{r.phone ?? '—'}</td>
                     <td className="px-3 py-2 text-catalan-textMuted text-xs">{getFormTitle(r.form_id)}</td>
+                    <td className="px-3 py-2 text-catalan-textMuted text-xs">{r.location_name ?? '—'}</td>
                     <td className="px-3 py-2 text-catalan-textMuted text-xs">{getEnumeratorName(r.target_enumerator_id)}</td>
                     <td className="px-3 py-2 text-catalan-textMuted text-xs">{r.scheduled_date ?? '—'}</td>
                     <td className="px-3 py-2">

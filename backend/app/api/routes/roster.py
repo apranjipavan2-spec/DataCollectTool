@@ -36,8 +36,8 @@ class BulkImportBody(BaseModel):
     respondents: list[RosterCreate]
 
 
-def _roster_to_dict(r: RespondentRoster) -> dict:
-    return {
+def _roster_to_dict(r: RespondentRoster, location_map: dict = None) -> dict:
+    d = {
         "id": str(r.id),
         "form_id": str(r.form_id),
         "tenant_id": str(r.tenant_id),
@@ -48,8 +48,30 @@ def _roster_to_dict(r: RespondentRoster) -> dict:
         "status": r.status,
         "scheduled_date": str(r.scheduled_date) if r.scheduled_date else None,
         "notes": r.notes,
+        "location_id": str(r.location_id) if r.location_id else None,
+        "location_name": None,
         "created_at": str(r.created_at) if r.created_at else None,
     }
+    if location_map and r.location_id:
+        loc = location_map.get(str(r.location_id))
+        if loc:
+            d["location_name"] = loc["name"]
+    return d
+
+
+def _get_or_create_location(db, tenant_id, name, type_, parent_id=None):
+    from app.models.location import Location
+    loc = db.query(Location).filter(
+        Location.tenant_id == tenant_id,
+        Location.name == name,
+        Location.type == type_,
+        Location.parent_id == parent_id,
+    ).first()
+    if not loc:
+        loc = Location(tenant_id=tenant_id, name=name, type=type_, parent_id=parent_id)
+        db.add(loc)
+        db.flush()
+    return loc
 
 
 @router.get("/")
@@ -186,8 +208,13 @@ async def upload_roster_csv(
     if "name" not in df.columns:
         raise HTTPException(status_code=422, detail="CSV must have a 'name' column")
 
-    known_cols = {"name", "phone", "address", "enumerator_phone", "scheduled_date", "notes"}
+    location_cols = {"district", "taluka", "village"}
+    known_cols = {"name", "phone", "address", "enumerator_phone", "scheduled_date", "notes"} | location_cols
     extra_cols = [c for c in df.columns if c not in known_cols]
+
+    has_district = "district" in df.columns
+    has_taluka = "taluka" in df.columns
+    has_village = "village" in df.columns
 
     created = 0
     skipped = 0
@@ -229,6 +256,23 @@ async def upload_roster_csv(
         address = str(row.get("address", "")).strip() if row.get("address") is not None else ""
         notes = str(row.get("notes", "")).strip() if row.get("notes") is not None else ""
 
+        location_id = None
+        if has_district:
+            district_name = str(row.get("district", "")).strip()
+            if district_name and district_name.lower() not in ("nan", "none", ""):
+                district_loc = _get_or_create_location(db, user["tenant_id"], district_name, "district")
+                location_id = district_loc.id
+                if has_taluka:
+                    taluka_name = str(row.get("taluka", "")).strip()
+                    if taluka_name and taluka_name.lower() not in ("nan", "none", ""):
+                        taluka_loc = _get_or_create_location(db, user["tenant_id"], taluka_name, "taluka", parent_id=district_loc.id)
+                        location_id = taluka_loc.id
+                        if has_village:
+                            village_name = str(row.get("village", "")).strip()
+                            if village_name and village_name.lower() not in ("nan", "none", ""):
+                                village_loc = _get_or_create_location(db, user["tenant_id"], village_name, "village", parent_id=taluka_loc.id)
+                                location_id = village_loc.id
+
         r = RespondentRoster(
             form_id=form_id,
             tenant_id=user["tenant_id"],
@@ -239,6 +283,7 @@ async def upload_roster_csv(
             scheduled_date=sched_date,
             notes=notes or None,
             extra_data=extra if extra else {},
+            location_id=location_id,
         )
         db.add(r)
         created += 1
@@ -250,10 +295,12 @@ async def upload_roster_csv(
 @router.get("/with-status")
 def roster_with_status(
     form_id: str,
+    location_id: Optional[str] = None,
     user: dict = Depends(require_enumerator),
     db: Session = Depends(get_db),
 ):
     from app.models.submission import Submission
+    from app.models.location import Location
 
     q = db.query(RespondentRoster).filter(
         RespondentRoster.form_id == form_id,
@@ -261,8 +308,16 @@ def roster_with_status(
     )
     if user.get("role") == "enumerator":
         q = q.filter(RespondentRoster.target_enumerator_id == user["sub"])
+    if location_id:
+        q = q.filter(RespondentRoster.location_id == location_id)
 
     entries = q.order_by(RespondentRoster.created_at).all()
+
+    loc_ids = {str(e.location_id) for e in entries if e.location_id}
+    location_map = {}
+    if loc_ids:
+        locs = db.query(Location).filter(Location.id.in_(loc_ids)).all()
+        location_map = {str(l.id): {"name": l.name, "type": l.type} for l in locs}
 
     result = []
     for entry in entries:
@@ -270,7 +325,7 @@ def roster_with_status(
             Submission.roster_id == entry.id,
         ).first()
         collected = sub is not None or entry.status == "completed"
-        row = _roster_to_dict(entry)
+        row = _roster_to_dict(entry, location_map=location_map)
         row["extra_data"] = entry.extra_data or {}
         row["collected"] = collected
         row["submission_id"] = str(sub.id) if sub else None

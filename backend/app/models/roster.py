@@ -18,4 +18,5 @@ class RespondentRoster(Base):
     scheduled_date = Column(Date, nullable=True)
     notes = Column(Text)
     extra_data = Column(JSONB, default=dict, server_default="'{}'::jsonb")
+    location_id = Column(UUID(as_uuid=True), ForeignKey("locations.id"), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
