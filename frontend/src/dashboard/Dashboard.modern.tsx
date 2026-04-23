@@ -11,6 +11,8 @@ import { Card, Button, Modal, Loading, Alert, Pagination, DashboardSkeleton } fr
 import BarChart from '@/components/charts/BarChart'
 import LineChart from '@/components/charts/LineChart'
 import AuditLog from '@/components/AuditLog'
+import RosterTab from '@/dashboard/RosterTab'
+import ProgressTab from '@/dashboard/ProgressTab'
 
 const MiniMap = lazy(() => import('@/renderer/fields/MiniMap'))
 const SubmissionsMap = lazy(() => import('@/dashboard/SubmissionsMap'))
@@ -34,6 +36,9 @@ interface Submission {
   status: string
   serial_no: number | null
   server_received_at: string
+  has_violations?: boolean
+  backcheck_required?: boolean
+  data_json?: Record<string, unknown>
 }
 
 interface SubDetail extends Submission {
@@ -415,7 +420,7 @@ const TEAM_PAGE_SIZE = 20
 
 export default function Dashboard() {
   const toast = useToast()
-  const [tab, setTab] = useState<'overview' | 'submissions' | 'map' | 'analytics' | 'forms' | 'team' | 'integrations'>('overview')
+  const [tab, setTab] = useState<'overview' | 'submissions' | 'map' | 'analytics' | 'forms' | 'team' | 'roster' | 'progress' | 'integrations'>('overview')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -433,6 +438,9 @@ export default function Dashboard() {
   const [filterForm, setFilterForm] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [filterViolations, setFilterViolations] = useState(false)
+  const [filterDupSuspect, setFilterDupSuspect] = useState(false)
+  const [filterBackcheck, setFilterBackcheck] = useState(false)
   const [exportingCsv, setExportingCsv] = useState(false)
 
   // Submission pagination + sort
@@ -461,6 +469,11 @@ export default function Dashboard() {
   const [csvUploading, setCsvUploading] = useState(false)
   const [csvResult, setCsvResult] = useState<{ created: number; skipped: number; errors: string[] } | null>(null)
   const csvInputRef = useRef<HTMLInputElement>(null)
+
+  // QR login
+  const [qrModal, setQrModal] = useState<{ memberId: string; memberName: string; qrDataUrl: string; qrUrl: string } | null>(null)
+  const [generatingQr, setGeneratingQr] = useState<string | null>(null)
+  const [qrCopied, setQrCopied] = useState(false)
 
   // Usage tracking
   interface UsageData {
@@ -622,8 +635,11 @@ export default function Dashboard() {
     if (search && !s.enumerator_name.toLowerCase().includes(search.toLowerCase()) && !s.id.includes(search)) return false
     if (dateFrom && s.server_received_at < dateFrom) return false
     if (dateTo && s.server_received_at.slice(0, 10) > dateTo) return false
+    if (filterViolations && !s.has_violations) return false
+    if (filterDupSuspect && !s.data_json?.['_duplicate_suspect']) return false
+    if (filterBackcheck && !s.backcheck_required) return false
     return true
-  }), [submissions, filterForm, search, dateFrom, dateTo])
+  }), [submissions, filterForm, search, dateFrom, dateTo, filterViolations, filterDupSuspect, filterBackcheck])
 
   // Sorted submissions
   const sortedSubs = useMemo(() => {
@@ -777,6 +793,16 @@ export default function Dashboard() {
     }
   }
 
+  const handleFlagBackcheck = async (id: string) => {
+    try {
+      await api.post(`/submissions/${id}/flag-backcheck`)
+      setSubmissions(prev => prev.map(s => s.id === id ? { ...s, backcheck_required: true } : s))
+      toast.success('Flagged for back-check')
+    } catch {
+      toast.error('Failed to flag for back-check')
+    }
+  }
+
   const handleLoadTemplates = async () => {
     if (templates.length > 0) return // already loaded
     setLoadingTemplates(true)
@@ -919,6 +945,21 @@ export default function Dashboard() {
       toast.success(`${member.name} deactivated`)
     } catch {
       toast.error('Failed to deactivate user')
+    }
+  }
+
+  const handleGenerateQr = async (member: TeamMember) => {
+    setGeneratingQr(member.id)
+    try {
+      const { data } = await api.post<{ token: string; qr_url: string }>('/auth/qr-generate', { user_id: member.id })
+      const fullUrl = `${window.location.origin}${data.qr_url}`
+      const QRCode = (await import('qrcode')).default
+      const qrDataUrl = await QRCode.toDataURL(fullUrl, { width: 256, margin: 2 })
+      setQrModal({ memberId: member.id, memberName: member.name, qrDataUrl, qrUrl: fullUrl })
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail ?? 'Failed to generate QR code')
+    } finally {
+      setGeneratingQr(null)
     }
   }
 
@@ -1443,6 +1484,30 @@ export default function Dashboard() {
                     >
                       ⚠ Dupes
                     </Button>
+                    <Button
+                      variant={filterViolations ? 'primary' : 'secondary'}
+                      size="sm"
+                      onClick={() => { setFilterViolations(v => !v); setSubPage(1) }}
+                      title="Show only submissions with validation violations"
+                    >
+                      ⚠️ Violations
+                    </Button>
+                    <Button
+                      variant={filterDupSuspect ? 'primary' : 'secondary'}
+                      size="sm"
+                      onClick={() => { setFilterDupSuspect(v => !v); setSubPage(1) }}
+                      title="Show only suspected duplicate submissions"
+                    >
+                      🔁 Duplicates
+                    </Button>
+                    <Button
+                      variant={filterBackcheck ? 'primary' : 'secondary'}
+                      size="sm"
+                      onClick={() => { setFilterBackcheck(v => !v); setSubPage(1) }}
+                      title="Show back-check queue"
+                    >
+                      🔍 Back-Check
+                    </Button>
                   </div>}
                 </div>
               </Card>
@@ -1599,9 +1664,29 @@ export default function Dashboard() {
                             <td className="px-3 py-2 font-mono text-xs text-catalan-textMuted cursor-pointer" onClick={() => openDetail(sub.id)}>{sub.id.slice(0, 8)}…</td>
                             <td className="px-3 py-2 text-catalan-text cursor-pointer" onClick={() => openDetail(sub.id)}>{sub.form_title || forms.find(f => f.id === sub.form_id)?.title || '—'}</td>
                             <td className="px-3 py-2 text-catalan-text cursor-pointer" onClick={() => openDetail(sub.id)}>{sub.enumerator_name}</td>
-                            <td className="px-3 py-2 cursor-pointer" onClick={() => openDetail(sub.id)}><StatusBadge status={sub.status} /></td>
+                            <td className="px-3 py-2 cursor-pointer" onClick={() => openDetail(sub.id)}>
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <StatusBadge status={sub.status} />
+                                {sub.has_violations && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-yellow-700 bg-yellow-100">⚠️ Violations</span>}
+                                {sub.data_json?.['_duplicate_suspect'] && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-orange-700 bg-orange-100">Dup?</span>}
+                                {sub.backcheck_required && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-blue-700 bg-blue-100">🔍 Back-Check</span>}
+                              </div>
+                            </td>
                             <td className="px-3 py-2 text-catalan-textMuted text-xs cursor-pointer" onClick={() => openDetail(sub.id)}>{new Date(sub.server_received_at).toLocaleString()}</td>
-                            <td className="px-3 py-2 text-catalan-primary text-xs cursor-pointer" onClick={() => openDetail(sub.id)}>View →</td>
+                            <td className="px-3 py-2 text-xs" onClick={e => e.stopPropagation()}>
+                              <div className="flex items-center gap-2">
+                                <button className="text-catalan-primary hover:underline" onClick={() => openDetail(sub.id)}>View →</button>
+                                {!isEnumerator && !sub.backcheck_required && (
+                                  <button
+                                    className="text-catalan-textMuted hover:text-catalan-text border border-catalan-border rounded px-1.5 py-0.5 hover:border-catalan-primary/50 transition-colors"
+                                    onClick={() => handleFlagBackcheck(sub.id)}
+                                    title="Flag for back-check"
+                                  >
+                                    🔍
+                                  </button>
+                                )}
+                              </div>
+                            </td>
                           </tr>
                         ))
                       )}
@@ -2428,12 +2513,24 @@ export default function Dashboard() {
                               <td className="px-3 py-2"><RoleBadge role={member.role} /></td>
                               <td className="px-3 py-2 text-catalan-text">{subCount}</td>
                               <td className="px-3 py-2">
-                                <button
-                                  onClick={() => handleDeactivate(member)}
-                                  className="text-xs px-2 py-1 rounded border border-catalan-error/30 text-catalan-error hover:bg-catalan-error/10 transition-colors"
-                                >
-                                  Deactivate
-                                </button>
+                                <div className="flex items-center gap-2">
+                                  {member.role === 'enumerator' && (
+                                    <button
+                                      onClick={() => handleGenerateQr(member)}
+                                      disabled={generatingQr === member.id}
+                                      className="text-xs px-2 py-1 rounded border border-catalan-primary/30 text-catalan-primary hover:bg-catalan-primary/10 transition-colors disabled:opacity-50"
+                                      title="Generate QR login code"
+                                    >
+                                      {generatingQr === member.id ? '…' : '🔲 QR'}
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleDeactivate(member)}
+                                    className="text-xs px-2 py-1 rounded border border-catalan-error/30 text-catalan-error hover:bg-catalan-error/10 transition-colors"
+                                  >
+                                    Deactivate
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           )
@@ -2449,6 +2546,34 @@ export default function Dashboard() {
                   onChange={p => setTeamPage(p)}
                 />
               </Card>
+
+              {/* QR Login Modal */}
+              {qrModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setQrModal(null)}>
+                  <div className="bg-catalan-surface border border-catalan-border rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-base font-semibold text-catalan-text">QR Login — {qrModal.memberName}</h3>
+                      <button onClick={() => setQrModal(null)} className="text-catalan-textMuted hover:text-catalan-text text-lg leading-none">×</button>
+                    </div>
+                    <div className="flex justify-center mb-4">
+                      <img src={qrModal.qrDataUrl} alt="QR code" className="w-48 h-48 rounded-lg border border-catalan-border" />
+                    </div>
+                    <p className="text-xs text-catalan-textMuted text-center mb-4">Valid for 24 hours. Scan to log in as this enumerator.</p>
+                    <div className="flex items-center gap-2 bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 mb-4">
+                      <span className="text-xs text-catalan-textMuted flex-1 truncate font-mono">{qrModal.qrUrl}</span>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(qrModal.qrUrl); setQrCopied(true); setTimeout(() => setQrCopied(false), 2000) }}
+                        className="text-xs px-2 py-0.5 rounded bg-catalan-primary text-catalan-bg flex-shrink-0"
+                      >
+                        {qrCopied ? '✓' : 'Copy'}
+                      </button>
+                    </div>
+                    <button onClick={() => setQrModal(null)} className="w-full text-sm py-2 rounded-xl border border-catalan-border text-catalan-textMuted hover:text-catalan-text transition-colors">
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* ── Schedules ── */}
               <Card title="Field Schedules">

@@ -5,13 +5,14 @@ from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from jose import JWTError
+from jose import JWTError, jwt
 from app.core.security import (
     hash_otp, verify_otp, hash_password, verify_password,
     create_access_token, create_refresh_token, decode_token,
 )
+from app.core.config import settings
 from app.core.rate_limit import limiter
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, require_org_admin
 from app.models.user import User
 from app.services.email import send_password_reset_email
 
@@ -226,6 +227,40 @@ def send_otp(request: Request, body: SendOTPRequest, db: Session = Depends(get_d
     print(f"[DEV] OTP for {body.phone}: {otp}")
 
     return {"message": "OTP sent if phone is registered"}
+
+
+class QrGenerateRequest(BaseModel):
+    user_id: str
+
+
+class QrLoginRequest(BaseModel):
+    token: str
+
+
+@router.post("/qr-generate")
+def qr_generate(body: QrGenerateRequest, current_user=Depends(require_org_admin), db: Session = Depends(get_db)):
+    target = db.query(User).filter(User.id == body.user_id, User.is_active == True).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    expire = datetime.now(timezone.utc) + timedelta(seconds=86400)
+    payload = {"sub": str(target.id), "purpose": "qr_login", "exp": expire}
+    token = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    qr_url = f"/auth/qr-login?t={token}"
+    return {"token": token, "qr_url": qr_url}
+
+
+@router.post("/qr-login")
+def qr_login(body: QrLoginRequest, db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(body.token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired QR token")
+    if payload.get("purpose") != "qr_login":
+        raise HTTPException(status_code=401, detail="Invalid token purpose")
+    user = db.query(User).filter(User.id == payload["sub"], User.is_active == True).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found or deactivated")
+    return _make_token(user)
 
 
 @router.post("/verify-otp")

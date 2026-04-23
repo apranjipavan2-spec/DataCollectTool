@@ -4,6 +4,7 @@ import FormBuilder         from '@/builder/FormBuilder.modern'
 import LoginPage           from '@/auth/LoginPage'
 import ForgotPasswordPage  from '@/auth/ForgotPasswordPage'
 import ResetPasswordPage   from '@/auth/ResetPasswordPage'
+import QrLoginPage         from '@/auth/QrLoginPage'
 import RequireAuth, { homeForRole } from '@/auth/RequireAuth'
 import FieldApp       from '@/collect/FieldApp.modern'
 import AdminPanel     from '@/admin/AdminPanel.modern'
@@ -83,6 +84,7 @@ export default function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/auth/qr-login" element={<QrLoginPage />} />
 
               <Route path="/" element={
                 <RequireAuth roles={['org_admin', 'supervisor', 'enumerator']}>

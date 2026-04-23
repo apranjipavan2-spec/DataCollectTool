@@ -11,6 +11,14 @@ import { Button } from '@/components/ui'
 import Sidebar from '@/components/Sidebar'
 import { getNavItems } from '@/lib/navigation'
 
+function _haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000
+  const p1 = (lat1 * Math.PI) / 180, p2 = (lat2 * Math.PI) / 180
+  const dp = ((lat2 - lat1) * Math.PI) / 180, dl = ((lng2 - lng1) * Math.PI) / 180
+  const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 // ── Extract beneficiary name from data_json ────────────────────────────────
 // Looks for the first text-like field whose key or label suggests a person's name.
 const NAME_KEYS = ['name', 'full_name', 'respondent_name', 'beneficiary_name',
@@ -102,6 +110,8 @@ export default function FieldApp() {
   }>(null)
   const [locations, setLocations] = useState<any[]>([])
   const [selectedLocationId, setSelectedLocationId] = useState('')
+  const [assignedArm, setAssignedArm] = useState<string | null>(null)
+  const [geofenceWarning, setGeofenceWarning] = useState(false)
   const syncRef = useRef<() => Promise<void>>()
   const loadFormsRef = useRef<() => Promise<void>>()
   const { language, setLanguage } = useLanguage()
@@ -454,15 +464,44 @@ export default function FieldApp() {
   }
 
   const openForm = async (meta: FormMeta, schedCtx?: { programContext: any; locationContext?: any; locationId?: string }) => {
+    let schema: FormSchema | null = null
     try {
       const { data } = await api.get<{ json_schema: FormSchema }>(`/forms/${meta.id}`)
-      setActiveForm({ meta, schema: data.json_schema })
+      schema = data.json_schema
     } catch {
       const store = await getStorage()
       const cached = await store.getFormCache(meta.id)
       if (!cached) { setSyncMsg('Form not available offline'); return }
-      setActiveForm({ meta, schema: JSON.parse(cached.schema) as FormSchema })
+      schema = JSON.parse(cached.schema) as FormSchema
     }
+    setActiveForm({ meta, schema })
+    setAssignedArm(null)
+    setGeofenceWarning(false)
+
+    // Arm assignment
+    const randCfg = schema.settings?.randomization
+    if (randCfg?.enabled && (randCfg.arms?.length ?? 0) > 0) {
+      const storageKey = `fieldgovern_arm_key_${meta.id}`
+      let respondentKey = localStorage.getItem(storageKey)
+      if (!respondentKey) {
+        respondentKey = uuidv4()
+        try { localStorage.setItem(storageKey, respondentKey) } catch { }
+      }
+      try {
+        const { data } = await api.post<{ arm: string }>(`/forms/${meta.id}/assign-arm`, { respondent_key: respondentKey })
+        setAssignedArm(data.arm)
+      } catch { }
+    }
+
+    // Geofence check (client-side warning only)
+    const geoCfg = schema.settings?.geofence
+    if (geoCfg?.enabled && geoCfg.lat != null && geoCfg.lng != null && geoCfg.radius_meters) {
+      navigator.geolocation?.getCurrentPosition(pos => {
+        const dist = _haversineM(geoCfg.lat!, geoCfg.lng!, pos.coords.latitude, pos.coords.longitude)
+        if (dist > geoCfg.radius_meters!) setGeofenceWarning(true)
+      }, () => {}, { enableHighAccuracy: true, timeout: 10000 })
+    }
+
     if (schedCtx?.programContext) {
       const pc = schedCtx.programContext
       const lc = schedCtx.locationContext ?? {}
@@ -718,9 +757,19 @@ export default function FieldApp() {
 
   // Form collection screen
   if (screen === 'collecting' && activeForm) {
-    const clearProg = () => { setProgramContext(null); setSelectedLocationId('') }
+    const clearProg = () => { setProgramContext(null); setSelectedLocationId(''); setAssignedArm(null); setGeofenceWarning(false) }
     return (
       <div className="flex flex-col h-screen">
+        {assignedArm && (
+          <div className="bg-catalan-primary text-catalan-bg px-4 py-2 text-xs font-medium shrink-0 z-50 flex items-center gap-2">
+            <span>📊 Arm: {assignedArm}</span>
+          </div>
+        )}
+        {geofenceWarning && (
+          <div className="bg-catalan-warning/20 border-b border-catalan-warning/40 text-catalan-warning px-4 py-2 text-xs shrink-0 z-50 flex items-center gap-2">
+            <span>⚠️ You are outside the designated survey area. Submissions will be flagged.</span>
+          </div>
+        )}
         {programContext && (
           <div className="bg-blue-700 text-white px-4 py-2 text-xs flex items-center gap-3 flex-wrap shrink-0 z-50">
             <span className="font-medium truncate">

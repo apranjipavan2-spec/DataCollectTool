@@ -3,7 +3,7 @@
 export type FieldType =
   | 'text' | 'number' | 'decimal' | 'single_choice' | 'multiple_choice'
   | 'date' | 'time' | 'gps' | 'photo' | 'audio' | 'barcode'
-  | 'calculated' | 'repeat_group' | 'note' | 'rating'
+  | 'calculated' | 'repeat_group' | 'note' | 'rating' | 'signature'
 
 export interface SkipCondition {
   field: string
@@ -71,4 +71,17 @@ export interface FormSchema {
   title: string
   sections: FormSection[]
   version: number
+  settings?: {
+    randomization?: {
+      enabled?: boolean
+      arms?: string[]
+    }
+    geofence?: {
+      enabled?: boolean
+      lat?: number
+      lng?: number
+      radius_meters?: number
+    }
+    [key: string]: unknown
+  }
 }

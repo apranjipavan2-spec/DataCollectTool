@@ -20,7 +20,7 @@ import { useToast } from '@/lib/ToastContext'
 const FIELD_TYPE_ICONS: Record<string, string> = {
   text: '𝐓', number: '#', decimal: '.1', single_choice: '◉', multiple_choice: '☑',
   date: '📅', time: '⏰', gps: '📍', photo: '📷', audio: '🎙', barcode: '▦',
-  calculated: '∑', repeat_group: '⟳', note: 'ℹ', rating: '★',
+  calculated: '∑', repeat_group: '⟳', note: 'ℹ', rating: '★', signature: '✍️',
 }
 
 interface DeleteConfirm {
@@ -754,10 +754,7 @@ export default function FormBuilder() {
                   onAddField={() => setShowTypeMenu(true)}
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-catalan-textMuted">
-                  <div className="text-7xl mb-6">📋</div>
-                  <div className="text-xl font-semibold mb-2 text-catalan-text">Select a section or field</div>
-                </div>
+                <FormSettingsPanel schema={schema} onChange={setSchema} />
               )}
             </div>
           </div>
@@ -920,6 +917,271 @@ function SectionEditor({ section, schema, onTitleChange, onSkipLogicChange, onAd
         <Button onClick={onAddField} size="sm" fullWidth>
           + Add Question to this section
         </Button>
+      </div>
+    </div>
+  )
+}
+
+// ── Form-level Settings Panel ────────────────────────────────────────────────
+function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange: (s: FormSchema) => void }) {
+  const [randOpen, setRandOpen] = React.useState(false)
+  const [geoOpen, setGeoOpen] = React.useState(false)
+  const [validationOpen, setValidationOpen] = React.useState(false)
+  const [locating, setLocating] = React.useState(false)
+
+  const rand = schema.settings?.randomization ?? {}
+  const geo = schema.settings?.geofence ?? {}
+  const validationRules: Array<{ field_id: string; operator: string; value: string; message: string }> =
+    (schema.settings as any)?.validation_rules ?? []
+  const allFields = getAllFieldsInOrder(schema.sections)
+
+  const updateValidationRules = (rules: typeof validationRules) =>
+    onChange({ ...schema, settings: { ...(schema.settings as any), validation_rules: rules } } as FormSchema)
+
+  const addValidationRule = () =>
+    updateValidationRules([...validationRules, { field_id: '', operator: 'min', value: '', message: '' }])
+
+  const removeValidationRule = (i: number) =>
+    updateValidationRules(validationRules.filter((_, idx) => idx !== i))
+
+  const updateValidationRule = (i: number, patch: Partial<typeof validationRules[0]>) =>
+    updateValidationRules(validationRules.map((r, idx) => idx === i ? { ...r, ...patch } : r))
+
+  const updateRand = (patch: Record<string, unknown>) =>
+    onChange({ ...schema, settings: { ...schema.settings, randomization: { ...rand, ...patch } } })
+
+  const updateGeo = (patch: Record<string, unknown>) =>
+    onChange({ ...schema, settings: { ...schema.settings, geofence: { ...geo, ...patch } } })
+
+  const useMyLocation = () => {
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      p => { updateGeo({ lat: p.coords.latitude, lng: p.coords.longitude }); setLocating(false) },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }
+
+  const inputCls = 'w-full bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text placeholder-catalan-textMuted focus:outline-none focus:border-catalan-primary transition-colors'
+  const labelCls = 'block text-xs font-medium text-catalan-textMuted mb-1.5 uppercase tracking-wider'
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="p-5 sm:p-6 max-w-2xl">
+        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-catalan-border">
+          <div className="w-9 h-9 rounded-xl bg-catalan-primary/10 flex items-center justify-center text-catalan-primary font-bold flex-shrink-0 text-base">⚙</div>
+          <div>
+            <div className="text-xs text-catalan-textMuted mb-0.5">Form-level settings</div>
+            <div className="text-base font-semibold text-catalan-text">Form Settings</div>
+          </div>
+        </div>
+
+        {/* Data Purpose (DPDP) */}
+        <div className="mb-4">
+          <label className={labelCls}>Data Purpose (DPDP Compliance)</label>
+          <textarea
+            className={inputCls + ' resize-none'}
+            rows={3}
+            value={(schema.settings as any)?.purpose ?? ''}
+            onChange={e => onChange({ ...schema, settings: { ...(schema.settings as any), purpose: e.target.value || undefined } } as FormSchema)}
+            placeholder="Describe why this data is being collected. If set, respondents will see a consent banner before starting."
+          />
+          <p className="text-xs text-catalan-textMuted mt-1">Leave blank to skip the consent banner.</p>
+        </div>
+
+        {/* Validation Rules */}
+        <div className="mb-4 border border-catalan-border rounded-xl overflow-hidden">
+          <button
+            onClick={() => setValidationOpen(o => !o)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-catalan-surface hover:bg-catalan-hover transition-colors text-left"
+          >
+            <span className="font-medium text-catalan-text text-sm">✅ Validation Rules {validationRules.length > 0 && <span className="ml-1 text-xs bg-catalan-primary/20 text-catalan-primary px-1.5 py-0.5 rounded-full">{validationRules.length}</span>}</span>
+            <span className="text-catalan-textMuted text-xs">{validationOpen ? '▲' : '▼'}</span>
+          </button>
+          {validationOpen && (
+            <div className="p-4 border-t border-catalan-border bg-catalan-hover/30 space-y-3">
+              <p className="text-xs text-catalan-textMuted">Server-side rules evaluated when submissions are synced. Violations are flagged automatically.</p>
+              {validationRules.map((rule, i) => (
+                <div key={i} className="bg-catalan-surface border border-catalan-border rounded-lg p-3 space-y-2">
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className={labelCls}>Field</label>
+                      <select
+                        className={inputCls}
+                        value={rule.field_id}
+                        onChange={e => updateValidationRule(i, { field_id: e.target.value })}
+                      >
+                        <option value="">Select field…</option>
+                        {allFields.map(f => <option key={f.id} value={f.id}>{f.label || f.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="w-36">
+                      <label className={labelCls}>Operator</label>
+                      <select
+                        className={inputCls}
+                        value={rule.operator}
+                        onChange={e => updateValidationRule(i, { operator: e.target.value })}
+                      >
+                        <option value="min">min</option>
+                        <option value="max">max</option>
+                        <option value="regex">regex</option>
+                        <option value="required_if_field">required_if_field</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>
+                      {rule.operator === 'required_if_field' ? 'Required when this field ID is non-empty' : 'Value'}
+                    </label>
+                    {rule.operator === 'required_if_field' ? (
+                      <select
+                        className={inputCls}
+                        value={rule.value}
+                        onChange={e => updateValidationRule(i, { value: e.target.value })}
+                      >
+                        <option value="">Select triggering field…</option>
+                        {allFields.filter(f => f.id !== rule.field_id).map(f => <option key={f.id} value={f.id}>{f.label || f.name}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        className={inputCls}
+                        value={rule.value}
+                        onChange={e => updateValidationRule(i, { value: e.target.value })}
+                        placeholder={rule.operator === 'regex' ? 'e.g. ^[0-9]{10}$' : 'e.g. 0'}
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <label className={labelCls}>Error message</label>
+                    <input
+                      className={inputCls}
+                      value={rule.message}
+                      onChange={e => updateValidationRule(i, { message: e.target.value })}
+                      placeholder="e.g. Age must be at least 0"
+                    />
+                  </div>
+                  <button
+                    onClick={() => removeValidationRule(i)}
+                    className="text-xs text-catalan-error hover:underline"
+                  >
+                    Remove rule
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={addValidationRule}
+                className="w-full text-sm py-2 rounded-lg border border-dashed border-catalan-primary/50 text-catalan-primary hover:bg-catalan-primary/10 transition-colors"
+              >
+                + Add Rule
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Randomization */}
+        <div className="mb-4 border border-catalan-border rounded-xl overflow-hidden">
+          <button
+            onClick={() => setRandOpen(o => !o)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-catalan-surface hover:bg-catalan-hover transition-colors text-left"
+          >
+            <span className="font-medium text-catalan-text text-sm">📊 Randomization / Arm Assignment</span>
+            <span className="text-catalan-textMuted text-xs">{randOpen ? '▲' : '▼'}</span>
+          </button>
+          {randOpen && (
+            <div className="p-4 border-t border-catalan-border space-y-4 bg-catalan-hover/30">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!rand.enabled}
+                  onChange={e => updateRand({ enabled: e.target.checked })}
+                  className="w-4 h-4 accent-catalan-primary"
+                />
+                <span className="text-sm text-catalan-text">Enable arm assignment</span>
+              </label>
+              {rand.enabled && (
+                <div>
+                  <label className={labelCls}>Arm names (comma-separated)</label>
+                  <input
+                    className={inputCls}
+                    value={(rand.arms ?? []).join(', ')}
+                    onChange={e => updateRand({ arms: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })}
+                    placeholder="Control, Treatment A, Treatment B"
+                  />
+                  <p className="text-xs text-catalan-textMuted mt-1">Each respondent is deterministically assigned to one arm.</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Geofencing */}
+        <div className="mb-4 border border-catalan-border rounded-xl overflow-hidden">
+          <button
+            onClick={() => setGeoOpen(o => !o)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-catalan-surface hover:bg-catalan-hover transition-colors text-left"
+          >
+            <span className="font-medium text-catalan-text text-sm">🗺 Geofencing</span>
+            <span className="text-catalan-textMuted text-xs">{geoOpen ? '▲' : '▼'}</span>
+          </button>
+          {geoOpen && (
+            <div className="p-4 border-t border-catalan-border space-y-4 bg-catalan-hover/30">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!geo.enabled}
+                  onChange={e => updateGeo({ enabled: e.target.checked })}
+                  className="w-4 h-4 accent-catalan-primary"
+                />
+                <span className="text-sm text-catalan-text">Enable geofence</span>
+              </label>
+              {geo.enabled && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Center latitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        className={inputCls}
+                        value={geo.lat ?? ''}
+                        onChange={e => updateGeo({ lat: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        placeholder="e.g. 28.6139"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Center longitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        className={inputCls}
+                        value={geo.lng ?? ''}
+                        onChange={e => updateGeo({ lng: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        placeholder="e.g. 77.2090"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Radius (meters)</label>
+                    <input
+                      type="number"
+                      className={inputCls}
+                      value={geo.radius_meters ?? ''}
+                      onChange={e => updateGeo({ radius_meters: e.target.value === '' ? undefined : parseInt(e.target.value, 10) })}
+                      placeholder="e.g. 500"
+                    />
+                  </div>
+                  <button
+                    onClick={useMyLocation}
+                    disabled={locating}
+                    className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-catalan-primary/40 text-catalan-primary hover:bg-catalan-primary/10 transition-colors disabled:opacity-50"
+                  >
+                    {locating ? '⏳ Getting location…' : '📍 Use my location'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import math
 import uuid as _uuid
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Request
 from fastapi.params import Form as FormParam
@@ -35,6 +36,105 @@ class SubmissionPayload(BaseModel):
     participant_type_id: Optional[str] = None
     questionnaire_id: Optional[str] = None
     location_id: Optional[str] = None
+    # DPDP consent
+    consent_given: Optional[bool] = True
+    consent_timestamp: Optional[str] = None
+
+
+def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    R = 6_371_000
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlam = math.radians(lng2 - lng1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def _run_validation(form_schema: dict, data_json: dict) -> list[dict]:
+    import re
+    rules = (form_schema.get("settings") or {}).get("validation_rules") or []
+    violations = []
+    for rule in rules:
+        field_id = rule.get("field_id", "")
+        operator = rule.get("operator", "")
+        rule_val = rule.get("value", "")
+        message = rule.get("message", f"Validation failed for {field_id}")
+        val = data_json.get(field_id)
+        failed = False
+        if operator == "min":
+            try:
+                failed = val is None or float(val) < float(rule_val)
+            except (TypeError, ValueError):
+                failed = True
+        elif operator == "max":
+            try:
+                failed = val is None or float(val) > float(rule_val)
+            except (TypeError, ValueError):
+                failed = True
+        elif operator == "regex":
+            try:
+                failed = not re.fullmatch(rule_val, str(val or ""))
+            except re.error:
+                failed = False
+        elif operator == "required_if_field":
+            other_val = data_json.get(rule_val)
+            if other_val not in (None, "", [], False):
+                failed = val in (None, "", [], False)
+        if failed:
+            violations.append({"field_id": field_id, "rule": operator, "message": message})
+    return violations
+
+
+def _check_duplicate(db: Session, sub: Submission, data_json: dict, enumerator_id: str) -> bool:
+    from sqlalchemy import func, cast, Date
+    same_day_subs = (
+        db.query(Submission)
+        .filter(
+            Submission.form_id == sub.form_id,
+            Submission.tenant_id == sub.tenant_id,
+            Submission.id != sub.id,
+            cast(Submission.server_received_at, Date) == cast(func.now(), Date),
+        )
+        .all()
+    )
+    if not same_day_subs:
+        return False
+
+    gps_str = next(
+        (v for v in data_json.values() if isinstance(v, str) and "," in v and _is_coord_string(v)),
+        None,
+    )
+    if gps_str:
+        try:
+            lat1, lng1 = (float(x.strip()) for x in gps_str.split(",", 1))
+            for other in same_day_subs:
+                other_gps = next(
+                    (v for v in (other.data_json or {}).values() if isinstance(v, str) and "," in v and _is_coord_string(v)),
+                    None,
+                )
+                if other_gps:
+                    try:
+                        lat2, lng2 = (float(x.strip()) for x in other_gps.split(",", 1))
+                        if _haversine_m(lat1, lng1, lat2, lng2) <= 50:
+                            return True
+                    except ValueError:
+                        pass
+        except ValueError:
+            pass
+
+    same_enum = any(str(s.enumerator_id) == str(enumerator_id) for s in same_day_subs)
+    return same_enum
+
+
+def _is_coord_string(s: str) -> bool:
+    parts = s.split(",", 1)
+    if len(parts) != 2:
+        return False
+    try:
+        lat, lng = float(parts[0].strip()), float(parts[1].strip())
+        return -90 <= lat <= 90 and -180 <= lng <= 180
+    except ValueError:
+        return False
 
 
 class PushRequest(BaseModel):
@@ -74,6 +174,13 @@ def push(request: Request, body: PushRequest, user=Depends(require_enumerator), 
             .scalar()
         ) or 1
 
+        consent_ts = None
+        if item.consent_timestamp:
+            try:
+                consent_ts = datetime.fromisoformat(item.consent_timestamp)
+            except ValueError:
+                pass
+
         sub = Submission(
             tenant_id=user["tenant_id"],
             form_id=item.form_id,
@@ -89,9 +196,48 @@ def push(request: Request, body: PushRequest, user=Depends(require_enumerator), 
             participant_type_id=item.participant_type_id,
             questionnaire_id=item.questionnaire_id,
             location_id=item.location_id,
+            consent_given=item.consent_given if item.consent_given is not None else True,
+            consent_timestamp=consent_ts,
         )
         db.add(sub)
         db.flush()  # get sub.id before commit
+
+        # Validation rules
+        form_obj_for_val = db.query(Form).filter(Form.id == item.form_id).first()
+        if form_obj_for_val and form_obj_for_val.json_schema:
+            violations = _run_validation(form_obj_for_val.json_schema, item.data_json)
+            if violations:
+                data = dict(sub.data_json or {})
+                data["_validation_violations"] = violations
+                sub.data_json = data
+                sub.has_violations = True
+
+        # Duplicate detection
+        is_dup = _check_duplicate(db, sub, item.data_json, str(user["sub"]))
+        if is_dup:
+            data = dict(sub.data_json or {})
+            data["_duplicate_suspect"] = True
+            sub.data_json = data
+
+        # Geofence check
+        if form_obj_for_val:
+            geo = (form_obj_for_val.json_schema or {}).get("settings", {}).get("geofence", {})
+            if geo.get("enabled") and geo.get("lat") is not None and geo.get("lng") is not None and geo.get("radius_meters"):
+                gps_val = next(
+                    (v for v in item.data_json.values() if isinstance(v, str) and "," in v and _is_coord_string(v)),
+                    None,
+                )
+                if gps_val:
+                    try:
+                        slat, slng = (float(x.strip()) for x in gps_val.split(",", 1))
+                        dist = _haversine_m(geo["lat"], geo["lng"], slat, slng)
+                        if dist > geo["radius_meters"]:
+                            d = dict(sub.data_json or {})
+                            d["geofence_violation"] = True
+                            sub.data_json = d
+                    except ValueError:
+                        pass
+
         results.append({"local_id": item.local_id, "server_id": str(sub.id), "status": "synced", "serial_no": next_serial})
 
     # Log sync event

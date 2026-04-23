@@ -1,3 +1,4 @@
+import hashlib
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from app.core.rate_limit import limiter
 from pydantic import BaseModel
@@ -27,6 +28,10 @@ class FormUpdate(BaseModel):
     title: Optional[str] = None
     json_schema: Optional[dict[str, Any]] = None
     status: Optional[str] = None
+
+
+class AssignArmRequest(BaseModel):
+    respondent_key: str
 
 
 class MigrateRequest(BaseModel):
@@ -457,3 +462,60 @@ def apply_submission_migration(
         "migrated_count": migrated_count,
         "renames_applied": diff["renamed"],
     }
+
+
+# ── Consent log ───────────────────────────────────────────────────────────
+
+
+@router.get("/{form_id}/consent-log")
+def consent_log(
+    form_id: str,
+    user=Depends(require_org_admin),
+    db: Session = Depends(get_db),
+):
+    form = _get_form_for_tenant(db, form_id, user["tenant_id"])
+
+    sig_fields: list[str] = []
+    for section in (form.json_schema or {}).get("sections", []):
+        for f in section.get("fields", []):
+            if f.get("type") == "signature":
+                sig_fields.append(f.get("name") or f.get("id") or "")
+
+    subs = db.query(Submission).filter(
+        Submission.form_id == form_id,
+        Submission.tenant_id == user["tenant_id"],
+    ).all()
+
+    results = []
+    for sub in subs:
+        data = sub.data_json or {}
+        has_sig = any(data.get(k) for k in sig_fields) if sig_fields else any(
+            isinstance(v, str) and v.startswith("data:image/") for v in data.values()
+        )
+        if has_sig:
+            results.append({
+                "submission_id": str(sub.id),
+                "enumerator_id": str(sub.enumerator_id),
+                "signed_at": sub.server_received_at.isoformat() if sub.server_received_at else None,
+            })
+
+    return results
+
+
+# ── Arm assignment ─────────────────────────────────────────────────────────
+
+
+@router.post("/{form_id}/assign-arm")
+def assign_arm(
+    form_id: str,
+    body: AssignArmRequest,
+    user=Depends(require_enumerator),
+    db: Session = Depends(get_db),
+):
+    form = _get_form_for_tenant(db, form_id, user["tenant_id"])
+    rand_cfg = (form.json_schema or {}).get("settings", {}).get("randomization", {})
+    arms: list[str] = rand_cfg.get("arms", [])
+    if not arms:
+        raise HTTPException(status_code=400, detail="No arms configured for this form")
+    idx = hashlib.md5(body.respondent_key.encode()).digest()[0] % len(arms)
+    return {"arm": arms[idx]}
