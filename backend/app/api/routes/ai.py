@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import require_role
@@ -9,7 +10,7 @@ from app.services import ai_service
 
 router = APIRouter()
 require_org_admin = require_role("org_admin")
-require_supervisor = require_role("supervisor")
+require_supervisor = require_role("org_admin", "supervisor")
 
 
 @router.get("/config")
@@ -88,3 +89,77 @@ async def translate_labels(body: dict, user: dict = Depends(require_org_admin), 
     except Exception as e:
         raise HTTPException(503, f"AI provider error: {e}")
     return {"translated": translated}
+
+
+@router.post("/writer")
+async def ai_writer(
+    body: dict,
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """FG Writer — generate styled report from table data + chart descriptions."""
+    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+    try:
+        report_md = await ai_service.generate_styled_report(
+            tenant=tenant,
+            style=body.get("style", "field_survey"),
+            form_title=body.get("form_title", "Survey"),
+            date_range=body.get("date_range", ""),
+            sample_size=body.get("sample_size", 0),
+            table_data=body.get("table_data", ""),
+            chart_descriptions=body.get("chart_descriptions", ""),
+            custom_context=body.get("custom_context", ""),
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(503, f"AI error: {e}")
+    return {"report_md": report_md}
+
+
+@router.post("/writer/export-docx")
+def export_docx(body: dict, user: dict = Depends(require_supervisor)):
+    """Convert markdown report to Word .docx"""
+    import io, re
+    try:
+        from docx import Document
+        from docx.shared import Pt, RGBColor
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+    except ImportError:
+        raise HTTPException(503, "python-docx not installed")
+
+    md = body.get("report_md", "")
+    title = body.get("title", "Report")
+
+    doc = Document()
+    t = doc.add_heading(title, 0)
+    t.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    for line in md.split('\n'):
+        line = line.strip()
+        if not line:
+            doc.add_paragraph('')
+        elif line.startswith('## '):
+            doc.add_heading(line[3:], level=1)
+        elif line.startswith('### '):
+            doc.add_heading(line[4:], level=2)
+        elif line.startswith('# '):
+            doc.add_heading(line[2:], level=1)
+        else:
+            p = doc.add_paragraph()
+            parts = re.split(r'(\*\*.*?\*\*)', line)
+            for part in parts:
+                if part.startswith('**') and part.endswith('**'):
+                    run = p.add_run(part[2:-2])
+                    run.bold = True
+                else:
+                    p.add_run(part)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return Response(
+        content=buf.read(),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{title}.docx"'}
+    )

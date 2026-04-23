@@ -25,7 +25,8 @@
     "wa-sqlite": "^1.0.0",
     "workbox-window": "^7.1.0",
     "qrcode": "^1.5.4",
-    "zustand": "^4.5.2"
+    "zustand": "^4.5.2",
+    "recharts": "^2.12.0"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.21",

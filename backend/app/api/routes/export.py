@@ -11,12 +11,14 @@ try:
 except ImportError:
     HAS_PANDAS = False
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_supervisor
+from app.core.security import verify_api_key
+from app.models.api_key import ApiKey
 from app.models.form import Form
 from app.models.submission import Submission
 from app.models.user import User
@@ -159,6 +161,118 @@ def export_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{form.title}.csv"'},
     )
+
+
+# ---------------------------------------------------------------------------
+# JSON export (API key or JWT auth)
+# ---------------------------------------------------------------------------
+
+def _resolve_user_from_request(request: Request, db: Session) -> dict:
+    """Resolve user from X-API-Key header or fall back to JWT Bearer."""
+    api_key_header = request.headers.get("X-API-Key")
+    if api_key_header:
+        records = db.query(ApiKey).filter(ApiKey.is_active == True).all()
+        matching = None
+        for record in records:
+            if verify_api_key(api_key_header, record.key_hash):
+                matching = record
+                break
+        if not matching:
+            raise HTTPException(status_code=401, detail="Invalid API key")
+        from sqlalchemy import func
+        matching.last_used_at = func.now()
+        db.commit()
+        creator = db.query(User).filter(User.id == matching.created_by_id).first()
+        if not creator:
+            raise HTTPException(status_code=401, detail="Key creator no longer exists")
+        if creator.role not in ("org_admin", "supervisor"):
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        from app.core.database import set_tenant_context
+        set_tenant_context(db, str(matching.tenant_id))
+        return {
+            "sub": str(creator.id),
+            "tenant_id": str(matching.tenant_id),
+            "role": creator.role,
+            "api_key_id": str(matching.id),
+        }
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    from jose import JWTError
+    from app.core.security import decode_token
+    from app.core.database import set_tenant_context
+    try:
+        payload = decode_token(auth_header[7:])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    if payload.get("role") not in ("org_admin", "supervisor"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    set_tenant_context(db, payload["tenant_id"])
+    return payload
+
+
+@router.get("/submissions/{form_id}/json")
+def export_json(
+    form_id: str,
+    request: Request,
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Flat JSON array of all submissions. Designed for external tools (FG Analyzer, FG Data Cleaner) to consume via API key auth."""
+    user = _resolve_user_from_request(request, db)
+
+    form = db.query(Form).filter(
+        Form.id == form_id, Form.tenant_id == user["tenant_id"]
+    ).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    date_from_dt: Optional[datetime] = None
+    date_to_dt: Optional[datetime] = None
+    if date_from:
+        try:
+            date_from_dt = datetime.fromisoformat(date_from)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid date_from format")
+    if date_to:
+        try:
+            date_to_dt = datetime.fromisoformat(date_to)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid date_to format")
+
+    subs = _query_submissions(db, form_id, user["tenant_id"], date_from_dt, date_to_dt, status)
+    enum_map = _build_enumerator_map(db, user["tenant_id"])
+
+    result = []
+    meta = {
+        "_meta": True,
+        "form_title": form.title,
+        "field_count": len([
+            f for section in (form.json_schema or {}).get("sections", [])
+            for f in section.get("fields", [])
+        ]),
+        "submission_count": len(subs),
+        "exported_at": datetime.utcnow().isoformat() + "Z",
+    }
+    result.append(meta)
+
+    for s in subs:
+        flat = _flatten(s.data_json or {})
+        row = {
+            "submission_id": str(s.id),
+            "serial_no": s.serial_no,
+            "enumerator_name": enum_map.get(s.enumerator_id, ""),
+            "submitted_at": s.local_created_at.isoformat() if s.local_created_at else (
+                s.server_received_at.isoformat() if s.server_received_at else None
+            ),
+            "status": s.status or "",
+            **flat,
+        }
+        result.append(row)
+
+    return JSONResponse(content=result)
 
 
 # ---------------------------------------------------------------------------

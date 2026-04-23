@@ -15,6 +15,7 @@ import ProgressDashboard   from '@/programs/ProgressDashboard'
 import SuperAdminMonitor   from '@/admin/SuperAdminMonitor'
 import MigrationPage      from '@/migration/MigrationPage'
 import PublicSurveyPage   from '@/collect/PublicSurveyPage'
+import FgWriter           from '@/reports/FgWriter'
 import { LanguageProvider } from '@/i18n/LanguageContext'
 import { ToastProvider } from '@/lib/ToastContext'
 import { ThemeProvider } from '@/lib/ThemeContext'
@@ -163,6 +164,14 @@ export default function App() {
                 <RequireAuth roles={['org_admin', 'master_admin']}>
                   <ErrorBoundary>
                     <MigrationPage />
+                  </ErrorBoundary>
+                </RequireAuth>
+              } />
+
+              <Route path="/writer" element={
+                <RequireAuth roles={['org_admin', 'supervisor']}>
+                  <ErrorBoundary>
+                    <FgWriter />
                   </ErrorBoundary>
                 </RequireAuth>
               } />

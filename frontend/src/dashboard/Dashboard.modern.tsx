@@ -14,6 +14,7 @@ import AuditLog from '@/components/AuditLog'
 import RosterTab from '@/dashboard/RosterTab'
 import ProgressTab from '@/dashboard/ProgressTab'
 import AiReportModal from '@/dashboard/AiReportModal'
+import AnalyticsTab from '@/dashboard/AnalyticsTab'
 
 const MiniMap = lazy(() => import('@/renderer/fields/MiniMap'))
 const SubmissionsMap = lazy(() => import('@/dashboard/SubmissionsMap'))
@@ -1947,6 +1948,9 @@ export default function Dashboard() {
           {/* ── ANALYTICS ── */}
           {tab === 'analytics' && (
             <div className="space-y-6">
+
+              {/* Recharts analytics section */}
+              <AnalyticsTab forms={forms} />
 
               {/* Status breakdown */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

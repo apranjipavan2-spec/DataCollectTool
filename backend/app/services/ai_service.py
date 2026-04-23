@@ -66,6 +66,39 @@ async def suggest_skip_logic(tenant, question_text: str, form_fields: list) -> l
     return []
 
 
+REPORT_STYLE_PROMPTS = {
+    "progress": "You are writing a field program progress report for NGO/government management. Use clear sections: Executive Summary, Progress Against Targets, Enumerator Performance, Data Quality, Issues & Resolutions, Next Steps. Professional but accessible tone.",
+    "field_survey": "You are writing a field survey report for a research team. Sections: Background, Methodology, Sample Description, Key Findings, Data Quality Assessment, Limitations, Recommendations. Technical but readable.",
+    "medical": "You are writing a clinical/health data report following CONSORT/STROBE guidelines. Sections: Background, Methods (design, participants, data collection), Results (with statistical context), Discussion, Conclusions. Formal medical research tone.",
+    "research": "You are writing an academic research paper. Sections: Abstract, Introduction, Methods, Results, Discussion, Conclusion. Use formal academic language, passive voice where appropriate, cite data precisely.",
+    "government": "You are writing an official government administrative report. Sections: Executive Summary, Objectives, Methodology, Findings, Recommendations, Action Points. Formal bureaucratic style, numbered points.",
+    "ngo": "You are writing an NGO/donor impact report. Sections: Program Overview, Impact Summary, Beneficiary Stories (placeholder), Key Indicators, Challenges, Lessons Learned, Financial Summary (placeholder). Warm but evidence-based tone.",
+}
+
+
+async def generate_styled_report(tenant, style: str, form_title: str, date_range: str,
+                                  sample_size: int, table_data: str, chart_descriptions: str,
+                                  custom_context: str) -> str:
+    style_prompt = REPORT_STYLE_PROMPTS.get(style, REPORT_STYLE_PROMPTS["field_survey"])
+    prompt = f"""{style_prompt}
+
+Form/Study: {form_title}
+Period: {date_range}
+Sample size: {sample_size} respondents
+
+Tabulation data provided:
+{table_data[:8000] if table_data else "No tabulation data provided — generate placeholder structure."}
+
+Charts/visuals described:
+{chart_descriptions or "No charts provided."}
+
+Additional context:
+{custom_context or "None."}
+
+Generate a complete, well-structured report. Use markdown formatting (## for sections, **bold** for key numbers, tables where appropriate). Be specific and data-driven where data is provided. Mark any section needing human input with [REVIEW NEEDED]."""
+    return await _call_llm(tenant, prompt)
+
+
 async def translate_labels(tenant, labels: list, target_lang: str) -> list:
     import json
     prompt = (
