@@ -20,6 +20,7 @@ from app.core.deps import require_supervisor
 from app.models.form import Form
 from app.models.submission import Submission
 from app.models.user import User
+from fastapi import Query as _Query
 
 router = APIRouter()
 
@@ -367,6 +368,101 @@ def export_dta(
 
 
 # ---------------------------------------------------------------------------
+# Stata alias + SPSS export
+# ---------------------------------------------------------------------------
+
+@router.get("/{form_id}/stata")
+def export_stata(
+    form_id: str,
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    status: Optional[str] = Query(None),
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Export submissions as Stata .dta (alias for /dta endpoint)."""
+    return export_dta(form_id=form_id, date_from=date_from, date_to=date_to, status=status, user=user, db=db)
+
+
+@router.get("/{form_id}/spss")
+def export_spss(
+    form_id: str,
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    status: Optional[str] = Query(None),
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Export submissions as SPSS .sav file using pyreadstat."""
+    try:
+        import pyreadstat
+    except ImportError:
+        raise HTTPException(status_code=501, detail="pyreadstat not installed — run: pip install pyreadstat")
+
+    if not HAS_PANDAS:
+        raise HTTPException(status_code=501, detail="SPSS export requires pandas.")
+
+    form = db.query(Form).filter(
+        Form.id == form_id, Form.tenant_id == user["tenant_id"]
+    ).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    subs = _query_submissions(db, form_id, user["tenant_id"], date_from, date_to, status)
+    enum_map = _build_enumerator_map(db, user["tenant_id"])
+    rows = _build_rows(subs, enum_map)
+
+    df = pd.DataFrame(rows) if rows else pd.DataFrame()
+
+    schema = form.json_schema or {}
+    raw_fields = schema.get("fields", [])
+    if not raw_fields and schema.get("sections"):
+        for sec in schema["sections"]:
+            raw_fields.extend(sec.get("fields", []))
+    variable_labels = {f.get("id", ""): f.get("label", f.get("id", "")) for f in raw_fields if f.get("id")}
+
+    col_renames: dict = {}
+    used_names: set = set()
+    for col in df.columns:
+        clean = _sanitize_stata_colname(col)
+        base = clean
+        counter = 2
+        while clean in used_names:
+            suffix = str(counter)
+            clean = base[: 32 - len(suffix)] + suffix
+            counter += 1
+        used_names.add(clean)
+        col_renames[col] = clean
+    df.rename(columns=col_renames, inplace=True)
+
+    for col in df.columns:
+        if df[col].dtype == object:
+            df[col] = df[col].astype(str).replace("None", "")
+
+    import tempfile
+    import os
+    with tempfile.NamedTemporaryFile(suffix=".sav", delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        col_labels = {col_renames.get(k, k): v for k, v in variable_labels.items() if col_renames.get(k, k) in df.columns}
+        pyreadstat.write_sav(df, tmp_path, column_labels=col_labels)
+        with open(tmp_path, "rb") as f:
+            content = f.read()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate .sav file: {e}")
+    finally:
+        os.unlink(tmp_path)
+
+    filename = f"{form.title}.sav"
+    return StreamingResponse(
+        iter([content]),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Google Sheets — connection status check
 # ---------------------------------------------------------------------------
 
@@ -550,4 +646,47 @@ def export_xlsx(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Consent report (DPDP compliance)
+# ---------------------------------------------------------------------------
+
+@router.get("/consent-report")
+def export_consent_report(
+    form_id: str = _Query(..., description="Form ID to export consent data for"),
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Export a CSV of consent records for a form (DPDP compliance)."""
+    form = db.query(Form).filter(Form.id == form_id, Form.tenant_id == user["tenant_id"]).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    subs = (
+        db.query(Submission, User.phone)
+        .outerjoin(User, Submission.enumerator_id == User.id)
+        .filter(Submission.form_id == form_id, Submission.tenant_id == user["tenant_id"])
+        .all()
+    )
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["submission_id", "enumerator_phone", "submitted_at", "consent_given", "consent_timestamp"])
+    for s, phone in subs:
+        writer.writerow([
+            str(s.id),
+            phone or "",
+            s.server_received_at.isoformat() if s.server_received_at else "",
+            str(s.consent_given) if s.consent_given is not None else "",
+            s.consent_timestamp.isoformat() if s.consent_timestamp else "",
+        ])
+    buf.seek(0)
+
+    safe_title = "".join(c for c in form.title if c.isalnum() or c in " _-")
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="consent_{safe_title}.csv"'},
     )

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, func
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 import uuid
 from app.core.database import Base
@@ -27,3 +27,9 @@ class Submission(Base):
     participant_type_id = Column(UUID(as_uuid=True), nullable=True)
     questionnaire_id = Column(UUID(as_uuid=True), nullable=True)
     location_id = Column(UUID(as_uuid=True), nullable=True)
+    # QC / compliance (migration 0020)
+    has_violations = Column(Boolean, default=False, nullable=True)
+    consent_given = Column(Boolean, default=True, nullable=True)
+    consent_timestamp = Column(DateTime(timezone=True), nullable=True)
+    backcheck_required = Column(Boolean, default=False, nullable=True)
+    backcheck_form_id = Column(UUID(as_uuid=True), nullable=True)

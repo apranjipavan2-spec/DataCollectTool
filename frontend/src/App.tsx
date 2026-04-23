@@ -14,6 +14,7 @@ import ProgramsPage        from '@/programs/ProgramsPage'
 import ProgressDashboard   from '@/programs/ProgressDashboard'
 import SuperAdminMonitor   from '@/admin/SuperAdminMonitor'
 import MigrationPage      from '@/migration/MigrationPage'
+import PublicSurveyPage   from '@/collect/PublicSurveyPage'
 import { LanguageProvider } from '@/i18n/LanguageContext'
 import { ToastProvider } from '@/lib/ToastContext'
 import { ThemeProvider } from '@/lib/ThemeContext'
@@ -164,6 +165,12 @@ export default function App() {
                     <MigrationPage />
                   </ErrorBoundary>
                 </RequireAuth>
+              } />
+
+              <Route path="/survey/:token" element={
+                <ErrorBoundary>
+                  <PublicSurveyPage />
+                </ErrorBoundary>
               } />
 
               <Route path="*" element={<RoleHome />} />

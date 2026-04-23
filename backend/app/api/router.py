@@ -5,6 +5,7 @@ from app.api.routes import (
     templates, import_excel, bulk_upload, programs, admin_monitor,
 )
 from app.api.routes.migration.router import router as migration_router
+from app.api.routes import public_survey, roster, analytics
 
 router = APIRouter()
 
@@ -28,3 +29,6 @@ router.include_router(bulk_upload.router, prefix="/bulk-upload", tags=["bulk-upl
 router.include_router(programs.router, prefix="/programs", tags=["programs"])
 router.include_router(admin_monitor.router)
 router.include_router(migration_router, prefix="/migration", tags=["migration"])
+router.include_router(public_survey.router, tags=["public-survey"])
+router.include_router(roster.router, prefix="/roster", tags=["roster"])
+router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])

@@ -64,6 +64,8 @@ def list_submissions(
     q: Optional[str] = None,
     page: int = 1,
     page_size: int = 50,
+    backcheck_required: Optional[bool] = None,
+    has_violations: Optional[bool] = None,
     user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -83,6 +85,10 @@ def list_submissions(
             query = query.filter(Submission.enumerator_id == enumerator_id)
         if status:
             query = query.filter(Submission.status == status)
+        if backcheck_required is not None:
+            query = query.filter(Submission.backcheck_required == backcheck_required)
+        if has_violations is not None:
+            query = query.filter(Submission.has_violations == has_violations)
         if date_from:
             query = query.filter(Submission.server_received_at >= datetime.fromisoformat(date_from))
         if date_to:
@@ -120,6 +126,9 @@ def list_submissions(
                     "status": s.status,
                     "serial_no": s.serial_no,
                     "data_json": s.data_json,
+                    "has_violations": bool(s.has_violations),
+                    "backcheck_required": bool(s.backcheck_required),
+                    "consent_given": s.consent_given,
                     "local_created_at": s.local_created_at.isoformat() if s.local_created_at else None,
                     "server_received_at": s.server_received_at.isoformat() if s.server_received_at else None,
                 }
@@ -605,3 +614,41 @@ def update_serial_no(
     sub.serial_no = body.serial_no
     db.commit()
     return {"id": str(sub.id), "serial_no": sub.serial_no}
+
+
+# ── Anonymize (DPDP) — master_admin only ─────────────────────────────────────
+
+@router.post("/{submission_id}/anonymize")
+def anonymize_submission(
+    submission_id: str,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if user.get("role") != "master_admin":
+        raise HTTPException(status_code=403, detail="Only master_admin can anonymize submissions")
+    sub = db.query(Submission).filter(
+        Submission.id == submission_id, Submission.tenant_id == user["tenant_id"]
+    ).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    sub.data_json = {"anonymized": True, "anonymized_at": datetime.now(timezone.utc).isoformat()}
+    db.commit()
+    return {"id": str(sub.id), "status": "anonymized"}
+
+
+# ── Flag back-check — supervisor+ ────────────────────────────────────────────
+
+@router.post("/{submission_id}/flag-backcheck")
+def flag_backcheck(
+    submission_id: str,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    sub = db.query(Submission).filter(
+        Submission.id == submission_id, Submission.tenant_id == user["tenant_id"]
+    ).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    sub.backcheck_required = True
+    db.commit()
+    return {"id": str(sub.id), "backcheck_required": True}

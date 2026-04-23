@@ -21,6 +21,7 @@ const FIELD_TYPES: { type: FieldType; label: string; icon: string; description: 
   { type: 'repeat_group',    label: 'Repeat Group',    icon: '⟳',  description: 'Repeatable set of fields' },
   { type: 'note',            label: 'Note',            icon: 'ℹ',  description: 'Instructional text only' },
   { type: 'rating',          label: 'Rating Scale',    icon: '★',  description: '1–5 or 1–10 rating' },
+  { type: 'signature',       label: 'Signature / Consent', icon: '✍️', description: 'Touch / mouse signature pad' },
 ]
 
 export default function FieldTypeMenu({ onSelect, onClose }: Props) {

@@ -497,6 +497,15 @@ export default function Dashboard() {
   // Excel export
   const [exportingXlsx, setExportingXlsx] = useState(false)
 
+  // Stata / SPSS export
+  const [exportingStata, setExportingStata] = useState(false)
+  const [exportingSpss, setExportingSpss] = useState(false)
+
+  // Share modal
+  const [shareForm, setShareForm] = useState<Form | null>(null)
+  const [sharePublicUrl, setSharePublicUrl] = useState<string | null>(null)
+  const [sharingBusy, setSharingBusy] = useState(false)
+
   // Org settings
   const [allowEnumeratorEdit, setAllowEnumeratorEdit] = useState(true)
   const [savingEnumEdit, setSavingEnumEdit] = useState(false)
@@ -776,6 +785,64 @@ export default function Dashboard() {
       toast.error('Excel export failed')
     } finally {
       setExportingXlsx(false)
+    }
+  }
+
+  const handleExportStata = async () => {
+    if (!filterForm) { toast.warning('Select a form to export'); return }
+    setExportingStata(true)
+    try {
+      const res = await api.get(`/export/${filterForm}/stata`, { responseType: 'blob' })
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a'); a.href = url; a.download = 'data.dta'; a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Stata file downloaded')
+    } catch {
+      toast.error('Stata export failed')
+    } finally {
+      setExportingStata(false)
+    }
+  }
+
+  const handleExportSpss = async () => {
+    if (!filterForm) { toast.warning('Select a form to export'); return }
+    setExportingSpss(true)
+    try {
+      const res = await api.get(`/export/${filterForm}/spss`, { responseType: 'blob' })
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a'); a.href = url; a.download = 'data.sav'; a.click()
+      URL.revokeObjectURL(url)
+      toast.success('SPSS file downloaded')
+    } catch {
+      toast.error('SPSS export failed')
+    } finally {
+      setExportingSpss(false)
+    }
+  }
+
+  const handleMakePublic = async (form: Form) => {
+    setSharingBusy(true)
+    try {
+      const { data } = await api.post(`/forms/${form.id}/make-public`)
+      setSharePublicUrl(window.location.origin + data.public_url)
+      toast.success('Survey link created')
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail ?? 'Failed to make public')
+    } finally {
+      setSharingBusy(false)
+    }
+  }
+
+  const handleMakePrivate = async (form: Form) => {
+    setSharingBusy(true)
+    try {
+      await api.post(`/forms/${form.id}/make-private`)
+      setSharePublicUrl(null)
+      toast.success('Survey link deactivated')
+    } catch {
+      toast.error('Failed to make private')
+    } finally {
+      setSharingBusy(false)
     }
   }
 
@@ -1161,6 +1228,45 @@ export default function Dashboard() {
         />
       )}
 
+      {/* Share modal */}
+      {shareForm && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setShareForm(null)}>
+          <div className="bg-catalan-bg border border-catalan-border rounded-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-catalan-border flex justify-between items-center">
+              <h2 className="text-base font-semibold text-catalan-text">Share Survey — {shareForm.title}</h2>
+              <button onClick={() => setShareForm(null)} className="text-catalan-textMuted hover:text-catalan-text text-2xl leading-none">×</button>
+            </div>
+            <div className="px-5 py-5 space-y-4">
+              <p className="text-sm text-catalan-textMuted">Generate a public link that anyone can use to submit this form — no login required.</p>
+              {sharePublicUrl ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      readOnly
+                      value={sharePublicUrl}
+                      className="flex-1 bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text font-mono"
+                    />
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(sharePublicUrl); toast.success('Link copied!') }}
+                      className="text-xs px-3 py-2 rounded border border-catalan-primary/40 text-catalan-primary hover:bg-catalan-primary/10 flex-shrink-0"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <Button variant="secondary" size="sm" onClick={() => handleMakePrivate(shareForm)} disabled={sharingBusy}>
+                    {sharingBusy ? 'Deactivating…' : 'Deactivate Link'}
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="primary" size="sm" onClick={() => handleMakePublic(shareForm)} disabled={sharingBusy}>
+                  {sharingBusy ? 'Generating…' : 'Generate Public Link'}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar — desktop only */}
       <Sidebar items={sidebarItems} role={user.role} />
 
@@ -1221,7 +1327,7 @@ export default function Dashboard() {
           {!loading && <><div className="hidden sm:flex gap-1 bg-catalan-surface rounded-lg p-1 w-fit flex-wrap">
             {(isEnumerator
               ? (['overview', 'submissions', 'forms'] as const)
-              : (['overview', 'submissions', 'map', 'analytics', 'forms', 'team', 'integrations'] as const)
+              : (['overview', 'submissions', 'map', 'analytics', 'forms', 'team', 'roster', 'progress', 'integrations'] as const)
             ).map(t => (
               <button
                 key={t}
@@ -1237,7 +1343,7 @@ export default function Dashboard() {
                     : 'text-catalan-textMuted hover:text-catalan-text hover:bg-catalan-hover'
                 }`}
               >
-                {t.charAt(0).toUpperCase() + t.slice(1)}
+                {t === 'roster' ? 'Roster' : t === 'progress' ? 'Progress' : t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
             ))}
           </div>
@@ -1462,6 +1568,12 @@ export default function Dashboard() {
                     </Button>
                     <Button variant="secondary" size="sm" onClick={handleExportPdf} disabled={exportingPdf} title="Download PDF summary report">
                       {exportingPdf ? 'Building…' : '↓ PDF'}
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={handleExportStata} disabled={exportingStata} title="Download Stata .dta file">
+                      {exportingStata ? 'Building…' : '↓ Stata'}
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={handleExportSpss} disabled={exportingSpss} title="Download SPSS .sav file">
+                      {exportingSpss ? 'Building…' : '↓ SPSS'}
                     </Button>
                     {sheetsConfigured === false ? (
                       <button
@@ -2085,6 +2197,15 @@ export default function Dashboard() {
                                     Assign
                                   </button>
                                 </span>
+                                {['org_admin'].includes(user.role) && (
+                                  <button
+                                    onClick={() => { setShareForm(form); setSharePublicUrl(null) }}
+                                    className="text-xs text-catalan-primary hover:underline"
+                                    title="Share as public survey"
+                                  >
+                                    Share
+                                  </button>
+                                )}
                               </div>
                               )}
                             </td>
@@ -2100,9 +2221,34 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* ── ROSTER ── */}
+          {tab === 'roster' && (
+            <RosterTab forms={forms} team={team} />
+          )}
+
+          {/* ── PROGRESS ── */}
+          {tab === 'progress' && (
+            <ProgressTab forms={forms} />
+          )}
+
           {/* ── INTEGRATIONS ── */}
           {tab === 'integrations' && (
             <div className="space-y-6">
+
+              {/* ── Compliance — Consent Reports ── */}
+              <Card title="📋 Compliance — Consent Reports">
+                <p className="text-sm text-catalan-textMuted mb-3">Download DPDP consent audit records. Includes submission ID, enumerator phone, consent flag and timestamp.</p>
+                {forms.length === 0 ? <p className="text-sm text-catalan-textMuted">No forms available.</p> : (
+                  <div className="space-y-2">
+                    {forms.map(f => (
+                      <div key={f.id} className="flex items-center justify-between py-1.5 border-b border-catalan-border last:border-0">
+                        <span className="text-sm text-catalan-text">{f.title}</span>
+                        <a href={`/api/v1/export/consent-report?form_id=${f.id}`} target="_blank" rel="noopener noreferrer" className="text-xs px-2.5 py-1 rounded border border-catalan-primary/30 text-catalan-primary hover:bg-catalan-primary/10 transition-colors">📥 Download CSV</a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
 
               {/* ── API Keys ── */}
               <Card title="API Keys">

@@ -16,6 +16,7 @@ import RepeatGroupField from './fields/RepeatGroupField'
 import BarcodeField     from './fields/BarcodeField'
 import RatingField      from './fields/RatingField'
 import NoteField        from './fields/NoteField'
+import SignatureField   from './fields/SignatureField'
 
 interface Props {
   schema: FormSchema
@@ -34,6 +35,7 @@ export interface SubmissionDraft {
   gpsSubmit: GpsCoord | null
   status: 'draft' | 'outbox'
   startedAt: string
+  consentTimestamp?: string
 }
 
 interface GpsCoord { lat: number; lng: number; accuracy: number }
@@ -61,6 +63,9 @@ function validate(field: FormField, value: unknown): string {
 }
 
 export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initialDraft }: Props) {
+  const purpose = (schema as any).settings?.purpose as string | undefined
+  const [consentGiven, setConsentGiven] = useState(!purpose || !!initialDraft?.consentTimestamp)
+
   const [draft, setDraft] = useState<SubmissionDraft>(() => initialDraft ?? {
     id: uuidv4(), formVersion: schema.version,
     values: {}, gpsOpen: null, gpsSubmit: null, status: 'draft', startedAt: new Date().toISOString(),
@@ -199,6 +204,33 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
   const isLast = page === allFields.length - 1
   const progress = allFields.length > 0 ? ((page + 1) / allFields.length) * 100 : 0
 
+  if (purpose && !consentGiven) {
+    return (
+      <div className="h-full bg-catalan-bg flex flex-col items-center justify-center px-5 font-sans">
+        <div className="w-full max-w-lg bg-catalan-surface border border-catalan-border rounded-2xl p-8 text-center">
+          <div className="text-4xl mb-4">📋</div>
+          <h2 className="text-lg font-semibold text-catalan-text mb-2">Data Collection Purpose</h2>
+          <p className="text-sm text-catalan-textMuted mb-6 leading-relaxed">{purpose}</p>
+          <button
+            onClick={() => {
+              const ts = new Date().toISOString()
+              setConsentGiven(true)
+              setDraft(d => ({ ...d, consentTimestamp: ts }))
+            }}
+            className="w-full bg-catalan-primary text-white rounded-xl py-4 text-base font-semibold cursor-pointer hover:brightness-110 active:scale-[0.98] transition-all"
+          >
+            I Agree &amp; Continue
+          </button>
+          {onCancel && (
+            <button onClick={onCancel} className="mt-3 text-sm text-catalan-textMuted hover:text-catalan-text">
+              Cancel
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   if (!currentField) {
     return (
       <div className="min-h-screen bg-catalan-bg text-catalan-text font-sans flex items-center justify-center">
@@ -292,6 +324,9 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
           <RatingField field={localizedField} value={draft.values[currentField.name] as number ?? null} onChange={v => setValue(currentField.name, v)} />
         )}
         {localizedField.type === 'note' && <NoteField field={localizedField} />}
+        {localizedField.type === 'signature' && (
+          <SignatureField field={localizedField} value={draft.values[currentField.name] as string ?? null} onChange={v => setValue(currentField.name, v)} />
+        )}
         {localizedField.type === 'calculated' && (
           <div>
             {/* Question label */}
