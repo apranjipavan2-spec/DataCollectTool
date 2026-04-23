@@ -31,12 +31,26 @@
   </style>
 </head>
 <body>
-<nav>
+<nav id="navbar">
   <a href="index.html" class="nav-logo">
-    <img src="logo.png" alt="FieldGovern" style="width:32px;height:32px;border-radius:8px;object-fit:contain;filter:brightness(0) saturate(0);opacity:0.85"/>
+    <img src="logo.png" alt="FieldGovern" class="logo-nav-img" style="width:36px;height:36px;border-radius:10px;object-fit:contain"/>
     FieldGovern
   </a>
-  <a href="https://app.fieldgovern.com" class="btn-primary">Open App →</a>
+  <ul class="nav-links">
+    <li><a href="features.html">Features</a></li>
+    <li><a href="integrations.html">Integrations</a></li>
+    <li><a href="use-cases.html">Use Cases</a></li>
+    <li><a href="security.html">Security</a></li>
+    <li><a href="index.html#pricing">Pricing</a></li>
+    <li><a href="about.html">About</a></li>
+  </ul>
+  <div style="display:flex;gap:8px;align-items:center">
+    <a href="demo.html" class="btn-outline nav-cta-secondary">Try Demo</a>
+    <a href="https://app.fieldgovern.com" class="btn-primary">Open App &rarr;</a>
+    <button class="hamburger" id="hamburgerBtn" aria-label="Open menu" onclick="toggleMenu()">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
 </nav>
 
 <main>
