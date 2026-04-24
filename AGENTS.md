@@ -50,7 +50,6 @@ Always run `sigmap ask` or `sigmap --query` before searching for files relevant 
 ## deps
 ```
 backend\app\api\routes\ai.py ← fastapi, sqlalchemy, app
-backend\app\api\routes\export.py ← fastapi, sqlalchemy, app
 backend\app\api\routes\field_govern.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\api\routes\forms.py ← fastapi, app, pydantic, sqlalchemy
 backend\app\api\routes\submissions.py ← fastapi, pydantic, sqlalchemy, app
@@ -76,20 +75,6 @@ POST /translate  →  translate_labels()
 POST /writer  →  ai_writer()
 POST /writer/export-docx  →  export_docx()
 POST /generate-form  →  generate_form()
-```
-
-### backend\app\api\routes\export.py
-```
-GET /{form_id}/csv  →  export_csv()
-GET /submissions/{form_id}/json  →  export_json()
-GET /{form_id}/pdf  →  export_pdf()
-GET /{form_id}/dta  →  export_dta()
-GET /{form_id}/stata  →  export_stata()
-GET /{form_id}/spss  →  export_spss()
-GET /sheets/status  →  sheets_status()
-POST /{form_id}/sheets  →  export_sheets()
-GET /{form_id}/xlsx  →  export_xlsx()
-GET /consent-report  →  export_consent_report()
 ```
 
 ### backend\app\api\routes\field_govern.py
@@ -308,16 +293,6 @@ handler onDraft
 handler onSave
 handler onSubmit
 handler onSelect
-handler onChange
-```
-
-### frontend\src\dashboard\AnalyticsTab.tsx
-```
-component ChartCard
-component AnalyticsTab
-hook useState
-hook useCallback
-hook useEffect
 handler onChange
 ```
 
