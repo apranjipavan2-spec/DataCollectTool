@@ -60,10 +60,13 @@ backend\app\api\routes\submissions.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\api\routes\sync.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\api\routes\tenants.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\models\location.py ← sqlalchemy, app
+backend\app\models\program.py ← sqlalchemy, app
 backend\app\models\roster.py ← sqlalchemy, app
 backend\app\models\submission.py ← sqlalchemy, app
 backend\app\models\system_setting.py ← sqlalchemy, app
+backend\app\services\plan_enforcement.py ← sqlalchemy, app
 backend\app\services\telegram.py ← httpx
+frontend\src\builder\FieldEditor.tsx ← SkipLogicEditor
 frontend\src\builder\FormBuilder.modern.tsx ← FieldTypeMenu, FieldEditor, SkipLogicEditor, VersionHistoryPanel, AiFormBuilderModal
 frontend\src\collect\FieldApp.modern.tsx ← BeneficiaryListScreen
 ```
@@ -242,6 +245,16 @@ PATCH /integrations/sheets  →  update_form_sheets_sync()
 class Location(Base)
 ```
 
+### backend\app\models\program.py
+```
+class ProgramLocation(Base)
+class Program(Base)
+class ProgramParticipantType(Base)
+class ProgramQuestionnaire(Base)
+class QuestionnaireLocationTarget(Base)
+class ProgramAnalysis(Base)
+```
+
 ### backend\app\models\roster.py
 ```
 class RespondentRoster(Base)
@@ -262,6 +275,11 @@ class SystemSetting(Base)
 async def generate_report(cfg: dict, form_title: str, field_labels: list, submissions: list) → str
 async def suggest_skip_logic(cfg: dict, question_text: str, form_fields: list) → list
 async def generate_styled_report(cfg: dict, style: str, form_title: str, date_range: str, sample_size: int, table_data: str, chart_descriptions: str, custom_context: str) → str
+```
+
+### backend\app\services\plan_enforcement.py
+```
+def check_submission_limit(db: Session, tenant_id: str, plan_tier: str) → dict  # Return {"allowed": bool, "reason": str, "used": int, "limit"
 ```
 
 ### backend\app\services\telegram.py
@@ -312,6 +330,19 @@ hook useState
 hook useEffect
 handler onClick
 handler onChange
+```
+
+### frontend\src\builder\FieldEditor.tsx
+```
+component CompareValueInput
+component ExprInput
+component FormulaBuilder
+component RepeatGroupChildEditor
+component FieldEditor
+props Props
+hook useState
+handler onChange
+handler onClick
 ```
 
 ### frontend\src\builder\FormBuilder.modern.tsx
@@ -457,6 +488,55 @@ handler onChange
 handler onDelete
 ```
 
+### frontend\src\programs\FgCleaner.tsx
+```
+component ProgramPicker
+component FgCleaner
+hook useState
+hook useEffect
+hook useCallback
+handler onChange
+handler onClick
+```
+
+### frontend\src\programs\FieldGovern.tsx
+```
+component StatCard
+component AnalyzerTab
+component CleanerTab
+component TabulatorTab
+component WriterTab
+component PanelStudyTab
+component FieldGovern
+hook useState
+hook useEffect
+hook useCallback
+hook useToast
+hook useParams
+hook useNavigate
+handler onChange
+handler onClick
+```
+
+### frontend\src\programs\ProgramsPage.tsx
+```
+component Badge
+component ProgressBar
+component ProgramModal
+component LocationModal
+component ProgramDetail
+component ProgramsPage
+hook useState
+hook useToast
+hook useNavigate
+hook useCallback
+hook useEffect
+handler onChange
+handler onClick
+handler onKeyDown
+handler onSave
+```
+
 ### frontend\src\reports\FgWriter.tsx
 ```
 component ProgramPicker
@@ -508,6 +588,14 @@ title: Features — FieldGovern
 nav#navbar
 button#hamburgerBtn
 div#mobileMenu
+span#uploadPct
+span#sheetCount
+div#langQ
+div#langHint
+div#lo1
+div#lo2
+div#lo3
+div#lo4
 ```
 
 ### website\index.html
@@ -543,6 +631,14 @@ div#mobileMenu
 title: Privacy Policy — FieldGovern
 nav#navbar
 button#hamburgerBtn
+```
+
+### website\security.html
+```
+title: Security — FieldGovern
+nav#navbar
+button#hamburgerBtn
+div#mobileMenu
 ```
 
 ### website\terms.html
