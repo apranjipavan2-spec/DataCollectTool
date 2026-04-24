@@ -112,3 +112,62 @@ async def translate_labels(tenant, labels: list, target_lang: str) -> list:
     if match:
         return json.loads(match.group())
     return labels
+
+
+async def suggest_tabulation(tenant, column_headers: list, sample_rows: list, user_prompt: str, research_type: str = "field_survey") -> dict:
+    """AI selects columns and table structure; Python does the actual aggregation."""
+    import json
+    cols_str = json.dumps(column_headers[:60])
+    sample_str = json.dumps(sample_rows[:10])
+    prompt = (
+        f"You are a research data analyst designing tabulations for a {research_type} study.\n\n"
+        f"Available columns (use ONLY these ids):\n{cols_str}\n\n"
+        f"Sample data rows:\n{sample_str}\n\n"
+        f"User request: {user_prompt or 'Suggest the most insightful tabulations for this dataset.'}\n\n"
+        f"For each table decide:\n"
+        f"  - groupby_field: column id to group rows by (required)\n"
+        f"  - value_field: column id to aggregate, or '*' for row count\n"
+        f"  - aggregation: 'count', 'sum', or 'mean'\n"
+        f"  - chart_type: 'bar', 'line', or 'pie'\n"
+        f"  - show_percent: true if showing % of total adds insight (e.g. distributions, shares)\n"
+        f"  - secondary_groupby: a second column id for cross-tabulation (e.g. district × gender), or '' if not needed\n"
+        f"  - description: one sentence explaining what this table reveals\n\n"
+        f"Decide how many tables the user needs based on their request (1 table if they asked for one specific thing, up to 6 for broad exploration).\n\n"
+        f"Also write a one-sentence `rationale` summarising your overall approach. If the user's objectives mention columns that don't exist in the available columns list, note them explicitly (e.g. 'Column X was not found and could not be included').\n\n"
+        f"Respond with ONLY valid JSON, no markdown:\n"
+        f'{{"rationale": "Selected district and gender breakdowns to address coverage objectives.", "tables": [\n'
+        f'  {{"title": "District-wise Sample Count", "groupby_field": "district_id", "value_field": "*", '
+        f'"aggregation": "count", "chart_type": "bar", "show_percent": true, "secondary_groupby": "", '
+        f'"description": "Number and share of samples collected per district"}}\n'
+        f']}}'
+    )
+    raw = await _call_llm(tenant, prompt)
+    import re
+    match = re.search(r'\{.*\}', raw, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group())
+        except Exception:
+            pass
+    return {"tables": []}
+
+
+async def generate_program_report(tenant, program_name: str, scheme: str, date_range: str,
+                                   sample_size: int, waves: list, tabulations: str,
+                                   style: str = "field_survey", custom_context: str = "") -> str:
+    """FG Writer: generate report from program context, waves, and tabulation data."""
+    style_prompt = REPORT_STYLE_PROMPTS.get(style, REPORT_STYLE_PROMPTS["field_survey"])
+    waves_str = ", ".join([f"Wave {w['wave_number']} ({w['wave_label']})" for w in waves]) if waves else "Single wave"
+    prompt = (
+        f"{style_prompt}\n\n"
+        f"Program: {program_name}\n"
+        f"Scheme/Study: {scheme}\n"
+        f"Period: {date_range}\n"
+        f"Total sample: {sample_size} respondents\n"
+        f"Study design: {waves_str}\n\n"
+        f"Tabulation data:\n{tabulations[:10000] if tabulations else 'No tabulation data — use placeholders.'}\n\n"
+        f"Additional context: {custom_context or 'None.'}\n\n"
+        f"Generate a complete, professional report in markdown. Use ## for sections, **bold** for key findings. "
+        f"Mark sections needing human review with [REVIEW NEEDED]."
+    )
+    return await _call_llm(tenant, prompt)
