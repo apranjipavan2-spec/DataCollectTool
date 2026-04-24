@@ -55,3 +55,20 @@ graphify-out/
 
 # Railway data backups
 backend/backups/
+
+# Graphify artifacts
+.graphify_ast.json
+.graphify_detect.json
+.graphify_python
+.graphify_uncached.txt
+.graphifyignore
+
+# Local logo source files (copied to website/assets/)
+1.png
+2.png
+
+# Separate sub-projects
+MiroFish/
+
+# Data analysis files
+*.xlsx
