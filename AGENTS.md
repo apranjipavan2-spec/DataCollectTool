@@ -54,10 +54,8 @@ backend\app\api\routes\export.py ← fastapi, sqlalchemy, app
 backend\app\api\routes\field_govern.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\api\routes\forms.py ← fastapi, app, pydantic, sqlalchemy
 backend\app\api\routes\locations.py ← fastapi, sqlalchemy, app
-backend\app\api\routes\migration\router.py ← __future__, fastapi, pydantic, sqlalchemy, app
 backend\app\api\routes\roster.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\api\routes\submissions.py ← fastapi, pydantic, sqlalchemy, app
-backend\app\api\routes\sync.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\api\routes\tenants.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\models\location.py ← sqlalchemy, app
 backend\app\models\program.py ← sqlalchemy, app
@@ -65,7 +63,6 @@ backend\app\models\roster.py ← sqlalchemy, app
 backend\app\models\submission.py ← sqlalchemy, app
 backend\app\models\system_setting.py ← sqlalchemy, app
 backend\app\services\plan_enforcement.py ← sqlalchemy, app
-backend\app\services\telegram.py ← httpx
 frontend\src\builder\FieldEditor.tsx ← SkipLogicEditor
 frontend\src\builder\FormBuilder.modern.tsx ← FieldTypeMenu, FieldEditor, SkipLogicEditor, VersionHistoryPanel, AiFormBuilderModal
 frontend\src\collect\FieldApp.modern.tsx ← BeneficiaryListScreen
@@ -157,25 +154,6 @@ GET /  →  list_locations()
 GET /tree  →  location_tree()
 ```
 
-### backend\app\api\routes\migration\router.py
-```
-class XLSFormSaveRequest(BaseModel) {title*, json_schema*}
-class KoboConnectRequest(BaseModel) {server?, token*}
-class KoboImportRequest(BaseModel) {server?, token*, asset_uid*, import_submissions?}
-class SCTOConnectRequest(BaseModel) {server*, username*, password*}
-class SCTOImportRequest(BaseModel) {server*, username*, password*, form_id*, import_submissions?}
-class ODKConnectRequest(BaseModel) {server*, username*, password*, project_id*}
-class ODKImportRequest(BaseModel) {server*, username*, password*, project_id*, form_id*, import_submissions?}
-POST /xlsform/parse  →  xlsform_parse()
-POST /xlsform/save  →  xlsform_save()
-POST /kobo/connect  →  kobo_connect()
-POST /kobo/import  →  kobo_import()
-POST /surveycto/connect  →  surveycto_connect()
-POST /surveycto/import  →  surveycto_import()
-POST /odk/connect  →  odk_connect()
-POST /odk/import  →  odk_import()
-```
-
 ### backend\app\api\routes\roster.py
 ```
 class RosterCreate(BaseModel) {form_id*, name*, phone?, address?, target_enumerator_id?, scheduled_date?}
@@ -212,15 +190,6 @@ POST /{submission_id}/flag-backcheck  →  flag_backcheck()
 GET /my-backchecks  →  get_my_backchecks()
 POST /{submission_id}/complete-backcheck  →  complete_backcheck()
 PATCH /{submission_id}/backcheck-form  →  assign_backcheck_form()
-```
-
-### backend\app\api\routes\sync.py
-```
-class SubmissionPayload(BaseModel) {local_id*, form_id*, form_version*, data_json*, gps_open?, gps_submit?}
-class PushRequest(BaseModel) {submissions*}
-POST /push  →  push()
-POST /media  →  upload_media()
-GET /pull  →  pull()
 ```
 
 ### backend\app\api\routes\tenants.py
@@ -282,31 +251,12 @@ async def generate_styled_report(cfg: dict, style: str, form_title: str, date_ra
 def check_submission_limit(db: Session, tenant_id: str, plan_tier: str) → dict  # Return {"allowed": bool, "reason": str, "used": int, "limit"
 ```
 
-### backend\app\services\telegram.py
-```
-async def notify(tenant, event: str, params: dict)  # Fire-and-forget Telegram notification to all configured chat
-```
-
 ## frontend
 
 ### frontend\src\admin\AiConfigPanel.tsx
 ```
 component AiConfigPanel
 component MasterAiConfig
-hook useState
-hook useEffect
-handler onChange
-handler onClick
-```
-
-### frontend\src\admin\IntegrationsPanel.tsx
-```
-component Input
-component Toggle
-component TelegramSection
-component WhatsAppSection
-component SheetsSection
-component IntegrationsPanel
 hook useState
 hook useEffect
 handler onChange
