@@ -436,6 +436,8 @@ def get_submission(submission_id: str, user=Depends(get_current_user), db: Sessi
             "gps_submit": sub.gps_submit,
             "status": sub.status,
             "flag_note": sub.flag_note,
+            "backcheck_required": bool(sub.backcheck_required),
+            "backcheck_form_id": str(sub.backcheck_form_id) if sub.backcheck_form_id else None,
             "local_created_at": sub.local_created_at.isoformat() if sub.local_created_at else None,
             "server_received_at": sub.server_received_at.isoformat() if sub.server_received_at else None,
         }
@@ -656,3 +658,78 @@ def flag_backcheck(
     sub.backcheck_required = True
     db.commit()
     return {"id": str(sub.id), "backcheck_required": True}
+
+
+@router.get("/my-backchecks")
+def get_my_backchecks(user=Depends(require_enumerator), db: Session = Depends(get_db)):
+    """Enumerator: list submissions assigned to me that need back-checking."""
+    rows = db.query(Submission).filter(
+        Submission.tenant_id == user["tenant_id"],
+        Submission.enumerator_id == user["sub"],
+        Submission.backcheck_required == True,
+        Submission.backcheck_form_id != None,
+        Submission.backcheck_completed != True,
+    ).order_by(Submission.server_received_at.desc()).limit(50).all()
+
+    result = []
+    for s in rows:
+        from app.models.form import Form as FormModel
+        bc_form = db.query(FormModel).filter(FormModel.id == s.backcheck_form_id).first()
+        result.append({
+            "original_submission_id": str(s.id),
+            "form_title": s.form_title if hasattr(s, "form_title") else None,
+            "submitted_at": s.server_received_at.isoformat() if s.server_received_at else None,
+            "backcheck_form_id": str(s.backcheck_form_id),
+            "backcheck_form_title": bc_form.title if bc_form else "Back-check Form",
+            "data_json": s.data_json,
+        })
+    return result
+
+
+@router.post("/{submission_id}/complete-backcheck")
+def complete_backcheck(
+    submission_id: str,
+    user=Depends(require_enumerator),
+    db: Session = Depends(get_db),
+):
+    """Mark the original submission as back-check completed after enumerator submits."""
+    sub = db.query(Submission).filter(
+        Submission.id == submission_id,
+        Submission.tenant_id == user["tenant_id"],
+        Submission.enumerator_id == user["sub"],
+    ).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    sub.backcheck_completed = True
+    db.commit()
+    return {"id": str(sub.id), "backcheck_completed": True}
+
+
+@router.patch("/{submission_id}/backcheck-form")
+def assign_backcheck_form(
+    submission_id: str,
+    body: dict,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Assign a specific form to use for back-checking this submission."""
+    sub = db.query(Submission).filter(
+        Submission.id == submission_id, Submission.tenant_id == user["tenant_id"]
+    ).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    form_id = body.get("form_id")
+    if form_id:
+        form = db.query(Form).filter(
+            Form.id == form_id, Form.tenant_id == user["tenant_id"]
+        ).first()
+        if not form:
+            raise HTTPException(status_code=404, detail="Form not found")
+    sub.backcheck_form_id = form_id
+    sub.backcheck_required = True
+    db.commit()
+    return {
+        "id": str(sub.id),
+        "backcheck_required": True,
+        "backcheck_form_id": str(sub.backcheck_form_id) if sub.backcheck_form_id else None,
+    }

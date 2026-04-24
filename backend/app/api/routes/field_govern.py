@@ -17,7 +17,13 @@ from app.models.program import Program, ProgramQuestionnaire, ProgramAnalysis
 from app.models.submission import Submission
 from app.models.tenant import Tenant
 from app.models.user import User
+from app.models.system_setting import SystemSetting
 from app.services import ai_service
+
+
+def _get_global_ai_cfg(db: Session) -> dict:
+    row = db.query(SystemSetting).filter(SystemSetting.key == "ai_config").first()
+    return row.value if row else {}
 
 router = APIRouter()
 require_supervisor = require_role("org_admin", "supervisor")
@@ -329,10 +335,9 @@ async def suggest_tabulation(
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
-    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
     try:
         result = await ai_service.suggest_tabulation(
-            tenant,
+            _get_global_ai_cfg(db),
             body.column_headers,
             body.sample_rows,
             body.user_prompt,
@@ -831,7 +836,7 @@ async def _run_ai_generation(
 
         user_prompt = objectives.strip() or "Suggest the most insightful tabulations for this dataset."
         try:
-            result = await ai_service.suggest_tabulation(tenant, column_headers, sample_rows, user_prompt)
+            result = await ai_service.suggest_tabulation(_get_global_ai_cfg(db), column_headers, sample_rows, user_prompt)
         except Exception as e:
             _fail_analysis(db, analysis_id, f"AI call failed: {e}"); return
 
@@ -860,7 +865,7 @@ async def _run_ai_generation(
                 f"{[c['id'] for c in column_headers[:30]]}. Do NOT guess or invent ids."
             )
             try:
-                retry_result = await ai_service.suggest_tabulation(tenant, column_headers, sample_rows, strict)
+                retry_result = await ai_service.suggest_tabulation(_get_global_ai_cfg(db), column_headers, sample_rows, strict)
                 valid2 = [c for c in retry_result.get("tables", []) if _is_valid(c)]
                 if len(valid2) > len(valid): valid = valid2
             except Exception:
@@ -1149,8 +1154,6 @@ async def generate_program_report(
     if not prog:
         raise HTTPException(404, "Program not found")
 
-    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
-
     # Gather program metadata
     subs = db.query(Submission).filter(
         Submission.program_id == program_id,
@@ -1174,7 +1177,7 @@ async def generate_program_report(
 
     try:
         report_md = await ai_service.generate_program_report(
-            tenant=tenant,
+            cfg=_get_global_ai_cfg(db),
             program_name=prog.name,
             scheme=prog.scheme_name or "",
             date_range=date_range,

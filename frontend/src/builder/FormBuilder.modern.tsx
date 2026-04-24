@@ -10,6 +10,7 @@ import FieldTypeMenu from './FieldTypeMenu'
 import FieldEditor from './FieldEditor'
 import SkipLogicEditor from './SkipLogicEditor'
 import VersionHistoryPanel from './VersionHistoryPanel'
+import AiFormBuilderModal from './AiFormBuilderModal'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { Button, Alert, SkeletonBlock } from '@/components/ui'
@@ -61,6 +62,54 @@ export default function FormBuilder() {
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const isInitRef        = useRef(true)
 
+  // ── Translate state ──────────────────────────────────────────────────────
+  const [showTranslate, setShowTranslate] = useState(false)
+  const [translating, setTranslating]     = useState(false)
+
+  const handleTranslate = async (lang: string) => {
+    setTranslating(true)
+    try {
+      // Collect labels in a flat array, tracking the order so we can map back
+      const labels: string[] = []
+      const collectFromSections = (sections: FormSection[]) => {
+        for (const sec of sections) {
+          labels.push(sec.title)
+          for (const f of sec.fields) {
+            labels.push(f.label)
+            f.options?.forEach(o => labels.push(o.label))
+          }
+          if (sec.subsections?.length) collectFromSections(sec.subsections)
+        }
+      }
+      labels.push(schema.title)
+      collectFromSections(schema.sections)
+
+      const { data } = await api.post('/ai/translate', { labels, target_lang: lang })
+      const t: string[] = data.translated
+      let i = 1  // index 0 = form title, sections start at 1
+
+      const applyToSections = (sections: FormSection[]): FormSection[] =>
+        sections.map(sec => ({
+          ...sec,
+          title: t[i++] ?? sec.title,
+          fields: sec.fields.map(f => {
+            const label = t[i++] ?? f.label
+            const options = f.options?.map(o => ({ ...o, label: t[i++] ?? o.label }))
+            return { ...f, label, options }
+          }),
+          subsections: sec.subsections?.length ? applyToSections(sec.subsections) : sec.subsections,
+        }))
+
+      setSchema(s => ({ ...s, title: t[0] ?? s.title, sections: applyToSections(s.sections) }))
+      setShowTranslate(false)
+      toast.success(`Labels translated to ${lang}`)
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Translation failed')
+    } finally {
+      setTranslating(false)
+    }
+  }
+
   // ── Drag state ───────────────────────────────────────────────────────────
   const [dragSrc, setDragSrc] = useState<{ sectionId: string; fieldId: string } | null>(null)
   const [dragOver, setDragOver] = useState<{ sectionId: string; fieldId: string } | null>(null)
@@ -95,6 +144,7 @@ export default function FormBuilder() {
   // ── Excel import state ───────────────────────────────────────────────────
   const [importingExcel, setImportingExcel] = useState(false)
   const [importSummary, setImportSummary]   = useState<{ title: string; sections: number; fields: number } | null>(null)
+  const [showAiBuilder, setShowAiBuilder]   = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const currentSection = (() => {
@@ -649,6 +699,13 @@ export default function FormBuilder() {
               <Button onClick={() => setShowTypeMenu(true)} size="sm" fullWidth>+ Add Question</Button>
               <Button onClick={addSection} variant="secondary" size="sm" fullWidth>+ Add Section</Button>
 
+              <button
+                onClick={() => setShowAiBuilder(true)}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-gradient-to-r from-catalan-primary to-purple-600 text-white text-xs font-semibold hover:opacity-90 transition-opacity shadow-sm"
+              >
+                <span>🤖</span> Generate Form with AI
+              </button>
+
               <div className="flex items-center gap-1.5 mb-1" data-help-id="import-excel-btn">
                 <InfoButton topicId="import-excel" />
                 <span className="text-xs text-catalan-textMuted">Import form from Excel</span>
@@ -723,6 +780,7 @@ export default function FormBuilder() {
                     </Button>
                   </span>
                 )}
+                <Button variant="secondary" size="sm" onClick={() => setShowTranslate(true)}>Translate</Button>
                 <Button variant="secondary" size="sm" onClick={() => window.location.href = '/collect'}>Preview</Button>
                 <Button onClick={handleSave} disabled={saving} size="sm"
                   className={saved ? '!bg-catalan-success !text-catalan-bg !border-catalan-success hover:!bg-catalan-success' : ''}>
@@ -762,6 +820,23 @@ export default function FormBuilder() {
       </div>
 
       {showTypeMenu && <FieldTypeMenu onSelect={addField} onClose={() => setShowTypeMenu(false)} />}
+      {showTranslate && (
+        <TranslateModal
+          onTranslate={handleTranslate}
+          onClose={() => setShowTranslate(false)}
+          translating={translating}
+        />
+      )}
+      {showAiBuilder && (
+        <AiFormBuilderModal
+          onClose={() => setShowAiBuilder(false)}
+          onFormGenerated={(generatedFormId, title) => {
+            setShowAiBuilder(false)
+            // Navigate to the newly generated form for editing
+            window.location.href = `/builder?formId=${generatedFormId}`
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -1181,6 +1256,51 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
               )}
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Translate Modal ──────────────────────────────────────────────────────────
+
+const LANGUAGES = [
+  'Hindi', 'Bengali', 'Telugu', 'Marathi', 'Tamil',
+  'Kannada', 'Gujarati', 'Urdu', 'Malayalam', 'Odia',
+  'Punjabi', 'Assamese', 'Maithili', 'Santali',
+  'Arabic', 'French', 'Spanish', 'Portuguese', 'Swahili',
+]
+
+function TranslateModal({ onTranslate, onClose, translating }: {
+  onTranslate: (lang: string) => void
+  onClose: () => void
+  translating: boolean
+}) {
+  const [selected, setSelected] = useState('')
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-catalan-surface border border-catalan-border rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-xl">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-catalan-text">Translate Form Labels</h3>
+          <button onClick={onClose} className="text-catalan-textMuted hover:text-catalan-text text-lg leading-none">×</button>
+        </div>
+        <p className="text-xs text-catalan-textMuted">
+          Replaces all field labels, section titles, and option labels with AI-translated text. This is a one-time operation — save the form after translating.
+        </p>
+        <select
+          className="w-full border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text focus:ring-2 focus:ring-catalan-primary outline-none"
+          value={selected}
+          onChange={e => setSelected(e.target.value)}
+        >
+          <option value="">— Select language —</option>
+          {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+        </select>
+        <div className="flex gap-2 justify-end">
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={translating}>Cancel</Button>
+          <Button size="sm" onClick={() => selected && onTranslate(selected)} disabled={!selected || translating}>
+            {translating ? 'Translating…' : 'Translate'}
+          </Button>
         </div>
       </div>
     </div>

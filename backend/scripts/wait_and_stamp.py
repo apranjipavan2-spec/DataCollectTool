@@ -78,8 +78,26 @@ def detect_and_stamp():
             stamp = "0016"
         elif not col_exists(cur, "submissions", "program_id"):
             stamp = "0017"
-        else:
+        elif not col_exists(cur, "tenants", "notification_config"):
             stamp = "0018"
+        elif not col_exists(cur, "submissions", "has_violations"):
+            stamp = "0019"
+        elif not table_exists(cur, "respondent_roster"):
+            stamp = "0020"
+        elif not col_exists(cur, "tenants", "ai_config"):
+            stamp = "0021"
+        elif not col_exists(cur, "submissions", "roster_id"):
+            stamp = "0022"
+        elif not table_exists(cur, "locations"):
+            stamp = "0023"
+        elif not col_exists(cur, "submissions", "household_id"):
+            stamp = "0024"
+        elif not col_exists(cur, "submissions", "backcheck_completed"):
+            stamp = "0025"
+        elif not table_exists(cur, "system_settings"):
+            stamp = "0026"
+        else:
+            stamp = "0027"
 
         print(f"Stamping alembic_version to {stamp}")
         if not has_alembic:

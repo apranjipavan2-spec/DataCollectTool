@@ -201,6 +201,18 @@ def get_form(form_id: str, user=Depends(require_enumerator), db: Session = Depen
             "version": form.version, "status": form.status}
 
 
+@router.get("/{form_id}/generation-status")
+def get_generation_status(form_id: str, user=Depends(require_org_admin), db: Session = Depends(get_db)):
+    """Poll AI form generation progress."""
+    form = _get_form_for_tenant(db, form_id, user["tenant_id"])
+    return {
+        "form_id": str(form.id),
+        "status": form.generation_status or "done",
+        "title": form.title,
+        "error": form.generation_error,
+    }
+
+
 @router.put("/{form_id}")
 def update_form(form_id: str, body: FormUpdate, user=Depends(require_org_admin), db: Session = Depends(get_db)):
     form = _get_form_for_tenant(db, form_id, user["tenant_id"])

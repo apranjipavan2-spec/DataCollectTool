@@ -70,7 +70,16 @@ function computeTileUrls(lat: number, lng: number, radiusKm: number, zoomLevels:
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type Screen = 'list' | 'drafts' | 'collecting' | 'submitted' | 'history' | 'editing'
+type Screen = 'list' | 'drafts' | 'collecting' | 'submitted' | 'history' | 'editing' | 'backchecks'
+
+interface BackcheckTask {
+  original_submission_id: string
+  form_title: string | null
+  submitted_at: string | null
+  backcheck_form_id: string
+  backcheck_form_title: string
+  data_json: Record<string, unknown> | null
+}
 
 interface FormMeta { id: string; title: string; version: number }
 
@@ -116,6 +125,9 @@ export default function FieldApp() {
   const [rosterEntries, setRosterEntries] = useState<RosterEntry[]>([])
   const [showBeneficiaryList, setShowBeneficiaryList] = useState(false)
   const [rosterInitialValues, setRosterInitialValues] = useState<Record<string, unknown> | null>(null)
+  const [backchecks, setBackchecks] = useState<BackcheckTask[]>([])
+  const [backcheckLoading, setBackcheckLoading] = useState(false)
+  const [activeBackcheck, setActiveBackcheck] = useState<BackcheckTask | null>(null)
   const syncRef = useRef<() => Promise<void>>()
   const loadFormsRef = useRef<() => Promise<void>>()
   const { language, setLanguage } = useLanguage()
@@ -298,6 +310,39 @@ export default function FieldApp() {
     }
   }
 
+  const loadBackchecks = async () => {
+    setBackcheckLoading(true)
+    try {
+      const { data } = await api.get('/submissions/my-backchecks')
+      setBackchecks(data)
+    } catch {
+      setBackchecks([])
+    } finally {
+      setBackcheckLoading(false)
+    }
+  }
+
+  const openBackcheckForm = async (task: BackcheckTask) => {
+    setSyncMsg('Loading back-check form…')
+    try {
+      const { data } = await api.get<{ json_schema: FormSchema }>(`/forms/${task.backcheck_form_id}`)
+      const meta: FormMeta = { id: task.backcheck_form_id, title: task.backcheck_form_title, version: data.version ?? 1 }
+      // Pre-fill context from original submission
+      const initialValues: Record<string, unknown> = {
+        _backcheck_for: task.original_submission_id,
+        ...(task.data_json ?? {}),
+      }
+      setActiveForm({ meta, schema: data.json_schema })
+      setRosterInitialValues(initialValues)
+      setActiveBackcheck(task)
+      setSyncMsg('')
+      setScreen('collecting')
+    } catch {
+      setSyncMsg('Could not load back-check form')
+      setTimeout(() => setSyncMsg(''), 3000)
+    }
+  }
+
   const openEdit = async (submission: any) => {
     try {
       setSyncMsg('Loading…')
@@ -389,6 +434,7 @@ export default function FieldApp() {
 
       api.get('/schedules/').then(r => setSchedules(r.data)).catch(() => {})
       api.get('/programs/locations').then(r => setLocations(r.data)).catch(() => {})
+      api.get('/submissions/my-backchecks').then(r => setBackchecks(r.data)).catch(() => {})
 
       // Enumerator stats
       api.get('/submissions/?page_size=200').then(r => {
@@ -602,6 +648,16 @@ export default function FieldApp() {
     }
 
     syncToServer()
+
+    // If this was a back-check submission, mark the original as completed
+    if (activeBackcheck) {
+      try {
+        await api.post(`/submissions/${activeBackcheck.original_submission_id}/complete-backcheck`)
+        setBackchecks(prev => prev.filter(b => b.original_submission_id !== activeBackcheck.original_submission_id))
+      } catch { /* non-critical */ }
+      setActiveBackcheck(null)
+    }
+
     setScreen('submitted')
   }
 
@@ -635,6 +691,53 @@ export default function FieldApp() {
       </div>
     </WithSidebar>
   )
+
+  // Back-check queue screen
+  if (screen === 'backchecks') {
+    return (
+      <SubPage title="Back-checks Assigned to Me" onBack={() => setScreen('list')}>
+        {backcheckLoading ? (
+          <div className="text-center py-12 text-catalan-textMuted text-sm">Loading…</div>
+        ) : backchecks.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="text-5xl mb-4">✅</div>
+            <p className="text-catalan-textMuted font-medium">No back-checks pending</p>
+            <p className="text-catalan-textMuted text-sm mt-1">Your supervisor will assign back-checks here when needed.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="text-xs text-catalan-textMuted bg-catalan-warning/10 border border-catalan-warning/30 rounded-lg px-3 py-2">
+              ⚠️ Your supervisor has flagged these submissions for verification. Open each one, fill the back-check form, and submit.
+            </div>
+            {backchecks.map(task => (
+              <div key={task.original_submission_id} className="bg-catalan-surface border border-catalan-border rounded-xl p-4 space-y-3">
+                <div>
+                  <div className="font-semibold text-catalan-text text-sm">{task.form_title ?? 'Submission'}</div>
+                  <div className="text-xs text-catalan-textMuted mt-0.5">
+                    Original submitted: {task.submitted_at ? new Date(task.submitted_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '—'}
+                  </div>
+                  <div className="text-xs text-catalan-info mt-1 font-medium">Back-check form: {task.backcheck_form_title}</div>
+                </div>
+                {task.data_json && (
+                  <div className="bg-catalan-hover rounded-lg p-2 text-xs text-catalan-textMuted max-h-20 overflow-y-auto">
+                    {Object.entries(task.data_json).filter(([k]) => !k.startsWith('_')).slice(0, 4).map(([k, v]) => (
+                      <div key={k} className="truncate"><span className="font-medium">{k}:</span> {String(v)}</div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() => openBackcheckForm(task)}
+                  className="w-full text-sm px-4 py-2.5 rounded-lg bg-catalan-primary text-catalan-bg font-semibold hover:opacity-90 transition-opacity"
+                >
+                  Start Back-check →
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </SubPage>
+    )
+  }
 
   // History screen
   if (screen === 'history') {
@@ -900,6 +1003,17 @@ export default function FieldApp() {
                 </span>
               )}
               {/* Always-visible action buttons */}
+              {backchecks.length > 0 && (
+                <button
+                  onClick={() => setScreen('backchecks')}
+                  className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-catalan-warning/10 border border-catalan-warning/40 text-catalan-warning hover:bg-catalan-warning/20 transition-all font-medium"
+                  title="Back-checks assigned to me"
+                >
+                  <span>🔁</span>
+                  <span className="hidden sm:inline">Back-checks</span>
+                  <span className="bg-catalan-warning text-white text-[10px] font-bold rounded-full px-1.5 leading-4">{backchecks.length}</span>
+                </button>
+              )}
               <button
                 onClick={() => { loadHistory(); setScreen('history') }}
                 className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-catalan-hover border border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50 transition-all"
@@ -1117,6 +1231,15 @@ export default function FieldApp() {
                     <span>📝</span> Saved Drafts
                     {drafts.length > 0 && <span className="ml-auto bg-catalan-primary text-catalan-bg text-xs font-bold rounded-full px-2 py-0.5">{drafts.length}</span>}
                   </button>
+                  {backchecks.length > 0 && (
+                    <button
+                      onClick={() => setScreen('backchecks')}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-catalan-warning/10 hover:bg-catalan-warning/20 text-catalan-warning text-sm transition-colors text-left font-medium"
+                    >
+                      <span>🔁</span> Back-checks
+                      <span className="ml-auto bg-catalan-warning text-white text-xs font-bold rounded-full px-2 py-0.5">{backchecks.length}</span>
+                    </button>
+                  )}
                   <button
                     onClick={handleCacheTiles}
                     disabled={cachingTiles}
