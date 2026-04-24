@@ -103,6 +103,54 @@ _PATCHES = [
     "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS participant_type_id UUID REFERENCES program_participant_types(id) ON DELETE SET NULL",
     "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS questionnaire_id UUID REFERENCES program_questionnaires(id) ON DELETE SET NULL",
     "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES program_locations(id) ON DELETE SET NULL",
+    # 0019 — integrations
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS notification_config JSONB DEFAULT '{}'::jsonb",
+    "ALTER TABLE forms ADD COLUMN IF NOT EXISTS sheets_sync_config JSONB DEFAULT '{}'::jsonb",
+    # 0020 — QC / compliance
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS has_violations BOOLEAN DEFAULT false",
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS consent_given BOOLEAN DEFAULT true",
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS consent_timestamp TIMESTAMPTZ",
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS backcheck_required BOOLEAN DEFAULT false",
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS backcheck_form_id UUID",
+    # 0021 — public survey + respondent roster
+    "ALTER TABLE forms ADD COLUMN IF NOT EXISTS public_token VARCHAR(64)",
+    "ALTER TABLE forms ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT false",
+    """CREATE TABLE IF NOT EXISTS respondent_roster (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        form_id UUID NOT NULL REFERENCES forms(id),
+        tenant_id UUID NOT NULL REFERENCES tenants(id),
+        name VARCHAR(255) NOT NULL,
+        phone VARCHAR(50),
+        address TEXT,
+        target_enumerator_id UUID REFERENCES users(id),
+        status VARCHAR(20) DEFAULT 'pending',
+        scheduled_date DATE,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT now()
+    )""",
+    # 0022 — AI config
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ai_config JSONB DEFAULT '{}'::jsonb",
+    # 0023 — roster ↔ submission link
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS roster_id UUID REFERENCES respondent_roster(id)",
+    "ALTER TABLE respondent_roster ADD COLUMN IF NOT EXISTS extra_data JSONB DEFAULT '{}'::jsonb",
+    # 0024 — locations hierarchy
+    """CREATE TABLE IF NOT EXISTS locations (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        tenant_id UUID NOT NULL REFERENCES tenants(id),
+        name VARCHAR(255) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        parent_id UUID REFERENCES locations(id),
+        code VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT now()
+    )""",
+    "ALTER TABLE respondent_roster ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES locations(id)",
+    # 0025 — panel study / waves
+    "ALTER TABLE program_questionnaires ADD COLUMN IF NOT EXISTS wave_number INTEGER",
+    "ALTER TABLE program_questionnaires ADD COLUMN IF NOT EXISTS wave_label VARCHAR(100)",
+    "ALTER TABLE program_questionnaires ADD COLUMN IF NOT EXISTS panel_key VARCHAR(200)",
+    "ALTER TABLE programs ADD COLUMN IF NOT EXISTS is_panel_study BOOLEAN DEFAULT false",
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS household_id VARCHAR(500)",
+    "CREATE INDEX IF NOT EXISTS ix_submissions_household_id ON submissions (household_id, tenant_id)",
 ]
 
 from sqlalchemy import text as _text

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { v4 as uuidv4 } from 'uuid'
 import type { FormField, FormSection, FieldOption, FieldType } from '@/types/form'
 import { evalFormula } from '@/lib/formUtils'
 import SkipLogicEditor from './SkipLogicEditor'
@@ -16,8 +17,24 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'audio',           label: 'Audio' },
   { value: 'barcode',         label: 'Barcode' },
   { value: 'calculated',      label: 'Calculated / Conditional' },
+  { value: 'repeat_group',    label: 'Repeat Group' },
   { value: 'rating',          label: 'Rating' },
   { value: 'note',            label: 'Note / Instruction' },
+]
+
+const CHILD_FIELD_TYPES: { value: FieldType; label: string }[] = [
+  { value: 'text',            label: 'Text' },
+  { value: 'number',          label: 'Number' },
+  { value: 'decimal',         label: 'Decimal' },
+  { value: 'single_choice',   label: 'Single Choice' },
+  { value: 'multiple_choice', label: 'Multiple Choice' },
+  { value: 'date',            label: 'Date' },
+  { value: 'time',            label: 'Time' },
+  { value: 'gps',             label: 'GPS' },
+  { value: 'photo',           label: 'Photo' },
+  { value: 'barcode',         label: 'Barcode' },
+  { value: 'rating',          label: 'Rating' },
+  { value: 'note',            label: 'Note' },
 ]
 
 interface Props {
@@ -482,6 +499,176 @@ function FormulaBuilder({ field, prevFields, onChange }: {
   )
 }
 
+// ── Repeat Group Child Field Editor ────────────────────────────────────────
+function RepeatGroupChildEditor({ fields, onChange }: {
+  fields: FormField[]
+  onChange: (fields: FormField[]) => void
+}) {
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const addChild = () => {
+    const child: FormField = {
+      id: uuidv4(),
+      type: 'text',
+      name: `child_${Math.random().toString(36).slice(2, 7)}`,
+      label: '',
+      required: false,
+    }
+    onChange([...fields, child])
+    setExpandedId(child.id)
+  }
+
+  const updateChild = (id: string, patch: Partial<FormField>) =>
+    onChange(fields.map(f => f.id === id ? { ...f, ...patch } : f))
+
+  const deleteChild = (id: string) => {
+    onChange(fields.filter(f => f.id !== id))
+    if (expandedId === id) setExpandedId(null)
+  }
+
+  return (
+    <div className="space-y-2">
+      {fields.map((cf, idx) => {
+        const isOpen = expandedId === cf.id
+        return (
+          <div key={cf.id} className="border border-catalan-border rounded-lg bg-catalan-bg overflow-hidden">
+            <div
+              className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-catalan-hover transition-colors"
+              onClick={() => setExpandedId(isOpen ? null : cf.id)}
+            >
+              <span className="text-xs font-mono text-catalan-primary w-5 flex-shrink-0">{idx + 1}</span>
+              <select
+                value={cf.type}
+                onClick={e => e.stopPropagation()}
+                onChange={e => {
+                  const newType = e.target.value as FieldType
+                  const patch: Partial<FormField> = { type: newType }
+                  if (newType === 'single_choice' || newType === 'multiple_choice') {
+                    if (!cf.options?.length) patch.options = [{ value: 'option_1', label: 'Option 1' }]
+                  } else {
+                    patch.options = undefined
+                  }
+                  updateChild(cf.id, patch)
+                }}
+                className="text-xs border border-catalan-border rounded px-1.5 py-0.5 bg-catalan-surface text-catalan-text focus:outline-none focus:border-catalan-primary flex-shrink-0"
+              >
+                {CHILD_FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+              <input
+                value={cf.label}
+                onClick={e => e.stopPropagation()}
+                onChange={e => updateChild(cf.id, { label: e.target.value })}
+                placeholder="Field label"
+                className="flex-1 text-sm bg-transparent text-catalan-text placeholder-catalan-textMuted focus:outline-none min-w-0"
+              />
+              <button
+                onClick={e => { e.stopPropagation(); deleteChild(cf.id) }}
+                className="text-catalan-textMuted hover:text-catalan-error text-sm px-1 transition-colors flex-shrink-0"
+              >✕</button>
+              <span className="text-catalan-textMuted text-xs flex-shrink-0">{isOpen ? '▲' : '▼'}</span>
+            </div>
+
+            {isOpen && (
+              <div className="border-t border-catalan-border px-3 py-3 space-y-3 bg-catalan-surface">
+                <div>
+                  <label className="block text-xs text-catalan-textMuted mb-1">Variable name</label>
+                  <input
+                    className={`${inputCls} font-mono text-xs`}
+                    value={cf.name}
+                    onChange={e => updateChild(cf.id, { name: e.target.value.replace(/\s+/g, '_').toLowerCase() })}
+                    placeholder="snake_case_name"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateChild(cf.id, { required: !cf.required })}
+                    className={`relative w-8 h-4 rounded-full transition-colors flex-shrink-0 ${cf.required ? 'bg-catalan-primary' : 'bg-catalan-hover border border-catalan-border'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${cf.required ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </button>
+                  <span className="text-xs text-catalan-text">Required</span>
+                </div>
+
+                {(cf.type === 'single_choice' || cf.type === 'multiple_choice') && (
+                  <div>
+                    <label className="block text-xs text-catalan-textMuted mb-1.5">Options</label>
+                    <div className="space-y-1.5 mb-2">
+                      {(cf.options ?? []).map((opt, oi) => (
+                        <div key={oi} className="flex gap-1.5 items-center">
+                          <input
+                            className={`${inputCls} flex-1 text-xs`}
+                            value={opt.label}
+                            placeholder="Label"
+                            onChange={e => {
+                              const opts = (cf.options ?? []).map((o, i) => i === oi ? { ...o, label: e.target.value } : o)
+                              updateChild(cf.id, { options: opts })
+                            }}
+                          />
+                          <input
+                            className={`${inputCls} w-24 text-xs font-mono`}
+                            value={opt.value}
+                            placeholder="value"
+                            onChange={e => {
+                              const opts = (cf.options ?? []).map((o, i) => i === oi ? { ...o, value: e.target.value } : o)
+                              updateChild(cf.id, { options: opts })
+                            }}
+                          />
+                          <button
+                            onClick={() => updateChild(cf.id, { options: (cf.options ?? []).filter((_, i) => i !== oi) })}
+                            className="text-catalan-textMuted hover:text-catalan-error text-xs px-1 transition-colors"
+                          >✕</button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => updateChild(cf.id, { options: [...(cf.options ?? []), { value: `opt_${Date.now()}`, label: '' }] })}
+                      className="text-xs text-catalan-primary hover:underline"
+                    >+ Add option</button>
+                  </div>
+                )}
+
+                {(cf.type === 'number' || cf.type === 'decimal' || cf.type === 'rating') && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-catalan-textMuted mb-1">Min</label>
+                      <input type="number" className={`${inputCls} text-xs`} value={cf.min ?? ''}
+                        onChange={e => updateChild(cf.id, { min: e.target.value === '' ? undefined : Number(e.target.value) })}
+                        placeholder="No min" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-catalan-textMuted mb-1">Max</label>
+                      <input type="number" className={`${inputCls} text-xs`} value={cf.max ?? ''}
+                        onChange={e => updateChild(cf.id, { max: e.target.value === '' ? undefined : Number(e.target.value) })}
+                        placeholder="No max" />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs text-catalan-textMuted mb-1">Hint (optional)</label>
+                  <input
+                    className={`${inputCls} text-xs`}
+                    value={cf.hint ?? ''}
+                    placeholder="Helper text shown below the field"
+                    onChange={e => updateChild(cf.id, { hint: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+      <button
+        onClick={addChild}
+        className="w-full text-xs border border-dashed border-catalan-border rounded-lg py-2.5 text-catalan-primary hover:border-catalan-primary hover:bg-catalan-primary/5 transition-colors"
+      >
+        + Add child field
+      </button>
+    </div>
+  )
+}
+
 // ── Main FieldEditor ────────────────────────────────────────────────────────
 export default function FieldEditor({ field, sections, onChange, onDelete }: Props) {
   const updateOption = (i: number, patch: Partial<FieldOption>) => {
@@ -605,6 +792,34 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
           <label className={labelCls}>Note text</label>
           <textarea className={`${inputCls} resize-none`} rows={3} value={field.hint ?? ''} onChange={e => onChange({ hint: e.target.value })} placeholder="Instructional text displayed to the enumerator…" />
         </div>
+      )}
+
+      {/* Repeat Group — max entries + child fields */}
+      {field.type === 'repeat_group' && (
+        <>
+          <div className={groupCls}>
+            <label className={labelCls}>Max Entries <span className="normal-case font-normal text-catalan-textMuted">(optional)</span></label>
+            <input
+              type="number"
+              className={inputCls}
+              min={1}
+              value={field.max ?? ''}
+              placeholder="No limit"
+              onChange={e => onChange({ max: e.target.value === '' ? undefined : Number(e.target.value) })}
+            />
+            <p className="text-xs text-catalan-textMuted mt-1">Leave blank to allow unlimited repetitions per submission.</p>
+          </div>
+          <div className={groupCls}>
+            <label className={labelCls}>Child Fields</label>
+            <p className="text-xs text-catalan-textMuted mb-3">
+              Define the fields collected per row. Each enumerator can add as many rows as needed.
+            </p>
+            <RepeatGroupChildEditor
+              fields={field.fields ?? []}
+              onChange={fields => onChange({ fields })}
+            />
+          </div>
+        </>
       )}
 
       {/* Single / Multiple choice — Options */}

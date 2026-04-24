@@ -51,6 +51,7 @@ interface SubDetail extends Submission {
   gps_submit: { lat: number; lng: number; accuracy: number } | null
   flag_note: string | null
   local_created_at: string
+  backcheck_form_id?: string | null
 }
 
 interface TeamMember {
@@ -132,6 +133,8 @@ function SubmissionDetailModal({
   const [rejectReason, setRejectReason] = useState('')
   const [showRejectInput, setShowRejectInput] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [bcFormId, setBcFormId] = useState(sub.backcheck_form_id ?? '')
+  const [savingBcForm, setSavingBcForm] = useState(false)
 
   const isFlagged = sub.status === 'flagged'
   const isReviewed = sub.status === 'approved' || sub.status === 'rejected'
@@ -282,6 +285,36 @@ function SubmissionDetailModal({
             </div>
           )}
         </div>}
+
+        {/* Back-Check Form Assignment */}
+        {sub.backcheck_required && !isEnumerator && (
+          <div className="px-5 py-3 border-b border-catalan-border bg-blue-500/5">
+            <div className="text-xs font-medium text-catalan-textMuted uppercase tracking-wider mb-2">Back-Check Assignment</div>
+            <p className="text-xs text-catalan-textMuted mb-3">Assign the form to use for back-checking this submission.</p>
+            <div className="flex gap-2">
+              <select
+                value={bcFormId}
+                onChange={e => setBcFormId(e.target.value)}
+                className="flex-1 border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text focus:outline-none focus:border-catalan-primary"
+              >
+                <option value="">— Select back-check form —</option>
+                {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
+              </select>
+              <button
+                disabled={savingBcForm || !bcFormId}
+                onClick={async () => {
+                  setSavingBcForm(true)
+                  try {
+                    await api.patch(`/submissions/${sub.id}/backcheck-form`, { form_id: bcFormId })
+                  } finally { setSavingBcForm(false) }
+                }}
+                className="px-3 py-2 bg-catalan-primary text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
+              >
+                {savingBcForm ? '…' : 'Assign'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Response Data */}
         <div className="px-5 py-3">

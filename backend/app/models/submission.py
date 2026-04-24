@@ -34,3 +34,4 @@ class Submission(Base):
     backcheck_required = Column(Boolean, default=False, nullable=True)
     backcheck_form_id = Column(UUID(as_uuid=True), nullable=True)
     roster_id = Column(UUID(as_uuid=True), ForeignKey('respondent_roster.id'), nullable=True)
+    household_id = Column(String(500), nullable=True)   # panel study respondent key

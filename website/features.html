@@ -4,120 +4,362 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Features — FieldGovern</title>
-  <meta name="description" content="Everything your field team needs — offline-first collection, form builder, supervisor dashboard, AI reports, DPDP compliance and more."/>
+  <link rel="icon" href="assets/logo-icon.png" type="image/png"/>
+  <meta name="description" content="Offline-first collection, AI form builder, drag-and-drop survey designer, supervisor dashboard, DPDP compliance — every tool your field team needs."/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
   <style>
-    :root {
-      --brand: #0ea5e9;
-      --brand-dark: #0369a1;
-      --accent: #7c3aed;
-      --accent-light: #a78bfa;
-      --green: #10b981;
-      --bg: #ffffff;
-      --bg2: #f8fafc;
-      --bg3: #f1f5f9;
-      --text: #0f172a;
-      --text2: #334155;
-      --text3: #64748b;
-      --border: #e2e8f0;
-      --shadow: 0 4px 24px rgba(14,165,233,0.08);
-      --shadow-lg: 0 20px 60px rgba(14,165,233,0.15);
-    }
+    :root{--brand:#0ea5e9;--brand-dark:#0369a1;--accent:#7c3aed;--green:#10b981;--orange:#f59e0b;--red:#ef4444;--bg:#ffffff;--bg2:#f8fafc;--bg3:#f1f5f9;--dark:#0f172a;--dark2:#1e293b;--dark3:#334155;--text:#0f172a;--text2:#334155;--text3:#64748b;--border:#e2e8f0}
     *{box-sizing:border-box;margin:0;padding:0}
     html{font-family:'Inter',sans-serif;color:var(--text);background:var(--bg)}
     body{overflow-x:hidden}
-    @keyframes fadeUp{from{opacity:0;transform:translateY(32px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
-    @keyframes floatSlow{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-8px) rotate(3deg)}}
-    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(14,165,233,0.4)}50%{box-shadow:0 0 0 16px rgba(14,165,233,0)}}
-    @keyframes iconBounce{0%,100%{transform:translateY(0) scale(1)}30%{transform:translateY(-8px) scale(1.15)}60%{transform:translateY(-3px) scale(1.05)}}
-    .animate-fade-up{animation:fadeUp 0.7s ease forwards}
-    .animate-pulse-ring{animation:pulse 2s infinite}
-    .delay-1{animation-delay:0.1s}
-    .delay-2{animation-delay:0.2s}
-    .delay-3{animation-delay:0.3s}
-    .reveal{opacity:0;transform:translateY(32px);transition:all 0.7s cubic-bezier(.16,1,.3,1)}
-    .reveal.visible{opacity:1;transform:translateY(0)}
-    /* NAV */
-    nav{position:fixed;top:0;width:100%;z-index:100;padding:0 24px;height:68px;display:flex;align-items:center;justify-content:space-between;transition:all 0.3s}
-    nav.scrolled{background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);box-shadow:0 2px 20px rgba(0,0,0,0.06);border-bottom:1px solid var(--border)}
-    .nav-logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.2rem;color:var(--text);text-decoration:none}
-    .nav-links{display:flex;align-items:center;gap:32px;list-style:none}
-    .nav-links a{text-decoration:none;color:var(--text2);font-weight:500;font-size:0.9rem;transition:color 0.2s;position:relative}
-    .nav-links a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;background:var(--brand);border-radius:2px;transition:width 0.3s}
-    .nav-links a:hover{color:var(--brand)}
-    .nav-links a:hover::after{width:100%}
-    .btn-primary{background:linear-gradient(135deg,var(--brand),var(--accent));color:white;border:none;border-radius:10px;padding:10px 22px;font-weight:600;font-size:0.9rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all 0.3s;box-shadow:0 4px 16px rgba(14,165,233,0.3)}
-    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(14,165,233,0.4)}
-    .btn-outline{border:2px solid var(--brand);color:var(--brand);border-radius:10px;padding:10px 22px;font-weight:600;font-size:0.9rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:transparent;transition:all 0.3s}
+
+    /* ── NAV ─────────────────────────────── */
+    nav{position:fixed;top:0;width:100%;z-index:100;padding:0 24px;height:68px;display:flex;align-items:center;justify-content:space-between;transition:all .3s}
+    nav.scrolled{background:rgba(255,255,255,.95);backdrop-filter:blur(16px);box-shadow:0 2px 20px rgba(0,0,0,.06);border-bottom:1px solid var(--border)}
+    .nav-logo{display:flex;align-items:center;text-decoration:none}
+    .nav-logo img{height:42px;width:auto}
+    .nav-links{display:flex;align-items:center;gap:28px;list-style:none}
+    .nav-links a{text-decoration:none;color:var(--text2);font-weight:500;font-size:.9rem;transition:color .2s;position:relative}
+    .nav-links a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;background:var(--brand);border-radius:2px;transition:width .3s}
+    .nav-links a:hover,.nav-links a.active{color:var(--brand)}
+    .nav-links a:hover::after,.nav-links a.active::after{width:100%}
+    .btn-primary{background:linear-gradient(135deg,var(--brand),var(--accent));color:white;border:none;border-radius:10px;padding:10px 22px;font-weight:600;font-size:.9rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all .3s;box-shadow:0 4px 16px rgba(14,165,233,.3)}
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(14,165,233,.4)}
+    .btn-outline{border:2px solid var(--brand);color:var(--brand);border-radius:10px;padding:10px 22px;font-weight:600;font-size:.9rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:transparent;transition:all .3s}
     .btn-outline:hover{background:var(--brand);color:white;transform:translateY(-2px)}
-    .logo-nav-img{filter:brightness(0) saturate(0);opacity:0.85;transition:filter 0.3s,opacity 0.3s}
-    .logo-footer-img{filter:none;opacity:1}
     .hamburger{display:none;flex-direction:column;justify-content:center;gap:5px;cursor:pointer;width:40px;height:40px;border-radius:9px;border:1.5px solid var(--border);background:white;padding:8px;flex-shrink:0}
-    .hamburger span{display:block;width:100%;height:2px;background:var(--text);border-radius:2px;transition:all 0.3s}
+    .hamburger span{display:block;width:100%;height:2px;background:var(--text);border-radius:2px;transition:all .3s}
     .hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
     .hamburger.open span:nth-child(2){opacity:0}
     .hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
-    #mobileMenu{display:none;position:fixed;top:64px;left:0;right:0;background:white;border-bottom:2px solid var(--border);box-shadow:0 12px 40px rgba(0,0,0,0.12);z-index:98;padding:8px 0}
+    #mobileMenu{display:none;position:fixed;top:64px;left:0;right:0;background:white;border-bottom:2px solid var(--border);box-shadow:0 12px 40px rgba(0,0,0,.12);z-index:98;padding:8px 0}
     #mobileMenu.open{display:block}
-    #mobileMenu a{display:flex;align-items:center;padding:14px 24px;color:var(--text2);font-weight:500;font-size:0.95rem;text-decoration:none;border-bottom:1px solid var(--border);transition:background 0.15s,color 0.15s}
+    #mobileMenu a{display:flex;align-items:center;padding:14px 24px;color:var(--text2);font-weight:500;font-size:.95rem;text-decoration:none;border-bottom:1px solid var(--border);transition:background .15s}
     #mobileMenu a:last-child{border-bottom:none}
-    #mobileMenu a:hover,#mobileMenu a:active{background:var(--bg2);color:var(--brand)}
-    /* PAGE HERO */
-    .page-hero{padding:140px 24px 80px;background:linear-gradient(160deg,#f0f9ff 0%,#ffffff 50%,#faf5ff 100%);text-align:center}
-    .page-hero h1{font-size:2.8rem;font-weight:900;color:var(--text);line-height:1.15;margin-bottom:16px}
+    #mobileMenu a:hover{background:var(--bg2);color:var(--brand)}
+
+    /* ── HERO ─────────────────────────────── */
+    .page-hero{padding:140px 24px 80px;background:linear-gradient(160deg,#f0f9ff 0%,#fff 55%,#faf5ff 100%);text-align:center}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+    .afu{animation:fadeUp .7s ease forwards;opacity:0}
+    .d1{animation-delay:.12s}.d2{animation-delay:.26s}.d3{animation-delay:.4s}
+    .section-tag{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(14,165,233,.1),rgba(124,58,237,.1));border:1px solid rgba(14,165,233,.2);border-radius:999px;padding:5px 14px;font-size:.78rem;font-weight:700;color:var(--brand-dark);letter-spacing:.04em;text-transform:uppercase;margin-bottom:16px}
+    .page-hero h1{font-size:3rem;font-weight:900;color:var(--text);line-height:1.15;margin-bottom:16px}
     .grad-text{background:linear-gradient(135deg,var(--brand),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
     .page-hero p{font-size:1.1rem;color:var(--text2);line-height:1.7;max-width:580px;margin:0 auto 36px}
-    .section-tag{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(14,165,233,0.1),rgba(124,58,237,0.1));border:1px solid rgba(14,165,233,0.2);border-radius:999px;padding:5px 14px;font-size:0.78rem;font-weight:700;color:var(--brand-dark);letter-spacing:0.04em;text-transform:uppercase;margin-bottom:16px}
-    /* FEATURES */
-    section{padding:80px 24px}
-    .section-inner{max-width:1100px;margin:0 auto}
-    .section-title{font-size:2.2rem;font-weight:900;color:var(--text);line-height:1.2;margin-bottom:12px}
-    .features-list{display:flex;flex-direction:column;gap:0}
-    .feature-row{display:grid;grid-template-columns:80px 1fr;gap:28px;align-items:start;padding:40px 0;border-bottom:1px solid var(--border)}
-    .feature-row:last-child{border-bottom:none}
-    .feature-emoji{font-size:2.8rem;line-height:1;text-align:center;padding-top:4px}
-    .feature-body h3{font-size:1.2rem;font-weight:800;color:var(--text);margin-bottom:8px}
-    .feature-body p{font-size:0.95rem;color:var(--text2);line-height:1.7}
-    /* CTA */
+    @keyframes pulseRing{0%,100%{box-shadow:0 4px 16px rgba(14,165,233,.3)}50%{box-shadow:0 4px 32px rgba(14,165,233,.5),0 0 0 8px rgba(14,165,233,.1)}}
+    .pulse-btn{animation:pulseRing 2s infinite}
+
+    /* ── CATEGORY HEADING ─────────────────── */
+    .cat-heading{text-align:center;padding:72px 24px 8px}
+    .cat-heading .cat-tag{display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:999px;padding:5px 14px;font-size:.75rem;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px}
+    .cat-heading h2{font-size:1.8rem;font-weight:900;color:var(--text);margin-bottom:8px}
+    .cat-heading p{font-size:.95rem;color:var(--text3);max-width:500px;margin:0 auto}
+
+    /* ── FEATURE ROW ─────────────────────── */
+    .feat-section{padding:56px 24px}
+    .feat-section.alt{background:var(--bg2)}
+    .feat-section.dark-bg{background:var(--dark)}
+    .feat-inner{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:center}
+    .feat-inner.flip .feat-content{order:2}.feat-inner.flip .feat-visual{order:1}
+    .feat-tag{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 12px;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:14px;border:1px solid}
+    .feat-tag.blue{background:rgba(14,165,233,.1);border-color:rgba(14,165,233,.2);color:var(--brand)}
+    .feat-tag.green{background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.25);color:var(--green)}
+    .feat-tag.purple{background:rgba(124,58,237,.1);border-color:rgba(124,58,237,.2);color:var(--accent)}
+    .feat-tag.orange{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.2);color:var(--orange)}
+    .feat-tag.white{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.7)}
+    .feat-content h3{font-size:1.85rem;font-weight:900;color:var(--text);line-height:1.2;margin-bottom:14px}
+    .dark-bg .feat-content h3{color:#fff}
+    .feat-content p{font-size:.98rem;color:var(--text2);line-height:1.75;margin-bottom:20px}
+    .dark-bg .feat-content p{color:rgba(255,255,255,.65)}
+    .feat-bullets{list-style:none;display:flex;flex-direction:column;gap:9px}
+    .feat-bullets li{display:flex;align-items:center;gap:10px;font-size:.88rem;color:var(--text3);font-weight:500}
+    .dark-bg .feat-bullets li{color:rgba(255,255,255,.55)}
+    .feat-bullets li .bchk{width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--accent));color:white;font-size:9px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+
+    /* ── VISUAL SCREEN ───────────────────── */
+    .feat-visual{position:relative}
+    .feat-screen{background:var(--dark2);border-radius:18px;padding:18px;overflow:hidden;position:relative;min-height:330px;box-shadow:0 24px 60px rgba(0,0,0,.22),0 0 0 1px rgba(255,255,255,.06);display:flex;flex-direction:column}
+    .feat-screen::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--brand),var(--accent))}
+    .scr-bar{display:flex;align-items:center;gap:6px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.06)}
+    .scr-dot{width:9px;height:9px;border-radius:50%}
+    .scr-dot.r{background:#ef4444}.scr-dot.y{background:#f59e0b}.scr-dot.g{background:#10b981}
+    .scr-lbl{font-size:.68rem;font-weight:600;color:rgba(255,255,255,.3);margin-left:8px;font-family:'JetBrains Mono',monospace;letter-spacing:.03em}
+
+    /* scroll reveal */
+    .reveal{opacity:0;transform:translateY(32px);transition:all .8s cubic-bezier(.16,1,.3,1)}
+    .reveal.visible{opacity:1;transform:translateY(0)}
+
+    /* animation gate */
+    .feat-screen .a{animation-play-state:paused}
+    .feat-visual.playing .feat-screen .a{animation-play-state:running}
+
+    /* ═══════════════════════════════════════
+       FEATURE 1 — OFFLINE-FIRST
+    ═══════════════════════════════════════ */
+    @keyframes offBadge{0%,45%{opacity:1}55%,100%{opacity:0}}
+    @keyframes onBadge{0%,50%{opacity:0}60%,100%{opacity:1}}
+    @keyframes fBar1{0%,8%{width:0}35%,100%{width:82%}}
+    @keyframes fBar2{0%,18%{width:0}45%,100%{width:62%}}
+    @keyframes fBar3{0%,28%{width:0}55%,100%{width:91%}}
+    @keyframes syncBarFill{0%,55%{width:0;opacity:0}60%{opacity:1;width:0}92%{width:100%;opacity:1}100%{width:100%;opacity:0}}
+    @keyframes syncDone{0%,88%{opacity:0;transform:scale(.8)}95%,100%{opacity:1;transform:scale(1)}}
+    .f1-offline{display:inline-flex;align-items:center;gap:6px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#f87171;font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:999px;margin-bottom:14px;animation:offBadge 8s infinite}
+    .f1-online{display:inline-flex;align-items:center;gap:6px;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:#34d399;font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:999px;margin-bottom:14px;position:absolute;top:18px;left:18px;margin-top:46px;animation:onBadge 8s infinite}
+    .f1-field{margin-bottom:10px}
+    .f1-label{font-size:.68rem;color:rgba(255,255,255,.4);margin-bottom:4px;font-family:'JetBrains Mono',monospace}
+    .f1-track{height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden}
+    .f1-fill{height:100%;background:linear-gradient(90deg,var(--brand),var(--accent));border-radius:3px;width:0}
+    .f1-fill.b1{animation:fBar1 8s infinite}
+    .f1-fill.b2{animation:fBar2 8s infinite}
+    .f1-fill.b3{animation:fBar3 8s infinite}
+    .f1-synctrack{height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-top:20px}
+    .f1-syncfill{height:100%;background:linear-gradient(90deg,#34d399,#0ea5e9);border-radius:2px;animation:syncBarFill 8s infinite}
+    .f1-done{font-size:.72rem;color:#34d399;font-weight:700;margin-top:8px;animation:syncDone 8s infinite;opacity:0}
+
+    /* ═══════════════════════════════════════
+       FEATURE 2 — FORM BUILDER
+    ═══════════════════════════════════════ */
+    @keyframes fieldSlide1{0%,5%{opacity:0;transform:translateX(-20px)}20%,100%{opacity:1;transform:translateX(0)}}
+    @keyframes fieldSlide2{0%,22%{opacity:0;transform:translateX(-20px)}37%,100%{opacity:1;transform:translateX(0)}}
+    @keyframes fieldSlide3{0%,40%{opacity:0;transform:translateX(-20px)}55%,100%{opacity:1;transform:translateX(0)}}
+    @keyframes skipLineDraw{0%,52%{stroke-dashoffset:100;opacity:0}58%{opacity:1}85%,100%{stroke-dashoffset:0;opacity:1}}
+    @keyframes dotPulse{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.4);opacity:1}}
+    .f2-pill{display:inline-flex;align-items:center;gap:5px;background:rgba(14,165,233,.1);border:1px solid rgba(14,165,233,.2);border-radius:6px;padding:3px 8px;font-size:.65rem;color:var(--brand);font-weight:600;margin-right:4px;margin-bottom:4px}
+    .f2-field-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:.72rem;color:rgba(255,255,255,.7);display:flex;align-items:center;gap:8px}
+    .f2-field-card.s1{animation:fieldSlide1 8s infinite}
+    .f2-field-card.s2{animation:fieldSlide2 8s infinite}
+    .f2-field-card.s3{animation:fieldSlide3 8s infinite}
+    .f2-field-icon{width:20px;height:20px;border-radius:5px;background:linear-gradient(135deg,var(--brand),var(--accent));display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
+    .f2-skip-svg{width:100%;height:36px;overflow:visible;margin-top:4px}
+    .f2-skip-path{stroke:var(--brand);stroke-width:1.5;fill:none;stroke-dasharray:100;animation:skipLineDraw 8s infinite}
+    .skip-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);border-radius:6px;padding:3px 8px;font-size:.65rem;color:#a78bfa;font-weight:600;margin-top:6px}
+
+    /* ═══════════════════════════════════════
+       FEATURE 3 — AI FORM BUILDER
+    ═══════════════════════════════════════ */
+    @keyframes aiThink{0%,100%{opacity:.3}50%{opacity:1}}
+    @keyframes aiSpinner{to{transform:rotate(360deg)}}
+    @keyframes sectionPop{from{opacity:0;transform:scale(.85) translateY(6px)}to{opacity:1;transform:scale(1) translateY(0)}}
+    @keyframes aiProgressFill{0%{width:0}100%{width:100%}}
+    .f3-input{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 12px;font-size:.72rem;color:rgba(255,255,255,.6);line-height:1.5;margin-bottom:12px;font-family:'Inter',sans-serif}
+    .f3-spinner{width:18px;height:18px;border:2px solid rgba(14,165,233,.2);border-top-color:var(--brand);border-radius:50%;display:inline-block;animation:aiSpinner .8s linear infinite;vertical-align:middle;margin-right:6px}
+    .f3-status{font-size:.72rem;color:rgba(255,255,255,.5);margin-bottom:10px;font-family:'JetBrains Mono',monospace}
+    .f3-progress{height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-bottom:14px}
+    .f3-progress-fill{height:100%;background:linear-gradient(90deg,var(--brand),var(--accent));border-radius:2px;animation:aiProgressFill 4s ease infinite}
+    .f3-result{font-size:.72rem;color:#34d399;font-weight:700;margin-bottom:10px}
+    .f3-sections{display:flex;flex-wrap:wrap;gap:6px}
+    .f3-sec{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:4px 10px;font-size:.65rem;color:rgba(255,255,255,.7);font-weight:500}
+    .f3-sec:nth-child(1){animation:sectionPop .4s ease forwards .1s;opacity:0}
+    .f3-sec:nth-child(2){animation:sectionPop .4s ease forwards .25s;opacity:0}
+    .f3-sec:nth-child(3){animation:sectionPop .4s ease forwards .4s;opacity:0}
+    .f3-sec:nth-child(4){animation:sectionPop .4s ease forwards .55s;opacity:0}
+    .f3-sec:nth-child(5){animation:sectionPop .4s ease forwards .7s;opacity:0}
+    .f3-sec:nth-child(6){animation:sectionPop .4s ease forwards .85s;opacity:0}
+
+    /* ═══════════════════════════════════════
+       FEATURE 4 — IMPORT
+    ═══════════════════════════════════════ */
+    @keyframes arrowFlow{0%{stroke-dashoffset:60}100%{stroke-dashoffset:0}}
+    @keyframes badgePop{0%,8%{opacity:0;transform:scale(.7)}22%,78%{opacity:1;transform:scale(1)}90%,100%{opacity:0;transform:scale(.7)}}
+    @keyframes centerPulse{0%,100%{box-shadow:0 0 0 0 rgba(14,165,233,.5)}50%{box-shadow:0 0 0 10px rgba(14,165,233,0)}}
+    .f4-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center}
+    .f4-sources{display:flex;flex-direction:column;gap:8px}
+    .f4-src{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:7px 10px;font-size:.68rem;color:rgba(255,255,255,.6);font-weight:600;display:flex;align-items:center;gap:6px;animation:badgePop 6s infinite}
+    .f4-src:nth-child(2){animation-delay:-2s}.f4-src:nth-child(3){animation-delay:-4s}
+    .f4-center{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--brand),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.1rem;color:white;animation:centerPulse 2s infinite;flex-shrink:0}
+    .f4-target{display:flex;flex-direction:column;gap:8px}
+    .f4-tgt{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:7px 10px;font-size:.68rem;color:#34d399;font-weight:600;display:flex;align-items:center;gap:6px}
+    .f4-arrow-svg{width:48px;height:100px;overflow:visible}
+    .f4-arrow-path{stroke:rgba(14,165,233,.4);stroke-width:1.5;fill:none;stroke-dasharray:20;animation:arrowFlow 1s linear infinite}
+
+    /* ═══════════════════════════════════════
+       FEATURE 5 — SYNC & MEDIA
+    ═══════════════════════════════════════ */
+    @keyframes shimmer{0%,100%{opacity:.7}50%{opacity:1}}
+    @keyframes uploadFill{0%,10%{width:0}80%{width:100%}100%{width:100%}}
+    @keyframes sizeChange{0%,5%{opacity:1} 14%{opacity:0} 15%{opacity:1} 29%{opacity:0} 30%{opacity:1} 44%{opacity:0} 45%{opacity:1} 59%{opacity:0} 60%,100%{opacity:1}}
+    .f5-photo{width:100%;height:100px;background:linear-gradient(135deg,#1e3a5f,#0c2340,#1a4080);border-radius:8px;margin-bottom:10px;position:relative;overflow:hidden;animation:shimmer 3s infinite}
+    .f5-photo::after{content:'📷';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.6rem}
+    .f5-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .f5-name{font-size:.68rem;color:rgba(255,255,255,.6);font-family:'JetBrains Mono',monospace}
+    .f5-sizes{display:flex;flex-direction:column;gap:3px;text-align:right}
+    .f5-orig{font-size:.62rem;color:rgba(255,255,255,.35);text-decoration:line-through}
+    .f5-comp{font-size:.72rem;color:#34d399;font-weight:700}
+    .f5-upload-label{font-size:.65rem;color:rgba(255,255,255,.4);margin-bottom:6px;display:flex;justify-content:space-between}
+    .f5-track{height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;margin-bottom:8px}
+    .f5-fill{height:100%;background:linear-gradient(90deg,var(--brand),var(--accent));border-radius:3px;animation:uploadFill 5s ease infinite}
+    .f5-status{font-size:.7rem;color:var(--brand);font-weight:600;text-align:center}
+
+    /* ═══════════════════════════════════════
+       FEATURE 6 — SUPERVISOR DASHBOARD
+    ═══════════════════════════════════════ */
+    @keyframes rowApprove{0%,15%{background:transparent;border-color:rgba(255,255,255,.08)}30%,65%{background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.25)}80%,100%{background:transparent;border-color:rgba(255,255,255,.08)}}
+    @keyframes rowFlag{0%,35%{background:transparent;border-color:rgba(255,255,255,.08)}50%,80%{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.25)}95%,100%{background:transparent;border-color:rgba(255,255,255,.08)}}
+    @keyframes statusApprove{0%,15%{color:rgba(255,255,255,.35)}30%,65%{color:#34d399}80%,100%{color:rgba(255,255,255,.35)}}
+    @keyframes statusFlag{0%,35%{color:rgba(255,255,255,.35)}50%,80%{color:#fbbf24}95%,100%{color:rgba(255,255,255,.35)}}
+    @keyframes gpsBlip{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.5);opacity:1}}
+    .f6-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .f6-title{font-size:.75rem;font-weight:700;color:rgba(255,255,255,.8)}
+    .f6-count{font-size:.68rem;color:var(--brand);font-weight:600;background:rgba(14,165,233,.1);border:1px solid rgba(14,165,233,.2);padding:2px 8px;border-radius:999px}
+    .f6-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:8px 10px;margin-bottom:6px}
+    .f6-row.r1{animation:rowApprove 8s infinite}
+    .f6-row.r2{animation:rowFlag 8s infinite}
+    .f6-name{font-size:.7rem;color:rgba(255,255,255,.7);font-weight:500}
+    .f6-loc{font-size:.62rem;color:rgba(255,255,255,.35)}
+    .f6-gps{width:8px;height:8px;border-radius:50%;background:var(--brand);animation:gpsBlip 2s infinite}
+    .f6-status{font-size:.65rem;font-weight:700;min-width:56px;text-align:right}
+    .f6-status.s1{animation:statusApprove 8s infinite;color:rgba(255,255,255,.35)}
+    .f6-status.s2{animation:statusFlag 8s infinite;color:rgba(255,255,255,.35)}
+    .f6-row.r3{border-color:rgba(16,185,129,.25);background:rgba(16,185,129,.08)}
+    .f6-status.s3{color:#34d399}
+
+    /* ═══════════════════════════════════════
+       FEATURE 7 — WHATSAPP
+    ═══════════════════════════════════════ */
+    @keyframes bubbleIn{from{opacity:0;transform:translateY(10px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+    .f7-header{background:#075e54;border-radius:8px 8px 0 0;padding:8px 12px;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+    .f7-avatar{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0}
+    .f7-hname{font-size:.75rem;font-weight:700;color:white}
+    .f7-hstatus{font-size:.6rem;color:rgba(255,255,255,.6)}
+    .f7-chat{flex:1;overflow:hidden;display:flex;flex-direction:column;gap:8px}
+    .f7-bubble{background:rgba(7,94,84,.4);border:1px solid rgba(255,255,255,.06);border-radius:0 10px 10px 10px;padding:8px 10px;max-width:88%;opacity:0;animation:bubbleIn .4s ease forwards}
+    .f7-bubble:nth-child(1){animation-delay:.5s}
+    .f7-bubble:nth-child(2){animation-delay:2s}
+    .f7-bubble:nth-child(3){animation-delay:3.5s;margin-left:auto;background:rgba(14,165,233,.2);border-radius:10px 0 10px 10px}
+    .f7-btext{font-size:.7rem;color:rgba(255,255,255,.85);line-height:1.5}
+    .f7-btime{font-size:.58rem;color:rgba(255,255,255,.35);margin-top:3px;text-align:right}
+
+    /* ═══════════════════════════════════════
+       FEATURE 8 — GOOGLE SHEETS
+    ═══════════════════════════════════════ */
+    @keyframes rowAppend{from{opacity:0;background:rgba(16,185,129,.2);transform:translateY(-6px)}to{opacity:1;background:transparent;transform:translateY(0)}}
+    @keyframes counterTick{0%{content:"847"}33%{content:"848"}66%{content:"849"}100%{content:"850"}}
+    .f8-sheetbar{background:#1a6435;border-radius:6px;padding:5px 10px;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+    .f8-sheeticon{font-size:.9rem}
+    .f8-sheettitle{font-size:.68rem;font-weight:600;color:rgba(255,255,255,.8)}
+    .f8-counter{font-size:.62rem;color:rgba(255,255,255,.5);margin-left:auto}
+    .f8-counter span{color:#34d399;font-weight:700}
+    .f8-headers{display:grid;grid-template-columns:28px 1fr 1fr 64px;gap:0;background:rgba(255,255,255,.07);border-radius:4px 4px 0 0;padding:4px 6px;margin-bottom:1px}
+    .f8-hcell{font-size:.6rem;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.04em}
+    .f8-row{display:grid;grid-template-columns:28px 1fr 1fr 64px;gap:0;padding:5px 6px;border-bottom:1px solid rgba(255,255,255,.05);font-size:.65rem;color:rgba(255,255,255,.7)}
+    .f8-row.new1{animation:rowAppend .5s ease forwards .4s;opacity:0}
+    .f8-row.new2{animation:rowAppend .5s ease forwards 1.6s;opacity:0}
+    .f8-row.new3{animation:rowAppend .5s ease forwards 2.8s;opacity:0}
+    .f8-status{display:inline-block;padding:1px 6px;border-radius:4px;font-size:.6rem;font-weight:600;background:rgba(16,185,129,.15);color:#34d399}
+
+    /* ═══════════════════════════════════════
+       FEATURE 9 — AI REPORT WRITER
+    ═══════════════════════════════════════ */
+    @keyframes typeReveal{from{width:0}to{width:100%}}
+    @keyframes blink{0%,100%{border-right-color:var(--brand)}50%{border-right-color:transparent}}
+    @keyframes modelFade{0%,20%{opacity:0;transform:translateY(4px)}30%,100%{opacity:1;transform:translateY(0)}}
+    .f9-model{display:inline-flex;align-items:center;gap:6px;background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.25);border-radius:6px;padding:4px 10px;font-size:.68rem;color:#a78bfa;font-weight:600;margin-bottom:12px;animation:modelFade 8s infinite}
+    .f9-line{font-size:.72rem;color:rgba(255,255,255,.75);font-family:'JetBrains Mono',monospace;line-height:1.6;overflow:hidden;white-space:nowrap;border-right:2px solid var(--brand);margin-bottom:6px}
+    .f9-line.l1{animation:typeReveal 2s steps(35) forwards .3s, blink .5s step-end infinite;width:0}
+    .f9-line.l2{animation:typeReveal 2.5s steps(45) forwards 2.6s, blink .5s step-end infinite 2.6s;width:0;color:rgba(255,255,255,.55)}
+    .f9-line.l3{animation:typeReveal 2s steps(30) forwards 5.3s, blink .5s step-end infinite 5.3s;width:0;color:rgba(255,255,255,.55)}
+    .f9-generating{display:flex;align-items:center;gap:8px;font-size:.68rem;color:rgba(255,255,255,.4);margin-bottom:12px}
+    @keyframes dotDot{0%,100%{opacity:.3}33%{opacity:1}}
+    .f9-dot{width:5px;height:5px;border-radius:50%;background:var(--brand);animation:dotDot 1s infinite}
+    .f9-dot:nth-child(2){animation-delay:.2s}.f9-dot:nth-child(3){animation-delay:.4s}
+
+    /* ═══════════════════════════════════════
+       FEATURE 10 — QC SUITE
+    ═══════════════════════════════════════ */
+    @keyframes checkTick{from{opacity:0;transform:scale(0) rotate(-90deg)}to{opacity:1;transform:scale(1) rotate(0)}}
+    @keyframes rowReveal{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
+    .f10-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;margin-bottom:6px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);opacity:0}
+    .f10-row:nth-child(1){animation:rowReveal .4s ease forwards .2s}
+    .f10-row:nth-child(2){animation:rowReveal .4s ease forwards .7s}
+    .f10-row:nth-child(3){animation:rowReveal .4s ease forwards 1.2s}
+    .f10-row:nth-child(4){animation:rowReveal .4s ease forwards 1.7s}
+    .f10-row:nth-child(5){animation:rowReveal .4s ease forwards 2.2s}
+    .f10-icon{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.7rem;flex-shrink:0}
+    .f10-icon.ok{background:rgba(16,185,129,.15);color:#34d399}
+    .f10-icon.warn{background:rgba(245,158,11,.15);color:#fbbf24}
+    .f10-icon.red{background:rgba(239,68,68,.15);color:#f87171}
+    .f10-text{flex:1;font-size:.72rem;color:rgba(255,255,255,.7)}
+    .f10-badge{font-size:.65rem;font-weight:700;padding:2px 8px;border-radius:999px}
+    .f10-badge.ok{background:rgba(16,185,129,.1);color:#34d399}
+    .f10-badge.warn{background:rgba(245,158,11,.1);color:#fbbf24}
+
+    /* ═══════════════════════════════════════
+       FEATURE 11 — DPDP COMPLIANCE
+    ═══════════════════════════════════════ */
+    @keyframes shieldPulse{0%,100%{filter:drop-shadow(0 0 4px rgba(16,185,129,.3))}50%{filter:drop-shadow(0 0 14px rgba(16,185,129,.7))}}
+    @keyframes consentCheck{0%,25%{transform:scale(0);opacity:0}40%,100%{transform:scale(1);opacity:1}}
+    @keyframes auditRow{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+    .f11-shield{font-size:2rem;text-align:center;display:block;margin-bottom:4px;animation:shieldPulse 2.5s infinite}
+    .f11-badge{text-align:center;font-size:.7rem;font-weight:700;color:#34d399;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);border-radius:8px;padding:5px;margin-bottom:12px}
+    .f11-consent{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:9px 10px;margin-bottom:8px}
+    .f11-chk{width:18px;height:18px;border-radius:4px;background:rgba(16,185,129,.15);border:1.5px solid rgba(16,185,129,.4);display:flex;align-items:center;justify-content:center;font-size:.65rem;color:#34d399;flex-shrink:0;animation:consentCheck 5s infinite}
+    .f11-ctext{font-size:.7rem;color:rgba(255,255,255,.7);line-height:1.4}
+    .f11-audit-row{font-size:.63rem;color:rgba(255,255,255,.4);padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);display:flex;justify-content:space-between;opacity:0}
+    .f11-audit-row:nth-child(1){animation:auditRow .3s ease forwards .3s}
+    .f11-audit-row:nth-child(2){animation:auditRow .3s ease forwards .8s}
+    .f11-audit-row:nth-child(3){animation:auditRow .3s ease forwards 1.3s}
+
+    /* ═══════════════════════════════════════
+       FEATURE 12 — MULTILINGUAL
+    ═══════════════════════════════════════ */
+    @keyframes langFadeOut{0%,70%{opacity:1;transform:translateY(0)}85%,100%{opacity:0;transform:translateY(-8px)}}
+    @keyframes langFadeIn{0%,10%{opacity:0;transform:translateY(8px)}25%,100%{opacity:1;transform:translateY(0)}}
+    .f12-tabs{display:flex;gap:4px;margin-bottom:14px}
+    .f12-tab{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:6px 4px;font-size:.68rem;font-weight:600;text-align:center;color:rgba(255,255,255,.4);cursor:pointer;transition:all .3s}
+    .f12-tab.active{background:rgba(14,165,233,.15);border-color:rgba(14,165,233,.35);color:var(--brand)}
+    .f12-q-wrap{position:relative;min-height:52px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:12px;margin-bottom:10px;overflow:hidden}
+    .f12-q{font-size:.85rem;font-weight:700;color:rgba(255,255,255,.85);line-height:1.4;position:absolute;top:12px;left:12px;right:12px}
+    .f12-q.out{animation:langFadeOut 1s ease forwards}
+    .f12-q.in{animation:langFadeIn 1s ease forwards}
+    .f12-hint{font-size:.62rem;color:rgba(255,255,255,.3);margin-top:4px}
+    .f12-options{display:flex;gap:6px;flex-wrap:wrap}
+    .f12-opt{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:5px 10px;font-size:.68rem;color:rgba(255,255,255,.6)}
+
+    /* ── CTA ──────────────────────────────── */
     .cta-section{background:linear-gradient(135deg,#f0f9ff,#faf5ff);text-align:center;padding:80px 24px;border-top:1px solid var(--border)}
-    .cta-section h2{font-size:2rem;font-weight:900;color:var(--text);margin-bottom:12px}
+    .cta-section h2{font-size:2.2rem;font-weight:900;color:var(--text);margin-bottom:12px}
     .cta-section p{color:var(--text2);margin-bottom:32px;font-size:1rem}
-    /* FOOTER */
-    footer{background:#0f172a;color:rgba(255,255,255,0.7);padding:60px 24px 32px}
+
+    /* ── FOOTER ───────────────────────────── */
+    footer{background:var(--dark);color:rgba(255,255,255,.7);padding:60px 24px 32px}
     .footer-inner{max-width:1100px;margin:0 auto}
     .footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;margin-bottom:48px}
-    .footer-brand p{font-size:0.85rem;color:rgba(255,255,255,0.5);line-height:1.7;margin-top:12px;max-width:260px}
-    .footer-col h4{font-size:0.82rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:16px}
+    .footer-logo-box{display:inline-flex;background:white;border-radius:10px;padding:7px 14px;margin-bottom:14px}
+    .footer-logo-box img{height:34px;width:auto}
+    .footer-brand p{font-size:.85rem;color:rgba(255,255,255,.5);line-height:1.7;max-width:260px}
+    .footer-col h4{font-size:.82rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:.06em;margin-bottom:16px}
     .footer-col ul{list-style:none;display:flex;flex-direction:column;gap:10px}
-    .footer-col a{font-size:0.85rem;color:rgba(255,255,255,0.5);text-decoration:none;transition:color 0.2s}
+    .footer-col a{font-size:.85rem;color:rgba(255,255,255,.5);text-decoration:none;transition:color .2s}
     .footer-col a:hover{color:white}
-    .footer-bottom{border-top:1px solid rgba(255,255,255,0.08);padding-top:24px;display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;color:rgba(255,255,255,0.35);flex-wrap:wrap;gap:12px}
+    .footer-bottom{border-top:1px solid rgba(255,255,255,.08);padding-top:24px;display:flex;justify-content:space-between;align-items:center;font-size:.8rem;color:rgba(255,255,255,.35);flex-wrap:wrap;gap:12px}
+
+    /* ── RESPONSIVE ──────────────────────── */
+    @media(max-width:900px){
+      .feat-inner{grid-template-columns:1fr;gap:40px}
+      .feat-inner.flip .feat-content{order:1}.feat-inner.flip .feat-visual{order:2}
+      .page-hero h1{font-size:2.2rem}
+      .cat-heading h2{font-size:1.5rem}
+    }
     @media(max-width:640px){
-      .page-hero h1{font-size:2rem}
-      .feature-row{grid-template-columns:1fr;gap:12px}
-      .feature-emoji{text-align:left}
-      .nav-links{display:none}
+      .nav-links,.nav-cta-secondary{display:none}
       .hamburger{display:flex}
-      .nav-cta-secondary{display:none}
       .footer-grid{grid-template-columns:1fr}
       .footer-bottom{flex-direction:column;text-align:center}
+      .page-hero h1{font-size:1.8rem}
     }
-    @media(max-width:1024px){
-      .footer-grid{grid-template-columns:1fr 1fr}
-    }
+    @media(max-width:1024px){.footer-grid{grid-template-columns:1fr 1fr}}
   </style>
 </head>
 <body>
+
 <nav id="navbar">
   <a href="index.html" class="nav-logo">
-    <img src="logo.png" alt="FieldGovern" class="logo-nav-img" style="width:36px;height:36px;border-radius:10px;object-fit:contain"/>
-    FieldGovern
+    <img src="assets/logo-wide.png" alt="FieldGovern"/>
   </a>
   <ul class="nav-links">
-    <li><a href="features.html">Features</a></li>
+    <li><a href="features.html" class="active">Features</a></li>
     <li><a href="integrations.html">Integrations</a></li>
     <li><a href="use-cases.html">Use Cases</a></li>
     <li><a href="security.html">Security</a></li>
@@ -128,130 +370,550 @@
   <div style="display:flex;gap:8px;align-items:center">
     <a href="demo.html" class="btn-outline nav-cta-secondary">Try Demo</a>
     <a href="https://app.fieldgovern.com" class="btn-primary">Open App →</a>
-    <button class="hamburger" id="hamburgerBtn" aria-label="Open menu" onclick="toggleMenu()">
-      <span></span><span></span><span></span>
-    </button>
+    <button class="hamburger" id="hamburgerBtn" onclick="toggleMenu()"><span></span><span></span><span></span></button>
   </div>
 </nav>
 
-<div id="mobileMenu" role="navigation">
+<div id="mobileMenu">
   <a href="features.html">✦ Features</a>
   <a href="integrations.html">🔗 Integrations</a>
   <a href="use-cases.html">🏘️ Use Cases</a>
   <a href="index.html#pricing">💰 Pricing</a>
-  <a href="about.html">🏛️ About Us</a>
+  <a href="about.html">🏛️ About</a>
   <a href="about.html#contact">✉️ Contact</a>
   <a href="demo.html" style="color:var(--brand);font-weight:700">🚀 Try Free Demo</a>
 </div>
 
+<!-- HERO -->
 <div class="page-hero">
-  <div class="section-tag animate-fade-up">🚀 Platform Features</div>
-  <h1 class="animate-fade-up delay-1">Everything your field team needs<br/><span class="grad-text">— in one platform</span></h1>
-  <p class="animate-fade-up delay-2">From offline data collection to AI-generated reports — every tool your field research team requires, built for India's connectivity realities.</p>
-  <a href="https://app.fieldgovern.com" class="btn-primary animate-pulse-ring animate-fade-up delay-3" style="font-size:1rem;padding:14px 28px;display:inline-flex">Start Free Trial →</a>
+  <div class="section-tag afu">🚀 Platform Features</div>
+  <h1 class="afu d1">Every tool your field team needs<br/><span class="grad-text">— in one platform</span></h1>
+  <p class="afu d2">From offline-first data collection to AI-generated reports — purpose-built for India's connectivity realities and compliance requirements.</p>
+  <a href="https://app.fieldgovern.com" class="btn-primary pulse-btn afu d3" style="font-size:1rem;padding:14px 28px">Start Free Trial →</a>
 </div>
 
-<section>
-  <div class="section-inner">
-    <div class="features-list">
+<!-- ══════════════════════════════════════════════
+     CATEGORY 1: DATA COLLECTION
+═══════════════════════════════════════════════ -->
+<div class="cat-heading reveal">
+  <div class="cat-tag">📱 Data Collection</div>
+  <h2>Collect data anywhere, on any form</h2>
+  <p>Works without internet, builds complex surveys visually, and imports from every tool you already use.</p>
+</div>
 
-      <div class="feature-row reveal">
-        <div class="feature-emoji">📱</div>
-        <div class="feature-body">
-          <h3>Offline-First Collection</h3>
-          <p>Works without internet — forms are cached locally so enumerators can collect data anywhere, from remote villages to basement clinics. Data auto-syncs securely the moment a connection returns, with zero data loss guaranteed.</p>
+<!-- F1: OFFLINE-FIRST -->
+<section class="feat-section">
+  <div class="feat-inner reveal">
+    <div class="feat-content">
+      <div class="feat-tag blue">📵 Offline-First</div>
+      <h3>Works without internet.<br/>Zero data loss.</h3>
+      <p>Forms are cached locally the moment they're assigned. Enumerators collect GPS, photos, and responses even in remote villages with no signal — data syncs automatically and securely the instant a connection returns.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Full form functionality with no connectivity</li>
+        <li><span class="bchk">✓</span>Photos, GPS, audio — all cached locally</li>
+        <li><span class="bchk">✓</span>Auto-sync with idempotency — no duplicates</li>
+        <li><span class="bchk">✓</span>Works on 2G — text first, media batched</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">FieldGovern — Enumerator App</span></div>
+        <div style="position:relative;margin-bottom:14px">
+          <div class="f1-offline a">📵 Offline — 4 forms saved locally</div>
+          <div class="f1-online a" style="position:relative;top:auto;left:auto;margin-top:0">⟳ Connection restored — syncing…</div>
         </div>
-      </div>
-
-      <div class="feature-row reveal">
-        <div class="feature-emoji">🏗️</div>
-        <div class="feature-body">
-          <h3>Drag-and-Drop Form Builder</h3>
-          <p>Design complex surveys visually with 14+ field types, advanced AND/OR skip logic, form versioning, and repeat groups. No coding required — what you build is exactly what enumerators see in the field.</p>
+        <div class="f1-field">
+          <div class="f1-label">Respondent Name</div>
+          <div class="f1-track"><div class="f1-fill b1 a"></div></div>
         </div>
-      </div>
-
-      <div class="feature-row reveal">
-        <div class="feature-emoji">🔄</div>
-        <div class="feature-body">
-          <h3>Multi-Platform Import</h3>
-          <p>Migrate from XLSForm, KoboToolbox, SurveyCTO, or ODK Central with a single click — your existing forms come in exactly as designed. No manual re-entry, no lost skip logic.</p>
+        <div class="f1-field">
+          <div class="f1-label">Village / Ward</div>
+          <div class="f1-track"><div class="f1-fill b2 a"></div></div>
         </div>
-      </div>
-
-      <div class="feature-row reveal">
-        <div class="feature-emoji">🌐</div>
-        <div class="feature-body">
-          <h3>Real-time Sync &amp; Media</h3>
-          <p>Photos, GPS coordinates, and audio recordings sync securely using a two-phase approach — text first on 2G, then media in background batches. 5 MB photos compress to ~200 KB automatically.</p>
+        <div class="f1-field">
+          <div class="f1-label">GPS Location</div>
+          <div class="f1-track"><div class="f1-fill b3 a"></div></div>
         </div>
+        <div class="f1-synctrack"><div class="f1-syncfill a"></div></div>
+        <div class="f1-done a">✅ 4 submissions synced successfully</div>
       </div>
-
-      <div class="feature-row reveal">
-        <div class="feature-emoji">👁️</div>
-        <div class="feature-body">
-          <h3>Supervisor Dashboard</h3>
-          <p>Flag, approve, or reject individual submissions in real time, with full GPS map view and audit trail. Export any subset of data at any time as CSV, Stata .dta, or straight to Google Sheets.</p>
-        </div>
-      </div>
-
-      <div class="feature-row reveal">
-        <div class="feature-emoji">🟢</div>
-        <div class="feature-body">
-          <h3>WhatsApp Notifications</h3>
-          <p>Instant MSG91 WABA alerts sent to supervisors when enumerators sync, flag, or complete their assignment. Stay informed on field events without refreshing a dashboard.</p>
-        </div>
-      </div>
-
-      <div class="feature-row reveal">
-        <div class="feature-emoji">📊</div>
-        <div class="feature-body">
-          <h3>Google Sheets Live Sync</h3>
-          <p>Every submission is auto-appended as a new row to a connected Google Sheet the moment it syncs. Your data is always up to date without any manual exports or scheduled jobs.</p>
-        </div>
-      </div>
-
-      <div class="feature-row reveal">
-        <div class="feature-emoji">🤖</div>
-        <div class="feature-body">
-          <h3>AI Report Writer</h3>
-          <p>Connect OpenAI, Anthropic Claude, or Google Gemini using your own API key. Generate professional 3–5 paragraph markdown summaries of any form's submissions in seconds.</p>
-        </div>
-      </div>
-
-      <div class="feature-row reveal">
-        <div class="feature-emoji">✅</div>
-        <div class="feature-body">
-          <h3>QC Suite</h3>
-          <p>Server-side validation rules, automated duplicate detection using idempotency keys, and a built-in back-check audit workflow ensure your data is clean before analysis begins.</p>
-        </div>
-      </div>
-
-      <div class="feature-row reveal">
-        <div class="feature-emoji">🛡️</div>
-        <div class="feature-body">
-          <h3>DPDP Compliance</h3>
-          <p>India's Digital Personal Data Protection Act 2023 is built into the platform — consent tracking per respondent, full audit logs, a data erasure endpoint, and a purpose field on every form.</p>
-        </div>
-      </div>
-
-      <div class="feature-row reveal">
-        <div class="feature-emoji">🌍</div>
-        <div class="feature-body">
-          <h3>Multilingual</h3>
-          <p>English, Hindi, Kannada, and Telugu are available out of the box for the enumerator interface. AI-powered label translation lets you add new languages to any form in minutes.</p>
-        </div>
-      </div>
-
     </div>
   </div>
 </section>
 
+<!-- F2: FORM BUILDER -->
+<section class="feat-section alt">
+  <div class="feat-inner flip reveal">
+    <div class="feat-content">
+      <div class="feat-tag purple">🏗️ Form Builder</div>
+      <h3>Drag-and-drop forms.<br/>No coding required.</h3>
+      <p>Design complex surveys with 14+ field types, visual AND/OR skip logic, form versioning, and nested repeat groups. What you build is exactly what your enumerators see — no surprises in the field.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>14+ field types: GPS, photo, audio, select, repeat</li>
+        <li><span class="bchk">✓</span>Visual skip logic with AND/OR conditions</li>
+        <li><span class="bchk">✓</span>Form versioning — update without losing data</li>
+        <li><span class="bchk">✓</span>Enumerator hints and instructions per field</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Form Builder</span></div>
+        <div style="margin-bottom:8px;display:flex;flex-wrap:wrap">
+          <div class="f2-pill">📝 Text</div>
+          <div class="f2-pill">🔢 Number</div>
+          <div class="f2-pill">📍 GPS</div>
+          <div class="f2-pill">📷 Photo</div>
+          <div class="f2-pill">☑ Select</div>
+        </div>
+        <div class="f2-field-card s1 a">
+          <div class="f2-field-icon">📝</div>
+          <span>Respondent Name — Text field</span>
+        </div>
+        <div class="f2-field-card s2 a">
+          <div class="f2-field-icon">🔢</div>
+          <span>Age — Number (18–99) with validation</span>
+        </div>
+        <div class="f2-field-card s3 a">
+          <div class="f2-field-icon">📍</div>
+          <span>GPS Location — auto-capture enabled</span>
+        </div>
+        <svg class="f2-skip-svg a" viewBox="0 0 200 32">
+          <path class="f2-skip-path a" d="M 20 8 C 60 8, 80 24, 120 24 L 180 24" stroke-dasharray="100"/>
+          <polygon points="178,20 185,24 178,28" fill="rgba(14,165,233,.5)"/>
+        </svg>
+        <div class="skip-badge">⤷ Skip logic: if Age &lt; 18, skip Section 3</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- F3: AI FORM BUILDER -->
+<section class="feat-section" style="background:linear-gradient(135deg,#0f172a 0%,#1a1040 100%)">
+  <div class="feat-inner reveal">
+    <div class="feat-content">
+      <div class="feat-tag white">🤖 AI-Powered · Live Now</div>
+      <h3 style="color:white">Describe your study.<br/><span style="background:linear-gradient(135deg,#38bdf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">AI builds the form.</span></h3>
+      <p>Share your study objectives and target population — our AI designs a complete, field-ready form with proper sections, skip logic, field types, sub-questions, and enumerator hints. Complex surveys in 90 seconds.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>20–45 questions, 4–8 logical sections</li>
+        <li><span class="bchk">✓</span>Correct field types — GPS, select, repeat groups</li>
+        <li><span class="bchk">✓</span>Skip logic and conditional flows auto-wired</li>
+        <li><span class="bchk">✓</span>Runs in background — edit when ready</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">AI Form Builder</span></div>
+        <div class="f3-input">Household survey for MGNREGA beneficiaries in Karnataka. Collect work days, wages, bank account linkage, awareness, grievances. Include caste, gender, landholding demographics.</div>
+        <div class="f3-status a"><span class="f3-spinner a"></span>Designing question structure and sections…</div>
+        <div class="f3-progress"><div class="f3-progress-fill a"></div></div>
+        <div class="f3-result a">✅ Generated: 38 questions · 7 sections · Skip logic applied</div>
+        <div class="f3-sections">
+          <div class="f3-sec a">📋 Consent</div>
+          <div class="f3-sec a">👤 Demographics</div>
+          <div class="f3-sec a">💼 MGNREGA Work</div>
+          <div class="f3-sec a">🏦 Wages & Payments</div>
+          <div class="f3-sec a">📣 Awareness</div>
+          <div class="f3-sec a">⚠️ Grievances</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- F4: IMPORT -->
+<section class="feat-section alt">
+  <div class="feat-inner flip reveal">
+    <div class="feat-content">
+      <div class="feat-tag blue">🔄 Migration</div>
+      <h3>Already on KoboToolbox?<br/>Migrate in one click.</h3>
+      <p>Import from XLSForm, KoboToolbox, SurveyCTO, or ODK Central with a single upload — your existing forms come in exactly as designed, with all skip logic and field types preserved. No manual re-entry.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>XLSForm / ODK / KoboToolbox / SurveyCTO</li>
+        <li><span class="bchk">✓</span>Skip logic and repeat groups fully preserved</li>
+        <li><span class="bchk">✓</span>Migrate team, not just the data</li>
+        <li><span class="bchk">✓</span>1/3 the cost of SurveyCTO after migration</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen" style="justify-content:center">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Platform Import</span></div>
+        <div class="f4-grid">
+          <div class="f4-sources">
+            <div class="f4-src a" style="animation-delay:0s">📊 XLSForm</div>
+            <div class="f4-src a" style="animation-delay:-2s">🔵 KoboToolbox</div>
+            <div class="f4-src a" style="animation-delay:-4s">🟠 SurveyCTO</div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:center">
+            <svg class="f4-arrow-svg a" viewBox="0 0 48 80">
+              <path class="f4-arrow-path a" d="M 8 10 Q 40 40 8 70"/>
+              <path class="f4-arrow-path a" d="M 8 40 L 40 40" style="animation-delay:-.5s"/>
+              <path class="f4-arrow-path a" d="M 8 70 Q 40 40 8 10" style="animation-delay:-1s"/>
+              <polygon points="38,36 46,40 38,44" fill="rgba(14,165,233,.5)"/>
+            </svg>
+          </div>
+          <div style="display:flex;align-items:center">
+            <div class="f4-center a">FG</div>
+          </div>
+        </div>
+        <div class="f4-target" style="margin-top:12px">
+          <div class="f4-tgt">✅ 1 form imported — 47 questions, skip logic preserved</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     CATEGORY 2: OPERATIONS & OVERSIGHT
+═══════════════════════════════════════════════ -->
+<div class="cat-heading reveal" style="background:var(--bg2);padding-bottom:8px">
+  <div class="cat-tag">👁️ Operations & Oversight</div>
+  <h2>Real-time visibility across your entire field team</h2>
+  <p>Supervisor dashboard, live sync, WhatsApp alerts, and Google Sheets integration — all connected.</p>
+</div>
+
+<!-- F5: SYNC & MEDIA -->
+<section class="feat-section alt">
+  <div class="feat-inner reveal">
+    <div class="feat-content">
+      <div class="feat-tag blue">🌐 Sync Engine</div>
+      <h3>5 MB photos.<br/>200 KB by sync time.</h3>
+      <p>Photos, GPS coordinates, and audio sync securely using a two-phase approach — text fields go first on 2G, then media uploads in background batches when bandwidth allows. Auto-compression included.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Auto-compress: 5 MB → ~200 KB photos</li>
+        <li><span class="bchk">✓</span>Two-phase: text first on 2G, media batched</li>
+        <li><span class="bchk">✓</span>Secure presigned S3 URLs for all media</li>
+        <li><span class="bchk">✓</span>Resume interrupted uploads automatically</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Media Sync</span></div>
+        <div class="f5-photo a"></div>
+        <div class="f5-meta">
+          <div>
+            <div class="f5-name">IMG_4521.jpg</div>
+            <div style="font-size:.62rem;color:rgba(255,255,255,.35);margin-top:2px">Captured · 2025-03-12 11:24</div>
+          </div>
+          <div class="f5-sizes">
+            <div class="f5-orig">5.0 MB original</div>
+            <div class="f5-comp">0.19 MB compressed</div>
+          </div>
+        </div>
+        <div class="f5-upload-label">
+          <span>Uploading to secure storage…</span>
+          <span id="uploadPct">0%</span>
+        </div>
+        <div class="f5-track"><div class="f5-fill a"></div></div>
+        <div class="f5-status a">✓ Upload complete — linked to submission #847</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- F6: SUPERVISOR DASHBOARD -->
+<section class="feat-section">
+  <div class="feat-inner flip reveal">
+    <div class="feat-content">
+      <div class="feat-tag green">👁️ Supervisor</div>
+      <h3>Flag. Approve. Reject.<br/>In real time.</h3>
+      <p>Review every submission with GPS map view, full audit trail, and photo evidence. Flag suspicious records, assign back-checks, and export any subset as CSV, Stata .dta, or directly to Google Sheets.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>GPS map view — see exactly where data was collected</li>
+        <li><span class="bchk">✓</span>Flag → back-check assignment workflow</li>
+        <li><span class="bchk">✓</span>Export: CSV, Stata .dta, Google Sheets</li>
+        <li><span class="bchk">✓</span>Full audit trail on every action</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Supervisor Dashboard</span></div>
+        <div class="f6-hdr">
+          <span class="f6-title">Today's submissions</span>
+          <span class="f6-count">23 pending review</span>
+        </div>
+        <div class="f6-row r1 a">
+          <div><div class="f6-name">Rajesh Kumar</div><div class="f6-loc">Bellary, Karnataka</div></div>
+          <div class="f6-gps a"></div>
+          <div class="f6-status s1 a">✓ Approved</div>
+        </div>
+        <div class="f6-row r2 a">
+          <div><div class="f6-name">Priya Devi</div><div class="f6-loc">Bidar, Karnataka</div></div>
+          <div class="f6-gps a"></div>
+          <div class="f6-status s2 a">⚑ Flagged</div>
+        </div>
+        <div class="f6-row r3">
+          <div><div class="f6-name">Mohammed Irfan</div><div class="f6-loc">Gulbarga, Karnataka</div></div>
+          <div class="f6-gps a"></div>
+          <div class="f6-status s3">✓ Approved</div>
+        </div>
+        <div style="margin-top:10px;font-size:.65rem;color:rgba(255,255,255,.3);text-align:right">Export: CSV · Stata · Sheets ↗</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- F7: WHATSAPP -->
+<section class="feat-section alt">
+  <div class="feat-inner reveal">
+    <div class="feat-content">
+      <div class="feat-tag green">🟢 WhatsApp Alerts</div>
+      <h3>Instant notifications.<br/>No dashboard refresh needed.</h3>
+      <p>MSG91 WABA-powered alerts keep supervisors informed the moment enumerators sync, flag a record, or complete their assignment. Real-time field awareness without any polling.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Sync alerts — know when each enumerator submits</li>
+        <li><span class="bchk">✓</span>GPS mismatch and QC violation alerts</li>
+        <li><span class="bchk">✓</span>Daily summary digests to supervisor</li>
+        <li><span class="bchk">✓</span>Powered by MSG91 WABA — reliable delivery</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen" style="padding:0;overflow:hidden">
+        <div style="padding:18px 18px 0">
+          <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">WhatsApp Business</span></div>
+        </div>
+        <div class="f7-header">
+          <div class="f7-avatar">📊</div>
+          <div><div class="f7-hname">FieldGovern Alerts</div><div class="f7-hstatus">Official Business Account · Online</div></div>
+        </div>
+        <div style="padding:0 14px 14px;flex:1;display:flex;flex-direction:column;gap:8px;background:rgba(0,0,0,.15)">
+          <div class="f7-bubble">
+            <div class="f7-btext">📊 <strong>Sync Alert</strong><br/>Rajesh Kumar synced 5 forms from Bellary, Karnataka</div>
+            <div class="f7-btime">11:24 AM ✓✓</div>
+          </div>
+          <div class="f7-bubble">
+            <div class="f7-btext">⚠️ <strong>QC Alert</strong><br/>GPS mismatch detected on submission #842 — expected Gulbarga, recorded Bidar</div>
+            <div class="f7-btime">11:31 AM ✓✓</div>
+          </div>
+          <div class="f7-bubble">
+            <div class="f7-btext">✅ <strong>Assignment Complete</strong><br/>Block 4 survey completed — 23/23 households done</div>
+            <div class="f7-btime">12:47 PM ✓✓</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- F8: GOOGLE SHEETS -->
+<section class="feat-section">
+  <div class="feat-inner flip reveal">
+    <div class="feat-content">
+      <div class="feat-tag green">📊 Google Sheets</div>
+      <h3>Every submission.<br/>Auto-appended live.</h3>
+      <p>Connect once and every new submission is automatically appended as a new row to your Google Sheet — in real time, the moment it syncs. Your data is always current without any manual exports.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Live append — no scheduled jobs, no manual exports</li>
+        <li><span class="bchk">✓</span>Column mapping preserved across form versions</li>
+        <li><span class="bchk">✓</span>Multiple sheets per form supported</li>
+        <li><span class="bchk">✓</span>Works alongside CSV and Stata export</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Google Sheets — Live</span></div>
+        <div class="f8-sheetbar">
+          <span class="f8-sheeticon">🟢</span>
+          <span class="f8-sheettitle">MGNREGA Survey 2025</span>
+          <span class="f8-counter">Total: <span id="sheetCount">847</span> rows</span>
+        </div>
+        <div class="f8-headers">
+          <div class="f8-hcell">#</div>
+          <div class="f8-hcell">Name</div>
+          <div class="f8-hcell">Village</div>
+          <div class="f8-hcell">Status</div>
+        </div>
+        <div class="f8-row"><span>845</span><span>Lalitha B.</span><span>Yadgir</span><span class="f8-status">Synced</span></div>
+        <div class="f8-row"><span>846</span><span>Kiran S.</span><span>Raichur</span><span class="f8-status">Synced</span></div>
+        <div class="f8-row new1"><span>847</span><span>Rajesh K.</span><span>Bellary</span><span class="f8-status">New ✦</span></div>
+        <div class="f8-row new2"><span>848</span><span>Priya D.</span><span>Bidar</span><span class="f8-status">New ✦</span></div>
+        <div class="f8-row new3"><span>849</span><span>M. Irfan</span><span>Gulbarga</span><span class="f8-status">New ✦</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     CATEGORY 3: AI INTELLIGENCE
+═══════════════════════════════════════════════ -->
+<div class="cat-heading reveal" style="background:var(--dark);padding-bottom:8px">
+  <div class="cat-tag" style="background:rgba(124,58,237,.15);border-color:rgba(124,58,237,.3);color:#a78bfa">🤖 AI Intelligence</div>
+  <h2 style="color:white">AI that understands field research</h2>
+  <p style="color:rgba(255,255,255,.5)">From generating forms to writing final reports — bring your own API key and let AI do the heavy lifting.</p>
+</div>
+
+<!-- F9: AI REPORT WRITER -->
+<section class="feat-section dark-bg">
+  <div class="feat-inner reveal">
+    <div class="feat-content">
+      <div class="feat-tag white">📝 AI Report Writer</div>
+      <h3>Data in. Report out.<br/><span style="background:linear-gradient(135deg,#38bdf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">In seconds.</span></h3>
+      <p>Connect OpenAI, Anthropic Claude, or Google Gemini using your own API key. Generate professional 3–5 paragraph narrative summaries, section-by-section analysis, and tabulation suggestions from any form's submission data.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Bring your own API key — OpenAI, Claude, Gemini</li>
+        <li><span class="bchk">✓</span>Narrative summaries, findings, recommendations</li>
+        <li><span class="bchk">✓</span>Tabulation and cross-tab suggestions</li>
+        <li><span class="bchk">✓</span>Markdown output — paste into any doc</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">AI Report Writer</span></div>
+        <div class="f9-model a">🤖 claude-sonnet-4-6 · 847 submissions</div>
+        <div class="f9-generating">
+          <div class="f9-dot a"></div>
+          <div class="f9-dot a"></div>
+          <div class="f9-dot a"></div>
+          <span>Generating report…</span>
+        </div>
+        <div class="f9-line l1 a" style="color:rgba(255,255,255,.9);font-weight:600">## Field Survey Summary</div>
+        <div class="f9-line l2 a">Data from 847 respondents, 12 districts.</div>
+        <div class="f9-line l3 a">73% aware of MGNREGA entitlements.</div>
+        <div style="margin-top:8px;font-size:.65rem;color:rgba(255,255,255,.3)">↓ Export as Markdown · Word · PDF</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     CATEGORY 4: QUALITY & COMPLIANCE
+═══════════════════════════════════════════════ -->
+<div class="cat-heading reveal">
+  <div class="cat-tag">✅ Quality & Compliance</div>
+  <h2>Clean data. Full compliance. Always.</h2>
+  <p>Server-side QC, back-check audit workflow, DPDP consent tracking, and multilingual support — built in from day one.</p>
+</div>
+
+<!-- F10: QC SUITE -->
+<section class="feat-section">
+  <div class="feat-inner reveal">
+    <div class="feat-content">
+      <div class="feat-tag orange">✅ QC Suite</div>
+      <h3>Catch problems<br/>before analysis begins.</h3>
+      <p>Server-side validation, duplicate detection using idempotency keys, GPS mismatch alerts, and a built-in back-check workflow. Your data is clean before it ever reaches the analysis team.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Idempotency keys — zero accidental duplicates</li>
+        <li><span class="bchk">✓</span>GPS-coordinate boundary validation</li>
+        <li><span class="bchk">✓</span>Back-check assignment and re-survey workflow</li>
+        <li><span class="bchk">✓</span>AI-detected outliers flagged automatically</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">QC Validation Report</span></div>
+        <div class="f10-row a">
+          <div class="f10-icon ok">✓</div>
+          <span class="f10-text">No duplicate submissions detected</span>
+          <span class="f10-badge ok">0 found</span>
+        </div>
+        <div class="f10-row a">
+          <div class="f10-icon ok">✓</div>
+          <span class="f10-text">GPS coordinates validated</span>
+          <span class="f10-badge ok">847/847</span>
+        </div>
+        <div class="f10-row a">
+          <div class="f10-icon warn">⚑</div>
+          <span class="f10-text">Back-checks assigned</span>
+          <span class="f10-badge warn">23 records</span>
+        </div>
+        <div class="f10-row a">
+          <div class="f10-icon warn">⚠</div>
+          <span class="f10-text">Statistical outliers flagged</span>
+          <span class="f10-badge warn">4 records</span>
+        </div>
+        <div class="f10-row a">
+          <div class="f10-icon ok">✓</div>
+          <span class="f10-text">Idempotency checks passed</span>
+          <span class="f10-badge ok">100%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- F11: DPDP -->
+<section class="feat-section alt">
+  <div class="feat-inner flip reveal">
+    <div class="feat-content">
+      <div class="feat-tag blue">🛡️ DPDP 2023</div>
+      <h3>India's data protection law.<br/>Built into every form.</h3>
+      <p>The Digital Personal Data Protection Act 2023 is baked into the platform — consent tracking per respondent, full audit logs, a data erasure endpoint, and a purpose field on every form. No custom compliance work needed.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Per-respondent consent captured and stored</li>
+        <li><span class="bchk">✓</span>Purpose field on every form (DPDP §6)</li>
+        <li><span class="bchk">✓</span>Data erasure endpoint — right to be forgotten</li>
+        <li><span class="bchk">✓</span>Full immutable audit log on all data access</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Compliance Dashboard</span></div>
+        <div style="text-align:center;margin-bottom:4px">
+          <span class="f11-shield a">🛡️</span>
+          <div class="f11-badge">DPDP 2023 Compliant · Audit Active</div>
+        </div>
+        <div class="f11-consent">
+          <div class="f11-chk a">✓</div>
+          <div class="f11-ctext"><strong style="color:rgba(255,255,255,.85)">Informed consent recorded</strong><br/>Purpose: MGNREGA Impact Assessment · Signed 12-Mar-2025</div>
+        </div>
+        <div style="font-size:.65rem;color:rgba(255,255,255,.35);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Recent Audit Log</div>
+        <div class="f11-audit-row a"><span>Data accessed — Supervisor Meena K.</span><span>11:24</span></div>
+        <div class="f11-audit-row a"><span>Export requested — CSV · 847 rows</span><span>11:31</span></div>
+        <div class="f11-audit-row a"><span>Erasure request fulfilled — Record #312</span><span>12:05</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- F12: MULTILINGUAL -->
+<section class="feat-section">
+  <div class="feat-inner reveal">
+    <div class="feat-content">
+      <div class="feat-tag blue">🌍 Multilingual</div>
+      <h3>English. Hindi. Kannada.<br/>Telugu. And more.</h3>
+      <p>Four languages available out of the box for the enumerator interface. AI-powered label translation lets you add new languages to any existing form in minutes — no developer needed, no strings file to manage.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>EN · हिन्दी · ಕನ್ನಡ · తెలుగు built-in</li>
+        <li><span class="bchk">✓</span>AI translation — add any language in minutes</li>
+        <li><span class="bchk">✓</span>Per-enumerator language preference</li>
+        <li><span class="bchk">✓</span>Enumerator hints and labels both translated</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Enumerator App — Language</span></div>
+        <div class="f12-tabs">
+          <div class="f12-tab active" id="tab-en" onclick="switchLang('en')">EN</div>
+          <div class="f12-tab" id="tab-hi" onclick="switchLang('hi')">हि</div>
+          <div class="f12-tab" id="tab-kn" onclick="switchLang('kn')">ಕ</div>
+          <div class="f12-tab" id="tab-te" onclick="switchLang('te')">తె</div>
+        </div>
+        <div class="f12-q-wrap">
+          <div class="f12-q" id="langQ">What is the household's primary source of income?</div>
+        </div>
+        <div class="f12-hint" id="langHint">Select one option — or "Other" to specify</div>
+        <div class="f12-options">
+          <div class="f12-opt" id="lo1">Agriculture</div>
+          <div class="f12-opt" id="lo2">Daily wage</div>
+          <div class="f12-opt" id="lo3">MGNREGA</div>
+          <div class="f12-opt" id="lo4">Other</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
 <div class="cta-section">
-  <div class="section-inner">
-    <h2>Ready to replace SurveyCTO?</h2>
-    <p>Start free — no credit card required. Full platform access for 30 days.</p>
-    <a href="https://app.fieldgovern.com" class="btn-primary animate-pulse-ring" style="font-size:1.05rem;padding:16px 36px">Start Free Trial →</a>
+  <div style="max-width:600px;margin:0 auto">
+    <div class="section-tag" style="margin-bottom:16px">🚀 Ready to start?</div>
+    <h2>Replace SurveyCTO in one sprint.</h2>
+    <p>Full platform access, free for 30 days. No credit card required. Import your existing forms in minutes.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <a href="https://app.fieldgovern.com" class="btn-primary pulse-btn" style="font-size:1.05rem;padding:16px 36px">Start Free Trial →</a>
+      <a href="demo.html" class="btn-outline" style="font-size:1.05rem;padding:16px 36px">Try Live Demo</a>
+    </div>
   </div>
 </div>
 
@@ -259,9 +921,10 @@
   <div class="footer-inner">
     <div class="footer-grid">
       <div class="footer-brand">
-        <a href="index.html" class="nav-logo" style="color:white;margin-bottom:12px;display:inline-flex">
-          <img src="logo.png" alt="FieldGovern" class="logo-footer-img" style="width:32px;height:32px;border-radius:8px;object-fit:contain"/>
-          FieldGovern
+        <a href="index.html" style="display:block;margin-bottom:2px">
+          <div class="footer-logo-box">
+            <img src="assets/logo-wide.png" alt="FieldGovern"/>
+          </div>
         </a>
         <p>Offline-first field data collection for India's research teams. Built to replace SurveyCTO at 1/3 the cost.</p>
       </div>
@@ -271,7 +934,7 @@
           <li><a href="features.html">Features</a></li>
           <li><a href="integrations.html">Integrations</a></li>
           <li><a href="security.html">Security</a></li>
-    <li><a href="index.html#pricing">Pricing</a></li>
+          <li><a href="index.html#pricing">Pricing</a></li>
           <li><a href="demo.html">Live Demo</a></li>
         </ul>
       </div>
@@ -291,44 +954,100 @@
           <li><a href="https://app.fieldgovern.com" target="_blank">Live App ↗</a></li>
           <li><a href="demo.html">Try Demo</a></li>
         </ul>
-        <div style="margin-top:16px;font-size:0.8rem;color:rgba(255,255,255,0.3)">EN · हिन्दी · ಕನ್ನಡ · తెలుగు</div>
+        <div style="margin-top:16px;font-size:.8rem;color:rgba(255,255,255,.3)">EN · हिन्दी · ಕನ್ನಡ · తెలుగు</div>
       </div>
     </div>
     <div class="footer-bottom">
-      <span>© 2026 FieldGovern · <a href="privacy.html" style="color:rgba(255,255,255,0.4)">Privacy</a> · <a href="terms.html" style="color:rgba(255,255,255,0.4)">Terms</a> · <a href="about.html" style="color:rgba(255,255,255,0.4)">About</a></span>
+      <span>© 2026 FieldGovern · <a href="privacy.html" style="color:rgba(255,255,255,.4)">Privacy</a> · <a href="terms.html" style="color:rgba(255,255,255,.4)">Terms</a> · <a href="about.html" style="color:rgba(255,255,255,.4)">About</a></span>
       <span>Founded by Pallavi Deshetty · FastAPI + React + PostgreSQL</span>
     </div>
   </div>
 </footer>
 
 <script>
+  /* ── Nav scroll ─── */
   const navbar = document.getElementById('navbar');
-  window.addEventListener('scroll', () => {
-    navbar.classList.toggle('scrolled', window.scrollY > 20);
-  });
-  const reveals = document.querySelectorAll('.reveal');
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((e, i) => {
-      if (e.isIntersecting) {
-        setTimeout(() => e.target.classList.add('visible'), i * 60);
-        observer.unobserve(e.target);
-      }
+  window.addEventListener('scroll', () => navbar.classList.toggle('scrolled', scrollY > 20));
+
+  /* ── Scroll reveal ─── */
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
     });
-  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
-  reveals.forEach(el => observer.observe(el));
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  /* ── Animation play-state gate ─── */
+  const animIO = new IntersectionObserver((entries) => {
+    entries.forEach(e => e.target.classList.toggle('playing', e.isIntersecting));
+  }, { threshold: 0.3 });
+  document.querySelectorAll('.feat-visual').forEach(el => animIO.observe(el));
+
+  /* ── Multilingual switcher ─── */
+  const LANGS = {
+    en: { q: 'What is the household\'s primary source of income?', hint: 'Select one option — or "Other" to specify', opts: ['Agriculture','Daily wage','MGNREGA','Other'] },
+    hi: { q: 'परिवार की आय का मुख्य स्रोत क्या है?', hint: 'एक विकल्प चुनें', opts: ['कृषि','दैनिक मजदूरी','मनरेगा','अन्य'] },
+    kn: { q: 'ಮನೆಯ ಮುಖ್ಯ ಆದಾಯದ ಮೂಲ ಯಾವುದು?', hint: 'ಒಂದು ಆಯ್ಕೆ ಆರಿಸಿ', opts: ['ಕೃಷಿ','ದಿನಗೂಲಿ','MGNREGA','ಇತರ'] },
+    te: { q: 'గృహంలో ప్రధాన ఆదాయ వనరు ఏమిటి?', hint: 'ఒక ఆప్షన్ ఎంచుకోండి', opts: ['వ్యవసాయం','కూలి పని','MGNREGA','ఇతర'] },
+  };
+  let langTimer;
+  const langOrder = ['en','hi','kn','te'];
+  let langIdx = 0;
+
+  function switchLang(lang) {
+    clearTimeout(langTimer);
+    const d = LANGS[lang];
+    const qEl = document.getElementById('langQ');
+    qEl.classList.add('out');
+    setTimeout(() => {
+      qEl.textContent = d.q;
+      document.getElementById('langHint').textContent = d.hint;
+      ['lo1','lo2','lo3','lo4'].forEach((id,i) => { const el = document.getElementById(id); if(el) el.textContent = d.opts[i]; });
+      qEl.classList.remove('out');
+      qEl.classList.add('in');
+      setTimeout(() => qEl.classList.remove('in'), 600);
+    }, 300);
+    document.querySelectorAll('.f12-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + lang)?.classList.add('active');
+    langIdx = langOrder.indexOf(lang);
+    scheduleLangCycle();
+  }
+
+  function scheduleLangCycle() {
+    langTimer = setTimeout(() => {
+      langIdx = (langIdx + 1) % langOrder.length;
+      switchLang(langOrder[langIdx]);
+    }, 3000);
+  }
+  scheduleLangCycle();
+
+  /* ── Google Sheets counter ─── */
+  let sheetCount = 847;
+  setInterval(() => {
+    sheetCount++;
+    const el = document.getElementById('sheetCount');
+    if(el) el.textContent = sheetCount;
+  }, 1800);
+
+  /* ── Upload percent ─── */
+  let pct = 0;
+  setInterval(() => {
+    pct = (pct >= 100) ? 0 : pct + 2;
+    const el = document.getElementById('uploadPct');
+    if(el) el.textContent = pct + '%';
+  }, 100);
+
+  /* ── Mobile menu ─── */
   function toggleMenu() {
     const btn = document.getElementById('hamburgerBtn');
     const menu = document.getElementById('mobileMenu');
     const isOpen = menu.classList.toggle('open');
     btn.classList.toggle('open', isOpen);
-    btn.setAttribute('aria-expanded', isOpen);
   }
-  document.querySelectorAll('#mobileMenu a').forEach(a => {
-    a.addEventListener('click', () => {
-      document.getElementById('mobileMenu').classList.remove('open');
-      document.getElementById('hamburgerBtn').classList.remove('open');
-    });
-  });
+  document.querySelectorAll('#mobileMenu a').forEach(a => a.addEventListener('click', () => {
+    document.getElementById('mobileMenu').classList.remove('open');
+    document.getElementById('hamburgerBtn').classList.remove('open');
+  }));
   window.addEventListener('scroll', () => {
     document.getElementById('mobileMenu').classList.remove('open');
     document.getElementById('hamburgerBtn').classList.remove('open');

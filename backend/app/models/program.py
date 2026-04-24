@@ -1,6 +1,6 @@
 import uuid
-from sqlalchemy import Column, String, Integer, Date, DateTime, Float, ForeignKey, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Integer, Date, DateTime, Float, ForeignKey, Text, Boolean, func
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.core.database import Base
 
 
@@ -27,6 +27,7 @@ class Program(Base):
     start_date = Column(Date, nullable=True)
     end_date = Column(Date, nullable=True)
     status = Column(String, default="active")  # planning|active|completed|archived
+    is_panel_study = Column(Boolean, default=False, nullable=True)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -54,6 +55,9 @@ class ProgramQuestionnaire(Base):
     start_date = Column(Date, nullable=True)
     end_date = Column(Date, nullable=True)
     status = Column(String, default="active")  # active|completed|cancelled
+    wave_number = Column(Integer, nullable=True)   # 1=baseline, 2=midline, 3=endline
+    wave_label = Column(String(100), nullable=True)  # "Baseline", "Midline", "Endline"
+    panel_key = Column(String(200), nullable=True)   # field_id used as household/respondent ID
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -66,3 +70,22 @@ class QuestionnaireLocationTarget(Base):
     target_count = Column(Integer, default=0)
     deadline = Column(Date, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ProgramAnalysis(Base):
+    __tablename__ = "program_analysis"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    program_id = Column(UUID(as_uuid=True), ForeignKey("programs.id", ondelete="CASCADE"), nullable=False)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    status = Column(Text, default="done")       # pending | done | failed
+    source = Column(Text, default="manual")     # manual | ai
+    objectives = Column(Text, nullable=True)
+    table_configs = Column(JSONB, default=list)
+    cleaning_summary = Column(JSONB, default=dict)
+    ai_rationale = Column(Text, nullable=True)
+    error_text = Column(Text, nullable=True)
+    run_count = Column(Integer, default=0)
+    last_run_at = Column(DateTime(timezone=True), nullable=True)

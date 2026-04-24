@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api, { getStoredUser } from '@/lib/api'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
@@ -362,6 +363,7 @@ function ProgramDetail({ prog, locations, forms, onRefresh }: {
 export default function ProgramsPage() {
   const user = getStoredUser()
   const toast = useToast()
+  const navigate = useNavigate()
   const [tab, setTab] = useState<'programs' | 'locations'>('programs')
   const [programs, setPrograms] = useState<Program[]>([])
   const [locations, setLocations] = useState<Location[]>([])
@@ -507,6 +509,12 @@ export default function ProgramsPage() {
                           {selectedProg.description && <p className="text-sm text-catalan-text mt-1">{selectedProg.description}</p>}
                         </div>
                         <div className="flex gap-2">
+                          <button
+                            onClick={() => navigate(`/programs/${selectedProg.id}/govern`)}
+                            className="px-3 py-1.5 text-sm bg-catalan-primary/10 border border-catalan-primary/30 text-catalan-primary rounded-lg hover:bg-catalan-primary/20 transition-colors font-medium"
+                          >
+                            Field Govern
+                          </button>
                           <button onClick={() => { setEditingProg(selectedProg); setShowProgModal(true) }} className={btnSecondary}>Edit</button>
                           <button onClick={() => deleteProgram(selectedProg.id)} className={btnDanger}>Delete</button>
                         </div>

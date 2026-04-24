@@ -32,11 +32,13 @@ require_master = require_role("master_admin")
 # -1 = unlimited
 
 PLAN_LIMITS: dict[str, dict] = {
-    "free":         {"submissions_per_month": 100,   "users": 5,   "forms": 3},
-    "starter":      {"submissions_per_month": 5_000, "users": 25,  "forms": 20},
-    "professional": {"submissions_per_month": 50_000,"users": 100, "forms": 100},
-    "enterprise":   {"submissions_per_month": -1,    "users": -1,  "forms": -1},
+    # free: 3 users (1 admin + 1 supervisor + 1 enumerator), 100 submissions LIFETIME, 3 forms
+    "free":         {"submissions_per_month": -2,    "submissions_total": 100, "users": 3,   "forms": 3},
+    "starter":      {"submissions_per_month": 5_000, "submissions_total": -1,  "users": 25,  "forms": 20},
+    "professional": {"submissions_per_month": 50_000,"submissions_total": -1,  "users": 100, "forms": 100},
+    "enterprise":   {"submissions_per_month": -1,    "submissions_total": -1,  "users": -1,  "forms": -1},
 }
+# submissions_per_month == -2 means: use submissions_total instead (lifetime cap)
 
 def _limits_for(plan_tier: str) -> dict:
     return PLAN_LIMITS.get(plan_tier, PLAN_LIMITS["free"])
@@ -72,13 +74,19 @@ def get_my_usage(user=Depends(get_current_user), db: Session = Depends(get_db)):
 
     limits = _limits_for(tenant.plan_tier)
 
-    now = datetime.now(timezone.utc)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    is_lifetime = limits.get("submissions_per_month") == -2
 
-    subs_this_month = db.query(func.count(Submission.id)).filter(
-        Submission.tenant_id == user["tenant_id"],
-        Submission.server_received_at >= month_start,
-    ).scalar() or 0
+    if is_lifetime:
+        subs_used = db.query(func.count(Submission.id)).filter(
+            Submission.tenant_id == user["tenant_id"],
+        ).scalar() or 0
+    else:
+        now = datetime.now(timezone.utc)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        subs_used = db.query(func.count(Submission.id)).filter(
+            Submission.tenant_id == user["tenant_id"],
+            Submission.server_received_at >= month_start,
+        ).scalar() or 0
 
     users_count = db.query(func.count(User.id)).filter(
         User.tenant_id == user["tenant_id"],
@@ -93,7 +101,8 @@ def get_my_usage(user=Depends(get_current_user), db: Session = Depends(get_db)):
         "plan_tier": tenant.plan_tier,
         "limits": limits,
         "usage": {
-            "submissions_this_month": subs_this_month,
+            "submissions_this_month": subs_used,
+            "submissions_mode": "lifetime" if is_lifetime else "monthly",
             "users": users_count,
             "forms": forms_count,
         },

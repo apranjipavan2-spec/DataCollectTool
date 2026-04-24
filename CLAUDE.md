@@ -1,300 +1,303 @@
-# CLAUDE.md — FieldGovern (DataCollectTool)
+# CLAUDE.md — FieldGovern
 
-This file is the authoritative guide for Claude Code when working in this repository.
-
----
-
-## Project Overview
-
-**FieldGovern** is a B2B SaaS platform for offline-first field data collection, targeting research teams in India. Competes directly with SurveyCTO at ₹18,000/month vs SurveyCTO's $225–630/month.
-
-**Repo**: https://github.com/apranjipavan2-spec/DataCollectTool  
-**Deployment**: Private VPS — GitHub Actions (`.github/workflows/deploy-app.yml`) builds Docker image → pushes to `ghcr.io` → SSHes into VPS at `/opt/fieldgovern` → `docker compose pull && up`  
-**GitHub Pages**: `apranjipavan2-spec.github.io/DataCollectTool/` — served from `docs/` on `main`. Always edit `website/` and copy to `docs/` before pushing — never edit `docs/` directly.  
-**Status**: MVP complete, production-deployed
+> Authoritative guide for Claude Code. Read `tasks/todo.md` + `tasks/lessons.md` at session start.
 
 ---
 
-## Architecture
+# Workflow Orchestration
 
-### Single-Container Deployment
-- Dockerfile builds frontend (Node 20) then serves static files from FastAPI backend (Python 3.13)
-- Hosted on private VPS via Docker Compose; PostgreSQL and Redis run as separate containers
-- Startup: `alembic upgrade head` → `seed_dev.py` → `uvicorn`
-- VPS secrets required in GitHub repo → Settings → Environments → production: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `GHCR_PAT`
+## 1. Plan Mode Default
+- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+- If something goes sideways, STOP and re-plan immediately
+- Use plan mode for verification steps, not just building
+
+## 2. Subagent Strategy
+- Use subagents for research, exploration, and parallel analysis to keep main context clean
+- One task per subagent for focused execution
+
+## 3. Self-Improvement Loop
+- After ANY correction: update `tasks/lessons.md` with the pattern
+- Write rules that prevent the same mistake
+- Review lessons at session start for relevant project
+
+## 4. Verification Before Done
+- Never mark a task complete without proving it works
+- Run TS check (`npx tsc --noEmit --skipLibCheck`) after frontend changes
+- Check API routes are registered in `router.py` after backend changes
+
+## 5. Demand Elegance (Balanced)
+- For non-trivial changes: ask "is there a more elegant way?"
+- Skip for simple obvious fixes — don't over-engineer
+
+## 6. Autonomous Bug Fixing
+- Bug report → just fix it. Point at the root cause and resolve it.
+
+---
+
+# Task Management
+
+1. **Plan First:** Write plan to `tasks/todo.md` with checkable items
+2. **Verify Plan:** Check in before starting implementation
+3. **Track Progress:** Mark items complete as you go
+4. **Explain Changes:** High-level summary at each step
+5. **Document Results:** Add review section to `tasks/todo.md`
+6. **Capture Lessons:** Update `tasks/lessons.md` after corrections
+
+---
+
+# Core Principles
+
+- **Simplicity First:** Make every change as simple as possible. Impact minimal code.
+- **No Laziness:** Find root causes. No temporary fixes. Senior developer standards.
+- **Minimal Impact:** Only touch what's necessary. No side effects.
+
+---
+
+# Project Overview
+
+**FieldGovern** — B2B SaaS for offline-first field data collection. Targets Indian research teams. Competes with SurveyCTO at ₹18,000/month vs $225–630/month.
+
+**Repo:** https://github.com/apranjipavan2-spec/DataCollectTool  
+**Deploy:** GitHub Actions → Docker → VPS at `/opt/fieldgovern`  
+**GitHub Pages:** `docs/` on main → always edit `website/` and copy, never edit `docs/` directly  
+**Status:** MVP live, production-deployed
+
+---
+
+# Architecture
 
 ### Stack
 | Layer | Tech |
 |-------|------|
-| Frontend | React 18 + TypeScript + Vite + TailwindCSS 4 |
-| PWA / Offline | vite-plugin-pwa, Workbox, OPFS + wa-sqlite (Chrome), IndexedDB + Dexie (Safari) |
+| Frontend | React 18 + TS + Vite + Tailwind 4 |
+| PWA/Offline | vite-plugin-pwa, Workbox, OPFS + wa-sqlite (Chrome), IndexedDB (Safari) |
 | Backend | FastAPI 0.111 + SQLAlchemy 2.0 + Alembic |
-| Database | PostgreSQL 16 |
-| Cache | Redis 7 |
-| Auth | JWT (HS256, 2h expiry) + bcrypt + API keys |
-| Storage | Local disk (default), Google Drive, or AWS S3 |
-| Languages | English, Hindi, Kannada, Telugu (i18next) |
+| DB | PostgreSQL 16 + Redis 7 |
+| Auth | JWT HS256 (2h) + bcrypt + API keys |
+
+### Single-Container Deploy
+- Dockerfile: Node 20 build → Python 3.13 serve static + API
+- Startup: `wait_and_stamp.py` → `alembic upgrade head` → `seed_dev.py` → uvicorn
+- VPS secrets (GitHub → Environments → production): `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `GHCR_PAT`
 
 ---
 
-## Directory Structure
+# Key Rules (learned from mistakes — see tasks/lessons.md)
+
+1. **New migration → always add patch to `seed_dev.py` `_PATCHES` + detection line in `wait_and_stamp.py`**
+2. **New route file → always import + `include_router` in `app/api/router.py`**
+3. **New nav item → always add matching `<Route>` in `App.tsx`**
+4. **User dependency is a dict**: use `user["tenant_id"]`, not `user.tenant_id`
+5. **TopNav breadcrumbs**: use `path` not `href`
+6. **localStorage**: always namespace by entity ID (e.g. `fg_tabs_{programId}`)
+
+---
+
+# Directory Structure
 
 ```
 DataCollectTool/
-├── backend/
-│   ├── app/
-│   │   ├── main.py
-│   │   ├── api/
-│   │   │   ├── router.py
-│   │   │   └── routes/          # auth, forms, submissions, sync, export, users,
-│   │   │                        # tenants, api_keys, schedules, bulk_upload,
-│   │   │                        # webhooks, notifications, import_excel
-│   │   ├── core/
-│   │   │   ├── config.py
-│   │   │   ├── database.py      # SQLAlchemy engine, session, RLS
-│   │   │   ├── deps.py          # get_current_user, require_role, require_enumerator
-│   │   │   ├── security.py      # JWT, bcrypt
-│   │   │   ├── storage.py       # Media storage abstraction
-│   │   │   └── image_compress.py
-│   │   ├── models/              # SQLAlchemy ORM models
-│   │   └── services/            # email, webhooks, plan_enforcement, sheets
-│   ├── alembic/versions/        # 0001–0016 migration files
-│   ├── scripts/seed_dev.py      # Idempotent seed (Demo Org + Dataworx tenants)
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── App.tsx              # All routes + providers
-│   │   ├── auth/                # Login (with demo quick-fill), ForgotPassword, Reset
-│   │   ├── builder/             # Form builder + skip logic + versioning
-│   │   ├── collect/             # FieldApp (offline collection, drafts, history + edit)
-│   │   ├── dashboard/           # Dashboard (submissions table, serial_no, settings)
-│   │   ├── admin/               # Master admin + Org admin panels
-│   │   ├── renderer/            # FormRenderer + field components (GPS, photo, audio…)
-│   │   ├── help/                # HelpContext, InfoButton, HelpPanel, HelpSpotlight
-│   │   ├── storage/             # OpfsAdapter, IndexedDbAdapter
-│   │   ├── i18n/locales/        # en.json, hi.json, kn.json, te.json
-│   │   └── lib/                 # api.ts, formUtils, navigation, branding, push
-│   ├── vite.config.ts
-│   └── package.json
-├── docs/                        # GitHub Pages (synced from website/ — never edit directly)
-├── website/                     # Marketing pages: index.html, about.html, demo.html, privacy.html, terms.html
-│   │                            # All three main pages share identical nav (logo.png image, 6 links,
-│   │                            # Try Demo + Open App buttons, hamburger + mobile overlay)
-├── Dockerfile                   # Multi-stage: Node build → Python serve
-├── docker-compose.yml
-├── railway.toml
-└── gen-context.config.json      # SigMap config
+├── backend/app/
+│   ├── main.py
+│   ├── api/
+│   │   ├── router.py               ← register all routers here
+│   │   └── routes/
+│   │       ├── auth, forms, submissions, sync, export, users
+│   │       ├── tenants, notifications, api_keys, webhooks
+│   │       ├── reports, templates, import_excel, bulk_upload
+│   │       ├── programs, admin_monitor, ai, public_survey
+│   │       ├── roster, analytics, locations
+│   │       ├── field_govern.py     ← FG Analyzer/Cleaner/Tabulator/Writer/Panel Study
+│   │       └── migration/router.py
+│   ├── core/
+│   │   ├── database.py             ← RLS via set_tenant_context()
+│   │   ├── deps.py                 ← get_current_user, require_role (returns dict)
+│   │   └── config.py               ← CORS_ORIGINS env var
+│   ├── models/                     ← SQLAlchemy ORM models
+│   └── services/ai_service.py      ← suggest_tabulation, generate_program_report
+├── backend/alembic/versions/       ← 0001–0025 migrations
+├── backend/scripts/
+│   ├── seed_dev.py                 ← idempotent seed + schema patches 0001–0025
+│   └── wait_and_stamp.py           ← detects DB revision, stamps alembic_version
+├── frontend/src/
+│   ├── App.tsx                     ← all routes
+│   ├── lib/
+│   │   ├── api.ts                  ← axios, JWT attach, refresh
+│   │   ├── navigation.ts           ← getNavItems per role
+│   │   └── fgStorage.ts            ← localStorage for tabulations + reports
+│   ├── programs/
+│   │   ├── ProgramsPage.tsx        ← program list + detail + Field Govern button
+│   │   ├── FgAnalyzer.tsx          ← /fg/analyzer (Overview, Tabulator AI, Panel Study)
+│   │   ├── FgCleaner.tsx           ← /fg/cleaner (quality table, issue filters)
+│   │   └── FieldGovern.tsx         ← /programs/:id/govern (quick-access, all tabs)
+│   └── reports/FgWriter.tsx        ← /fg/writer (program-aware, uses fgStorage)
+├── tasks/
+│   ├── todo.md                     ← sprint board
+│   └── lessons.md                  ← mistake patterns + prevention rules
+├── planning/
+│   ├── ROADMAP.md                  ← full feature backlog
+│   ├── ANALYTICS_SUITE_ROADMAP.md  ← FG Analyzer/Cleaner/Writer/Tabulator plan
+│   └── PENDING_MANUAL.md           ← items needing external credentials
+├── website/                        ← marketing pages (copy to docs/ before push)
+└── docs/                           ← GitHub Pages (never edit directly)
 ```
 
 ---
 
-## Key API Endpoints
+# API Base Path: `/api/v1`
 
-Base path: `/api/v1`
+### Key endpoints (partial — see code for full list)
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
+| Method | Path | Min Role | Description |
+|--------|------|----------|-------------|
 | POST | `/auth/login` | public | Phone + password → JWT |
-| POST | `/auth/refresh` | public | Refresh token → new tokens |
-| GET | `/forms/` | enumerator+ | List active forms |
-| POST | `/forms/` | org_admin+ | Create form |
-| POST | `/sync/push` | enumerator+ | Batch offline submissions (assigns serial_no) |
-| GET | `/sync/pull` | enumerator+ | Pull form schemas for offline cache |
-| POST | `/sync/media` | enumerator+ | Upload photo/audio for a submission |
-| GET | `/submissions/` | enumerator+ | List (enumerators see own only) |
-| GET | `/submissions/{id}` | enumerator+ | Detail (enumerators see own only) |
-| PATCH | `/submissions/{id}` | supervisor+ | Flag / approve / reject |
-| PATCH | `/submissions/{id}/data` | enumerator+ | Edit data_json (enumerator: own + tenant allows) |
-| PATCH | `/submissions/{id}/serial-no` | master_admin | Change serial number |
-| POST | `/bulk-upload/parse` | org_admin+ | Parse Excel → suggested column mapping |
-| POST | `/bulk-upload/apply` | org_admin+ | Apply mapping → create submissions |
-| GET | `/bulk-upload/template/{form_id}` | org_admin+ | Download pre-formatted Excel template |
-| GET | `/tenants/branding` | any auth | Tenant logo, colors, allow_enumerator_edit |
-| PATCH | `/tenants/{id}` | org_admin+ | Update settings incl. allow_enumerator_edit |
-| GET | `/export/submissions/{form_id}/csv` | supervisor+ | CSV export |
-| GET | `/health` | public | Railway health check |
+| GET | `/forms/` | enumerator | List forms |
+| POST | `/sync/push` | enumerator | Batch offline submissions |
+| GET | `/submissions/` | enumerator | List (own only for enumerators) |
+| PATCH | `/submissions/{id}` | supervisor | Flag / approve |
+| GET | `/fg/programs/{id}/analyzer-data` | supervisor | KPIs, trend, enumerators, columns |
+| GET | `/fg/programs/{id}/cleaner` | supervisor | Paginated quality view |
+| POST | `/fg/programs/{id}/tabulate/suggest` | supervisor | AI suggests tables |
+| POST | `/fg/programs/{id}/tabulate/execute` | supervisor | Run aggregation |
+| POST | `/fg/programs/{id}/writer/generate` | supervisor | AI report from program data |
+| GET | `/fg/programs/{id}/waves` | supervisor | Wave list |
+| PUT | `/fg/programs/{id}/waves` | org_admin | Set wave on questionnaire |
+| GET | `/fg/programs/{id}/attrition` | supervisor | Panel study attrition |
+| GET | `/export/submissions/{form_id}/csv` | supervisor | CSV export |
 
 ---
 
-## User Roles
+# User Roles
 
 | Role | Access |
 |------|--------|
-| `master_admin` | Platform-wide: tenants, serial numbers, all data |
-| `org_admin` | Org-wide: forms, users, API keys, branding, bulk upload |
-| `supervisor` | Team lead: flag/approve submissions, assign forms, export |
-| `enumerator` | Data collector: fill forms, sync, edit own records (if tenant allows) |
+| `master_admin` | Platform-wide: tenants, all data, serial numbers |
+| `org_admin` | Org-wide: forms, users, API keys, branding, FG tools |
+| `supervisor` | Flag/approve submissions, FG Analyzer/Cleaner/Writer, export |
+| `enumerator` | Fill forms, sync, edit own records (if tenant allows) |
 
 ---
 
-## Database Migrations
+# Database Migrations
 
-Current: **0018** migrations (`backend/alembic/versions/0001_…0018_…`).
+Current: **0025** (`backend/alembic/versions/`)
 
-Key additions:
-- **0016**: `submissions.serial_no`, `tenants.allow_enumerator_edit`
-- **0017**: `programs`, `program_locations`, `program_participant_types`, `program_questionnaires`, `questionnaire_location_targets`
-- **0018**: `submissions.{program_id, participant_type_id, questionnaire_id, location_id}`, `schedules.{program_questionnaire_id, location_id}`
+| Migration | Key Change |
+|-----------|-----------|
+| 0016 | `submissions.serial_no`, `tenants.allow_enumerator_edit` |
+| 0017 | Programs, participant_types, questionnaires, location_targets tables |
+| 0018 | `submissions.{program_id, questionnaire_id, location_id, ...}` |
+| 0019 | `tenants.notification_config`, `forms.sheets_sync_config` |
+| 0020 | `submissions.{has_violations, consent_given, backcheck_*}` |
+| 0021 | `forms.{public_token, is_public}`, `respondent_roster` table |
+| 0022 | `tenants.ai_config` |
+| 0023 | `submissions.roster_id`, `respondent_roster.extra_data` |
+| 0024 | `locations` table, `respondent_roster.location_id` |
+| 0025 | `program_questionnaires.{wave_number, wave_label, panel_key}`, `programs.is_panel_study`, `submissions.household_id` |
 
-To add a new migration:
+**Add migration:**
 ```bash
 cd backend
 python -m alembic revision --autogenerate -m "describe change"
 python -m alembic upgrade head
-```
-Follow `0001_`, `0002_` … naming pattern.
-
-### ⚠️ Deployment — Known Issue & Fix (originally Railway, now VPS)
-
-The PostgreSQL DB was originally set up using `Base.metadata.create_all` (not alembic), so `alembic_version` table was absent. Alembic would try to run from 0001, fail on existing tables, get silently swallowed, and new migrations never applied.
-
-**Fix in place (do not revert):**
-1. `backend/scripts/wait_and_stamp.py` — runs before alembic on every deploy; detects DB state by checking which columns/tables exist, creates `alembic_version` table and stamps to the correct revision if missing
-2. `backend/scripts/seed_dev.py` — applies `ADD COLUMN IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS` patches for all migrations 0013–0018 as a belt-and-suspenders fallback
-3. `backend/start.sh` — startup script; replaces old inline CMD; runs wait_and_stamp → alembic → seed → uvicorn
-4. `.gitattributes` — forces LF endings for `*.sh`/`*.py`/`Dockerfile` (CRLF broke heredocs in Docker Linux containers)
-5. `seed_dev.py` commits tenants → users in separate transactions so login always works even if sample-data creation fails
-
-**Never revert to single `db.commit()` at end of seed** — that pattern rolls back all new users when sample data fails.
-
----
-
-## Demo / Test Credentials
-
-Seeded by `scripts/seed_dev.py` (idempotent, runs on every Railway deploy).
-
-### Platform (tenant: "FieldGovern Platform") — master_admin
-| Phone | Password | Name |
-|-------|----------|------|
-| +918317390926 | superadmin@4991 | Pavan Deshetty (primary super admin) |
-| +919999990000 | test@123 | Master Admin |
-
-### Demo Org (tenant: "Demo Org", plan: professional)
-| Phone | Password | Role |
-|-------|----------|------|
-| +919999990001 | test@123 | org_admin (Admin User) |
-| +918123105186 | test@123 | org_admin (PavanDeshetty) |
-| +919999990002 | test@123 | supervisor |
-| +919999990003 | test@123 | enumerator (Enumerator User) |
-| +919999990004 | test@123 | enumerator (Priya Sharma) |
-
-### Dataworx (tenant: "Dataworx", plan: starter)
-| Phone | Password | Role |
-|-------|----------|------|
-| +919999991001 | test@123 | org_admin (Dataworx Admin) |
-| +919999991002 | test@123 | supervisor (Manjunath) |
-| +919999991003–1005 | test@123 | enumerator |
-
-Login page has a **"Try a demo account"** quick-fill button for Admin / Supervisor / Enumerator.
-
----
-
-## Environment Variables
-
-**Required** (set as VPS Docker env vars, never commit):
-```
-DATABASE_URL          # PostgreSQL connection string
-REDIS_URL             # Redis connection string
-JWT_SECRET            # Min 32-char random string
-STORAGE_BACKEND       # local | drive | s3
-CORS_ORIGINS          # Comma-separated allowed origins
-```
-
-**Optional:**
-```
-SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASSWORD
-VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY
-GDRIVE_FOLDER_ID / GDRIVE_CLIENT_SECRET_PATH
-AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_S3_BUCKET
+# Then add IF NOT EXISTS patch to seed_dev.py + detection to wait_and_stamp.py
 ```
 
 ---
 
-## Local Development
+# CORS & Security
 
-```bash
-# 1. Start postgres + redis
-docker compose up -d
+- **CORS:** `CORSMiddleware` with `allow_origins=settings.cors_origins` (from `CORS_ORIGINS` env var), `allow_credentials=True`, all methods + headers
+- **RLS:** `set_tenant_context(db, tenant_id)` called in `deps.py` on every authenticated request; PostgreSQL `current_setting('app.current_tenant')` used in RLS policies
+- **All FG endpoints:** filter by `tenant_id` explicitly on every query; role-guarded by `require_supervisor` or `require_org_admin`
+- **API Keys:** separate auth path, same tenant_id enforcement
 
-# 2. Backend
-cd backend
-pip install -r requirements.txt
-cp .env.example .env   # fill in values
-python -m alembic upgrade head
-python scripts/seed_dev.py
-python -m uvicorn app.main:app --port 8000 --reload
+---
 
-# 3. Frontend
-cd frontend
-npm install
-npm run dev            # → http://localhost:5173
+# Demo Credentials
+
+| Tenant | Phone | Password | Role |
+|--------|-------|----------|------|
+| Demo Org | +919999990001 | test@123 | org_admin |
+| Demo Org | +919999990002 | test@123 | supervisor |
+| Demo Org | +919999990003 | test@123 | enumerator |
+| Platform | +918317390926 | superadmin@4991 | master_admin |
+| Dataworx | +919999991001 | test@123 | org_admin |
+
+---
+
+# Environment Variables
+
+```
+DATABASE_URL      # PostgreSQL
+REDIS_URL         # Redis
+JWT_SECRET        # ≥32 chars
+CORS_ORIGINS      # comma-separated allowed origins
+STORAGE_BACKEND   # local | drive | s3
+SENTRY_DSN        # optional — backend error monitoring
+```
+
+Frontend build vars (via GitHub Actions secrets):
+```
+VITE_SENTRY_DSN   # optional — frontend error monitoring
 ```
 
 ---
 
-## Key Features Built
+# Key Features Built
 
-| Feature | Where |
-|---------|-------|
-| Offline-first PWA | `collect/FieldApp.modern.tsx`, `storage/`, `sw.ts` |
+| Feature | File / Route |
+|---------|-------------|
+| Offline PWA | `collect/FieldApp.modern.tsx` + `storage/` + `sw.ts` |
 | Form builder + skip logic | `builder/FormBuilder.modern.tsx` |
-| Auto-advance on single-tap | `renderer/FormRenderer.tsx` (`AUTO_ADVANCE_TYPES`) |
-| GPS capture + clear | `renderer/fields/GpsField.tsx` |
-| Photo capture + delete | `renderer/fields/PhotoField.tsx` |
-| Bulk upload (Excel, org_admin+) | `backend/app/api/routes/bulk_upload.py` |
-| Contextual help system | `help/` — InfoButton, HelpPanel, HelpSpotlight |
-| Serial numbers on submissions | migration 0016, `sync.py`, `submissions.py` |
-| Enumerator edit own records | `PATCH /submissions/{id}/data`, tenant toggle |
-| History edit in FieldApp | `collect/FieldApp.modern.tsx` screen=editing |
-| Dashboard serial_no column | `dashboard/Dashboard.modern.tsx` |
-| Allow-enumerator-edit toggle | Dashboard → Integrations → Org Settings |
-| Demo quick-fill on login | `auth/LoginPage.tsx` |
-| Unified website nav | `website/` — all pages (index, about, demo) share identical nav: logo.png image, Features / How It Works / Compare / Pricing / About / Contact links, Try Demo + Open App buttons, hamburger + mobile overlay |
-| Platform migration (XLSForm import) | `backend/app/api/routes/migration/` + `frontend/src/migration/` — imports XLSForm, Kobo, SurveyCTO, ODK Central forms + submissions |
-| WhatsApp notifications (MSG91) | `backend/app/services/whatsapp.py` — fires on submission.created/flagged/approved/rejected + import.complete; config in tenant.notification_config |
-| Google Sheets live sync | `backend/app/services/sheets_sync.py` — Apps Script webhook per form; config in forms.sheets_sync_config; fires on sync and migration import |
-| Sentry error monitoring | Frontend: `@sentry/react` init in `main.tsx` (VITE_SENTRY_DSN). Backend: `sentry-sdk[fastapi]` init in `main.py` (SENTRY_DSN). Both conditional on env var. |
-| Integrations settings UI | OrgAdminPanel → Integrations tab → `IntegrationsPanel.tsx` — WhatsApp config + per-form Sheets sync toggle |
+| Bulk upload (Excel) | `routes/bulk_upload.py` |
+| Platform migration (XLSForm/Kobo/ODK) | `routes/migration/` + `migration/MigrationPage.tsx` |
+| WhatsApp notifications | `services/whatsapp.py` |
+| Google Sheets sync | `services/sheets_sync.py` |
+| FG Analyzer | `programs/FgAnalyzer.tsx` + `/fg/programs/{id}/analyzer-data` |
+| FG Cleaner | `programs/FgCleaner.tsx` + `/fg/programs/{id}/cleaner` |
+| FG Tabulator (AI) | inside FgAnalyzer + `/fg/programs/{id}/tabulate/{suggest,execute}` |
+| FG Writer | `reports/FgWriter.tsx` + `/fg/programs/{id}/writer/generate` |
+| Panel Study + Attrition | inside FgAnalyzer + `/fg/programs/{id}/{waves,attrition}` |
+| AI multi-LLM | `services/ai_service.py` — OpenAI / Anthropic / Gemini per-tenant |
+| Contextual help | `help/` — InfoButton, HelpPanel, HelpSpotlight |
+| Sentry monitoring | `main.py` + `main.tsx` (conditional on DSN) |
 
 ---
 
-## Roadmap & Planning
-
-Full future scope: `planning/ROADMAP.md`  
-Migration feature spec: `planning/MIGRATION_SPEC.md`
-
----
-
-## Sensitive Files — Never Commit
-
-- `backend/.env`
-- `credentials.csv` / `export_credentials.py`
-- `backend/credentials/` (Google OAuth tokens)
-- `*.key`, `*_token.json`, `*_secret*`
-
-`TEST_CREDENTIALS.csv` is tracked (demo passwords only — intentional).
-
----
-
-## AI Tools Active in This Project
+# AI Tools
 
 ### 1. Caveman (`/caveman`)
-Skill at `.claude/skills/caveman/SKILL.md`. Ultra-compressed token-saving mode (~75% reduction).
-- `/caveman` — activate full mode
-- `/caveman lite` — terse but full sentences
-- `/caveman ultra` — maximum compression
-- `/caveman:compress CLAUDE.md` — compress this file to save tokens
-- `stop caveman` / `normal mode` — deactivate
+Skill at `.claude/skills/caveman/SKILL.md`. ~75% token reduction. Levels: lite, full, ultra.
 
-### 2. SigMap (signature context — always active)
-Config: `gen-context.config.json`. Output: `.github/copilot-instructions.md` (hot) + `.github/context-cold.md` (cold).
-- Regenerate after schema/route changes: `npx sigmap`
-- MCP server registered in `.claude/settings.local.json`
+### 2. SigMap (always active)
+`npx sigmap` — regenerates `.github/copilot-instructions.md` after schema/route changes.
 
 ### 3. Graphify (`/graphify`)
-Installed globally. Builds interactive knowledge graph of codebase.
-- `/graphify .` — full project graph
-- Output: `graphify-out/graph.html`, `GRAPH_REPORT.md`
+Global skill. Builds interactive knowledge graph. Outputs `graphify-out/graph.html`.
 
-### 4. Claude-mem (persistent memory)
-Auto-saves session context. Memory files at `~/.claude/projects/C--Users-apran/memory/`.
+### 4. Claude-mem (auto-memory)
+Memory files at `~/.claude/projects/C--Users-apran/memory/`.
+
+---
+
+# Roadmap Status (see `planning/ROADMAP.md` for full list)
+
+| Bundle | Status |
+|--------|--------|
+| Migration (XLSForm/Kobo/ODK/SurveyCTO) | ✅ Done |
+| Google Sheets sync | ✅ Done |
+| WhatsApp notifications | ✅ Done (pending MSG91 account) |
+| AI report writer | ✅ Done (FG Writer) |
+| FG Analyzer + Tabulator + Panel Study | ✅ Done |
+| FG Cleaner | ✅ Done |
+| Repeat groups | 📋 Planned (highest priority) |
+| Public survey URL | 📋 Planned (schema ready) |
+| Back-check / QC audit | 📋 Planned |
+| Stata/SPSS export | 📋 Planned |
+| DHIS2 integration | 📋 Planned |
+
+---
+
+# Sensitive Files — Never Commit
+`backend/.env`, `credentials.csv`, `export_credentials.py`, `backend/credentials/`, `*.key`, `*_token.json`, `*_secret*`

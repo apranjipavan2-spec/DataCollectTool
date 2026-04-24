@@ -11,11 +11,14 @@ import AdminPanel     from '@/admin/AdminPanel.modern'
 import OrgAdminPanel  from '@/admin/OrgAdminPanel.modern'
 import UserProfile    from '@/profile/UserProfile'
 import ProgramsPage        from '@/programs/ProgramsPage'
+import FieldGovern         from '@/programs/FieldGovern'
+import FgAnalyzer          from '@/programs/FgAnalyzer'
+import FgCleaner           from '@/programs/FgCleaner'
+import FgWriter            from '@/reports/FgWriter'
 import ProgressDashboard   from '@/programs/ProgressDashboard'
 import SuperAdminMonitor   from '@/admin/SuperAdminMonitor'
 import MigrationPage      from '@/migration/MigrationPage'
 import PublicSurveyPage   from '@/collect/PublicSurveyPage'
-import FgWriter           from '@/reports/FgWriter'
 import { LanguageProvider } from '@/i18n/LanguageContext'
 import { ToastProvider } from '@/lib/ToastContext'
 import { ThemeProvider } from '@/lib/ThemeContext'
@@ -136,6 +139,14 @@ export default function App() {
                 </RequireAuth>
               } />
 
+              <Route path="/programs/:programId/govern" element={
+                <RequireAuth roles={['org_admin', 'supervisor']}>
+                  <ErrorBoundary>
+                    <FieldGovern />
+                  </ErrorBoundary>
+                </RequireAuth>
+              } />
+
               <Route path="/progress" element={
                 <RequireAuth roles={['org_admin', 'supervisor']}>
                   <ErrorBoundary>
@@ -168,7 +179,25 @@ export default function App() {
                 </RequireAuth>
               } />
 
-              <Route path="/writer" element={
+              <Route path="/writer" element={<Navigate to="/fg/writer" replace />} />
+
+              <Route path="/fg/analyzer" element={
+                <RequireAuth roles={['org_admin', 'supervisor']}>
+                  <ErrorBoundary>
+                    <FgAnalyzer />
+                  </ErrorBoundary>
+                </RequireAuth>
+              } />
+
+              <Route path="/fg/cleaner" element={
+                <RequireAuth roles={['org_admin', 'supervisor']}>
+                  <ErrorBoundary>
+                    <FgCleaner />
+                  </ErrorBoundary>
+                </RequireAuth>
+              } />
+
+              <Route path="/fg/writer" element={
                 <RequireAuth roles={['org_admin', 'supervisor']}>
                   <ErrorBoundary>
                     <FgWriter />
