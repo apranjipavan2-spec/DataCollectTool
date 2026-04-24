@@ -4,22 +4,32 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>FieldGovern — Live Demo</title>
-  <meta name="description" content="Try FieldGovern free. All 4 roles pre-loaded. No signup."/>
+  <meta name="description" content="Try FieldGovern free. All 4 roles pre-loaded with real data. No signup required."/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
   <style>
-    :root{--brand:#0ea5e9;--brand-dk:#0369a1;--accent:#7c3aed;--green:#10b981;--amber:#f59e0b;--red:#ef4444;--bg:#f1f5f9;--card:#fff;--text:#0f172a;--text2:#334155;--text3:#64748b;--border:#e2e8f0}
+    :root{
+      --brand:#0ea5e9;--brand-dk:#0369a1;--accent:#7c3aed;
+      --green:#10b981;--amber:#f59e0b;--red:#ef4444;
+      --bg:#f1f5f9;--card:#fff;--text:#0f172a;--text2:#334155;--text3:#64748b;--border:#e2e8f0;
+    }
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 
     @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
     @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(14,165,233,0.5)}70%{box-shadow:0 0 0 10px rgba(14,165,233,0)}}
     @keyframes ripple{to{transform:scale(4);opacity:0}}
-    @keyframes slideCheck{from{stroke-dashoffset:24}to{stroke-dashoffset:0}}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0.4}}
 
-    /* NAV */
-    nav{background:#fff;border-bottom:1px solid var(--border);height:68px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:100;box-shadow:0 1px 8px rgba(0,0,0,0.04)}
-    .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.2rem;color:var(--text);text-decoration:none}
-    .logo-nav-img{filter:brightness(0) saturate(0);opacity:0.85;transition:filter 0.3s,opacity 0.3s}
+    /* ── NAV ── */
+    nav{
+      background:#fff;border-bottom:1px solid var(--border);
+      height:68px;display:flex;align-items:center;justify-content:space-between;
+      padding:0 24px;position:sticky;top:0;z-index:100;
+      box-shadow:0 1px 8px rgba(0,0,0,0.04);
+    }
+    .nav-logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.2rem;color:var(--text);text-decoration:none}
+    .logo-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--accent));display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:0.85rem;box-shadow:0 4px 12px rgba(14,165,233,0.4);overflow:hidden;flex-shrink:0}
+    .logo-icon img{width:100%;height:100%;object-fit:contain;border-radius:10px}
     .nav-links{display:flex;align-items:center;gap:28px;list-style:none}
     .nav-links a{text-decoration:none;color:var(--text2);font-weight:500;font-size:0.9rem;transition:color 0.2s;position:relative}
     .nav-links a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;background:var(--brand);border-radius:2px;transition:width 0.3s}
@@ -27,8 +37,6 @@
     .nav-links a:hover::after{width:100%}
     .btn-primary{background:linear-gradient(135deg,var(--brand),var(--accent));color:white;border:none;border-radius:10px;padding:10px 22px;font-weight:600;font-size:0.9rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all 0.3s;box-shadow:0 4px 16px rgba(14,165,233,0.3)}
     .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(14,165,233,0.4)}
-    .nav-back{font-size:0.84rem;color:var(--text3);text-decoration:none;border:1px solid var(--border);border-radius:8px;padding:6px 14px;transition:.2s;display:flex;align-items:center;gap:5px}
-    .nav-back:hover{border-color:var(--brand);color:var(--brand)}
     .hamburger{display:none;flex-direction:column;justify-content:center;gap:5px;cursor:pointer;width:40px;height:40px;border-radius:9px;border:1.5px solid var(--border);background:white;padding:8px;flex-shrink:0}
     .hamburger span{display:block;width:100%;height:2px;background:var(--text);border-radius:2px;transition:all 0.3s}
     .hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
@@ -38,206 +46,545 @@
     #mobileMenu.open{display:block}
     #mobileMenu a{display:flex;align-items:center;padding:14px 24px;color:var(--text2);font-weight:500;font-size:0.95rem;text-decoration:none;border-bottom:1px solid var(--border);transition:background 0.15s,color 0.15s}
     #mobileMenu a:last-child{border-bottom:none}
-    #mobileMenu a:hover,#mobileMenu a:active{background:#f8fafc;color:var(--brand)}
-    @media(max-width:640px){.nav-links{display:none}.hamburger{display:flex}.nav-back{display:none}}
+    #mobileMenu a:hover{background:#f8fafc;color:var(--brand)}
+    @media(max-width:640px){.nav-links{display:none}.hamburger{display:flex}}
 
-    /* PAGE */
+    /* ── PAGE WRAP ── */
     .wrap{max-width:900px;margin:0 auto;padding:36px 20px 80px}
 
-    /* HERO BANNER */
-    .hero{background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 55%,#0c4a6e 100%);border-radius:20px;padding:44px 40px;margin-bottom:28px;text-align:center;position:relative;overflow:hidden;animation:fadeUp .6s ease}
+    /* ── HERO BANNER ── */
+    .hero{
+      background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 55%,#0c4a6e 100%);
+      border-radius:20px;padding:48px 40px;margin-bottom:28px;text-align:center;
+      position:relative;overflow:hidden;animation:fadeUp .6s ease;
+    }
     .hero::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at 2px 2px,rgba(255,255,255,0.05) 1px,transparent 0);background-size:30px 30px;pointer-events:none}
     .live-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);border-radius:999px;padding:5px 14px;font-size:0.76rem;font-weight:700;color:#6ee7b7;margin-bottom:16px;letter-spacing:.03em}
-    .live-dot{width:8px;height:8px;background:#22c55e;border-radius:50%;animation:pulse 2s infinite}
-    .hero h1{font-size:1.9rem;font-weight:900;color:#fff;margin-bottom:10px}
-    .hero p{color:rgba(255,255,255,0.6);font-size:.9rem;line-height:1.65;margin-bottom:28px;max-width:480px;margin-left:auto;margin-right:auto}
+    .live-dot{width:8px;height:8px;background:#22c55e;border-radius:50%;animation:blink 1.5s infinite}
+    .hero h1{font-size:2rem;font-weight:900;color:#fff;margin-bottom:10px;line-height:1.2}
+    .hero p{color:rgba(255,255,255,0.65);font-size:.92rem;line-height:1.65;margin-bottom:28px;max-width:500px;margin-left:auto;margin-right:auto}
 
-    /* URL BAR — the key fix: use a real input so user can select+copy manually too */
-    .url-bar{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:14px;padding:14px 18px;display:flex;align-items:center;gap:12px;max-width:560px;margin:0 auto;flex-wrap:wrap;justify-content:center}
+    /* ── APP URL BAR ── */
+    .url-bar{
+      background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);
+      border-radius:14px;padding:14px 18px;display:flex;align-items:center;gap:12px;
+      max-width:580px;margin:0 auto;flex-wrap:wrap;justify-content:center;
+    }
     .url-input-wrap{display:flex;align-items:center;gap:8px;flex:1;min-width:200px}
-    .url-icon{font-size:1rem}
-    #urlInput{background:transparent;border:none;outline:none;font-family:monospace;font-size:0.88rem;color:#7dd3fc;font-weight:600;flex:1;min-width:0;cursor:pointer;caret-color:transparent;width:100%}
+    #urlInput{
+      background:transparent;border:none;outline:none;font-family:monospace;
+      font-size:.9rem;color:#7dd3fc;font-weight:700;flex:1;min-width:0;
+      cursor:pointer;caret-color:transparent;
+    }
     #urlInput::selection{background:rgba(14,165,233,0.4)}
-    .btn{border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:0.83rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:.25s;white-space:nowrap;position:relative;overflow:hidden}
-    .btn::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,0.3);border-radius:50%;transform:scale(0);opacity:0}
-    .btn:active::after{animation:ripple .4s ease-out}
-    .btn-copy{background:rgba(255,255,255,0.14);color:#fff;border:1px solid rgba(255,255,255,0.2)}
-    .btn-copy:hover{background:rgba(255,255,255,0.24)}
+    .btn-copy{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:9px;padding:9px 16px;font-weight:700;font-size:.82rem;cursor:pointer;transition:.25s;white-space:nowrap}
+    .btn-copy:hover{background:rgba(255,255,255,0.22)}
     .btn-copy.copied{background:rgba(16,185,129,0.3);border-color:rgba(16,185,129,0.5);color:#6ee7b7}
-    .btn-open{background:var(--green);color:#fff;box-shadow:0 4px 14px rgba(16,185,129,0.4)}
-    .btn-open:hover{background:#059669;transform:translateY(-2px);box-shadow:0 8px 22px rgba(16,185,129,0.5)}
+    .btn-open{background:var(--green);color:#fff;border:none;border-radius:9px;padding:9px 18px;font-weight:800;font-size:.82rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 4px 14px rgba(16,185,129,0.4);transition:.25s}
+    .btn-open:hover{background:#059669;transform:translateY(-2px)}
 
-    /* QUICKSTART */
+    /* ── QUICKSTART STEPS ── */
     .qs{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px}
-    .qs-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:18px 16px;text-align:center;animation:fadeUp .6s ease both}
-    .qs-num{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;font-weight:800;font-size:.8rem;display:flex;align-items:center;justify-content:center;margin:0 auto 10px}
-    .qs-card h4{font-size:.84rem;font-weight:700;margin-bottom:4px}
+    .qs-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 16px;text-align:center;animation:fadeUp .6s ease both}
+    .qs-num{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;font-weight:900;font-size:.8rem;display:flex;align-items:center;justify-content:center;margin:0 auto 10px}
+    .qs-card h4{font-size:.85rem;font-weight:700;margin-bottom:4px;color:var(--text)}
     .qs-card p{font-size:.75rem;color:var(--text3);line-height:1.5}
 
-    /* ROLES GRID */
-    .roles-label{font-size:1.05rem;font-weight:800;margin-bottom:4px}
-    .roles-sub{font-size:.83rem;color:var(--text3);margin-bottom:16px}
+    /* ── SECTION HEADERS ── */
+    .section-hd{margin-bottom:14px}
+    .section-hd h2{font-size:1.05rem;font-weight:800;color:var(--text);margin-bottom:2px}
+    .section-hd p{font-size:.82rem;color:var(--text3)}
+
+    /* ── ROLE CARDS ── */
     .roles{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px}
-    .rc{background:#fff;border:2px solid var(--border);border-radius:16px;padding:18px;cursor:pointer;transition:.25s;position:relative;user-select:none}
+    .rc{
+      background:var(--card);border:2px solid var(--border);border-radius:16px;
+      padding:18px;cursor:pointer;transition:.25s;position:relative;user-select:none;
+    }
     .rc:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(14,165,233,0.09);border-color:rgba(14,165,233,0.3)}
     .rc.active{border-color:var(--brand);box-shadow:0 8px 28px rgba(14,165,233,0.15);background:linear-gradient(135deg,rgba(14,165,233,0.03),rgba(124,58,237,0.03))}
-    .rc-indicator{position:absolute;top:12px;right:12px;width:22px;height:22px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;transition:.2s}
+    .rc-indicator{position:absolute;top:12px;right:12px;width:22px;height:22px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;transition:.2s;background:transparent}
     .rc.active .rc-indicator{background:var(--brand);border-color:var(--brand)}
-    .rc-check{stroke-dasharray:24;stroke-dashoffset:24;transition:.3s}
+    .rc-check{stroke-dasharray:20;stroke-dashoffset:20;transition:.3s}
     .rc.active .rc-check{stroke-dashoffset:0}
-    .rc-top{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+    .rc-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
     .rc-emoji{font-size:1.7rem;line-height:1}
-    .rc-badge{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px}
+    .rc-badge{font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px}
     .badge-admin{background:#dbeafe;color:#1d4ed8}
     .badge-sup{background:#dcfce7;color:#15803d}
     .badge-enum{background:#ede9fe;color:#6d28d9}
     .badge-master{background:#fef9c3;color:#92400e}
-    .rc h3{font-size:.9rem;font-weight:700;margin-bottom:8px}
+    .rc h3{font-size:.9rem;font-weight:700;margin-bottom:8px;color:var(--text)}
     .rc ul{list-style:none;display:flex;flex-direction:column;gap:4px}
     .rc li{font-size:.75rem;color:var(--text2);display:flex;gap:6px;line-height:1.4}
     .rc li::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
 
-    /* CREDENTIAL FIELD — real inputs for easy copy */
-    .cred{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-top:10px}
-    .cred-row{display:flex;align-items:center;gap:8px;padding:4px 0}
+    /* ── CREDENTIAL BOX ── */
+    .cred-box{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-top:10px}
+    .cred-row{display:flex;align-items:center;gap:8px;padding:5px 0}
     .cred-row+.cred-row{border-top:1px solid var(--border);margin-top:4px;padding-top:8px}
-    .cred-label{font-size:.67rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;width:56px;flex-shrink:0}
-    .cred-input{font-family:monospace;font-size:.82rem;font-weight:700;color:var(--text);background:transparent;border:none;outline:none;flex:1;min-width:0;cursor:text}
-    .cred-input::selection{background:rgba(14,165,233,0.25)}
+    .cred-label{font-size:.67rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;width:58px;flex-shrink:0}
+    .cred-val{font-family:monospace;font-size:.83rem;font-weight:700;color:var(--text);flex:1;min-width:0}
     .cpy{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font-size:.68rem;font-weight:700;color:var(--text3);cursor:pointer;transition:.2s;white-space:nowrap;flex-shrink:0}
-    .cpy:hover{border-color:var(--brand);color:var(--brand);background:rgba(14,165,233,0.05)}
-    .cpy.ok{border-color:var(--green);color:var(--green);background:rgba(16,185,129,0.08)}
+    .cpy:hover{border-color:var(--brand);color:var(--brand)}
+    .cpy.ok{border-color:var(--green);color:var(--green);background:rgba(16,185,129,.08)}
 
-    /* LOGIN PANEL */
-    .panel{background:#fff;border:2px solid var(--brand);border-radius:16px;padding:22px;margin-bottom:20px;position:relative;overflow:hidden}
-    .panel::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--brand),var(--accent))}
-    .panel-title{font-size:.95rem;font-weight:800;margin-bottom:16px;display:flex;align-items:center;gap:8px}
-    .panel-role{color:var(--brand)}
-    .panel-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
-    .pf{display:flex;flex-direction:column;gap:4px}
-    .pf label{font-size:.67rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
-    .pf-val{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;display:flex;align-items:center;gap:6px}
-    .pf-input{font-family:monospace;font-size:.84rem;font-weight:700;color:var(--text);background:transparent;border:none;outline:none;flex:1;min-width:0}
-    .panel-actions{display:flex;gap:10px;flex-wrap:wrap}
-    .btn-main{background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;border:none;border-radius:12px;padding:13px 24px;font-weight:800;font-size:.92rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:7px;transition:.25s;box-shadow:0 4px 16px rgba(14,165,233,0.3);animation:pulse 3s infinite}
-    .btn-main:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(14,165,233,0.45)}
+    /* ── ACTIVE LOGIN PANEL ── */
+    .login-panel{
+      background:#fff;border:2px solid var(--brand);border-radius:18px;
+      padding:24px;margin-bottom:24px;position:relative;overflow:hidden;
+      animation:fadeUp .4s ease;
+    }
+    .login-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--brand),var(--accent))}
+    .lp-title{font-size:.95rem;font-weight:800;margin-bottom:16px;display:flex;align-items:center;gap:8px;color:var(--text)}
+    .lp-role{color:var(--brand)}
+    .lp-fields{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px}
+    .lpf label{font-size:.67rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px}
+    .lpf-val{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;display:flex;align-items:center;gap:6px}
+    .lpf-input{font-family:monospace;font-size:.84rem;font-weight:700;color:var(--text);background:transparent;border:none;outline:none;flex:1;min-width:0;cursor:text}
+    .lp-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .btn-login{
+      background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;
+      border:none;border-radius:12px;padding:13px 28px;font-weight:800;font-size:.92rem;
+      cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:7px;
+      transition:.25s;box-shadow:0 4px 16px rgba(14,165,233,0.3);animation:pulse 3s infinite;
+    }
+    .btn-login:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(14,165,233,0.45)}
     .btn-sec{background:var(--bg);border:1px solid var(--border);color:var(--text2);border-radius:10px;padding:12px 18px;font-weight:600;font-size:.84rem;cursor:pointer;transition:.2s}
     .btn-sec:hover{border-color:var(--brand);color:var(--brand)}
 
-    /* INFO CARDS */
-    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+    /* ── INFO CARDS ── */
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
     .info-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px}
-    .info-card h3{font-size:.88rem;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+    .info-card h3{font-size:.88rem;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:7px;color:var(--text)}
     .info-card ul{list-style:none;display:flex;flex-direction:column;gap:6px}
     .info-card li{font-size:.78rem;color:var(--text2);display:flex;gap:7px;line-height:1.4}
-    .info-card li::before{content:'·';color:var(--brand);font-weight:700;flex-shrink:0}
+    .info-card li::before{content:'·';color:var(--brand);font-weight:700;flex-shrink:0;font-size:1.1rem;line-height:1.2}
 
-    /* OFFLINE TEST */
-    .offline{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid rgba(16,185,129,0.25);border-radius:14px;padding:22px}
-    .offline h3{font-size:.9rem;font-weight:700;color:#065f46;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+    /* ── AI FEATURES HIGHLIGHT ── */
+    .ai-highlight{
+      background:linear-gradient(135deg,#0f172a,#1e1b4b);
+      border-radius:16px;padding:24px;margin-bottom:24px;color:white;
+    }
+    .ai-highlight h3{font-size:.95rem;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+    .ai-highlight-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .ai-feat{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px}
+    .ai-feat h4{font-size:.78rem;font-weight:700;color:#7dd3fc;margin-bottom:4px}
+    .ai-feat p{font-size:.72rem;color:rgba(255,255,255,.6);line-height:1.5}
+    .ai-live-pill{display:inline-flex;align-items:center;gap:5px;background:rgba(16,185,129,.2);border:1px solid rgba(16,185,129,.4);border-radius:999px;padding:2px 10px;font-size:.65rem;font-weight:700;color:#6ee7b7;text-transform:uppercase;letter-spacing:.04em;margin-top:8px}
+    .ai-live-pill::before{content:'';width:5px;height:5px;background:#22c55e;border-radius:50%;display:inline-block}
+
+    /* ── OFFLINE TEST ── */
+    .offline{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid rgba(16,185,129,.25);border-radius:14px;padding:24px;margin-bottom:24px}
+    .offline h3{font-size:.92rem;font-weight:700;color:#065f46;margin-bottom:14px;display:flex;align-items:center;gap:7px}
     .os{display:flex;flex-direction:column;gap:8px}
     .os-row{display:flex;gap:10px;font-size:.8rem;color:#064e3b;line-height:1.5}
-    .os-n{width:22px;height:22px;border-radius:50%;background:var(--green);color:#fff;font-size:.7rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+    .os-n{width:22px;height:22px;border-radius:50%;background:var(--green);color:#fff;font-size:.7rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
 
-    /* TOAST */
-    .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#0f172a;color:#fff;border-radius:12px;padding:11px 22px;font-size:.84rem;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,0.25);z-index:999;transition:transform .35s cubic-bezier(.16,1,.3,1),opacity .35s;opacity:0;display:flex;align-items:center;gap:8px;white-space:nowrap}
+    /* ── TOAST ── */
+    .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#0f172a;color:#fff;border-radius:12px;padding:11px 22px;font-size:.84rem;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.25);z-index:999;transition:transform .35s cubic-bezier(.16,1,.3,1),opacity .35s;opacity:0;display:flex;align-items:center;gap:8px;white-space:nowrap}
     .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 
-    @media(max-width:600px){
+    @media(max-width:640px){
       .qs{grid-template-columns:1fr}
       .roles{grid-template-columns:1fr}
-      .panel-fields{grid-template-columns:1fr}
+      .lp-fields{grid-template-columns:1fr}
       .info-grid{grid-template-columns:1fr}
+      .ai-highlight-grid{grid-template-columns:1fr}
       .hero{padding:32px 20px}
-      .hero h1{font-size:1.5rem}
-      .url-bar{flex-direction:column}
+      .hero h1{font-size:1.55rem}
+      .url-bar{flex-direction:column;gap:8px}
     }
   </style>
 </head>
 <body>
 
+<!-- NAV -->
 <nav id="navbar">
   <a href="index.html" class="nav-logo">
-    <img src="logo.png" alt="FieldGovern" class="logo-nav-img" style="width:36px;height:36px;border-radius:10px;object-fit:contain"/>
+    <div class="logo-icon">
+      <img src="logo.png" alt="FG" onerror="this.style.display='none';this.parentNode.textContent='FG'"/>
+    </div>
     FieldGovern
   </a>
-      <ul class="nav-links">
-    <li><a href="features.html">Features</a></li>
-    <li><a href="integrations.html">Integrations</a></li>
-    <li><a href="use-cases.html">Use Cases</a></li>
-    <li><a href="security.html">Security</a></li>
+  <ul class="nav-links">
+    <li><a href="index.html#features">Features</a></li>
+    <li><a href="index.html#compare">Compare</a></li>
     <li><a href="index.html#pricing">Pricing</a></li>
     <li><a href="about.html">About</a></li>
   </ul>
+  <div style="display:flex;gap:8px;align-items:center">
+    <a href="index.html" class="btn-primary" style="font-size:.85rem;padding:8px 18px">← Back to Site</a>
+    <button class="hamburger" id="hamburgerBtn" aria-label="Open menu" onclick="toggleMenu()">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<div id="mobileMenu" role="navigation">
+  <a href="index.html#features">Features</a>
+  <a href="index.html#compare">Compare</a>
+  <a href="index.html#pricing">Pricing</a>
+  <a href="about.html">About</a>
+  <a href="index.html" style="color:var(--brand);font-weight:700">← Back to Site</a>
+</div>
+
+<!-- PAGE CONTENT -->
+<div class="wrap">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="live-badge"><div class="live-dot"></div> Live Demo — No Signup Required</div>
+    <h1>Try FieldGovern Right Now</h1>
+    <p>Full app pre-loaded with real forms, GPS submissions, photos, and all 4 user roles. Pick a role below and log in instantly.</p>
+    <div class="url-bar">
+      <div class="url-input-wrap">
+        <span style="font-size:1.1rem">🌐</span>
+        <input id="urlInput" type="text" value="https://app.fieldgovern.com" readonly onclick="this.select()"/>
+      </div>
+      <button class="btn-copy" id="copyBtn" onclick="copyUrl(this)">📋 Copy URL</button>
+      <a href="https://app.fieldgovern.com" target="_blank" class="btn-open">Open App →</a>
     </div>
+  </div>
+
+  <!-- QUICKSTART -->
+  <div class="qs">
+    <div class="qs-card" style="animation-delay:.05s">
+      <div class="qs-num">1</div>
+      <h4>Pick a Role</h4>
+      <p>Choose from Master Admin, Org Admin, Supervisor, or Enumerator — each sees a different view</p>
+    </div>
+    <div class="qs-card" style="animation-delay:.12s">
+      <div class="qs-num">2</div>
+      <h4>Copy Credentials</h4>
+      <p>One-click copy the phone number and password, then log in at app.fieldgovern.com</p>
+    </div>
+    <div class="qs-card" style="animation-delay:.19s">
+      <div class="qs-num">3</div>
+      <h4>Explore the App</h4>
+      <p>Submit forms, view the dashboard, run AI analysis, write reports — everything is live</p>
+    </div>
+  </div>
+
+  <!-- ROLE PICKER -->
+  <div class="section-hd">
+    <h2>Choose Your Role</h2>
+    <p>Click a role card to load its credentials below</p>
+  </div>
+
+  <div class="roles">
+    <div class="rc" id="rc-admin" onclick="pick(this,'admin')">
+      <div class="rc-indicator">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <polyline class="rc-check" points="2,6 5,9 10,3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="rc-top">
+        <span class="rc-emoji">🏢</span>
+        <span class="rc-badge badge-admin">Org Admin</span>
+      </div>
+      <h3>Organisation Admin</h3>
+      <ul>
+        <li>Build and manage forms</li>
+        <li>View all submissions & flags</li>
+        <li>Export data (CSV, Stata, SPSS)</li>
+        <li>Run AI tabulation & reports</li>
+        <li>Manage users & API keys</li>
+      </ul>
+      <div class="cred-box" onclick="event.stopPropagation()">
+        <div class="cred-row">
+          <span class="cred-label">Phone</span>
+          <span class="cred-val" id="cv-admin-phone">+91 99999 90001</span>
+          <button class="cpy" onclick="cp('+919999990001',this)">Copy</button>
+        </div>
+        <div class="cred-row">
+          <span class="cred-label">Password</span>
+          <span class="cred-val">test@123</span>
+          <button class="cpy" onclick="cp('test@123',this)">Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="rc" id="rc-supervisor" onclick="pick(this,'supervisor')">
+      <div class="rc-indicator">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <polyline class="rc-check" points="2,6 5,9 10,3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="rc-top">
+        <span class="rc-emoji">👔</span>
+        <span class="rc-badge badge-sup">Supervisor</span>
+      </div>
+      <h3>Field Supervisor</h3>
+      <ul>
+        <li>Live submission dashboard & GPS map</li>
+        <li>Flag, approve, reject submissions</li>
+        <li>Assign back-checks to enumerators</li>
+        <li>Track daily progress per enumerator</li>
+        <li>FG Analyzer, Cleaner & Writer</li>
+      </ul>
+      <div class="cred-box" onclick="event.stopPropagation()">
+        <div class="cred-row">
+          <span class="cred-label">Phone</span>
+          <span class="cred-val">+91 99999 90002</span>
+          <button class="cpy" onclick="cp('+919999990002',this)">Copy</button>
+        </div>
+        <div class="cred-row">
+          <span class="cred-label">Password</span>
+          <span class="cred-val">test@123</span>
+          <button class="cpy" onclick="cp('test@123',this)">Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="rc" id="rc-enumerator" onclick="pick(this,'enumerator')">
+      <div class="rc-indicator">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <polyline class="rc-check" points="2,6 5,9 10,3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="rc-top">
+        <span class="rc-emoji">📱</span>
+        <span class="rc-badge badge-enum">Enumerator</span>
+      </div>
+      <h3>Field Enumerator</h3>
+      <ul>
+        <li>Fill forms fully offline — zero internet</li>
+        <li>Auto-sync when reconnected</li>
+        <li>GPS, photo, audio, repeat groups</li>
+        <li>View submission history & drafts</li>
+        <li>See back-checks assigned by supervisor</li>
+      </ul>
+      <div class="cred-box" onclick="event.stopPropagation()">
+        <div class="cred-row">
+          <span class="cred-label">Phone</span>
+          <span class="cred-val">+91 99999 90003</span>
+          <button class="cpy" onclick="cp('+919999990003',this)">Copy</button>
+        </div>
+        <div class="cred-row">
+          <span class="cred-label">Password</span>
+          <span class="cred-val">test@123</span>
+          <button class="cpy" onclick="cp('test@123',this)">Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="rc" id="rc-master" onclick="pick(this,'master')">
+      <div class="rc-indicator">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <polyline class="rc-check" points="2,6 5,9 10,3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="rc-top">
+        <span class="rc-emoji">👑</span>
+        <span class="rc-badge badge-master">Master Admin</span>
+      </div>
+      <h3>Platform Super Admin</h3>
+      <ul>
+        <li>Manage all organisations & tenants</li>
+        <li>Set global AI API key (OpenAI / Claude / Gemini)</li>
+        <li>Monitor platform usage & system health</li>
+        <li>Create & configure new organisations</li>
+        <li>White-label branding per tenant</li>
+      </ul>
+      <div class="cred-box" onclick="event.stopPropagation()">
+        <div class="cred-row">
+          <span class="cred-label">Phone</span>
+          <span class="cred-val">+91 99999 90000</span>
+          <button class="cpy" onclick="cp('+919999990000',this)">Copy</button>
+        </div>
+        <div class="cred-row">
+          <span class="cred-label">Password</span>
+          <span class="cred-val">master@123</span>
+          <button class="cpy" onclick="cp('master@123',this)">Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIVE LOGIN PANEL -->
+  <div class="login-panel" id="loginPanel">
+    <div class="lp-title">
+      🚀 Log in as <span class="lp-role" id="roleName">Org Admin</span>
+    </div>
+    <div class="lp-fields">
+      <div class="lpf">
+        <label>App URL</label>
+        <div class="lpf-val">
+          <span style="font-size:.9rem">🌐</span>
+          <input class="lpf-input" id="pUrl" type="text" value="app.fieldgovern.com" readonly onclick="this.select()"/>
+        </div>
+      </div>
+      <div class="lpf">
+        <label>Phone Number</label>
+        <div class="lpf-val">
+          <span style="font-size:.9rem">📱</span>
+          <input class="lpf-input" id="pPhone" type="text" value="+919999990001" readonly onclick="this.select()"/>
+        </div>
+      </div>
+      <div class="lpf">
+        <label>Password</label>
+        <div class="lpf-val">
+          <span style="font-size:.9rem">🔑</span>
+          <input class="lpf-input" id="pPass" type="text" value="test@123" readonly onclick="this.select()"/>
+        </div>
+      </div>
+    </div>
+    <div class="lp-actions">
+      <a href="https://app.fieldgovern.com" target="_blank" class="btn-login">
+        🚀 Open App & Log In
+      </a>
+      <button class="btn-sec" onclick="cpAll()">📋 Copy All Credentials</button>
+    </div>
+  </div>
+
+  <!-- WHAT'S IN THE DEMO -->
+  <div class="section-hd" style="margin-top:8px">
+    <h2>What's Pre-loaded in the Demo</h2>
+    <p>Real data across all modules — explore everything without setting anything up</p>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-card">
+      <h3>📋 Forms & Submissions</h3>
+      <ul>
+        <li>3 active survey forms with 15+ field types</li>
+        <li>200+ sample submissions with GPS coordinates</li>
+        <li>Photos compressed and synced</li>
+        <li>Mix of approved, flagged, and pending statuses</li>
+        <li>Form version history and schema migration example</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <h3>📊 Analysis & Reports</h3>
+      <ul>
+        <li>FG Analyzer with pre-generated AI cross-tabulations</li>
+        <li>Bar charts, pie charts, and cross-tab tables</li>
+        <li>FG Writer with a sample NGO impact report</li>
+        <li>FG Cleaner showing data quality issues</li>
+        <li>Export to CSV, Stata .dta, Google Sheets</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <h3>👥 Team Structure</h3>
+      <ul>
+        <li>1 Master Admin managing the platform</li>
+        <li>1 Org Admin (Demo Organisation)</li>
+        <li>2 Supervisors tracking enumerator progress</li>
+        <li>3 Enumerators with assigned forms & schedules</li>
+        <li>QR code login pre-configured for field staff</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <h3>🗺️ Field & Location Data</h3>
+      <ul>
+        <li>GPS submissions plotted on live map</li>
+        <li>District / block / village location hierarchy</li>
+        <li>Geofence boundaries configured</li>
+        <li>Enumerator daily progress vs. targets</li>
+        <li>Back-check assignments to verify data quality</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- AI FEATURES -->
+  <div class="ai-highlight">
+    <h3>🤖 AI Intelligence Suite — All Live in the Demo</h3>
+    <div class="ai-highlight-grid">
+      <div class="ai-feat">
+        <h4>1-Click AI Auto-Generate Insights</h4>
+        <p>Go to FG Analyzer → click "Auto-Generate AI Insights". AI designs cross-tabs, runs them, and renders charts in ~2 minutes.</p>
+        <div class="ai-live-pill">Live Now</div>
+      </div>
+      <div class="ai-feat">
+        <h4>AI Form Builder</h4>
+        <p>Go to Form Builder → "Generate Form with AI". Describe your study objectives — AI creates a complete 30+ question form with skip logic.</p>
+        <div class="ai-live-pill">Live Now</div>
+      </div>
+      <div class="ai-feat">
+        <h4>AI Report Writer</h4>
+        <p>FG Writer → select a style (NGO, Government, Research) → generate a full publication-ready report from your tabulation data.</p>
+        <div class="ai-live-pill">Live Now</div>
+      </div>
+      <div class="ai-feat">
+        <h4>AI Skip Logic & Translation</h4>
+        <p>In Form Builder, select any question → "Suggest skip logic". Or translate all labels to Hindi / Kannada / Telugu in one click.</p>
+        <div class="ai-live-pill">Live Now</div>
+      </div>
+    </div>
+    <p style="font-size:.72rem;color:rgba(255,255,255,.4);margin-top:12px">
+      * AI features require the platform AI key to be configured. Contact us if AI calls return "not configured".
+    </p>
   </div>
 
   <!-- OFFLINE TEST -->
   <div class="offline">
-    <h3>🔌 Test Offline Mode — FieldGovern's #1 Feature</h3>
+    <h3>🔌 Test Offline Mode — FieldGovern's Core Feature</h3>
     <div class="os">
-      <div class="os-row"><div class="os-n">1</div>Log in as <strong>Enumerator</strong> (+919999990003) → open an assigned form</div>
-      <div class="os-row"><div class="os-n">2</div>Open Chrome DevTools (F12) → Network tab → set dropdown to <strong>"Offline"</strong></div>
-      <div class="os-row"><div class="os-n">3</div>Fill the form completely and hit <strong>Submit</strong> — it saves locally, zero internet needed</div>
-      <div class="os-row"><div class="os-n">4</div>Switch Network back to <strong>"Online"</strong> → the sync badge updates automatically</div>
-      <div class="os-row"><div class="os-n">5</div>Log in as <strong>Supervisor</strong> (+919999990002) → your submission is on the dashboard ✓</div>
+      <div class="os-row"><div class="os-n">1</div>Log in as <strong>Enumerator</strong> (+919999990003) → open an assigned form from the list</div>
+      <div class="os-row"><div class="os-n">2</div>Open Chrome DevTools (F12) → Network tab → set the dropdown to <strong>"Offline"</strong></div>
+      <div class="os-row"><div class="os-n">3</div>Fill the entire form and hit <strong>Submit</strong> — it saves locally with zero internet</div>
+      <div class="os-row"><div class="os-n">4</div>Switch Network back to <strong>"Online"</strong> → sync badge updates and data uploads automatically</div>
+      <div class="os-row"><div class="os-n">5</div>Log in as <strong>Supervisor</strong> (+919999990002) → your submission appears on the dashboard instantly ✓</div>
     </div>
   </div>
 
-</div>
+  <!-- FOOTER NOTE -->
+  <div style="text-align:center;padding:12px 0">
+    <p style="font-size:.8rem;color:var(--text3)">
+      Demo data resets periodically. Questions?
+      <a href="mailto:hello@fieldgovern.com" style="color:var(--brand);font-weight:600">hello@fieldgovern.com</a>
+      ·
+      <a href="index.html" style="color:var(--brand);font-weight:600">Back to fieldgovern.com</a>
+    </p>
+  </div>
+
+</div><!-- /wrap -->
 
 <div class="toast" id="toast">✓ Copied!</div>
 
 <script>
-  const roles = {
-    admin:      { name:'Org Admin',  phone:'+919999990001', pass:'test@123' },
-    supervisor: { name:'Supervisor', phone:'+919999990002', pass:'test@123' },
-    enumerator: { name:'Enumerator', phone:'+919999990003', pass:'test@123' },
+  const ROLES = {
+    admin:      { label: 'Org Admin',      phone: '+919999990001', pass: 'test@123' },
+    supervisor: { label: 'Supervisor',     phone: '+919999990002', pass: 'test@123' },
+    enumerator: { label: 'Enumerator',     phone: '+919999990003', pass: 'test@123' },
+    master:     { label: 'Master Admin',   phone: '+919999990000', pass: 'master@123' },
   };
   let cur = 'admin';
 
+  // Select a role card
   function pick(card, role) {
     document.querySelectorAll('.rc').forEach(c => c.classList.remove('active'));
     card.classList.add('active');
     cur = role;
-    const r = roles[role];
-    document.getElementById('roleName').textContent = r.name;
+    const r = ROLES[role];
+    document.getElementById('roleName').textContent = r.label;
     document.getElementById('pPhone').value = r.phone;
     document.getElementById('pPass').value = r.pass;
-    toast('Switched to ' + r.name);
+    showToast('Switched to ' + r.label);
   }
 
-  // Robust copy — tries clipboard API then falls back to execCommand
+  // Robust copy
   function safeCopy(text) {
-    if (navigator.clipboard && window.isSecureContext) {
-      return navigator.clipboard.writeText(text);
-    }
-    // Fallback for file:// or HTTP
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
     const ta = document.createElement('textarea');
     ta.value = text;
-    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
+    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
     document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
+    ta.focus(); ta.select();
     try { document.execCommand('copy'); } catch(e) {}
     document.body.removeChild(ta);
     return Promise.resolve();
   }
 
-  function cp(text, btn, e) {
-    if (e) e.stopPropagation();
+  function cp(text, btn) {
     safeCopy(text).then(() => {
+      const orig = btn.textContent;
       btn.textContent = '✓ Done';
       btn.classList.add('ok');
-      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 1600);
+      setTimeout(() => { btn.textContent = orig; btn.classList.remove('ok'); }, 1600);
     });
-    toast('Copied!');
-  }
-
-  function cpEl(id, btn, e) {
-    if (e) e.stopPropagation();
-    const val = document.getElementById(id).value;
-    cp(val, btn, null);
+    showToast('Copied!');
   }
 
   function copyUrl(btn) {
@@ -246,43 +593,43 @@
       btn.classList.add('copied');
       setTimeout(() => { btn.textContent = '📋 Copy URL'; btn.classList.remove('copied'); }, 1600);
     });
-    toast('URL copied!');
+    showToast('URL copied!');
   }
 
   function cpAll() {
-    const r = roles[cur];
-    const text = `FieldGovern Demo\nURL: https://app.fieldgovern.com\nPhone: ${r.phone}\nPassword: ${r.pass}\nRole: ${r.name}`;
+    const r = ROLES[cur];
+    const text = `FieldGovern Demo\nURL: https://app.fieldgovern.com\nPhone: ${r.phone}\nPassword: ${r.pass}\nRole: ${r.label}`;
     safeCopy(text);
-    toast('All credentials copied!');
+    showToast('All credentials copied!');
   }
 
-  function toast(msg) {
+  function showToast(msg) {
     const t = document.getElementById('toast');
     t.textContent = '✓ ' + msg;
     t.classList.add('show');
-    clearTimeout(t._t);
-    t._t = setTimeout(() => t.classList.remove('show'), 2200);
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 2200);
   }
 
-  // Mobile hamburger menu
+  // Mobile menu
   function toggleMenu() {
     const btn = document.getElementById('hamburgerBtn');
     const menu = document.getElementById('mobileMenu');
-    const isOpen = menu.classList.toggle('open');
-    btn.classList.toggle('open', isOpen);
-    btn.setAttribute('aria-expanded', isOpen);
+    const open = menu.classList.toggle('open');
+    btn.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', open);
   }
-  document.querySelectorAll('#mobileMenu a').forEach(a => {
-    a.addEventListener('click', () => {
-      document.getElementById('mobileMenu').classList.remove('open');
-      document.getElementById('hamburgerBtn').classList.remove('open');
-    });
-  });
-  window.addEventListener('scroll', () => {
+  document.querySelectorAll('#mobileMenu a').forEach(a => a.addEventListener('click', () => {
     document.getElementById('mobileMenu').classList.remove('open');
-    const btn = document.getElementById('hamburgerBtn');
-    if (btn) btn.classList.remove('open');
+    document.getElementById('hamburgerBtn').classList.remove('open');
+  }));
+  window.addEventListener('scroll', () => {
+    document.getElementById('mobileMenu')?.classList.remove('open');
+    document.getElementById('hamburgerBtn')?.classList.remove('open');
   }, { passive: true });
+
+  // Auto-select admin card on load
+  document.getElementById('rc-admin').classList.add('active');
 </script>
 </body>
 </html>
