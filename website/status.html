@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>FieldGovern — Deploy Status</title>
+  <style>
+    :root{
+      --brand:#0ea5e9;--green:#10b981;--red:#ef4444;--yellow:#f59e0b;--orange:#f97316;
+      --bg:#0f172a;--card:#1e293b;--border:#334155;--text:#f1f5f9;--text2:#94a3b8;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:24px}
+    h1{font-size:1.4rem;font-weight:700;margin-bottom:4px}
+    .sub{color:var(--text2);font-size:.85rem;margin-bottom:28px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:16px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+    .card-title{font-size:.75rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
+    .status-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+    .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .dot-green{background:var(--green);box-shadow:0 0 8px var(--green)}
+    .dot-red{background:var(--red);box-shadow:0 0 8px var(--red)}
+    .dot-yellow{background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
+    .dot-orange{background:var(--orange);box-shadow:0 0 8px var(--orange)}
+    .dot-spin{width:10px;height:10px;border-radius:2px;background:var(--brand);animation:spin-sq .8s linear infinite;flex-shrink:0}
+    @keyframes spin-sq{to{transform:rotate(360deg)}}
+    .dot-pulse{background:var(--yellow);animation:pulse 1.2s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
+    .status-label{font-size:.95rem;font-weight:600}
+    .status-detail{font-size:.8rem;color:var(--text2);margin-top:2px}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font-size:.75rem;font-weight:600}
+    .badge-green{background:rgba(16,185,129,.15);color:var(--green)}
+    .badge-red{background:rgba(239,68,68,.15);color:var(--red)}
+    .badge-yellow{background:rgba(245,158,11,.15);color:var(--yellow)}
+    .badge-orange{background:rgba(249,115,22,.15);color:var(--orange)}
+    .badge-blue{background:rgba(14,165,233,.15);color:var(--brand)}
+    .progress-bar{height:6px;background:#334155;border-radius:4px;margin:10px 0 4px;overflow:hidden}
+    .progress-fill{height:100%;border-radius:4px;transition:width .5s ease;background:var(--brand)}
+    .progress-label{font-size:.72rem;color:var(--text2);display:flex;justify-content:space-between}
+    .commits{display:flex;flex-direction:column;gap:8px}
+    .commit{background:#0f172a;border-radius:8px;padding:12px;border-left:3px solid var(--border)}
+    .commit.latest{border-left-color:var(--green)}
+    .commit-msg{font-size:.85rem;font-weight:500;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .commit-meta{font-size:.75rem;color:var(--text2);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .sha{font-family:monospace;background:#334155;padding:2px 6px;border-radius:4px;font-size:.7rem}
+    .error-box{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:12px;margin-top:8px}
+    .error-title{color:var(--red);font-size:.8rem;font-weight:600;margin-bottom:6px}
+    .error-text{font-size:.78rem;color:#fca5a5;font-family:monospace;white-space:pre-wrap;word-break:break-all}
+    .warn-box{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:12px;margin-top:8px}
+    .warn-title{color:var(--yellow);font-size:.8rem;font-weight:600;margin-bottom:4px}
+    .warn-text{font-size:.78rem;color:#fde68a}
+    .refresh-btn{background:var(--brand);color:#fff;border:none;padding:8px 20px;border-radius:8px;font-size:.85rem;font-weight:600;cursor:pointer;margin-bottom:24px}
+    .refresh-btn:hover{opacity:.85}
+    .auto-refresh{color:var(--text2);font-size:.8rem;margin-left:12px}
+    .section-title{font-size:1rem;font-weight:700;margin-bottom:14px}
+    .endpoint-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:8px}
+    .endpoint-row:last-child{border:none}
+    .endpoint-url{font-family:monospace;font-size:.8rem;color:var(--brand);min-width:80px}
+    .endpoint-label{font-size:.8rem;color:var(--text2);flex:1}
+    .endpoint-status{font-size:.8rem;font-weight:600;white-space:nowrap}
+    .ts{color:var(--text2);font-size:.75rem;margin-top:20px}
+    .logo{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+    .logo-text{font-size:1.1rem;font-weight:800;color:var(--brand)}
+    .timeline{display:flex;align-items:flex-start;gap:0;margin-top:12px;position:relative}
+    .tl-step{display:flex;flex-direction:column;align-items:center;flex:1;position:relative}
+    .tl-step:not(:last-child)::after{content:'';position:absolute;top:10px;left:50%;width:100%;height:2px;background:var(--border);z-index:0}
+    .tl-step.done::after{background:var(--green)}
+    .tl-step.active::after{background:linear-gradient(90deg,var(--brand),var(--border))}
+    .tl-dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);background:var(--bg);z-index:1;display:flex;align-items:center;justify-content:center;font-size:.65rem}
+    .tl-dot.done{background:var(--green);border-color:var(--green);color:#fff}
+    .tl-dot.active{background:var(--brand);border-color:var(--brand);color:#fff;animation:pulse 1.2s ease-in-out infinite}
+    .tl-dot.fail{background:var(--red);border-color:var(--red);color:#fff}
+    .tl-label{font-size:.65rem;color:var(--text2);margin-top:5px;text-align:center;max-width:60px}
+    .tl-label.active{color:var(--brand);font-weight:600}
+    .tl-label.done{color:var(--green)}
+    .tl-label.fail{color:var(--red)}
+    .big-status{text-align:center;padding:16px 0 8px}
+    .big-status-icon{font-size:2.5rem;margin-bottom:6px}
+    .big-status-text{font-size:1.1rem;font-weight:700;margin-bottom:4px}
+    .big-status-sub{font-size:.8rem;color:var(--text2)}
+    .action-run{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+    .action-run:last-child{border:none}
+    .run-badge{padding:2px 8px;border-radius:99px;font-size:.7rem;font-weight:600;white-space:nowrap}
+    .run-success{background:rgba(16,185,129,.15);color:var(--green)}
+    .run-failure{background:rgba(239,68,68,.15);color:var(--red)}
+    .run-progress{background:rgba(14,165,233,.15);color:var(--brand)}
+    .run-queued{background:rgba(245,158,11,.15);color:var(--yellow)}
+    .run-cancelled{background:rgba(148,163,184,.15);color:var(--text2)}
+    .divider{border:none;border-top:1px solid var(--border);margin:16px 0}
+  </style>
+</head>
+<body>
+
+<div class="logo">
+  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+    <rect width="28" height="28" rx="8" fill="#0ea5e9"/>
+    <path d="M7 14h14M7 9h14M7 19h9" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+  <span class="logo-text">FieldGovern</span>
+</div>
+
+<h1>Deploy Status</h1>
+<p class="sub">Live deployment health — auto-refreshes every 30 seconds</p>
+
+<button class="refresh-btn" onclick="refresh()">↻ Refresh Now</button>
+<span class="auto-refresh" id="countdown">Next refresh in 30s</span>
+
+<!-- Big Status Banner -->
+<div class="card" style="margin-bottom:16px" id="overall-card">
+  <div class="big-status" id="overall-status">
+    <div class="big-status-icon">⏳</div>
+    <div class="big-status-text">Checking deployment…</div>
+    <div class="big-status-sub">Fetching health + commit data</div>
+  </div>
+  <!-- Deploy Timeline -->
+  <div class="timeline" id="deploy-timeline">
+    <div class="tl-step" id="tl-push">
+      <div class="tl-dot" id="tl-push-dot">1</div>
+      <div class="tl-label" id="tl-push-label">Push to GitHub</div>
+    </div>
+    <div class="tl-step" id="tl-build">
+      <div class="tl-dot" id="tl-build-dot">2</div>
+      <div class="tl-label" id="tl-build-label">Docker Build</div>
+    </div>
+    <div class="tl-step" id="tl-restart">
+      <div class="tl-dot" id="tl-restart-dot">3</div>
+      <div class="tl-label" id="tl-restart-label">Container Restart</div>
+    </div>
+    <div class="tl-step">
+      <div class="tl-dot" id="tl-live-dot">4</div>
+      <div class="tl-label" id="tl-live-label">Live</div>
+    </div>
+  </div>
+  <div id="build-progress-wrap" style="display:none;margin-top:16px">
+    <div class="progress-bar"><div class="progress-fill" id="build-progress" style="width:0%"></div></div>
+    <div class="progress-label"><span id="prog-left">Estimating…</span><span id="prog-right"></span></div>
+  </div>
+  <div id="overall-detail" style="margin-top:12px"></div>
+</div>
+
+<div class="grid">
+  <!-- App Health -->
+  <div class="card">
+    <div class="card-title">App Health</div>
+    <div class="status-row">
+      <div class="dot dot-spin" id="health-dot"></div>
+      <div>
+        <div class="status-label" id="health-label">Checking…</div>
+        <div class="status-detail" id="health-detail">Pinging /health endpoint</div>
+      </div>
+    </div>
+    <div id="health-error"></div>
+  </div>
+
+  <!-- Latest Commit -->
+  <div class="card">
+    <div class="card-title">Latest GitHub Commit</div>
+    <div id="commit-status">
+      <div class="status-row">
+        <div class="dot dot-spin"></div>
+        <div class="status-label">Fetching…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GitHub Actions -->
+  <div class="card">
+    <div class="card-title">GitHub Actions / CI</div>
+    <div id="actions-status">
+      <div class="status-row">
+        <div class="dot dot-spin"></div>
+        <div class="status-label">Fetching…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Commits -->
+<div class="card" style="margin-bottom:16px">
+  <div class="section-title">Recent Commits</div>
+  <div class="commits" id="commits-list">
+    <div style="color:var(--text2);font-size:.85rem">Loading…</div>
+  </div>
+</div>
+
+<!-- Endpoints -->
+<div class="card" style="margin-bottom:16px">
+  <div class="section-title">Endpoint Checks</div>
+  <div id="endpoints-list">
+    <div style="color:var(--text2);font-size:.85rem">Loading…</div>
+  </div>
+</div>
+
+<div class="ts" id="last-checked">Last checked: —</div>
+
+<script>
+  const GITHUB_REPO = 'apranjipavan2-spec/DataCollectTool';
+  const APP_BASE    = 'https://www.fieldgovern.com';
+  const ENDPOINTS   = [
+    { label: 'Health Check',  url: '/health' },
+    { label: 'API Root',      url: '/api/v1' },
+    { label: 'Homepage',      url: '/' },
+    { label: 'Demo Page',     url: '/demo.html' },
+    { label: 'Features Page', url: '/features.html' },
+    { label: 'Status Page',   url: '/status.html' },
+  ];
+  const BUILD_TIME_MS = 10 * 60 * 1000; // estimated 10 min Docker build
+
+  let timer, countdown = 30;
+  let healthOk = false, latestCommitDate = null, actionsRun = null;
+
+  // ── Health ─────────────────────────────────────────────────────────────────
+  async function checkHealth() {
+    const dot    = document.getElementById('health-dot');
+    const label  = document.getElementById('health-label');
+    const detail = document.getElementById('health-detail');
+    const errBox = document.getElementById('health-error');
+    try {
+      const t0  = Date.now();
+      const res = await fetch(APP_BASE + '/health', { cache: 'no-store' });
+      const ms  = Date.now() - t0;
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        healthOk = true;
+        dot.className      = 'dot dot-green';
+        label.textContent  = '✓ Online';
+        detail.textContent = `${res.status} · ${ms}ms · status: ${body.status || 'ok'}`;
+        errBox.innerHTML   = '';
+      } else {
+        healthOk = false;
+        dot.className      = 'dot dot-red';
+        label.textContent  = '✗ Error';
+        detail.textContent = `HTTP ${res.status} · ${ms}ms`;
+        errBox.innerHTML   = `<div class="error-box"><div class="error-title">Response Error</div><div class="error-text">Status: ${res.status}\nBody: ${JSON.stringify(body)}</div></div>`;
+      }
+    } catch(e) {
+      healthOk = false;
+      dot.className      = 'dot dot-red';
+      label.textContent  = '✗ Unreachable';
+      detail.textContent = 'Could not reach the server';
+      errBox.innerHTML   = `<div class="error-box"><div class="error-title">Connection Error</div><div class="error-text">${e.message}</div></div>`;
+    }
+  }
+
+  // ── GitHub commits ─────────────────────────────────────────────────────────
+  async function checkGithub() {
+    try {
+      const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/commits?per_page=5`, {
+        headers: { Accept: 'application/vnd.github.v3+json' }
+      });
+      if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+      const commits = await res.json();
+      const latest  = commits[0];
+      latestCommitDate = new Date(latest.commit.author.date);
+      const age = timeSince(latestCommitDate);
+
+      document.getElementById('commit-status').innerHTML = `
+        <div class="status-row">
+          <div class="dot dot-green"></div>
+          <div>
+            <div class="status-label">${age} ago</div>
+            <div class="status-detail">${latestCommitDate.toLocaleString()}</div>
+          </div>
+        </div>
+        <div style="margin-top:8px">
+          <span class="sha">${latest.sha.slice(0,7)}</span>
+          <span style="font-size:.8rem;color:var(--text2);margin-left:6px">${escHtml(latest.commit.message.split('\n')[0].slice(0,60))}</span>
+        </div>`;
+
+      const rows = commits.map((c, i) => {
+        const d   = new Date(c.commit.author.date);
+        const msg = escHtml(c.commit.message.split('\n')[0].slice(0, 80));
+        const who = escHtml(c.commit.author.name);
+        return `<div class="commit ${i===0?'latest':''}">
+          <div class="commit-msg">${msg}</div>
+          <div class="commit-meta">
+            <span class="sha">${c.sha.slice(0,7)}</span>
+            <span>${who}</span>
+            <span>${timeSince(d)} ago</span>
+            <span>${d.toLocaleDateString()}</span>
+          </div>
+        </div>`;
+      }).join('');
+      document.getElementById('commits-list').innerHTML = rows;
+
+    } catch(e) {
+      const errHtml = `<div class="error-box"><div class="error-title">GitHub API Error</div><div class="error-text">${e.message}</div></div>`;
+      document.getElementById('commit-status').innerHTML = `<div class="status-row"><div class="dot dot-red"></div><div class="status-label">Failed</div></div>${errHtml}`;
+      document.getElementById('commits-list').innerHTML = errHtml;
+    }
+  }
+
+  // ── GitHub Actions ─────────────────────────────────────────────────────────
+  async function checkActions() {
+    try {
+      const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/actions/runs?per_page=5`, {
+        headers: { Accept: 'application/vnd.github.v3+json' }
+      });
+      if (!res.ok) {
+        // Actions API may return 404 if Actions not enabled — not an error
+        document.getElementById('actions-status').innerHTML = `
+          <div class="status-row">
+            <div class="dot dot-yellow"></div>
+            <div>
+              <div class="status-label">No Actions configured</div>
+              <div class="status-detail">Deploy triggered by VPS webhook</div>
+            </div>
+          </div>`;
+        return;
+      }
+      const data = await res.json();
+      const runs = data.workflow_runs || [];
+      if (runs.length === 0) {
+        document.getElementById('actions-status').innerHTML = `<div style="color:var(--text2);font-size:.85rem">No workflow runs found</div>`;
+        return;
+      }
+      actionsRun = runs[0];
+
+      const rows = runs.slice(0,3).map((r, i) => {
+        const cls  = runClass(r);
+        const icon = runIcon(r);
+        const age  = timeSince(new Date(r.created_at));
+        const dur  = r.updated_at ? durationStr(new Date(r.created_at), new Date(r.updated_at)) : '';
+        return `<div class="action-run">
+          <span class="run-badge ${cls}">${icon} ${runLabel(r)}</span>
+          <span style="font-size:.8rem;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(r.name || r.event)}</span>
+          <span style="font-size:.75rem;color:var(--text2)">${age} ago${dur ? ' · ' + dur : ''}</span>
+        </div>`;
+      }).join('');
+      document.getElementById('actions-status').innerHTML = rows;
+    } catch(e) {
+      document.getElementById('actions-status').innerHTML = `<div class="error-box"><div class="error-title">Actions API Error</div><div class="error-text">${e.message}</div></div>`;
+    }
+  }
+
+  function runClass(r) {
+    if (r.status === 'in_progress' || r.status === 'queued') return 'run-progress';
+    if (r.conclusion === 'success')   return 'run-success';
+    if (r.conclusion === 'failure')   return 'run-failure';
+    if (r.conclusion === 'cancelled') return 'run-cancelled';
+    return 'run-queued';
+  }
+  function runIcon(r) {
+    if (r.status === 'in_progress') return '⚙️';
+    if (r.status === 'queued')      return '⏳';
+    if (r.conclusion === 'success') return '✓';
+    if (r.conclusion === 'failure') return '✗';
+    return '·';
+  }
+  function runLabel(r) {
+    if (r.status === 'in_progress') return 'Running';
+    if (r.status === 'queued')      return 'Queued';
+    if (r.conclusion === 'success') return 'Passed';
+    if (r.conclusion === 'failure') return 'Failed';
+    if (r.conclusion === 'cancelled') return 'Cancelled';
+    return r.status;
+  }
+  function durationStr(start, end) {
+    const s = Math.floor((end - start) / 1000);
+    if (s < 60)   return `${s}s`;
+    return `${Math.floor(s/60)}m ${s%60}s`;
+  }
+
+  // ── Overall deploy state ───────────────────────────────────────────────────
+  function updateOverallStatus() {
+    if (!latestCommitDate) return;
+    const ageMs  = Date.now() - latestCommitDate;
+    const ageMin = ageMs / 60000;
+
+    const icon   = document.getElementById('overall-status');
+    const detail = document.getElementById('overall-detail');
+    const pWrap  = document.getElementById('build-progress-wrap');
+    const pFill  = document.getElementById('build-progress');
+    const pLeft  = document.getElementById('prog-left');
+    const pRight = document.getElementById('prog-right');
+
+    // Timeline dots
+    const setStep = (id, state) => {
+      const dot   = document.getElementById(id + '-dot');
+      const label = document.getElementById(id + '-label');
+      dot.className   = 'tl-dot ' + state;
+      label.className = 'tl-label ' + state;
+      if (state === 'done') dot.textContent = '✓';
+      if (state === 'fail') dot.textContent = '✗';
+      if (state === 'active') dot.textContent = '●';
+    };
+
+    if (healthOk) {
+      // ✅ Fully deployed
+      icon.innerHTML = `<div class="big-status-icon">✅</div>
+        <div class="big-status-text" style="color:var(--green)">Deployed & Live</div>
+        <div class="big-status-sub">App is running · last pushed ${timeSince(latestCommitDate)} ago</div>`;
+      setStep('tl-push',    'done');
+      setStep('tl-build',   'done');
+      setStep('tl-restart', 'done');
+      setStep('tl-live',    'done');
+      document.getElementById('tl-push').classList.add('done');
+      document.getElementById('tl-build').classList.add('done');
+      document.getElementById('tl-restart').classList.add('done');
+      pWrap.style.display = 'none';
+      detail.innerHTML = '';
+
+    } else if (ageMin < 2) {
+      // Just pushed
+      icon.innerHTML = `<div class="big-status-icon">📤</div>
+        <div class="big-status-text" style="color:var(--yellow)">Push received — build queuing</div>
+        <div class="big-status-sub">VPS webhook should trigger in seconds</div>`;
+      setStep('tl-push',    'done');
+      setStep('tl-build',   'active');
+      setStep('tl-restart', '');
+      setStep('tl-live',    '');
+      document.getElementById('tl-push').classList.add('done');
+      document.getElementById('tl-build').classList.add('active');
+      pWrap.style.display = 'block';
+      const pct = Math.min(5, (ageMs / BUILD_TIME_MS) * 100);
+      pFill.style.width = pct + '%';
+      pLeft.textContent = 'Build starting…';
+      pRight.textContent = `~${Math.round((BUILD_TIME_MS - ageMs) / 60000)}m remaining`;
+
+    } else if (ageMin < 15) {
+      // Build in progress (most likely)
+      const pct = Math.min(90, (ageMs / BUILD_TIME_MS) * 100);
+      const remMin = Math.max(0, Math.round((BUILD_TIME_MS - ageMs) / 60000));
+      icon.innerHTML = `<div class="big-status-icon">🔨</div>
+        <div class="big-status-text" style="color:var(--brand)">Docker build in progress</div>
+        <div class="big-status-sub">Pushed ${timeSince(latestCommitDate)} ago · builds typically take ~10 min</div>`;
+      setStep('tl-push',    'done');
+      setStep('tl-build',   'active');
+      setStep('tl-restart', '');
+      setStep('tl-live',    '');
+      document.getElementById('tl-push').classList.add('done');
+      document.getElementById('tl-build').classList.add('active');
+      pWrap.style.display = 'block';
+      pFill.style.width = pct + '%';
+      pFill.style.background = 'var(--brand)';
+      pLeft.textContent = `Building… ${Math.round(pct)}% estimated`;
+      pRight.textContent = remMin > 0 ? `~${remMin}m remaining` : 'finishing soon…';
+      detail.innerHTML = `<div class="warn-box"><div class="warn-title">⏳ Build in progress</div>
+        <div class="warn-text">The VPS is running the Docker build triggered by your last push. The /health endpoint will return 200 once the new container is live. Keep refreshing.</div></div>`;
+
+    } else if (ageMin < 30) {
+      // Should be done — but health is still failing
+      icon.innerHTML = `<div class="big-status-icon">⚠️</div>
+        <div class="big-status-text" style="color:var(--orange)">Build overdue — may have failed</div>
+        <div class="big-status-sub">Pushed ${timeSince(latestCommitDate)} ago · build usually finishes by now</div>`;
+      setStep('tl-push',    'done');
+      setStep('tl-build',   'fail');
+      setStep('tl-restart', '');
+      setStep('tl-live',    '');
+      document.getElementById('tl-push').classList.add('done');
+      pWrap.style.display = 'block';
+      pFill.style.width = '90%';
+      pFill.style.background = 'var(--orange)';
+      pLeft.textContent = 'Build took longer than expected';
+      pRight.textContent = timeSince(latestCommitDate) + ' since push';
+      detail.innerHTML = `<div class="error-box"><div class="error-title">Possible build failure</div>
+        <div class="error-text">The build has been running for ${Math.round(ageMin)} minutes. Check your VPS logs:
+  ssh into VPS → docker logs &lt;container&gt;
+  or check your deploy webhook output for npm/build errors.</div></div>`;
+
+    } else {
+      // Long time since push, health still failing = real problem
+      icon.innerHTML = `<div class="big-status-icon">🚨</div>
+        <div class="big-status-text" style="color:var(--red)">App offline or build failed</div>
+        <div class="big-status-sub">Last push was ${timeSince(latestCommitDate)} ago — app should be live by now</div>`;
+      setStep('tl-push',    'done');
+      setStep('tl-build',   'fail');
+      setStep('tl-restart', 'fail');
+      setStep('tl-live',    'fail');
+      document.getElementById('tl-push').classList.add('done');
+      pWrap.style.display = 'none';
+      detail.innerHTML = `<div class="error-box"><div class="error-title">App is down</div>
+        <div class="error-text">The /health endpoint is unreachable ${Math.round(ageMin)} minutes after the last push. Likely causes:
+  1. Docker build failed (missing package, syntax error)
+  2. Container crashed on startup (DB connection, env var missing)
+  3. VPS out of memory or disk space
+  4. Webhook didn't trigger (check GitHub webhook delivery logs)</div></div>`;
+    }
+  }
+
+  // ── Endpoints ──────────────────────────────────────────────────────────────
+  async function checkEndpoints() {
+    const rows = await Promise.all(ENDPOINTS.map(async ep => {
+      try {
+        const t0  = Date.now();
+        await fetch(APP_BASE + ep.url, { cache: 'no-store', mode: 'no-cors' });
+        const ms  = Date.now() - t0;
+        return `<div class="endpoint-row">
+          <span class="endpoint-url">${ep.url}</span>
+          <span class="endpoint-label">${ep.label}</span>
+          <span class="endpoint-status" style="color:var(--green)">✓ ${ms}ms</span>
+        </div>`;
+      } catch(e) {
+        return `<div class="endpoint-row">
+          <span class="endpoint-url">${ep.url}</span>
+          <span class="endpoint-label">${ep.label}</span>
+          <span class="endpoint-status" style="color:var(--red)">✗ Unreachable</span>
+        </div>`;
+      }
+    }));
+    document.getElementById('endpoints-list').innerHTML = rows.join('');
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function timeSince(date) {
+    const s = Math.floor((Date.now() - date) / 1000);
+    if (s < 60)    return `${s}s`;
+    if (s < 3600)  return `${Math.floor(s/60)}m ${s%60}s`;
+    if (s < 86400) return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+    return `${Math.floor(s/86400)}d`;
+  }
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Main refresh ───────────────────────────────────────────────────────────
+  async function refresh() {
+    countdown = 30;
+    document.getElementById('countdown').textContent = 'Next refresh in 30s';
+    document.getElementById('last-checked').textContent = 'Last checked: ' + new Date().toLocaleTimeString();
+    await Promise.all([checkHealth(), checkGithub(), checkActions(), checkEndpoints()]);
+    updateOverallStatus();
+  }
+
+  function startCountdown() {
+    clearInterval(timer);
+    timer = setInterval(() => {
+      countdown--;
+      document.getElementById('countdown').textContent = `Next refresh in ${countdown}s`;
+      if (countdown <= 0) { countdown = 30; refresh(); }
+    }, 1000);
+  }
+
+  refresh();
+  startCountdown();
+</script>
+</body>
+</html>
