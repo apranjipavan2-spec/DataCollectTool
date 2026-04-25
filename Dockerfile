@@ -28,6 +28,9 @@ COPY backend /app
 # Copy built frontend into backend's static dir
 COPY --from=frontend-builder /frontend/dist /app/static
 
+# Copy marketing website
+COPY website /app/website
+
 RUN mkdir -p /app/uploads
 
 ENV PYTHONUNBUFFERED=1
