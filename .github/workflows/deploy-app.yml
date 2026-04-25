@@ -81,17 +81,26 @@ jobs:
             set -e
             cd /opt/fieldgovern
 
-            # Log in to ghcr.io (uses a PAT stored as env on server, or pass here)
-            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u apranjipavan2-spec --password-stdin
+            # ── 1. Update nginx config from repo (always keep in sync) ──────────
+            rm -f /opt/fieldgovern/nginx.conf
+            curl -fsSL "https://raw.githubusercontent.com/apranjipavan2-spec/DataCollectTool/main/deploy/nginx.conf" \
+              -o /opt/fieldgovern/nginx.conf
+            docker compose exec -T nginx nginx -t
+            docker compose exec -T nginx nginx -s reload
+            echo "Nginx config updated and reloaded"
 
-            # Pull latest image
+            # ── 2. Pull latest app image ────────────────────────────────────────
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u apranjipavan2-spec --password-stdin
             docker compose pull app
 
-            # Restart app only (zero-downtime: old container stays up until new one is ready)
+            # ── 3. Restart app (zero-downtime) ──────────────────────────────────
             docker compose up -d --no-deps app
 
-            # Apply any new DB migrations + schema patches
-            docker compose exec -T app sh -c "alembic upgrade head || true"
+            # ── 4. Run DB migrations (idempotent — safe to run every deploy) ───
+            docker compose exec -T app sh -c "alembic upgrade head 2>&1 || true"
+
+            # ── 5. Prune old images to save disk space ─────────────────────────
+            docker image prune -f
 
             echo "Deploy complete — $(date)"
 

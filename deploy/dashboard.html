@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>FieldGovern — Deploy Monitor</title>
+<style>
+:root {
+  --brand:#0ea5e9; --green:#10b981; --red:#ef4444; --yellow:#f59e0b; --orange:#f97316;
+  --bg:#0f172a; --card:#1e293b; --border:#334155; --text:#f1f5f9; --text2:#94a3b8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}
+a{color:var(--brand);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Layout */
+.logo{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.logo-text{font-size:1.1rem;font-weight:800;color:var(--brand)}
+.logo-actions{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+@media(max-width:900px){.grid3{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.grid2,.grid3{grid-template-columns:1fr}}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:14px;transition:border-color .3s}
+.card0{margin-bottom:0}
+.card-hdr{font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.hdr-actions{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;border:none;transition:.15s}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-sm{padding:4px 10px;font-size:.72rem}
+.btn-primary{background:var(--brand);color:#fff}.btn-primary:hover{opacity:.85}
+.btn-red{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}.btn-red:hover{background:rgba(239,68,68,.25)}
+.btn-orange{background:rgba(249,115,22,.15);color:var(--orange);border:1px solid rgba(249,115,22,.3)}.btn-orange:hover{background:rgba(249,115,22,.25)}
+.btn-green{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3)}.btn-green:hover{background:rgba(16,185,129,.25)}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}.btn-ghost:hover{background:var(--border)}
+
+/* Status dots */
+.dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block}
+.dot-green{background:var(--green);box-shadow:0 0 7px var(--green)}
+.dot-red{background:var(--red);box-shadow:0 0 7px var(--red)}
+.dot-yellow{background:var(--yellow);box-shadow:0 0 7px var(--yellow)}
+.dot-orange{background:var(--orange);box-shadow:0 0 7px var(--orange)}
+.dot-spin{width:9px;height:9px;border-radius:2px;background:var(--brand);animation:spin .8s linear infinite;flex-shrink:0;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Tags */
+.tag{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:99px;font-size:.7rem;font-weight:600}
+.tag-green{background:rgba(16,185,129,.15);color:var(--green)}
+.tag-red{background:rgba(239,68,68,.15);color:var(--red)}
+.tag-yellow{background:rgba(245,158,11,.15);color:var(--yellow)}
+.tag-orange{background:rgba(249,115,22,.15);color:var(--orange)}
+.tag-blue{background:rgba(14,165,233,.15);color:var(--brand)}
+.tag-gray{background:rgba(148,163,184,.12);color:var(--text2)}
+
+/* Progress */
+.prog-bar{height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin:8px 0 3px}
+.prog-fill{height:100%;border-radius:3px;transition:width .4s ease}
+.prog-labels{display:flex;justify-content:space-between;font-size:.72rem;color:var(--text2)}
+
+/* Log viewer */
+.log-wrap{background:#060d1a;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:10px}
+.log-toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#0a1628;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.log-search{flex:1;min-width:140px;background:#0f172a;border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:6px;font-size:.78rem;outline:none}
+.log-search:focus{border-color:var(--brand)}
+.log-select{background:#0f172a;border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:.78rem;outline:none;cursor:pointer}
+.log-body{height:480px;overflow-y:auto;padding:10px 14px;font-family:'Courier New',monospace;font-size:.75rem;line-height:1.6;white-space:pre-wrap;word-break:break-all}
+.log-body::-webkit-scrollbar{width:6px}
+.log-body::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+.log-line{display:block;padding:1px 0}
+.log-err{color:#fca5a5;background:rgba(239,68,68,.07);border-radius:2px}
+.log-warn{color:#fde68a}
+.log-info{color:#7dd3fc}
+.log-dim{color:#475569}
+.hl{background:rgba(245,158,11,.4);border-radius:2px;color:#fff}
+
+/* Container rows */
+.ctr-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:.8rem}
+.ctr-row:last-child{border:none}
+.ctr-name{flex:1;font-weight:600;font-family:monospace;font-size:.78rem}
+.ctr-detail{font-size:.72rem;color:var(--text2)}
+
+/* GitHub runs */
+.run-item{background:#0a1628;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;overflow:hidden}
+.run-hdr{display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;font-size:.8rem;user-select:none}
+.run-hdr:hover{background:rgba(255,255,255,.03)}
+.run-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.run-body{display:none;border-top:1px solid var(--border);padding:12px}
+.run-body.open{display:block}
+.step-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:5px;font-size:.75rem}
+.step-row:hover{background:rgba(255,255,255,.04)}
+.step-name{flex:1;color:var(--text2)}
+.step-dur{color:var(--text2);font-size:.7rem;white-space:nowrap}
+
+/* SSH commands */
+.cmd-block{background:#060d1a;border:1px solid var(--border);border-radius:7px;padding:9px 12px;margin-bottom:6px;display:flex;align-items:flex-start;gap:10px}
+.cmd-info{flex:1}
+.cmd-label{font-size:.68rem;color:var(--text2);margin-bottom:3px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.cmd-code{font-family:'Courier New',monospace;font-size:.76rem;color:#7dd3fc;white-space:pre-wrap;word-break:break-all}
+.copy-btn{background:#1e293b;border:1px solid var(--border);color:var(--text2);padding:4px 9px;border-radius:5px;font-size:.7rem;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:.15s}
+.copy-btn:hover{background:#334155;color:var(--text)}
+.copy-btn.ok{color:var(--green);border-color:var(--green)}
+
+/* Settings modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;width:min(500px,100%);max-height:90vh;overflow-y:auto}
+.modal h2{font-size:1rem;font-weight:700;margin-bottom:18px}
+.form-row{margin-bottom:14px}
+.form-label{font-size:.75rem;color:var(--text2);margin-bottom:5px;display:block;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.form-input{width:100%;background:#0f172a;border:1px solid var(--border);color:var(--text);padding:8px 11px;border-radius:7px;font-size:.84rem;outline:none;font-family:monospace}
+.form-input:focus{border-color:var(--brand)}
+.form-hint{font-size:.7rem;color:var(--text2);margin-top:4px;line-height:1.4}
+.info-box{background:#0a1628;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:.74rem;color:var(--text2);line-height:1.6;margin-top:8px}
+.info-box b{color:var(--yellow)}
+.info-box code{color:#7dd3fc;background:rgba(14,165,233,.1);padding:1px 4px;border-radius:3px}
+
+/* Action output */
+.action-out{background:#060d1a;border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:10px;font-family:monospace;font-size:.76rem;white-space:pre-wrap;max-height:200px;overflow-y:auto;display:none}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:.82rem;z-index:200;animation:slidein .2s ease;max-width:340px;pointer-events:none}
+@keyframes slidein{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+.toast.ok{border-color:var(--green);color:var(--green)}
+.toast.err{border-color:var(--red);color:var(--red)}
+.toast.warn{border-color:var(--orange);color:var(--orange)}
+
+/* Misc */
+.ts{color:var(--text2);font-size:.72rem}
+.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
+.stat-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.stat-label{font-size:.9rem;font-weight:600}
+.stat-sub{font-size:.76rem;color:var(--text2)}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="logo">
+  <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+    <rect width="28" height="28" rx="8" fill="#0ea5e9"/>
+    <path d="M7 14h14M7 9h14M7 19h9" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+  <span class="logo-text">FieldGovern</span>
+  <span style="color:var(--text2);font-size:.8rem;margin-left:2px">/ Deploy Monitor</span>
+  <div class="logo-actions">
+    <span id="auto-badge" class="tag tag-green" style="cursor:pointer" onclick="toggleAuto()">⟳ Auto 30s</span>
+    <span id="countdown-badge" class="tag tag-gray">—</span>
+    <button class="btn btn-primary btn-sm" onclick="refreshAll()">↻ Refresh All</button>
+    <button class="btn btn-ghost btn-sm" onclick="showSettings()">⚙ Settings</button>
+  </div>
+</div>
+
+<!-- Banner -->
+<div class="card" id="banner-card" style="margin-bottom:14px">
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <div id="banner-icon" style="font-size:2rem">⏳</div>
+    <div style="flex:1;min-width:180px">
+      <div id="banner-title" style="font-size:1.05rem;font-weight:700">Checking deployment…</div>
+      <div id="banner-sub" class="ts" style="margin-top:3px">Fetching health + GitHub data</div>
+    </div>
+    <div id="banner-tags" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+  </div>
+  <div id="prog-wrap" style="display:none;margin-top:12px">
+    <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%;background:var(--brand)"></div></div>
+    <div class="prog-labels"><span id="prog-left">—</span><span id="prog-right">—</span></div>
+  </div>
+</div>
+
+<!-- Top 3 cards -->
+<div class="grid3">
+  <!-- Health -->
+  <div class="card card0">
+    <div class="card-hdr">App Health</div>
+    <div class="stat-row">
+      <div class="dot dot-spin" id="h-dot"></div>
+      <div>
+        <div class="stat-label" id="h-label">Checking…</div>
+        <div class="stat-sub" id="h-sub">Pinging /health</div>
+      </div>
+    </div>
+    <div id="h-err"></div>
+  </div>
+  <!-- VPS resources -->
+  <div class="card card0">
+    <div class="card-hdr">VPS Resources
+      <div class="hdr-actions"><button class="btn btn-ghost btn-sm" onclick="fetchVps()">↻</button></div>
+    </div>
+    <div id="vps-metrics"><div class="ts">Loading…</div></div>
+  </div>
+  <!-- Containers -->
+  <div class="card card0">
+    <div class="card-hdr">Containers</div>
+    <div id="containers-list"><div class="ts">Loading…</div></div>
+  </div>
+</div>
+
+<!-- Docker Logs -->
+<div class="card">
+  <div class="card-hdr">
+    Docker Logs — Live from VPS
+    <div class="hdr-actions">
+      <select class="log-select" id="log-svc" onchange="fetchLogs()">
+        <option value="">All services</option>
+        <option value="app">app</option>
+        <option value="nginx">nginx</option>
+        <option value="postgres">postgres</option>
+      </select>
+      <select class="log-select" id="log-lines">
+        <option value="100">100 lines</option>
+        <option value="300" selected>300 lines</option>
+        <option value="500">500 lines</option>
+        <option value="1000">1000 lines</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="fetchLogs()">↻ Refresh</button>
+      <button class="btn btn-ghost btn-sm" onclick="scrollBottom()">⬇ Bottom</button>
+    </div>
+  </div>
+  <div class="log-wrap">
+    <div class="log-toolbar">
+      <input class="log-search" id="log-search" placeholder="Filter: error  warn  nginx  app  postgres…" oninput="filterLogs()"/>
+      <button class="btn btn-ghost btn-sm" onclick="clearSearch()">✕</button>
+      <span id="log-match" class="ts"></span>
+      <span id="log-ts" class="ts" style="margin-left:auto"></span>
+    </div>
+    <div class="log-body" id="log-body">
+      <span class="ts">Fetching logs…</span>
+    </div>
+  </div>
+</div>
+
+<!-- GitHub Actions + Commits -->
+<div class="grid2">
+  <div class="card card0">
+    <div class="card-hdr">GitHub Actions Runs
+      <div class="hdr-actions"><button class="btn btn-ghost btn-sm" onclick="fetchGithub()">↻</button></div>
+    </div>
+    <div id="actions-list"><div class="ts">Loading…</div></div>
+  </div>
+  <div class="card card0">
+    <div class="card-hdr">Recent Commits</div>
+    <div id="commits-list"><div class="ts">Loading…</div></div>
+  </div>
+</div>
+
+<!-- VPS Actions -->
+<div class="card" style="margin-top:14px">
+  <div class="card-hdr">
+    VPS Actions
+    <div class="hdr-actions">
+      <button class="btn btn-green btn-sm" onclick="vpsAction('/api/vps/restart','Restart App')">⟳ Restart App</button>
+      <button class="btn btn-orange btn-sm" onclick="vpsAction('/api/vps/deploy','Pull &amp; Deploy')">⬆ Pull &amp; Deploy</button>
+      <button class="btn btn-red btn-sm" onclick="vpsAction('/api/vps/prune','Prune Images')">🗑 Prune Images</button>
+    </div>
+  </div>
+  <div id="action-out" class="action-out"></div>
+
+  <div class="divider"></div>
+
+  <!-- SSH Troubleshooting Guide -->
+  <div class="card-hdr" style="margin-bottom:4px">SSH Troubleshooting Guide</div>
+  <p class="ts" style="margin-bottom:12px">All commands run remotely via this dashboard. Copy any command to run it yourself in your terminal.</p>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <button class="btn btn-ghost btn-sm" onclick="showSection('sec-connect')">🔗 Connect</button>
+    <button class="btn btn-ghost btn-sm" onclick="showSection('sec-logs')">📋 View Logs</button>
+    <button class="btn btn-ghost btn-sm" onclick="showSection('sec-containers')">🐳 Containers</button>
+    <button class="btn btn-ghost btn-sm" onclick="showSection('sec-disk')">💾 Disk/Memory</button>
+    <button class="btn btn-ghost btn-sm" onclick="showSection('sec-deploy')">🚀 Deploy</button>
+    <button class="btn btn-ghost btn-sm" onclick="showSection('sec-env')">🔑 Env/Config</button>
+    <button class="btn btn-ghost btn-sm" onclick="showSection('sec-all')">Show All</button>
+  </div>
+
+  <div id="ssh-sections"></div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-bg" id="settings-modal" style="display:none" onclick="if(event.target===this)hideSettings()">
+  <div class="modal">
+    <h2>⚙ Monitor Configuration</h2>
+
+    <div class="form-row">
+      <label class="form-label">VPS Host — IP address or domain</label>
+      <input class="form-input" id="s-host" placeholder="e.g. 123.456.789.0 or vps.example.com"/>
+      <div class="form-hint">Your VPS public IP. Find it in your cloud provider dashboard.</div>
+    </div>
+
+    <div class="form-row">
+      <label class="form-label">SSH Username</label>
+      <input class="form-input" id="s-user" placeholder="fieldgovern"/>
+    </div>
+
+    <div class="form-row">
+      <label class="form-label">SSH Private Key Path (optional)</label>
+      <input class="form-input" id="s-key" placeholder="C:/Users/you/.ssh/id_rsa  or  leave blank for default"/>
+      <div class="form-hint">Path to the private key that matches the VPS's <code>~/.ssh/authorized_keys</code>.</div>
+    </div>
+
+    <div class="form-row">
+      <label class="form-label">App Directory on VPS</label>
+      <input class="form-input" id="s-dir" placeholder="/opt/fieldgovern"/>
+    </div>
+
+    <div class="form-row">
+      <label class="form-label">GitHub Personal Access Token (optional)</label>
+      <input class="form-input" id="s-token" type="password" placeholder="ghp_… — higher API rate limit (5000 req/hr vs 60)"/>
+      <div class="form-hint">Create at github.com/settings/tokens — needs <b>repo</b> read scope.</div>
+    </div>
+
+    <div class="info-box">
+      <b>First-time SSH setup on Windows:</b><br/>
+      1. Open PowerShell as Admin and run:<br/>
+      &nbsp;&nbsp;<code>Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0</code><br/>
+      2. Generate a key (if you don't have one):<br/>
+      &nbsp;&nbsp;<code>ssh-keygen -t ed25519 -C "fieldgovern-monitor"</code><br/>
+      3. Copy key to VPS:<br/>
+      &nbsp;&nbsp;<code>ssh-copy-id fieldgovern@YOUR_VPS_IP</code><br/>
+      4. Test: <code>ssh fieldgovern@YOUR_VPS_IP "echo ok"</code><br/>
+      <br/>
+      <b>If your key is from GitHub Actions secrets</b>, export it from your repo secrets and save it to <code>~/.ssh/fieldgovern_vps</code>, then set the key path above.
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:18px">
+      <button class="btn btn-primary" onclick="saveSettings()">Save &amp; Reconnect</button>
+      <button class="btn btn-ghost" onclick="hideSettings()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+const BASE = 'http://localhost:4747';
+let cfg = {};
+let rawLogs = '';
+let latestRunId = null;
+let latestCommitDate = null;
+let healthOk = false;
+let autoOn = true;
+let autoTimer = null;
+let countdown = 30;
+let countdownTimer = null;
+const BUILD_TIME_MS = 10 * 60 * 1000;
+// Store commands for copy buttons (avoids escaping issues in onclick)
+const cmdStore = {};
+
+function $id(id) { return document.getElementById(id); }
+
+function esc(s) {
+  return String(s || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+function ago(d) {
+  const s = Math.floor((Date.now() - new Date(d)) / 1000);
+  if (s < 60)    return s + 's';
+  if (s < 3600)  return Math.floor(s/60) + 'm ' + (s%60) + 's';
+  if (s < 86400) return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+  return Math.floor(s/86400) + 'd';
+}
+function dur(a, b) {
+  const s = Math.round((new Date(b) - new Date(a)) / 1000);
+  return s < 60 ? s + 's' : Math.floor(s/60) + 'm ' + (s % 60) + 's';
+}
+
+function toast(msg, type) {
+  type = type || 'ok';
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  $id('toasts').appendChild(el);
+  setTimeout(function() { el.remove(); }, 3500);
+}
+
+async function api(path, method, body) {
+  method = method || 'GET';
+  const opts = { method: method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(BASE + path, opts);
+  return r.json();
+}
+
+// ── Config ────────────────────────────────────────────────────────────────────
+async function loadConfig() {
+  cfg = await api('/api/config');
+  buildSshSections();
+  if (!cfg.configured) {
+    $id('banner-icon').textContent = '⚙';
+    $id('banner-title').textContent = 'VPS not configured';
+    $id('banner-sub').textContent = 'Click ⚙ Settings and enter your VPS IP to enable SSH log access.';
+  }
+}
+
+// ── Health ────────────────────────────────────────────────────────────────────
+async function fetchHealth() {
+  $id('h-dot').className = 'dot dot-spin';
+  let r;
+  try { r = await api('/api/health'); } catch(e) { r = { ok: false, error: e.message }; }
+  if (r.ok) {
+    healthOk = true;
+    $id('h-dot').className = 'dot dot-green';
+    $id('h-label').textContent = '✓ Online';
+    $id('h-sub').textContent = 'HTTP ' + r.status + ' · ' + r.ms + 'ms';
+    $id('h-err').innerHTML = '';
+  } else {
+    healthOk = false;
+    $id('h-dot').className = 'dot dot-red';
+    $id('h-label').textContent = r.error ? '✗ Unreachable' : ('✗ HTTP ' + r.status);
+    $id('h-sub').textContent = r.error || ('HTTP ' + r.status + ' · ' + r.ms + 'ms');
+    $id('h-err').innerHTML =
+      '<div style="margin-top:7px;padding:8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:6px;font-size:.75rem;color:#fca5a5">' +
+      esc(r.error || ('Server returned HTTP ' + r.status)) +
+      (r.body ? '<br/><code style="opacity:.7">' + esc(r.body.slice(0,200)) + '</code>' : '') +
+      '</div>';
+  }
+  updateBanner();
+}
+
+// ── VPS Status ────────────────────────────────────────────────────────────────
+async function fetchVps() {
+  const r = await api('/api/vps/status');
+  if (r.error) {
+    const errHtml = '<div class="ts">' + esc(r.error) + '</div>';
+    $id('vps-metrics').innerHTML = errHtml;
+    $id('containers-list').innerHTML = errHtml;
+    return;
+  }
+  const dp = r.disk || {};
+  const mp = r.memory || {};
+  const diskPct = parseInt(dp.pct) || 0;
+  const diskCol = diskPct > 85 ? 'var(--red)' : diskPct > 70 ? 'var(--orange)' : 'var(--green)';
+
+  $id('vps-metrics').innerHTML =
+    '<div class="ts" style="margin-bottom:8px">' + esc(r.uptime || '') + '</div>' +
+    '<div style="margin-bottom:9px">' +
+      '<div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:3px">' +
+        '<span>Disk</span>' +
+        '<span style="color:' + diskCol + '">' + esc(dp.used || '?') + ' / ' + esc(dp.size || '?') + ' (' + esc(dp.pct || '?') + ')</span>' +
+      '</div>' +
+      '<div class="prog-bar"><div class="prog-fill" style="width:' + diskPct + '%;background:' + diskCol + '"></div></div>' +
+    '</div>' +
+    '<div style="font-size:.76rem;display:flex;justify-content:space-between">' +
+      '<span style="color:var(--text2)">RAM</span>' +
+      '<span>' + esc(mp.used || '?') + ' / ' + esc(mp.total || '?') + '</span>' +
+    '</div>' +
+    (r.images && r.images.length ?
+      '<div style="margin-top:9px;display:flex;flex-wrap:wrap;gap:4px">' +
+      r.images.map(function(img) {
+        return '<span class="tag tag-gray" style="font-size:.65rem">' + esc(img.name) + ' ' + esc(img.size || '') + '</span>';
+      }).join('') + '</div>' : '');
+
+  if (!r.containers || !r.containers.length) {
+    $id('containers-list').innerHTML = '<div style="color:var(--orange);font-size:.8rem">⚠ No running containers</div>';
+  } else {
+    $id('containers-list').innerHTML = r.containers.map(function(c) {
+      const up = c.status && c.status.toLowerCase().indexOf('up') === 0;
+      return '<div class="ctr-row">' +
+        '<div class="dot ' + (up ? 'dot-green' : 'dot-red') + '"></div>' +
+        '<div><div class="ctr-name">' + esc(c.name || '?') + '</div>' +
+        '<div class="ctr-detail">' + esc(c.status || '') + ' · ' + esc((c.image || '').split(':')[0].split('/').pop()) + '</div></div>' +
+        '</div>';
+    }).join('');
+  }
+}
+
+// ── Docker Logs ───────────────────────────────────────────────────────────────
+async function fetchLogs() {
+  const lines = $id('log-lines').value;
+  const svc   = $id('log-svc').value;
+  $id('log-ts').textContent = 'Fetching…';
+  let r;
+  try { r = await api('/api/vps/logs?lines=' + lines + (svc ? '&service=' + svc : '')); }
+  catch(e) { r = { error: e.message }; }
+  if (r.error) {
+    rawLogs = '';
+    $id('log-body').innerHTML = '<span style="color:var(--red)">' + esc(r.error) + '</span>';
+    $id('log-ts').textContent = 'Error';
+    return;
+  }
+  rawLogs = r.logs || '';
+  $id('log-ts').textContent = 'Updated ' + new Date().toLocaleTimeString();
+  renderLogs();
+  scrollBottom();
+}
+
+function colorClass(line) {
+  const l = line.toLowerCase();
+  if (/error|fatal|panic|exception|failed|exited/.test(l)) return 'log-err';
+  if (/warn|warning/.test(l)) return 'log-warn';
+  if (/info|starting|started|listening|connected|ready|success/.test(l)) return 'log-info';
+  if (/^#|step \d/.test(l)) return 'log-dim';
+  return '';
+}
+
+function renderLogs() {
+  const q = $id('log-search').value.toLowerCase().trim();
+  const lines = rawLogs.split('\n');
+  let matches = 0;
+  const html = lines.map(function(line) {
+    const cls = colorClass(line);
+    let display = esc(line);
+    if (q) {
+      if (line.toLowerCase().indexOf(q) === -1) return '';
+      matches++;
+      const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      display = display.replace(new RegExp('(' + safe + ')', 'gi'), '<span class="hl">$1</span>');
+    }
+    return '<span class="log-line ' + cls + '">' + display + '</span>';
+  }).join('\n');
+  $id('log-body').innerHTML = html || '<span class="ts">No matching lines.</span>';
+  $id('log-match').textContent = q ? (matches + ' match' + (matches !== 1 ? 'es' : '')) : (lines.length + ' lines');
+}
+function filterLogs() { renderLogs(); }
+function clearSearch() { $id('log-search').value = ''; renderLogs(); }
+function scrollBottom() { const lb = $id('log-body'); lb.scrollTop = lb.scrollHeight; }
+
+// ── GitHub ────────────────────────────────────────────────────────────────────
+async function fetchGithub() {
+  let r;
+  try { r = await api('/api/github/runs'); }
+  catch(e) { $id('actions-list').innerHTML = '<div class="ts">Error: ' + esc(e.message) + '</div>'; return; }
+
+  const runs    = (r.runs && r.runs.workflow_runs) ? r.runs.workflow_runs : [];
+  const commits = Array.isArray(r.commits) ? r.commits : [];
+
+  if (runs.length) {
+    latestRunId = runs[0].id;
+    latestCommitDate = runs[0].created_at ? new Date(runs[0].created_at) : null;
+  }
+
+  $id('actions-list').innerHTML = runs.slice(0, 6).map(function(run) {
+    const running = run.status === 'in_progress' || run.status === 'queued';
+    const cls   = run.conclusion === 'success' ? 'tag-green'
+                : run.conclusion === 'failure' ? 'tag-red'
+                : running ? 'tag-blue' : 'tag-gray';
+    const icon  = run.conclusion === 'success' ? '✓'
+                : run.conclusion === 'failure' ? '✗'
+                : run.status === 'in_progress' ? '⚙' : '⏳';
+    const label = run.conclusion || run.status;
+    const elapsed = run.updated_at ? dur(run.created_at, run.updated_at) : '';
+    const logsUrl = 'https://github.com/' + cfg.github_repo + '/actions/runs/' + run.id;
+    return '<div class="run-item">' +
+      '<div class="run-hdr" onclick="toggleRun(' + run.id + ')">' +
+        '<span class="tag ' + cls + '" style="flex-shrink:0">' + icon + ' ' + esc(label) + '</span>' +
+        '<span class="run-name">' + esc(run.display_title || run.name || run.event) + '</span>' +
+        '<span class="ts">' + ago(run.created_at) + ' ago' + (elapsed ? ' · ' + elapsed : '') + '</span>' +
+        '<a href="' + logsUrl + '" target="_blank" style="font-size:.7rem;flex-shrink:0" onclick="event.stopPropagation()">→ GitHub</a>' +
+      '</div>' +
+      '<div class="run-body" id="run-' + run.id + '"><div class="ts">Loading steps…</div></div>' +
+    '</div>';
+  }).join('') || '<div class="ts">No runs found</div>';
+
+  $id('commits-list').innerHTML = commits.map(function(c, i) {
+    const msg = c.commit && c.commit.message ? c.commit.message.split('\n')[0].slice(0, 72) : '';
+    const author = c.commit && c.commit.author ? c.commit.author.name : '';
+    const date = c.commit && c.commit.author ? c.commit.author.date : '';
+    return '<div style="padding:7px 0;border-bottom:1px solid var(--border)' + (i === commits.length - 1 ? ';border:none' : '') + ';font-size:.8rem">' +
+      '<div style="font-weight:500;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(msg) + '</div>' +
+      '<div style="display:flex;gap:8px;font-size:.72rem;color:var(--text2);flex-wrap:wrap">' +
+        '<code style="background:var(--border);padding:1px 5px;border-radius:3px">' + esc(c.sha ? c.sha.slice(0, 7) : '') + '</code>' +
+        '<span>' + esc(author) + '</span>' +
+        (date ? '<span>' + ago(date) + ' ago</span>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('') || '<div class="ts">No commits found</div>';
+
+  updateBanner();
+}
+
+async function toggleRun(runId) {
+  const body = $id('run-' + runId);
+  if (!body) return;
+  if (body.classList.contains('open')) { body.classList.remove('open'); return; }
+  body.classList.add('open');
+  body.innerHTML = '<div class="ts">Fetching job steps from GitHub…</div>';
+  let r;
+  try { r = await api('/api/github/jobs?run_id=' + runId); }
+  catch(e) { body.innerHTML = '<div class="ts">Error: ' + esc(e.message) + '</div>'; return; }
+  const jobs = r.jobs || [];
+  if (!jobs.length) { body.innerHTML = '<div class="ts">No job data available</div>'; return; }
+  body.innerHTML = jobs.map(function(job) {
+    const jOk   = job.conclusion === 'success';
+    const jFail = job.conclusion === 'failure';
+    const jCls  = jOk ? 'tag-green' : jFail ? 'tag-red' : 'tag-blue';
+    const jIcon = jOk ? '✓' : jFail ? '✗' : '⚙';
+    const steps = (job.steps || []).map(function(s) {
+      const sc = s.conclusion === 'success' ? 'var(--green)'
+               : s.conclusion === 'failure' ? 'var(--red)'
+               : s.status === 'in_progress' ? 'var(--brand)' : 'var(--text2)';
+      const si = s.conclusion === 'success' ? '✓' : s.conclusion === 'failure' ? '✗'
+               : s.status === 'in_progress' ? '⚙' : '·';
+      const d  = (s.started_at && s.completed_at) ? dur(s.started_at, s.completed_at) : '';
+      const failNote = s.conclusion === 'failure'
+        ? '<div style="font-size:.7rem;color:#fca5a5;margin-top:2px;padding-left:20px">← This step failed. Check the GitHub Actions log for the exact error.</div>'
+        : '';
+      return '<div class="step-row">' +
+        '<span style="color:' + sc + ';font-size:.8rem;flex-shrink:0;width:14px">' + si + '</span>' +
+        '<span class="step-name">' + esc(s.name) + '</span>' +
+        (d ? '<span class="step-dur">' + d + '</span>' : '') +
+        '<span style="color:' + sc + ';font-size:.7rem;font-weight:600">' + esc(s.conclusion || s.status || '') + '</span>' +
+        '</div>' + failNote;
+    }).join('');
+    const logsUrl = 'https://github.com/' + cfg.github_repo + '/actions/runs/' + runId;
+    return '<div style="margin-bottom:12px">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+        '<span class="tag ' + jCls + '">' + jIcon + ' ' + esc(job.name) + '</span>' +
+        '<span class="ts">' + (job.steps ? job.steps.length + ' steps' : '') +
+          (job.started_at ? ' · ' + ago(job.started_at) + ' ago' : '') + '</span>' +
+        '<a href="' + logsUrl + '" target="_blank" style="font-size:.7rem;margin-left:auto">→ Full Log</a>' +
+      '</div>' +
+      '<div>' + (steps || '<div class="ts">No step details</div>') + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ── Banner ────────────────────────────────────────────────────────────────────
+function updateBanner() {
+  if (!latestCommitDate) return;
+  const ageMs  = Date.now() - latestCommitDate;
+  const ageMin = ageMs / 60000;
+  const icon  = $id('banner-icon');
+  const title = $id('banner-title');
+  const sub   = $id('banner-sub');
+  const tags  = $id('banner-tags');
+  const pw    = $id('prog-wrap');
+  const pf    = $id('prog-fill');
+  const pl    = $id('prog-left');
+  const pr    = $id('prog-right');
+  const card  = $id('banner-card');
+
+  if (healthOk) {
+    icon.textContent = '✅'; title.textContent = 'Deployed & Live';
+    title.style.color = 'var(--green)'; card.style.borderColor = 'rgba(16,185,129,.3)';
+    sub.textContent = 'App is healthy · last commit ' + ago(latestCommitDate) + ' ago';
+    tags.innerHTML = '<span class="tag tag-green">✓ Online</span>';
+    pw.style.display = 'none';
+  } else if (ageMin < 2) {
+    icon.textContent = '📤'; title.textContent = 'Push received — queueing…';
+    title.style.color = 'var(--yellow)'; card.style.borderColor = 'rgba(245,158,11,.3)';
+    sub.textContent = 'VPS webhook fires in seconds';
+    tags.innerHTML = '<span class="tag tag-yellow">⏳ Queuing</span>';
+    pw.style.display = 'block'; pf.style.width = '5%'; pf.style.background = 'var(--brand)';
+    pl.textContent = 'Build starting…'; pr.textContent = '~10m remaining';
+  } else if (ageMin < 15) {
+    const pct = Math.min(90, (ageMs / BUILD_TIME_MS) * 100);
+    const rem = Math.max(0, Math.round((BUILD_TIME_MS - ageMs) / 60000));
+    icon.textContent = '🔨'; title.textContent = 'Docker build in progress';
+    title.style.color = 'var(--brand)'; card.style.borderColor = 'rgba(14,165,233,.3)';
+    sub.textContent = 'Pushed ' + ago(latestCommitDate) + ' ago · builds typically take ~10 min';
+    tags.innerHTML = '<span class="tag tag-blue">⚙ Building</span>';
+    pw.style.display = 'block'; pf.style.width = pct + '%'; pf.style.background = 'var(--brand)';
+    pl.textContent = 'Building… ~' + Math.round(pct) + '%';
+    pr.textContent = rem > 0 ? '~' + rem + 'm left' : 'almost done…';
+  } else if (ageMin < 35) {
+    icon.textContent = '⚠️'; title.textContent = 'Build overdue — likely failed';
+    title.style.color = 'var(--orange)'; card.style.borderColor = 'rgba(249,115,22,.4)';
+    sub.textContent = ago(latestCommitDate) + ' since push · expected ~10 min · check Docker logs below';
+    tags.innerHTML = '<span class="tag tag-orange">⚠ Overdue</span><span class="tag tag-red">✗ App offline</span>';
+    pw.style.display = 'block'; pf.style.width = '93%'; pf.style.background = 'var(--orange)';
+    pl.textContent = 'Build stalled'; pr.textContent = ago(latestCommitDate) + ' elapsed';
+  } else {
+    icon.textContent = '🚨'; title.textContent = 'App offline — build failed';
+    title.style.color = 'var(--red)'; card.style.borderColor = 'rgba(239,68,68,.4)';
+    sub.textContent = 'Last push ' + ago(latestCommitDate) + ' ago · see Docker logs for crash reason';
+    tags.innerHTML = '<span class="tag tag-red">✗ Offline</span><span class="tag tag-red">✗ Build failed</span>';
+    pw.style.display = 'none';
+  }
+}
+
+// ── VPS Actions ───────────────────────────────────────────────────────────────
+async function vpsAction(path, label) {
+  if (!cfg.configured) { toast('VPS not configured — open ⚙ Settings', 'warn'); return; }
+  if (!confirm('Run "' + label + '" on VPS ' + cfg.vps_host + '?')) return;
+  const out = $id('action-out');
+  out.style.display = 'block';
+  out.textContent = 'Running "' + label + '"…';
+  toast('Running ' + label + '…');
+  let r;
+  try { r = await api(path, 'POST'); }
+  catch(e) { r = { error: e.message }; }
+  if (r.error) {
+    out.textContent = 'Error: ' + r.error;
+    toast(label + ' failed', 'err');
+  } else {
+    out.textContent = r.output || r.message || 'Done.';
+    toast(label + ' complete', 'ok');
+    setTimeout(refreshAll, 4000);
+  }
+}
+
+// ── SSH Sections ──────────────────────────────────────────────────────────────
+function mkCmd(label, code) {
+  const k = 'k' + Math.random().toString(36).slice(2, 9);
+  cmdStore[k] = code;
+  return '<div class="cmd-block">' +
+    '<div class="cmd-info">' +
+      '<div class="cmd-label">' + esc(label) + '</div>' +
+      '<div class="cmd-code">' + esc(code) + '</div>' +
+    '</div>' +
+    '<button class="copy-btn" onclick="doCopy(this,\'' + k + '\')">Copy</button>' +
+  '</div>';
+}
+function doCopy(btn, k) {
+  navigator.clipboard.writeText(cmdStore[k] || '').then(function() {
+    btn.textContent = '✓ Copied'; btn.classList.add('ok');
+    setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 2000);
+  });
+}
+
+function buildSshSections() {
+  const h   = cfg.vps_host || 'YOUR_VPS_IP';
+  const u   = cfg.vps_user || 'fieldgovern';
+  const dir = cfg.app_dir  || '/opt/fieldgovern';
+  const ssh = u + '@' + h;
+
+  const sections = {
+    'sec-connect': {
+      title: '🔗 Connecting to VPS',
+      content: [
+        mkCmd('Basic SSH login', 'ssh ' + ssh),
+        mkCmd('SSH with specific key file', 'ssh -i ~/.ssh/id_rsa ' + ssh),
+        mkCmd('Test SSH (no login)', 'ssh ' + ssh + ' "echo Connected successfully"'),
+        mkCmd('First time — copy your local key to VPS', 'ssh-copy-id ' + ssh),
+        '<div class="info-box"><b>What is your VPS IP?</b> Log in to your cloud provider (Oracle, DigitalOcean, Hetzner) and find the public IP of your VM. It looks like 123.456.789.0.</div>',
+      ]
+    },
+    'sec-logs': {
+      title: '📋 Viewing Container Logs',
+      content: [
+        mkCmd('All service logs — last 200 lines', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose logs --tail=200"'),
+        mkCmd('App logs only — last 100 lines', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose logs --tail=100 app"'),
+        mkCmd('Follow app logs live (Ctrl+C to stop)', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose logs -f app"'),
+        mkCmd('Nginx logs', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose logs --tail=50 nginx"'),
+        mkCmd('Postgres logs', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose logs --tail=50 postgres"'),
+        mkCmd('Logs since last 1 hour', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose logs --since 1h"'),
+        mkCmd('Show timestamps with logs', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose logs --timestamps --tail=100"'),
+        '<div class="info-box"><b>Common error patterns to look for:</b><br/>• <code>Error: Cannot find module</code> — missing npm package, Dockerfile COPY failed<br/>• <code>ECONNREFUSED</code> — app can\'t connect to DB (wrong DATABASE_URL or postgres not ready)<br/>• <code>Killed</code> — container ran out of memory (OOM kill)<br/>• <code>Port already in use</code> — previous container still running on same port<br/>• <code>permission denied</code> — file/volume ownership issue</div>',
+      ]
+    },
+    'sec-containers': {
+      title: '🐳 Container Management',
+      content: [
+        mkCmd('List running containers', 'ssh ' + ssh + ' "docker ps"'),
+        mkCmd('List ALL containers including stopped', 'ssh ' + ssh + ' "docker ps -a"'),
+        mkCmd('Inspect container environment variables', 'ssh ' + ssh + ' "docker inspect $(docker ps -q --filter name=app) | python3 -c \\"import sys,json; c=json.load(sys.stdin)[0]; [print(e) for e in c[\'Config\'][\'Env\']]\\"" 2>/dev/null || docker inspect $(docker ps -aq | head -1)'),
+        mkCmd('Restart app container', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose restart app"'),
+        mkCmd('Stop all containers', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose stop"'),
+        mkCmd('Start all containers', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose up -d"'),
+        mkCmd('Pull latest image + redeploy', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose pull app && docker compose up -d --force-recreate app"'),
+        mkCmd('View container resource usage', 'ssh ' + ssh + ' "docker stats --no-stream"'),
+        '<div class="info-box"><b>No running containers?</b><br/>1. Run <code>docker ps -a</code> — if you see the container with status "Exited", it crashed<br/>2. Run <code>docker logs &lt;container-id&gt;</code> to see why it crashed<br/>3. Common fix: check env vars are set correctly in <code>' + dir + '/.env</code></div>',
+      ]
+    },
+    'sec-disk': {
+      title: '💾 Disk & Memory',
+      content: [
+        mkCmd('Check disk space', 'ssh ' + ssh + ' "df -h"'),
+        mkCmd('Check Docker disk usage', 'ssh ' + ssh + ' "docker system df"'),
+        mkCmd('Check memory', 'ssh ' + ssh + ' "free -h"'),
+        mkCmd('Check CPU load', 'ssh ' + ssh + ' "uptime && top -bn1 | head -20"'),
+        mkCmd('Prune unused Docker images (frees space)', 'ssh ' + ssh + ' "docker image prune -f"'),
+        mkCmd('Prune all unused Docker resources', 'ssh ' + ssh + ' "docker system prune -f"'),
+        mkCmd('Find large files', 'ssh ' + ssh + ' "du -sh /* 2>/dev/null | sort -rh | head -20"'),
+        '<div class="info-box"><b>Disk full = build fails silently.</b><br/>If <code>df -h</code> shows 100% on <code>/</code>, run <code>docker system prune -f</code> first. Docker layer cache is the most common culprit — it can grow to 10GB+.</div>',
+      ]
+    },
+    'sec-deploy': {
+      title: '🚀 Deployment',
+      content: [
+        mkCmd('Manually pull latest Docker image', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose pull app"'),
+        mkCmd('Deploy latest image', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose up -d --force-recreate app"'),
+        mkCmd('Full redeploy (pull + restart)', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose pull && docker compose up -d --force-recreate"'),
+        mkCmd('Check GHCR image exists (replace SHA)', 'ssh ' + ssh + ' "docker manifest inspect ghcr.io/apranjipavan2-spec/datacollecttool:latest 2>&1 | head -5"'),
+        mkCmd('Check webhook service is running', 'ssh ' + ssh + ' "systemctl status webhook 2>/dev/null || pm2 status 2>/dev/null || echo no webhook service found"'),
+        mkCmd('Check what is listening on port 80', 'ssh ' + ssh + ' "ss -tlnp | grep :80"'),
+        mkCmd('View nginx status', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose logs --tail=30 nginx"'),
+        '<div class="info-box"><b>Why does GitHub Actions pass but VPS not update?</b><br/>1. The GitHub Actions SSH deploy step failed (check Actions → failing step)<br/>2. The webhook on VPS never received the trigger (check webhook logs)<br/>3. VPS pulled the image but the container failed to start (check docker logs)<br/>4. DNS not pointing to your VPS IP (run <code>nslookup fieldgovern.com</code>)</div>',
+      ]
+    },
+    'sec-env': {
+      title: '🔑 Environment & Config',
+      content: [
+        mkCmd('View .env file on VPS', 'ssh ' + ssh + ' "cat ' + dir + '/.env"'),
+        mkCmd('Edit .env on VPS', 'ssh ' + ssh + ' "nano ' + dir + '/.env"'),
+        mkCmd('Check docker-compose.yml on VPS', 'ssh ' + ssh + ' "cat ' + dir + '/docker-compose.yml"'),
+        mkCmd('Check nginx config', 'ssh ' + ssh + ' "cat ' + dir + '/nginx.conf"'),
+        mkCmd('Test nginx config', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose exec nginx nginx -t"'),
+        mkCmd('Reload nginx', 'ssh ' + ssh + ' "cd ' + dir + ' && docker compose exec nginx nginx -s reload"'),
+        mkCmd('View SSL cert expiry', 'ssh ' + ssh + ' "openssl s_client -connect fieldgovern.com:443 -servername fieldgovern.com 2>/dev/null | openssl x509 -noout -dates 2>/dev/null"'),
+        '<div class="info-box"><b>Missing env var = crash on startup.</b><br/>If the app starts then immediately exits with code 1, look for lines like:<br/><code>Error: DATABASE_URL is required</code><br/><code>Cannot read property of undefined</code><br/>Check your <code>.env</code> file on the VPS has all the required variables from your codebase.</div>',
+      ]
+    },
+  };
+
+  window._sshSections = sections;
+  showSection('sec-connect');
+}
+
+function showSection(key) {
+  const sections = window._sshSections;
+  if (!sections) return;
+  const container = $id('ssh-sections');
+
+  if (key === 'sec-all') {
+    container.innerHTML = Object.keys(sections).map(function(k) {
+      const s = sections[k];
+      return '<div style="margin-bottom:16px"><div class="card-hdr" style="margin-bottom:8px">' + s.title + '</div>' + s.content.join('') + '</div>';
+    }).join('<div class="divider"></div>');
+  } else {
+    const s = sections[key];
+    if (!s) return;
+    container.innerHTML = '<div class="card-hdr" style="margin-bottom:8px">' + s.title + '</div>' + s.content.join('');
+  }
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+function showSettings() {
+  $id('s-host').value  = cfg.vps_host  || '';
+  $id('s-user').value  = cfg.vps_user  || 'fieldgovern';
+  $id('s-key').value   = cfg.vps_key   || '';
+  $id('s-dir').value   = cfg.app_dir   || '/opt/fieldgovern';
+  $id('s-token').value = '';
+  $id('settings-modal').style.display = 'flex';
+}
+function hideSettings() { $id('settings-modal').style.display = 'none'; }
+async function saveSettings() {
+  const patch = {
+    vps_host:     $id('s-host').value.trim(),
+    vps_user:     $id('s-user').value.trim() || 'fieldgovern',
+    vps_key:      $id('s-key').value.trim(),
+    app_dir:      $id('s-dir').value.trim() || '/opt/fieldgovern',
+    github_token: $id('s-token').value.trim(),
+  };
+  try { await api('/api/config', 'POST', patch); }
+  catch(e) { toast('Save failed: ' + e.message, 'err'); return; }
+  Object.assign(cfg, patch);
+  buildSshSections();
+  hideSettings();
+  toast('Settings saved', 'ok');
+  setTimeout(refreshAll, 500);
+}
+
+// ── Auto-refresh & countdown ──────────────────────────────────────────────────
+function toggleAuto() {
+  autoOn = !autoOn;
+  $id('auto-badge').textContent = autoOn ? '⟳ Auto 30s' : '⊘ Auto OFF';
+  $id('auto-badge').className = 'tag ' + (autoOn ? 'tag-green' : 'tag-gray');
+  if (autoOn) startCountdown(); else clearTimers();
+}
+
+function clearTimers() { clearInterval(autoTimer); clearInterval(countdownTimer); }
+
+function startCountdown() {
+  clearTimers();
+  countdown = 30;
+  $id('countdown-badge').textContent = '30s';
+  countdownTimer = setInterval(function() {
+    countdown--;
+    $id('countdown-badge').textContent = countdown + 's';
+    if (countdown <= 0) { countdown = 30; fetchHealth(); fetchGithub(); fetchVps(); }
+  }, 1000);
+}
+
+async function refreshAll() {
+  await Promise.all([fetchHealth(), fetchGithub(), fetchVps()]);
+  fetchLogs();
+  if (autoOn) startCountdown();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadConfig().then(function() {
+  fetchHealth();
+  fetchGithub();
+  fetchVps();
+  fetchLogs();
+  startCountdown();
+});
+</script>
+</body>
+</html>
