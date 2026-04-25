@@ -113,7 +113,6 @@
     .badge-admin{background:#dbeafe;color:#1d4ed8}
     .badge-sup{background:#dcfce7;color:#15803d}
     .badge-enum{background:#ede9fe;color:#6d28d9}
-    .badge-master{background:#fef9c3;color:#92400e}
     .rc h3{font-size:.9rem;font-weight:700;margin-bottom:8px;color:var(--text)}
     .rc ul{list-style:none;display:flex;flex-direction:column;gap:4px}
     .rc li{font-size:.75rem;color:var(--text2);display:flex;gap:6px;line-height:1.4}
@@ -249,7 +248,7 @@
     <div class="qs-card" style="animation-delay:.05s">
       <div class="qs-num">1</div>
       <h4>Pick a Role</h4>
-      <p>Choose from Master Admin, Org Admin, Supervisor, or Enumerator — each sees a different view</p>
+      <p>Choose from Org Admin, Supervisor, or Enumerator — each sees a different view</p>
     </div>
     <div class="qs-card" style="animation-delay:.12s">
       <div class="qs-num">2</div>
@@ -366,37 +365,6 @@
       </div>
     </div>
 
-    <div class="rc" id="rc-master" onclick="pick(this,'master')">
-      <div class="rc-indicator">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <polyline class="rc-check" points="2,6 5,9 10,3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <div class="rc-top">
-        <span class="rc-emoji">👑</span>
-        <span class="rc-badge badge-master">Master Admin</span>
-      </div>
-      <h3>Platform Super Admin</h3>
-      <ul>
-        <li>Manage all organisations & tenants</li>
-        <li>Set global AI API key (OpenAI / Claude / Gemini)</li>
-        <li>Monitor platform usage & system health</li>
-        <li>Create & configure new organisations</li>
-        <li>White-label branding per tenant</li>
-      </ul>
-      <div class="cred-box" onclick="event.stopPropagation()">
-        <div class="cred-row">
-          <span class="cred-label">Phone</span>
-          <span class="cred-val">+91 99999 90000</span>
-          <button class="cpy" onclick="cp('+919999990000',this)">Copy</button>
-        </div>
-        <div class="cred-row">
-          <span class="cred-label">Password</span>
-          <span class="cred-val">master@123</span>
-          <button class="cpy" onclick="cp('master@123',this)">Copy</button>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- ACTIVE LOGIN PANEL -->
@@ -545,7 +513,6 @@
     admin:      { label: 'Org Admin',      phone: '+919999990001', pass: 'test@123' },
     supervisor: { label: 'Supervisor',     phone: '+919999990002', pass: 'test@123' },
     enumerator: { label: 'Enumerator',     phone: '+919999990003', pass: 'test@123' },
-    master:     { label: 'Master Admin',   phone: '+919999990000', pass: 'master@123' },
   };
   let cur = 'admin';
 
