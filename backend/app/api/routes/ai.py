@@ -15,37 +15,82 @@ require_master      = require_role("master_admin")
 
 
 def _get_global_ai_cfg(db: Session) -> dict:
+    """Return cfg in legacy format {provider, api_key, model} for ai_service compatibility."""
     row = db.query(SystemSetting).filter(SystemSetting.key == "ai_config").first()
-    return row.value if row else {}
+    if not row:
+        return {}
+    cfg = row.value or {}
+    # New multi-key format → resolve active provider
+    if "keys" in cfg:
+        active = cfg.get("active_provider", "")
+        key_cfg = cfg.get("keys", {}).get(active, {})
+        return {"provider": active, "api_key": key_cfg.get("api_key", ""), "model": key_cfg.get("model", "")}
+    # Legacy single-key format
+    return cfg
 
 
 # ── AI Config (global — set by master_admin, visible to all) ──────────────
 
+PROVIDER_DEFAULTS = {"openai": "gpt-4o", "anthropic": "claude-sonnet-4-6", "gemini": "gemini-2.0-flash"}
+
 @router.get("/config")
 def get_ai_config(user: dict = Depends(require_org_admin), db: Session = Depends(get_db)):
-    """Any org_admin/supervisor can see AI status (not the key)."""
-    cfg = _get_global_ai_cfg(db)
+    row = db.query(SystemSetting).filter(SystemSetting.key == "ai_config").first()
+    cfg = row.value if row else {}
+
+    if "keys" in cfg:
+        keys_status = {
+            p: {"configured": bool(cfg["keys"].get(p, {}).get("api_key")),
+                "model": cfg["keys"].get(p, {}).get("model", PROVIDER_DEFAULTS.get(p, ""))}
+            for p in ["openai", "anthropic", "gemini"]
+        }
+        active = cfg.get("active_provider", "")
+        return {
+            "active_provider": active,
+            "keys": keys_status,
+            "configured": bool(cfg["keys"].get(active, {}).get("api_key")),
+            # legacy compat
+            "provider": active,
+        }
+
+    # Legacy format
     return {
-        "provider": cfg.get("provider"),
-        "model": cfg.get("model"),
+        "active_provider": cfg.get("provider", ""),
+        "provider": cfg.get("provider", ""),
+        "keys": {p: {"configured": cfg.get("provider") == p and bool(cfg.get("api_key")),
+                     "model": PROVIDER_DEFAULTS.get(p, "")} for p in ["openai","anthropic","gemini"]},
         "configured": bool(cfg.get("provider") and cfg.get("api_key")),
     }
 
 
 @router.patch("/config")
 def update_ai_config(body: dict, user: dict = Depends(require_master), db: Session = Depends(get_db)):
-    """Only master_admin can set the global AI key — applies to ALL organisations."""
+    """master_admin sets per-provider keys and chooses active provider."""
     row = db.query(SystemSetting).filter(SystemSetting.key == "ai_config").first()
     if not row:
-        row = SystemSetting(key="ai_config", value={})
+        row = SystemSetting(key="ai_config", value={"keys": {}, "active_provider": ""})
         db.add(row)
-    row.value = {
-        "provider": body.get("provider"),
-        "api_key": body.get("api_key"),
-        "model": body.get("model"),
-    }
+
+    cfg = dict(row.value or {})
+    if "keys" not in cfg:
+        # Migrate legacy format
+        cfg = {"keys": {}, "active_provider": cfg.get("provider", "")}
+
+    provider = body.get("provider", "")
+    if provider and body.get("api_key"):
+        cfg["keys"].setdefault(provider, {})
+        cfg["keys"][provider]["api_key"] = body["api_key"]
+        cfg["keys"][provider]["model"] = body.get("model") or PROVIDER_DEFAULTS.get(provider, "")
+    if body.get("active_provider"):
+        cfg["active_provider"] = body["active_provider"]
+    elif provider:
+        cfg["active_provider"] = provider
+
+    from sqlalchemy.orm.attributes import flag_modified
+    row.value = cfg
+    flag_modified(row, "value")
     db.commit()
-    return {"ok": True, "provider": body.get("provider")}
+    return {"ok": True, "active_provider": cfg.get("active_provider")}
 
 
 # ── AI Features ───────────────────────────────────────────────────────────
