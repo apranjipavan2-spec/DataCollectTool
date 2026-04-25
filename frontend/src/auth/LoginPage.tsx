@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import api, { storeUser } from '@/lib/api'
 import { useNavigate } from 'react-router-dom'
 import { subscribeToPush } from '@/lib/pushNotifications'
@@ -8,6 +8,20 @@ const DEMO_ACCOUNTS = [
   { role: 'Supervisor',  icon: '👁',  phone: '+919999990002', password: 'test@123', color: '#7c3aed' },
   { role: 'Enumerator',  icon: '📋',  phone: '+919999990003', password: 'test@123', color: '#059669' },
 ]
+
+// Logo shown always on light backgrounds — multiply blends away the white square
+function Logo({ size = 40, className = '' }: { size?: number; className?: string }) {
+  return (
+    <img
+      src="/logo.png"
+      alt="FieldGovern"
+      width={size}
+      height={size}
+      className={`object-contain flex-shrink-0 ${className}`}
+      style={{ mixBlendMode: 'multiply', width: size, height: size }}
+    />
+  )
+}
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -67,10 +81,9 @@ export default function LoginPage() {
         <div className="absolute bottom-[-60px] left-[-60px] w-[240px] h-[240px] rounded-full opacity-20"
              style={{ background: 'radial-gradient(circle, #7c3aed, transparent 70%)' }} />
 
-        {/* Logo — light background: darken logo */}
+        {/* Logo */}
         <div className="relative z-10 flex items-center gap-3 mb-auto">
-          <img src="/logo.png" alt="FieldGovern" className="w-10 h-10 rounded-xl object-contain shadow-sm"
-               style={{ filter: 'brightness(0) saturate(0)', opacity: 0.85 }} />
+          <Logo size={44} />
           <span className="text-slate-800 text-xl font-bold tracking-tight">FieldGovern</span>
         </div>
 
@@ -118,10 +131,9 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12" style={{ background: '#e0f2fe' }}>
         <div className="w-full max-w-[420px]">
 
-          {/* Mobile logo — light background: darken logo */}
+          {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 mb-8">
-            <img src="/logo.png" alt="FieldGovern" className="w-9 h-9 rounded-xl object-contain"
-                 style={{ filter: 'brightness(0) saturate(0)', opacity: 0.85 }} />
+            <Logo size={40} />
             <span className="text-slate-800 text-xl font-bold">FieldGovern</span>
           </div>
 
@@ -129,11 +141,10 @@ export default function LoginPage() {
           <div className="bg-white rounded-2xl border border-blue-100 p-8"
                style={{ boxShadow: '0 8px 32px rgba(14,165,233,0.12), 0 2px 8px rgba(0,0,0,0.06)' }}>
 
-            {/* Heading — white card: darken logo */}
+            {/* Heading */}
             <div className="mb-7 pb-6 border-b border-slate-100 text-center">
               <div className="flex items-center justify-center gap-3 mb-2">
-                <img src="/logo.png" alt="FieldGovern" className="w-10 h-10 rounded-xl object-contain flex-shrink-0"
-                     style={{ filter: 'brightness(0) saturate(0)', opacity: 0.85 }} />
+                <Logo size={44} />
                 <h1 className="text-2xl font-bold text-black tracking-tight">Welcome back</h1>
               </div>
               <p className="text-slate-500 text-sm">Sign in to continue to FieldGovern</p>

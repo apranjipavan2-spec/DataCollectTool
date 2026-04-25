@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useHelp } from '@/help/HelpContext'
+import AppLogo from '@/components/AppLogo'
 
 interface SidebarItem {
   label: string
@@ -32,9 +33,9 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
         "
       >
         {/* Header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-catalan-border">
-          <h1 className="text-xl font-bold text-catalan-primary hidden lg:block">FieldGovern</h1>
-          <span className="text-xl font-bold text-catalan-primary lg:hidden">FP</span>
+        <div className="h-16 flex items-center px-3 border-b border-catalan-border gap-2.5">
+          <AppLogo size={32} className="flex-shrink-0" />
+          <span className="text-base font-bold text-catalan-primary hidden lg:block leading-tight">FieldGovern</span>
         </div>
 
         {/* Navigation Items */}
@@ -119,7 +120,10 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
         `}
       >
         <div className="h-16 flex items-center justify-between px-4 border-b border-catalan-border">
-          <h1 className="text-xl font-bold text-catalan-primary">FieldGovern</h1>
+          <div className="flex items-center gap-2.5">
+            <AppLogo size={32} />
+            <h1 className="text-base font-bold text-catalan-primary">FieldGovern</h1>
+          </div>
           <button
             onClick={() => setMobileOpen(false)}
             className="text-catalan-textMuted hover:text-catalan-text p-1"

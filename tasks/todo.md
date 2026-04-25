@@ -29,6 +29,16 @@
 - [ ] Sentry DSN env vars (SENTRY_DSN, VITE_SENTRY_DSN) — see `planning/PENDING_MANUAL.md`
 - [ ] Each org needs AI keys set via Org Settings → AI (master_admin assigns)
 
+## ✅ Completed (sprint 3)
+
+- [x] Light theme as default (ThemeContext fallback changed from 'dark' → 'light')
+- [x] AppLogo component — theme-aware: `mix-blend-mode: multiply` in light (gold lion, white bg disappears), `brightness(0) invert(1)` in dark (white silhouette on dark surface)
+- [x] Login page — logo updated: golden lion shows properly, no more gray darkening filter
+- [x] Sidebar — actual logo image in header for both desktop and mobile drawers
+- [x] Improved field map: form/enumerator filter dropdowns, legend overlay, empty-state hint, stale-closure fix
+- [x] Back-check queue: always visible button (not hidden when 0), refresh button, improved task cards
+- [x] Background GPS accuracy strip in form collection screen (colour-coded, live update)
+
 ## ✅ Completed (sprint 2)
 
 - [x] CSV export with field labels (`?labels=true`) — remaps field IDs → labels, decodes choice values
