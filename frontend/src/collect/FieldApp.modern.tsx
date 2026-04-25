@@ -132,6 +132,7 @@ export default function FieldApp() {
   const loadFormsRef = useRef<() => Promise<void>>()
   const bgGpsWatchId = useRef<number | null>(null)
   const bestGpsRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null)
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
   const { language, setLanguage } = useLanguage()
 
   // ── Sync to server ─────────────────────────────────────────
@@ -611,12 +612,14 @@ export default function FieldApp() {
     }
     // Start background GPS watch — tracks best (highest accuracy) fix
     bestGpsRef.current = null
+    setGpsAccuracy(null)
     if (bgGpsWatchId.current !== null) navigator.geolocation?.clearWatch(bgGpsWatchId.current)
     bgGpsWatchId.current = navigator.geolocation?.watchPosition(
       (pos) => {
         const { latitude: lat, longitude: lng, accuracy } = pos.coords
         if (!bestGpsRef.current || accuracy < bestGpsRef.current.accuracy) {
           bestGpsRef.current = { lat, lng, accuracy }
+          setGpsAccuracy(accuracy)
         }
       },
       () => {},
@@ -631,6 +634,7 @@ export default function FieldApp() {
       navigator.geolocation?.clearWatch(bgGpsWatchId.current)
       bgGpsWatchId.current = null
     }
+    setGpsAccuracy(null)
   }
 
   const handleSave = async (draft: SubmissionDraft) => {
@@ -727,43 +731,71 @@ export default function FieldApp() {
   if (screen === 'backchecks') {
     return (
       <SubPage title="Back-checks Assigned to Me" onBack={() => setScreen('list')}>
+        <div className="flex justify-end mb-3">
+          <button
+            onClick={async () => {
+              setBackcheckLoading(true)
+              try { const { data } = await api.get('/submissions/my-backchecks'); setBackchecks(data) } catch { }
+              finally { setBackcheckLoading(false) }
+            }}
+            disabled={backcheckLoading}
+            className="text-xs px-3 py-1.5 rounded-lg border border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50 transition-colors disabled:opacity-40"
+          >
+            {backcheckLoading ? '⏳ Loading…' : '↺ Refresh'}
+          </button>
+        </div>
+
         {backcheckLoading ? (
           <div className="text-center py-12 text-catalan-textMuted text-sm">Loading…</div>
         ) : backchecks.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-5xl mb-4">✅</div>
-            <p className="text-catalan-textMuted font-medium">No back-checks pending</p>
+            <p className="text-catalan-textMuted font-semibold">No back-checks pending</p>
             <p className="text-catalan-textMuted text-sm mt-1">Your supervisor will assign back-checks here when needed.</p>
           </div>
         ) : (
           <div className="space-y-3">
             <div className="text-xs text-catalan-textMuted bg-catalan-warning/10 border border-catalan-warning/30 rounded-lg px-3 py-2">
-              ⚠️ Your supervisor has flagged these submissions for verification. Open each one, fill the back-check form, and submit.
+              ⚠️ Your supervisor flagged {backchecks.length} submission{backchecks.length !== 1 ? 's' : ''} for verification. Open each one, fill the back-check form, and submit.
             </div>
-            {backchecks.map(task => (
-              <div key={task.original_submission_id} className="bg-catalan-surface border border-catalan-border rounded-xl p-4 space-y-3">
-                <div>
-                  <div className="font-semibold text-catalan-text text-sm">{task.form_title ?? 'Submission'}</div>
-                  <div className="text-xs text-catalan-textMuted mt-0.5">
-                    Original submitted: {task.submitted_at ? new Date(task.submitted_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '—'}
+            {backchecks.map(task => {
+              const keyFields = task.data_json
+                ? Object.entries(task.data_json).filter(([k]) => !k.startsWith('_')).slice(0, 5)
+                : []
+              return (
+                <div key={task.original_submission_id} className="bg-catalan-surface border border-catalan-border rounded-xl p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-catalan-text text-sm">{task.form_title ?? 'Survey Submission'}</div>
+                      <div className="text-xs text-catalan-textMuted mt-0.5">
+                        Submitted: {task.submitted_at ? new Date(task.submitted_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
+                      </div>
+                    </div>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-catalan-warning/15 text-catalan-warning font-medium flex-shrink-0">Back-check</span>
                   </div>
-                  <div className="text-xs text-catalan-info mt-1 font-medium">Back-check form: {task.backcheck_form_title}</div>
+                  {keyFields.length > 0 && (
+                    <div className="bg-catalan-bg rounded-lg p-3 text-xs space-y-1 border border-catalan-border">
+                      <div className="text-catalan-textMuted font-medium mb-1.5 uppercase tracking-wide">Original answers (preview)</div>
+                      {keyFields.map(([k, v]) => (
+                        <div key={k} className="flex gap-2">
+                          <span className="text-catalan-textMuted flex-shrink-0 min-w-0 truncate" style={{ maxWidth: '45%' }}>{k}:</span>
+                          <span className="text-catalan-text truncate">{String(v)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="text-xs text-catalan-primary font-medium">
+                    📋 Back-check form: {task.backcheck_form_title}
+                  </div>
+                  <button
+                    onClick={() => openBackcheckForm(task)}
+                    className="w-full text-sm px-4 py-2.5 rounded-lg bg-catalan-primary text-catalan-bg font-semibold hover:opacity-90 transition-opacity"
+                  >
+                    Open &amp; Fill Back-check →
+                  </button>
                 </div>
-                {task.data_json && (
-                  <div className="bg-catalan-hover rounded-lg p-2 text-xs text-catalan-textMuted max-h-20 overflow-y-auto">
-                    {Object.entries(task.data_json).filter(([k]) => !k.startsWith('_')).slice(0, 4).map(([k, v]) => (
-                      <div key={k} className="truncate"><span className="font-medium">{k}:</span> {String(v)}</div>
-                    ))}
-                  </div>
-                )}
-                <button
-                  onClick={() => openBackcheckForm(task)}
-                  className="w-full text-sm px-4 py-2.5 rounded-lg bg-catalan-primary text-catalan-bg font-semibold hover:opacity-90 transition-opacity"
-                >
-                  Start Back-check →
-                </button>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </SubPage>
@@ -947,6 +979,18 @@ export default function FieldApp() {
             <span>📊 Arm: {assignedArm}</span>
           </div>
         )}
+        {/* GPS accuracy indicator */}
+        <div className={`px-4 py-1.5 text-xs shrink-0 z-50 flex items-center gap-2 transition-colors ${
+          gpsAccuracy === null
+            ? 'bg-catalan-textMuted/10 text-catalan-textMuted'
+            : gpsAccuracy <= 10 ? 'bg-catalan-success/10 text-catalan-success'
+            : gpsAccuracy <= 30 ? 'bg-catalan-warning/10 text-catalan-warning'
+            : 'bg-catalan-error/10 text-catalan-error'
+        }`}>
+          <span>{gpsAccuracy === null ? '📡 Acquiring GPS…' : gpsAccuracy <= 10 ? '📍 GPS locked' : gpsAccuracy <= 30 ? '📡 GPS: fair signal' : '⚠️ GPS: weak signal'}</span>
+          {gpsAccuracy !== null && <span className="font-medium">±{Math.round(gpsAccuracy)}m</span>}
+          {gpsAccuracy !== null && gpsAccuracy > 30 && <span className="text-[10px] opacity-75">· Move to open sky for better accuracy</span>}
+        </div>
         {geofenceWarning && (
           <div className="bg-catalan-warning/20 border-b border-catalan-warning/40 text-catalan-warning px-4 py-2 text-xs shrink-0 z-50 flex items-center gap-2">
             <span>⚠️ You are outside the designated survey area. Submissions will be flagged.</span>
@@ -1033,18 +1077,22 @@ export default function FieldApp() {
                   📡
                 </span>
               )}
-              {/* Always-visible action buttons */}
-              {backchecks.length > 0 && (
-                <button
-                  onClick={() => setScreen('backchecks')}
-                  className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-catalan-warning/10 border border-catalan-warning/40 text-catalan-warning hover:bg-catalan-warning/20 transition-all font-medium"
-                  title="Back-checks assigned to me"
-                >
-                  <span>🔁</span>
-                  <span className="hidden sm:inline">Back-checks</span>
+              {/* Back-checks — always visible; badge shows count */}
+              <button
+                onClick={() => setScreen('backchecks')}
+                className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border transition-all font-medium ${
+                  backchecks.length > 0
+                    ? 'bg-catalan-warning/10 border-catalan-warning/40 text-catalan-warning hover:bg-catalan-warning/20'
+                    : 'bg-catalan-hover border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50'
+                }`}
+                title="Back-check queue"
+              >
+                <span>🔁</span>
+                <span className="hidden sm:inline">Back-checks</span>
+                {backchecks.length > 0 && (
                   <span className="bg-catalan-warning text-white text-[10px] font-bold rounded-full px-1.5 leading-4">{backchecks.length}</span>
-                </button>
-              )}
+                )}
+              </button>
               <button
                 onClick={() => { loadHistory(); setScreen('history') }}
                 className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-catalan-hover border border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50 transition-all"
@@ -1262,15 +1310,20 @@ export default function FieldApp() {
                     <span>📝</span> Saved Drafts
                     {drafts.length > 0 && <span className="ml-auto bg-catalan-primary text-catalan-bg text-xs font-bold rounded-full px-2 py-0.5">{drafts.length}</span>}
                   </button>
-                  {backchecks.length > 0 && (
-                    <button
-                      onClick={() => setScreen('backchecks')}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-catalan-warning/10 hover:bg-catalan-warning/20 text-catalan-warning text-sm transition-colors text-left font-medium"
-                    >
-                      <span>🔁</span> Back-checks
-                      <span className="ml-auto bg-catalan-warning text-white text-xs font-bold rounded-full px-2 py-0.5">{backchecks.length}</span>
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setScreen('backchecks')}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                      backchecks.length > 0
+                        ? 'bg-catalan-warning/10 hover:bg-catalan-warning/20 text-catalan-warning font-medium'
+                        : 'bg-catalan-hover hover:bg-catalan-primary/10 hover:text-catalan-primary text-catalan-text'
+                    }`}
+                  >
+                    <span>🔁</span> Back-checks
+                    {backchecks.length > 0
+                      ? <span className="ml-auto bg-catalan-warning text-white text-xs font-bold rounded-full px-2 py-0.5">{backchecks.length}</span>
+                      : <span className="ml-auto text-xs text-catalan-textMuted">0</span>
+                    }
+                  </button>
                   <button
                     onClick={handleCacheTiles}
                     disabled={cachingTiles}
