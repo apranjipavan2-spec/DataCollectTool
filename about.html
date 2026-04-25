@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>About Us — FieldGovern</title>
+  <meta name="description" content="Learn about the team behind FieldGovern — India's most affordable offline-first field data collection platform."/>
+  <link rel="icon" type="image/png" href="assets/logo-icon.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --primary: #0ea5e9;
+      --primary-dark: #0284c7;
+      --secondary: #6366f1;
+      --accent: #8b5cf6;
+      --dark: #0f172a;
+      --slate-800: #1e293b;
+      --slate-600: #475569;
+      --slate-100: #f1f5f9;
+      --surface: #ffffff;
+      --bg: #fafafa;
+      --glass: rgba(255, 255, 255, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.5);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--slate-800);
+      background-color: var(--bg);
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+
+    h1, h2, h3, h4, .font-display {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    /* --- BACKGROUND ANIMATIONS --- */
+    .bg-blobs {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      z-index: -1; overflow: hidden; pointer-events: none;
+      background: radial-gradient(circle at top right, rgba(14,165,233,0.05), transparent 40%),
+                  radial-gradient(circle at bottom left, rgba(139,92,246,0.05), transparent 40%);
+    }
+    .blob {
+      position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.6;
+      animation: float 20s infinite alternate ease-in-out;
+    }
+    .blob-1 { width: 500px; height: 500px; background: rgba(14,165,233,0.15); top: -10%; left: -10%; }
+    .blob-2 { width: 400px; height: 400px; background: rgba(139,92,246,0.15); bottom: 10%; right: -5%; animation-delay: -5s; }
+    
+    @keyframes float {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(50px, 50px) scale(1.1); }
+    }
+
+    /* --- SCROLL ANIMATIONS (Intersection Observer) --- */
+    .fade-up {
+      opacity: 0; transform: translateY(40px);
+      transition: opacity 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .fade-up.visible { opacity: 1; transform: translateY(0); }
+    .delay-100 { transition-delay: 100ms; }
+    .delay-200 { transition-delay: 200ms; }
+    .delay-300 { transition-delay: 300ms; }
+    .delay-400 { transition-delay: 400ms; }
+
+    /* --- NAVIGATION --- */
+    nav {
+      position: fixed; top: 0; width: 100%; z-index: 100;
+      padding: 16px 40px; display: flex; justify-content: space-between; align-items: center;
+      background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+      transition: all 0.3s ease;
+    }
+    nav.scrolled { padding: 12px 40px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05); }
+    
+    .logo { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.25rem; color: var(--dark); text-decoration: none; display: flex; align-items: center; gap: 12px; }
+    .logo-mark { width: 36px; height: 36px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 900; font-size: 18px; box-shadow: 0 4px 15px rgba(14,165,233,0.3); }
+    
+    .nav-links { display: flex; gap: 32px; list-style: none; align-items: center; }
+    .nav-links a { text-decoration: none; color: var(--slate-600); font-weight: 500; font-size: 0.95rem; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--primary); }
+    
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 24px; border-radius: 12px; font-weight: 600; font-size: 0.95rem; cursor: pointer; text-decoration: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .btn-outline { border: 2px solid var(--slate-100); color: var(--slate-800); background: white; }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-2px); box-shadow: 0 10px 25px rgba(14,165,233,0.1); }
+    .btn-primary { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; position: relative; overflow: hidden; border: none; box-shadow: 0 4px 15px rgba(99,102,241,0.3); }
+    .btn-primary::after { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); transition: 0.5s; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(99,102,241,0.4); }
+    .btn-primary:hover::after { left: 100%; }
+    .logo-nav-img{filter:brightness(0) saturate(0);opacity:0.85;transition:filter 0.3s,opacity 0.3s}
+    .hamburger{display:none;flex-direction:column;justify-content:center;gap:5px;cursor:pointer;width:40px;height:40px;border-radius:9px;border:1.5px solid var(--slate-100);background:white;padding:8px;flex-shrink:0}
+    .hamburger span{display:block;width:100%;height:2px;background:var(--dark);border-radius:2px;transition:all 0.3s}
+    .hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+    .hamburger.open span:nth-child(2){opacity:0}
+    .hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+    #mobileMenu{display:none;position:fixed;top:68px;left:0;right:0;background:white;border-bottom:2px solid var(--slate-100);box-shadow:0 12px 40px rgba(0,0,0,0.12);z-index:98;padding:8px 0}
+    #mobileMenu.open{display:block}
+    #mobileMenu a{display:flex;align-items:center;padding:14px 24px;color:var(--slate-600);font-weight:500;font-size:0.95rem;text-decoration:none;border-bottom:1px solid var(--slate-100);transition:background 0.15s,color 0.15s}
+    #mobileMenu a:last-child{border-bottom:none}
+    #mobileMenu a:hover,#mobileMenu a:active{background:var(--bg);color:var(--primary)}
+
+    /* --- HERO SECTION --- */
+    .hero {
+      padding: 180px 24px 100px; text-align: center; position: relative;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 20px;
+      background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.2);
+      border-radius: 99px; color: var(--primary-dark); font-weight: 700; font-size: 0.8rem;
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-size: clamp(2.5rem, 6vw, 4.5rem); font-weight: 800; line-height: 1.1; letter-spacing: -0.03em; margin-bottom: 24px; color: var(--dark);
+    }
+    .text-gradient {
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; color: transparent;
+      animation: gradient-shift 5s ease infinite alternate; background-size: 200% 200%;
+    }
+    @keyframes gradient-shift { 0% { background-position: 0% 50%; } 100% { background-position: 100% 50%; } }
+    .hero p {
+      font-size: clamp(1.1rem, 2vw, 1.25rem); color: var(--slate-600); max-width: 700px; margin: 0 auto; line-height: 1.8;
+    }
+
+    /* --- LAYOUT UTILS --- */
+    .container { max-width: 1200px; margin: 0 auto; padding: 100px 24px; }
+    .section-header { margin-bottom: 60px; max-width: 700px; }
+    .section-title { font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 800; color: var(--dark); margin-bottom: 16px; letter-spacing: -0.02em; }
+    .section-desc { font-size: 1.1rem; color: var(--slate-600); line-height: 1.7; }
+
+    /* --- CARDS (Glass & Hover Effects) --- */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border); border-radius: 24px; padding: 40px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative; overflow: hidden;
+    }
+    .glass-card::before {
+      content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px;
+      background: linear-gradient(90deg, var(--primary), var(--secondary)); opacity: 0; transition: opacity 0.3s;
+    }
+    .glass-card:hover {
+      transform: translateY(-8px); box-shadow: 0 20px 40px rgba(14, 165, 233, 0.1); border-color: rgba(14, 165, 233, 0.3);
+    }
+    .glass-card:hover::before { opacity: 1; }
+
+    /* --- SPECIFIC SECTIONS --- */
+    .mission-text p { margin-bottom: 24px; font-size: 1.05rem; }
+    
+    .feature-icon {
+      width: 60px; height: 60px; border-radius: 16px; background: linear-gradient(135deg, rgba(14,165,233,0.1), rgba(99,102,241,0.1));
+      display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 24px;
+      border: 1px solid rgba(14,165,233,0.2); transition: transform 0.3s;
+    }
+    .glass-card:hover .feature-icon { transform: scale(1.1) rotate(5deg); }
+    .glass-card h3 { font-size: 1.25rem; font-weight: 700; margin-bottom: 12px; color: var(--dark); }
+
+    /* --- TEAM --- */
+    .team-avatar {
+      width: 90px; height: 90px; border-radius: 24px; display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; font-weight: 800; color: white; margin-bottom: 24px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1); transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .glass-card:hover .team-avatar { transform: translateY(-5px) scale(1.05); }
+    .avatar-1 { background: linear-gradient(135deg, #f43f5e, #8b5cf6); }
+    .avatar-2 { background: linear-gradient(135deg, #0ea5e9, #3b82f6); }
+    .avatar-3 { background: linear-gradient(135deg, #10b981, #0ea5e9); }
+    
+    .role-tag { display: inline-block; padding: 4px 12px; background: rgba(14,165,233,0.1); color: var(--primary-dark); font-size: 0.75rem; font-weight: 700; border-radius: 99px; text-transform: uppercase; margin-bottom: 16px; letter-spacing: 0.5px; }
+    .team-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(0,0,0,0.05); }
+    .tag { font-size: 0.75rem; font-weight: 600; padding: 6px 12px; background: var(--slate-100); border-radius: 8px; color: var(--slate-600); }
+
+    /* --- STRATEGIC PARTNER (Highlight Box) --- */
+    .partner-section { position: relative; padding: 60px 0; }
+    .partner-box {
+      background: var(--dark); color: white; border-radius: 32px; padding: 64px;
+      position: relative; overflow: hidden; display: flex; gap: 48px; align-items: center;
+      box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.5);
+    }
+    .partner-box::before {
+      content: ''; position: absolute; top: 0; right: 0; width: 50%; height: 100%;
+      background: radial-gradient(circle at top right, rgba(99,102,241,0.3), transparent 70%); pointer-events: none;
+    }
+    .partner-icon {
+      width: 120px; height: 120px; flex-shrink: 0; background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: 32px; display: flex; align-items: center; justify-content: center; font-size: 3rem;
+      box-shadow: 0 0 40px rgba(14,165,233,0.4); border: 2px solid rgba(255,255,255,0.2);
+    }
+    .partner-content h2 { font-size: 2rem; margin-bottom: 16px; color: white; }
+    .partner-content p { color: rgba(255,255,255,0.8); font-size: 1.05rem; margin-bottom: 20px; }
+
+    /* --- CONTACT FORM --- */
+    .contact-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; }
+    .form-control { width: 100%; padding: 16px 20px; background: white; border: 2px solid var(--slate-100); border-radius: 12px; font-family: inherit; font-size: 0.95rem; outline: none; transition: all 0.3s; margin-bottom: 20px; }
+    .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(14,165,233,0.1); }
+    textarea.form-control { min-height: 150px; resize: vertical; }
+    
+    .contact-item { display: flex; gap: 20px; align-items: flex-start; margin-bottom: 32px; }
+    .contact-icon { width: 48px; height: 48px; border-radius: 12px; background: rgba(14,165,233,0.1); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: var(--primary); flex-shrink: 0; }
+    .contact-text h4 { font-size: 1.1rem; color: var(--dark); margin-bottom: 4px; }
+    .contact-text a { color: var(--primary); text-decoration: none; font-weight: 600; }
+    .contact-text p { font-size: 0.9rem; color: var(--slate-600); margin-top: 4px; }
+
+    /* --- FOOTER --- */
+    footer { background: var(--dark); color: white; padding: 80px 24px 40px; text-align: center; }
+    .footer-links { margin-bottom: 32px; display: flex; justify-content: center; gap: 32px; flex-wrap: wrap; }
+    .footer-links a { color: rgba(255,255,255,0.6); text-decoration: none; font-weight: 500; transition: color 0.3s; }
+    .footer-links a:hover { color: white; }
+    .footer-divider { width: 60px; height: 2px; background: rgba(255,255,255,0.1); margin: 32px auto; }
+    .footer-credits p { color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-bottom: 12px; }
+    .highlight-text { color: white; font-weight: 600; }
+    .disclaimer { font-size: 0.8rem; color: rgba(255,255,255,0.4); margin-top: 24px; }
+
+    /* --- RESPONSIVE --- */
+    @media (max-width: 992px) {
+      .grid-3 { grid-template-columns: repeat(2, 1fr); }
+      .partner-box { flex-direction: column; text-align: center; padding: 40px; }
+      .contact-wrapper { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) {
+      nav { padding: 16px 24px; }
+      .nav-links { display: none; }
+      .hamburger { display: flex; }
+      .nav-cta-secondary { display: none; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .hero { padding: 140px 20px 80px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+</div>
+
+<nav id="navbar">
+  <a href="index.html" class="nav-logo">
+    <img src="assets/logo-wide.png" alt="FieldGovern" style="height:40px;width:auto"/>
+  </a>
+      <ul class="nav-links">
+    <li><a href="features.html">Features</a></li>
+    <li><a href="integrations.html">Integrations</a></li>
+    <li><a href="use-cases.html">Use Cases</a></li>
+    <li><a href="security.html">Security</a></li>
+    <li><a href="index.html#pricing">Pricing</a></li>
+    <li><a href="about.html">About</a></li>
+  </ul>
+  <div style="display: flex; gap: 8px; align-items: center;">
+    <a href="demo.html" class="btn btn-outline nav-cta-secondary">Try Demo</a>
+    <a href="https://app.fieldgovern.com" class="btn btn-primary">Open App →</a>
+    <button class="hamburger" id="hamburgerBtn" aria-label="Open menu" onclick="toggleMenu()">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- Mobile navigation menu -->
+<div id="mobileMenu" role="navigation">
+  <a href="index.html#features">✦ Features</a>
+  <a href="index.html#how-it-works">⚙️ How It Works</a>
+  <a href="index.html#compare">📊 Compare</a>
+  <a href="index.html#pricing">💰 Pricing</a>
+  <a href="about.html">🏛️ About Us</a>
+  <a href="about.html#contact">✉️ Contact</a>
+  <a href="demo.html" style="color:var(--primary);font-weight:700">🚀 Try Free Demo</a>
+</div>
+
+<header class="hero">
+  <div class="badge fade-up">🏛️ Our Story</div>
+  <h1 class="fade-up delay-100">Built by researchers,<br><span class="text-gradient">for researchers.</span></h1>
+  <p class="fade-up delay-200">FieldGovern was born from firsthand frustration with expensive, unreliable tools that break in the field. We set out to build the platform India's research teams deserve — affordable, offline-first, and natively India-ready.</p>
+</header>
+
+<section class="container">
+  <div class="grid-2">
+    <div class="mission-text fade-up">
+      <h2 class="section-title">World-class data tools at Indian prices</h2>
+      <p>India's field researchers collect some of the most important data in the world under the most challenging conditions. Yet they've been forced to choose between expensive Western platforms or unreliable homegrown spreadsheets.</p>
+      <p>FieldGovern changes that. At a fraction of the cost of legacy systems, we're engineered specifically for Indian field environments: low-end Android devices, spotty 2G connectivity, regional language support, and local research workflows.</p>
+      <p>Our platform works completely offline. Data is stored securely on the local device and synced the moment connectivity returns — zero data loss, guaranteed.</p>
+    </div>
+    <div class="mission-features grid-2">
+      <div class="glass-card fade-up delay-100" style="padding: 32px;">
+        <div class="feature-icon">🇮🇳</div>
+        <h3>India-first</h3>
+        <p style="font-size: 0.9rem; color: var(--slate-600);">Built for Indian networks, languages, and budget constraints.</p>
+      </div>
+      <div class="glass-card fade-up delay-200" style="padding: 32px;">
+        <div class="feature-icon">🔒</div>
+        <h3>Sovereignty</h3>
+        <p style="font-size: 0.9rem; color: var(--slate-600);">Multi-tenant isolation enforced at the database layer.</p>
+      </div>
+      <div class="glass-card fade-up delay-300" style="grid-column: span 2; padding: 32px; display: flex; align-items: center; gap: 24px;">
+        <div class="feature-icon" style="margin: 0; flex-shrink: 0;">📵</div>
+        <div>
+          <h3>True offline-first</h3>
+          <p style="font-size: 0.9rem; color: var(--slate-600);">Collect data in zero-connectivity. Syncs automatically. No lost submissions, ever.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="container partner-section">
+  <div class="partner-box fade-up">
+    <div class="partner-icon">📊</div>
+    <div class="partner-content">
+      <div class="badge" style="background: rgba(255,255,255,0.1); border:none; color:white;">Strategic Growth Partner</div>
+      <h2>Strategic Partnership with Dataworx</h2>
+      <p>FieldGovern partners with <strong>Dataworx</strong> — a specialized data science and analytics firm with deep roots in research data management and program M&E for government and development sector clients across India.</p>
+      <p>Led by <strong>Manjunath YN (CEO)</strong>, Dataworx serves as a strategic growth partner, connecting FieldGovern with institutions executing large-scale field research and keeping the platform aligned with real-world sector needs.</p>
+    </div>
+  </div>
+</section>
+
+<section class="container">
+  <div class="section-header fade-up">
+    <h2 class="section-title">The minds behind the platform</h2>
+    <p class="section-desc">A focused coalition of operations leaders, strategic advisors, and open-source software architects dedicated to fixing field data collection.</p>
+  </div>
+
+  <div class="grid-3">
+    <div class="glass-card fade-up delay-100">
+      <div class="team-avatar avatar-1">PD</div>
+      <h3 style="font-size: 1.5rem; margin-bottom: 4px;">Pallavi Deshetty</h3>
+      <div class="role-tag">Chief Executive Officer</div>
+      <p style="color: var(--slate-600); font-size: 0.95rem;">Pallavi leads FieldGovern, driving the strategic vision to bring affordable, offline-first data infrastructure to India's research sector.</p>
+      <p style="color: var(--slate-600); font-size: 0.95rem; margin-top: 12px;">With a strong background in operations, she oversees the platform's commercial growth and execution strategy.</p>
+      <div class="team-tags">
+        <span class="tag">Leadership</span> <span class="tag">Operations</span> <span class="tag">Strategy</span>
+      </div>
+    </div>
+
+    <div class="glass-card fade-up delay-200">
+      <div class="team-avatar avatar-2">PD</div>
+      <h3 style="font-size: 1.5rem; margin-bottom: 4px;">Pavankumar Deshetty</h3>
+      <div class="role-tag">Lead Contributor (Open Source)</div>
+      <p style="color: var(--slate-600); font-size: 0.95rem;">Pavankumar is the original author of the robust, open-source offline PWA framework that FieldGovern is built upon.</p>
+      <p style="color: var(--slate-600); font-size: 0.95rem; margin-top: 12px;">His day job at <strong>Kalike (Tata Trusts)</strong> and his firsthand experience struggling with rural data collection inspired him to architect this resilient, zero-internet code.</p>
+      <div class="team-tags">
+        <span class="tag">Open Source</span> <span class="tag">FastAPI/React</span> <span class="tag">PWA Architecture</span>
+      </div>
+    </div>
+
+    <div class="glass-card fade-up delay-300">
+      <div class="team-avatar avatar-3">MY</div>
+      <h3 style="font-size: 1.5rem; margin-bottom: 4px;">Manjunath YN</h3>
+      <div class="role-tag">Strategic Advisor</div>
+      <p style="color: var(--slate-600); font-size: 0.95rem;">As CEO of Dataworx, Manjunath serves as FieldGovern's strategic growth partner, guiding market direction.</p>
+      <p style="color: var(--slate-600); font-size: 0.95rem; margin-top: 12px;">With over a decade in program M&E, he ensures FieldGovern stays connected to the real-world demands of Indian research ecosystems.</p>
+      <div class="team-tags">
+        <span class="tag">Program M&E</span> <span class="tag">Field Research</span> <span class="tag">Development Sector</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="container" id="contact">
+  <div class="glass-card fade-up" style="padding: 60px; background: rgba(255,255,255,0.9);">
+    <div class="contact-wrapper">
+      <div>
+        <h2 class="section-title">Start collecting better data</h2>
+        <p class="section-desc" style="margin-bottom: 40px;">Have questions about implementation, data security, or a custom enterprise quote? We aim to respond within one business day.</p>
+        
+        <div class="contact-item">
+          <div class="contact-icon">📧</div>
+          <div class="contact-text">
+            <h4>General Inquiries</h4>
+            <a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a>
+            <p>Platform questions and demo requests.</p>
+          </div>
+        </div>
+        
+        <div class="contact-item">
+          <div class="contact-icon">🤝</div>
+          <div class="contact-text">
+            <h4>Strategic Partnership</h4>
+            <a href="mailto:pallavi@dataworx.co.in">pallavi@dataworx.co.in</a>
+            <p>Outreach and M&E coordination via Dataworx.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div>
+        <form action="mailto:hello@fieldgovern.com" method="get" enctype="text/plain">
+          <input name="name" class="form-control" type="text" placeholder="Your full name" required/>
+          <input name="contact" class="form-control" type="email" placeholder="you@organization.com" required/>
+          <input name="org" class="form-control" type="text" placeholder="Organization / NGO / Dept"/>
+          <textarea name="body" class="form-control" placeholder="Tell us about your team size, use case, or specific requirements..." required></textarea>
+          <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 16px; font-size: 1.05rem;">Send Message →</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-links">
+    <a href="index.html">Home</a>
+    <a href="demo.html">Live Demo</a>
+    <a href="about.html">About Us</a>
+    <a href="privacy.html">Privacy Policy</a>
+    <a href="terms.html">Terms of Service</a>
+  </div>
+  
+  <div class="footer-credits">
+    <p>© 2026 FieldGovern · Built for Indian field researchers</p>
+    <p>Platform driven by <span class="highlight-text">Pallavi Deshetty</span> · Strategic Marketing by <span class="highlight-text">Dataworx</span></p>
+  </div>
+  
+  <div class="footer-divider"></div>
+  
+  <p class="disclaimer">Core framework based on open-source code authored by Pavankumar Deshetty.</p>
+</footer>
+
+<script>
+  // Navbar blur effect on scroll
+  window.addEventListener('scroll', () => {
+    const nav = document.getElementById('navbar');
+    if (window.scrollY > 50) {
+      nav.classList.add('scrolled');
+    } else {
+      nav.classList.remove('scrolled');
+    }
+  });
+
+  // Mobile hamburger menu
+  function toggleMenu() {
+    const btn = document.getElementById('hamburgerBtn');
+    const menu = document.getElementById('mobileMenu');
+    const isOpen = menu.classList.toggle('open');
+    btn.classList.toggle('open', isOpen);
+    btn.setAttribute('aria-expanded', isOpen);
+  }
+  document.querySelectorAll('#mobileMenu a').forEach(a => {
+    a.addEventListener('click', () => {
+      document.getElementById('mobileMenu').classList.remove('open');
+      document.getElementById('hamburgerBtn').classList.remove('open');
+    });
+  });
+  window.addEventListener('scroll', () => {
+    document.getElementById('mobileMenu').classList.remove('open');
+    const btn = document.getElementById('hamburgerBtn');
+    if (btn) btn.classList.remove('open');
+  }, { passive: true });
+
+  // Intersection Observer for scroll reveal animations
+  document.addEventListener("DOMContentLoaded", function() {
+    const observerOptions = {
+      root: null,
+      rootMargin: '0px',
+      threshold: 0.1
+    };
+
+    const observer = new IntersectionObserver((entries, observer) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, observerOptions);
+
+    const revealElements = document.querySelectorAll('.fade-up');
+    revealElements.forEach(el => {
+      observer.observe(el);
+    });
+  });
+</script>
+
+</body>
+</html>

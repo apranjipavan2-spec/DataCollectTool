@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>FieldGovern — Offline-First Field Data Collection & Analysis for India</title>
+  <meta name="description" content="Replace SurveyCTO at 1/3 the cost. Offline-first PWA for field data collection, real-time analysis, and automated report writing. Works anywhere in India."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --brand: #0ea5e9;
+      --brand-dark: #0369a1;
+      --accent: #7c3aed;
+      --accent-light: #a78bfa;
+      --green: #10b981;
+      --bg: #ffffff;
+      --bg2: #f8fafc;
+      --bg3: #f1f5f9;
+      --text: #0f172a;
+      --text2: #334155;
+      --text3: #64748b;
+      --border: #e2e8f0;
+      --shadow: 0 4px 24px rgba(14,165,233,0.08);
+      --shadow-lg: 0 20px 60px rgba(14,165,233,0.15);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{font-family:'Inter',sans-serif;color:var(--text);background:var(--bg)}
+    body{overflow-x:hidden}
+    /* ANIMATIONS */
+    @keyframes fadeUp{from{opacity:0;transform:translateY(32px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+    @keyframes floatSlow{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-8px) rotate(3deg)}}
+    @keyframes gradientShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(14,165,233,0.4)}50%{box-shadow:0 0 0 16px rgba(14,165,233,0)}}
+    @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+    @keyframes counterUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    @keyframes blob{0%,100%{border-radius:60% 40% 30% 70%/60% 30% 70% 40%}50%{border-radius:30% 60% 70% 40%/50% 60% 30% 60%}}
+    @keyframes slideInLeft{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:translateX(0)}}
+    @keyframes slideInRight{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+    @keyframes scaleIn{from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}}
+    @keyframes iconBounce{0%,100%{transform:translateY(0) scale(1)}30%{transform:translateY(-8px) scale(1.15)}60%{transform:translateY(-3px) scale(1.05)}}
+    .animate-fade-up{animation:fadeUp 0.7s ease forwards}
+    .animate-fade-in{animation:fadeIn 0.6s ease forwards}
+    .animate-float{animation:float 3s ease-in-out infinite}
+    .animate-float-slow{animation:floatSlow 4s ease-in-out infinite}
+    .animate-pulse-ring{animation:pulse 2s infinite}
+    .delay-1{animation-delay:0.1s}
+    .delay-2{animation-delay:0.2s}
+    .delay-3{animation-delay:0.3s}
+    .delay-4{animation-delay:0.4s}
+    .delay-5{animation-delay:0.5s}
+    .delay-6{animation-delay:0.6s}
+    /* Scroll-reveal */
+    .reveal{opacity:0;transform:translateY(32px);transition:all 0.7s cubic-bezier(.16,1,.3,1)}
+    .reveal.visible{opacity:1;transform:translateY(0)}
+    .reveal-left{opacity:0;transform:translateX(-32px);transition:all 0.7s cubic-bezier(.16,1,.3,1)}
+    .reveal-left.visible{opacity:1;transform:translateX(0)}
+    .reveal-right{opacity:0;transform:translateX(32px);transition:all 0.7s cubic-bezier(.16,1,.3,1)}
+    .reveal-right.visible{opacity:1;transform:translateX(0)}
+    .reveal-scale{opacity:0;transform:scale(0.9);transition:all 0.6s cubic-bezier(.16,1,.3,1)}
+    .reveal-scale.visible{opacity:1;transform:scale(1)}
+    /* NAV */
+    nav{position:fixed;top:0;width:100%;z-index:100;padding:0 24px;height:68px;display:flex;align-items:center;justify-content:space-between;transition:all 0.3s}
+    nav.scrolled{background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);box-shadow:0 2px 20px rgba(0,0,0,0.06);border-bottom:1px solid var(--border)}
+    .nav-logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.2rem;color:var(--text);text-decoration:none}
+    .logo-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--accent));display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:0.85rem;box-shadow:0 4px 12px rgba(14,165,233,0.4)}
+    .nav-links{display:flex;align-items:center;gap:32px;list-style:none}
+    .nav-links a{text-decoration:none;color:var(--text2);font-weight:500;font-size:0.9rem;transition:color 0.2s;position:relative}
+    .nav-links a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;background:var(--brand);border-radius:2px;transition:width 0.3s}
+    .nav-links a:hover{color:var(--brand)}
+    .nav-links a:hover::after{width:100%}
+    .btn-primary{background:linear-gradient(135deg,var(--brand),var(--accent));color:white;border:none;border-radius:10px;padding:10px 22px;font-weight:600;font-size:0.9rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all 0.3s;box-shadow:0 4px 16px rgba(14,165,233,0.3)}
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(14,165,233,0.4)}
+    .btn-outline{border:2px solid var(--brand);color:var(--brand);border-radius:10px;padding:10px 22px;font-weight:600;font-size:0.9rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:transparent;transition:all 0.3s}
+    .btn-outline:hover{background:var(--brand);color:white;transform:translateY(-2px)}
+    /* HERO */
+    .hero{min-height:100vh;display:flex;align-items:center;padding:100px 24px 60px;position:relative;overflow:hidden;background:linear-gradient(160deg,#f0f9ff 0%,#ffffff 40%,#faf5ff 100%)}
+    .hero-bg-blob{position:absolute;width:600px;height:600px;filter:blur(80px);opacity:0.25;border-radius:50%;pointer-events:none}
+    .blob1{top:-100px;right:-100px;background:radial-gradient(circle,var(--brand),transparent);animation:float 6s ease-in-out infinite}
+    .blob2{bottom:-100px;left:-100px;background:radial-gradient(circle,var(--accent-light),transparent);animation:float 8s ease-in-out infinite reverse}
+    .blob3{top:40%;left:40%;width:300px;height:300px;background:radial-gradient(circle,#34d399,transparent);animation:float 5s ease-in-out infinite 2s}
+    .hero-inner{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;width:100%}
+    .hero-badge{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,rgba(14,165,233,0.12),rgba(124,58,237,0.12));border:1px solid rgba(14,165,233,0.25);border-radius:999px;padding:6px 16px;font-size:0.8rem;font-weight:600;color:var(--brand-dark);margin-bottom:20px}
+    .hero-badge span{display:inline-block;width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
+    .hero h1{font-size:3.2rem;font-weight:900;line-height:1.1;color:var(--text);margin-bottom:20px}
+    .grad-text{background:linear-gradient(135deg,var(--brand),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .hero p{font-size:1.1rem;color:var(--text2);line-height:1.7;margin-bottom:32px;max-width:480px}
+    .hero-cta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:40px}
+    .hero-stats{display:flex;gap:32px;flex-wrap:wrap}
+    .stat-item{text-align:center}
+    .stat-num{font-size:1.8rem;font-weight:900;color:var(--text);display:block}
+    .stat-label{font-size:0.78rem;color:var(--text3);font-weight:500}
+    .hero-visual{position:relative;display:flex;align-items:center;justify-content:center}
+    .dashboard-mock{background:white;border-radius:20px;box-shadow:0 24px 80px rgba(0,0,0,0.12),0 4px 16px rgba(14,165,233,0.1);padding:24px;width:100%;max-width:420px;border:1px solid var(--border);animation:float 4s ease-in-out infinite}
+    .mock-header{display:flex;align-items:center;gap:10px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+    .mock-dot{width:10px;height:10px;border-radius:50%}
+    .mock-title{font-weight:700;font-size:0.95rem;color:var(--text);flex:1}
+    .mock-badge{background:#dcfce7;color:#16a34a;border-radius:6px;padding:2px 10px;font-size:0.72rem;font-weight:700}
+    .mock-row{display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;margin-bottom:8px;transition:background 0.2s}
+    .mock-row:hover{background:var(--bg2)}
+    .mock-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem;color:white;flex-shrink:0}
+    .mock-info{flex:1}
+    .mock-name{font-weight:600;font-size:0.83rem;color:var(--text)}
+    .mock-sub{font-size:0.72rem;color:var(--text3)}
+    .mock-status{border-radius:6px;padding:2px 8px;font-size:0.7rem;font-weight:600}
+    .status-synced{background:#dcfce7;color:#16a34a}
+    .status-pending{background:#fef9c3;color:#b45309}
+    .status-flagged{background:#fee2e2;color:#dc2626}
+    .mock-chart{margin-top:16px;padding:12px;background:var(--bg2);border-radius:12px}
+    .chart-label{font-size:0.72rem;color:var(--text3);font-weight:500;margin-bottom:8px}
+    .chart-bars{display:flex;align-items:flex-end;gap:4px;height:48px}
+    .bar{flex:1;border-radius:4px 4px 0 0;background:linear-gradient(to top,var(--brand),var(--accent-light));transition:height 0.5s ease;animation:fadeUp 0.5s ease forwards}
+    .floating-chip{position:absolute;background:white;border-radius:12px;padding:8px 14px;box-shadow:0 8px 32px rgba(0,0,0,0.1);border:1px solid var(--border);font-size:0.78rem;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap;z-index:10}
+    .chip1{top:-20px;left:-30px;animation:floatSlow 3.5s ease-in-out infinite}
+    .chip2{bottom:10px;right:-30px;animation:floatSlow 4s ease-in-out infinite 1s}
+    .chip3{top:40%;left:-50px;animation:floatSlow 3s ease-in-out infinite 0.5s}
+    .chip4{top:20%;right:-40px;background:linear-gradient(135deg,#0ea5e9,#7c3aed);color:white;border:none;box-shadow:0 12px 30px rgba(124,58,237,0.3);animation:floatSlow 4.5s ease-in-out infinite 0.8s}
+    /* SECTION BASE */
+    section{padding:80px 24px}
+    .section-inner{max-width:1100px;margin:0 auto}
+    .section-tag{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(14,165,233,0.1),rgba(124,58,237,0.1));border:1px solid rgba(14,165,233,0.2);border-radius:999px;padding:5px 14px;font-size:0.78rem;font-weight:700;color:var(--brand-dark);letter-spacing:0.04em;text-transform:uppercase;margin-bottom:16px}
+    .section-title{font-size:2.4rem;font-weight:900;color:var(--text);line-height:1.2;margin-bottom:16px}
+    .section-sub{font-size:1.05rem;color:var(--text2);line-height:1.7;max-width:640px}
+    .text-center{text-align:center}
+    .text-center .section-sub{margin:0 auto}
+    /* LOGOS / SOCIAL PROOF */
+    .proof-strip{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:28px 24px}
+    .proof-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:40px;flex-wrap:wrap;justify-content:center}
+    .proof-label{font-size:0.8rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;white-space:nowrap}
+    .proof-items{display:flex;gap:32px;flex-wrap:wrap;align-items:center}
+    .proof-item{font-size:0.88rem;font-weight:600;color:var(--text2);display:flex;align-items:center;gap:8px;opacity:0.7;transition:opacity 0.2s}
+    .proof-item:hover{opacity:1}
+    /* PROBLEM */
+    .problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;margin-top:48px}
+    .problem-list{display:flex;flex-direction:column;gap:16px}
+    .problem-item{display:flex;gap:14px;align-items:flex-start;padding:16px;border-radius:12px;background:var(--bg2);border:1px solid var(--border);transition:all 0.3s}
+    .problem-item:hover{transform:translateX(4px);border-color:rgba(220,38,38,0.3)}
+    .prob-icon{width:36px;height:36px;border-radius:8px;background:#fee2e2;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem}
+    .problem-item p{color:var(--text2);font-size:0.88rem;line-height:1.6}
+    .solution-card{background:linear-gradient(135deg,#f0f9ff,#faf5ff);border:1px solid rgba(14,165,233,0.2);border-radius:20px;padding:32px}
+    .solution-item{display:flex;gap:12px;align-items:flex-start;margin-bottom:18px}
+    .sol-icon{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--brand),var(--accent));display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.8rem;color:white}
+    .solution-item h4{font-size:0.9rem;font-weight:700;color:var(--text);margin-bottom:2px}
+    .solution-item p{font-size:0.82rem;color:var(--text2);line-height:1.5}
+    /* FEATURES */
+    .features-bg{background:var(--bg2)}
+    .features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:48px}
+    .feature-card{background:white;border:1px solid var(--border);border-radius:16px;padding:24px;transition:all 0.35s cubic-bezier(.16,1,.3,1);cursor:default;position:relative;overflow:hidden}
+    .feature-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(14,165,233,0.04),rgba(124,58,237,0.04));opacity:0;transition:opacity 0.3s}
+    .feature-card:hover{transform:translateY(-6px);box-shadow:0 20px 48px rgba(14,165,233,0.12);border-color:rgba(14,165,233,0.3)}
+    .feature-card:hover::before{opacity:1}
+    .feature-card:hover .feat-icon{animation:iconBounce 0.55s ease forwards}
+    .feat-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin-bottom:16px;transition:transform 0.3s}
+    .feature-card h3{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:10px}
+    .feature-card ul{list-style:none;display:flex;flex-direction:column;gap:6px}
+    .feature-card li{font-size:0.82rem;color:var(--text2);display:flex;align-items:flex-start;gap:8px;line-height:1.5}
+    .feature-card li::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0;margin-top:1px}
+    /* FIELD TYPES */
+    .field-types-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:32px}
+    .field-type{background:white;border:1px solid var(--border);border-radius:12px;padding:16px 10px;text-align:center;transition:all 0.3s;cursor:default}
+    .field-type:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(14,165,233,0.1);border-color:var(--brand)}
+    .field-type .icon{font-size:1.6rem;margin-bottom:8px;display:block}
+    .field-type span{font-size:0.75rem;font-weight:600;color:var(--text2)}
+    /* HOW IT WORKS */
+    .steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:40px;margin-top:56px;position:relative}
+    .steps-grid::before{content:'';position:absolute;top:48px;left:calc(16.66% + 20px);right:calc(16.66% + 20px);height:2px;background:linear-gradient(to right,var(--brand),var(--accent));opacity:0.3}
+    .step-card{text-align:center;position:relative}
+    .step-num{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--accent));color:white;font-size:2rem;font-weight:900;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:0 8px 24px rgba(14,165,233,0.3);position:relative;z-index:1}
+    .step-label{font-size:0.75rem;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px}
+    .step-card h3{font-size:1.1rem;font-weight:800;color:var(--text);margin-bottom:10px}
+    .step-card p{font-size:0.85rem;color:var(--text2);line-height:1.6}
+    .sync-explainer{background:linear-gradient(135deg,#f0f9ff,#faf5ff);border:1px solid rgba(14,165,233,0.2);border-radius:20px;padding:40px;margin-top:56px;display:grid;grid-template-columns:1fr 1fr;gap:32px}
+    .sync-phase h4{font-size:0.95rem;font-weight:700;margin-bottom:8px}
+    .sync-phase p{font-size:0.85rem;color:var(--text2);line-height:1.6;margin-bottom:12px}
+    .code-block{background:white;border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-family:monospace;font-size:0.78rem;line-height:1.8;color:var(--green);font-weight:500}
+    /* COMPARISON */
+    .compare-wrap{overflow-x:auto;border-radius:16px;border:1px solid var(--border);box-shadow:0 4px 24px rgba(0,0,0,0.05)}
+    table{width:100%;border-collapse:collapse;background:white;min-width:700px}
+    thead tr{background:linear-gradient(135deg,#f0f9ff,#faf5ff);border-bottom:2px solid var(--border)}
+    th{padding:16px 20px;font-size:0.85rem;font-weight:700;text-align:center}
+    th:first-child{text-align:left}
+    th.highlight{color:var(--brand-dark)}
+    td{padding:14px 20px;font-size:0.85rem;border-bottom:1px solid var(--border);text-align:center}
+    td:first-child{text-align:left;font-weight:600;color:var(--text)}
+    tr:last-child td{border-bottom:none}
+    tr:hover{background:var(--bg2)}
+    .tag-better{display:inline-block;background:#dcfce7;color:#16a34a;border-radius:6px;padding:3px 10px;font-size:0.75rem;font-weight:700}
+    .tag-worse{display:inline-block;background:#fee2e2;color:#dc2626;border-radius:6px;padding:3px 10px;font-size:0.75rem;font-weight:700}
+    .tag-ok{display:inline-block;background:#fef9c3;color:#b45309;border-radius:6px;padding:3px 10px;font-size:0.75rem;font-weight:700}
+    .tag-na{display:inline-block;background:#f1f5f9;color:var(--text3);border-radius:6px;padding:3px 10px;font-size:0.75rem;font-weight:600}
+    /* UPCOMING INTELLIGENCE SUITE */
+    .coming-soon-bg{background:linear-gradient(135deg,#0f172a,#1e1b4b,#0c4a6e);color:white;position:relative;overflow:hidden}
+    .coming-soon-bg::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at 2px 2px,rgba(255,255,255,0.06) 1px,transparent 0);background-size:36px 36px}
+    .coming-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:48px}
+    .coming-card{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:16px;padding:28px;backdrop-filter:blur(8px);transition:all 0.3s;position:relative;overflow:hidden}
+    .coming-card::after{content:'';position:absolute;top:0;left:0;width:100%;height:3px;background:linear-gradient(90deg,var(--brand),var(--accent));opacity:0;transition:opacity 0.3s}
+    .coming-card:hover{background:rgba(255,255,255,0.1);transform:translateY(-4px);border-color:rgba(14,165,233,0.4);box-shadow:0 12px 40px rgba(14,165,233,0.15)}
+    .coming-card:hover::after{opacity:1}
+    .coming-card .icon{font-size:2rem;margin-bottom:16px;display:block}
+    .coming-card h3{font-size:1.1rem;font-weight:700;color:white;margin-bottom:8px}
+    .coming-card p{font-size:0.85rem;color:rgba(255,255,255,0.7);line-height:1.6}
+    .coming-tag{display:inline-block;background:rgba(14,165,233,0.2);border:1px solid rgba(14,165,233,0.4);border-radius:999px;padding:3px 12px;font-size:0.7rem;font-weight:700;color:#7dd3fc;letter-spacing:0.04em;text-transform:uppercase;margin-top:16px}
+    /* PRICING */
+    .pricing-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:48px;align-items:start}
+    .price-card{background:white;border:2px solid var(--border);border-radius:20px;padding:28px;transition:all 0.35s cubic-bezier(.16,1,.3,1);position:relative}
+    .price-card:hover{transform:translateY(-6px);box-shadow:0 24px 64px rgba(14,165,233,0.1)}
+    .price-card.popular{border-color:var(--brand);box-shadow:0 8px 40px rgba(14,165,233,0.15)}
+    .popular-badge{position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--brand),var(--accent));color:white;border-radius:999px;padding:4px 18px;font-size:0.72rem;font-weight:800;white-space:nowrap;letter-spacing:0.04em}
+    .price-tier{font-size:0.8rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px}
+    .price-amount{font-size:2.2rem;font-weight:900;color:var(--text);margin-bottom:2px;display:flex;align-items:baseline;gap:4px}
+    .price-amount .currency{font-size:1.2rem;font-weight:700;margin-top:4px}
+    .price-period{font-size:0.8rem;color:var(--text3);margin-bottom:20px}
+    .price-divider{height:1px;background:var(--border);margin:20px 0}
+    .price-list{list-style:none;display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+    .price-list li{font-size:0.83rem;color:var(--text2);display:flex;align-items:flex-start;gap:8px;line-height:1.5}
+    .price-list li.check::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
+    .price-list li.cross{color:var(--text3)}
+    .price-list li.cross::before{content:'✕';color:var(--border);font-weight:700;flex-shrink:0}
+    .btn-plan{width:100%;padding:12px;border-radius:10px;font-weight:700;font-size:0.88rem;cursor:pointer;border:none;text-align:center;text-decoration:none;display:block;transition:all 0.3s}
+    .btn-plan-primary{background:linear-gradient(135deg,var(--brand),var(--accent));color:white;box-shadow:0 4px 16px rgba(14,165,233,0.3)}
+    .btn-plan-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(14,165,233,0.4)}
+    .btn-plan-ghost{background:var(--bg2);color:var(--text2);border:1px solid var(--border)}
+    .btn-plan-ghost:hover{background:var(--bg3);color:var(--text)}
+    /* DEMO CTA */
+    .demo-cta-bg{background:linear-gradient(135deg,#f0f9ff,#faf5ff);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .demo-role-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:32px 0}
+    .role-pill{background:white;border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center;transition:all 0.3s;cursor:default}
+    .role-pill:hover{border-color:var(--brand);box-shadow:0 8px 24px rgba(14,165,233,0.1);transform:translateY(-3px)}
+    .role-pill .emoji{font-size:1.6rem;margin-bottom:8px;display:block}
+    .role-pill h4{font-size:0.82rem;font-weight:700;color:var(--text);margin-bottom:4px}
+    .role-pill p{font-size:0.72rem;color:var(--text3);line-height:1.4}
+    /* FAQ */
+    .faq-list{display:flex;flex-direction:column;gap:12px;margin-top:40px;max-width:760px;margin-left:auto;margin-right:auto}
+    details{background:white;border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:all 0.3s}
+    details[open]{border-color:rgba(14,165,233,0.3);box-shadow:0 4px 20px rgba(14,165,233,0.08)}
+    summary{padding:18px 22px;font-weight:600;font-size:0.92rem;color:var(--text);cursor:pointer;display:flex;justify-content:space-between;align-items:center;list-style:none;user-select:none}
+    summary::-webkit-details-marker{display:none}
+    summary::after{content:'▾';color:var(--brand);transition:transform 0.3s;font-size:0.8rem}
+    details[open] summary::after{transform:rotate(180deg)}
+    details p{padding:0 22px 18px;font-size:0.86rem;color:var(--text2);line-height:1.7}
+    /* FOOTER */
+    footer{background:#0f172a;color:rgba(255,255,255,0.7);padding:60px 24px 32px}
+    .footer-inner{max-width:1100px;margin:0 auto}
+    .footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;margin-bottom:48px}
+    .footer-brand p{font-size:0.85rem;color:rgba(255,255,255,0.5);line-height:1.7;margin-top:12px;max-width:260px}
+    .footer-col h4{font-size:0.82rem;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:16px}
+    .footer-col ul{list-style:none;display:flex;flex-direction:column;gap:10px}
+    .footer-col a{font-size:0.85rem;color:rgba(255,255,255,0.5);text-decoration:none;transition:color 0.2s}
+    .footer-col a:hover{color:white}
+    .footer-bottom{border-top:1px solid rgba(255,255,255,0.08);padding-top:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:gap;font-size:0.8rem;color:rgba(255,255,255,0.35);flex-wrap:wrap;gap:12px}
+    /* FEATURE CARD PREVIEWS */
+    .feat-preview{height:110px;border-radius:10px;margin-bottom:14px;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center}
+    .fp-offline{background:linear-gradient(135deg,#eff6ff,#dbeafe);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%}
+    .fp-status{display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:700;white-space:nowrap}
+    .fp-status.offline{background:#fee2e2;color:#dc2626;animation:fpStatus 4s infinite}
+    .fp-status.saving{background:#fef9c3;color:#b45309;animation:fpStatus 4s infinite 1.3s;opacity:0}
+    .fp-status.syncing{background:#dcfce7;color:#16a34a;animation:fpStatus 4s infinite 2.6s;opacity:0}
+    @keyframes fpStatus{0%,100%{opacity:0;transform:scale(0.9)}15%,75%{opacity:1;transform:scale(1)}90%{opacity:0}}
+    .fp-form{background:linear-gradient(135deg,#f5f3ff,#ede9fe);padding:12px;width:100%;display:flex;flex-direction:column;gap:5px}
+    .fp-field{background:white;border-radius:6px;height:18px;border:1px solid #ddd6fe;animation:fpFieldIn 0.5s ease forwards;opacity:0;display:flex;align-items:center;padding:0 8px;gap:5px;font-size:0.62rem;color:#64748b}
+    .fp-field:nth-child(1){animation-delay:0.1s}
+    .fp-field:nth-child(2){animation-delay:0.4s}
+    .fp-field:nth-child(3){animation-delay:0.7s}
+    .fp-field:nth-child(4){animation-delay:1.0s}
+    @keyframes fpFieldIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+    .fp-dash{background:linear-gradient(135deg,#f0fdf4,#dcfce7);padding:10px;width:100%;display:flex;flex-direction:column;gap:4px}
+    .fp-row{display:flex;align-items:center;gap:6px;padding:4px 6px;background:white;border-radius:5px;font-size:0.62rem;animation:fpFadeIn 0.4s ease forwards;opacity:0}
+    .fp-row:nth-child(1){animation-delay:0.2s}
+    .fp-row:nth-child(2){animation-delay:0.5s}
+    .fp-row:nth-child(3){animation-delay:0.8s}
+    @keyframes fpFadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+    .fp-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+    .fp-ai{background:linear-gradient(135deg,#fffbeb,#fef3c7);padding:12px;width:100%;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+    .fp-ai-line{height:10px;border-radius:4px;background:linear-gradient(90deg,#fde68a,#f59e0b);animation:fpWidth 2s ease-in-out infinite alternate}
+    @keyframes fpWidth{from{width:30%}to{width:90%}}
+    .fp-ai-chip{background:#fef9c3;border:1px solid #fde68a;border-radius:6px;padding:3px 8px;font-size:0.6rem;font-weight:700;color:#92400e;animation:fpChip 3s infinite}
+    @keyframes fpChip{0%,100%{opacity:0.5}50%{opacity:1}}
+    .fp-team{background:linear-gradient(135deg,#fdf2f8,#fce7f3);padding:10px;width:100%;display:flex;flex-direction:column;align-items:center;gap:3px}
+    .fp-role{padding:3px 10px;border-radius:6px;font-size:0.6rem;font-weight:700;text-align:center;animation:fpFadeIn 0.4s ease forwards;opacity:0}
+    .fp-role:nth-child(1){animation-delay:0.1s;background:#fce7f3;color:#be185d;width:120px}
+    .fp-role:nth-child(2){animation-delay:0.3s;background:#ede9fe;color:#7c3aed;width:100px}
+    .fp-role:nth-child(3){animation-delay:0.5s;background:#dbeafe;color:#1d4ed8;width:80px}
+    .fp-role:nth-child(4){animation-delay:0.7s;background:#dcfce7;color:#15803d;width:60px}
+    .fp-connector{width:1px;height:6px;background:#e2e8f0}
+    .fp-export{background:linear-gradient(135deg,#fff7ed,#ffedd5);padding:12px;width:100%;display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:center}
+    .fp-fmt{padding:4px 8px;border-radius:6px;font-size:0.62rem;font-weight:800;animation:fpScale 0.4s ease forwards;opacity:0;transform:scale(0.8)}
+    .fp-fmt:nth-child(1){animation-delay:0.1s;background:#dcfce7;color:#15803d}
+    .fp-fmt:nth-child(2){animation-delay:0.3s;background:#dbeafe;color:#1d4ed8}
+    .fp-fmt:nth-child(3){animation-delay:0.5s;background:#fce7f3;color:#be185d}
+    .fp-fmt:nth-child(4){animation-delay:0.7s;background:#fef9c3;color:#92400e}
+    .fp-fmt:nth-child(5){animation-delay:0.9s;background:#ede9fe;color:#7c3aed}
+    @keyframes fpScale{from{opacity:0;transform:scale(0.7)}to{opacity:1;transform:scale(1)}}
+    /* SCORE BARS — comparison visual */
+    .score-section{margin-bottom:40px}
+    .score-title{text-align:center;font-size:0.82rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:20px}
+    .score-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:20px}
+    .score-item{text-align:center}
+    .score-label{font-size:0.7rem;font-weight:600;color:var(--text2);margin-bottom:6px}
+    .score-bars{display:flex;gap:4px;align-items:flex-end;justify-content:center;height:60px}
+    .sbar{width:16px;border-radius:3px 3px 0 0;transition:height 1s cubic-bezier(.16,1,.3,1)}
+    .sbar.fg{background:linear-gradient(to top,var(--brand),var(--accent))}
+    .sbar.other{background:#e2e8f0}
+    .score-legend{display:flex;gap:16px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+    .legend-item{display:flex;align-items:center;gap:5px;font-size:0.72rem;color:var(--text3)}
+    .legend-dot{width:10px;height:10px;border-radius:2px}
+    /* AI SHOWCASE */
+    .ai-showcase-bg{background:linear-gradient(160deg,#0f172a 0%,#1e1b4b 50%,#0c4a6e 100%);position:relative;overflow:hidden}
+    .ai-showcase-bg::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at 2px 2px,rgba(255,255,255,0.04) 1px,transparent 0);background-size:32px 32px;pointer-events:none}
+    .ai-flow-wrap{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;margin-top:48px}
+    .ai-flow-steps{display:flex;flex-direction:column;gap:20px}
+    .ai-step{display:flex;gap:14px;align-items:flex-start;padding:16px;border-radius:14px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);transition:all 0.3s}
+    .ai-step.active{background:rgba(14,165,233,0.12);border-color:rgba(14,165,233,0.4)}
+    .ai-step-num{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--accent));color:white;font-size:0.75rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .ai-step h4{font-size:0.88rem;font-weight:700;color:white;margin-bottom:3px}
+    .ai-step p{font-size:0.78rem;color:rgba(255,255,255,0.6);line-height:1.5}
+    .ai-mock-screen{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:16px;padding:20px;backdrop-filter:blur(12px)}
+    .ai-mock-btn{background:linear-gradient(135deg,var(--brand),var(--accent));color:white;border:none;border-radius:8px;padding:10px 18px;font-size:0.82rem;font-weight:700;cursor:default;display:inline-flex;align-items:center;gap:6px;box-shadow:0 4px 16px rgba(14,165,233,0.4);animation:aiPulse 2s infinite}
+    @keyframes aiPulse{0%,100%{box-shadow:0 4px 16px rgba(14,165,233,0.4)}50%{box-shadow:0 4px 32px rgba(14,165,233,0.7)}}
+    .ai-progress-msg{font-size:0.75rem;color:#7dd3fc;font-weight:600;text-align:center;margin:12px 0;min-height:18px}
+    .ai-result-card{background:rgba(255,255,255,0.08);border:1px solid rgba(14,165,233,0.3);border-radius:10px;padding:12px;margin-bottom:8px;animation:fpFadeIn 0.5s ease forwards;opacity:0}
+    .ai-result-card:nth-child(1){animation-delay:0.1s}
+    .ai-result-card:nth-child(2){animation-delay:0.4s}
+    .ai-result-card:nth-child(3){animation-delay:0.7s}
+    .ai-card-title{font-size:0.75rem;font-weight:700;color:white;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+    .ai-mini-bars{display:flex;gap:3px;align-items:flex-end;height:30px}
+    .ai-mini-bar{width:12px;border-radius:2px 2px 0 0;background:linear-gradient(to top,#0ea5e9,#7c3aed);opacity:0.8}
+    .live-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);border-radius:999px;padding:3px 12px;font-size:0.7rem;font-weight:700;color:#6ee7b7;letter-spacing:0.04em;text-transform:uppercase}
+    .live-badge::before{content:'';width:6px;height:6px;background:#10b981;border-radius:50%;animation:pulse 2s infinite}
+    .coming-tag-v2{display:inline-block;background:rgba(14,165,233,0.15);border:1px solid rgba(14,165,233,0.3);border-radius:999px;padding:3px 12px;font-size:0.7rem;font-weight:700;color:#7dd3fc;letter-spacing:0.04em;text-transform:uppercase;margin-top:12px}
+    /* RESPONSIVE */
+    @media(max-width:1024px){
+      .hero-inner{grid-template-columns:1fr;text-align:center}
+      .hero-visual{display:none}
+      .hero p{margin:0 auto 32px}
+      .hero-cta{justify-content:center}
+      .hero-stats{justify-content:center}
+      .features-grid{grid-template-columns:repeat(2,1fr)}
+      .pricing-grid{grid-template-columns:repeat(2,1fr)}
+      .coming-grid{grid-template-columns:repeat(2,1fr)}
+      .demo-role-grid{grid-template-columns:repeat(2,1fr)}
+      .footer-grid{grid-template-columns:1fr 1fr}
+      .problem-grid{grid-template-columns:1fr}
+      .sync-explainer{grid-template-columns:1fr}
+      .steps-grid::before{display:none}
+    }
+    /* Logo adaptive coloring */
+    .logo-nav-img{filter:brightness(0) saturate(0);opacity:0.85;transition:filter 0.3s,opacity 0.3s}
+    .logo-footer-img{filter:none;opacity:1}
+    /* PARTNER GRID */
+    .partner-showcase{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:48px}
+    /* HAMBURGER */
+    .hamburger{display:none;flex-direction:column;justify-content:center;gap:5px;cursor:pointer;width:40px;height:40px;border-radius:9px;border:1.5px solid var(--border);background:white;padding:8px;flex-shrink:0}
+    .hamburger span{display:block;width:100%;height:2px;background:var(--text);border-radius:2px;transition:all 0.3s}
+    .hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+    .hamburger.open span:nth-child(2){opacity:0}
+    .hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+    /* MOBILE NAV MENU */
+    #mobileMenu{display:none;position:fixed;top:64px;left:0;right:0;background:white;border-bottom:2px solid var(--border);box-shadow:0 12px 40px rgba(0,0,0,0.12);z-index:98;padding:8px 0}
+    #mobileMenu.open{display:block}
+    #mobileMenu a{display:flex;align-items:center;padding:14px 24px;color:var(--text2);font-weight:500;font-size:0.95rem;text-decoration:none;border-bottom:1px solid var(--border);transition:background 0.15s,color 0.15s}
+    #mobileMenu a:last-child{border-bottom:none}
+    #mobileMenu a:hover,#mobileMenu a:active{background:var(--bg2);color:var(--brand)}
+    @media(max-width:640px){
+      .hero h1{font-size:2.1rem}
+      .features-grid{grid-template-columns:1fr}
+      .field-types-grid{grid-template-columns:repeat(3,1fr)}
+      .steps-grid{grid-template-columns:1fr}
+      .pricing-grid{grid-template-columns:1fr}
+      .coming-grid{grid-template-columns:1fr}
+      .nav-links{display:none}
+      .hamburger{display:flex}
+      .nav-cta-secondary{display:none}
+      .section-title{font-size:1.8rem}
+      .compare-wrap{font-size:0.76rem}
+      .partner-showcase{grid-template-columns:1fr}
+      section{padding:56px 16px}
+      .hero{padding:80px 16px 48px}
+      .hero-cta .btn-outline{display:none}
+      .proof-strip{padding:20px 16px}
+      .footer-grid{grid-template-columns:1fr}
+      .footer-bottom{flex-direction:column;text-align:center}
+      .demo-role-grid{grid-template-columns:1fr 1fr}
+      .faq-list{margin-top:24px}
+    }
+  </style>
+</head>
+<body>
+<nav id="navbar">
+  <a href="#" class="nav-logo">
+    <img src="assets/logo-wide.png" alt="FieldGovern" style="height:40px;width:auto"/>
+  </a>
+    <ul class="nav-links">
+    <li><a href="features.html">Features</a></li>
+    <li><a href="integrations.html">Integrations</a></li>
+    <li><a href="use-cases.html">Use Cases</a></li>
+    <li><a href="security.html">Security</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="about.html">About</a></li>
+  </ul>
+  <div style="display:flex;gap:8px;align-items:center">
+    <a href="demo.html" class="btn-outline nav-cta-secondary">Try Demo</a>
+    <a href="https://app.fieldgovern.com" class="btn-primary">Open App →</a>
+    <button class="hamburger" id="hamburgerBtn" aria-label="Open menu" onclick="toggleMenu()">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- Mobile navigation menu -->
+<div id="mobileMenu" role="navigation">
+  <a href="#features">✦ Features</a>
+  <a href="#how-it-works">⚙️ How It Works</a>
+  <a href="#compare">📊 Compare</a>
+  <a href="#pricing">💰 Pricing</a>
+  <a href="about.html">🏛️ About Us</a>
+  <a href="about.html#contact">✉️ Contact</a>
+  <a href="demo.html" style="color:var(--brand);font-weight:700">🚀 Try Free Demo</a>
+</div>
+
+<section class="hero">
+  <canvas id="particleCanvas" style="position:absolute;inset:0;pointer-events:none;z-index:0;opacity:0.45"></canvas>
+  <div class="hero-bg-blob blob1"></div>
+  <div class="hero-bg-blob blob2"></div>
+  <div class="hero-bg-blob blob3"></div>
+  <div class="hero-inner">
+    <div>
+      <div class="hero-badge animate-fade-up"><span></span> New: AI Auto-Generate Insights — Live Now</div>
+      <h1 class="animate-fade-up delay-1">
+        Collect, Analyze, & Report<br/><span class="grad-text">From the Field.</span>
+      </h1>
+      <p class="animate-fade-up delay-2">
+        India's most affordable offline-first field data platform. Collect with <strong>zero internet</strong>, auto-sync, and unlock <strong>real-time analysis, cross-tabulation, and automated report writing</strong> right in your browser.
+      </p>
+      <div class="hero-cta animate-fade-up delay-3">
+        <a href="demo.html" class="btn-primary animate-pulse-ring" style="font-size:1rem;padding:14px 28px">Try Live Demo →</a>
+        <a href="#analytics" class="btn-outline" style="font-size:1rem;padding:14px 28px">Explore Analytics Suite</a>
+      </div>
+      <div class="hero-stats animate-fade-up delay-4">
+        <div class="stat-item">
+          <span class="stat-num" data-count="100">0</span>
+          <span class="stat-label">% Offline capable</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num" data-count="96">0</span>
+          <span class="stat-label">% Photo compression</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num" data-count="15">0</span>
+          <span class="stat-label">Field types</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num" data-count="4">0</span>
+          <span class="stat-label">Languages</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-visual animate-fade-up delay-3">
+      <div class="floating-chip chip1">📡 Syncing 12 submissions...</div>
+      <div class="floating-chip chip2">✅ 47 synced today</div>
+      <div class="floating-chip chip3">📍 GPS captured</div>
+      <div class="floating-chip chip4">📑 Auto-generating report...</div>
+      
+      <div class="dashboard-mock">
+        <div class="mock-header">
+          <div class="mock-dot" style="background:#ef4444"></div>
+          <div class="mock-dot" style="background:#f59e0b;margin-left:4px"></div>
+          <div class="mock-dot" style="background:#22c55e;margin-left:4px"></div>
+          <span class="mock-title" style="margin-left:8px">Dashboard — Demo Org</span>
+          <span class="mock-badge">● Live</span>
+        </div>
+        <div class="mock-row">
+          <div class="mock-avatar" style="background:linear-gradient(135deg,#0ea5e9,#7c3aed)">RK</div>
+          <div class="mock-info"><div class="mock-name">Rajesh Kumar</div><div class="mock-sub">Household Survey · 2m ago</div></div>
+          <span class="mock-status status-synced">Synced</span>
+        </div>
+        <div class="mock-row">
+          <div class="mock-avatar" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">PS</div>
+          <div class="mock-info"><div class="mock-name">Priya Sharma</div><div class="mock-sub">Health Assessment · 8m ago</div></div>
+          <span class="mock-status status-pending">Pending</span>
+        </div>
+        <div class="mock-row">
+          <div class="mock-avatar" style="background:linear-gradient(135deg,#10b981,#0ea5e9)">AM</div>
+          <div class="mock-info"><div class="mock-name">Amit Mehta</div><div class="mock-sub">Agricultural Plot · 14m ago</div></div>
+          <span class="mock-status status-flagged">Flagged</span>
+        </div>
+        <div class="mock-chart">
+          <div class="chart-label">Submissions this week</div>
+          <div class="chart-bars" id="mockBars">
+            <div class="bar" style="height:60%"></div>
+            <div class="bar" style="height:40%;animation-delay:0.1s"></div>
+            <div class="bar" style="height:80%;animation-delay:0.2s"></div>
+            <div class="bar" style="height:55%;animation-delay:0.3s"></div>
+            <div class="bar" style="height:90%;animation-delay:0.4s"></div>
+            <div class="bar" style="height:70%;animation-delay:0.5s"></div>
+            <div class="bar" style="height:100%;animation-delay:0.6s"></div>
+          </div>
+        </div>
+        <div style="margin-top:12px;padding:10px 12px;background:linear-gradient(135deg,rgba(14,165,233,0.08),rgba(124,58,237,0.08));border-radius:10px;border:1px solid rgba(14,165,233,0.15)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:0.7rem;font-weight:600;color:#0369a1">Sync Progress</span>
+            <span id="syncPct" style="font-size:0.7rem;font-weight:700;color:#0ea5e9">0%</span>
+          </div>
+          <div style="height:5px;background:#e2e8f0;border-radius:4px;overflow:hidden">
+            <div id="syncBar" style="height:100%;width:0%;background:linear-gradient(90deg,#0ea5e9,#7c3aed);border-radius:4px;transition:width 0.4s ease"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="proof-strip">
+  <div class="proof-inner">
+    <span class="proof-label">Trusted by</span>
+    <div class="proof-items">
+      <span class="proof-item">🏛️ Government Ministries</span>
+      <span class="proof-item">🎓 Academic Research</span>
+      <span class="proof-item">📊 Survey Orgs</span>
+      <span class="proof-item">🏥 Public Health</span>
+      <span class="proof-item">🌍 Impact NGOs</span>
+      <span class="proof-item">🌾 Agriculture</span>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="section-inner">
+    <div class="reveal" style="max-width:600px">
+      <div class="section-tag">⚡ The Problem</div>
+      <h2 class="section-title">Field data collection is broken in India</h2>
+      <p class="section-sub">Expensive tools, unreliable internet, paper forms — field research teams deserve better.</p>
+    </div>
+    <div class="problem-grid">
+      <div class="problem-list">
+        <div class="problem-item reveal delay-1">
+          <div class="prob-icon">💸</div>
+          <p><strong>SurveyCTO costs $225–630/month</strong> — out of reach for most Indian research teams and NGOs.</p>
+        </div>
+        <div class="problem-item reveal delay-2">
+          <div class="prob-icon">📵</div>
+          <p><strong>KoboToolbox & ODK crash offline</strong> — data gets lost mid-survey when signal drops.</p>
+        </div>
+        <div class="problem-item reveal delay-3">
+          <div class="prob-icon">📄</div>
+          <p><strong>Paper forms cause errors</strong> — manual entry delays analysis by days or weeks.</p>
+        </div>
+        <div class="problem-item reveal delay-4">
+          <div class="prob-icon">📸</div>
+          <p><strong>5MB photos kill uploads</strong> — field photos fail to sync on slow connections.</p>
+        </div>
+        <div class="problem-item reveal delay-5">
+          <div class="prob-icon">👁️</div>
+          <p><strong>Zero real-time visibility</strong> — supervisors have no idea if data was actually collected.</p>
+        </div>
+      </div>
+      <div class="solution-card reveal-right">
+        <div class="section-tag" style="margin-bottom:24px">✦ FieldGovern Solution</div>
+        <div class="solution-item">
+          <div class="sol-icon">₹</div>
+          <div><h4>₹18,000/month</h4><p>70% cheaper than SurveyCTO. Same capability, fraction of the cost.</p></div>
+        </div>
+        <div class="solution-item">
+          <div class="sol-icon">📡</div>
+          <div><h4>Full offline mode</h4><p>Works with zero internet, forever. OPFS + IndexedDB storage.</p></div>
+        </div>
+        <div class="solution-item">
+          <div class="sol-icon">🗜️</div>
+          <div><h4>Auto photo compression</h4><p>5MB → 200KB (96% smaller). Photos upload fast even on 2G.</p></div>
+        </div>
+        <div class="solution-item">
+          <div class="sol-icon">⚡</div>
+          <div><h4>Real-time dashboard</h4><p>Supervisors see data the moment the enumerator gets signal.</p></div>
+        </div>
+        <div class="solution-item">
+          <div class="sol-icon">📱</div>
+          <div><h4>No app install needed</h4><p>PWA — runs in any browser. Share a link, start collecting.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features" class="features-bg">
+  <div class="section-inner">
+    <div class="text-center reveal">
+      <div class="section-tag">🚀 Features</div>
+      <h2 class="section-title">Everything your field team needs</h2>
+      <p class="section-sub">From form design to data export — one platform, every role covered.</p>
+    </div>
+    <div class="features-grid">
+
+      <div class="feature-card reveal delay-1">
+        <div class="feat-preview fp-offline">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:5px;width:100%;padding:0 16px">
+            <div class="fp-status offline">📵 No internet — collecting locally</div>
+            <div class="fp-status saving">💾 Saving to device storage…</div>
+            <div class="fp-status syncing">📡 Back online — syncing now… ✓</div>
+            <div style="display:flex;gap:8px;margin-top:4px">
+              <span style="font-size:0.6rem;background:#dbeafe;color:#1d4ed8;border-radius:4px;padding:2px 7px;font-weight:700">OPFS</span>
+              <span style="font-size:0.6rem;background:#dcfce7;color:#15803d;border-radius:4px;padding:2px 7px;font-weight:700">IndexedDB</span>
+              <span style="font-size:0.6rem;background:#fce7f3;color:#be185d;border-radius:4px;padding:2px 7px;font-weight:700">PWA</span>
+            </div>
+          </div>
+        </div>
+        <div class="feat-icon" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);width:36px;height:36px;font-size:1.1rem;margin-bottom:8px">📡</div>
+        <h3>Offline-First Architecture</h3>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">Zero data loss — auto-saves every 300ms, two-phase sync, geofencing. Works on any browser, forever offline.</p>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <span style="font-size:0.7rem;background:#f0f9ff;color:var(--brand-dark);border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bae6fd">100% Offline</span>
+          <span style="font-size:0.7rem;background:#f0fdf4;color:#15803d;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bbf7d0">Background sync</span>
+          <span style="font-size:0.7rem;background:#fdf4ff;color:#7c3aed;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #e9d5ff">Geofencing</span>
+        </div>
+      </div>
+
+      <div class="feature-card reveal delay-2">
+        <div class="feat-preview fp-form">
+          <div class="fp-field">📝 <span>District Name (Text)</span></div>
+          <div class="fp-field">☑️ <span>Household type (Select One)</span></div>
+          <div class="fp-field">📍 <span>Plot location (GPS)</span></div>
+          <div class="fp-field">📷 <span>House photo (Photo)</span></div>
+        </div>
+        <div class="feat-icon" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);width:36px;height:36px;font-size:1.1rem;margin-bottom:8px">🏗️</div>
+        <h3>Powerful Form Builder</h3>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">17 field types, nested skip logic, RCT randomization, XLSForm import. Public survey URL — no install needed.</p>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <span style="font-size:0.7rem;background:#f5f3ff;color:#7c3aed;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #ddd6fe">17 field types</span>
+          <span style="font-size:0.7rem;background:#fef9c3;color:#92400e;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fde68a">Skip logic</span>
+          <span style="font-size:0.7rem;background:#f0f9ff;color:var(--brand-dark);border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bae6fd">XLSForm import</span>
+        </div>
+      </div>
+
+      <div class="feature-card reveal delay-3">
+        <div class="feat-preview fp-dash">
+          <div class="fp-row"><div class="fp-dot" style="background:#22c55e"></div><span style="flex:1;color:#334155;font-weight:600">Rajesh Kumar</span><span style="font-size:0.6rem;background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;font-weight:700">Synced</span></div>
+          <div class="fp-row"><div class="fp-dot" style="background:#f59e0b"></div><span style="flex:1;color:#334155;font-weight:600">Priya Sharma</span><span style="font-size:0.6rem;background:#fef9c3;color:#b45309;border-radius:4px;padding:1px 5px;font-weight:700">Pending</span></div>
+          <div class="fp-row"><div class="fp-dot" style="background:#ef4444"></div><span style="flex:1;color:#334155;font-weight:600">Amit Mehta</span><span style="font-size:0.6rem;background:#fee2e2;color:#dc2626;border-radius:4px;padding:1px 5px;font-weight:700">Flagged</span></div>
+        </div>
+        <div class="feat-icon" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);width:36px;height:36px;font-size:1.1rem;margin-bottom:8px">📊</div>
+        <h3>Supervisor Dashboard</h3>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">Live feed of submissions, flag/approve/reject, GPS map, duplicate detection, daily progress per enumerator.</p>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <span style="font-size:0.7rem;background:#f0fdf4;color:#15803d;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bbf7d0">Real-time</span>
+          <span style="font-size:0.7rem;background:#fef2f2;color:#dc2626;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fecaca">Flag & audit</span>
+          <span style="font-size:0.7rem;background:#f0f9ff;color:var(--brand-dark);border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bae6fd">GPS map</span>
+        </div>
+      </div>
+
+      <div class="feature-card reveal delay-1">
+        <div class="feat-preview fp-ai" style="flex-direction:column;padding:14px 16px;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;width:100%">
+            <span style="font-size:0.65rem;font-weight:700;color:#92400e">🤖 AI generating insights…</span>
+            <div style="flex:1;height:4px;background:#fde68a;border-radius:2px;overflow:hidden"><div style="height:100%;background:#f59e0b;border-radius:2px;animation:fpWidth 2s ease-in-out infinite alternate"></div></div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <div class="fp-ai-chip">District × Gender</div>
+            <div class="fp-ai-chip" style="animation-delay:0.5s">Age distribution</div>
+            <div class="fp-ai-chip" style="animation-delay:1s">Coverage by block</div>
+          </div>
+          <div style="font-size:0.58rem;color:#92400e;font-style:italic;opacity:0.8">"6 tables generated · OpenAI · Claude · Gemini"</div>
+        </div>
+        <div class="feat-icon" style="background:linear-gradient(135deg,#fef9c3,#fde68a);width:36px;height:36px;font-size:1.1rem;margin-bottom:8px">🤖</div>
+        <h3>AI-Powered Analysis</h3>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">1-click AI auto-generates cross-tabulations. BYOK: OpenAI, Claude, Gemini. Translate labels, suggest skip logic.</p>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <span style="font-size:0.7rem;background:#fffbeb;color:#92400e;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fde68a">Auto-insights</span>
+          <span style="font-size:0.7rem;background:#f5f3ff;color:#7c3aed;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #ddd6fe">BYOK</span>
+          <span style="font-size:0.7rem;background:#f0fdf4;color:#15803d;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bbf7d0">Live Now ✓</span>
+        </div>
+      </div>
+
+      <div class="feature-card reveal delay-2">
+        <div class="feat-preview fp-team" style="justify-content:center">
+          <div class="fp-role">👑 Master Admin</div>
+          <div class="fp-connector"></div>
+          <div class="fp-role">🏢 Org Admin</div>
+          <div class="fp-connector"></div>
+          <div class="fp-role">👔 Supervisor</div>
+          <div class="fp-connector"></div>
+          <div class="fp-role">📱 Enumerator</div>
+        </div>
+        <div class="feat-icon" style="background:linear-gradient(135deg,#fce7f3,#fbcfe8);width:36px;height:36px;font-size:1.1rem;margin-bottom:8px">👥</div>
+        <h3>Team &amp; Field Management</h3>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">4-tier role hierarchy, QR login for field staff, WhatsApp/push alerts, multi-language EN/HI/KN/TE.</p>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <span style="font-size:0.7rem;background:#fdf2f8;color:#be185d;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fbcfe8">QR login</span>
+          <span style="font-size:0.7rem;background:#f0fdf4;color:#15803d;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bbf7d0">WhatsApp alerts</span>
+          <span style="font-size:0.7rem;background:#fffbeb;color:#92400e;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fde68a">4 languages</span>
+        </div>
+      </div>
+
+      <div class="feature-card reveal delay-3">
+        <div class="feat-preview fp-export">
+          <div class="fp-fmt">📄 CSV</div>
+          <div class="fp-fmt">📊 Stata .dta</div>
+          <div class="fp-fmt">📈 SPSS .sav</div>
+          <div class="fp-fmt">🟢 Sheets</div>
+          <div class="fp-fmt">🔌 REST API</div>
+          <div class="fp-fmt" style="animation-delay:1.1s;background:#f0fdf4;color:#15803d">⚕️ DHIS2</div>
+        </div>
+        <div class="feat-icon" style="background:linear-gradient(135deg,#ffedd5,#fed7aa);width:36px;height:36px;font-size:1.1rem;margin-bottom:8px">🔗</div>
+        <h3>Export, Compliance &amp; Integration</h3>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">CSV, Stata, SPSS, Google Sheets live sync. DPDP 2023 compliant. Webhooks, DHIS2 push, white-label per org.</p>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <span style="font-size:0.7rem;background:#fff7ed;color:#c2410c;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fed7aa">DPDP 2023</span>
+          <span style="font-size:0.7rem;background:#f0f9ff;color:var(--brand-dark);border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bae6fd">Webhooks</span>
+          <span style="font-size:0.7rem;background:#fdf4ff;color:#7c3aed;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #e9d5ff">White-label</span>
+        </div>
+      </div>
+
+    </div>
+    
+    <div class="reveal" style="margin-top:48px">
+      <h3 style="text-align:center;font-size:1.3rem;font-weight:800;color:var(--text);margin-bottom:8px">17 Field Types</h3>
+      <p style="text-align:center;font-size:0.85rem;color:var(--text3);margin-bottom:24px">Every data type your survey needs — built-in, no configuration required</p>
+      <div class="field-types-grid">
+        <div class="field-type"><span class="icon">📝</span><span>Text</span></div>
+        <div class="field-type"><span class="icon">🔢</span><span>Number</span></div>
+        <div class="field-type"><span class="icon">☑️</span><span>Select One</span></div>
+        <div class="field-type"><span class="icon">✅</span><span>Multi-Select</span></div>
+        <div class="field-type"><span class="icon">📍</span><span>GPS</span></div>
+        <div class="field-type"><span class="icon">📷</span><span>Photo</span></div>
+        <div class="field-type"><span class="icon">🎙️</span><span>Audio</span></div>
+        <div class="field-type"><span class="icon">📅</span><span>Date</span></div>
+        <div class="field-type"><span class="icon">🕐</span><span>Date &amp; Time</span></div>
+        <div class="field-type"><span class="icon">⭐</span><span>Rating</span></div>
+        <div class="field-type"><span class="icon">📦</span><span>Barcode</span></div>
+        <div class="field-type"><span class="icon">🔁</span><span>Repeat Group</span></div>
+        <div class="field-type"><span class="icon">📑</span><span>Section</span></div>
+        <div class="field-type"><span class="icon">☑️</span><span>Checkbox</span></div>
+        <div class="field-type"><span class="icon">✍️</span><span>Signature</span></div>
+        <div class="field-type"><span class="icon">🔢</span><span>Decimal</span></div>
+        <div class="field-type"><span class="icon">🔣</span><span>Calculated</span></div>
+        <div class="field-type"><span class="icon">⚡</span><span>Skip Logic</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how-it-works">
+  <div class="section-inner">
+    <div class="text-center reveal">
+      <div class="section-tag">📖 How It Works</div>
+      <h2 class="section-title">Three steps from setup to insights</h2>
+      <p class="section-sub">Get your entire field team collecting data in under 30 minutes.</p>
+    </div>
+    <div class="steps-grid">
+      <div class="step-card reveal delay-1">
+        <div class="step-num">1</div>
+        <div class="step-label">Admin</div>
+        <h3>Design Your Form</h3>
+        <p>Use the visual form builder to create surveys with 15 field types, skip logic, and templates. Assign forms to enumerators in one click.</p>
+      </div>
+      <div class="step-card reveal delay-2">
+        <div class="step-num">2</div>
+        <div class="step-label">Enumerator</div>
+        <h3>Collect Offline</h3>
+        <p>Enumerators open the web link on any phone — no install needed. Fill forms, capture GPS and photos, even with zero internet.</p>
+      </div>
+      <div class="step-card reveal delay-3">
+        <div class="step-num">3</div>
+        <div class="step-label">Supervisor</div>
+        <h3>See Data Instantly</h3>
+        <p>The moment the enumerator gets any signal, data syncs automatically. Supervisors see it live on the dashboard in real time.</p>
+      </div>
+    </div>
+    <div class="sync-explainer reveal">
+      <div>
+        <h3 style="font-size:1.1rem;font-weight:800;color:var(--text);margin-bottom:20px">⚡ Two-Phase Sync Magic</h3>
+        <div class="sync-phase">
+          <h4 style="color:var(--brand)">Phase 1 — Text Data (~2KB)</h4>
+          <p>Submission registers on the server immediately. Supervisor sees the form is submitted even before photos arrive. Works on 2G.</p>
+          <div class="code-block">✓ Instant registration<br/>✓ Works on 2G / EDGE<br/>✓ No data loss if dropped</div>
+        </div>
+      </div>
+      <div>
+        <div class="sync-phase" style="padding-top:40px">
+          <h4 style="color:var(--accent)">Phase 2 — Media Files (batch)</h4>
+          <p>Photos and audio upload in background batches. Already compressed to ~200KB each so uploads finish fast even on slow connections.</p>
+          <div class="code-block">✓ Background upload<br/>✓ Resumes on reconnect<br/>✓ 96% smaller files</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="compare" class="features-bg">
+  <div class="section-inner">
+    <div class="text-center reveal">
+      <div class="section-tag">🔍 Compare</div>
+      <h2 class="section-title">FieldGovern vs the alternatives</h2>
+      <p class="section-sub">See why teams are switching from SurveyCTO, KoboToolbox, and ODK.</p>
+    </div>
+    <!-- Visual score comparison -->
+    <div class="score-section reveal" style="margin-top:40px">
+      <div class="score-title">How we stack up — key dimensions</div>
+      <div class="score-grid" id="scoreGrid">
+        <div class="score-item">
+          <div class="score-label">Offline capability</div>
+          <div class="score-bars">
+            <div class="sbar fg" style="height:0%" data-h="100%"></div>
+            <div class="sbar other" style="height:0%" data-h="55%"></div>
+            <div class="sbar other" style="height:0%" data-h="40%"></div>
+            <div class="sbar other" style="height:0%" data-h="45%"></div>
+          </div>
+        </div>
+        <div class="score-item">
+          <div class="score-label">Affordability</div>
+          <div class="score-bars">
+            <div class="sbar fg" style="height:0%" data-h="95%"></div>
+            <div class="sbar other" style="height:0%" data-h="18%"></div>
+            <div class="sbar other" style="height:0%" data-h="60%"></div>
+            <div class="sbar other" style="height:0%" data-h="50%"></div>
+          </div>
+        </div>
+        <div class="score-item">
+          <div class="score-label">AI & Analytics</div>
+          <div class="score-bars">
+            <div class="sbar fg" style="height:0%" data-h="100%"></div>
+            <div class="sbar other" style="height:0%" data-h="30%"></div>
+            <div class="sbar other" style="height:0%" data-h="20%"></div>
+            <div class="sbar other" style="height:0%" data-h="15%"></div>
+          </div>
+        </div>
+        <div class="score-item">
+          <div class="score-label">No install needed</div>
+          <div class="score-bars">
+            <div class="sbar fg" style="height:0%" data-h="100%"></div>
+            <div class="sbar other" style="height:0%" data-h="0%"></div>
+            <div class="sbar other" style="height:0%" data-h="0%"></div>
+            <div class="sbar other" style="height:0%" data-h="0%"></div>
+          </div>
+        </div>
+        <div class="score-item">
+          <div class="score-label">India-first features</div>
+          <div class="score-bars">
+            <div class="sbar fg" style="height:0%" data-h="100%"></div>
+            <div class="sbar other" style="height:0%" data-h="25%"></div>
+            <div class="sbar other" style="height:0%" data-h="35%"></div>
+            <div class="sbar other" style="height:0%" data-h="30%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="score-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:linear-gradient(135deg,var(--brand),var(--accent))"></div>FieldGovern</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#e2e8f0"></div>SurveyCTO</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#e2e8f0"></div>KoboToolbox</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#e2e8f0"></div>ODK</div>
+      </div>
+    </div>
+
+    <div class="compare-wrap reveal" style="margin-top:40px">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left">Feature</th>
+            <th class="highlight">FieldGovern ✦</th>
+            <th>SurveyCTO</th>
+            <th>KoboToolbox</th>
+            <th>ODK</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Monthly Price</td><td><span class="tag-better">₹18,000 (~$215)</span></td><td><span class="tag-worse">$225–630</span></td><td><span class="tag-ok">Free (limited)</span></td><td><span class="tag-ok">Self-hosted</span></td></tr>
+          <tr><td>True Offline Mode</td><td><span class="tag-better">✓ Full offline</span></td><td><span class="tag-ok">✓ App only</span></td><td><span class="tag-ok">⚡ Partial</span></td><td><span class="tag-ok">⚡ App only</span></td></tr>
+          <tr><td>No Installation Needed</td><td><span class="tag-better">✓ PWA — any browser</span></td><td><span class="tag-worse">✕ App required</span></td><td><span class="tag-worse">✕ App required</span></td><td><span class="tag-worse">✕ App required</span></td></tr>
+          <tr><td>Auto Photo Compression</td><td><span class="tag-better">✓ 96% reduction</span></td><td><span class="tag-worse">✕ None</span></td><td><span class="tag-worse">✕ None</span></td><td><span class="tag-worse">✕ None</span></td></tr>
+          <tr><td>Background Sync</td><td><span class="tag-better">✓ Even app-closed</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+          <tr><td>Real-Time Dashboard</td><td><span class="tag-better">✓ Instant</span></td><td><span class="tag-ok">✓ Delayed</span></td><td><span class="tag-ok">⚡ Delayed</span></td><td><span class="tag-worse">✕</span></td></tr>
+          <tr><td>Indian Language Support</td><td><span class="tag-better">✓ HI, KN, TE, EN</span></td><td><span class="tag-ok">⚡ Limited</span></td><td><span class="tag-ok">✓ Many</span></td><td><span class="tag-ok">✓ Many</span></td></tr>
+          <tr><td>White-label Branding</td><td><span class="tag-better">✓ Per tenant</span></td><td><span class="tag-ok">Enterprise only</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+          <tr><td>REST API + API Keys</td><td><span class="tag-better">✓ All paid plans</span></td><td><span class="tag-ok">⚡ Paid add-on</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td></tr>
+          <tr><td>Stata .dta Export</td><td><span class="tag-better">✓ Built-in</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+          <tr><td>Multi-tenant SaaS</td><td><span class="tag-better">✓ Full isolation</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+          <tr><td>Skip Logic (AND/OR)</td><td><span class="tag-better">✓ Nested</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="ai-showcase-bg">
+  <div class="section-inner">
+    <div class="text-center reveal">
+      <div class="section-tag" style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.35);color:#6ee7b7">✦ Now Live</div>
+      <h2 class="section-title" style="color:white">1-Click AI Auto-Generate Insights</h2>
+      <p class="section-sub" style="color:rgba(255,255,255,0.65);margin:0 auto">Click one button. Our AI analyzes your dataset, designs the most meaningful cross-tabulations, and renders live charts — in under 2 minutes.</p>
+    </div>
+    <div class="ai-flow-wrap">
+      <div class="ai-flow-steps">
+        <div class="ai-step active reveal delay-1">
+          <div class="ai-step-num">1</div>
+          <div>
+            <h4>Click "Auto-Generate AI Insights"</h4>
+            <p>One button in the Analyzer. Optionally describe your research objectives — AI will cross-verify against your columns.</p>
+          </div>
+        </div>
+        <div class="ai-step reveal delay-2">
+          <div class="ai-step-num">2</div>
+          <div>
+            <h4>AI analyzes your dataset in background</h4>
+            <p>The AI reads your column schema, actual field values, and sample data. Runs async — close the tab, come back in 2 minutes.</p>
+          </div>
+        </div>
+        <div class="ai-step reveal delay-3">
+          <div class="ai-step-num">3</div>
+          <div>
+            <h4>Up to 10 publication-ready tables appear</h4>
+            <p>Bar charts, cross-tabs, distributions — each with an AI rationale. Tables auto-refresh every 30 min with new submissions.</p>
+          </div>
+        </div>
+        <div class="ai-step reveal delay-4">
+          <div class="ai-step-num">4</div>
+          <div>
+            <h4>Export to FG Writer for your report</h4>
+            <p>Send all tables directly to the report writer. Generate a full NGO/government/research report in the format you need.</p>
+          </div>
+        </div>
+      </div>
+      <div class="reveal-right">
+        <div class="ai-mock-screen">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <span style="font-size:0.8rem;font-weight:700;color:white">FG Analyzer — Demo Program</span>
+            <span class="live-badge">Live</span>
+          </div>
+          <div style="text-align:center;margin-bottom:16px">
+            <button class="ai-mock-btn">✦ Auto-Generate AI Insights</button>
+          </div>
+          <div class="ai-progress-msg" id="aiMsg">Analyzing dataset schema…</div>
+          <div id="aiCards" style="display:none">
+            <div class="ai-result-card">
+              <div class="ai-card-title">📊 District-wise Sample Count <span style="font-size:0.6rem;color:#7dd3fc;background:rgba(14,165,233,0.15);border-radius:4px;padding:1px 5px">bar</span></div>
+              <div class="ai-mini-bars">
+                <div class="ai-mini-bar" style="height:60%"></div>
+                <div class="ai-mini-bar" style="height:45%"></div>
+                <div class="ai-mini-bar" style="height:80%"></div>
+                <div class="ai-mini-bar" style="height:35%"></div>
+                <div class="ai-mini-bar" style="height:70%"></div>
+              </div>
+            </div>
+            <div class="ai-result-card">
+              <div class="ai-card-title">📊 Gender × Household type <span style="font-size:0.6rem;color:#7dd3fc;background:rgba(14,165,233,0.15);border-radius:4px;padding:1px 5px">cross-tab</span></div>
+              <div class="ai-mini-bars">
+                <div class="ai-mini-bar" style="height:50%"></div>
+                <div class="ai-mini-bar" style="height:90%"></div>
+                <div class="ai-mini-bar" style="height:40%"></div>
+                <div class="ai-mini-bar" style="height:65%"></div>
+                <div class="ai-mini-bar" style="height:55%"></div>
+              </div>
+            </div>
+            <div class="ai-result-card">
+              <div class="ai-card-title">📊 Age Distribution <span style="font-size:0.6rem;color:#7dd3fc;background:rgba(14,165,233,0.15);border-radius:4px;padding:1px 5px">pie</span></div>
+              <div class="ai-mini-bars">
+                <div class="ai-mini-bar" style="height:30%"></div>
+                <div class="ai-mini-bar" style="height:75%"></div>
+                <div class="ai-mini-bar" style="height:100%"></div>
+                <div class="ai-mini-bar" style="height:55%"></div>
+                <div class="ai-mini-bar" style="height:40%"></div>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <span style="font-size:0.65rem;color:rgba(255,255,255,0.5)">⏱ 2 generations / day</span>
+            <span style="font-size:0.65rem;color:rgba(255,255,255,0.5)">🔄 Auto-refresh 30 min</span>
+            <span style="font-size:0.65rem;color:rgba(255,255,255,0.5)">📋 History view</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="analytics" class="coming-soon-bg">
+  <div class="section-inner">
+    <div class="text-center reveal">
+      <div class="section-tag" style="background:rgba(14,165,233,0.15);border-color:rgba(14,165,233,0.3);color:#7dd3fc">⚡ Intelligence Suite</div>
+      <h2 class="section-title" style="color:white">End-to-End Analysis & Reporting</h2>
+      <p class="section-sub" style="color:rgba(255,255,255,0.7);margin:0 auto">FieldGovern is a complete intelligence suite — from data collection to publication-ready reports. Four modules are live now.</p>
+    </div>
+    
+    <div class="coming-grid">
+      <div class="coming-card reveal delay-1">
+        <span class="icon">📈</span>
+        <h3>Real-Time Data Analysis</h3>
+        <p>Instantly visualize field data the moment it syncs. Live, interactive dashboards for government officers, researchers, and program managers — no external BI tools needed.</p>
+        <span class="live-badge" style="margin-top:16px">Live Now</span>
+      </div>
+
+      <div class="coming-card reveal delay-2">
+        <span class="icon">🧮</span>
+        <h3>Advanced Tabulation Engine</h3>
+        <p>Publication-ready cross-tabs, frequency tables, and distributions directly in your browser. AI auto-generates up to 10 tables in one click — with rationale for every choice.</p>
+        <span class="live-badge" style="margin-top:16px">Live Now</span>
+      </div>
+
+      <div class="coming-card reveal delay-3">
+        <span class="icon">📑</span>
+        <h3>Automated Report Writing</h3>
+        <p>Turn tabulation data into narrative reports instantly. 6 styles: NGO, Government, Research, Medical, Progress, Field Survey. Push charts directly from Analyzer to Writer.</p>
+        <span class="live-badge" style="margin-top:16px">Live Now</span>
+      </div>
+
+      <div class="coming-card reveal delay-1">
+        <span class="icon">🗺️</span>
+        <h3>GIS & Spatial Analytics</h3>
+        <p>Advanced map layers, spatial clustering, and coverage heatmaps for geographical field studies. Track surveyor footprints and visualize impact density automatically.</p>
+        <span class="coming-tag-v2">Coming Q3 2026</span>
+      </div>
+
+      <div class="coming-card reveal delay-2">
+        <span class="icon">🤖</span>
+        <h3>AI Data Assistant</h3>
+        <p>1-click AI auto-generates the most insightful cross-tabulations for your dataset. Validates outputs, retries on hallucination, stores history with full run audit trail.</p>
+        <span class="live-badge" style="margin-top:16px">Live Now</span>
+      </div>
+
+      <div class="coming-card reveal delay-3">
+        <span class="icon">🔔</span>
+        <h3>Smart Alerts & Digest</h3>
+        <p>Set custom thresholds for critical indicators. Get daily email digests and instant SMS notifications when field data goes out of range or flagged anomalies require attention.</p>
+        <span class="coming-tag-v2">Coming Q3 2026</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="section-inner">
+    <div class="text-center reveal">
+      <div class="section-tag">💳 Pricing</div>
+      <h2 class="section-title">Simple, transparent pricing</h2>
+      <p class="section-sub">All plans include offline collection, sync, dashboard, and CSV export. No hidden fees.</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="price-card reveal delay-1">
+        <div class="price-tier">Free</div>
+        <div class="price-amount"><span class="currency">₹</span>0</div>
+        <div class="price-period">Forever free</div>
+        <div class="price-divider"></div>
+        <ul class="price-list">
+          <li class="check"><strong>100</strong> submissions/month</li>
+          <li class="check">5 users</li>
+          <li class="check">3 forms</li>
+          <li class="check">Offline collection</li>
+          <li class="check">CSV export</li>
+          <li class="cross">API access</li>
+          <li class="cross">White-label</li>
+          <li class="cross">Stata export</li>
+        </ul>
+        <a href="demo.html" class="btn-plan btn-plan-ghost">Start Free</a>
+      </div>
+      <div class="price-card reveal delay-2">
+        <div class="price-tier" style="color:var(--brand)">Starter</div>
+        <div class="price-amount"><span class="currency">₹</span>6,000</div>
+        <div class="price-period">per month</div>
+        <div class="price-divider"></div>
+        <ul class="price-list">
+          <li class="check"><strong>5,000</strong> submissions/month</li>
+          <li class="check">25 users</li>
+          <li class="check">20 forms</li>
+          <li class="check">Offline + sync</li>
+          <li class="check">CSV + Stata export</li>
+          <li class="check">API access</li>
+          <li class="cross">White-label</li>
+          <li class="cross">Webhooks</li>
+        </ul>
+        <a href="demo.html" class="btn-plan btn-plan-primary">Get Started</a>
+      </div>
+      <div class="price-card popular reveal delay-3">
+        <div class="popular-badge">MOST POPULAR</div>
+        <div class="price-tier" style="color:var(--accent)">Professional</div>
+        <div class="price-amount"><span class="currency">₹</span>18,000</div>
+        <div class="price-period">per month</div>
+        <div class="price-divider"></div>
+        <ul class="price-list">
+          <li class="check"><strong>50,000</strong> submissions/month</li>
+          <li class="check">100 users</li>
+          <li class="check">100 forms</li>
+          <li class="check">Everything in Starter</li>
+          <li class="check">White-label branding</li>
+          <li class="check">Webhooks</li>
+          <li class="check">Google Sheets sync</li>
+          <li class="check">Priority support</li>
+        </ul>
+        <a href="demo.html" class="btn-plan btn-plan-primary" style="background:linear-gradient(135deg,var(--accent),#9333ea)">Start Trial</a>
+      </div>
+      <div class="price-card reveal delay-4">
+        <div class="price-tier" style="color:var(--green)">Enterprise</div>
+        <div class="price-amount" style="font-size:1.6rem">Custom</div>
+        <div class="price-period">Contact us</div>
+        <div class="price-divider"></div>
+        <ul class="price-list">
+          <li class="check"><strong>Unlimited</strong> submissions</li>
+          <li class="check">Unlimited users & forms</li>
+          <li class="check">Everything in Professional</li>
+          <li class="check">Dedicated support</li>
+          <li class="check">Custom SLA</li>
+          <li class="check">On-premise option</li>
+          <li class="check">Custom integrations</li>
+          <li class="check">Training included</li>
+        </ul>
+        <a href="mailto:hello@fieldgovern.in" class="btn-plan btn-plan-ghost" style="border-color:var(--green);color:var(--green)">Contact Sales</a>
+      </div>
+    </div>
+    <p style="text-align:center;color:var(--text3);font-size:0.85rem;margin-top:24px">SurveyCTO Professional = $499/month (~₹42,000). FieldGovern Professional = ₹18,000. <strong style="color:var(--text)">Same capability, 57% savings.</strong></p>
+  </div>
+</section>
+
+<section class="demo-cta-bg">
+  <div class="section-inner text-center">
+    <div class="reveal">
+      <div class="section-tag">🎮 Live Demo</div>
+      <h2 class="section-title">Try FieldGovern right now — no signup</h2>
+      <p class="section-sub">Pre-loaded with real forms, GPS submissions, photos, and all 4 user roles. Log in with one click.</p>
+    </div>
+    <div class="demo-role-grid">
+      <div class="role-pill reveal delay-1">
+        <span class="emoji">🌐</span>
+        <h4>Master Admin</h4>
+        <p>Manage all organizations & tenants</p>
+      </div>
+      <div class="role-pill reveal delay-2">
+        <span class="emoji">🏢</span>
+        <h4>Org Admin</h4>
+        <p>Build forms, manage users, API keys</p>
+      </div>
+      <div class="role-pill reveal delay-3">
+        <span class="emoji">👔</span>
+        <h4>Supervisor</h4>
+        <p>Dashboard, flags, exports, GPS map</p>
+      </div>
+      <div class="role-pill reveal delay-4">
+        <span class="emoji">📱</span>
+        <h4>Enumerator</h4>
+        <p>Fill forms offline, sync, history</p>
+      </div>
+    </div>
+    <a href="demo.html" class="btn-primary animate-pulse-ring" style="font-size:1.05rem;padding:16px 36px">
+      Access Demo Account →
+    </a>
+    <p style="margin-top:16px;font-size:0.82rem;color:var(--text3)">Live app at <a href="https://app.fieldgovern.com" target="_blank" style="color:var(--brand);font-weight:600">app.fieldgovern.com</a> · No credit card required</p>
+  </div>
+</section>
+
+<section>
+  <div class="section-inner">
+    <div class="text-center reveal">
+      <div class="section-tag">❓ FAQ</div>
+      <h2 class="section-title">Common questions</h2>
+    </div>
+    <div class="faq-list">
+      <details class="reveal">
+        <summary>Does it really work with no internet?</summary>
+        <p>Yes. Forms are cached locally the first time they're loaded. Data is stored in OPFS (Chrome/Android) or IndexedDB (Safari/iOS). Even photos and audio are stored locally until sync. The only internet needed is once to load the form initially — after that, fully offline forever.</p>
+      </details>
+      <details class="reveal">
+        <summary>Do enumerators need to install anything?</summary>
+        <p>No. FieldGovern is a Progressive Web App (PWA). Enumerators open the URL in Chrome or Safari on any phone. They can optionally "Add to Home Screen" for an app-like icon, but it works directly in the browser with no Play Store or App Store required.</p>
+      </details>
+      <details class="reveal">
+        <summary>How is data isolated between organizations?</summary>
+        <p>Full multi-tenant isolation at the database level. Every query is filtered by tenant_id. Row-Level Security (RLS) is enforced via SQLAlchemy. No organization can ever see another's data — technically guaranteed at the DB layer, not just application policy.</p>
+      </details>
+      <details class="reveal">
+        <summary>Can I export to Stata for academic analysis?</summary>
+        <p>Yes. FieldGovern exports to CSV, Stata .dta format (via pandas), and Google Sheets. This is specifically designed for academic and policy research teams who use Stata — a feature SurveyCTO charges extra for on their Professional plan.</p>
+      </details>
+      <details class="reveal">
+        <summary>What if an enumerator submits the same form twice?</summary>
+        <p>No duplicates. Each submission gets a local_id (idempotency key) generated on the device before submission. If the same submission is pushed twice (e.g., sync interrupted mid-upload), the server detects the duplicate via local_id and silently ignores the second copy.</p>
+      </details>
+      <details class="reveal">
+        <summary>Can I use FieldGovern with my own branding?</summary>
+        <p>Yes — white-labeling is available on Professional and Enterprise plans. You can set a custom logo, app name, and primary color per organization. Your enumerators see your brand, not "FieldGovern".</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- PARTNER SECTION -->
+<section style="background:var(--bg2)" id="about">
+  <div class="section-inner">
+    <div class="text-center reveal">
+      <div class="section-tag">🤝 Leadership &amp; Partnership</div>
+      <h2 class="section-title">Built for India's field researchers</h2>
+      <p class="section-sub">FieldGovern is founded and led by <strong>Pallavi Deshetty (CEO)</strong>, with <strong>Dataworx</strong> — a Bengaluru-based data science and M&amp;E firm led by <strong>Manjunath YN</strong> — as a strategic partner shaping the product roadmap.</p>
+    </div>
+    <div class="partner-showcase reveal">
+      <div style="background:white;border:2px solid rgba(14,165,233,0.3);border-radius:20px;padding:28px;text-align:center;box-shadow:0 8px 32px rgba(14,165,233,0.1)">
+        <div style="font-size:2.5rem;margin-bottom:12px">👩‍💼</div>
+        <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:8px">Pallavi Deshetty</h3>
+        <p style="font-size:0.78rem;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px">CEO &amp; Founder, FieldGovern</p>
+        <p style="font-size:0.83rem;color:var(--text2);line-height:1.6">Building India's most affordable offline-first field data platform to empower research teams and replace legacy tools like SurveyCTO.</p>
+      </div>
+      <div style="background:white;border:1px solid var(--border);border-radius:20px;padding:28px;text-align:center">
+        <div style="font-size:2.5rem;margin-bottom:12px">📊</div>
+        <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:8px">Dataworx</h3>
+        <p style="font-size:0.78rem;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px">Strategic Partner</p>
+        <p style="font-size:0.83rem;color:var(--text2);line-height:1.6">Bengaluru-based data science &amp; M&amp;E firm shaping FieldGovern's product roadmap based on real field research needs across India.</p>
+      </div>
+      <div style="background:white;border:1px solid var(--border);border-radius:20px;padding:28px;text-align:center">
+        <div style="font-size:2.5rem;margin-bottom:12px">🧑‍💼</div>
+        <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:8px">Manjunath YN</h3>
+        <p style="font-size:0.78rem;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px">CEO, Dataworx</p>
+        <p style="font-size:0.83rem;color:var(--text2);line-height:1.6">10+ years in program M&amp;E and large-scale field data collection across multiple Indian states for government &amp; civil society programs.</p>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:32px" class="reveal">
+      <a href="about.html" style="color:var(--brand);font-weight:600;font-size:0.92rem;text-decoration:none">Learn more about our team &amp; mission →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="#" class="nav-logo" style="color:white;margin-bottom:12px;display:inline-flex">
+          <div style="display:inline-flex;background:white;border-radius:10px;padding:6px 12px;margin-bottom:12px"><img src="assets/logo-wide.png" alt="FieldGovern" style="height:32px;width:auto"/></div>
+        </a>
+        <p>Offline-first field data collection for India's research teams. Built to replace SurveyCTO at 1/3 the cost.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#pricing">Pricing</a></li>
+          <li><a href="#compare">Compare</a></li>
+          <li><a href="demo.html">Live Demo</a></li>
+          <li><a href="#analytics">Analysis & Reports</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="about.html">About Us</a></li>
+          <li><a href="about.html#contact">Contact</a></li>
+          <li><a href="privacy.html">Privacy Policy</a></li>
+          <li><a href="terms.html">Terms of Service</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Contact</h4>
+        <ul>
+          <li><a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a></li>
+          <li><a href="https://app.fieldgovern.com" target="_blank">Live App ↗</a></li>
+          <li><a href="demo.html">Try Demo</a></li>
+        </ul>
+        <div style="margin-top:16px;font-size:0.8rem;color:rgba(255,255,255,0.3)">EN · हिन्दी · ಕನ್ನಡ · తెలుగు</div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 FieldGovern · <a href="privacy.html" style="color:rgba(255,255,255,0.4)">Privacy</a> · <a href="terms.html" style="color:rgba(255,255,255,0.4)">Terms</a> · <a href="about.html" style="color:rgba(255,255,255,0.4)">About</a></span>
+      <span>Founded by Pallavi Deshetty · FastAPI + React + PostgreSQL</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Navbar scroll effect
+  const navbar = document.getElementById('navbar');
+  window.addEventListener('scroll', () => {
+    navbar.classList.toggle('scrolled', window.scrollY > 20);
+  });
+  // Scroll reveal
+  const reveals = document.querySelectorAll('.reveal,.reveal-left,.reveal-right,.reveal-scale');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) {
+        setTimeout(() => e.target.classList.add('visible'), i * 60);
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+  reveals.forEach(el => observer.observe(el));
+  // Counter animation
+  function animateCounter(el) {
+    const target = parseInt(el.dataset.count);
+    const duration = 1200;
+    const step = target / (duration / 16);
+    let current = 0;
+    const timer = setInterval(() => {
+      current = Math.min(current + step, target);
+      el.textContent = Math.round(current) + (el.closest('.stat-item').querySelector('.stat-label').textContent.startsWith('%') ? '' : '');
+      if (current >= target) clearInterval(timer);
+    }, 16);
+  }
+  const statsObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.querySelectorAll('[data-count]').forEach(animateCounter);
+        statsObs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.5 });
+  const heroStats = document.querySelector('.hero-stats');
+  if (heroStats) statsObs.observe(heroStats);
+  
+  // Particle canvas
+  (function(){
+    const canvas = document.getElementById('particleCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    function resize(){canvas.width=canvas.offsetWidth;canvas.height=canvas.offsetHeight;}
+    resize();
+    window.addEventListener('resize', resize);
+    const colors = ['#0ea5e9','#7c3aed','#10b981','#f59e0b'];
+    function spawn(){
+      if(particles.length>60) return;
+      particles.push({
+        x: Math.random()*canvas.width,
+        y: canvas.height + 10,
+        r: 1.5 + Math.random()*3,
+        speed: 0.4 + Math.random()*0.8,
+        dx: (Math.random()-0.5)*0.6,
+        color: colors[Math.floor(Math.random()*colors.length)],
+        alpha: 0.15 + Math.random()*0.35,
+        life: 0,
+        maxLife: 180 + Math.random()*240
+      });
+    }
+    function draw(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      if(Math.random()<0.15) spawn();
+      particles = particles.filter(p=>{
+        p.y -= p.speed;
+        p.x += p.dx;
+        p.life++;
+        const fade = p.life < 30 ? p.life/30 : p.life > p.maxLife-30 ? (p.maxLife-p.life)/30 : 1;
+        ctx.globalAlpha = p.alpha * fade;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        ctx.fill();
+        return p.life < p.maxLife && p.y > -10;
+      });
+      ctx.globalAlpha = 1;
+      requestAnimationFrame(draw);
+    }
+    draw();
+  })();
+  
+  // Animated sync progress bar in hero mock
+  (function(){
+    const bar = document.getElementById('syncBar');
+    const pct = document.getElementById('syncPct');
+    if (!bar || !pct) return;
+    let v = 0;
+    let dir = 1;
+    function tick(){
+      v += dir * (0.3 + Math.random()*0.5);
+      if(v >= 100){ v = 100; setTimeout(()=>{ dir = -1; v = 0; bar.style.transition='width 0.1s'; bar.style.width='0%'; pct.textContent='0%'; setTimeout(()=>{ dir=1; bar.style.transition='width 0.4s ease'; },200); },800); }
+      bar.style.width = v + '%';
+      pct.textContent = Math.round(v) + '%';
+      setTimeout(tick, 80);
+    }
+    tick();
+  })();
+  
+  // Mobile hamburger menu
+  function toggleMenu() {
+    const btn = document.getElementById('hamburgerBtn');
+    const menu = document.getElementById('mobileMenu');
+    const isOpen = menu.classList.toggle('open');
+    btn.classList.toggle('open', isOpen);
+    btn.setAttribute('aria-expanded', isOpen);
+  }
+  // Close mobile menu when a link is clicked
+  document.querySelectorAll('#mobileMenu a').forEach(a => {
+    a.addEventListener('click', () => {
+      document.getElementById('mobileMenu').classList.remove('open');
+      document.getElementById('hamburgerBtn').classList.remove('open');
+    });
+  });
+  // Close mobile menu on scroll
+  window.addEventListener('scroll', () => {
+    document.getElementById('mobileMenu').classList.remove('open');
+    document.getElementById('hamburgerBtn').classList.remove('open');
+  }, { passive: true });
+
+  // Score bars — animate when scrolled into view
+  (function(){
+    const grid = document.getElementById('scoreGrid');
+    if (!grid) return;
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          grid.querySelectorAll('.sbar').forEach((bar, i) => {
+            setTimeout(() => { bar.style.height = bar.dataset.h; bar.style.transition = 'height 0.9s cubic-bezier(.16,1,.3,1)'; }, i * 80);
+          });
+          obs.unobserve(grid);
+        }
+      });
+    }, { threshold: 0.3 });
+    obs.observe(grid);
+  })();
+
+  // AI showcase — cycle messages then reveal cards
+  (function(){
+    const msgs = ['Analyzing dataset schema…','Mapping study objectives…','Identifying key variables…','Generating cross-tabulations…','Validating outputs…','✓ 6 tables ready!'];
+    const msgEl = document.getElementById('aiMsg');
+    const cards = document.getElementById('aiCards');
+    if (!msgEl || !cards) return;
+    let i = 0;
+    const iv = setInterval(() => {
+      i++;
+      if (i < msgs.length - 1) {
+        msgEl.textContent = msgs[i];
+      } else {
+        msgEl.textContent = msgs[msgs.length - 1];
+        msgEl.style.color = '#6ee7b7';
+        cards.style.display = 'block';
+        clearInterval(iv);
+        setTimeout(() => { i = 0; msgEl.style.color = ''; msgEl.textContent = msgs[0]; cards.style.display = 'none'; setTimeout(()=>{ /* restart */ }, 500); }, 6000);
+      }
+    }, 1400);
+  })();
+
+  // Animated chart bars — cycle heights every 3s
+  (function(){
+    const container = document.getElementById('mockBars');
+    if (!container) return;
+    const heights = [
+      [60,40,80,55,90,70,100],
+      [45,75,30,95,60,85,50],
+      [80,50,70,35,100,45,65],
+      [30,90,60,75,40,100,80],
+    ];
+    let idx = 0;
+    setInterval(()=>{
+      idx = (idx + 1) % heights.length;
+      const bars = container.querySelectorAll('.bar');
+      bars.forEach((b,i)=>{ b.style.height = heights[idx][i] + '%'; b.style.transition = 'height 0.6s cubic-bezier(.16,1,.3,1)'; });
+    }, 2800);
+  })();
+</script>
+</body>
+</html>
