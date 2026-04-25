@@ -3,6 +3,8 @@ name: Deploy Website to GitHub Pages
 on:
   push:
     branches: [main]
+    paths:
+      - "website/**"
   workflow_dispatch:
 
 permissions:
@@ -15,10 +17,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./website
-          publish_branch: gh-pages
-          force_orphan: true
+      - name: Sync website/ → docs/ (GitHub Pages source)
+        run: |
+          cp -rf website/. docs/
+          rm -f docs/status.html
+
+      - name: Commit and push docs/ if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/
+          git diff --staged --quiet && echo "No changes to docs/" && exit 0
+          git commit -m "sync: website → docs/ [skip ci]"
+          git push

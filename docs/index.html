@@ -251,6 +251,85 @@
     .footer-col a{font-size:0.85rem;color:rgba(255,255,255,0.5);text-decoration:none;transition:color 0.2s}
     .footer-col a:hover{color:white}
     .footer-bottom{border-top:1px solid rgba(255,255,255,0.08);padding-top:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:gap;font-size:0.8rem;color:rgba(255,255,255,0.35);flex-wrap:wrap;gap:12px}
+    /* FEATURE CARD PREVIEWS */
+    .feat-preview{height:110px;border-radius:10px;margin-bottom:14px;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center}
+    .fp-offline{background:linear-gradient(135deg,#eff6ff,#dbeafe);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%}
+    .fp-status{display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:700;white-space:nowrap}
+    .fp-status.offline{background:#fee2e2;color:#dc2626;animation:fpStatus 4s infinite}
+    .fp-status.saving{background:#fef9c3;color:#b45309;animation:fpStatus 4s infinite 1.3s;opacity:0}
+    .fp-status.syncing{background:#dcfce7;color:#16a34a;animation:fpStatus 4s infinite 2.6s;opacity:0}
+    @keyframes fpStatus{0%,100%{opacity:0;transform:scale(0.9)}15%,75%{opacity:1;transform:scale(1)}90%{opacity:0}}
+    .fp-form{background:linear-gradient(135deg,#f5f3ff,#ede9fe);padding:12px;width:100%;display:flex;flex-direction:column;gap:5px}
+    .fp-field{background:white;border-radius:6px;height:18px;border:1px solid #ddd6fe;animation:fpFieldIn 0.5s ease forwards;opacity:0;display:flex;align-items:center;padding:0 8px;gap:5px;font-size:0.62rem;color:#64748b}
+    .fp-field:nth-child(1){animation-delay:0.1s}
+    .fp-field:nth-child(2){animation-delay:0.4s}
+    .fp-field:nth-child(3){animation-delay:0.7s}
+    .fp-field:nth-child(4){animation-delay:1.0s}
+    @keyframes fpFieldIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+    .fp-dash{background:linear-gradient(135deg,#f0fdf4,#dcfce7);padding:10px;width:100%;display:flex;flex-direction:column;gap:4px}
+    .fp-row{display:flex;align-items:center;gap:6px;padding:4px 6px;background:white;border-radius:5px;font-size:0.62rem;animation:fpFadeIn 0.4s ease forwards;opacity:0}
+    .fp-row:nth-child(1){animation-delay:0.2s}
+    .fp-row:nth-child(2){animation-delay:0.5s}
+    .fp-row:nth-child(3){animation-delay:0.8s}
+    @keyframes fpFadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+    .fp-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+    .fp-ai{background:linear-gradient(135deg,#fffbeb,#fef3c7);padding:12px;width:100%;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+    .fp-ai-line{height:10px;border-radius:4px;background:linear-gradient(90deg,#fde68a,#f59e0b);animation:fpWidth 2s ease-in-out infinite alternate}
+    @keyframes fpWidth{from{width:30%}to{width:90%}}
+    .fp-ai-chip{background:#fef9c3;border:1px solid #fde68a;border-radius:6px;padding:3px 8px;font-size:0.6rem;font-weight:700;color:#92400e;animation:fpChip 3s infinite}
+    @keyframes fpChip{0%,100%{opacity:0.5}50%{opacity:1}}
+    .fp-team{background:linear-gradient(135deg,#fdf2f8,#fce7f3);padding:10px;width:100%;display:flex;flex-direction:column;align-items:center;gap:3px}
+    .fp-role{padding:3px 10px;border-radius:6px;font-size:0.6rem;font-weight:700;text-align:center;animation:fpFadeIn 0.4s ease forwards;opacity:0}
+    .fp-role:nth-child(1){animation-delay:0.1s;background:#fce7f3;color:#be185d;width:120px}
+    .fp-role:nth-child(2){animation-delay:0.3s;background:#ede9fe;color:#7c3aed;width:100px}
+    .fp-role:nth-child(3){animation-delay:0.5s;background:#dbeafe;color:#1d4ed8;width:80px}
+    .fp-role:nth-child(4){animation-delay:0.7s;background:#dcfce7;color:#15803d;width:60px}
+    .fp-connector{width:1px;height:6px;background:#e2e8f0}
+    .fp-export{background:linear-gradient(135deg,#fff7ed,#ffedd5);padding:12px;width:100%;display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:center}
+    .fp-fmt{padding:4px 8px;border-radius:6px;font-size:0.62rem;font-weight:800;animation:fpScale 0.4s ease forwards;opacity:0;transform:scale(0.8)}
+    .fp-fmt:nth-child(1){animation-delay:0.1s;background:#dcfce7;color:#15803d}
+    .fp-fmt:nth-child(2){animation-delay:0.3s;background:#dbeafe;color:#1d4ed8}
+    .fp-fmt:nth-child(3){animation-delay:0.5s;background:#fce7f3;color:#be185d}
+    .fp-fmt:nth-child(4){animation-delay:0.7s;background:#fef9c3;color:#92400e}
+    .fp-fmt:nth-child(5){animation-delay:0.9s;background:#ede9fe;color:#7c3aed}
+    @keyframes fpScale{from{opacity:0;transform:scale(0.7)}to{opacity:1;transform:scale(1)}}
+    /* SCORE BARS — comparison visual */
+    .score-section{margin-bottom:40px}
+    .score-title{text-align:center;font-size:0.82rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:20px}
+    .score-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:20px}
+    .score-item{text-align:center}
+    .score-label{font-size:0.7rem;font-weight:600;color:var(--text2);margin-bottom:6px}
+    .score-bars{display:flex;gap:4px;align-items:flex-end;justify-content:center;height:60px}
+    .sbar{width:16px;border-radius:3px 3px 0 0;transition:height 1s cubic-bezier(.16,1,.3,1)}
+    .sbar.fg{background:linear-gradient(to top,var(--brand),var(--accent))}
+    .sbar.other{background:#e2e8f0}
+    .score-legend{display:flex;gap:16px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+    .legend-item{display:flex;align-items:center;gap:5px;font-size:0.72rem;color:var(--text3)}
+    .legend-dot{width:10px;height:10px;border-radius:2px}
+    /* AI SHOWCASE */
+    .ai-showcase-bg{background:linear-gradient(160deg,#0f172a 0%,#1e1b4b 50%,#0c4a6e 100%);position:relative;overflow:hidden}
+    .ai-showcase-bg::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at 2px 2px,rgba(255,255,255,0.04) 1px,transparent 0);background-size:32px 32px;pointer-events:none}
+    .ai-flow-wrap{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;margin-top:48px}
+    .ai-flow-steps{display:flex;flex-direction:column;gap:20px}
+    .ai-step{display:flex;gap:14px;align-items:flex-start;padding:16px;border-radius:14px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);transition:all 0.3s}
+    .ai-step.active{background:rgba(14,165,233,0.12);border-color:rgba(14,165,233,0.4)}
+    .ai-step-num{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--accent));color:white;font-size:0.75rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .ai-step h4{font-size:0.88rem;font-weight:700;color:white;margin-bottom:3px}
+    .ai-step p{font-size:0.78rem;color:rgba(255,255,255,0.6);line-height:1.5}
+    .ai-mock-screen{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:16px;padding:20px;backdrop-filter:blur(12px)}
+    .ai-mock-btn{background:linear-gradient(135deg,var(--brand),var(--accent));color:white;border:none;border-radius:8px;padding:10px 18px;font-size:0.82rem;font-weight:700;cursor:default;display:inline-flex;align-items:center;gap:6px;box-shadow:0 4px 16px rgba(14,165,233,0.4);animation:aiPulse 2s infinite}
+    @keyframes aiPulse{0%,100%{box-shadow:0 4px 16px rgba(14,165,233,0.4)}50%{box-shadow:0 4px 32px rgba(14,165,233,0.7)}}
+    .ai-progress-msg{font-size:0.75rem;color:#7dd3fc;font-weight:600;text-align:center;margin:12px 0;min-height:18px}
+    .ai-result-card{background:rgba(255,255,255,0.08);border:1px solid rgba(14,165,233,0.3);border-radius:10px;padding:12px;margin-bottom:8px;animation:fpFadeIn 0.5s ease forwards;opacity:0}
+    .ai-result-card:nth-child(1){animation-delay:0.1s}
+    .ai-result-card:nth-child(2){animation-delay:0.4s}
+    .ai-result-card:nth-child(3){animation-delay:0.7s}
+    .ai-card-title{font-size:0.75rem;font-weight:700;color:white;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+    .ai-mini-bars{display:flex;gap:3px;align-items:flex-end;height:30px}
+    .ai-mini-bar{width:12px;border-radius:2px 2px 0 0;background:linear-gradient(to top,#0ea5e9,#7c3aed);opacity:0.8}
+    .live-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);border-radius:999px;padding:3px 12px;font-size:0.7rem;font-weight:700;color:#6ee7b7;letter-spacing:0.04em;text-transform:uppercase}
+    .live-badge::before{content:'';width:6px;height:6px;background:#10b981;border-radius:50%;animation:pulse 2s infinite}
+    .coming-tag-v2{display:inline-block;background:rgba(14,165,233,0.15);border:1px solid rgba(14,165,233,0.3);border-radius:999px;padding:3px 12px;font-size:0.7rem;font-weight:700;color:#7dd3fc;letter-spacing:0.04em;text-transform:uppercase;margin-top:12px}
     /* RESPONSIVE */
     @media(max-width:1024px){
       .hero-inner{grid-template-columns:1fr;text-align:center}
@@ -311,8 +390,7 @@
 <body>
 <nav id="navbar">
   <a href="#" class="nav-logo">
-    <img src="logo.png" alt="FieldGovern" class="logo-nav-img" style="width:36px;height:36px;border-radius:10px;object-fit:contain"/>
-    FieldGovern
+    <img src="assets/logo-wide.png" alt="FieldGovern" style="height:40px;width:auto"/>
   </a>
     <ul class="nav-links">
     <li><a href="features.html">Features</a></li>
@@ -349,7 +427,7 @@
   <div class="hero-bg-blob blob3"></div>
   <div class="hero-inner">
     <div>
-      <div class="hero-badge animate-fade-up"><span></span> New: Real-Time Tabulation & Reports Coming Soon</div>
+      <div class="hero-badge animate-fade-up"><span></span> New: AI Auto-Generate Insights — Live Now</div>
       <h1 class="animate-fade-up delay-1">
         Collect, Analyze, & Report<br/><span class="grad-text">From the Field.</span>
       </h1>
@@ -513,78 +591,125 @@
       <p class="section-sub">From form design to data export — one platform, every role covered.</p>
     </div>
     <div class="features-grid">
+
       <div class="feature-card reveal delay-1">
-        <div class="feat-icon" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe)">📡</div>
+        <div class="feat-preview fp-offline">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:5px;width:100%;padding:0 16px">
+            <div class="fp-status offline">📵 No internet — collecting locally</div>
+            <div class="fp-status saving">💾 Saving to device storage…</div>
+            <div class="fp-status syncing">📡 Back online — syncing now… ✓</div>
+            <div style="display:flex;gap:8px;margin-top:4px">
+              <span style="font-size:0.6rem;background:#dbeafe;color:#1d4ed8;border-radius:4px;padding:2px 7px;font-weight:700">OPFS</span>
+              <span style="font-size:0.6rem;background:#dcfce7;color:#15803d;border-radius:4px;padding:2px 7px;font-weight:700">IndexedDB</span>
+              <span style="font-size:0.6rem;background:#fce7f3;color:#be185d;border-radius:4px;padding:2px 7px;font-weight:700">PWA</span>
+            </div>
+          </div>
+        </div>
+        <div class="feat-icon" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);width:36px;height:36px;font-size:1.1rem;margin-bottom:8px">📡</div>
         <h3>Offline-First Architecture</h3>
-        <ul>
-          <li>Complete offline data collection — no internet needed</li>
-          <li>Auto-saves every 300ms — zero data loss</li>
-          <li>Background sync when reconnected</li>
-          <li>Two-phase sync (text first, media second)</li>
-          <li>Works on OPFS + IndexedDB (all browsers)</li>
-          <li>Geofencing — restrict collection to approved zones</li>
-        </ul>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">Zero data loss — auto-saves every 300ms, two-phase sync, geofencing. Works on any browser, forever offline.</p>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <span style="font-size:0.7rem;background:#f0f9ff;color:var(--brand-dark);border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bae6fd">100% Offline</span>
+          <span style="font-size:0.7rem;background:#f0fdf4;color:#15803d;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bbf7d0">Background sync</span>
+          <span style="font-size:0.7rem;background:#fdf4ff;color:#7c3aed;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #e9d5ff">Geofencing</span>
+        </div>
       </div>
+
       <div class="feature-card reveal delay-2">
-        <div class="feat-icon" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe)">🏗️</div>
+        <div class="feat-preview fp-form">
+          <div class="fp-field">📝 <span>District Name (Text)</span></div>
+          <div class="fp-field">☑️ <span>Household type (Select One)</span></div>
+          <div class="fp-field">📍 <span>Plot location (GPS)</span></div>
+          <div class="fp-field">📷 <span>House photo (Photo)</span></div>
+        </div>
+        <div class="feat-icon" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);width:36px;height:36px;font-size:1.1rem;margin-bottom:8px">🏗️</div>
         <h3>Powerful Form Builder</h3>
-        <ul>
-          <li>17 field types incl. signature, GPS, photo, audio</li>
-          <li>Advanced skip logic with AND/OR nesting</li>
-          <li>Form versioning & schema migration</li>
-          <li>Import from XLSForm, Kobo, SurveyCTO, ODK</li>
-          <li>Randomization / arm assignment for RCTs</li>
-          <li>Public survey URL — no login required</li>
-        </ul>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">17 field types, nested skip logic, RCT randomization, XLSForm import. Public survey URL — no install needed.</p>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <span style="font-size:0.7rem;background:#f5f3ff;color:#7c3aed;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #ddd6fe">17 field types</span>
+          <span style="font-size:0.7rem;background:#fef9c3;color:#92400e;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fde68a">Skip logic</span>
+          <span style="font-size:0.7rem;background:#f0f9ff;color:var(--brand-dark);border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bae6fd">XLSForm import</span>
+        </div>
       </div>
+
       <div class="feature-card reveal delay-3">
-        <div class="feat-icon" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0)">📊</div>
+        <div class="feat-preview fp-dash">
+          <div class="fp-row"><div class="fp-dot" style="background:#22c55e"></div><span style="flex:1;color:#334155;font-weight:600">Rajesh Kumar</span><span style="font-size:0.6rem;background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;font-weight:700">Synced</span></div>
+          <div class="fp-row"><div class="fp-dot" style="background:#f59e0b"></div><span style="flex:1;color:#334155;font-weight:600">Priya Sharma</span><span style="font-size:0.6rem;background:#fef9c3;color:#b45309;border-radius:4px;padding:1px 5px;font-weight:700">Pending</span></div>
+          <div class="fp-row"><div class="fp-dot" style="background:#ef4444"></div><span style="flex:1;color:#334155;font-weight:600">Amit Mehta</span><span style="font-size:0.6rem;background:#fee2e2;color:#dc2626;border-radius:4px;padding:1px 5px;font-weight:700">Flagged</span></div>
+        </div>
+        <div class="feat-icon" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);width:36px;height:36px;font-size:1.1rem;margin-bottom:8px">📊</div>
         <h3>Supervisor Dashboard</h3>
-        <ul>
-          <li>Submissions appear instantly on sync</li>
-          <li>Flag / approve / reject + back-check audit</li>
-          <li>Respondent roster with status tracking</li>
-          <li>Daily progress tracker per enumerator</li>
-          <li>Duplicate detection (GPS + same-day check)</li>
-          <li>Server-side validation rule violations</li>
-        </ul>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">Live feed of submissions, flag/approve/reject, GPS map, duplicate detection, daily progress per enumerator.</p>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <span style="font-size:0.7rem;background:#f0fdf4;color:#15803d;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bbf7d0">Real-time</span>
+          <span style="font-size:0.7rem;background:#fef2f2;color:#dc2626;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fecaca">Flag & audit</span>
+          <span style="font-size:0.7rem;background:#f0f9ff;color:var(--brand-dark);border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bae6fd">GPS map</span>
+        </div>
       </div>
+
       <div class="feature-card reveal delay-1">
-        <div class="feat-icon" style="background:linear-gradient(135deg,#fef9c3,#fde68a)">🤖</div>
-        <h3>AI-Powered Features</h3>
-        <ul>
-          <li>AI report writer — summarize submissions instantly</li>
-          <li>Supports OpenAI, Anthropic Claude, Google Gemini</li>
-          <li>Bring your own API key — stored per org</li>
-          <li>AI skip logic suggestions from plain English</li>
-          <li>Auto-translate labels to Hindi / Kannada / Telugu</li>
-          <li>No vendor lock-in — switch providers any time</li>
-        </ul>
+        <div class="feat-preview fp-ai" style="flex-direction:column;padding:14px 16px;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;width:100%">
+            <span style="font-size:0.65rem;font-weight:700;color:#92400e">🤖 AI generating insights…</span>
+            <div style="flex:1;height:4px;background:#fde68a;border-radius:2px;overflow:hidden"><div style="height:100%;background:#f59e0b;border-radius:2px;animation:fpWidth 2s ease-in-out infinite alternate"></div></div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <div class="fp-ai-chip">District × Gender</div>
+            <div class="fp-ai-chip" style="animation-delay:0.5s">Age distribution</div>
+            <div class="fp-ai-chip" style="animation-delay:1s">Coverage by block</div>
+          </div>
+          <div style="font-size:0.58rem;color:#92400e;font-style:italic;opacity:0.8">"6 tables generated · OpenAI · Claude · Gemini"</div>
+        </div>
+        <div class="feat-icon" style="background:linear-gradient(135deg,#fef9c3,#fde68a);width:36px;height:36px;font-size:1.1rem;margin-bottom:8px">🤖</div>
+        <h3>AI-Powered Analysis</h3>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">1-click AI auto-generates cross-tabulations. BYOK: OpenAI, Claude, Gemini. Translate labels, suggest skip logic.</p>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <span style="font-size:0.7rem;background:#fffbeb;color:#92400e;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fde68a">Auto-insights</span>
+          <span style="font-size:0.7rem;background:#f5f3ff;color:#7c3aed;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #ddd6fe">BYOK</span>
+          <span style="font-size:0.7rem;background:#f0fdf4;color:#15803d;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bbf7d0">Live Now ✓</span>
+        </div>
       </div>
+
       <div class="feature-card reveal delay-2">
-        <div class="feat-icon" style="background:linear-gradient(135deg,#fce7f3,#fbcfe8)">👥</div>
+        <div class="feat-preview fp-team" style="justify-content:center">
+          <div class="fp-role">👑 Master Admin</div>
+          <div class="fp-connector"></div>
+          <div class="fp-role">🏢 Org Admin</div>
+          <div class="fp-connector"></div>
+          <div class="fp-role">👔 Supervisor</div>
+          <div class="fp-connector"></div>
+          <div class="fp-role">📱 Enumerator</div>
+        </div>
+        <div class="feat-icon" style="background:linear-gradient(135deg,#fce7f3,#fbcfe8);width:36px;height:36px;font-size:1.1rem;margin-bottom:8px">👥</div>
         <h3>Team &amp; Field Management</h3>
-        <ul>
-          <li>4 roles: Master Admin → Org Admin → Supervisor → Enumerator</li>
-          <li>QR code login — no passwords for field staff</li>
-          <li>WhatsApp alerts on sync, flag, approve, reject</li>
-          <li>Push notifications for sync events</li>
-          <li>Multi-language: EN / HI / KN / TE</li>
-          <li>Digital consent + signature capture</li>
-        </ul>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">4-tier role hierarchy, QR login for field staff, WhatsApp/push alerts, multi-language EN/HI/KN/TE.</p>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <span style="font-size:0.7rem;background:#fdf2f8;color:#be185d;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fbcfe8">QR login</span>
+          <span style="font-size:0.7rem;background:#f0fdf4;color:#15803d;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bbf7d0">WhatsApp alerts</span>
+          <span style="font-size:0.7rem;background:#fffbeb;color:#92400e;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fde68a">4 languages</span>
+        </div>
       </div>
+
       <div class="feature-card reveal delay-3">
-        <div class="feat-icon" style="background:linear-gradient(135deg,#ffedd5,#fed7aa)">🔗</div>
+        <div class="feat-preview fp-export">
+          <div class="fp-fmt">📄 CSV</div>
+          <div class="fp-fmt">📊 Stata .dta</div>
+          <div class="fp-fmt">📈 SPSS .sav</div>
+          <div class="fp-fmt">🟢 Sheets</div>
+          <div class="fp-fmt">🔌 REST API</div>
+          <div class="fp-fmt" style="animation-delay:1.1s;background:#f0fdf4;color:#15803d">⚕️ DHIS2</div>
+        </div>
+        <div class="feat-icon" style="background:linear-gradient(135deg,#ffedd5,#fed7aa);width:36px;height:36px;font-size:1.1rem;margin-bottom:8px">🔗</div>
         <h3>Export, Compliance &amp; Integration</h3>
-        <ul>
-          <li>CSV, Stata .dta, SPSS .sav export</li>
-          <li>Google Sheets live sync per form</li>
-          <li>DPDP 2023 compliant — consent log, data erasure</li>
-          <li>REST API + API keys + webhooks</li>
-          <li>DHIS2 push integration for health data</li>
-          <li>White-label (custom logo, color, app name)</li>
-        </ul>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">CSV, Stata, SPSS, Google Sheets live sync. DPDP 2023 compliant. Webhooks, DHIS2 push, white-label per org.</p>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <span style="font-size:0.7rem;background:#fff7ed;color:#c2410c;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fed7aa">DPDP 2023</span>
+          <span style="font-size:0.7rem;background:#f0f9ff;color:var(--brand-dark);border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bae6fd">Webhooks</span>
+          <span style="font-size:0.7rem;background:#fdf4ff;color:#7c3aed;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #e9d5ff">White-label</span>
+        </div>
       </div>
+
     </div>
     
     <div class="reveal" style="margin-top:48px">
@@ -668,6 +793,64 @@
       <h2 class="section-title">FieldGovern vs the alternatives</h2>
       <p class="section-sub">See why teams are switching from SurveyCTO, KoboToolbox, and ODK.</p>
     </div>
+    <!-- Visual score comparison -->
+    <div class="score-section reveal" style="margin-top:40px">
+      <div class="score-title">How we stack up — key dimensions</div>
+      <div class="score-grid" id="scoreGrid">
+        <div class="score-item">
+          <div class="score-label">Offline capability</div>
+          <div class="score-bars">
+            <div class="sbar fg" style="height:0%" data-h="100%"></div>
+            <div class="sbar other" style="height:0%" data-h="55%"></div>
+            <div class="sbar other" style="height:0%" data-h="40%"></div>
+            <div class="sbar other" style="height:0%" data-h="45%"></div>
+          </div>
+        </div>
+        <div class="score-item">
+          <div class="score-label">Affordability</div>
+          <div class="score-bars">
+            <div class="sbar fg" style="height:0%" data-h="95%"></div>
+            <div class="sbar other" style="height:0%" data-h="18%"></div>
+            <div class="sbar other" style="height:0%" data-h="60%"></div>
+            <div class="sbar other" style="height:0%" data-h="50%"></div>
+          </div>
+        </div>
+        <div class="score-item">
+          <div class="score-label">AI & Analytics</div>
+          <div class="score-bars">
+            <div class="sbar fg" style="height:0%" data-h="100%"></div>
+            <div class="sbar other" style="height:0%" data-h="30%"></div>
+            <div class="sbar other" style="height:0%" data-h="20%"></div>
+            <div class="sbar other" style="height:0%" data-h="15%"></div>
+          </div>
+        </div>
+        <div class="score-item">
+          <div class="score-label">No install needed</div>
+          <div class="score-bars">
+            <div class="sbar fg" style="height:0%" data-h="100%"></div>
+            <div class="sbar other" style="height:0%" data-h="0%"></div>
+            <div class="sbar other" style="height:0%" data-h="0%"></div>
+            <div class="sbar other" style="height:0%" data-h="0%"></div>
+          </div>
+        </div>
+        <div class="score-item">
+          <div class="score-label">India-first features</div>
+          <div class="score-bars">
+            <div class="sbar fg" style="height:0%" data-h="100%"></div>
+            <div class="sbar other" style="height:0%" data-h="25%"></div>
+            <div class="sbar other" style="height:0%" data-h="35%"></div>
+            <div class="sbar other" style="height:0%" data-h="30%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="score-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:linear-gradient(135deg,var(--brand),var(--accent))"></div>FieldGovern</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#e2e8f0"></div>SurveyCTO</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#e2e8f0"></div>KoboToolbox</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#e2e8f0"></div>ODK</div>
+      </div>
+    </div>
+
     <div class="compare-wrap reveal" style="margin-top:40px">
       <table>
         <thead>
@@ -698,55 +881,146 @@
   </div>
 </section>
 
+<section class="ai-showcase-bg">
+  <div class="section-inner">
+    <div class="text-center reveal">
+      <div class="section-tag" style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.35);color:#6ee7b7">✦ Now Live</div>
+      <h2 class="section-title" style="color:white">1-Click AI Auto-Generate Insights</h2>
+      <p class="section-sub" style="color:rgba(255,255,255,0.65);margin:0 auto">Click one button. Our AI analyzes your dataset, designs the most meaningful cross-tabulations, and renders live charts — in under 2 minutes.</p>
+    </div>
+    <div class="ai-flow-wrap">
+      <div class="ai-flow-steps">
+        <div class="ai-step active reveal delay-1">
+          <div class="ai-step-num">1</div>
+          <div>
+            <h4>Click "Auto-Generate AI Insights"</h4>
+            <p>One button in the Analyzer. Optionally describe your research objectives — AI will cross-verify against your columns.</p>
+          </div>
+        </div>
+        <div class="ai-step reveal delay-2">
+          <div class="ai-step-num">2</div>
+          <div>
+            <h4>AI analyzes your dataset in background</h4>
+            <p>The AI reads your column schema, actual field values, and sample data. Runs async — close the tab, come back in 2 minutes.</p>
+          </div>
+        </div>
+        <div class="ai-step reveal delay-3">
+          <div class="ai-step-num">3</div>
+          <div>
+            <h4>Up to 10 publication-ready tables appear</h4>
+            <p>Bar charts, cross-tabs, distributions — each with an AI rationale. Tables auto-refresh every 30 min with new submissions.</p>
+          </div>
+        </div>
+        <div class="ai-step reveal delay-4">
+          <div class="ai-step-num">4</div>
+          <div>
+            <h4>Export to FG Writer for your report</h4>
+            <p>Send all tables directly to the report writer. Generate a full NGO/government/research report in the format you need.</p>
+          </div>
+        </div>
+      </div>
+      <div class="reveal-right">
+        <div class="ai-mock-screen">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <span style="font-size:0.8rem;font-weight:700;color:white">FG Analyzer — Demo Program</span>
+            <span class="live-badge">Live</span>
+          </div>
+          <div style="text-align:center;margin-bottom:16px">
+            <button class="ai-mock-btn">✦ Auto-Generate AI Insights</button>
+          </div>
+          <div class="ai-progress-msg" id="aiMsg">Analyzing dataset schema…</div>
+          <div id="aiCards" style="display:none">
+            <div class="ai-result-card">
+              <div class="ai-card-title">📊 District-wise Sample Count <span style="font-size:0.6rem;color:#7dd3fc;background:rgba(14,165,233,0.15);border-radius:4px;padding:1px 5px">bar</span></div>
+              <div class="ai-mini-bars">
+                <div class="ai-mini-bar" style="height:60%"></div>
+                <div class="ai-mini-bar" style="height:45%"></div>
+                <div class="ai-mini-bar" style="height:80%"></div>
+                <div class="ai-mini-bar" style="height:35%"></div>
+                <div class="ai-mini-bar" style="height:70%"></div>
+              </div>
+            </div>
+            <div class="ai-result-card">
+              <div class="ai-card-title">📊 Gender × Household type <span style="font-size:0.6rem;color:#7dd3fc;background:rgba(14,165,233,0.15);border-radius:4px;padding:1px 5px">cross-tab</span></div>
+              <div class="ai-mini-bars">
+                <div class="ai-mini-bar" style="height:50%"></div>
+                <div class="ai-mini-bar" style="height:90%"></div>
+                <div class="ai-mini-bar" style="height:40%"></div>
+                <div class="ai-mini-bar" style="height:65%"></div>
+                <div class="ai-mini-bar" style="height:55%"></div>
+              </div>
+            </div>
+            <div class="ai-result-card">
+              <div class="ai-card-title">📊 Age Distribution <span style="font-size:0.6rem;color:#7dd3fc;background:rgba(14,165,233,0.15);border-radius:4px;padding:1px 5px">pie</span></div>
+              <div class="ai-mini-bars">
+                <div class="ai-mini-bar" style="height:30%"></div>
+                <div class="ai-mini-bar" style="height:75%"></div>
+                <div class="ai-mini-bar" style="height:100%"></div>
+                <div class="ai-mini-bar" style="height:55%"></div>
+                <div class="ai-mini-bar" style="height:40%"></div>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <span style="font-size:0.65rem;color:rgba(255,255,255,0.5)">⏱ 2 generations / day</span>
+            <span style="font-size:0.65rem;color:rgba(255,255,255,0.5)">🔄 Auto-refresh 30 min</span>
+            <span style="font-size:0.65rem;color:rgba(255,255,255,0.5)">📋 History view</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="analytics" class="coming-soon-bg">
   <div class="section-inner">
     <div class="text-center reveal">
-      <div class="section-tag" style="background:rgba(14,165,233,0.15);border-color:rgba(14,165,233,0.3);color:#7dd3fc">🔮 The Intelligence Layer</div>
+      <div class="section-tag" style="background:rgba(14,165,233,0.15);border-color:rgba(14,165,233,0.3);color:#7dd3fc">⚡ Intelligence Suite</div>
       <h2 class="section-title" style="color:white">End-to-End Analysis & Reporting</h2>
-      <p class="section-sub" style="color:rgba(255,255,255,0.7);margin:0 auto">We're expanding FieldGovern from a data collection tool into a complete intelligence suite tailored for Government, Academic Research, and Impact Reporting.</p>
+      <p class="section-sub" style="color:rgba(255,255,255,0.7);margin:0 auto">FieldGovern is a complete intelligence suite — from data collection to publication-ready reports. Four modules are live now.</p>
     </div>
     
     <div class="coming-grid">
       <div class="coming-card reveal delay-1">
         <span class="icon">📈</span>
         <h3>Real-Time Data Analysis</h3>
-        <p>Instantly visualize field data the moment it syncs. Create live, interactive dashboards tailored for government nodal officers, researchers, and program managers without relying on external BI tools.</p>
-        <span class="coming-tag">Rolling out Q3 2025</span>
+        <p>Instantly visualize field data the moment it syncs. Live, interactive dashboards for government officers, researchers, and program managers — no external BI tools needed.</p>
+        <span class="live-badge" style="margin-top:16px">Live Now</span>
       </div>
-      
+
       <div class="coming-card reveal delay-2">
         <span class="icon">🧮</span>
         <h3>Advanced Tabulation Engine</h3>
-        <p>Generate complex, publication-ready cross-tabs, frequency tables, and statistical summaries directly in your browser. Ditch the heavy lifting of exporting to SPSS or Stata for essential data checks.</p>
-        <span class="coming-tag">Rolling out Q3 2025</span>
+        <p>Publication-ready cross-tabs, frequency tables, and distributions directly in your browser. AI auto-generates up to 10 tables in one click — with rationale for every choice.</p>
+        <span class="live-badge" style="margin-top:16px">Live Now</span>
       </div>
-      
+
       <div class="coming-card reveal delay-3">
         <span class="icon">📑</span>
         <h3>Automated Report Writing</h3>
-        <p>Turn raw data into narrative insights instantly. Auto-generate PDF policy briefs, compliance documents, and comprehensive grant reports tailored exactly to Ministry or Research formats.</p>
-        <span class="coming-tag">Rolling out Q4 2025</span>
+        <p>Turn tabulation data into narrative reports instantly. 6 styles: NGO, Government, Research, Medical, Progress, Field Survey. Push charts directly from Analyzer to Writer.</p>
+        <span class="live-badge" style="margin-top:16px">Live Now</span>
       </div>
-      
+
       <div class="coming-card reveal delay-1">
         <span class="icon">🗺️</span>
         <h3>GIS & Spatial Analytics</h3>
         <p>Advanced map layers, spatial clustering, and coverage heatmaps for geographical field studies. Track surveyor footprints and visualize impact density automatically.</p>
-        <span class="coming-tag">Rolling out Q4 2025</span>
+        <span class="coming-tag-v2">Coming Q3 2026</span>
       </div>
-      
+
       <div class="coming-card reveal delay-2">
         <span class="icon">🤖</span>
         <h3>AI Data Assistant</h3>
-        <p>Ask questions about your data in plain English. Let AI detect anomalies, summarize outliers, and perform automated quality checks across thousands of field submissions.</p>
-        <span class="coming-tag">Rolling out Q4 2025</span>
+        <p>1-click AI auto-generates the most insightful cross-tabulations for your dataset. Validates outputs, retries on hallucination, stores history with full run audit trail.</p>
+        <span class="live-badge" style="margin-top:16px">Live Now</span>
       </div>
-      
+
       <div class="coming-card reveal delay-3">
         <span class="icon">🔔</span>
         <h3>Smart Alerts & Digest</h3>
         <p>Set custom thresholds for critical indicators. Get daily email digests and instant SMS notifications when field data goes out of range or flagged anomalies require attention.</p>
-        <span class="coming-tag">Rolling out Q3 2025</span>
+        <span class="coming-tag-v2">Coming Q3 2026</span>
       </div>
     </div>
   </div>
@@ -944,8 +1218,7 @@
     <div class="footer-grid">
       <div class="footer-brand">
         <a href="#" class="nav-logo" style="color:white;margin-bottom:12px;display:inline-flex">
-          <img src="logo.png" alt="FieldGovern" class="logo-footer-img" style="width:32px;height:32px;border-radius:8px;object-fit:contain"/>
-          FieldGovern
+          <div style="display:inline-flex;background:white;border-radius:10px;padding:6px 12px;margin-bottom:12px"><img src="assets/logo-wide.png" alt="FieldGovern" style="height:32px;width:auto"/></div>
         </a>
         <p>Offline-first field data collection for India's research teams. Built to replace SurveyCTO at 1/3 the cost.</p>
       </div>
@@ -1107,6 +1380,44 @@
     document.getElementById('mobileMenu').classList.remove('open');
     document.getElementById('hamburgerBtn').classList.remove('open');
   }, { passive: true });
+
+  // Score bars — animate when scrolled into view
+  (function(){
+    const grid = document.getElementById('scoreGrid');
+    if (!grid) return;
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          grid.querySelectorAll('.sbar').forEach((bar, i) => {
+            setTimeout(() => { bar.style.height = bar.dataset.h; bar.style.transition = 'height 0.9s cubic-bezier(.16,1,.3,1)'; }, i * 80);
+          });
+          obs.unobserve(grid);
+        }
+      });
+    }, { threshold: 0.3 });
+    obs.observe(grid);
+  })();
+
+  // AI showcase — cycle messages then reveal cards
+  (function(){
+    const msgs = ['Analyzing dataset schema…','Mapping study objectives…','Identifying key variables…','Generating cross-tabulations…','Validating outputs…','✓ 6 tables ready!'];
+    const msgEl = document.getElementById('aiMsg');
+    const cards = document.getElementById('aiCards');
+    if (!msgEl || !cards) return;
+    let i = 0;
+    const iv = setInterval(() => {
+      i++;
+      if (i < msgs.length - 1) {
+        msgEl.textContent = msgs[i];
+      } else {
+        msgEl.textContent = msgs[msgs.length - 1];
+        msgEl.style.color = '#6ee7b7';
+        cards.style.display = 'block';
+        clearInterval(iv);
+        setTimeout(() => { i = 0; msgEl.style.color = ''; msgEl.textContent = msgs[0]; cards.style.display = 'none'; setTimeout(()=>{ /* restart */ }, 500); }, 6000);
+      }
+    }, 1400);
+  })();
 
   // Animated chart bars — cycle heights every 3s
   (function(){
