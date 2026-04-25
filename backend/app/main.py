@@ -69,28 +69,15 @@ def health():
     return {"status": "ok"}
 
 
-# Serve React frontend + marketing website (must be last)
+# Serve React SPA — catch-all must be last
 static_dir = Path(__file__).parent.parent / "static"
-website_dir = Path(__file__).parent.parent / "website"
 
-if static_dir.exists() or website_dir.exists():
+if static_dir.exists():
     @app.get("/{full_path:path}")
     def serve_spa(full_path: str):
-        # Check React build first
-        if static_dir.exists():
-            file_path = static_dir / full_path
-            if file_path.is_file():
-                return FileResponse(str(file_path))
-        # Check marketing website files
-        if website_dir.exists():
-            website_path = website_dir / full_path
-            if website_path.is_file():
-                return FileResponse(str(website_path))
-            # Serve website index at root
-            if full_path in ("", "/"):
-                website_index = website_dir / "index.html"
-                if website_index.exists():
-                    return FileResponse(str(website_index))
-        # Fall back to React SPA
-        index = static_dir / "index.html"
-        return FileResponse(str(index)) if index.exists() else {"detail": "Not Found"}
+        # Serve exact static asset if it exists (JS, CSS, images)
+        file_path = static_dir / full_path
+        if file_path.is_file():
+            return FileResponse(str(file_path))
+        # All other routes → React SPA index.html
+        return FileResponse(str(static_dir / "index.html"))
