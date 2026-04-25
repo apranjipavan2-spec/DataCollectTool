@@ -74,3 +74,4 @@ MiroFish/
 *.xlsx
 website/status.html
 deploy/monitor-config.json
+process_deployment.md

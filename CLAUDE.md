@@ -1,6 +1,7 @@
 # CLAUDE.md — FieldGovern
 
 > Authoritative guide for Claude Code. Read `tasks/todo.md` + `tasks/lessons.md` at session start.
+> **DEPLOYMENT SESSION:** Read `process_deployment.md` first (local only, has credentials + full process).
 
 ---
 
@@ -59,7 +60,7 @@
 
 **Repo:** https://github.com/apranjipavan2-spec/DataCollectTool  
 **Deploy:** GitHub Actions → Docker → VPS at `/opt/fieldgovern`  
-**GitHub Pages:** `docs/` on main → always edit `website/` and copy, never edit `docs/` directly  
+**GitHub Pages:** `docs/` on main → edit `website/`, push — workflow auto-copies to `docs/`. Never edit `docs/` directly. See `process_deployment.md` for full details.  
 **Status:** MVP live, production-deployed
 
 ---
