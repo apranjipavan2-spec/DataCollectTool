@@ -28,6 +28,7 @@ const ISSUE_LABELS: Record<string, string> = {
   missing_required: 'Missing Required',
   no_gps:          'No GPS',
   flagged:         'Flagged',
+  outlier:         'Outlier (>2σ)',
   clean:           'Clean',
 }
 const ISSUE_COLORS: Record<string, string> = {
@@ -36,6 +37,7 @@ const ISSUE_COLORS: Record<string, string> = {
   missing_required: 'text-orange-400 bg-orange-400/10 border-orange-400/30',
   no_gps:          'text-blue-400 bg-blue-400/10 border-blue-400/30',
   flagged:         'text-catalan-error bg-catalan-error/15 border-catalan-error/40',
+  outlier:         'text-purple-400 bg-purple-400/10 border-purple-400/30',
   clean:           'text-green-400 bg-green-400/10 border-green-400/30',
 }
 

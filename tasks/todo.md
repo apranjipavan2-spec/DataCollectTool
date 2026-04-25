@@ -29,15 +29,32 @@
 - [ ] Sentry DSN env vars (SENTRY_DSN, VITE_SENTRY_DSN) — see `planning/PENDING_MANUAL.md`
 - [ ] Each org needs AI keys set via Org Settings → AI (master_admin assigns)
 
+## ✅ Completed (sprint 2)
+
+- [x] CSV export with field labels (`?labels=true`) — remaps field IDs → labels, decodes choice values
+- [x] Automated outlier detection in FG Cleaner — mean ± 2σ on numeric fields (≥5 data points), shows as "outlier" filter card
+- [x] Comments & review thread on submissions — `CommentsThread` in detail modal, backend `comments.py`
+- [x] In-app notification inbox — `NotificationBell` in TopNav, 60s polling, unread badge, `inbox.py`
+- [x] Live field map (`/map`) — Leaflet CDN, colour-coded pins by status, days filter, click popup
+- [x] Usage dashboard — "Usage" tab in SuperAdminMonitor, per-tenant table, platform totals
+- [x] Background GPS — `watchPosition` auto-starts on form open, captures best accuracy fix on submit
+- [x] Back-check queue — already built in FieldApp (orange badge + screen) — confirmed complete
+- [x] Multi-provider AI config — OpenAI / Anthropic / Google simultaneously with active toggle
+- [x] 14 demo programs across 7 sectors with realistic Indian data (`seed_programs.py`)
+- [x] AI tab hidden from org_admin (master_admin only)
+- [x] Import item removed from org_admin sidebar
+
 ## 📋 Next Sprint Candidates
 
 ### Medium Priority
 - [ ] AI form builder assistant (skip logic from plain English)
 - [ ] Auto-translate form labels (one-click Hindi/Kannada/Telugu)
+- [ ] Enumerator performance scorecard (submissions/day, accuracy rate, backcheck pass rate)
+- [ ] Scheduled report delivery (email PDF of FG Writer report on cron)
 
 ### Low Priority
 - [ ] DHIS2 push integration
-- [ ] Back-check enumerator workflow — enumerator sees back-check queue + opens assigned form
+- [ ] ODK Central compatibility layer (import ODK XLS form, export ODK-compatible submissions)
 
 ## Review Notes
 

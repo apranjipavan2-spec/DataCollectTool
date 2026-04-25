@@ -1667,8 +1667,23 @@ export default function Dashboard() {
                   </div>
                   {!isEnumerator && <div className="flex gap-2 flex-wrap ml-auto items-center" data-help-id="export-btn">
                     <InfoButton topicId="export-data" />
-                    <Button variant="secondary" size="sm" onClick={handleExport} disabled={exportingCsv}>
+                    <Button variant="secondary" size="sm" onClick={handleExport} disabled={exportingCsv} title="Raw field IDs">
                       {exportingCsv ? 'Exporting…' : '↓ CSV'}
+                    </Button>
+                    <Button variant="secondary" size="sm" disabled={exportingCsv} title="CSV with human-readable field labels"
+                      onClick={async () => {
+                        if (!filterForm) { toast.warning('Select a form to export'); return }
+                        setExportingCsv(true)
+                        try {
+                          const res = await api.get(`/export/${filterForm}/csv`, { responseType: 'blob', params: { labels: 'true' } })
+                          const url = URL.createObjectURL(res.data)
+                          const a = document.createElement('a')
+                          a.href = url; a.download = 'export_labelled.csv'; a.click()
+                          URL.revokeObjectURL(url)
+                          toast.success('Labelled CSV exported')
+                        } catch { toast.error('Export failed') } finally { setExportingCsv(false) }
+                      }}>
+                      ↓ CSV (Labels)
                     </Button>
                     <Button variant="secondary" size="sm" onClick={handleExportXlsx} disabled={exportingXlsx} title="Download as Excel (.xlsx)">
                       {exportingXlsx ? 'Creating…' : '↓ Excel'}

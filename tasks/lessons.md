@@ -26,6 +26,21 @@
 **Pattern:** The `TopNav` component accepts `{ label: string; path?: string }` — NOT `href`.  
 **Why:** Used `href` initially which caused dead breadcrumb links (silently ignored).
 
+## L008 — SQLAlchemy JSONB mutations need flag_modified
+**Pattern:** When updating a JSONB column in-place (`row.value["key"] = val`), SQLAlchemy does NOT detect the change. Must call `flag_modified(row, "value")` before `db.commit()`.  
+**Why:** SQLAlchemy tracks object identity, not deep dict content. Silent no-op otherwise.  
+**How to apply:** After any in-place JSONB dict mutation, always call `from sqlalchemy.orm.attributes import flag_modified; flag_modified(row, "column_name")`.
+
+## L009 — _ensure_table() for ad-hoc tables avoids migration overhead
+**Pattern:** For new feature tables (comments, inbox), use `_ensure_table(db)` with raw `CREATE TABLE IF NOT EXISTS` SQL called at the start of each endpoint.  
+**Why:** Avoids creating a migration for every small feature table; safe for idempotent re-runs; production-compatible.  
+**Tradeoff:** No alembic tracking — fine for feature tables, not for tables with FK constraints to core models.
+
+## L010 — Leaflet loaded from CDN, not npm, for optional map features
+**Pattern:** Dynamically inject `<link>` and `<script>` for Leaflet CSS/JS in a `useEffect` only when the map page loads.  
+**Why:** Avoids adding ~150KB to the main bundle for a feature only supervisors use. CDN load is cached after first visit.  
+**How to apply:** Check `window.L` before injecting; use `script.onload = initMap` callback; guard with `if (!document.getElementById('leaflet-js'))` to prevent double-inject.
+
 ## L007 — seed_dev.py fast-path skips patches on warm restart
 **Pattern:** The seed exits early if `Demo Org` tenant exists. Schema patches run BEFORE that check, so they always apply.  
 **Why:** This is intentional — patches must always run to handle incremental column additions on existing DBs.
