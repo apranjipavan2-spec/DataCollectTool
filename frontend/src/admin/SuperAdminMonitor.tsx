@@ -16,6 +16,16 @@ interface TenantOverview {
   pct: number
 }
 
+interface UsageTenant {
+  tenant_id: string; tenant_name: string; plan: string
+  total_submissions: number; submissions_this_month: number
+  total_users: number; total_forms: number; last_activity: string | null
+}
+interface UsageData {
+  tenants: UsageTenant[]
+  platform_totals: { total_submissions: number; total_users: number; total_forms: number; active_tenants: number }
+}
+
 interface ProgramRow {
   id: string
   tenant_id: string
@@ -56,9 +66,10 @@ function ProgressBar({ pct }: { pct: number }) {
 }
 
 export default function SuperAdminMonitor() {
-  const [tab, setTab] = useState<'overview' | 'programs'>('overview')
+  const [tab, setTab] = useState<'overview' | 'programs' | 'usage'>('overview')
   const [overview, setOverview] = useState<TenantOverview[]>([])
   const [programs, setPrograms] = useState<ProgramRow[]>([])
+  const [usage, setUsage] = useState<UsageData | null>(null)
   const [loading, setLoading] = useState(true)
   const [filterTenant, setFilterTenant] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
@@ -70,9 +81,11 @@ export default function SuperAdminMonitor() {
     Promise.all([
       api.get('/admin/monitor/overview'),
       api.get('/admin/monitor/programs'),
-    ]).then(([ov, pg]) => {
+      api.get('/platform-usage').catch(() => ({ data: null })),
+    ]).then(([ov, pg, us]) => {
       setOverview(ov.data)
       setPrograms(pg.data)
+      if (us.data) setUsage(us.data)
     }).finally(() => setLoading(false))
   }, [])
 
@@ -115,17 +128,17 @@ export default function SuperAdminMonitor() {
 
           {/* Tabs */}
           <div className="flex gap-1 border-b border-catalan-border">
-            {(['overview', 'programs'] as const).map(t => (
+            {([['overview', 'By Organisation'], ['programs', 'All Programs'], ['usage', 'Usage']] as const).map(([t, label]) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`px-4 py-2 text-sm font-medium capitalize border-b-2 transition-colors ${
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                   tab === t
                     ? 'border-catalan-primary text-catalan-primary'
                     : 'border-transparent text-catalan-textMuted hover:text-catalan-text'
                 }`}
               >
-                {t === 'overview' ? 'By Organisation' : 'All Programs'}
+                {label}
               </button>
             ))}
           </div>
@@ -168,6 +181,65 @@ export default function SuperAdminMonitor() {
               )}
             </div>
 
+          ) : (
+
+            /* ── Usage tab ── */
+            tab === 'usage' ? (
+            <div className="space-y-4">
+              {usage ? (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {[
+                      { label: 'Total Submissions', value: usage.platform_totals.total_submissions },
+                      { label: 'Total Users',        value: usage.platform_totals.total_users },
+                      { label: 'Total Forms',        value: usage.platform_totals.total_forms },
+                      { label: 'Active Tenants',     value: usage.platform_totals.active_tenants },
+                    ].map(c => (
+                      <div key={c.label} className="bg-catalan-surface border border-catalan-border rounded-xl px-5 py-4">
+                        <p className="text-xs text-catalan-textMuted uppercase tracking-wide font-semibold">{c.label}</p>
+                        <p className="text-2xl font-bold text-catalan-text mt-1">{c.value.toLocaleString()}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bg-catalan-surface border border-catalan-border rounded-xl overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-catalan-border bg-catalan-bg">
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Organisation</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Plan</th>
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Submissions</th>
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">This Month</th>
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Users</th>
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Forms</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Last Activity</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-catalan-border">
+                          {usage.tenants.map(t => (
+                            <tr key={t.tenant_id} className="hover:bg-catalan-bg transition-colors">
+                              <td className="px-4 py-3 font-medium text-catalan-text">{t.tenant_name}</td>
+                              <td className="px-4 py-3">
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${PLAN_BADGE[t.plan] ?? PLAN_BADGE.free}`}>{t.plan}</span>
+                              </td>
+                              <td className="px-4 py-3 text-right text-catalan-text">{t.total_submissions.toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right text-catalan-text">{t.submissions_this_month.toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right text-catalan-text">{t.total_users}</td>
+                              <td className="px-4 py-3 text-right text-catalan-text">{t.total_forms}</td>
+                              <td className="px-4 py-3 text-catalan-textMuted text-xs">
+                                {t.last_activity ? new Date(t.last_activity).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-catalan-textMuted text-sm">Usage data not available.</p>
+              )}
+            </div>
           ) : (
 
             /* ── Programs tab ── */
@@ -250,7 +322,7 @@ export default function SuperAdminMonitor() {
                 </div>
               </div>
             </div>
-          )}
+          ))}
         </main>
       </div>
     </div>

@@ -18,6 +18,7 @@ import FgWriter            from '@/reports/FgWriter'
 import ProgressDashboard   from '@/programs/ProgressDashboard'
 import SuperAdminMonitor   from '@/admin/SuperAdminMonitor'
 import MigrationPage      from '@/migration/MigrationPage'
+import FieldMapPage       from '@/map/FieldMapPage'
 import PublicSurveyPage   from '@/collect/PublicSurveyPage'
 import { LanguageProvider } from '@/i18n/LanguageContext'
 import { ToastProvider } from '@/lib/ToastContext'
@@ -201,6 +202,14 @@ export default function App() {
                 <RequireAuth roles={['org_admin', 'supervisor']}>
                   <ErrorBoundary>
                     <FgWriter />
+                  </ErrorBoundary>
+                </RequireAuth>
+              } />
+
+              <Route path="/map" element={
+                <RequireAuth roles={['org_admin', 'supervisor']}>
+                  <ErrorBoundary>
+                    <FieldMapPage />
                   </ErrorBoundary>
                 </RequireAuth>
               } />

@@ -1066,6 +1066,39 @@ def get_cleaner_data(
         for u in db.query(User).filter(User.tenant_id == user["tenant_id"]).all()
     }
 
+    # Build outlier thresholds per numeric field (mean ± 2σ) across all submissions
+    import math
+    numeric_fields: dict[str, list[float]] = {}
+    for s in subs:
+        for form in forms.values():
+            for section in (form.json_schema or {}).get("sections", []):
+                for f in section.get("fields", []):
+                    if f.get("type") in ("number", "decimal") and f.get("id"):
+                        fid = f["id"]
+                        val = (s.data_json or {}).get(fid)
+                        try:
+                            numeric_fields.setdefault(fid, []).append(float(val))
+                        except (TypeError, ValueError):
+                            pass
+
+    outlier_bounds: dict[str, tuple[float, float]] = {}
+    for fid, vals in numeric_fields.items():
+        if len(vals) >= 5:
+            mean = sum(vals) / len(vals)
+            variance = sum((v - mean) ** 2 for v in vals) / len(vals)
+            sd = math.sqrt(variance)
+            outlier_bounds[fid] = (mean - 2 * sd, mean + 2 * sd)
+
+    def _is_outlier(data_json: dict) -> bool:
+        for fid, (lo, hi) in outlier_bounds.items():
+            val = data_json.get(fid)
+            try:
+                if not (lo <= float(val) <= hi):
+                    return True
+            except (TypeError, ValueError):
+                pass
+        return False
+
     # Detect issues for each submission
     issues_list = []
     for s in subs:
@@ -1101,6 +1134,10 @@ def get_cleaner_data(
         if s.status == "flagged":
             sub_issues.append("flagged")
 
+        # 6. Numeric outlier (>2σ from mean on any field)
+        if s.data_json and _is_outlier(s.data_json):
+            sub_issues.append("outlier")
+
         if issue_type == "all" or issue_type in sub_issues or (issue_type == "issues_only" and sub_issues):
             issues_list.append({
                 "id": str(s.id),
@@ -1134,6 +1171,7 @@ def get_cleaner_data(
             "missing_required": sum(1 for i in issues_list if "missing_required" in i["issues"]),
             "no_gps":          sum(1 for i in issues_list if "no_gps" in i["issues"]),
             "flagged":         sum(1 for i in issues_list if "flagged" in i["issues"]),
+            "outlier":         sum(1 for i in issues_list if "outlier" in i["issues"]),
             "clean":           sum(1 for i in issues_list if not i["issues"]),
         },
     }

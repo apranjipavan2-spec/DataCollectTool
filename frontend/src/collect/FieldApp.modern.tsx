@@ -130,6 +130,8 @@ export default function FieldApp() {
   const [activeBackcheck, setActiveBackcheck] = useState<BackcheckTask | null>(null)
   const syncRef = useRef<() => Promise<void>>()
   const loadFormsRef = useRef<() => Promise<void>>()
+  const bgGpsWatchId = useRef<number | null>(null)
+  const bestGpsRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null)
   const { language, setLanguage } = useLanguage()
 
   // ── Sync to server ─────────────────────────────────────────
@@ -607,7 +609,28 @@ export default function FieldApp() {
     } else {
       setProgramContext(null); setSelectedLocationId('')
     }
+    // Start background GPS watch — tracks best (highest accuracy) fix
+    bestGpsRef.current = null
+    if (bgGpsWatchId.current !== null) navigator.geolocation?.clearWatch(bgGpsWatchId.current)
+    bgGpsWatchId.current = navigator.geolocation?.watchPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lng, accuracy } = pos.coords
+        if (!bestGpsRef.current || accuracy < bestGpsRef.current.accuracy) {
+          bestGpsRef.current = { lat, lng, accuracy }
+        }
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 10000 }
+    ) ?? null
+
     setScreen('collecting')
+  }
+
+  const stopBgGps = () => {
+    if (bgGpsWatchId.current !== null) {
+      navigator.geolocation?.clearWatch(bgGpsWatchId.current)
+      bgGpsWatchId.current = null
+    }
   }
 
   const handleSave = async (draft: SubmissionDraft) => {
@@ -622,6 +645,10 @@ export default function FieldApp() {
   }
 
   const handleSubmit = async (draft: SubmissionDraft) => {
+    stopBgGps()
+    if (bestGpsRef.current && !draft.gpsSubmit) {
+      draft = { ...draft, gpsSubmit: bestGpsRef.current }
+    }
     await handleSave(draft)
     setOutboxCount(c => c + 1)
 
@@ -967,7 +994,7 @@ export default function FieldApp() {
               status: 'draft',
               startedAt: new Date().toISOString(),
             } : undefined)}
-            onCancel={() => { setScreen('list'); setActiveForm(null); setResumingDraft(null); setRosterInitialValues(null); clearProg() }}
+            onCancel={() => { stopBgGps(); setScreen('list'); setActiveForm(null); setResumingDraft(null); setRosterInitialValues(null); clearProg() }}
           />
         </div>
       </div>

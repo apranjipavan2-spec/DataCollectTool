@@ -114,16 +114,32 @@ def _sanitize_stata_colname(name: str) -> str:
 # CSV export
 # ---------------------------------------------------------------------------
 
+def _build_label_maps(form_schema: dict) -> tuple[dict, dict]:
+    """Returns (id_to_label, id_to_option_labels) from a form json_schema."""
+    id_to_label: dict = {}
+    id_to_options: dict = {}
+    for section in (form_schema or {}).get("sections", []):
+        for f in section.get("fields", []):
+            fid = f.get("id", "")
+            if fid:
+                id_to_label[fid] = f.get("label", fid)
+                opts = f.get("options", [])
+                if opts:
+                    id_to_options[fid] = {o.get("value", ""): o.get("label", o.get("value", "")) for o in opts}
+    return id_to_label, id_to_options
+
+
 @router.get("/{form_id}/csv")
 def export_csv(
     form_id: str,
-    date_from: Optional[datetime] = Query(None, description="Filter: local_created_at >="),
-    date_to: Optional[datetime] = Query(None, description="Filter: local_created_at <="),
-    status: Optional[str] = Query(None, description="Filter by submission status"),
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    status: Optional[str] = Query(None),
+    labels: bool = Query(False, description="Use field labels as column headers and decode choice values"),
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
-    """Export submissions for a form as CSV."""
+    """Export submissions as CSV. ?labels=true for human-readable headers + decoded values."""
     form = db.query(Form).filter(
         Form.id == form_id, Form.tenant_id == user["tenant_id"]
     ).first()
@@ -141,7 +157,22 @@ def export_csv(
             headers={"Content-Disposition": f'attachment; filename="{form.title}.csv"'},
         )
 
-    # Union all keys across rows so every column appears
+    if labels:
+        id_to_label, id_to_options = _build_label_maps(form.json_schema or {})
+        # Remap row keys → labels; decode choice values
+        labeled_rows = []
+        for row in rows:
+            new_row: dict = {}
+            for k, v in row.items():
+                col = id_to_label.get(k, k)
+                if k in id_to_options and isinstance(v, str):
+                    v = id_to_options[k].get(v, v)
+                elif k in id_to_options and isinstance(v, list):
+                    v = "; ".join(id_to_options[k].get(i, i) for i in v)
+                new_row[col] = v
+            labeled_rows.append(new_row)
+        rows = labeled_rows
+
     all_keys: list[str] = []
     seen: set[str] = set()
     for row in rows:
@@ -156,10 +187,11 @@ def export_csv(
     writer.writerows(rows)
     buf.seek(0)
 
+    fname = f"{form.title}{'_labelled' if labels else ''}.csv"
     return StreamingResponse(
         iter([buf.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{form.title}.csv"'},
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
 
 

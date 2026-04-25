@@ -6,7 +6,7 @@ from app.api.routes import (
     field_govern,
 )
 from app.api.routes.migration.router import router as migration_router
-from app.api.routes import public_survey, roster, analytics, locations
+from app.api.routes import public_survey, roster, analytics, locations, comments, inbox
 
 router = APIRouter()
 
@@ -36,3 +36,5 @@ router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 router.include_router(ai.router, prefix="/ai", tags=["ai"])
 router.include_router(locations.router, prefix="/locations", tags=["locations"])
 router.include_router(field_govern.router, prefix="/fg", tags=["field-govern"])
+router.include_router(comments.router, tags=["comments"])
+router.include_router(inbox.router, tags=["inbox"])

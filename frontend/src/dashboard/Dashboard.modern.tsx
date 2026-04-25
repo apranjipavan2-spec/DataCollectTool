@@ -117,6 +117,64 @@ function renderFieldValue(val: unknown): React.ReactNode {
   return String(val)
 }
 
+// ── Comments Thread ────────────────────────────────────────────────────────
+
+interface Comment { id: string; author_name: string; author_role: string; body: string; created_at: string | null }
+
+function CommentsThread({ submissionId }: { submissionId: string }) {
+  const [comments, setComments] = useState<Comment[]>([])
+  const [draft, setDraft] = useState('')
+  const [posting, setPosting] = useState(false)
+
+  useEffect(() => {
+    api.get(`/submissions/${submissionId}/comments`)
+      .then(r => setComments(r.data))
+      .catch(() => {})
+  }, [submissionId])
+
+  const post = async () => {
+    if (!draft.trim()) return
+    setPosting(true)
+    try {
+      const { data } = await api.post(`/submissions/${submissionId}/comments`, { body: draft.trim() })
+      setComments(prev => [...prev, data])
+      setDraft('')
+    } catch {} finally { setPosting(false) }
+  }
+
+  return (
+    <div className="px-5 py-3 border-t border-catalan-border">
+      <div className="text-xs font-medium text-catalan-textMuted uppercase tracking-wider mb-3">Comments</div>
+      <div className="space-y-3 mb-3 max-h-48 overflow-y-auto">
+        {comments.length === 0 && <p className="text-xs text-catalan-textMuted">No comments yet.</p>}
+        {comments.map(c => (
+          <div key={c.id} className="text-sm">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className="font-medium text-catalan-text">{c.author_name}</span>
+              <span className="text-xs text-catalan-textMuted capitalize">({c.author_role.replace('_', ' ')})</span>
+              {c.created_at && <span className="text-[10px] text-catalan-textMuted ml-auto">{new Date(c.created_at).toLocaleString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</span>}
+            </div>
+            <p className="text-catalan-text bg-catalan-surface rounded-lg px-3 py-2 text-xs">{c.body}</p>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); post() } }}
+          placeholder="Add a comment…"
+          className="flex-1 bg-catalan-surface border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text placeholder-catalan-textMuted focus:outline-none focus:border-catalan-primary"
+        />
+        <button onClick={post} disabled={posting || !draft.trim()}
+          className="px-3 py-2 bg-catalan-primary text-catalan-bg rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-40 transition-opacity">
+          {posting ? '…' : 'Send'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Submission Detail Modal ────────────────────────────────────────────────
 
 function SubmissionDetailModal({
@@ -332,6 +390,8 @@ function SubmissionDetailModal({
             </div>
           )}
         </div>
+
+        <CommentsThread submissionId={sub.id} />
 
         {/* Audit Trail */}
         <div className="px-5 py-3 border-t border-catalan-border">

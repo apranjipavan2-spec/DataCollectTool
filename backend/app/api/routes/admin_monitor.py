@@ -152,3 +152,48 @@ def get_tenant_enumerator_stats(tenant_id: str, user=Depends(require_master_admi
     t = _resolve_tenant(tenant_id, db)
     rows = (db.query(User.id, User.name, func.count(Submission.id).label("total"), func.sum((Submission.status == "approved").cast("int")).label("approved"), func.sum((Submission.status == "flagged").cast("int")).label("flagged"), func.sum((Submission.status == "rejected").cast("int")).label("rejected"), func.max(Submission.server_received_at).label("last_sub")).join(Submission, Submission.enumerator_id == User.id).filter(User.tenant_id == t.id, Submission.tenant_id == t.id).group_by(User.id, User.name).order_by(func.count(Submission.id).desc()).all())
     return [{"id": str(r.id), "name": r.name or "Unknown", "total": r.total, "approved": int(r.approved or 0), "flagged": int(r.flagged or 0), "rejected": int(r.rejected or 0), "synced": r.total - int(r.approved or 0) - int(r.flagged or 0) - int(r.rejected or 0), "last_submission": r.last_sub.isoformat() if r.last_sub else None} for r in rows]
+
+
+# ── Platform Usage Dashboard ─────────────────────────────────────────────────
+
+@router.get("/platform-usage")
+def platform_usage(user=Depends(require_master_admin), db: Session = Depends(get_db)):
+    """Per-tenant usage summary for master_admin dashboard."""
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import text
+
+    month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    tenants = db.query(Tenant).filter(Tenant.name != "Platform").order_by(Tenant.created_at.desc()).all()
+    result = []
+    platform_totals = {"tenants": len(tenants), "submissions_this_month": 0, "total_submissions": 0, "total_users": 0}
+
+    for t in tenants:
+        total_subs = db.query(func.count(Submission.id)).filter(Submission.tenant_id == t.id).scalar() or 0
+        month_subs = db.query(func.count(Submission.id)).filter(
+            Submission.tenant_id == t.id,
+            Submission.server_received_at >= month_start,
+        ).scalar() or 0
+        total_users = db.query(func.count(User.id)).filter(
+            User.tenant_id == t.id, User.is_active == True
+        ).scalar() or 0
+        total_forms = db.query(func.count(Form.id)).filter(Form.tenant_id == t.id).scalar() or 0
+        last_sub = db.query(func.max(Submission.server_received_at)).filter(Submission.tenant_id == t.id).scalar()
+
+        platform_totals["submissions_this_month"] += month_subs
+        platform_totals["total_submissions"] += total_subs
+        platform_totals["total_users"] += total_users
+
+        result.append({
+            "tenant_id": str(t.id),
+            "tenant_name": t.name,
+            "plan": getattr(t, "plan", "starter"),
+            "total_submissions": total_subs,
+            "submissions_this_month": month_subs,
+            "total_users": total_users,
+            "total_forms": total_forms,
+            "last_activity": last_sub.isoformat() if last_sub else None,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+        })
+
+    return {"platform_totals": platform_totals, "tenants": result}
