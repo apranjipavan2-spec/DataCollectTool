@@ -111,7 +111,7 @@ function TelegramSection() {
         <ol className="list-decimal list-inside space-y-0.5">
           <li>Create a bot via @BotFather on Telegram → copy the token</li>
           <li>Each supervisor opens Telegram, messages your bot, and sends /start</li>
-          <li>Find their chat_id at: <code className="bg-blue-100 px-1 rounded">https://api.telegram.org/bot{'{'TOKEN{'}'}/getUpdates</code> — look for 'chat.id' in the response</li>
+          <li>Find their chat_id at: <code className="bg-blue-100 px-1 rounded">{'https://api.telegram.org/bot{TOKEN}/getUpdates'}</code> — look for 'chat.id' in the response</li>
           <li>Paste the token and chat IDs below</li>
         </ol>
       </div>
