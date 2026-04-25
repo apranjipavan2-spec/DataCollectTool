@@ -22,13 +22,14 @@ export default function OrgAdminPanel() {
   const user = getStoredUser() || { name: '', role: '' }
   const sidebarItems = getNavItems(user.role)
 
+  const isMasterAdmin = user.role === 'master_admin'
   const tabs = [
     { id: 'users', label: '👥 Users', description: 'Manage team members' },
     { id: 'api-keys', label: '🔑 API Keys', description: 'Integration access' },
     { id: 'forms', label: '📋 Forms', description: 'Form templates' },
     { id: 'migration', label: '🔄 Import', description: 'Kobo · SurveyCTO · XLSForm' },
     { id: 'integrations', label: '🔗 Integrations', description: 'WhatsApp · Google Sheets' },
-    { id: 'ai', label: '🤖 AI', description: 'OpenAI · Claude · Gemini' },
+    ...(isMasterAdmin ? [{ id: 'ai', label: '🤖 AI', description: 'OpenAI · Claude · Gemini' }] : []),
   ]
 
   return (

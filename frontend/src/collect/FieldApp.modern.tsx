@@ -410,57 +410,61 @@ export default function FieldApp() {
   // Load forms
   useEffect(() => {
     const loadForms = async () => {
-      const store = await getStorage()
-      const outbox = await store.getOutbox()
-      const pendingMedia = await store.getMediaQueueCount()
-      const allMedia = await store.getMediaQueue()
-      setOutboxCount(outbox.length)
-      setMediaQueueCount(pendingMedia)
-      const failedMedia = allMedia.filter(m => m.status === 'failed')
-      setFailedMediaCount(failedMedia.length)
-      // Auto-reset failed media to pending on every startup so they retry automatically
-      if (failedMedia.length > 0 && navigator.onLine) {
-        for (const item of failedMedia) await store.updateMediaStatus(item.id, 'pending')
-        setFailedMediaCount(0)
-      }
-      if ((outbox.length > 0 || pendingMedia > 0 || failedMedia.length > 0) && navigator.onLine) syncToServer()
-
-      // Storage quota warning
       try {
-        const info = await store.getStorageInfo()
-        const freeMB = (info.quotaBytes - info.usedBytes) / 1024 / 1024
-        setLowStorage(freeMB < 200)
-      } catch { }
+        const store = await getStorage()
+        const outbox = await store.getOutbox()
+        const pendingMedia = await store.getMediaQueueCount()
+        const allMedia = await store.getMediaQueue()
+        setOutboxCount(outbox.length)
+        setMediaQueueCount(pendingMedia)
+        const failedMedia = allMedia.filter(m => m.status === 'failed')
+        setFailedMediaCount(failedMedia.length)
+        // Auto-reset failed media to pending on every startup so they retry automatically
+        if (failedMedia.length > 0 && navigator.onLine) {
+          for (const item of failedMedia) await store.updateMediaStatus(item.id, 'pending')
+          setFailedMediaCount(0)
+        }
+        if ((outbox.length > 0 || pendingMedia > 0 || failedMedia.length > 0) && navigator.onLine) syncToServer()
 
-      api.get('/schedules/').then(r => setSchedules(r.data)).catch(() => {})
-      api.get('/programs/locations').then(r => setLocations(r.data)).catch(() => {})
-      api.get('/submissions/my-backchecks').then(r => setBackchecks(r.data)).catch(() => {})
+        // Storage quota warning
+        try {
+          const info = await store.getStorageInfo()
+          const freeMB = (info.quotaBytes - info.usedBytes) / 1024 / 1024
+          setLowStorage(freeMB < 200)
+        } catch { }
 
-      // Enumerator stats
-      api.get('/submissions/?page_size=200').then(r => {
-        const items = r.data.items ?? r.data.submissions ?? []
-        const today = new Date().toISOString().slice(0, 10)
-        const todayCount = items.filter((s: any) => s.server_received_at?.slice(0, 10) === today).length
-        setMyStats({ today: todayCount, total: r.data.total ?? items.length })
-      }).catch(() => {})
+        api.get('/schedules/').then(r => setSchedules(r.data)).catch(() => {})
+        api.get('/programs/locations').then(r => setLocations(r.data)).catch(() => {})
+        api.get('/submissions/my-backchecks').then(r => setBackchecks(r.data)).catch(() => {})
 
-      try {
-        const { data } = await api.get<Array<{ id: string; title: string; version: number }>>('/forms/?status=active')
-        setForms(data)
-        await Promise.all(data.map(async f => {
+        // Enumerator stats
+        api.get('/submissions/?page_size=200').then(r => {
+          const items = r.data.items ?? r.data.submissions ?? []
+          const today = new Date().toISOString().slice(0, 10)
+          const todayCount = items.filter((s: any) => s.server_received_at?.slice(0, 10) === today).length
+          setMyStats({ today: todayCount, total: r.data.total ?? items.length })
+        }).catch(() => {})
+
+        try {
+          const { data } = await api.get<Array<{ id: string; title: string; version: number }>>('/forms/?status=active')
+          setForms(data)
+          await Promise.all(data.map(async f => {
+            try {
+              const detail = await api.get<{ json_schema: FormSchema }>(`/forms/${f.id}`)
+              await store.saveFormCache({
+                id: f.id, title: f.title, version: f.version, status: 'active',
+                schema: JSON.stringify(detail.data.json_schema),
+                cachedAt: new Date().toISOString(),
+              })
+            } catch { }
+          }))
+        } catch {
           try {
-            const detail = await api.get<{ json_schema: FormSchema }>(`/forms/${f.id}`)
-            await store.saveFormCache({
-              id: f.id, title: f.title, version: f.version, status: 'active',
-              schema: JSON.stringify(detail.data.json_schema),
-              cachedAt: new Date().toISOString(),
-            })
+            const cached = await store.listFormCache()
+            setForms(cached.map(c => ({ id: c.id, title: c.title, version: c.version })))
           } catch { }
-        }))
-      } catch {
-        const cached = await store.listFormCache()
-        setForms(cached.map(c => ({ id: c.id, title: c.title, version: c.version })))
-      } finally {
+        }
+      } catch { } finally {
         setLoading(false)
         setRefreshing(false)
       }

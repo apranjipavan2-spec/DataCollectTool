@@ -17,6 +17,7 @@ from app.models.form import Form
 from app.models.form_version import FormVersion
 from app.models.submission import Submission
 from app.models.form_assignment import FormAssignment
+from app.models.program import Program, ProgramQuestionnaire
 import uuid
 from datetime import datetime, timezone, timedelta
 
@@ -515,6 +516,103 @@ try:
 except Exception as e:
     db.rollback()
     print(f"Stage 2 warning (sample data skipped): {e}")
+
+# ── Stage 3: programs + link submissions (non-critical) ───────────────────────
+try:
+    enum1     = user_objs['+919999990003']
+    enum2     = user_objs['+919999990004']
+    org_admin = user_objs['+919999990001']
+
+    hs_form = db.query(Form).filter(Form.tenant_id == demo_tenant.id, Form.title == 'Household Survey').first()
+    ha_form = db.query(Form).filter(Form.tenant_id == demo_tenant.id, Form.title == 'Health Assessment').first()
+
+    if hs_form and ha_form:
+        # Ensure all enumerators have form assignments
+        all_enums = [u for u in user_objs.values() if u.tenant_id == demo_tenant.id and u.role == 'enumerator']
+        for enum in all_enums:
+            for form in [hs_form, ha_form]:
+                exists = db.query(FormAssignment).filter(
+                    FormAssignment.form_id == form.id,
+                    FormAssignment.enumerator_id == enum.id,
+                ).first()
+                if not exists:
+                    db.add(FormAssignment(
+                        tenant_id=demo_tenant.id,
+                        form_id=form.id,
+                        enumerator_id=enum.id,
+                        assigned_by=org_admin.id,
+                    ))
+        db.flush()
+
+        # Create demo program if it doesn't exist
+        prog = db.query(Program).filter(
+            Program.tenant_id == demo_tenant.id,
+            Program.name == 'Rural Health Survey 2024',
+        ).first()
+        if not prog:
+            prog = Program(
+                tenant_id=demo_tenant.id,
+                name='Rural Health Survey 2024',
+                scheme_name='Karnataka Rural Health Mission',
+                description='Baseline household and health survey across 5 districts in Karnataka.',
+                status='active',
+                start_date=datetime(2024, 1, 1).date(),
+                end_date=datetime(2024, 12, 31).date(),
+                created_by=org_admin.id,
+            )
+            db.add(prog)
+            db.flush()
+
+        # Create questionnaires linked to forms
+        hs_q = db.query(ProgramQuestionnaire).filter(
+            ProgramQuestionnaire.program_id == prog.id,
+            ProgramQuestionnaire.form_id == hs_form.id,
+        ).first()
+        if not hs_q:
+            hs_q = ProgramQuestionnaire(
+                program_id=prog.id,
+                form_id=hs_form.id,
+                tenant_id=demo_tenant.id,
+                name='Household Survey',
+                total_target=200,
+                status='active',
+            )
+            db.add(hs_q)
+            db.flush()
+
+        ha_q = db.query(ProgramQuestionnaire).filter(
+            ProgramQuestionnaire.program_id == prog.id,
+            ProgramQuestionnaire.form_id == ha_form.id,
+        ).first()
+        if not ha_q:
+            ha_q = ProgramQuestionnaire(
+                program_id=prog.id,
+                form_id=ha_form.id,
+                tenant_id=demo_tenant.id,
+                name='Health Assessment',
+                total_target=200,
+                status='active',
+            )
+            db.add(ha_q)
+            db.flush()
+
+        # Link all unlinked submissions to the program
+        db.execute(
+            f"""UPDATE submissions SET program_id = '{prog.id}', questionnaire_id = '{hs_q.id}'
+                WHERE tenant_id = '{demo_tenant.id}' AND form_id = '{hs_form.id}' AND program_id IS NULL"""
+        )
+        db.execute(
+            f"""UPDATE submissions SET program_id = '{prog.id}', questionnaire_id = '{ha_q.id}'
+                WHERE tenant_id = '{demo_tenant.id}' AND form_id = '{ha_form.id}' AND program_id IS NULL"""
+        )
+        db.commit()
+        print("Stage 3: program + questionnaires + submission links OK")
+    else:
+        print("Stage 3: skipped (forms not found, run seed after forms are created)")
+
+except Exception as e:
+    db.rollback()
+    print(f"Stage 3 warning (program seed skipped): {e}")
 
 finally:
     db.close()
