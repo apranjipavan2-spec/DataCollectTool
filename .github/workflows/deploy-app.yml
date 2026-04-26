@@ -128,10 +128,28 @@ jobs:
               fieldgovern-cleaner:latest
 
             # ── 6. Reload nginx AFTER tools are running ──────────────────────────
+            # Show exactly where nginx reads its config from
+            echo "=== Nginx bind mounts ==="
+            docker inspect "$NGINX_ID" --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}'
+
+            # Find the actual host path for the nginx config inside the container
+            NGINX_CONF_HOST=$(docker inspect "$NGINX_ID" --format '{{range .Mounts}}{{if eq .Destination "/etc/nginx/conf.d/default.conf"}}{{.Source}}{{end}}{{end}}')
+            echo "Nginx config source on host: $NGINX_CONF_HOST"
+
+            # Download updated config — write to both the detected path AND common fallbacks
             curl -fsSL "https://raw.githubusercontent.com/apranjipavan2-spec/DataCollectTool/main/deploy/nginx.conf" \
               -o /opt/fieldgovern/nginx.conf
-            echo "--- nginx.conf analyzer block ---"
+            cp /opt/fieldgovern/nginx.conf /opt/fieldgovern/deploy/nginx.conf 2>/dev/null || true
+            # Also write to the actual detected path if different
+            if [ -n "$NGINX_CONF_HOST" ] && [ "$NGINX_CONF_HOST" != "/opt/fieldgovern/nginx.conf" ]; then
+              cp /opt/fieldgovern/nginx.conf "$NGINX_CONF_HOST"
+              echo "Copied config to detected path: $NGINX_CONF_HOST"
+            fi
+
+            echo "--- analyzer block in nginx.conf ---"
             grep -A4 "location /analyzer" /opt/fieldgovern/nginx.conf || echo "WARNING: no analyzer block found"
+            echo "--- config inside container ---"
+            docker exec "$NGINX_ID" cat /etc/nginx/conf.d/default.conf | grep -A4 "location /analyzer" || echo "WARNING: analyzer block NOT visible inside container"
             docker exec "$NGINX_ID" nginx -t
             docker exec "$NGINX_ID" nginx -s reload
             echo "Nginx reloaded"
