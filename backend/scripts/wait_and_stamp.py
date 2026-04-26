@@ -98,8 +98,10 @@ def detect_and_stamp():
             stamp = "0026"
         elif not col_exists(cur, "program_locations", "program_id"):
             stamp = "0027"
-        else:
+        elif not table_exists(cur, "user_tool_projects"):
             stamp = "0028"
+        else:
+            stamp = "0029"
 
         print(f"Stamping alembic_version to {stamp}")
         if not has_alembic:

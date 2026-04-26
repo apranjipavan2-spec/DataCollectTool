@@ -236,27 +236,42 @@ def get_analyzer_data(
     form_ids = [str(q.form_id) for q in questionnaires if q.form_id]
     q_map = {str(q.form_id): q for q in questionnaires if q.form_id}
 
-    # Load all submissions for this program
+    # Load submissions — capped at 20k for performance; use aggregate queries for KPIs
+    # Submission trend via SQL aggregation (avoids Python loop over all rows)
+    trend_rows = db.execute(
+        text("""
+            SELECT DATE(server_received_at) AS d, COUNT(*) AS cnt
+            FROM submissions
+            WHERE program_id = :pid AND tenant_id = :tid
+            GROUP BY DATE(server_received_at)
+            ORDER BY d
+        """), {"pid": str(program_id), "tid": str(user["tenant_id"])}
+    ).fetchall()
+    trend = [{"date": str(r.d), "count": r.cnt} for r in trend_rows]
+
+    # Status breakdown via SQL
+    status_rows = db.execute(
+        text("""
+            SELECT status, COUNT(*) AS cnt
+            FROM submissions WHERE program_id = :pid AND tenant_id = :tid
+            GROUP BY status
+        """), {"pid": str(program_id), "tid": str(user["tenant_id"])}
+    ).fetchall()
+    status_counts: dict = {r.status: r.cnt for r in status_rows}
+
+    # Load submissions (still needed for column detection — cap at 20k)
     subs = db.query(Submission).filter(
         Submission.program_id == program_id,
         Submission.tenant_id == user["tenant_id"],
-    ).order_by(Submission.server_received_at).all()
+    ).order_by(Submission.server_received_at.desc()).limit(20000).all()
 
-    # Submission trend (daily)
-    trend_map: dict = defaultdict(int)
-    for s in subs:
-        if s.server_received_at:
-            trend_map[s.server_received_at.strftime("%Y-%m-%d")] += 1
-    trend = [{"date": d, "count": c} for d, c in sorted(trend_map.items())]
-
-    # Status breakdown
-    status_counts: dict = defaultdict(int)
-    for s in subs:
-        status_counts[s.status] += 1
-
-    # Enumerator performance
+    # Enumerator performance — load only relevant users
     enum_map: dict = defaultdict(lambda: {"name": "", "count": 0})
-    enum_users = {str(u.id): u.name for u in db.query(User).filter(User.tenant_id == user["tenant_id"]).all()}
+    enum_ids_set = list({str(s.enumerator_id) for s in subs if s.enumerator_id})
+    enum_users = {}
+    if enum_ids_set:
+        for u in db.query(User).filter(User.id.in_([_uuid.UUID(eid) for eid in enum_ids_set])).all():
+            enum_users[str(u.id)] = u.name
     for s in subs:
         eid = str(s.enumerator_id)
         enum_map[eid]["name"] = enum_users.get(eid, eid[:8])
@@ -1048,27 +1063,33 @@ def get_cleaner_data(
     if not prog:
         raise HTTPException(404, "Program not found")
 
-    # Load forms for this program
+    # Load forms for this program — single query (avoid N+1)
     questionnaires = db.query(ProgramQuestionnaire).filter(
         ProgramQuestionnaire.program_id == program_id,
         ProgramQuestionnaire.tenant_id == user["tenant_id"],
     ).all()
+    form_ids = [q.form_id for q in questionnaires if q.form_id]
     forms: dict = {}
-    for q in questionnaires:
-        if q.form_id:
-            form = db.query(Form).filter(Form.id == q.form_id).first()
-            if form:
-                forms[str(q.form_id)] = form
+    if form_ids:
+        for form in db.query(Form).filter(Form.id.in_(form_ids)).all():
+            forms[str(form.id)] = form
 
     subs = db.query(Submission).filter(
         Submission.program_id == program_id,
         Submission.tenant_id == user["tenant_id"],
-    ).order_by(Submission.server_received_at.desc()).all()
+    ).order_by(Submission.server_received_at.desc()).limit(10000).all()
 
-    enum_users = {
-        str(u.id): u.name
-        for u in db.query(User).filter(User.tenant_id == user["tenant_id"]).all()
-    }
+    # Load only users referenced in these submissions (avoid full-tenant scan)
+    enum_ids = list({str(s.enumerator_id) for s in subs if s.enumerator_id})
+    if enum_ids:
+        from sqlalchemy import cast as _cast
+        from sqlalchemy.dialects.postgresql import UUID as PGUUID
+        enum_users = {
+            str(u.id): u.name
+            for u in db.query(User).filter(User.id.in_([_uuid.UUID(eid) for eid in enum_ids])).all()
+        }
+    else:
+        enum_users = {}
 
     # Build outlier thresholds per numeric field (mean ± 2σ) across all submissions
     import math
@@ -1244,14 +1265,19 @@ def export_program_xlsx(
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
+    try:
+        pid_uuid = _uuid.UUID(program_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid program_id format")
+
     prog = db.query(Program).filter(
-        Program.id == program_id, Program.tenant_id == user["tenant_id"]
+        Program.id == pid_uuid, Program.tenant_id == user["tenant_id"]
     ).first()
     if not prog:
         raise HTTPException(404, "Program not found")
 
     q = db.query(Submission).filter(
-        Submission.program_id == program_id,
+        Submission.program_id == pid_uuid,
         Submission.tenant_id == user["tenant_id"],
     )
     if questionnaire_id:
@@ -1292,5 +1318,3 @@ def export_program_xlsx(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
-
-    return {"report_md": report_md, "program_name": prog.name, "sample_size": len(subs)}

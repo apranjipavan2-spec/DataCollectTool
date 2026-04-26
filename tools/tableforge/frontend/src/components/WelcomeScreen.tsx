@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { fgListPrograms, fgListQuestionnaires, importFromFg } from '../api';
+import { fgListPrograms, fgListQuestionnaires, importFromFg, fgListUserProjects } from '../api';
 
 interface FgContext { fgUrl: string; token: string; programId?: string }
 
@@ -14,6 +14,7 @@ interface Props {
 
 interface Program { id: string; name: string; scheme_name: string }
 interface Questionnaire { questionnaire_id: string; name: string; form_title: string }
+interface RecentProject { id: string; name: string; updated_at: string; program_id?: string }
 
 const s = {
   wrap: {
@@ -23,7 +24,7 @@ const s = {
   },
   card: {
     background: 'var(--surface, #1e293b)', border: '1px solid var(--border, #334155)',
-    borderRadius: 16, padding: 36, width: '100%', maxWidth: 460,
+    borderRadius: 16, padding: 36, width: '100%', maxWidth: 480,
     display: 'flex', flexDirection: 'column' as const, gap: 0,
   },
   label: { fontSize: 11, fontWeight: 700, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 6 },
@@ -39,8 +40,8 @@ const s = {
     background: '#3b82f6', color: '#fff', fontSize: 14, fontWeight: 700,
     cursor: 'pointer', transition: 'opacity 0.15s',
   },
-  divider: { display: 'flex', alignItems: 'center', gap: 12, margin: '24px 0' },
-  dividerLine: { flex: 1, height: 1, background: '#1e293b' },
+  divider: { display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' },
+  dividerLine: { flex: 1, height: 1, background: '#334155' },
   dividerText: { fontSize: 12, color: '#475569', whiteSpace: 'nowrap' as const },
   linkBtn: {
     background: 'none', border: '1px solid #334155', borderRadius: 8, padding: '10px 14px',
@@ -50,24 +51,42 @@ const s = {
   errorMsg: { color: '#f87171', fontSize: 12, marginTop: 8, padding: '8px 12px', background: 'rgba(248,113,113,0.08)', borderRadius: 6 },
 };
 
+function formatRelative(dateStr: string) {
+  try {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 2) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  } catch { return ''; }
+}
+
 export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, fgContext, loading, error }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const projectFileRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<HTMLDivElement>(null);
 
-  const [programs, setPrograms]           = useState<Program[]>([]);
+  const [programs, setPrograms]             = useState<Program[]>([]);
   const [questionnaires, setQuestionnaires] = useState<Questionnaire[]>([]);
   const [selProgram, setSelProgram]         = useState('');
   const [selQ, setSelQ]                     = useState('');
   const [fgLoading, setFgLoading]           = useState(false);
   const [fgError, setFgError]               = useState('');
-  const [showUpload, setShowUpload]         = useState(!fgContext);
+  const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
 
   useEffect(() => {
-    if (!fgContext) { setShowUpload(true); return; }
-    setShowUpload(false);
+    if (!fgContext) return;
     fgListPrograms(fgContext.fgUrl, fgContext.token).then(setPrograms).catch(() => {});
     if (fgContext.programId) setSelProgram(fgContext.programId);
+    // Load recent FG projects
+    fgListUserProjects(fgContext.fgUrl, fgContext.token, 'analyzer')
+      .then((projs: any[]) => {
+        const valid = projs.filter(p => p.name && p.name !== '__autosave__');
+        setRecentProjects(valid.slice(0, 3));
+      })
+      .catch(() => {});
   }, [fgContext]);
 
   useEffect(() => {
@@ -84,7 +103,7 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
       const meta = await importFromFg(fgContext.fgUrl, fgContext.token, selProgram, selQ || undefined);
       onDatasetLoaded?.(meta);
     } catch (e: any) {
-      setFgError(e.message || 'Load failed');
+      setFgError(e.message || 'Failed to load data from FieldGovern');
     } finally { setFgLoading(false); }
   };
 
@@ -113,13 +132,13 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
       <div style={s.card}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <img src="/logo-icon.png" alt="Analyzer" style={{ width: 40, height: 40, marginBottom: 8, display: 'block', margin: '0 auto 8px' }} />
+          <img src="/logo-icon.png" alt="FieldGovern" style={{ width: 40, height: 40, display: 'block', margin: '0 auto 8px' }} />
           <div style={{ fontSize: 20, fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.02em' }}>Analyzer</div>
           <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>FieldGovern Data Analyzer</div>
         </div>
 
-        {/* FG loader — shown when token present */}
-        {fgContext && (
+        {/* FG program picker */}
+        {fgContext ? (
           <>
             <div style={{ marginBottom: 16 }}>
               <div style={s.label}>Program</div>
@@ -135,7 +154,10 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
 
             {selProgram && (
               <div style={{ marginBottom: 20 }}>
-                <div style={s.label}>Questionnaire / Form <span style={{ color: '#475569', textTransform: 'none', fontWeight: 400 }}>(optional — leave blank to load all)</span></div>
+                <div style={s.label}>
+                  Questionnaire / Form{' '}
+                  <span style={{ color: '#475569', textTransform: 'none', fontWeight: 400 }}>(optional)</span>
+                </div>
                 <select style={s.select} value={selQ} onChange={e => setSelQ(e.target.value)}>
                   <option value="">All questionnaires</option>
                   {questionnaires.map(q => (
@@ -157,16 +179,33 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
 
             {fgError && <div style={s.errorMsg}>{fgError}</div>}
 
-            <div style={s.divider}>
-              <div style={s.dividerLine} />
-              <span style={s.dividerText}>or</span>
-              <div style={s.dividerLine} />
-            </div>
+            {/* Recent projects */}
+            {recentProjects.length > 0 && (
+              <>
+                <div style={s.divider}>
+                  <div style={s.dividerLine} />
+                  <span style={s.dividerText}>recent sessions</span>
+                  <div style={s.dividerLine} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {recentProjects.map(proj => (
+                    <button key={proj.id} style={{ ...s.linkBtn, justifyContent: 'space-between' }}
+                      onClick={() => {
+                        if (proj.program_id) setSelProgram(proj.program_id);
+                      }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>📊</span>
+                        <span style={{ fontSize: 13, color: '#e2e8f0' }}>{proj.name}</span>
+                      </span>
+                      <span style={{ fontSize: 11, color: '#475569' }}>{formatRelative(proj.updated_at)}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </>
-        )}
-
-        {/* Upload / project import — only show when no FG context */}
-        {!fgContext && (
+        ) : (
+          /* No FG context — plain file upload */
           <div
             ref={dragRef}
             onDragOver={e => { e.preventDefault(); dragRef.current?.classList.add('drag-over'); }}
@@ -193,13 +232,6 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
             )}
             {error && <div style={s.errorMsg}>{error}</div>}
           </div>
-        )}
-
-        {/* When FG context, offer local import as last resort */}
-        {fgContext && (
-          <button style={{ ...s.linkBtn, marginTop: 8, opacity: 0.6, fontSize: 12 }} onClick={() => fileRef.current?.click()}>
-            <span>📂</span> Import a local CSV / Excel file instead
-          </button>
         )}
       </div>
 

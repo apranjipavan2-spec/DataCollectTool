@@ -383,7 +383,11 @@ input, select, textarea { font-family: inherit; }
   <!-- ── Sidebar ─────────────────────────────────── -->
   <div class="sidebar" id="sidebar" style="width: 250px; min-width: 250px;">
     <div class="sidebar-header">
-      <h1><span>🧹</span> Data Cleaner</h1>
+      <h1 style="display:flex;align-items:center;gap:7px;">
+        <img src="/static/logo-icon.png" alt="FG" style="width:20px;height:20px;border-radius:4px;" onerror="this.style.display='none'">
+        <span style="font-size:15px;font-weight:800;color:var(--text)">Cleaner</span>
+        <span style="font-size:10px;font-weight:500;color:var(--text3)">by FieldGovern</span>
+      </h1>
       <div class="file-info" id="fileInfo">No file loaded</div>
     </div>
     <div class="sidebar-section collapsed" id="completenessToggle" onclick="toggleSection('completenessCard', this)">
@@ -410,9 +414,10 @@ input, select, textarea { font-family: inherit; }
       <div style="padding:20px;color:var(--text3);font-size:12px;text-align:center;">Upload a file to see columns</div>
     </div>
     <div style="padding:10px; border-top:1px solid var(--border); display:flex; gap:4px;">
-      <button class="btn btn-secondary btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doUndo()" title="Undo action">↩ Undo</button>
+      <button class="btn btn-secondary btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doUndo()" title="Undo last action">↩</button>
+      <button class="btn btn-secondary btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doRedo()" title="Redo last action">↪</button>
       <button class="btn btn-success btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doExport('csv')">⬇ CSV</button>
-      <button class="btn btn-success btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doExport('excel')">⬇ Excel</button>
+      <button class="btn btn-success btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doExport('excel')">⬇ XLS</button>
     </div>
   </div>
 
@@ -1441,6 +1446,15 @@ async function doUndo() {
   }
 }
 
+async function doRedo() {
+  const data = await apiPost('redo', {});
+  if (data) {
+    toast(`Redone`);
+    await loadInfo();
+    if (activeCol) selectColumn(activeCol);
+  }
+}
+
 // ── Export ────────────────────────────────────────────────
 function doExport(fmt) {
   window.open(`/api/export?format=${fmt}`, '_blank');
@@ -1827,9 +1841,11 @@ async function fgLoadData(programId, questionnaireId) {
 (async function () {
   if (!_fgUrl || !_fgToken) return;
 
-  // Show the divider between FG picker and file upload
+  // Hide the file upload zone — FG context is the primary data source
+  const uploadZone = document.getElementById('uploadZone');
+  if (uploadZone) uploadZone.style.display = 'none';
   const divider = document.getElementById('uploadDivider');
-  if (divider) divider.style.display = 'flex';
+  if (divider) divider.style.display = 'none';
 
   // Fetch programs
   let programs = [];

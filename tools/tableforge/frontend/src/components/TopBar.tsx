@@ -9,6 +9,7 @@ interface Props {
   theme: 'dark' | 'light';
   ribbonTab?: string;
   onRibbonTabChange?: (tab: string) => void;
+  fgHomeUrl?: string;
 }
 
 const ribbonTabs = ['Home', 'Insert', 'Data', 'Statistics', 'Format', 'View'];
@@ -27,7 +28,7 @@ interface MenuDef {
   items: (MenuItem | { divider: true })[];
 }
 
-export function TopBar({ onFileUpload, dataset, onAction, onToggleTheme, theme, ribbonTab, onRibbonTabChange }: Props) {
+export function TopBar({ onFileUpload, dataset, onAction, onToggleTheme, theme, ribbonTab, onRibbonTabChange, fgHomeUrl }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -120,8 +121,11 @@ export function TopBar({ onFileUpload, dataset, onAction, onToggleTheme, theme, 
   return (
     <div className="topbar">
       {/* Brand */}
-      <div className="topbar-brand">
-        <img src="/logo-icon.png" alt="Analyzer" className="logo-img" style={{ width: 28, height: 28, marginRight: 6 }} />
+      <div className="topbar-brand"
+        style={{ cursor: fgHomeUrl ? 'pointer' : 'default' }}
+        onClick={() => { if (fgHomeUrl) window.location.href = fgHomeUrl; }}
+        title={fgHomeUrl ? 'Back to FieldGovern dashboard' : undefined}>
+        <img src="/logo-icon.png" alt="FieldGovern" className="logo-img" style={{ width: 28, height: 28, marginRight: 6 }} />
         <span className="brand-name">Analyzer</span>
         <span className="brand-tag">FieldGovern</span>
       </div>

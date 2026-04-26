@@ -35,6 +35,7 @@ DATA = {
     "copy_path": None,    # path to the working copy
     "sheet_name": None,   # active sheet name for Excel files
     "history": [],        # list of (description, DataFrame-copy) for undo
+    "redo_stack": [],     # list of (description, DataFrame-copy) for redo
     "max_history": 20,
     "column_types": {},   # col_name -> type_name
     "active_filters": {},  # col_name -> {type, val1, val2}
@@ -98,9 +99,10 @@ def _load_state():
             print(f"Error loading state: {e}")
 
 def _push_undo(desc: str):
-    """Snapshot current df for undo."""
+    """Snapshot current df for undo; clears redo stack."""
     if DATA["df"] is not None:
         DATA["history"].append((desc, DATA["df"].copy()))
+        DATA["redo_stack"].clear()
         if len(DATA["history"]) > DATA["max_history"]:
             DATA["history"].pop(0)
     _save_state()
@@ -1130,12 +1132,30 @@ def validate_format():
 
 @app.route("/api/undo", methods=["POST"])
 def undo():
-    """Undo last operation."""
+    """Undo last operation, pushing current state to redo stack."""
     if not DATA["history"]:
         return jsonify(error="Nothing to undo"), 400
+    # Save current state to redo stack before undoing
+    if DATA["df"] is not None:
+        DATA["redo_stack"].append(("(before undo)", DATA["df"].copy()))
     desc, prev_df = DATA["history"].pop()
     DATA["df"] = prev_df
-    return jsonify(ok=True, undone=desc, remaining=len(DATA["history"]))
+    _save_state()
+    return jsonify(ok=True, undone=desc, remaining=len(DATA["history"]), redo_count=len(DATA["redo_stack"]))
+
+
+@app.route("/api/redo", methods=["POST"])
+def redo():
+    """Redo last undone operation."""
+    if not DATA["redo_stack"]:
+        return jsonify(error="Nothing to redo"), 400
+    # Save current state to undo history
+    if DATA["df"] is not None:
+        DATA["history"].append(("(before redo)", DATA["df"].copy()))
+    desc, next_df = DATA["redo_stack"].pop()
+    DATA["df"] = next_df
+    _save_state()
+    return jsonify(ok=True, redone=desc, remaining=len(DATA["redo_stack"]), undo_count=len(DATA["history"]))
 
 
 @app.route("/api/export")

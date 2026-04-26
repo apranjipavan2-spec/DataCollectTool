@@ -268,6 +268,28 @@ _PATCHES = [
        )
        WHERE pq.tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)
        AND pq.participant_type_id IS NULL""",
+
+    # 0029 — user_tool_projects
+    """CREATE TABLE IF NOT EXISTS user_tool_projects (
+        id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id   UUID NOT NULL REFERENCES tenants(id)  ON DELETE CASCADE,
+        user_id     UUID NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
+        tool        VARCHAR(20)  NOT NULL,
+        name        VARCHAR(255) NOT NULL,
+        program_id  UUID REFERENCES programs(id) ON DELETE SET NULL,
+        data        JSONB NOT NULL DEFAULT '{}',
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_utp_user_tool ON user_tool_projects (user_id, tool)",
+    "CREATE INDEX IF NOT EXISTS ix_utp_tenant    ON user_tool_projects (tenant_id)",
+
+    # 0030 — performance indexes on submissions
+    "CREATE INDEX IF NOT EXISTS ix_sub_tenant_program    ON submissions (tenant_id, program_id) WHERE program_id IS NOT NULL",
+    "CREATE INDEX IF NOT EXISTS ix_sub_questionnaire     ON submissions (questionnaire_id) WHERE questionnaire_id IS NOT NULL",
+    "CREATE INDEX IF NOT EXISTS ix_sub_enumerator        ON submissions (enumerator_id)",
+    "CREATE INDEX IF NOT EXISTS ix_sub_tenant_status     ON submissions (tenant_id, status)",
+    "CREATE INDEX IF NOT EXISTS ix_sub_tenant_recvd      ON submissions (tenant_id, server_received_at DESC)",
 ]
 
 from sqlalchemy import text as _text

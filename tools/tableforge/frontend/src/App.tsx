@@ -825,6 +825,7 @@ export default function App() {
         }}
         onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} theme={theme}
         ribbonTab={ribbonTab} onRibbonTabChange={setRibbonTab}
+        fgHomeUrl={fgContext ? fgContext.fgUrl : undefined}
       />
       <RibbonBar
         table={activeTable}

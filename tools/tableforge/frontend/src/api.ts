@@ -195,11 +195,11 @@ export async function fgSaveProject(fgUrl: string, token: string, name: string, 
   return res.json();
 }
 
-export async function fgListUserProjects(fgUrl: string, token: string) {
+export async function fgListUserProjects(fgUrl: string, token: string, tool = 'analyzer') {
   const res = await fetch(`${API_BASE}/fg/user-projects/list`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fg_base_url: fgUrl, token }),
+    body: JSON.stringify({ fg_base_url: fgUrl, token, tool }),
   });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json() as Promise<{ id: string; name: string; program_id: string | null; data: any; updated_at: string }[]>;
