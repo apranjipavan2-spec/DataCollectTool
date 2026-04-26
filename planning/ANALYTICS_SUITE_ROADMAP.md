@@ -1,6 +1,7 @@
 # Analytics Suite Roadmap
 <!-- Data Cleaning · Tabulation · Charting · Report Writing -->
 <!-- Updated: 2026-04-23 -->
+<!-- SEE MASTER_ROADMAP.md → Initiative A for the detailed implementation plan -->
 
 ---
 

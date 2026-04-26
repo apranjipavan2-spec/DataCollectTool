@@ -1,0 +1,218 @@
+// import.meta.env.BASE_URL is '/' in dev, '/analyzer/' in production build
+const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api';
+
+async function parseError(res: Response): Promise<string> {
+  const text = await res.text();
+  try {
+    const json = JSON.parse(text);
+    return json.detail || json.message || text;
+  } catch {
+    return text || `HTTP ${res.status}`;
+  }
+}
+
+export async function uploadFile(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function tabulate(config: {
+  dataset_id: string;
+  rows: string[];
+  columns: string[];
+  values: { field: string; agg: string; label?: string }[];
+  filters: Record<string, string[]>;
+  grand_total: boolean;
+  grand_total_rows?: boolean;
+  grand_total_columns?: boolean;
+  subtotals: boolean;
+  missing_data: string;
+  sort_by?: string;
+  sort_order?: string;
+  multi_sort?: { field: string; order: 'asc' | 'desc' }[];
+  date_groupings?: Record<string, string>;
+  blank_suppress?: boolean;
+}) {
+  const res = await fetch(`${API_BASE}/tabulate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function getColumnValues(datasetId: string, columnName: string) {
+  // Use a query parameter so column names containing "/" don't break URL path routing.
+  const res = await fetch(
+    `${API_BASE}/dataset/${datasetId}/column-values?column=${encodeURIComponent(columnName)}`
+  );
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function createMetric(datasetId: string, metric: any) {
+  const res = await fetch(`${API_BASE}/metrics/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, ...metric }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function changeColumnType(datasetId: string, column: string, newType: string) {
+  const res = await fetch(`${API_BASE}/dataset/column_type`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, column, new_type: newType }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function listMetrics(datasetId: string) {
+  const res = await fetch(`${API_BASE}/metrics/${datasetId}`);
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function deleteMetric(datasetId: string, metricName: string) {
+  const res = await fetch(`${API_BASE}/metrics/${datasetId}/${encodeURIComponent(metricName)}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function createBin(datasetId: string, bin: any) {
+  const res = await fetch(`${API_BASE}/bins/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, ...bin }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function listBins(datasetId: string) {
+  const res = await fetch(`${API_BASE}/bins/${datasetId}`);
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function deleteBin(datasetId: string, binName: string) {
+  const res = await fetch(`${API_BASE}/bins/${datasetId}/${encodeURIComponent(binName)}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function getDataQuality(datasetId: string) {
+  const res = await fetch(`${API_BASE}/dataset/${datasetId}/quality`);
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function exportTables(config: {
+  dataset_id: string;
+  tables: { name: string; headers: string[]; rows: any[][]; title?: string; subtitle?: string }[];
+  format: string;
+  filename: string;
+}) {
+  const res = await fetch(`${API_BASE}/export`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function saveProject(name: string, config: any) {
+  const res = await fetch(`${API_BASE}/project/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, config }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function listProjects() {
+  const res = await fetch(`${API_BASE}/projects`);
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function rollbackProject(path: string, versionIndex: number) {
+  const res = await fetch(`${API_BASE}/project/rollback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, version_index: versionIndex }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+// Module A: Sheet Selection
+export async function loadSheet(datasetId: string, sheetName: string) {
+  const res = await fetch(`${API_BASE}/upload/sheet`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, sheet_name: sheetName }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+// Module A: Column Rename / Exclude / Header Row
+export async function modifyDataset(config: {
+  dataset_id: string;
+  renames?: Record<string, string>;
+  exclude_columns?: string[];
+  exclude_rows?: number[];
+  header_row?: number | null;
+}) {
+  const res = await fetch(`${API_BASE}/dataset/modify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+// Module A: Multi-Sheet Union
+export async function unionSheets(datasetId: string, sheetNames: string[]) {
+  const res = await fetch(`${API_BASE}/upload/union`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, sheet_names: sheetNames }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+// Module A: Data Refresh
+export async function refreshDataset(datasetId: string) {
+  const res = await fetch(`${API_BASE}/dataset/${datasetId}/refresh`, { method: 'POST' });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+// Export download (binary)
+export async function downloadExport(config: {
+  dataset_id: string;
+  tables: { name: string; headers: string[]; rows: any[][]; title?: string; subtitle?: string }[];
+  format: string;
+  filename: string;
+}) {
+  const res = await fetch(`${API_BASE}/export`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res;
+}

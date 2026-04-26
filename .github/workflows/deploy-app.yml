@@ -8,6 +8,7 @@ on:
       - "frontend/**"
       - "Dockerfile"
       - "deploy/**"
+      - "tools/**"
   workflow_dispatch:
 
 env:
@@ -71,6 +72,15 @@ jobs:
       - name: Checkout (for deploy files)
         uses: actions/checkout@v4
 
+      - name: Sync tools to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "tools/"
+          target: "/opt/fieldgovern/"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -99,7 +109,11 @@ jobs:
             # ── 4. Run DB migrations (idempotent — safe to run every deploy) ───
             docker compose exec -T app sh -c "alembic upgrade head 2>&1 || true"
 
-            # ── 5. Prune old images to save disk space ─────────────────────────
+            # ── 5. Build and restart analyzer + cleaner ─────────────────────────
+            docker compose build analyzer cleaner
+            docker compose up -d --no-deps analyzer cleaner
+
+            # ── 6. Prune old images to save disk space ─────────────────────────
             docker image prune -f
 
             echo "Deploy complete — $(date)"

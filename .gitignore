@@ -70,6 +70,19 @@ backend/backups/
 # Separate sub-projects
 MiroFish/
 
+# Tools — runtime dirs (never commit)
+tools/tableforge/cache/
+tools/tableforge/exports/
+tools/tableforge/logs/
+tools/tableforge/parquet_cache/
+tools/tableforge/projects/
+tools/tableforge/__pycache__/
+tools/tableforge/*.db
+tools/datacleaner/working_copies/
+tools/datacleaner/__pycache__/
+tools/datacleaner/*.pkl
+tools/datacleaner/*.db
+
 # Data analysis files
 *.xlsx
 website/status.html

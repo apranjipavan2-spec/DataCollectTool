@@ -29,6 +29,27 @@ services:
       postgres:
         condition: service_healthy
 
+  analyzer:
+    build:
+      context: ../tools/tableforge
+      dockerfile: Dockerfile
+    restart: always
+    volumes:
+      - tableforge_data:/app/projects
+      - tableforge_exports:/app/exports
+    expose:
+      - "8001"
+
+  cleaner:
+    build:
+      context: ../tools/datacleaner
+      dockerfile: Dockerfile
+    restart: always
+    volumes:
+      - cleaner_data:/app/working_copies
+    expose:
+      - "8002"
+
   nginx:
     image: nginx:alpine
     restart: always
@@ -41,8 +62,13 @@ services:
       - certbot_webroot:/var/www/certbot:ro
     depends_on:
       - app
+      - analyzer
+      - cleaner
 
 volumes:
   postgres_data:
   uploads:
   certbot_webroot:
+  tableforge_data:
+  tableforge_exports:
+  cleaner_data:

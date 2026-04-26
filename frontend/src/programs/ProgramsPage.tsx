@@ -508,13 +508,35 @@ export default function ProgramsPage() {
                           {selectedProg.scheme_name && <p className="text-sm text-catalan-textMuted">Scheme: {selectedProg.scheme_name}</p>}
                           {selectedProg.description && <p className="text-sm text-catalan-text mt-1">{selectedProg.description}</p>}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                           <button
                             onClick={() => navigate(`/programs/${selectedProg.id}/govern`)}
                             className="px-3 py-1.5 text-sm bg-catalan-primary/10 border border-catalan-primary/30 text-catalan-primary rounded-lg hover:bg-catalan-primary/20 transition-colors font-medium"
                           >
                             Field Govern
                           </button>
+                          {['supervisor', 'org_admin', 'master_admin'].includes(user?.role ?? '') && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  const token = localStorage.getItem('fp_token')
+                                  window.open(`${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${selectedProg.id}&token=${token}`, '_blank')
+                                }}
+                                className="px-3 py-1.5 text-sm bg-blue-50 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors font-medium"
+                              >
+                                Open in Analyzer
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const token = localStorage.getItem('fp_token')
+                                  window.open(`${window.location.origin}/cleaner/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${selectedProg.id}&token=${token}`, '_blank')
+                                }}
+                                className="px-3 py-1.5 text-sm bg-green-50 border border-green-300 text-green-700 rounded-lg hover:bg-green-100 transition-colors font-medium"
+                              >
+                                Open in Cleaner
+                              </button>
+                            </>
+                          )}
                           <button onClick={() => { setEditingProg(selectedProg); setShowProgModal(true) }} className={btnSecondary}>Edit</button>
                           <button onClick={() => deleteProgram(selectedProg.id)} className={btnDanger}>Delete</button>
                         </div>

@@ -1,6 +1,7 @@
 # CLAUDE.md — FieldGovern
 
 > Authoritative guide for Claude Code. Read `tasks/todo.md` + `tasks/lessons.md` at session start.
+> **MASTER ROADMAP:** `planning/MASTER_ROADMAP.md` — single source of truth for all initiatives. Start here for any new work.
 > **DEPLOYMENT SESSION:** Read `process_deployment.md` first (local only, has credentials + full process).
 
 ---
@@ -282,7 +283,7 @@ Memory files at `~/.claude/projects/C--Users-apran/memory/`.
 
 ---
 
-# Roadmap Status (see `planning/ROADMAP.md` for full list)
+# Roadmap Status (see `planning/MASTER_ROADMAP.md` — master; `planning/ROADMAP.md` — feature backlog)
 
 | Bundle | Status |
 |--------|--------|

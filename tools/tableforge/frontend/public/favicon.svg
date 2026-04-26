@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="100%" stop-color="#DAA520"/>
+    </linearGradient>
+  </defs>
+  <!-- Crown -->
+  <path d="M22 18 L26 10 L32 16 L38 10 L42 18 Z" fill="url(#g)" stroke="#B8860B" stroke-width="0.5"/>
+  <rect x="22" y="17" width="20" height="4" rx="1" fill="url(#g)" stroke="#B8860B" stroke-width="0.5"/>
+  <!-- Crown jewels -->
+  <circle cx="27" cy="19" r="1" fill="#B8860B"/>
+  <circle cx="32" cy="19" r="1" fill="#B8860B"/>
+  <circle cx="37" cy="19" r="1" fill="#B8860B"/>
+  <!-- Lion face -->
+  <ellipse cx="32" cy="36" rx="12" ry="14" fill="url(#g)"/>
+  <!-- Mane -->
+  <path d="M16 30 Q14 24 20 20 Q22 22 22 26 Q18 26 16 30Z" fill="#DAA520"/>
+  <path d="M48 30 Q50 24 44 20 Q42 22 42 26 Q46 26 48 30Z" fill="#DAA520"/>
+  <path d="M16 30 Q12 36 16 44 Q18 40 20 38 Q16 36 16 30Z" fill="#DAA520"/>
+  <path d="M48 30 Q52 36 48 44 Q46 40 44 38 Q48 36 48 30Z" fill="#DAA520"/>
+  <!-- Eyes -->
+  <ellipse cx="27" cy="33" rx="2" ry="1.5" fill="#B8860B"/>
+  <ellipse cx="37" cy="33" rx="2" ry="1.5" fill="#B8860B"/>
+  <circle cx="27" cy="33" r="0.8" fill="#4a3000"/>
+  <circle cx="37" cy="33" r="0.8" fill="#4a3000"/>
+  <!-- Nose -->
+  <path d="M30 38 L32 40 L34 38 Z" fill="#B8860B"/>
+  <!-- Mouth -->
+  <path d="M28 42 Q32 46 36 42" fill="none" stroke="#B8860B" stroke-width="1"/>
+</svg>

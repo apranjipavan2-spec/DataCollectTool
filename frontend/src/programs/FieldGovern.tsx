@@ -787,6 +787,30 @@ export default function FieldGovern() {
         <main className="flex-1 overflow-auto">
           <div className="max-w-5xl mx-auto p-6">
 
+            {/* External tool launch buttons */}
+            {['supervisor', 'org_admin', 'master_admin'].includes(user?.role ?? '') && (
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => {
+                    const token = localStorage.getItem('fp_token')
+                    window.open(`${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}`, '_blank')
+                  }}
+                  className="px-3 py-1.5 text-sm bg-blue-50 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors font-medium"
+                >
+                  Open in Analyzer
+                </button>
+                <button
+                  onClick={() => {
+                    const token = localStorage.getItem('fp_token')
+                    window.open(`${window.location.origin}/cleaner/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}`, '_blank')
+                  }}
+                  className="px-3 py-1.5 text-sm bg-green-50 border border-green-300 text-green-700 rounded-lg hover:bg-green-100 transition-colors font-medium"
+                >
+                  Open in Cleaner
+                </button>
+              </div>
+            )}
+
             {/* Tab bar */}
             <div className="flex gap-1 mb-6 border-b border-catalan-border overflow-x-auto">
               {TABS.map(t => (

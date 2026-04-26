@@ -1,17 +1,21 @@
 """Field Govern API — Cleaner, Analyzer, Panel Study, AI Tabulation."""
+import io
 import uuid as _uuid
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from uuid import UUID
 
+import pandas as pd
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_role
+from app.api.routes.export import _flatten, _build_enumerator_map
 from app.models.form import Form
 from app.models.program import Program, ProgramQuestionnaire, ProgramAnalysis
 from app.models.submission import Submission
@@ -1229,5 +1233,57 @@ async def generate_program_report(
         raise HTTPException(400, str(e))
     except Exception as e:
         raise HTTPException(503, f"AI error: {e}")
+
+
+# ── Program export (used by analyzer.fieldgovern.com and cleaner.fieldgovern.com) ──
+
+@router.get("/programs/{program_id}/export.xlsx")
+def export_program_xlsx(
+    program_id: str,
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    prog = db.query(Program).filter(
+        Program.id == program_id, Program.tenant_id == user["tenant_id"]
+    ).first()
+    if not prog:
+        raise HTTPException(404, "Program not found")
+
+    subs = db.query(Submission).filter(
+        Submission.program_id == program_id,
+        Submission.tenant_id == user["tenant_id"],
+    ).all()
+
+    enum_map = _build_enumerator_map(db, user["tenant_id"])
+
+    rows = []
+    for s in subs:
+        flat = _flatten(s.data_json or {})
+        rows.append({
+            "serial_no": s.serial_no or "",
+            "submission_id": str(s.id),
+            "enumerator_name": enum_map.get(s.enumerator_id, ""),
+            "status": s.status or "",
+            "received_at": str(s.server_received_at) if s.server_received_at else "",
+            "household_id": s.household_id or "",
+            **flat,
+        })
+
+    df = pd.DataFrame(rows)
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Submissions")
+    buf.seek(0)
+
+    safe_name = (prog.scheme_name or "program").replace(" ", "_")
+    date_str = datetime.now().strftime("%Y%m%d")
+    filename = f"{safe_name}_{date_str}.xlsx"
+
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
     return {"report_md": report_md, "program_name": prog.name, "sample_size": len(subs)}
