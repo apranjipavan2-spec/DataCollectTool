@@ -375,6 +375,9 @@
       .nav-cta-secondary{display:none}
       .section-title{font-size:1.8rem}
       .compare-wrap{font-size:0.76rem}
+      #pipeline .pipe-visual{flex-direction:column !important}
+      #pipeline .pipe-arrow{transform:rotate(90deg)}
+      #pipeline .diff-grid{grid-template-columns:1fr !important}
       .partner-showcase{grid-template-columns:1fr}
       section{padding:56px 16px}
       .hero{padding:80px 16px 48px}
@@ -624,10 +627,10 @@
         </div>
         <div class="feat-icon" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);width:36px;height:36px;font-size:1.1rem;margin-bottom:8px">🏗️</div>
         <h3>Powerful Form Builder</h3>
-        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">17 field types, nested skip logic, RCT randomization, XLSForm import. Public survey URL — no install needed.</p>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">17 field types including GPS, photo, audio. Nested skip logic, multi-language labels, XLSForm import, public survey URL.</p>
         <div style="display:flex;gap:5px;flex-wrap:wrap">
-          <span style="font-size:0.7rem;background:#f5f3ff;color:#7c3aed;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #ddd6fe">17 field types</span>
-          <span style="font-size:0.7rem;background:#fef9c3;color:#92400e;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fde68a">Skip logic</span>
+          <span style="font-size:0.7rem;background:#f5f3ff;color:#7c3aed;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #ddd6fe">GPS + Photo + Audio</span>
+          <span style="font-size:0.7rem;background:#fef9c3;color:#92400e;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fde68a">22 languages</span>
           <span style="font-size:0.7rem;background:#f0f9ff;color:var(--brand-dark);border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bae6fd">XLSForm import</span>
         </div>
       </div>
@@ -683,11 +686,11 @@
         </div>
         <div class="feat-icon" style="background:linear-gradient(135deg,#fce7f3,#fbcfe8);width:36px;height:36px;font-size:1.1rem;margin-bottom:8px">👥</div>
         <h3>Team &amp; Field Management</h3>
-        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">4-tier role hierarchy, QR login for field staff, WhatsApp/push alerts, multi-language EN/HI/KN/TE.</p>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">4-tier role hierarchy, QR login for field staff, WhatsApp/push alerts. Forms in 22 Indian languages — Hindi, Telugu, Kannada, Tamil, Marathi and more.</p>
         <div style="display:flex;gap:5px;flex-wrap:wrap">
           <span style="font-size:0.7rem;background:#fdf2f8;color:#be185d;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fbcfe8">QR login</span>
           <span style="font-size:0.7rem;background:#f0fdf4;color:#15803d;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bbf7d0">WhatsApp alerts</span>
-          <span style="font-size:0.7rem;background:#fffbeb;color:#92400e;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fde68a">4 languages</span>
+          <span style="font-size:0.7rem;background:#fffbeb;color:#92400e;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fde68a">22 languages</span>
         </div>
       </div>
 
@@ -702,11 +705,11 @@
         </div>
         <div class="feat-icon" style="background:linear-gradient(135deg,#ffedd5,#fed7aa);width:36px;height:36px;font-size:1.1rem;margin-bottom:8px">🔗</div>
         <h3>Export, Compliance &amp; Integration</h3>
-        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">CSV, Stata, SPSS, Google Sheets live sync. DPDP 2023 compliant. Webhooks, DHIS2 push, white-label per org.</p>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6;margin-bottom:10px">CSV, Stata .dta, SPSS .sav, Google Sheets live sync. Scheduled email reports. Data stored in India. DPDP 2023 compliant.</p>
         <div style="display:flex;gap:5px;flex-wrap:wrap">
-          <span style="font-size:0.7rem;background:#fff7ed;color:#c2410c;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fed7aa">DPDP 2023</span>
-          <span style="font-size:0.7rem;background:#f0f9ff;color:var(--brand-dark);border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bae6fd">Webhooks</span>
-          <span style="font-size:0.7rem;background:#fdf4ff;color:#7c3aed;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #e9d5ff">White-label</span>
+          <span style="font-size:0.7rem;background:#fff7ed;color:#c2410c;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #fed7aa">Stata + SPSS</span>
+          <span style="font-size:0.7rem;background:#f0fdf4;color:#15803d;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #bbf7d0">India servers</span>
+          <span style="font-size:0.7rem;background:#fdf4ff;color:#7c3aed;border-radius:5px;padding:2px 7px;font-weight:600;border:1px solid #e9d5ff">Scheduled reports</span>
         </div>
       </div>
 
@@ -816,12 +819,21 @@
           </div>
         </div>
         <div class="score-item">
-          <div class="score-label">AI & Analytics</div>
+          <div class="score-label">AI &amp; Analytics</div>
           <div class="score-bars">
             <div class="sbar fg" style="height:0%" data-h="100%"></div>
-            <div class="sbar other" style="height:0%" data-h="30%"></div>
             <div class="sbar other" style="height:0%" data-h="20%"></div>
-            <div class="sbar other" style="height:0%" data-h="15%"></div>
+            <div class="sbar other" style="height:0%" data-h="10%"></div>
+            <div class="sbar other" style="height:0%" data-h="8%"></div>
+          </div>
+        </div>
+        <div class="score-item">
+          <div class="score-label">Collect→Report Pipeline</div>
+          <div class="score-bars">
+            <div class="sbar fg" style="height:0%" data-h="100%"></div>
+            <div class="sbar other" style="height:0%" data-h="12%"></div>
+            <div class="sbar other" style="height:0%" data-h="8%"></div>
+            <div class="sbar other" style="height:0%" data-h="5%"></div>
           </div>
         </div>
         <div class="score-item">
@@ -863,18 +875,34 @@
           </tr>
         </thead>
         <tbody>
+          <tr style="background:rgba(14,165,233,0.04)"><td colspan="5" style="text-align:left;font-size:0.72rem;font-weight:800;color:var(--brand);letter-spacing:0.08em;padding:10px 16px;text-transform:uppercase">📦 Collection & Field</td></tr>
           <tr><td>Monthly Price</td><td><span class="tag-better">₹18,000 (~$215)</span></td><td><span class="tag-worse">$225–630</span></td><td><span class="tag-ok">Free (limited)</span></td><td><span class="tag-ok">Self-hosted</span></td></tr>
           <tr><td>True Offline Mode</td><td><span class="tag-better">✓ Full offline</span></td><td><span class="tag-ok">✓ App only</span></td><td><span class="tag-ok">⚡ Partial</span></td><td><span class="tag-ok">⚡ App only</span></td></tr>
           <tr><td>No Installation Needed</td><td><span class="tag-better">✓ PWA — any browser</span></td><td><span class="tag-worse">✕ App required</span></td><td><span class="tag-worse">✕ App required</span></td><td><span class="tag-worse">✕ App required</span></td></tr>
+          <tr><td>GPS Capture in Forms</td><td><span class="tag-better">✓ Built-in geopoint</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td></tr>
+          <tr><td>Photo &amp; Audio Capture</td><td><span class="tag-better">✓ + auto-compress</span></td><td><span class="tag-ok">✓ No compression</span></td><td><span class="tag-ok">✓ No compression</span></td><td><span class="tag-ok">✓ No compression</span></td></tr>
           <tr><td>Auto Photo Compression</td><td><span class="tag-better">✓ 96% reduction</span></td><td><span class="tag-worse">✕ None</span></td><td><span class="tag-worse">✕ None</span></td><td><span class="tag-worse">✕ None</span></td></tr>
+          <tr><td>Multi-language Forms</td><td><span class="tag-better">✓ 22 Indian languages</span></td><td><span class="tag-ok">⚡ EN only UI</span></td><td><span class="tag-ok">✓ Many</span></td><td><span class="tag-ok">✓ Many</span></td></tr>
           <tr><td>Background Sync</td><td><span class="tag-better">✓ Even app-closed</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
           <tr><td>Real-Time Dashboard</td><td><span class="tag-better">✓ Instant</span></td><td><span class="tag-ok">✓ Delayed</span></td><td><span class="tag-ok">⚡ Delayed</span></td><td><span class="tag-worse">✕</span></td></tr>
-          <tr><td>Indian Language Support</td><td><span class="tag-better">✓ HI, KN, TE, EN</span></td><td><span class="tag-ok">⚡ Limited</span></td><td><span class="tag-ok">✓ Many</span></td><td><span class="tag-ok">✓ Many</span></td></tr>
+          <tr><td>Skip Logic (AND/OR)</td><td><span class="tag-better">✓ Nested</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td></tr>
+
+          <tr style="background:rgba(124,58,237,0.05)"><td colspan="5" style="text-align:left;font-size:0.72rem;font-weight:800;color:var(--accent);letter-spacing:0.08em;padding:10px 16px;text-transform:uppercase">🧠 Analysis &amp; Reporting — FieldGovern's Unique Advantage</td></tr>
+          <tr><td>Built-in Data Cleaner</td><td><span class="tag-better">✓ Dedup, type-fix, QC</span></td><td><span class="tag-worse">✕ Export &amp; use Stata</span></td><td><span class="tag-worse">✕ Export &amp; use R</span></td><td><span class="tag-worse">✕ Export &amp; use R</span></td></tr>
+          <tr><td>Cross-tab / Tabulation Engine</td><td><span class="tag-better">✓ Browser, live</span></td><td><span class="tag-worse">✕ External tool</span></td><td><span class="tag-worse">✕ External tool</span></td><td><span class="tag-worse">✕ External tool</span></td></tr>
+          <tr><td>AI Auto-Generate Insights</td><td><span class="tag-better">✓ 10 tables, 1 click</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+          <tr><td>AI Report Writer</td><td><span class="tag-better">✓ 6 report styles</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+          <tr><td>Panel Study &amp; Attrition</td><td><span class="tag-better">✓ Wave tracking</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+          <tr><td>Scheduled Report Emails</td><td><span class="tag-better">✓ Daily / weekly</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+          <tr><td>Stata .dta Export</td><td><span class="tag-better">✓ Built-in</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+          <tr><td>SPSS .sav Export</td><td><span class="tag-better">✓ Built-in</span></td><td><span class="tag-ok">✓ Paid add-on</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+
+          <tr style="background:rgba(16,185,129,0.04)"><td colspan="5" style="text-align:left;font-size:0.72rem;font-weight:800;color:var(--green);letter-spacing:0.08em;padding:10px 16px;text-transform:uppercase">🔧 Platform &amp; Compliance</td></tr>
+          <tr><td>Indian Language UI</td><td><span class="tag-better">✓ HI, KN, TE, MR, TA…</span></td><td><span class="tag-ok">⚡ Limited</span></td><td><span class="tag-ok">✓ Many</span></td><td><span class="tag-ok">✓ Many</span></td></tr>
           <tr><td>White-label Branding</td><td><span class="tag-better">✓ Per tenant</span></td><td><span class="tag-ok">Enterprise only</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
           <tr><td>REST API + API Keys</td><td><span class="tag-better">✓ All paid plans</span></td><td><span class="tag-ok">⚡ Paid add-on</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td></tr>
-          <tr><td>Stata .dta Export</td><td><span class="tag-better">✓ Built-in</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
-          <tr><td>Multi-tenant SaaS</td><td><span class="tag-better">✓ Full isolation</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
-          <tr><td>Skip Logic (AND/OR)</td><td><span class="tag-better">✓ Nested</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td></tr>
+          <tr><td>Multi-tenant SaaS</td><td><span class="tag-better">✓ Full DB isolation</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+          <tr><td>Data Stored in India</td><td><span class="tag-better">✓ Mumbai servers</span></td><td><span class="tag-worse">✕ US servers</span></td><td><span class="tag-worse">✕ EU servers</span></td><td><span class="tag-ok">⚡ Self-hosted</span></td></tr>
         </tbody>
       </table>
     </div>
@@ -972,6 +1000,93 @@
   </div>
 </section>
 
+<section id="pipeline" style="background:#fff">
+  <div class="section-inner">
+    <div class="text-center reveal">
+      <div class="section-tag" style="background:rgba(124,58,237,0.1);border-color:rgba(124,58,237,0.3);color:#7c3aed">🏆 Unique Advantage</div>
+      <h2 class="section-title">The only platform that closes the loop</h2>
+      <p class="section-sub">SurveyCTO, KoboToolbox, and ODK give you raw data — and stop there. FieldGovern takes you from first interview to final report, inside a single platform.</p>
+    </div>
+
+    <!-- Pipeline visual -->
+    <div class="reveal" style="margin-top:48px">
+      <div style="display:flex;align-items:stretch;gap:0;border-radius:16px;overflow:hidden;border:2px solid var(--border);box-shadow:0 8px 40px rgba(0,0,0,0.06)">
+        <div style="flex:1;background:linear-gradient(135deg,#0ea5e9,#3b82f6);color:white;padding:28px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px">
+          <div style="font-size:2rem">📱</div>
+          <div style="font-size:0.75rem;font-weight:800;letter-spacing:0.06em;opacity:0.85;text-transform:uppercase">Step 1</div>
+          <div style="font-size:1rem;font-weight:800">Collect</div>
+          <div style="font-size:0.75rem;opacity:0.85;line-height:1.5">GPS, photos, offline, 22 languages</div>
+          <div style="font-size:0.65rem;background:rgba(255,255,255,0.2);border-radius:6px;padding:3px 8px;font-weight:700">All tools ✓</div>
+        </div>
+        <div style="display:flex;align-items:center;background:#f1f5f9;padding:0 6px;font-size:1.2rem;color:#94a3b8">→</div>
+        <div style="flex:1;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:white;padding:28px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px">
+          <div style="font-size:2rem">📡</div>
+          <div style="font-size:0.75rem;font-weight:800;letter-spacing:0.06em;opacity:0.85;text-transform:uppercase">Step 2</div>
+          <div style="font-size:1rem;font-weight:800">Sync</div>
+          <div style="font-size:0.75rem;opacity:0.85;line-height:1.5">Two-phase, background, auto-compress</div>
+          <div style="font-size:0.65rem;background:rgba(255,255,255,0.2);border-radius:6px;padding:3px 8px;font-weight:700">All tools ✓</div>
+        </div>
+        <div style="display:flex;align-items:center;background:#f1f5f9;padding:0 6px;font-size:1.2rem;color:#94a3b8">→</div>
+        <div style="flex:1;background:linear-gradient(135deg,#10b981,#059669);color:white;padding:28px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;position:relative">
+          <div style="position:absolute;top:-1px;right:-1px;background:#f59e0b;color:white;font-size:0.6rem;font-weight:800;padding:3px 8px;border-radius:0 0 0 8px;letter-spacing:0.04em">ONLY FG</div>
+          <div style="font-size:2rem">🧹</div>
+          <div style="font-size:0.75rem;font-weight:800;letter-spacing:0.06em;opacity:0.85;text-transform:uppercase">Step 3</div>
+          <div style="font-size:1rem;font-weight:800">Clean</div>
+          <div style="font-size:0.75rem;opacity:0.85;line-height:1.5">Dedup, type-fix, quality report</div>
+          <div style="font-size:0.65rem;background:rgba(255,255,255,0.2);border-radius:6px;padding:3px 8px;font-weight:700">FieldGovern only ✦</div>
+        </div>
+        <div style="display:flex;align-items:center;background:#f1f5f9;padding:0 6px;font-size:1.2rem;color:#94a3b8">→</div>
+        <div style="flex:1;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;padding:28px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;position:relative">
+          <div style="position:absolute;top:-1px;right:-1px;background:#f59e0b;color:white;font-size:0.6rem;font-weight:800;padding:3px 8px;border-radius:0 0 0 8px;letter-spacing:0.04em">ONLY FG</div>
+          <div style="font-size:2rem">📊</div>
+          <div style="font-size:0.75rem;font-weight:800;letter-spacing:0.06em;opacity:0.85;text-transform:uppercase">Step 4</div>
+          <div style="font-size:1rem;font-weight:800">Analyze</div>
+          <div style="font-size:0.75rem;opacity:0.85;line-height:1.5">AI cross-tabs, charts, panel study</div>
+          <div style="font-size:0.65rem;background:rgba(255,255,255,0.2);border-radius:6px;padding:3px 8px;font-weight:700">FieldGovern only ✦</div>
+        </div>
+        <div style="display:flex;align-items:center;background:#f1f5f9;padding:0 6px;font-size:1.2rem;color:#94a3b8">→</div>
+        <div style="flex:1;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;padding:28px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;position:relative">
+          <div style="position:absolute;top:-1px;right:-1px;background:#f59e0b;color:white;font-size:0.6rem;font-weight:800;padding:3px 8px;border-radius:0 0 0 8px;letter-spacing:0.04em">ONLY FG</div>
+          <div style="font-size:2rem">📝</div>
+          <div style="font-size:0.75rem;font-weight:800;letter-spacing:0.06em;opacity:0.85;text-transform:uppercase">Step 5</div>
+          <div style="font-size:1rem;font-weight:800">Report</div>
+          <div style="font-size:0.75rem;opacity:0.85;line-height:1.5">AI narrative, Stata/SPSS export, schedule</div>
+          <div style="font-size:0.65rem;background:rgba(255,255,255,0.2);border-radius:6px;padding:3px 8px;font-weight:700">FieldGovern only ✦</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:20px;flex-wrap:wrap">
+        <span style="font-size:0.75rem;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:20px;padding:4px 12px">SurveyCTO: Steps 1–2 only</span>
+        <span style="font-size:0.75rem;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:20px;padding:4px 12px">KoboToolbox: Steps 1–2 only</span>
+        <span style="font-size:0.75rem;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:20px;padding:4px 12px">ODK: Steps 1–2 only</span>
+        <span style="font-size:0.75rem;color:white;background:linear-gradient(135deg,#0ea5e9,#7c3aed);border-radius:20px;padding:4px 12px;font-weight:700">FieldGovern: All 5 steps ✦</span>
+      </div>
+    </div>
+
+    <!-- Three differentiator callouts -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:48px">
+      <div class="reveal delay-1" style="background:#f8fafc;border:1px solid var(--border);border-radius:16px;padding:28px;border-top:3px solid #10b981">
+        <div style="font-size:1.8rem;margin-bottom:12px">🧹</div>
+        <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:8px">Built-in Data Cleaner</h3>
+        <p style="font-size:0.83rem;color:var(--text2);line-height:1.6">Automatically flag duplicates, fix data types, identify outliers, and view a quality report — without ever leaving FieldGovern. Competitors make you export to R or Stata first.</p>
+        <div style="margin-top:14px;font-size:0.72rem;color:#10b981;font-weight:700">← Step 3 of your pipeline</div>
+      </div>
+      <div class="reveal delay-2" style="background:#f8fafc;border:1px solid var(--border);border-radius:16px;padding:28px;border-top:3px solid #f59e0b">
+        <div style="font-size:1.8rem;margin-bottom:12px">📊</div>
+        <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:8px">Analyzer with AI Tables</h3>
+        <p style="font-size:0.83rem;color:var(--text2);line-height:1.6">Build publication-ready cross-tabulations, run panel attrition analysis, and let AI generate up to 10 meaningful tables in one click — directly on your field data.</p>
+        <div style="margin-top:14px;font-size:0.72rem;color:#f59e0b;font-weight:700">← Step 4 of your pipeline</div>
+      </div>
+      <div class="reveal delay-3" style="background:#f8fafc;border:1px solid var(--border);border-radius:16px;padding:28px;border-top:3px solid #ef4444">
+        <div style="font-size:1.8rem;margin-bottom:12px">📝</div>
+        <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:8px">AI Report Writer + Scheduler</h3>
+        <p style="font-size:0.83rem;color:var(--text2);line-height:1.6">Turn tables into a full narrative report in 6 styles — NGO, Government, Research, Medical, and more. Schedule weekly report emails to your PI or program officer automatically.</p>
+        <div style="margin-top:14px;font-size:0.72rem;color:#ef4444;font-weight:700">← Step 5 of your pipeline</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
 <section id="analytics" class="coming-soon-bg">
   <div class="section-inner">
     <div class="text-center reveal">
@@ -1018,9 +1133,9 @@
 
       <div class="coming-card reveal delay-3">
         <span class="icon">🔔</span>
-        <h3>Smart Alerts & Digest</h3>
-        <p>Set custom thresholds for critical indicators. Get daily email digests and instant SMS notifications when field data goes out of range or flagged anomalies require attention.</p>
-        <span class="coming-tag-v2">Coming Q3 2026</span>
+        <h3>Scheduled Reports &amp; Alerts</h3>
+        <p>Auto-schedule weekly or monthly program reports straight to your PI's inbox. Set thresholds for critical indicators — get WhatsApp alerts when field data goes out of range.</p>
+        <span class="live-badge" style="margin-top:16px">Live Now</span>
       </div>
     </div>
   </div>
