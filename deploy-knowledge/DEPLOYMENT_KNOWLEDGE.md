@@ -1,218 +1,341 @@
-﻿# FieldGovern Deployment Knowledge Base
+# FieldGovern Deployment Knowledge Base
 
 ## Overview
 
-FieldGovern is a FastAPI + React + PostgreSQL B2B SaaS platform deployed on a Contabo VPS (EU, 4 vCPU, 8GB RAM, 75GB NVMe, IP: 178.238.227.32).
-Domain: app.fieldgovern.com (SSL via Let's Encrypt / certbot)
-GitHub repo: https://github.com/apranjipavan2-spec/DataCollectTool
+FieldGovern is a FastAPI + React + PostgreSQL B2B SaaS platform deployed on a Contabo VPS.
+- **Domain:** app.fieldgovern.com (SSL via Let's Encrypt / certbot)
+- **Server:** Contabo Cloud VPS 10 — 4 vCPU, 8GB RAM, 75GB NVMe, EU region, ~$3.96/month
+- **GitHub repo:** https://github.com/apranjipavan2-spec/DataCollectTool
+- **App directory on VPS:** `/opt/fieldgovern/`
+
+---
 
 ## Infrastructure Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Container runtime | Docker + Docker Compose (docker-compose-plugin) |
+| Container runtime | Docker + Docker Compose |
 | App image registry | GitHub Container Registry (ghcr.io) |
-| CI/CD | GitHub Actions (.github/workflows/deploy-app.yml) |
-| Reverse proxy | Nginx (nginx:alpine container) |
-| SSL | Let's Encrypt via certbot (standalone + auto-renew cron) |
-| Database | PostgreSQL 16 (postgres:16-alpine container) |
-| Migrations | Alembic (runs at every startup via start.sh) |
-| Seed data | backend/scripts/seed_dev.py (idempotent, fast-path if already seeded) |
-| Backup | pg_dump daily cron → local 7-day retention + optional Cloudflare R2 (30 days) |
-| Firewall | UFW (allow 22, 80, 443 only) |
+| CI/CD | GitHub Actions — `.github/workflows/deploy-app.yml` |
+| Reverse proxy | Nginx (`nginx:alpine` container) |
+| SSL | Let's Encrypt via certbot (auto-renew cron) |
+| Database | PostgreSQL 16 (`postgres:16-alpine` container) |
+| Migrations | Alembic (runs at every deploy) |
+| Backup | `pg_dump` daily cron → local 7-day + optional Cloudflare R2 (30-day) |
+| Firewall | UFW — ports 22, 80, 443 only |
+
+---
+
+## Services Running on VPS
+
+### Core Services (managed by docker-compose.yml at /opt/fieldgovern/)
+
+| Container | Image / Build | Port | Purpose |
+|-----------|--------------|------|---------|
+| `fieldgovern-postgres-1` | postgres:16-alpine | internal | Database |
+| `fieldgovern-app-1` | ghcr.io/apranjipavan2-spec/datacollecttool:latest | 8000 (internal) | FastAPI + React SPA |
+| `fieldgovern-nginx-1` | nginx:alpine | 80, 443 | Reverse proxy + SSL |
+
+### Tool Services (managed by `docker run` in deploy script)
+
+| Container | Image (built on VPS) | Port | URL |
+|-----------|---------------------|------|-----|
+| `analyzer` | fieldgovern-analyzer:latest | 8001 (internal) | app.fieldgovern.com/analyzer/ |
+| `cleaner` | fieldgovern-cleaner:latest | 8002 (internal) | app.fieldgovern.com/cleaner/ |
+
+Tool containers are started with `docker run --network fieldgovern_default` so they share the same Docker network as nginx and can be proxied by service name.
+
+---
 
 ## Deployment Flow — Step by Step
 
 ### Trigger
-A push to the main branch on GitHub triggers the GitHub Actions workflow at .github/workflows/deploy-app.yml.
-The workflow also has a workflow_dispatch trigger for manual deploys.
+Push to `main` branch on paths: `backend/**`, `frontend/**`, `Dockerfile`, `deploy/**`, `tools/**`, `.github/workflows/deploy-app.yml`.
+Also has `workflow_dispatch` for manual deploys.
 
-### Phase 1 — Build Docker Image (GitHub Actions, ubuntu-latest runner)
+### Phase 1 — Build Main App Docker Image (GitHub Actions runner)
 1. Checkout code
 2. Login to ghcr.io using GITHUB_TOKEN
-3. Extract metadata (tags: sha-<commit>, latest) using docker/metadata-action@v5
-4. Set up QEMU for multi-arch emulation (linux/amd64 + linux/arm64)
-5. Set up Docker Buildx
-6. Build multi-arch image and push to ghcr.io/apranjipavan2-spec/datacollecttool
-7. GitHub Actions cache (type=gha) is used for layer caching
+3. Extract metadata (tags: `sha-<commit>`, `latest`)
+4. Set up QEMU + Docker Buildx for multi-arch (linux/amd64 + linux/arm64)
+5. Build and push to `ghcr.io/apranjipavan2-spec/datacollecttool`
+6. GitHub Actions GHA cache used for layer caching (speeds up unchanged layers)
 
-### Phase 2 — Deploy to VPS (SSH via appleboy/ssh-action@v1)
-Secrets required: VPS_HOST, VPS_USER, VPS_SSH_KEY, GHCR_PAT
-Target directory on server: /opt/fieldgovern
+### Phase 2 — Deploy to VPS (SSH via appleboy/ssh-action)
 
-Steps on server:
-1. cd /opt/fieldgovern
-2. docker login ghcr.io -u apranjipavan2-spec --password-stdin (using GHCR_PAT)
-3. docker compose pull app (pulls latest image)
-4. docker compose up -d --no-deps app (zero-downtime: old container stays up until new one healthy)
-5. docker compose exec -T app sh -c "alembic upgrade head || true" (applies new migrations)
+Required secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `GHCR_PAT`
 
-### Phase 3 — Health Check (GitHub Actions runner)
-- Sleep 30 seconds (allow container to start)
-- curl -f https://app.fieldgovern.com/health
-- If HTTP 200: deploy passes. If not: workflow fails.
+**Script steps (run from `/opt/fieldgovern/`):**
 
-## Container Startup Sequence (inside app container)
+```bash
+# 1. Pull and restart main app
+docker login ghcr.io -u apranjipavan2-spec --password-stdin
+docker compose pull app
+docker compose up -d --no-deps app
 
-When the app container starts, backend/start.sh runs:
-1. wait_and_stamp.py — waits for PostgreSQL to be ready (retries with exponential backoff), detects DB state, stamps alembic_version if missing
-2. alembic upgrade head — applies all pending migrations (0001 through 0018)
-3. seed_dev.py — fast-path: if Demo Org tenant exists, exits immediately (warm restart takes <5s). If fresh DB: seeds all demo tenants, users, forms
-4. uvicorn app.main:app --host 0.0.0.0 --port 8000
+# 2. Run DB migrations
+docker compose exec -T app sh -c "alembic upgrade head 2>&1 || true"
 
-## Docker Compose Services
+# 3. Build tool images on VPS (from files synced by SCP step)
+docker build -t fieldgovern-analyzer:latest /opt/fieldgovern/tools/tableforge
+docker build -t fieldgovern-cleaner:latest /opt/fieldgovern/tools/datacleaner
 
-### postgres
-- Image: postgres:16-alpine
-- Persistent volume: postgres_data
-- Health check: pg_isready (10s interval, 5 retries)
-- Env: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB (from .env)
+# 4. Find nginx's network, start tools on the same network
+NGINX_ID=$(docker ps -q -f "name=nginx" | head -1)
+NGINX_NET=<detected from docker inspect>
+docker ps -aq -f "name=analyzer" | xargs docker rm -f
+docker ps -aq -f "name=cleaner"  | xargs docker rm -f
+docker run -d --name analyzer --network $NGINX_NET --restart unless-stopped ...
+docker run -d --name cleaner  --network $NGINX_NET --restart unless-stopped ...
 
-### app
-- Image: ghcr.io/apranjipavan2-spec/datacollecttool:latest
-- Env file: .env (DATABASE_URL, JWT_SECRET, CORS_ORIGINS, etc.)
-- Depends on: postgres (healthy)
-- Volume: uploads (for media files)
-- Port: 8000 (internal, not exposed externally)
+# 5. Update nginx config and RESTART nginx (not just reload — see Known Issues)
+curl -fsSL "https://raw.githubusercontent.com/.../nginx.conf" -o /opt/fieldgovern/nginx.conf
+docker restart $NGINX_ID
+```
 
-### nginx
-- Image: nginx:alpine
-- Ports: 80 (HTTP→HTTPS redirect), 443 (HTTPS)
-- Volumes: nginx.conf, /etc/letsencrypt (certbot certs), certbot_webroot
-- Depends on: app
+### Phase 3 — Health Check
+- Sleep 30 seconds
+- `curl -f https://app.fieldgovern.com/health` — must return HTTP 200
 
-## Critical DATABASE_URL Format
+---
 
-IMPORTANT: The DATABASE_URL must use postgresql:// prefix (NOT postgresql+psycopg2://).
-Reason: wait_and_stamp.py uses psycopg2.connect() directly, which only accepts the standard prefix.
-SQLAlchemy-specific prefixes (postgresql+psycopg2://) cause connection failures.
+## Analyzer and Cleaner Tools
 
-Correct format: postgresql://fieldgovern:PASSWORD@postgres:5432/fieldgovern
+### What They Are
 
-## Known Issues and Fixes Applied
+| Tool | Source | Deployed URL | Purpose |
+|------|--------|-------------|---------|
+| **TableForge** (Analyzer) | `tools/tableforge/` | `/analyzer/` | Data tabulation, cross-tabs, statistics, Excel export |
+| **DataCleaner** | `tools/datacleaner/` | `/cleaner/` | Data cleaning, deduplication, column mapping |
 
-### Password special characters in DATABASE_URL
-@ and # characters in passwords break URL parsing (@ is URL delimiter, # is fragment delimiter).
-Fix: Use only alphanumeric characters in the database password.
+### Architecture
 
-### Stale postgres volume after password change
-If POSTGRES_PASSWORD changes but the postgres volume persists, the DB still uses the old password.
-Fix: docker compose down -v (destroys volume) then docker compose up -d (recreates with new password).
-WARNING: This destroys all data. Always backup first.
+**TableForge:** Multi-stage Docker build
+1. `node:20-slim` stage — builds React/Vite frontend with `VITE_BASE_PATH=/analyzer/`
+2. `python:3.11-slim` stage — runs FastAPI backend on port 8001, serves the built frontend as static files
 
-### Alembic version table missing
-The original DB was created with create_all (not alembic). Alembic couldn't run migrations.
-Fix: wait_and_stamp.py detects DB state, creates alembic_version table, stamps to correct revision.
-Do NOT remove wait_and_stamp.py — it runs on every deployment and is load-bearing.
+**DataCleaner:** Single-stage Docker build
+- `python:3.11-slim` — runs Flask app on port 8002 with Jinja2 templates
 
-### CORS_ORIGINS pydantic-settings v2 issue
-pydantic-settings v2 tries json.loads() on List[str] fields. Comma-separated URLs fail JSON parsing.
-Fix: CORS_ORIGINS is now type str in config.py with a cors_origins property that parses it.
-Do NOT change CORS_ORIGINS back to List[str] type.
+### Nginx Routing
 
-### seed_dev.py slow restart
-Original seed ran full user/form creation on every startup (30-60s).
-Fix: Fast-path early exit if Demo Org tenant exists. Warm restarts now take <5s.
+```nginx
+# Redirect /analyzer → /analyzer/ (no trailing slash)
+location = /analyzer { return 301 /analyzer/; }
+location = /cleaner  { return 301 /cleaner/; }
 
-### GitHub Actions path filter not triggering
-Empty commits do not trigger path-filtered workflows.
-Fix: Use workflow_dispatch (manual trigger) for test deploys with no code changes.
+# Proxy to tool containers (strip /analyzer/ prefix)
+location /analyzer/ {
+    proxy_pass http://analyzer:8001/;
+    proxy_read_timeout 300s;
+    client_max_body_size 200M;
+}
+location /cleaner/ {
+    proxy_pass http://cleaner:8002/;
+    proxy_read_timeout 300s;
+    client_max_body_size 200M;
+}
+```
 
-## Server Bootstrap (first time only)
+### FieldGovern Integration
 
-Run on fresh Ubuntu 22.04/24.04 VPS:
-curl -sL https://raw.githubusercontent.com/apranjipavan2-spec/DataCollectTool/main/deploy/server-setup.sh | bash
+- **Export endpoint:** `GET /api/v1/fg/programs/{program_id}/export.xlsx` (Bearer JWT, supervisor+)
+- **Analyzer import:** `POST /analyzer/api/import-from-fg` — fetches the export and loads it as a dataset
+- **Cleaner import:** `POST /cleaner/api/load-from-fg` — same flow for DataCleaner
+- **Frontend buttons:** "Open in Analyzer" and "Open in Cleaner" on ProgramsPage and FieldGovern.tsx — role-gated (supervisor/admin), pass `fg_url`, `program_id`, `token` as URL params
 
-The bootstrap script does:
-1. System update and Docker installation (official Docker repo, not snap)
-2. Install certbot for SSL
-3. Configure UFW firewall (ports 22, 80, 443)
-4. Create fieldgovern deploy user, add to docker group
-5. Create /opt/fieldgovern app directory
-6. Copy docker-compose.prod.yml, nginx.conf, backup-db.sh to app directory
-7. Create .env template (must be manually filled in)
-8. Obtain Let's Encrypt SSL certificate (certbot --standalone)
-9. Set up cron: SSL renewal at 3 AM daily + restart nginx
-10. Set up cron: DB backup at 2 AM daily
+---
 
-## GitHub Actions Secrets Required
+## Known Issues and Fixes
+
+### Stale Nginx Bind-Mount Inode (Critical — solved April 2026)
+
+**Symptom:** Nginx config file is updated on the host (`/opt/fieldgovern/nginx.conf`), `nginx -t` passes, `nginx -s reload` runs — but the container still serves the OLD config. New location blocks (`/analyzer/`, `/cleaner/`) are invisible inside the container.
+
+**Root cause:** Docker file bind-mounts lock to the file's inode at container start time. If the host file is later replaced (new inode created at the same path — e.g., by `curl -o`, `cp`, or `mv`), the bind-mount still reads the ORIGINAL inode. `nginx -s reload` re-reads from the container's view of the file, which is still the old inode.
+
+**Fix:** `docker restart <nginx_container_id>` — this stops and restarts the container, re-establishing the bind-mount against the current file at the path (current inode). The new config is applied on start.
+
+**Rule:** Whenever the nginx.conf changes, always `docker restart` the nginx container — never rely on `nginx -s reload` alone after a file update outside the container.
+
+---
+
+### Docker Compose Project / Network Isolation
+
+**Symptom:** Running `docker compose -f deploy/docker-compose.prod.yml up -d analyzer cleaner` starts the tools in a different Docker project (named from the compose file's directory, e.g., `deploy`), creating a separate `deploy_default` network. Nginx (on `fieldgovern_default`) cannot resolve `http://analyzer:8001`.
+
+**Fix:** Start tools with `docker run --network fieldgovern_default` (or nginx's detected network). This bypasses Docker Compose project isolation entirely.
+
+**Rule:** Never use a separate compose invocation with a different project directory for tool containers. Use `docker run` directly with explicit `--network`.
+
+---
+
+### Workflow Not Triggering on Workflow File Changes
+
+**Symptom:** Changes to `.github/workflows/deploy-app.yml` don't trigger the workflow because the file path wasn't in the `paths:` trigger list.
+
+**Fix:** Added `.github/workflows/deploy-app.yml` to the `paths:` trigger list. Note: the first commit that adds a path to triggers is evaluated against the OLD workflow — it won't self-trigger. Subsequent changes to that file will trigger correctly.
+
+---
+
+### Idempotent Alembic Migrations
+
+**Symptom:** Deploy fails with `DuplicateTable` or `DuplicateColumn` if a migration runs against a DB that already has those objects (e.g., after a failed partial migration or manual schema edit).
+
+**Fix:** Wrap all DDL operations in existence checks:
+```python
+def _col_exists(conn, table, col):
+    return conn.execute(sa.text(
+        "SELECT 1 FROM information_schema.columns WHERE table_name=:t AND column_name=:c"
+    ), {"t": table, "c": col}).fetchone() is not None
+```
+
+---
+
+### Nginx Config Validates But Proxy Fails to Start
+
+**Symptom:** `nginx -t` passes but `/analyzer/` returns 502 or fails to proxy.
+
+**Cause:** `nginx -t` only validates syntax — it does not test whether upstream hosts (`analyzer`, `cleaner`) are resolvable. Resolution happens when nginx worker processes start. If the tool containers aren't running or aren't on the same Docker network, resolution fails silently and nginx returns 502.
+
+**Fix:** Always start tool containers BEFORE restarting nginx. The deploy script follows this order intentionally.
+
+---
+
+## Container Startup (app container)
+
+When the app container starts, `backend/start.sh` runs:
+1. `wait_and_stamp.py` — waits for PostgreSQL (retries with backoff), stamps `alembic_version` if missing
+2. `alembic upgrade head` — applies pending migrations
+3. `seed_dev.py` — fast-path exit if Demo Org exists; otherwise seeds demo data
+4. `uvicorn app.main:app --host 0.0.0.0 --port 8000`
+
+**Do NOT remove `wait_and_stamp.py`** — it is load-bearing for DB readiness on every deploy.
+
+---
+
+## Critical Configuration Notes
+
+### DATABASE_URL Format
+Must use `postgresql://` prefix (NOT `postgresql+psycopg2://`).
+`wait_and_stamp.py` uses `psycopg2.connect()` directly which only accepts the standard prefix.
+
+```
+DATABASE_URL=postgresql://fieldgovern:PASSWORD@postgres:5432/fieldgovern
+```
+
+### Password Characters
+Use only alphanumeric characters in `POSTGRES_PASSWORD`. The `@` and `#` characters break URL parsing.
+
+### CORS_ORIGINS
+Type must be `str` in `config.py` (not `List[str]`). pydantic-settings v2 tries `json.loads()` on list fields — comma-separated URLs cause parse failures.
+
+---
+
+## GitHub Actions Secrets
 
 | Secret | Value |
 |--------|-------|
-| VPS_HOST | Server IP address (178.238.227.32) |
-| VPS_USER | SSH username (root for Contabo) |
-| VPS_SSH_KEY | Full private SSH key content |
-| GHCR_PAT | GitHub PAT with read:packages scope |
+| `VPS_HOST` | Server IP (178.238.227.32) |
+| `VPS_USER` | SSH username (`root` for Contabo) |
+| `VPS_SSH_KEY` | Full private SSH key content |
+| `GHCR_PAT` | GitHub PAT with `read:packages` scope |
 
-Set in: GitHub repo → Settings → Secrets → Actions → Environment: production
+Set in: GitHub repo → Settings → Secrets → Actions → Environment: **production**
 
-## Environment Variables on Server (.env file at /opt/fieldgovern/.env)
+---
 
+## Environment Variables (`.env` at `/opt/fieldgovern/.env`)
+
+```env
 POSTGRES_USER=fieldgovern
-POSTGRES_PASSWORD=<alphanumeric only, no @ or #>
+POSTGRES_PASSWORD=<alphanumeric only>
 POSTGRES_DB=fieldgovern
 DATABASE_URL=postgresql://fieldgovern:PASSWORD@postgres:5432/fieldgovern
-JWT_SECRET=<min 32 chars random string>
+JWT_SECRET=<min 32 chars random>
 CORS_ORIGINS=https://app.fieldgovern.com,http://localhost:5173
 STORAGE_BACKEND=local
 APP_URL=https://app.fieldgovern.com
-SMTP_HOST=<optional>
-SMTP_PORT=587
+```
+
+---
 
 ## Backup System
 
-Daily backup at 2 AM via /opt/fieldgovern/backup-db.sh:
-1. pg_dump inside postgres container → pipe to gzip → save to /opt/fieldgovern/backups/
-2. Optional: rclone upload to Cloudflare R2 (free up to 10GB)
-3. Delete local backups older than 7 days
-4. Delete R2 backups older than 30 days
+Daily cron at 2 AM via `/opt/fieldgovern/backup-db.sh`:
+1. `pg_dump` inside postgres container → gzip → `/opt/fieldgovern/backups/`
+2. Optional: `rclone` upload to Cloudflare R2 (free up to 10GB)
+3. Delete local backups older than 7 days / R2 backups older than 30 days
 
-To enable R2 backup: add R2_BUCKET=fieldgovern-backups to .env
-To restore from backup: gunzip -c backup.sql.gz | docker compose exec -T postgres psql -U fieldgovern fieldgovern
+To enable R2: add `R2_BUCKET=fieldgovern-backups` to `.env`
 
-## Hosting Provider Details
+**Restore:**
+```bash
+gunzip -c backup.sql.gz | docker compose exec -T postgres psql -U fieldgovern fieldgovern
+```
 
-Provider: Contabo (contabo.com) — Cloud VPS 10
-Specs: 4 vCPU, 8GB RAM, 75GB NVMe
-Region: EU (Germany) — ~250-300ms from India (acceptable for offline-first app)
-Cost: 3.96 USD/month (12-month term)
-OS: Ubuntu 24.04 LTS
-
-Alternative providers considered: Oracle Cloud Free Tier (A1.Flex, capacity issues in India region), Hetzner (CX22 Singapore, EUR 3.79/month), DigitalOcean (BLR1, 12 USD/month)
-
-## Multi-Arch Docker Image
-
-The image is built for both linux/amd64 and linux/arm64 using QEMU emulation in GitHub Actions.
-This allows deployment on:
-- Contabo/Hetzner/DigitalOcean (AMD64)
-- Oracle Cloud Ampere A1 free tier (ARM64)
-
-## SSL Certificate Renewal
-
-Automatic via cron at 3 AM daily:
-certbot renew --quiet --deploy-hook 'cd /opt/fieldgovern && docker compose restart nginx'
-
-Manual renewal if needed:
-docker compose stop nginx
-certbot renew
-docker compose start nginx
+---
 
 ## Useful Operational Commands
 
-# View app logs
-docker compose -f /opt/fieldgovern/docker-compose.yml logs -f app
+```bash
+# View logs
+docker compose logs -f app
+docker logs -f analyzer
+docker logs -f cleaner
 
-# Restart app
-docker compose -f /opt/fieldgovern/docker-compose.yml restart app
+# Restart services
+docker compose restart app
+docker restart fieldgovern-nginx-1   # use restart, not reload, when config changed
+
+# Check all containers
+docker ps
+
+# Restart analyzer/cleaner after a code change
+docker build -t fieldgovern-analyzer:latest /opt/fieldgovern/tools/tableforge
+docker rm -f analyzer
+docker run -d --name analyzer --network fieldgovern_default --restart unless-stopped \
+  -v fg_tableforge_data:/app/projects \
+  -v fg_tableforge_exports:/app/exports \
+  fieldgovern-analyzer:latest
 
 # Force redeploy without code change
-# → Go to GitHub repo → Actions → Build & Deploy App → Run workflow
+# GitHub repo → Actions → Build & Deploy App → Run workflow
 
 # Run manual backup
 /opt/fieldgovern/backup-db.sh
 
-# Check disk usage
+# Check disk
 df -h
+```
 
-# Check container status
-docker compose -f /opt/fieldgovern/docker-compose.yml ps
+---
+
+## SSL Certificate Renewal
+
+Auto-renews via cron at 3 AM daily:
+```bash
+certbot renew --quiet --deploy-hook 'docker restart fieldgovern-nginx-1'
+```
+
+Manual renewal:
+```bash
+docker stop fieldgovern-nginx-1
+certbot renew
+docker start fieldgovern-nginx-1
+```
+
+---
+
+## Server Bootstrap (first time only)
+
+```bash
+curl -sL https://raw.githubusercontent.com/apranjipavan2-spec/DataCollectTool/main/deploy/server-setup.sh | bash
+```
+
+Then manually fill in `/opt/fieldgovern/.env` and run:
+```bash
+cd /opt/fieldgovern
+docker compose pull
+docker compose up -d
+```

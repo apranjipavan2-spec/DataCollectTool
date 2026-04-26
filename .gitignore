@@ -71,6 +71,7 @@ backend/backups/
 MiroFish/
 
 # Tools — runtime dirs (never commit)
+tools/tableforge/static/
 tools/tableforge/cache/
 tools/tableforge/exports/
 tools/tableforge/logs/
