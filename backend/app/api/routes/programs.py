@@ -273,6 +273,31 @@ def delete_participant_type(prog_id: str, pt_id: str, user=Depends(require_super
 
 # ── Questionnaires ────────────────────────────────────────────────────────────
 
+@router.get("/{prog_id}/questionnaires")
+def list_questionnaires(prog_id: str, user=Depends(require_supervisor), db: Session = Depends(get_db)):
+    qs = db.query(ProgramQuestionnaire).filter(
+        ProgramQuestionnaire.program_id == prog_id,
+        ProgramQuestionnaire.tenant_id == user["tenant_id"],
+    ).order_by(ProgramQuestionnaire.wave_number.nullslast(), ProgramQuestionnaire.created_at).all()
+    result = []
+    for q in qs:
+        form_title = ""
+        if q.form_id:
+            from app.models.form import Form
+            f = db.query(Form).filter(Form.id == q.form_id).first()
+            form_title = f.title if f else ""
+        result.append({
+            "questionnaire_id": str(q.id),
+            "name": q.name,
+            "form_id": str(q.form_id) if q.form_id else None,
+            "form_title": form_title,
+            "wave_number": q.wave_number,
+            "wave_label": q.wave_label,
+            "status": q.status,
+        })
+    return result
+
+
 @router.post("/{prog_id}/questionnaires")
 def create_questionnaire(prog_id: str, body: QuestionnaireIn, user=Depends(require_supervisor), db: Session = Depends(get_db)):
     p = db.query(Program).filter(Program.id == prog_id, Program.tenant_id == user["tenant_id"]).first()

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType } from './types';
-import { uploadFile, tabulate, listMetrics, listBins, saveProject, refreshDataset, changeColumnType, fgSaveProject } from './api';
+import { uploadFile, tabulate, listMetrics, listBins, saveProject, refreshDataset, changeColumnType } from './api';
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
 import { LivePreview } from './components/LivePreview';
