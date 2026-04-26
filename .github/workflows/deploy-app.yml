@@ -91,27 +91,29 @@ jobs:
             set -e
             cd /opt/fieldgovern
 
-            # ── 1. Update nginx config from repo (always keep in sync) ──────────
+            # ── 1. Pull latest app image ────────────────────────────────────────
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u apranjipavan2-spec --password-stdin
+            docker compose pull app
+
+            # ── 2. Restart app (zero-downtime) ──────────────────────────────────
+            docker compose up -d --no-deps app
+
+            # ── 3. Run DB migrations (idempotent — safe to run every deploy) ───
+            docker compose exec -T app sh -c "alembic upgrade head 2>&1 || true"
+
+            # ── 4. Build and restart analyzer + cleaner ─────────────────────────
+            # -p fieldgovern ensures they join fieldgovern_default network (same as nginx)
+            docker compose -p fieldgovern -f /opt/fieldgovern/deploy/docker-compose.prod.yml build analyzer cleaner
+            docker compose -p fieldgovern -f /opt/fieldgovern/deploy/docker-compose.prod.yml up -d --no-deps analyzer cleaner
+
+            # ── 5. Update nginx config AFTER all services are up ────────────────
+            # Must be last: nginx -t resolves 'analyzer'/'cleaner' hostnames via
+            # Docker DNS — those containers must already be running in the network.
             curl -fsSL "https://raw.githubusercontent.com/apranjipavan2-spec/DataCollectTool/main/deploy/nginx.conf" \
               -o /opt/fieldgovern/nginx.conf
             docker compose exec -T nginx nginx -t
             docker compose exec -T nginx nginx -s reload
             echo "Nginx config updated and reloaded"
-
-            # ── 2. Pull latest app image ────────────────────────────────────────
-            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u apranjipavan2-spec --password-stdin
-            docker compose pull app
-
-            # ── 3. Restart app (zero-downtime) ──────────────────────────────────
-            docker compose up -d --no-deps app
-
-            # ── 4. Run DB migrations (idempotent — safe to run every deploy) ───
-            docker compose exec -T app sh -c "alembic upgrade head 2>&1 || true"
-
-            # ── 5. Build and restart analyzer + cleaner using prod compose file ─
-            # -p fieldgovern ensures they join fieldgovern_default network (same as nginx)
-            docker compose -p fieldgovern -f /opt/fieldgovern/deploy/docker-compose.prod.yml build analyzer cleaner
-            docker compose -p fieldgovern -f /opt/fieldgovern/deploy/docker-compose.prod.yml up -d --no-deps analyzer cleaner
 
             # ── 6. Prune old images to save disk space ─────────────────────────
             docker image prune -f

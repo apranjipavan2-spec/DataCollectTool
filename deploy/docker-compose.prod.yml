@@ -72,3 +72,8 @@ volumes:
   tableforge_data:
   tableforge_exports:
   cleaner_data:
+
+networks:
+  default:
+    name: fieldgovern_default
+    external: true
