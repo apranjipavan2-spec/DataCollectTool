@@ -89,33 +89,41 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-            cd /opt/fieldgovern
+
+            # Single compose invocation — all services share one project (fieldgovern)
+            # and one network (fieldgovern_default), so nginx can resolve analyzer/cleaner.
+            DC="docker compose --project-directory /opt/fieldgovern -f /opt/fieldgovern/deploy/docker-compose.prod.yml"
 
             # ── 1. Pull latest app image ────────────────────────────────────────
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u apranjipavan2-spec --password-stdin
-            docker compose pull app
+            $DC pull app
 
             # ── 2. Restart app (zero-downtime) ──────────────────────────────────
-            docker compose up -d --no-deps app
+            $DC up -d --no-deps app
 
             # ── 3. Run DB migrations (idempotent — safe to run every deploy) ───
-            docker compose exec -T app sh -c "alembic upgrade head 2>&1 || true"
+            $DC exec -T app sh -c "alembic upgrade head 2>&1 || true"
 
             # ── 4. Build and restart analyzer + cleaner ─────────────────────────
-            # -p fieldgovern ensures they join fieldgovern_default network (same as nginx)
-            docker compose -p fieldgovern -f /opt/fieldgovern/deploy/docker-compose.prod.yml build analyzer cleaner
-            docker compose -p fieldgovern -f /opt/fieldgovern/deploy/docker-compose.prod.yml up -d --no-deps analyzer cleaner
+            $DC build analyzer cleaner
+            $DC up -d --no-deps analyzer cleaner
 
             # ── 5. Update nginx config AFTER all services are up ────────────────
-            # Must be last: nginx -t resolves 'analyzer'/'cleaner' hostnames via
-            # Docker DNS — those containers must already be running in the network.
+            # nginx -t resolves 'analyzer'/'cleaner' via Docker DNS — containers
+            # must be running first or nginx rejects the config.
             curl -fsSL "https://raw.githubusercontent.com/apranjipavan2-spec/DataCollectTool/main/deploy/nginx.conf" \
               -o /opt/fieldgovern/nginx.conf
-            docker compose exec -T nginx nginx -t
-            docker compose exec -T nginx nginx -s reload
+            $DC exec -T nginx nginx -t
+            $DC exec -T nginx nginx -s reload
             echo "Nginx config updated and reloaded"
 
-            # ── 6. Prune old images to save disk space ─────────────────────────
+            # ── 6. Diagnostics ──────────────────────────────────────────────────
+            echo "=== Running containers ==="
+            docker ps --format "table {{.Names}}\t{{.Status}}"
+            echo "=== Networks ==="
+            docker network ls --filter "name=fieldgovern"
+
+            # ── 7. Prune old images to save disk space ─────────────────────────
             docker image prune -f
 
             echo "Deploy complete — $(date)"

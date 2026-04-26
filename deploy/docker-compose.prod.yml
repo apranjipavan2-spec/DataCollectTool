@@ -76,4 +76,3 @@ volumes:
 networks:
   default:
     name: fieldgovern_default
-    external: true
