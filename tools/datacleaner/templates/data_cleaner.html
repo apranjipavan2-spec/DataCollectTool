@@ -418,6 +418,11 @@ input, select, textarea { font-family: inherit; }
     </div>
 
     <div class="main-content">
+      <!-- FieldGovern program / questionnaire selector (shown when token present) -->
+      <div id="fgSelector" style="display:none;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.3);border-radius:12px;padding:20px;margin-bottom:16px;max-width:480px;">
+        <div style="font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:12px;">Load from FieldGovern</div>
+      </div>
+
       <!-- Upload Zone (initial) -->
       <div id="uploadZone" class="upload-zone">
         <h2>📂 Drop your data file here</h2>
@@ -1752,32 +1757,105 @@ function toggleSection(sectionId, headerEl) {
 </script>
 
 <script>
-// Auto-load from FieldGovern if URL params are present
-(async function () {
-  const params = new URLSearchParams(window.location.search);
-  const fgUrl = params.get('fg_url');
-  const programId = params.get('program_id');
-  const token = params.get('token');
-  if (!fgUrl || !programId || !token) return;
+// ── FieldGovern integration ───────────────────────────────────────────────────
+const _fgParams = new URLSearchParams(window.location.search);
+const _fgUrl    = _fgParams.get('fg_url');
+const _fgToken  = _fgParams.get('token');
+const _fgProgId = _fgParams.get('program_id');
 
+async function fgLoadData(programId, questionnaireId) {
+  if (!_fgUrl || !_fgToken || !programId) return;
   showLoading('Loading data from FieldGovern…');
   try {
+    const body = { fg_base_url: _fgUrl, program_id: programId, token: _fgToken };
+    if (questionnaireId) body.questionnaire_id = questionnaireId;
     const res = await fetch(BASE_URL + '/api/load-from-fg', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fg_base_url: fgUrl, program_id: programId, token }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     hideLoading();
     if (data.error) { toast(data.error, 'error'); return; }
     toast(`Loaded ${data.filename} — ${data.rows} rows, ${data.cols} columns`);
     document.getElementById('uploadZone').style.display = 'none';
+    document.getElementById('fgSelector').style.display = 'none';
     await loadInfo();
     switchTab('explore');
     if (columns.length > 0) selectColumn(columns[0].name);
   } catch (e) {
     hideLoading();
     toast('Failed to load FieldGovern data: ' + e, 'error');
+  }
+}
+
+// Build program / questionnaire selector if FG context present
+(async function () {
+  if (!_fgUrl || !_fgToken) return;
+
+  // Fetch programs
+  let programs = [];
+  try {
+    const r = await fetch(BASE_URL + '/api/fg/programs', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken }),
+    });
+    programs = await r.json();
+    if (!Array.isArray(programs)) programs = [];
+  } catch { programs = []; }
+
+  // Build selector UI
+  const box = document.getElementById('fgSelector');
+  if (!box) return;
+  box.style.display = 'block';
+
+  const progSel = document.createElement('select');
+  progSel.style.cssText = 'width:100%;padding:8px 10px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:13px;outline:none;margin-bottom:8px;';
+  progSel.innerHTML = '<option value="">— Select program —</option>' +
+    programs.map(p => `<option value="${p.id}">${p.name}${p.scheme_name ? ' · ' + p.scheme_name : ''}</option>`).join('');
+  box.appendChild(progSel);
+
+  const qSel = document.createElement('select');
+  qSel.style.cssText = progSel.style.cssText + 'display:none;';
+  qSel.innerHTML = '<option value="">— All questionnaires —</option>';
+  box.appendChild(qSel);
+
+  const btn = document.createElement('button');
+  btn.textContent = 'Load Data →';
+  btn.style.cssText = 'width:100%;padding:10px;border-radius:6px;border:none;background:#3b82f6;color:#fff;font-size:13px;font-weight:600;cursor:pointer;opacity:0.5;';
+  btn.disabled = true;
+  box.appendChild(btn);
+
+  progSel.addEventListener('change', async function () {
+    qSel.innerHTML = '<option value="">— All questionnaires —</option>';
+    qSel.style.display = 'none';
+    btn.disabled = !this.value;
+    btn.style.opacity = this.value ? '1' : '0.5';
+    if (!this.value) return;
+    try {
+      const r = await fetch(BASE_URL + '/api/fg/questionnaires', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken, program_id: this.value }),
+      });
+      const qs = await r.json();
+      if (Array.isArray(qs) && qs.length) {
+        qs.forEach(q => {
+          const opt = document.createElement('option');
+          opt.value = q.questionnaire_id;
+          opt.textContent = q.name + (q.form_title ? ' (' + q.form_title + ')' : '');
+          qSel.appendChild(opt);
+        });
+        qSel.style.display = 'block';
+      }
+    } catch {}
+  });
+
+  btn.addEventListener('click', () => fgLoadData(progSel.value, qSel.value || null));
+
+  // Auto-load if program_id was in URL
+  if (_fgProgId) {
+    progSel.value = _fgProgId;
+    progSel.dispatchEvent(new Event('change'));
+    setTimeout(() => fgLoadData(_fgProgId, null), 600);
   }
 })();
 </script>

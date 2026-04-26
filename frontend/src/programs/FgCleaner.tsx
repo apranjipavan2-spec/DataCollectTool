@@ -118,7 +118,7 @@ export default function FgCleaner() {
                 <button
                   onClick={() => {
                     const token = localStorage.getItem('fp_token')
-                    window.open(`${window.location.origin}/cleaner/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}`, '_blank')
+                    window.location.href = `${window.location.origin}/cleaner/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}`
                   }}
                   className="shrink-0 px-5 py-2.5 bg-catalan-primary text-catalan-bg rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity whitespace-nowrap"
                 >

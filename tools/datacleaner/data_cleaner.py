@@ -1372,19 +1372,74 @@ def apply_recovery():
         return jsonify(error=f"Recovery error: {e}"), 500
 
 
-# ── FieldGovern Integration ───────────────────────────────────────────────────
+# ── FieldGovern Integration + proxy endpoints ────────────────────────────────
+
+@app.route("/api/fg/programs", methods=["POST"])
+def proxy_fg_programs():
+    body = request.json or {}
+    fg_base_url = body.get("fg_base_url", "").rstrip("/")
+    token = body.get("token", "")
+    if not fg_base_url or not token:
+        return jsonify(error="fg_base_url and token required"), 400
+    try:
+        resp = _requests.get(f"{fg_base_url}/api/v1/programs/",
+                             headers={"Authorization": f"Bearer {token}"}, timeout=30)
+        return jsonify(resp.json()), resp.status_code
+    except Exception as e:
+        return jsonify(error=str(e)), 502
+
+
+@app.route("/api/fg/questionnaires", methods=["POST"])
+def proxy_fg_questionnaires():
+    body = request.json or {}
+    fg_base_url = body.get("fg_base_url", "").rstrip("/")
+    token = body.get("token", "")
+    program_id = body.get("program_id", "")
+    if not fg_base_url or not token or not program_id:
+        return jsonify(error="fg_base_url, token and program_id required"), 400
+    try:
+        resp = _requests.get(f"{fg_base_url}/api/v1/programs/{program_id}/questionnaires",
+                             headers={"Authorization": f"Bearer {token}"}, timeout=30)
+        return jsonify(resp.json()), resp.status_code
+    except Exception as e:
+        return jsonify(error=str(e)), 502
+
+
+@app.route("/api/fg/user-projects/save", methods=["POST"])
+def proxy_save_fg_project():
+    body = request.json or {}
+    fg_base_url = body.get("fg_base_url", "").rstrip("/")
+    token = body.get("token", "")
+    if not fg_base_url or not token:
+        return jsonify(error="fg_base_url and token required"), 400
+    payload = {
+        "tool": "cleaner",
+        "name": body.get("name", "Untitled"),
+        "program_id": body.get("program_id"),
+        "data": body.get("data", {}),
+    }
+    try:
+        resp = _requests.post(f"{fg_base_url}/api/v1/tool-projects/", json=payload,
+                              headers={"Authorization": f"Bearer {token}"}, timeout=30)
+        return jsonify(resp.json()), resp.status_code
+    except Exception as e:
+        return jsonify(error=str(e)), 502
+
 
 @app.route("/api/load-from-fg", methods=["POST"])
 def load_from_fg():
-    """Fetch program submissions from FieldGovern and load as working dataset."""
+    """Fetch program submissions from FieldGovern; supports optional questionnaire_id filter."""
     body = request.json or {}
     fg_base_url = body.get("fg_base_url", "").rstrip("/")
     program_id = body.get("program_id", "")
     token = body.get("token", "")
+    questionnaire_id = body.get("questionnaire_id", "")
     if not fg_base_url or not program_id or not token:
         return jsonify(error="fg_base_url, program_id, and token are required"), 400
 
     url = f"{fg_base_url}/api/v1/fg/programs/{program_id}/export.xlsx"
+    if questionnaire_id:
+        url += f"?questionnaire_id={questionnaire_id}"
     try:
         resp = _requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=120)
         if resp.status_code != 200:

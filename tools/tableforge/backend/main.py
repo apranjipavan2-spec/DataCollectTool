@@ -3762,12 +3762,15 @@ class FGImportBody(BaseModel):
     fg_base_url: str
     program_id: str
     token: str
+    questionnaire_id: Optional[str] = None
 
 @app.post("/api/import-from-fg")
 async def import_from_fg(body: FGImportBody):
     """Fetch program submissions from FieldGovern and load as a dataset (same shape as /api/upload)."""
     import httpx
     url = f"{body.fg_base_url.rstrip('/')}/api/v1/fg/programs/{body.program_id}/export.xlsx"
+    if body.questionnaire_id:
+        url += f"?questionnaire_id={body.questionnaire_id}"
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
             resp = await client.get(url, headers={"Authorization": f"Bearer {body.token}"})
@@ -3836,6 +3839,67 @@ async def import_from_fg(body: FGImportBody):
         "columns": columns,
         "preview": sanitize_for_json(df.head(50).fillna("").to_dict(orient="records")),
     }
+
+
+# ── FG proxy: list programs ───────────────────────────────────────────────────
+
+class FGBaseBody(BaseModel):
+    fg_base_url: str
+    token: str
+
+class FGQuestionnairesBody(BaseModel):
+    fg_base_url: str
+    token: str
+    program_id: str
+
+class FGSaveProjectBody(BaseModel):
+    fg_base_url: str
+    token: str
+    tool: str
+    name: str
+    program_id: Optional[str] = None
+    data: dict = {}
+
+@app.post("/api/fg/programs")
+async def proxy_fg_programs(body: FGBaseBody):
+    import httpx
+    url = f"{body.fg_base_url.rstrip('/')}/api/v1/programs/"
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.get(url, headers={"Authorization": f"Bearer {body.token}"})
+    if resp.status_code != 200:
+        raise HTTPException(resp.status_code, "FieldGovern programs fetch failed")
+    return resp.json()
+
+@app.post("/api/fg/questionnaires")
+async def proxy_fg_questionnaires(body: FGQuestionnairesBody):
+    import httpx
+    url = f"{body.fg_base_url.rstrip('/')}/api/v1/programs/{body.program_id}/questionnaires"
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.get(url, headers={"Authorization": f"Bearer {body.token}"})
+    if resp.status_code != 200:
+        raise HTTPException(resp.status_code, "FieldGovern questionnaires fetch failed")
+    return resp.json()
+
+@app.post("/api/fg/user-projects/save")
+async def proxy_save_fg_project(body: FGSaveProjectBody):
+    import httpx
+    url = f"{body.fg_base_url.rstrip('/')}/api/v1/tool-projects/"
+    payload = {"tool": body.tool, "name": body.name, "program_id": body.program_id, "data": body.data}
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(url, json=payload, headers={"Authorization": f"Bearer {body.token}"})
+    if resp.status_code not in (200, 201):
+        raise HTTPException(resp.status_code, "Failed to save project to FieldGovern")
+    return resp.json()
+
+@app.post("/api/fg/user-projects/list")
+async def proxy_list_fg_projects(body: FGBaseBody):
+    import httpx
+    url = f"{body.fg_base_url.rstrip('/')}/api/v1/tool-projects/?tool=analyzer"
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.get(url, headers={"Authorization": f"Bearer {body.token}"})
+    if resp.status_code != 200:
+        raise HTTPException(resp.status_code, "Failed to list projects from FieldGovern")
+    return resp.json()
 
 
 # ═══════════════════════════════════════════════════

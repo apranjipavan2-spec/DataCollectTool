@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TableConfig } from '../types';
-import { rollbackProject } from '../api';
+import { rollbackProject, fgSaveProject } from '../api';
 
 interface ProjectEntry {
   name: string;
@@ -16,6 +16,8 @@ interface ProjectEntry {
   } | null;
 }
 
+interface FgContext { fgUrl: string; token: string; programId?: string }
+
 interface Props {
   currentTables: TableConfig[];
   currentAnnotationsMap?: Record<string, any[]>;
@@ -27,9 +29,10 @@ interface Props {
   currentDatasetId?: string;
   currentRowCount?: number;
   currentColCount?: number;
+  fgContext?: FgContext | null;
 }
 
-export function ProjectManager({ currentTables, currentAnnotationsMap = {}, currentComparisonState, currentProjectFilters, onLoad, onClose, currentFilename, currentDatasetId, currentRowCount, currentColCount }: Props) {
+export function ProjectManager({ currentTables, currentAnnotationsMap = {}, currentComparisonState, currentProjectFilters, onLoad, onClose, currentFilename, currentDatasetId, currentRowCount, currentColCount, fgContext }: Props) {
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saveName, setSaveName] = useState('');
@@ -108,6 +111,16 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
         if (!res.ok) throw new Error(await res.text());
         const saveResult = await res.json();
         const savedPath = saveResult.path || '';
+        // Also save to FieldGovern DB if authenticated
+        if (fgContext) {
+          try {
+            await fgSaveProject(
+              fgContext.fgUrl, fgContext.token, saveName.trim(),
+              fgContext.programId || null,
+              { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null },
+            );
+          } catch { /* non-fatal */ }
+        }
         setSuccess(`Project "${saveName}" saved!\nLocation: ${savedPath}`);
         // Refresh list
         const listRes = await fetch('/api/projects');

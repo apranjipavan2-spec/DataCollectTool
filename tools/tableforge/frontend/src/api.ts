@@ -155,6 +155,60 @@ export async function rollbackProject(path: string, versionIndex: number) {
   return res.json();
 }
 
+// ── FieldGovern API helpers ───────────────────────────────────────────────────
+
+export async function fgListPrograms(fgUrl: string, token: string) {
+  const res = await fetch(`${API_BASE}/fg/programs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fg_base_url: fgUrl, token }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json() as Promise<{ id: string; name: string; scheme_name: string }[]>;
+}
+
+export async function fgListQuestionnaires(fgUrl: string, token: string, programId: string) {
+  const res = await fetch(`${API_BASE}/fg/questionnaires`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fg_base_url: fgUrl, token, program_id: programId }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json() as Promise<{ questionnaire_id: string; name: string; form_title: string }[]>;
+}
+
+export async function fgSaveProject(fgUrl: string, token: string, name: string, programId: string | null, data: any) {
+  const res = await fetch(`${API_BASE}/fg/user-projects/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fg_base_url: fgUrl, token, tool: 'analyzer', name, program_id: programId, data }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function fgListUserProjects(fgUrl: string, token: string) {
+  const res = await fetch(`${API_BASE}/fg/user-projects/list`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fg_base_url: fgUrl, token }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json() as Promise<{ id: string; name: string; program_id: string | null; data: any; updated_at: string }[]>;
+}
+
+export async function importFromFg(fgUrl: string, token: string, programId: string, questionnaireId?: string) {
+  const body: any = { fg_base_url: fgUrl, program_id: programId, token };
+  if (questionnaireId) body.questionnaire_id = questionnaireId;
+  const res = await fetch(`${API_BASE}/import-from-fg`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
 // Module A: Sheet Selection
 export async function loadSheet(datasetId: string, sheetName: string) {
   const res = await fetch(`${API_BASE}/upload/sheet`, {

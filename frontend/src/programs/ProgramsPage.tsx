@@ -520,7 +520,7 @@ export default function ProgramsPage() {
                               <button
                                 onClick={() => {
                                   const token = localStorage.getItem('fp_token')
-                                  window.open(`${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${selectedProg.id}&token=${token}`, '_blank')
+                                  window.location.href = `${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${selectedProg.id}&token=${token}`
                                 }}
                                 className="px-3 py-1.5 text-sm bg-blue-50 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors font-medium"
                               >
@@ -529,7 +529,7 @@ export default function ProgramsPage() {
                               <button
                                 onClick={() => {
                                   const token = localStorage.getItem('fp_token')
-                                  window.open(`${window.location.origin}/cleaner/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${selectedProg.id}&token=${token}`, '_blank')
+                                  window.location.href = `${window.location.origin}/cleaner/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${selectedProg.id}&token=${token}`
                                 }}
                                 className="px-3 py-1.5 text-sm bg-green-50 border border-green-300 text-green-700 rounded-lg hover:bg-green-100 transition-colors font-medium"
                               >

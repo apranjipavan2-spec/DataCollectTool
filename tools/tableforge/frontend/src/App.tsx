@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType } from './types';
-import { uploadFile, tabulate, listMetrics, listBins, saveProject, refreshDataset, changeColumnType } from './api';
+import { uploadFile, tabulate, listMetrics, listBins, saveProject, refreshDataset, changeColumnType, fgSaveProject } from './api';
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
 import { LivePreview } from './components/LivePreview';
@@ -60,6 +60,7 @@ interface ReconcileState {
 
 export default function App() {
   const [dataset, setDataset] = useState<DatasetMeta | null>(null);
+  const [fgContext, setFgContext] = useState<{ fgUrl: string; token: string; programId?: string } | null>(null);
   const [tables, setTables] = useState<TableConfig[]>([createEmptyTable('1', 'Table 1')]);
   const [activeTableIdx, setActiveTableIdx] = useState(0);
   const [results, setResults] = useState<Map<string, TableResult>>(new Map());
@@ -200,13 +201,15 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectFilters]);
 
-  // Auto-load from FieldGovern if URL params are present
+  // Read FG context from URL params; auto-load if program_id present
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const fgUrl = params.get('fg_url');
     const programId = params.get('program_id');
     const token = params.get('token');
-    if (!fgUrl || !programId || !token) return;
+    if (!fgUrl || !token) return;
+    setFgContext({ fgUrl, token, programId: programId || undefined });
+    if (!programId) return; // no auto-load; user will pick in WelcomeScreen
     setLoading(true);
     fetch(import.meta.env.BASE_URL.replace(/\/$/, '') + '/api/import-from-fg', {
       method: 'POST',
@@ -215,7 +218,7 @@ export default function App() {
     })
       .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(e.detail || 'Import failed')))
       .then(meta => { setDataset(meta); setLoading(false); })
-      .catch(err => { setLoading(false); alert(`Failed to load FieldGovern data: ${err}`); });
+      .catch(err => { setLoading(false); setError(`Failed to load FieldGovern data: ${err}`); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -699,9 +702,9 @@ export default function App() {
           }}
           onUpdate={() => {}} theme={theme} />
         <WelcomeScreen onFileUpload={handleFileUpload} loading={loading}
-          error={pendingProjectData
-            ? null
-            : error}
+          fgContext={fgContext}
+          onDatasetLoaded={meta => { setDataset(meta); setError(null); }}
+          error={pendingProjectData ? null : error}
           onProjectImport={(data) => {
             setPendingProjectData(data);
             setError(null);
@@ -1131,7 +1134,7 @@ export default function App() {
             setModal(null);
           }
         }}
-        onClose={() => setModal(null)} />}
+        onClose={() => setModal(null)} fgContext={fgContext} />}
       {/* Column Reconciliation Dialog */}
       {reconcileState && (
         <div className="modal-overlay">
