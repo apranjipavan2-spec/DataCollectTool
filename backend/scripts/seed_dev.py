@@ -17,7 +17,7 @@ from app.models.form import Form
 from app.models.form_version import FormVersion
 from app.models.submission import Submission
 from app.models.form_assignment import FormAssignment
-from app.models.program import Program, ProgramQuestionnaire
+from app.models.program import Program, ProgramQuestionnaire, ProgramParticipantType
 import uuid
 from datetime import datetime, timezone, timedelta
 
@@ -187,6 +187,87 @@ _PATCHES = [
     # 0028 — program_id on program_locations
     "ALTER TABLE program_locations ADD COLUMN IF NOT EXISTS program_id UUID REFERENCES programs(id) ON DELETE CASCADE",
     "CREATE INDEX IF NOT EXISTS ix_program_locations_program_id ON program_locations (program_id, tenant_id)",
+
+    # DATA: deactivate extra demo enumerators/supervisors (keep 3 enum + 1 supervisor)
+    """UPDATE users SET is_active = false
+       WHERE phone IN ('+919333333332', '+919111111111', '+919222222222')
+       AND tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)""",
+
+    # DATA: rename BulkUser1 to a realistic field name
+    """UPDATE users SET name = 'Arjun Das'
+       WHERE phone = '+919333333331'
+       AND tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)""",
+
+    # DATA: add participant types for all demo programs that have none yet
+    """INSERT INTO program_participant_types (id, program_id, tenant_id, name, description, sort_order)
+       SELECT gen_random_uuid(), p.id, p.tenant_id, 'Household', 'Household-level respondent', 0
+       FROM programs p
+       WHERE p.tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)
+       AND NOT EXISTS (
+           SELECT 1 FROM program_participant_types pt WHERE pt.program_id = p.id
+       )
+       AND p.name NOT ILIKE '%health%' AND p.name NOT ILIKE '%education%'
+       AND p.name NOT ILIKE '%student%' AND p.name NOT ILIKE '%farmer%'""",
+
+    """INSERT INTO program_participant_types (id, program_id, tenant_id, name, description, sort_order)
+       SELECT gen_random_uuid(), p.id, p.tenant_id, 'Beneficiary', 'Direct program beneficiary', 1
+       FROM programs p
+       WHERE p.tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)
+       AND NOT EXISTS (
+           SELECT 1 FROM program_participant_types pt WHERE pt.program_id = p.id AND pt.name = 'Beneficiary'
+       )""",
+
+    # DATA: add Health Worker type for health programs
+    """INSERT INTO program_participant_types (id, program_id, tenant_id, name, description, sort_order)
+       SELECT gen_random_uuid(), p.id, p.tenant_id, 'Patient / Community Member', 'Health program participant', 0
+       FROM programs p
+       WHERE p.tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)
+       AND (p.name ILIKE '%health%' OR p.name ILIKE '%nutrition%' OR p.name ILIKE '%sanitation%')
+       AND NOT EXISTS (
+           SELECT 1 FROM program_participant_types pt WHERE pt.program_id = p.id AND pt.name = 'Patient / Community Member'
+       )""",
+
+    # DATA: add Student type for education programs
+    """INSERT INTO program_participant_types (id, program_id, tenant_id, name, description, sort_order)
+       SELECT gen_random_uuid(), p.id, p.tenant_id, 'Student', 'School-going child', 0
+       FROM programs p
+       WHERE p.tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)
+       AND (p.name ILIKE '%education%' OR p.name ILIKE '%school%' OR p.name ILIKE '%student%' OR p.name ILIKE '%learning%')
+       AND NOT EXISTS (
+           SELECT 1 FROM program_participant_types pt WHERE pt.program_id = p.id AND pt.name = 'Student'
+       )""",
+
+    # DATA: add Farmer type for agriculture programs
+    """INSERT INTO program_participant_types (id, program_id, tenant_id, name, description, sort_order)
+       SELECT gen_random_uuid(), p.id, p.tenant_id, 'Farmer / Cultivator', 'Agricultural household', 0
+       FROM programs p
+       WHERE p.tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)
+       AND (p.name ILIKE '%farm%' OR p.name ILIKE '%agri%' OR p.name ILIKE '%crop%' OR p.name ILIKE '%kisan%' OR p.name ILIKE '%pm-kisan%')
+       AND NOT EXISTS (
+           SELECT 1 FROM program_participant_types pt WHERE pt.program_id = p.id AND pt.name = 'Farmer / Cultivator'
+       )""",
+
+    # DATA: update questionnaire total_target to realistic numbers
+    """UPDATE program_questionnaires SET total_target = CASE
+           WHEN name ILIKE '%baseline%' THEN 500
+           WHEN name ILIKE '%midline%' THEN 450
+           WHEN name ILIKE '%endline%' THEN 400
+           WHEN name ILIKE '%household%' THEN 300
+           WHEN name ILIKE '%health%' THEN 250
+           WHEN name ILIKE '%education%' OR name ILIKE '%school%' THEN 200
+           ELSE 250
+       END
+       WHERE tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)
+       AND total_target = 0""",
+
+    # DATA: link questionnaires to participant types where possible
+    """UPDATE program_questionnaires pq SET participant_type_id = (
+           SELECT pt.id FROM program_participant_types pt
+           WHERE pt.program_id = pq.program_id
+           ORDER BY pt.sort_order LIMIT 1
+       )
+       WHERE pq.tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)
+       AND pq.participant_type_id IS NULL""",
 ]
 
 from sqlalchemy import text as _text
@@ -470,12 +551,9 @@ demo_user_specs = [
     (demo_tenant.id,     '+919999990001', 'org_admin',    'Admin User',           None),
     (demo_tenant.id,     '+918123105186', 'org_admin',    'PavanDeshetty',        None),
     (demo_tenant.id,     '+919999990002', 'supervisor',   'Supervisor User',      None),
-    (demo_tenant.id,     '+919222222222', 'supervisor',   'New Supervisor',       None),
     (demo_tenant.id,     '+919999990003', 'enumerator',   'Enumerator User',      None),
     (demo_tenant.id,     '+919999990004', 'enumerator',   'Priya Sharma',         None),
-    (demo_tenant.id,     '+919333333331', 'enumerator',   'BulkUser1',            None),
-    (demo_tenant.id,     '+919333333332', 'enumerator',   'BulkUser2',            None),
-    (demo_tenant.id,     '+919111111111', 'enumerator',   'Test Field Worker',    None),
+    (demo_tenant.id,     '+919333333331', 'enumerator',   'Arjun Das',            None),
 ]
 dataworx_user_specs = [
     (dataworx_tenant.id, '+919999991001', 'org_admin',    'Dataworx Admin',   None),
@@ -598,6 +676,28 @@ try:
             db.add(prog)
             db.flush()
 
+        # Add participant types if not present
+        if not db.query(ProgramParticipantType).filter(ProgramParticipantType.program_id == prog.id).first():
+            for i, (pname, pdesc) in enumerate([
+                ('Household', 'Household head or representative'),
+                ('Patient / Community Member', 'Individual health status respondent'),
+                ('ASHA / Health Worker', 'Community health worker'),
+            ]):
+                db.add(ProgramParticipantType(
+                    program_id=prog.id, tenant_id=demo_tenant.id,
+                    name=pname, description=pdesc, sort_order=i,
+                ))
+            db.flush()
+
+        household_pt = db.query(ProgramParticipantType).filter(
+            ProgramParticipantType.program_id == prog.id,
+            ProgramParticipantType.name == 'Household',
+        ).first()
+        health_pt = db.query(ProgramParticipantType).filter(
+            ProgramParticipantType.program_id == prog.id,
+            ProgramParticipantType.name == 'Patient / Community Member',
+        ).first()
+
         # Create questionnaires linked to forms
         hs_q = db.query(ProgramQuestionnaire).filter(
             ProgramQuestionnaire.program_id == prog.id,
@@ -609,8 +709,9 @@ try:
                 form_id=hs_form.id,
                 tenant_id=demo_tenant.id,
                 name='Household Survey',
-                total_target=200,
+                total_target=300,
                 status='active',
+                participant_type_id=household_pt.id if household_pt else None,
             )
             db.add(hs_q)
             db.flush()
@@ -625,21 +726,23 @@ try:
                 form_id=ha_form.id,
                 tenant_id=demo_tenant.id,
                 name='Health Assessment',
-                total_target=200,
+                total_target=250,
                 status='active',
+                participant_type_id=health_pt.id if health_pt else None,
             )
             db.add(ha_q)
             db.flush()
 
         # Link all unlinked submissions to the program
-        db.execute(
+        from sqlalchemy import text as _sql
+        db.execute(_sql(
             f"""UPDATE submissions SET program_id = '{prog.id}', questionnaire_id = '{hs_q.id}'
                 WHERE tenant_id = '{demo_tenant.id}' AND form_id = '{hs_form.id}' AND program_id IS NULL"""
-        )
-        db.execute(
+        ))
+        db.execute(_sql(
             f"""UPDATE submissions SET program_id = '{prog.id}', questionnaire_id = '{ha_q.id}'
                 WHERE tenant_id = '{demo_tenant.id}' AND form_id = '{ha_form.id}' AND program_id IS NULL"""
-        )
+        ))
         db.commit()
         print("Stage 3: program + questionnaires + submission links OK")
     else:

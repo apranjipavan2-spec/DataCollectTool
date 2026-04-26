@@ -845,7 +845,7 @@ function PanelStudyTab({ programId }: { programId: string }) {
         api.get(`/fg/programs/${programId}/waves`),
         api.get(`/fg/programs/${programId}/attrition`),
       ])
-      setWaves(wRes.data)
+      setWaves(Array.isArray(wRes.data) ? wRes.data : [])
       setAttrition(aRes.data)
       setIsPanelStudy(aRes.data.is_panel_study ?? false)
     } finally {
@@ -1037,7 +1037,7 @@ function PanelStudyTab({ programId }: { programId: string }) {
 function ProgramPicker({ value, onChange }: { value: string; onChange: (id: string, name: string) => void }) {
   const [programs, setPrograms] = useState<Program[]>([])
   useEffect(() => {
-    api.get('/programs/').then(r => setPrograms(r.data)).catch(() => {})
+    api.get('/programs/').then(r => setPrograms(Array.isArray(r.data) ? r.data : [])).catch(() => {})
   }, [])
   return (
     <select className={`${sel} min-w-[220px]`} value={value}
@@ -1077,8 +1077,16 @@ export default function FgAnalyzer() {
     setLoading(true); setError('')
     try {
       const res = await api.get(`/fg/programs/${id}/analyzer-data`)
-      setData(res.data)
-      setProgName(res.data.program_name)
+      const d = res.data
+      if (!d || typeof d !== 'object' || Array.isArray(d)) throw new Error('Unexpected response shape')
+      // Ensure array fields are always arrays
+      d.trend = Array.isArray(d.trend) ? d.trend : []
+      d.enumerators = Array.isArray(d.enumerators) ? d.enumerators : []
+      d.wave_counts = Array.isArray(d.wave_counts) ? d.wave_counts : []
+      d.column_headers = Array.isArray(d.column_headers) ? d.column_headers : []
+      d.sample_rows = Array.isArray(d.sample_rows) ? d.sample_rows : []
+      setData(d)
+      setProgName(d.program_name)
     } catch (e: any) {
       setError(e.response?.data?.detail || 'Failed to load analyzer data')
     } finally {
