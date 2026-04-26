@@ -121,10 +121,9 @@ export function TopBar({ onFileUpload, dataset, onAction, onToggleTheme, theme, 
     <div className="topbar">
       {/* Brand */}
       <div className="topbar-brand">
-        <img src="/logo.png" alt="TableForge" className="logo-img" style={{ width: 28, height: 28, marginRight: 6 }} />
-        <span className="brand-name">TableForge</span>
-        <span className="brand-tag">by Pavankumar Deshetty</span>
-        <span className="brand-contact" style={{ fontSize: 10, opacity: 0.6, marginLeft: 6 }}>+91 83173 90926</span>
+        <img src="/logo-icon.png" alt="Analyzer" className="logo-img" style={{ width: 28, height: 28, marginRight: 6 }} />
+        <span className="brand-name">Analyzer</span>
+        <span className="brand-tag">FieldGovern</span>
       </div>
 
       {/* Ribbon tab buttons inline */}

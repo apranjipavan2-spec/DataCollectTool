@@ -2064,6 +2064,18 @@ async def get_audit_log(dataset_id: str):
     return {"logs": audit_logs.get(dataset_id, [])}
 
 
+class AuditEventBody(BaseModel):
+    dataset_id: str
+    action: str
+    details: str = ""
+
+@app.post("/api/audit/log")
+async def log_audit_event(body: AuditEventBody):
+    """Log a client-side audit event (e.g. column rename, title change)."""
+    add_audit_log(body.dataset_id, body.action, body.details)
+    return {"ok": True}
+
+
 # ═══════════════════════════════════════════════════
 # Module G: Global Metric Library
 # ═══════════════════════════════════════════════════
@@ -2533,6 +2545,10 @@ async def export_excel(config: ExportConfig):
             row_offset += 1
         if title or subtitle:
             row_offset += 1  # Blank row
+
+        # Apply header renames if present
+        header_renames = t.get("header_renames") or {}
+        headers = [header_renames.get(h, h) for h in headers]
 
         # Headers
         for ci, h in enumerate(headers, 1):

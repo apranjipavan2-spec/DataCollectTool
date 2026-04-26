@@ -113,9 +113,9 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
       <div style={s.card}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontSize: 28, marginBottom: 6 }}>🔬</div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.02em' }}>TableForge</div>
-          <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>Data analysis &amp; cross-tab builder</div>
+          <img src="/logo-icon.png" alt="Analyzer" style={{ width: 40, height: 40, marginBottom: 8, display: 'block', margin: '0 auto 8px' }} />
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.02em' }}>Analyzer</div>
+          <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>FieldGovern Data Analyzer</div>
         </div>
 
         {/* FG loader — shown when token present */}
@@ -165,8 +165,8 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
           </>
         )}
 
-        {/* Upload / project import */}
-        {(showUpload || !fgContext) && (
+        {/* Upload / project import — only show when no FG context */}
+        {!fgContext && (
           <div
             ref={dragRef}
             onDragOver={e => { e.preventDefault(); dragRef.current?.classList.add('drag-over'); }}
@@ -195,9 +195,9 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
           </div>
         )}
 
-        {/* When FG context but user wants to upload */}
-        {fgContext && !showUpload && (
-          <button style={s.linkBtn} onClick={() => setShowUpload(true)}>
+        {/* When FG context, offer local import as last resort */}
+        {fgContext && (
+          <button style={{ ...s.linkBtn, marginTop: 8, opacity: 0.6, fontSize: 12 }} onClick={() => fileRef.current?.click()}>
             <span>📂</span> Import a local CSV / Excel file instead
           </button>
         )}

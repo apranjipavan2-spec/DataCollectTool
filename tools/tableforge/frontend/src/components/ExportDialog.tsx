@@ -53,6 +53,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
           return {
             name: t.name, headers: res?.headers || [], rows: res?.rows || [],
             title: t.title, subtitle: t.subtitle, footnote: t.footnote,
+            header_renames: t.header_renames,
             annotations: annotationsMap[t.id] || [],
             // Formatting options for export fidelity
             column_widths: t.column_widths,

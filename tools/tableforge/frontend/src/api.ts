@@ -129,6 +129,14 @@ export async function exportTables(config: {
   return res.json();
 }
 
+export async function logAuditEvent(datasetId: string, action: string, details: string) {
+  fetch(`${API_BASE}/audit/log`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, action, details }),
+  }).catch(() => {});
+}
+
 export async function saveProject(name: string, config: any) {
   const res = await fetch(`${API_BASE}/project/save`, {
     method: 'POST',

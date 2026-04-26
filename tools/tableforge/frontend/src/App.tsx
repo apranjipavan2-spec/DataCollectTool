@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType } from './types';
-import { uploadFile, tabulate, listMetrics, listBins, saveProject, refreshDataset, changeColumnType } from './api';
+import { uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, logAuditEvent } from './api';
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
 import { LivePreview } from './components/LivePreview';
@@ -94,6 +94,7 @@ export default function App() {
   const [isDirty, setIsDirty] = useState(false);
   const [lastProjectHint, setLastProjectHint] = useState<string | null>(null);
   const [pendingProjectData, setPendingProjectData] = useState<any>(null);
+  const [resumePrompt, setResumePrompt] = useState<{ data: any; filename: string } | null>(null);
   const autoSaveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSaveStateRef = useRef<string>('');
   const ribbonFileRef = useRef<HTMLInputElement>(null);
@@ -201,6 +202,19 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectFilters]);
 
+  // On startup, check for autosave and offer to resume
+  useEffect(() => {
+    listProjects().then((projects: any[]) => {
+      const autosave = projects.find((p: any) => p.name === '__autosave__');
+      if (autosave?.config) {
+        const srcFile = autosave.config.source_file;
+        const label = srcFile?.filename || 'your last session';
+        setResumePrompt({ data: autosave.config, filename: label });
+      }
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Read FG context from URL params; auto-load if program_id present
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -244,6 +258,39 @@ export default function App() {
     setTables(next);
     if (next[activeTableIdx]) runTabulation(next[activeTableIdx]);
   }, [redoStack, tables, activeTableIdx]);
+
+  const handleResumeYes = useCallback(async () => {
+    const data = resumePrompt?.data;
+    setResumePrompt(null);
+    if (!data) return;
+    // Restore autosave state
+    if (data.tables) setTables(data.tables);
+    if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
+    if (data.comparisonState) setComparisonState(data.comparisonState);
+    if (data.projectFilters) setProjectFilters(data.projectFilters);
+    if (data.source_file) {
+      setDataset({ dataset_id: data.source_file.dataset_id, filename: data.source_file.filename, row_count: data.source_file.row_count, columns: [] });
+    }
+    setActiveTableIdx(0);
+    setResults(new Map());
+  }, [resumePrompt]);
+
+  const handleResumeNo = useCallback(async () => {
+    const data = resumePrompt?.data;
+    setResumePrompt(null);
+    if (!data) return;
+    // Save autosave as a versioned project
+    try {
+      const projects: any[] = await listProjects();
+      const baseName = data.source_file?.filename?.replace(/\.[^.]+$/, '') || 'session';
+      const prefix = `${baseName}_edit_v`;
+      const existing = projects.filter((p: any) => p.name.startsWith(prefix));
+      const nextN = existing.length + 1;
+      await saveProject(`${prefix}${nextN}`, data);
+    } catch {}
+    // Clear the autosave
+    try { await saveProject('__autosave__', {}); } catch {}
+  }, [resumePrompt]);
 
   const handleFileUpload = useCallback(async (file: File) => {
     setLoading(true); setError(null);
@@ -958,7 +1005,8 @@ export default function App() {
           <div className="table-title-bar">
             <input className="table-title-input" type="text"
               value={activeTable.title} placeholder="Click to add table title..."
-              onChange={e => updateTable({ title: e.target.value, _autoTitle: false } as any)} />
+              onChange={e => updateTable({ title: e.target.value, _autoTitle: false } as any)}
+              onBlur={e => { if (dataset && e.target.value) logAuditEvent(dataset.dataset_id, 'table_title_change', `Title set to: "${e.target.value}" on table "${activeTable.name}"`); }} />
             <input className="table-subtitle-input" type="text"
               value={activeTable.subtitle} placeholder="Subtitle (optional)"
               onChange={e => updateTable({ subtitle: e.target.value, _autoTitle: false } as any)} />
@@ -995,8 +1043,12 @@ export default function App() {
             tableMode={theme}
             onHeaderRename={(original, newName) => {
               const renames = { ...(activeTable.header_renames || {}) };
-              if (newName && newName !== original) renames[original] = newName;
-              else delete renames[original];
+              if (newName && newName !== original) {
+                renames[original] = newName;
+                if (dataset) logAuditEvent(dataset.dataset_id, 'column_rename', `Column "${original}" renamed to "${newName}" in table "${activeTable.name}"`);
+              } else {
+                delete renames[original];
+              }
               updateTable({ header_renames: renames });
             }}
           />}
@@ -1237,6 +1289,21 @@ export default function App() {
           />
         );
       })()}
+      {/* Resume popup */}
+      {resumePrompt && (
+        <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="modal" style={{ maxWidth: 420, padding: 32 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9', marginBottom: 12 }}>Resume where you left off?</div>
+            <div style={{ fontSize: 14, color: '#94a3b8', marginBottom: 24 }}>
+              We found an autosaved session for <strong style={{ color: '#e2e8f0' }}>{resumePrompt.filename}</strong>. Would you like to continue from where you stopped?
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn-primary" style={{ flex: 1 }} onClick={handleResumeYes}>Resume session</button>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={handleResumeNo}>Start fresh</button>
+            </div>
+          </div>
+        </div>
+      )}
       <input ref={ribbonFileRef} type="file" accept=".xlsx,.xls,.csv,.tsv"
         style={{ display: 'none' }}
         onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ''; }} />

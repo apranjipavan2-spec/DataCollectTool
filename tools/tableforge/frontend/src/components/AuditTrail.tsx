@@ -13,18 +13,48 @@ interface LogEntry {
 
 const ACTION_ICONS: Record<string, string> = {
   file_import: '📂',
+  fg_import: '🌐',
   tabulation: '📊',
   metric_create: '📐',
   bin_create: '📦',
   comparison: '📈',
   export: '💾',
   project_save: '📁',
+  project_load: '📂',
   annotation: '📝',
   sheet_change: '📋',
   data_modify: '✏️',
+  column_type_change: '🔧',
   sheet_union: '🔗',
   data_refresh: '🔄',
   filter_change: '🔍',
+  column_rename: '🏷️',
+  table_title_change: '📌',
+  clean_column: '🧹',
+  clean_bulk: '🧽',
+};
+
+const ACTION_LABELS: Record<string, string> = {
+  file_import: 'File Imported',
+  fg_import: 'FieldGovern Import',
+  tabulation: 'Table Computed',
+  metric_create: 'Metric Created',
+  bin_create: 'Bin Created',
+  comparison: 'Period Comparison',
+  export: 'Exported',
+  project_save: 'Project Saved',
+  project_load: 'Project Loaded',
+  annotation: 'Annotation Added',
+  sheet_change: 'Sheet Changed',
+  data_modify: 'Data Modified',
+  column_type_change: 'Column Type Changed',
+  sheet_union: 'Sheets Merged',
+  data_refresh: 'Data Refreshed',
+  filter_change: 'Filter Applied',
+  column_rename: 'Column Renamed',
+  table_title_change: 'Table Title Changed',
+  clean_column: 'Column Cleaned',
+  clean_bulk: 'Bulk Clean',
 };
 
 export function AuditTrail({ datasetId, onClose }: Props) {
@@ -87,7 +117,7 @@ export function AuditTrail({ datasetId, onClose }: Props) {
                 <div key={i} className="audit-entry">
                   <span className="audit-icon">{ACTION_ICONS[log.action] || '•'}</span>
                   <div className="audit-content">
-                    <div className="audit-action">{log.action.replace(/_/g, ' ')}</div>
+                    <div className="audit-action">{ACTION_LABELS[log.action] || log.action.replace(/_/g, ' ')}</div>
                     {log.details && <div className="audit-details">{log.details}</div>}
                   </div>
                   <span className="audit-time">{formatTime(log.timestamp)}</span>
