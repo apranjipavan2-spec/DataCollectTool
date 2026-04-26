@@ -15,8 +15,8 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('submissions', sa.Column('roster_id', pg.UUID(as_uuid=True), sa.ForeignKey('respondent_roster.id'), nullable=True))
-    op.add_column('respondent_roster', sa.Column('extra_data', pg.JSONB(), server_default="'{}'::jsonb", nullable=True))
+    op.execute("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS roster_id UUID REFERENCES respondent_roster(id)")
+    op.execute("ALTER TABLE respondent_roster ADD COLUMN IF NOT EXISTS extra_data JSONB DEFAULT '{}'::jsonb")
 
 
 def downgrade():

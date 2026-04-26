@@ -406,6 +406,74 @@ def bulk_update_submissions(
     return {"updated": updated, "skipped": skipped}
 
 
+# ── Named sub-routes — must be before /{submission_id} to avoid being captured ─
+
+@router.get("/my-backchecks")
+def get_my_backchecks(user=Depends(require_enumerator), db: Session = Depends(get_db)):
+    """Enumerator: list submissions assigned to me that need back-checking."""
+    rows = db.query(Submission).filter(
+        Submission.tenant_id == user["tenant_id"],
+        Submission.enumerator_id == user["sub"],
+        Submission.backcheck_required == True,
+        Submission.backcheck_form_id != None,
+        Submission.backcheck_completed != True,
+    ).order_by(Submission.server_received_at.desc()).limit(50).all()
+
+    result = []
+    for s in rows:
+        from app.models.form import Form as FormModel
+        bc_form = db.query(FormModel).filter(FormModel.id == s.backcheck_form_id).first()
+        result.append({
+            "original_submission_id": str(s.id),
+            "form_title": s.form_title if hasattr(s, "form_title") else None,
+            "submitted_at": s.server_received_at.isoformat() if s.server_received_at else None,
+            "backcheck_form_id": str(s.backcheck_form_id),
+            "backcheck_form_title": bc_form.title if bc_form else "Back-check Form",
+            "data_json": s.data_json,
+        })
+    return result
+
+
+@router.get("/map-data")
+def get_map_data(
+    form_id: Optional[str] = Query(None),
+    enumerator_id: Optional[str] = Query(None),
+    days: int = Query(30, ge=1, le=365),
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """GPS pins for the live field map. Returns last N days of submissions with GPS."""
+    from datetime import datetime, timezone, timedelta
+    from app.models.form import Form
+    from app.models.user import User as UserModel
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    q = db.query(Submission).filter(
+        Submission.tenant_id == user["tenant_id"],
+        Submission.server_received_at >= cutoff,
+        Submission.gps_submit.isnot(None),
+    )
+    if form_id:
+        q = q.filter(Submission.form_id == form_id)
+    if enumerator_id:
+        q = q.filter(Submission.enumerator_id == enumerator_id)
+
+    subs = q.order_by(Submission.server_received_at.desc()).limit(2000).all()
+
+    enum_map = {str(u.id): u.name for u in db.query(UserModel).filter(UserModel.tenant_id == user["tenant_id"]).all()}
+    form_map = {str(f.id): f.title for f in db.query(Form).filter(Form.tenant_id == user["tenant_id"]).all()}
+
+    return [{
+        "id": str(s.id),
+        "lat": (s.gps_submit or {}).get("lat"),
+        "lng": (s.gps_submit or {}).get("lng"),
+        "accuracy": (s.gps_submit or {}).get("accuracy"),
+        "status": s.status,
+        "enumerator": enum_map.get(str(s.enumerator_id), "Unknown"),
+        "form": form_map.get(str(s.form_id), "Unknown"),
+        "received": s.server_received_at.isoformat() if s.server_received_at else None,
+    } for s in subs if (s.gps_submit or {}).get("lat")]
+
+
 # ── Get single submission ─────────────────────────────────────────────────────
 
 @router.get("/{submission_id}")
@@ -660,32 +728,6 @@ def flag_backcheck(
     return {"id": str(sub.id), "backcheck_required": True}
 
 
-@router.get("/my-backchecks")
-def get_my_backchecks(user=Depends(require_enumerator), db: Session = Depends(get_db)):
-    """Enumerator: list submissions assigned to me that need back-checking."""
-    rows = db.query(Submission).filter(
-        Submission.tenant_id == user["tenant_id"],
-        Submission.enumerator_id == user["sub"],
-        Submission.backcheck_required == True,
-        Submission.backcheck_form_id != None,
-        Submission.backcheck_completed != True,
-    ).order_by(Submission.server_received_at.desc()).limit(50).all()
-
-    result = []
-    for s in rows:
-        from app.models.form import Form as FormModel
-        bc_form = db.query(FormModel).filter(FormModel.id == s.backcheck_form_id).first()
-        result.append({
-            "original_submission_id": str(s.id),
-            "form_title": s.form_title if hasattr(s, "form_title") else None,
-            "submitted_at": s.server_received_at.isoformat() if s.server_received_at else None,
-            "backcheck_form_id": str(s.backcheck_form_id),
-            "backcheck_form_title": bc_form.title if bc_form else "Back-check Form",
-            "data_json": s.data_json,
-        })
-    return result
-
-
 @router.post("/{submission_id}/complete-backcheck")
 def complete_backcheck(
     submission_id: str,
@@ -733,43 +775,3 @@ def assign_backcheck_form(
         "backcheck_required": True,
         "backcheck_form_id": str(sub.backcheck_form_id) if sub.backcheck_form_id else None,
     }
-
-
-@router.get("/map-data")
-def get_map_data(
-    form_id: Optional[str] = Query(None),
-    enumerator_id: Optional[str] = Query(None),
-    days: int = Query(30, ge=1, le=365),
-    user: dict = Depends(require_supervisor),
-    db: Session = Depends(get_db),
-):
-    """GPS pins for the live field map. Returns last N days of submissions with GPS."""
-    from datetime import datetime, timezone, timedelta
-    from app.models.form import Form
-    from app.models.user import User as UserModel
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    q = db.query(Submission).filter(
-        Submission.tenant_id == user["tenant_id"],
-        Submission.server_received_at >= cutoff,
-        Submission.gps_submit.isnot(None),
-    )
-    if form_id:
-        q = q.filter(Submission.form_id == form_id)
-    if enumerator_id:
-        q = q.filter(Submission.enumerator_id == enumerator_id)
-
-    subs = q.order_by(Submission.server_received_at.desc()).limit(2000).all()
-
-    enum_map = {str(u.id): u.name for u in db.query(UserModel).filter(UserModel.tenant_id == user["tenant_id"]).all()}
-    form_map = {str(f.id): f.title for f in db.query(Form).filter(Form.tenant_id == user["tenant_id"]).all()}
-
-    return [{
-        "id": str(s.id),
-        "lat": (s.gps_submit or {}).get("lat"),
-        "lng": (s.gps_submit or {}).get("lng"),
-        "accuracy": (s.gps_submit or {}).get("accuracy"),
-        "status": s.status,
-        "enumerator": enum_map.get(str(s.enumerator_id), "Unknown"),
-        "form": form_map.get(str(s.form_id), "Unknown"),
-        "received": s.server_received_at.isoformat() if s.server_received_at else None,
-    } for s in subs if (s.gps_submit or {}).get("lat")]

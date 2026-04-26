@@ -14,19 +14,12 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('program_questionnaires',
-        sa.Column('wave_number', sa.Integer(), nullable=True))
-    op.add_column('program_questionnaires',
-        sa.Column('wave_label', sa.String(100), nullable=True))
-    op.add_column('program_questionnaires',
-        sa.Column('panel_key', sa.String(200), nullable=True))
-
-    op.add_column('programs',
-        sa.Column('is_panel_study', sa.Boolean(), nullable=True, server_default='false'))
-
-    op.add_column('submissions',
-        sa.Column('household_id', sa.String(500), nullable=True))
-    op.create_index('ix_submissions_household_id', 'submissions', ['household_id', 'tenant_id'])
+    op.execute("ALTER TABLE program_questionnaires ADD COLUMN IF NOT EXISTS wave_number INTEGER")
+    op.execute("ALTER TABLE program_questionnaires ADD COLUMN IF NOT EXISTS wave_label VARCHAR(100)")
+    op.execute("ALTER TABLE program_questionnaires ADD COLUMN IF NOT EXISTS panel_key VARCHAR(200)")
+    op.execute("ALTER TABLE programs ADD COLUMN IF NOT EXISTS is_panel_study BOOLEAN DEFAULT false")
+    op.execute("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS household_id VARCHAR(500)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_submissions_household_id ON submissions (household_id, tenant_id)")
 
 
 def downgrade():

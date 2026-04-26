@@ -8,6 +8,7 @@ class ProgramLocation(Base):
     __tablename__ = "program_locations"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    program_id = Column(UUID(as_uuid=True), ForeignKey("programs.id", ondelete="CASCADE"), nullable=True)
     state = Column(String, default="")
     district = Column(String, nullable=False)
     block = Column(String, default="")

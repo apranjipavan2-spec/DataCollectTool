@@ -15,11 +15,11 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('submissions', sa.Column('has_violations', sa.Boolean(), nullable=True, server_default=sa.text('false')))
-    op.add_column('submissions', sa.Column('consent_given', sa.Boolean(), nullable=True, server_default=sa.text('true')))
-    op.add_column('submissions', sa.Column('consent_timestamp', sa.DateTime(timezone=True), nullable=True))
-    op.add_column('submissions', sa.Column('backcheck_required', sa.Boolean(), nullable=True, server_default=sa.text('false')))
-    op.add_column('submissions', sa.Column('backcheck_form_id', UUID(as_uuid=True), nullable=True))
+    op.execute("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS has_violations BOOLEAN DEFAULT false")
+    op.execute("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS consent_given BOOLEAN DEFAULT true")
+    op.execute("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS consent_timestamp TIMESTAMPTZ")
+    op.execute("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS backcheck_required BOOLEAN DEFAULT false")
+    op.execute("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS backcheck_form_id UUID")
 
 
 def downgrade():

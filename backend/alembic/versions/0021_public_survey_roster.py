@@ -15,22 +15,23 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('forms', sa.Column('public_token', sa.String(64), unique=True, nullable=True))
-    op.add_column('forms', sa.Column('is_public', sa.Boolean(), server_default='false', nullable=True))
-    op.create_table(
-        'respondent_roster',
-        sa.Column('id', pg.UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
-        sa.Column('form_id', pg.UUID(as_uuid=True), sa.ForeignKey('forms.id'), nullable=False),
-        sa.Column('tenant_id', pg.UUID(as_uuid=True), sa.ForeignKey('tenants.id'), nullable=False),
-        sa.Column('name', sa.String(255), nullable=False),
-        sa.Column('phone', sa.String(50)),
-        sa.Column('address', sa.Text()),
-        sa.Column('target_enumerator_id', pg.UUID(as_uuid=True), sa.ForeignKey('users.id'), nullable=True),
-        sa.Column('status', sa.String(20), server_default='pending'),
-        sa.Column('scheduled_date', sa.Date(), nullable=True),
-        sa.Column('notes', sa.Text()),
-        sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.func.now()),
-    )
+    op.execute("ALTER TABLE forms ADD COLUMN IF NOT EXISTS public_token VARCHAR(64)")
+    op.execute("ALTER TABLE forms ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT false")
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS respondent_roster (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            form_id UUID NOT NULL REFERENCES forms(id),
+            tenant_id UUID NOT NULL REFERENCES tenants(id),
+            name VARCHAR(255) NOT NULL,
+            phone VARCHAR(50),
+            address TEXT,
+            target_enumerator_id UUID REFERENCES users(id),
+            status VARCHAR(20) DEFAULT 'pending',
+            scheduled_date DATE,
+            notes TEXT,
+            created_at TIMESTAMPTZ DEFAULT now()
+        )
+    """)
 
 
 def downgrade():

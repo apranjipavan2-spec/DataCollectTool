@@ -152,6 +152,41 @@ _PATCHES = [
     "ALTER TABLE programs ADD COLUMN IF NOT EXISTS is_panel_study BOOLEAN DEFAULT false",
     "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS household_id VARCHAR(500)",
     "CREATE INDEX IF NOT EXISTS ix_submissions_household_id ON submissions (household_id, tenant_id)",
+
+    # 0026 — program_analysis
+    """CREATE TABLE IF NOT EXISTS program_analysis (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        program_id UUID NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+        tenant_id UUID NOT NULL,
+        created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ DEFAULT now(),
+        status TEXT DEFAULT 'done',
+        source TEXT DEFAULT 'manual',
+        objectives TEXT,
+        table_configs JSONB DEFAULT '[]',
+        cleaning_summary JSONB DEFAULT '{}',
+        ai_rationale TEXT,
+        error_text TEXT,
+        run_count INTEGER DEFAULT 0,
+        last_run_at TIMESTAMPTZ
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_program_analysis_program_id ON program_analysis (program_id, tenant_id)",
+
+    # 0027 — backcheck completion, system_settings, form generation status
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS backcheck_completed BOOLEAN DEFAULT false",
+    """CREATE TABLE IF NOT EXISTS system_settings (
+        key TEXT PRIMARY KEY,
+        value JSONB NOT NULL DEFAULT '{}',
+        updated_at TIMESTAMPTZ DEFAULT now()
+    )""",
+    "INSERT INTO system_settings (key, value) VALUES ('ai_config', '{}') ON CONFLICT DO NOTHING",
+    "ALTER TABLE forms ADD COLUMN IF NOT EXISTS generation_status TEXT DEFAULT 'done'",
+    "ALTER TABLE forms ADD COLUMN IF NOT EXISTS generation_error TEXT",
+
+    # 0028 — program_id on program_locations
+    "ALTER TABLE program_locations ADD COLUMN IF NOT EXISTS program_id UUID REFERENCES programs(id) ON DELETE CASCADE",
+    "CREATE INDEX IF NOT EXISTS ix_program_locations_program_id ON program_locations (program_id, tenant_id)",
 ]
 
 from sqlalchemy import text as _text

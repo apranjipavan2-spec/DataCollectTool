@@ -15,7 +15,7 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('tenants', sa.Column('ai_config', JSONB(), server_default="'{}'::jsonb", nullable=True))
+    op.execute("ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ai_config JSONB DEFAULT '{}'::jsonb")
 
 
 def downgrade():
