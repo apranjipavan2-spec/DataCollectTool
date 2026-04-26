@@ -15,6 +15,12 @@ depends_on = None
 
 
 def upgrade():
+    conn = op.get_bind()
+    exists = conn.execute(sa.text(
+        "SELECT 1 FROM information_schema.tables WHERE table_name='program_analysis'"
+    )).fetchone()
+    if exists:
+        return
     op.create_table(
         'program_analysis',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
