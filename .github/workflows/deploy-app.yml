@@ -109,8 +109,9 @@ jobs:
             docker compose exec -T app sh -c "alembic upgrade head 2>&1 || true"
 
             # ── 5. Build and restart analyzer + cleaner using prod compose file ─
-            docker compose -f /opt/fieldgovern/deploy/docker-compose.prod.yml build analyzer cleaner
-            docker compose -f /opt/fieldgovern/deploy/docker-compose.prod.yml up -d --no-deps analyzer cleaner
+            # -p fieldgovern ensures they join fieldgovern_default network (same as nginx)
+            docker compose -p fieldgovern -f /opt/fieldgovern/deploy/docker-compose.prod.yml build analyzer cleaner
+            docker compose -p fieldgovern -f /opt/fieldgovern/deploy/docker-compose.prod.yml up -d --no-deps analyzer cleaner
 
             # ── 6. Prune old images to save disk space ─────────────────────────
             docker image prune -f
