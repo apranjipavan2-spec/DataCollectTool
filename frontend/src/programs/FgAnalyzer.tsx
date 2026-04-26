@@ -1127,6 +1127,27 @@ export default function FgAnalyzer() {
               <div className="p-4 rounded-xl bg-catalan-error/10 border border-catalan-error/30 text-catalan-error text-sm">{error}</div>
             )}
 
+            {/* Launch banner — always visible once a program is selected */}
+            {programId && !loading && (
+              <div className="mb-6 bg-catalan-surface border border-catalan-border rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex-1">
+                  <div className="text-base font-semibold text-catalan-text mb-1">TableForge — Data Analyzer Wizard</div>
+                  <p className="text-sm text-catalan-textMuted leading-relaxed">
+                    Build cross-tabs, frequency tables, and statistical summaries from your program data. Export to Excel with one click, generate AI-powered table suggestions, and run panel-study attrition reports — all in the full-screen wizard.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    const token = localStorage.getItem('fp_token')
+                    window.open(`${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}`, '_blank')
+                  }}
+                  className="shrink-0 px-5 py-2.5 bg-catalan-primary text-catalan-bg rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity whitespace-nowrap"
+                >
+                  Open Analyzer Wizard →
+                </button>
+              </div>
+            )}
+
             {programId && data && !loading && (
               <>
                 <div className="flex gap-1 mb-6 border-b border-catalan-border">

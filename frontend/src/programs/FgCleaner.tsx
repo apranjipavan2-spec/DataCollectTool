@@ -106,6 +106,27 @@ export default function FgCleaner() {
               </div>
             )}
 
+            {/* Launch banner */}
+            {programId && (
+              <div className="mb-5 bg-catalan-surface border border-catalan-border rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex-1">
+                  <div className="text-base font-semibold text-catalan-text mb-1">DataCleaner — Data Cleaner Wizard</div>
+                  <p className="text-sm text-catalan-textMuted leading-relaxed">
+                    Deduplicate records, remap columns, fix inconsistencies, and export a clean dataset — all in the full-screen wizard. Use the quality view below for a quick scan, then launch the wizard for deep cleaning.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    const token = localStorage.getItem('fp_token')
+                    window.open(`${window.location.origin}/cleaner/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}`, '_blank')
+                  }}
+                  className="shrink-0 px-5 py-2.5 bg-catalan-primary text-catalan-bg rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity whitespace-nowrap"
+                >
+                  Open Cleaner Wizard →
+                </button>
+              </div>
+            )}
+
             {programId && (
               <>
                 {/* Quality score banner */}

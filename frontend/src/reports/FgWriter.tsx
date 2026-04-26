@@ -231,6 +231,24 @@ export default function FgWriter() {
               </div>
             )}
 
+            {/* Launch banner */}
+            {programId && (
+              <div className="mb-5 bg-catalan-surface border border-catalan-border rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex-1">
+                  <div className="text-base font-semibold text-catalan-text mb-1">FG Writer — AI Report Generator</div>
+                  <p className="text-sm text-catalan-textMuted leading-relaxed">
+                    Generate a structured, publication-ready report from your program's data and saved tabulations. Choose a report style (field survey, government, NGO, research), add context, and export to Word. Build your tables in FG Analyzer first for best results.
+                  </p>
+                </div>
+                <a
+                  href="/fg/analyzer"
+                  className="shrink-0 px-5 py-2.5 border border-catalan-border text-catalan-text rounded-lg text-sm font-semibold hover:bg-catalan-hover transition-colors whitespace-nowrap"
+                >
+                  Build Tables in Analyzer →
+                </a>
+              </div>
+            )}
+
             {programId && (
               <>
                 {/* Tabulations from Analyzer */}
