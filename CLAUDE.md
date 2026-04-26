@@ -3,6 +3,7 @@
 > Authoritative guide for Claude Code. Read `tasks/todo.md` + `tasks/lessons.md` at session start.
 > **MASTER ROADMAP:** `planning/MASTER_ROADMAP.md` — single source of truth for all initiatives. Start here for any new work.
 > **DEPLOYMENT SESSION:** Read `process_deployment.md` first (local only, has credentials + full process).
+> **TOOLS (Analyzer/Cleaner):** `deploy-knowledge/TOOLS_DEV_GUIDE.md` — where to edit TableForge & DataCleaner, deploy flow, patterns, gotchas.
 
 ---
 
