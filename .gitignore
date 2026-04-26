@@ -73,5 +73,9 @@ MiroFish/
 # Data analysis files
 *.xlsx
 website/status.html
+
+# Local archive (Railway configs + old tools, zipped for reference)
+_archive/
+_archive.zip
 deploy/monitor-config.json
 process_deployment.md
