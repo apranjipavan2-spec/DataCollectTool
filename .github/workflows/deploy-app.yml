@@ -103,38 +103,48 @@ jobs:
             docker build -t fieldgovern-analyzer:latest /opt/fieldgovern/tools/tableforge
             docker build -t fieldgovern-cleaner:latest /opt/fieldgovern/tools/datacleaner
 
-            # ── 4. Attach tools to same network as nginx ─────────────────────────
-            # Get the exact network nginx is connected to
+            # ── 4. Ensure a dedicated tools network exists and nginx is on it ────
+            docker network create fg-tools 2>/dev/null || echo "fg-tools network already exists"
             NGINX_ID=$(docker ps -q -f "name=nginx" | head -1)
-            MAIN_NET=$(docker inspect "$NGINX_ID" --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' | grep -v '^$' | head -1)
-            [ -z "$MAIN_NET" ] && MAIN_NET="fieldgovern_default"
-            echo "Nginx is on network: $MAIN_NET"
+            echo "Nginx container ID: $NGINX_ID"
+            if [ -z "$NGINX_ID" ]; then
+              echo "ERROR: no running nginx container found"
+              docker ps
+              exit 1
+            fi
+            docker network connect fg-tools "$NGINX_ID" 2>/dev/null || echo "nginx already on fg-tools"
 
-            # Stop old containers (from any previous compose-based deploys)
-            docker rm -f analyzer cleaner 2>/dev/null || true
-
-            # Start with docker run — explicit network, no compose project ambiguity
-            docker run -d --name analyzer --network "$MAIN_NET" --restart unless-stopped \
-              -v fieldgovern_tableforge_data:/app/projects \
-              -v fieldgovern_tableforge_exports:/app/exports \
+            # ── 5. Stop old containers and start fresh on fg-tools network ───────
+            # Remove any containers whose name contains 'analyzer' or 'cleaner'
+            # (catches compose-named variants like fieldgovern-analyzer-1 too)
+            docker ps -aq -f "name=analyzer" | xargs docker rm -f 2>/dev/null || true
+            docker ps -aq -f "name=cleaner"  | xargs docker rm -f 2>/dev/null || true
+            docker run -d --name analyzer --network fg-tools --restart unless-stopped \
+              -v fg_tableforge_data:/app/projects \
+              -v fg_tableforge_exports:/app/exports \
               fieldgovern-analyzer:latest
-
-            docker run -d --name cleaner --network "$MAIN_NET" --restart unless-stopped \
-              -v fieldgovern_cleaner_data:/app/working_copies \
+            docker run -d --name cleaner --network fg-tools --restart unless-stopped \
+              -v fg_cleaner_data:/app/working_copies \
               fieldgovern-cleaner:latest
 
-            # ── 5. Reload nginx AFTER tools are running ──────────────────────────
+            # ── 6. Reload nginx AFTER tools are running ──────────────────────────
             curl -fsSL "https://raw.githubusercontent.com/apranjipavan2-spec/DataCollectTool/main/deploy/nginx.conf" \
               -o /opt/fieldgovern/nginx.conf
-            docker compose exec -T nginx nginx -t
-            docker compose exec -T nginx nginx -s reload
-            echo "Nginx reloaded with updated config"
+            echo "--- nginx.conf analyzer block ---"
+            grep -A4 "location /analyzer" /opt/fieldgovern/nginx.conf || echo "WARNING: no analyzer block found"
+            docker exec "$NGINX_ID" nginx -t
+            docker exec "$NGINX_ID" nginx -s reload
+            echo "Nginx reloaded"
 
-            # ── 6. Diagnostics ───────────────────────────────────────────────────
+            # ── 7. Diagnostics ───────────────────────────────────────────────────
             echo "=== Running containers ==="
             docker ps --format "table {{.Names}}\t{{.Status}}"
+            echo "=== fg-tools network members ==="
+            docker network inspect fg-tools --format '{{range .Containers}}{{.Name}} {{end}}'
+            echo "=== Nginx networks ==="
+            docker inspect "$NGINX_ID" --format '{{range $k,$v := .NetworkSettings.Networks}}  - {{$k}}{{"\n"}}{{end}}'
 
-            # ── 7. Prune old images ──────────────────────────────────────────────
+            # ── 8. Prune old images ──────────────────────────────────────────────
             docker image prune -f
             echo "Deploy complete — $(date)"
 
