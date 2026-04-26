@@ -89,43 +89,53 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
+            cd /opt/fieldgovern
 
-            # Single compose invocation — all services share one project (fieldgovern)
-            # and one network (fieldgovern_default), so nginx can resolve analyzer/cleaner.
-            DC="docker compose --project-directory /opt/fieldgovern -f /opt/fieldgovern/deploy/docker-compose.prod.yml"
-
-            # ── 1. Pull latest app image ────────────────────────────────────────
+            # ── 1. Pull and restart main app ────────────────────────────────────
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u apranjipavan2-spec --password-stdin
-            $DC pull app
+            docker compose pull app
+            docker compose up -d --no-deps app
 
-            # ── 2. Restart app (zero-downtime) ──────────────────────────────────
-            $DC up -d --no-deps app
+            # ── 2. Run DB migrations ─────────────────────────────────────────────
+            docker compose exec -T app sh -c "alembic upgrade head 2>&1 || true"
 
-            # ── 3. Run DB migrations (idempotent — safe to run every deploy) ───
-            $DC exec -T app sh -c "alembic upgrade head 2>&1 || true"
+            # ── 3. Build analyzer and cleaner images on VPS ─────────────────────
+            docker build -t fieldgovern-analyzer:latest /opt/fieldgovern/tools/tableforge
+            docker build -t fieldgovern-cleaner:latest /opt/fieldgovern/tools/datacleaner
 
-            # ── 4. Build and restart analyzer + cleaner ─────────────────────────
-            $DC build analyzer cleaner
-            $DC up -d --no-deps analyzer cleaner
+            # ── 4. Attach tools to same network as nginx ─────────────────────────
+            # Get the exact network nginx is connected to
+            NGINX_ID=$(docker ps -q -f "name=nginx" | head -1)
+            MAIN_NET=$(docker inspect "$NGINX_ID" --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' | grep -v '^$' | head -1)
+            [ -z "$MAIN_NET" ] && MAIN_NET="fieldgovern_default"
+            echo "Nginx is on network: $MAIN_NET"
 
-            # ── 5. Update nginx config AFTER all services are up ────────────────
-            # nginx -t resolves 'analyzer'/'cleaner' via Docker DNS — containers
-            # must be running first or nginx rejects the config.
+            # Stop old containers (from any previous compose-based deploys)
+            docker rm -f analyzer cleaner 2>/dev/null || true
+
+            # Start with docker run — explicit network, no compose project ambiguity
+            docker run -d --name analyzer --network "$MAIN_NET" --restart unless-stopped \
+              -v fieldgovern_tableforge_data:/app/projects \
+              -v fieldgovern_tableforge_exports:/app/exports \
+              fieldgovern-analyzer:latest
+
+            docker run -d --name cleaner --network "$MAIN_NET" --restart unless-stopped \
+              -v fieldgovern_cleaner_data:/app/working_copies \
+              fieldgovern-cleaner:latest
+
+            # ── 5. Reload nginx AFTER tools are running ──────────────────────────
             curl -fsSL "https://raw.githubusercontent.com/apranjipavan2-spec/DataCollectTool/main/deploy/nginx.conf" \
               -o /opt/fieldgovern/nginx.conf
-            $DC exec -T nginx nginx -t
-            $DC exec -T nginx nginx -s reload
-            echo "Nginx config updated and reloaded"
+            docker compose exec -T nginx nginx -t
+            docker compose exec -T nginx nginx -s reload
+            echo "Nginx reloaded with updated config"
 
-            # ── 6. Diagnostics ──────────────────────────────────────────────────
+            # ── 6. Diagnostics ───────────────────────────────────────────────────
             echo "=== Running containers ==="
             docker ps --format "table {{.Names}}\t{{.Status}}"
-            echo "=== Networks ==="
-            docker network ls --filter "name=fieldgovern"
 
-            # ── 7. Prune old images to save disk space ─────────────────────────
+            # ── 7. Prune old images ──────────────────────────────────────────────
             docker image prune -f
-
             echo "Deploy complete — $(date)"
 
       - name: Health check

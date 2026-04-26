@@ -73,6 +73,3 @@ volumes:
   tableforge_exports:
   cleaner_data:
 
-networks:
-  default:
-    name: fieldgovern_default
