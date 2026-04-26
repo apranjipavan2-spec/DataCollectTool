@@ -50,6 +50,8 @@ export function TopBar({ onFileUpload, dataset, onAction, onToggleTheme, theme, 
     {
       label: 'Data',
       items: [
+        { label: 'Import CSV / Excel…', icon: '📂', action: 'import' },
+        { divider: true },
         { label: 'Metrics Builder', icon: '𝑓', action: 'metrics', disabled: !dataset },
         { label: 'Bin Creator', icon: '⊕', action: 'bins', disabled: !dataset },
         { label: 'Period Comparisons', icon: '↔', action: 'comparison', disabled: !dataset },

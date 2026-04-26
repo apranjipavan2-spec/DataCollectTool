@@ -1240,7 +1240,7 @@ async def generate_program_report(
 @router.get("/programs/{program_id}/export.xlsx")
 def export_program_xlsx(
     program_id: str,
-    questionnaire_id: str = None,
+    questionnaire_id: Optional[str] = None,
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
@@ -1255,7 +1255,10 @@ def export_program_xlsx(
         Submission.tenant_id == user["tenant_id"],
     )
     if questionnaire_id:
-        q = q.filter(Submission.questionnaire_id == questionnaire_id)
+        try:
+            q = q.filter(Submission.questionnaire_id == _uuid.UUID(questionnaire_id))
+        except ValueError:
+            raise HTTPException(400, "Invalid questionnaire_id format")
     subs = q.all()
 
     enum_map = _build_enumerator_map(db, user["tenant_id"])
