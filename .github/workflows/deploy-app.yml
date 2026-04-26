@@ -9,6 +9,7 @@ on:
       - "Dockerfile"
       - "deploy/**"
       - "tools/**"
+      - ".github/workflows/deploy-app.yml"
   workflow_dispatch:
 
 env:
