@@ -438,20 +438,21 @@ def get_my_backchecks(user=Depends(require_enumerator), db: Session = Depends(ge
 def get_map_data(
     form_id: Optional[str] = Query(None),
     enumerator_id: Optional[str] = Query(None),
-    days: int = Query(30, ge=1, le=365),
+    days: int = Query(30, ge=0, le=3650),
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
-    """GPS pins for the live field map. Returns last N days of submissions with GPS."""
+    """GPS pins for the live field map. Returns last N days of submissions with GPS. days=0 means all time."""
     from datetime import datetime, timezone, timedelta
     from app.models.form import Form
     from app.models.user import User as UserModel
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     q = db.query(Submission).filter(
         Submission.tenant_id == user["tenant_id"],
-        Submission.server_received_at >= cutoff,
         Submission.gps_submit.isnot(None),
     )
+    if days > 0:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        q = q.filter(Submission.server_received_at >= cutoff)
     if form_id:
         q = q.filter(Submission.form_id == form_id)
     if enumerator_id:

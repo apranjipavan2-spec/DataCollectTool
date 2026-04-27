@@ -134,6 +134,8 @@ export default function ProgressDashboard() {
     </th>
   )
 
+  const selectedProgData = programs.find(p => p.id === selectedProg)
+
   return (
     <div className="flex h-screen bg-catalan-bg">
       <Sidebar items={getNavItems(user?.role ?? '')} role={user?.role} />
@@ -143,222 +145,245 @@ export default function ProgressDashboard() {
           title="Progress"
           breadcrumbs={[{ label: 'Progress Dashboard' }]}
           rightContent={
-            <div className="flex gap-2">
-              <button
-                disabled={!selectedProg || exporting === 'xlsx'}
-                onClick={() => exportFile('xlsx')}
-                className="px-3 py-1.5 text-sm border border-catalan-border rounded-lg bg-catalan-surface text-catalan-text hover:bg-catalan-hover disabled:opacity-40 transition-colors"
-              >
-                {exporting === 'xlsx' ? 'Exporting…' : '⬇ Excel'}
-              </button>
-              <button
-                disabled={!selectedProg || exporting === 'pdf'}
-                onClick={() => exportFile('pdf')}
-                className="px-3 py-1.5 text-sm border border-catalan-border rounded-lg bg-catalan-surface text-catalan-text hover:bg-catalan-hover disabled:opacity-40 transition-colors"
-              >
-                {exporting === 'pdf' ? 'Exporting…' : '⬇ PDF Report'}
-              </button>
-            </div>
+            selectedProg ? (
+              <div className="flex gap-2">
+                <button onClick={() => { setSelectedProg(''); setData(null) }}
+                  className="px-3 py-1.5 text-sm border border-catalan-border rounded-lg text-catalan-textMuted hover:bg-catalan-hover transition-colors">
+                  ← All Programs
+                </button>
+                <button disabled={exporting === 'xlsx'} onClick={() => exportFile('xlsx')}
+                  className="px-3 py-1.5 text-sm border border-catalan-border rounded-lg bg-catalan-surface text-catalan-text hover:bg-catalan-hover disabled:opacity-40 transition-colors">
+                  {exporting === 'xlsx' ? 'Exporting…' : '⬇ Excel'}
+                </button>
+                <button disabled={exporting === 'pdf'} onClick={() => exportFile('pdf')}
+                  className="px-3 py-1.5 text-sm border border-catalan-border rounded-lg bg-catalan-surface text-catalan-text hover:bg-catalan-hover disabled:opacity-40 transition-colors">
+                  {exporting === 'pdf' ? 'Exporting…' : '⬇ PDF'}
+                </button>
+              </div>
+            ) : null
           }
         />
 
         <main className="flex-1 overflow-auto">
           <div className="max-w-7xl mx-auto p-6">
 
-            {/* Overview cards — cross-program */}
-            {!selectedProg && programs.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                {programs.map(p => (
-                  <div
-                    key={p.id}
-                    className="bg-catalan-surface border border-catalan-border rounded-xl p-4 cursor-pointer hover:border-catalan-primary/50 transition-colors"
-                    onClick={() => setSelectedProg(p.id)}
-                  >
-                    <div className="flex items-start justify-between mb-1">
-                      <div className="font-semibold text-sm text-catalan-text">{p.name}</div>
-                      {p.overdue > 0 && (
-                        <span className="text-xs bg-catalan-error/10 text-catalan-error px-1.5 py-0.5 rounded">
-                          {p.overdue} overdue
-                        </span>
-                      )}
-                    </div>
-                    {p.scheme_name && <div className="text-xs text-catalan-textMuted mb-2">{p.scheme_name}</div>}
-                    <div className="flex justify-between text-xs text-catalan-textMuted mb-1">
-                      <span>{p.total_collected} / {p.total_target} collected</span>
-                      <span className="font-medium text-catalan-text">{p.pct}%</span>
-                    </div>
-                    <ProgressBar pct={p.pct} />
+            {/* ── Program tile grid ── */}
+            {!selectedProg && (
+              <>
+                {programs.length === 0 ? (
+                  <div className="text-center py-16 text-catalan-textMuted">
+                    <div className="text-4xl mb-3">📈</div>
+                    <p className="font-medium text-catalan-text mb-1">No active programs</p>
+                    <p className="text-sm">Create a program in the Programs page to start tracking progress.</p>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {!selectedProg && programs.length === 0 && (
-              <div className="text-center py-16 text-catalan-textMuted">
-                <div className="text-4xl mb-3">📈</div>
-                <p className="font-medium text-catalan-text mb-1">No programs yet</p>
-                <p className="text-sm">Create a program in the Programs tab to start tracking progress.</p>
-              </div>
-            )}
-
-            {/* Filter bar */}
-            <div className="bg-catalan-surface border border-catalan-border rounded-xl p-4 mb-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="text-xs text-catalan-textMuted font-medium">Program</label>
-                  <select
-                    className={`${inputCls} mt-0.5`}
-                    value={selectedProg}
-                    onChange={e => {
-                      setSelectedProg(e.target.value)
-                      setFilters({ participant_type_id: '', questionnaire_id: '', district: '', block: '', status: '' })
-                    }}
-                  >
-                    <option value="">— All Programs —</option>
-                    {programs.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}{p.scheme_name ? ` (${p.scheme_name})` : ''}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-catalan-textMuted font-medium">Participant Type</label>
-                  <select className={`${inputCls} mt-0.5`} value={filters.participant_type_id}
-                    onChange={e => setFilter('participant_type_id', e.target.value)} disabled={!selectedProg}>
-                    <option value="">— All —</option>
-                    {ptypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-catalan-textMuted font-medium">Questionnaire</label>
-                  <select className={`${inputCls} mt-0.5`} value={filters.questionnaire_id}
-                    onChange={e => setFilter('questionnaire_id', e.target.value)} disabled={!selectedProg}>
-                    <option value="">— All —</option>
-                    {questionnaires.map(q => <option key={q.id} value={q.id}>{q.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-catalan-textMuted font-medium">District</label>
-                  <input className={`${inputCls} mt-0.5`} placeholder="Filter district…"
-                    value={filters.district} onChange={e => setFilter('district', e.target.value)} disabled={!selectedProg} />
-                </div>
-                <div>
-                  <label className="text-xs text-catalan-textMuted font-medium">Block</label>
-                  <input className={`${inputCls} mt-0.5`} placeholder="Filter block…"
-                    value={filters.block} onChange={e => setFilter('block', e.target.value)} disabled={!selectedProg} />
-                </div>
-                <div>
-                  <label className="text-xs text-catalan-textMuted font-medium">Status</label>
-                  <select className={`${inputCls} mt-0.5`} value={filters.status}
-                    onChange={e => setFilter('status', e.target.value)} disabled={!selectedProg}>
-                    <option value="">— All —</option>
-                    {['not_started', 'in_progress', 'at_risk', 'completed', 'overdue'].map(s => (
-                      <option key={s} value={s}>{s.replace('_', ' ')}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Summary cards */}
-            {data && (
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-4">
-                <SummaryCard label="Target" value={data.summary.total_target} />
-                <SummaryCard label="Collected" value={data.summary.total_collected} color="text-catalan-primary" />
-                <SummaryCard label="Remaining" value={data.summary.remaining} color="text-catalan-textMuted" />
-                <SummaryCard label="Complete" value={`${data.summary.pct}%`}
-                  color={data.summary.pct >= 100 ? 'text-catalan-success' : 'text-catalan-primary'} />
-                <SummaryCard label="Overdue" value={data.summary.overdue}
-                  color={data.summary.overdue > 0 ? 'text-catalan-error' : 'text-catalan-textMuted'} />
-                <SummaryCard label="At Risk" value={data.summary.at_risk}
-                  color={data.summary.at_risk > 0 ? 'text-catalan-warning' : 'text-catalan-textMuted'} />
-              </div>
-            )}
-
-            {/* Search + table */}
-            {selectedProg && (
-              <div className="bg-catalan-surface border border-catalan-border rounded-xl overflow-hidden">
-                <div className="px-4 py-3 border-b border-catalan-border">
-                  <input
-                    className="w-full border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text placeholder:text-catalan-textMuted focus:ring-2 focus:ring-catalan-primary outline-none"
-                    placeholder="Search by district, block, village, questionnaire…"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                  />
-                </div>
-
-                {loading ? (
-                  <div className="py-12 text-center text-catalan-textMuted">Loading progress…</div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-catalan-bg border-b border-catalan-border">
-                        <tr>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Questionnaire</th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Type</th>
-                          <Th k="district" label="District" />
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Block</th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Village</th>
-                          <Th k="remaining" label="Target" />
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Collected</th>
-                          <Th k="pct" label="%" />
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Progress</th>
-                          <Th k="status" label="Status" />
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Deadline</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-catalan-border">
-                        {rows.map(r => (
-                          <tr key={r.target_id} className={`hover:bg-catalan-hover transition-colors ${STATUS_ROW[r.status] ?? ''}`}>
-                            <td className="px-3 py-2.5 font-medium text-catalan-text">{r.questionnaire_name}</td>
-                            <td className="px-3 py-2.5 text-catalan-textMuted">{r.participant_type_name || '—'}</td>
-                            <td className="px-3 py-2.5 text-catalan-text">{r.district}</td>
-                            <td className="px-3 py-2.5 text-catalan-textMuted">{r.block || '—'}</td>
-                            <td className="px-3 py-2.5 text-catalan-textMuted">{r.village || '—'}</td>
-                            <td className="px-3 py-2.5 text-center font-medium text-catalan-text">{r.target}</td>
-                            <td className="px-3 py-2.5 text-center text-catalan-primary font-medium">{r.collected}</td>
-                            <td className="px-3 py-2.5 text-center font-bold text-catalan-text">{r.pct}%</td>
-                            <td className="px-3 py-2.5 w-24"><ProgressBar pct={r.pct} size="sm" /></td>
-                            <td className="px-3 py-2.5">
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[r.status] ?? 'bg-catalan-textMuted/10 text-catalan-textMuted'}`}>
-                                {r.status.replace('_', ' ')}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {programs.map(p => (
+                      <div
+                        key={p.id}
+                        className="bg-catalan-surface border border-catalan-border rounded-xl p-5 cursor-pointer hover:border-catalan-primary/60 hover:shadow-md transition-all group"
+                        onClick={() => {
+                          setSelectedProg(p.id)
+                          setFilters({ participant_type_id: '', questionnaire_id: '', district: '', block: '', status: '' })
+                        }}
+                      >
+                        <div className="flex items-start justify-between mb-1.5">
+                          <div className="font-semibold text-catalan-text group-hover:text-catalan-primary transition-colors leading-tight">{p.name}</div>
+                          <div className="flex gap-1 flex-shrink-0 ml-2">
+                            {p.overdue > 0 && (
+                              <span className="text-xs bg-catalan-error/10 text-catalan-error px-1.5 py-0.5 rounded-full font-medium">
+                                {p.overdue} overdue
                               </span>
-                            </td>
-                            <td className="px-3 py-2.5 text-xs">
-                              {r.deadline ? (
-                                <span className={
-                                  r.days_remaining !== null && r.days_remaining < 0
-                                    ? 'text-catalan-error font-medium'
-                                    : r.days_remaining !== null && r.days_remaining <= 7
-                                    ? 'text-catalan-warning'
-                                    : 'text-catalan-textMuted'
-                                }>
-                                  {r.deadline}{' '}
-                                  {r.days_remaining !== null && (
-                                    <span>({r.days_remaining < 0 ? `${Math.abs(r.days_remaining)}d late` : `${r.days_remaining}d left`})</span>
-                                  )}
-                                </span>
-                              ) : '—'}
-                            </td>
-                          </tr>
-                        ))}
-                        {rows.length === 0 && !loading && (
-                          <tr>
-                            <td colSpan={11} className="py-10 text-center text-catalan-textMuted">
-                              {data ? 'No location targets match your filters' : 'Select a program to view progress'}
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
+                            )}
+                            {p.at_risk > 0 && (
+                              <span className="text-xs bg-catalan-warning/10 text-catalan-warning px-1.5 py-0.5 rounded-full font-medium">
+                                {p.at_risk} at risk
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {p.scheme_name && <div className="text-xs text-catalan-textMuted mb-3">{p.scheme_name}</div>}
+                        <div className="flex justify-between text-xs text-catalan-textMuted mb-1.5">
+                          <span>{p.total_collected.toLocaleString()} / {p.total_target.toLocaleString()} collected</span>
+                          <span className={`font-bold ${p.pct >= 100 ? 'text-catalan-success' : p.pct >= 70 ? 'text-catalan-primary' : p.pct >= 30 ? 'text-catalan-warning' : 'text-catalan-error'}`}>
+                            {p.pct}%
+                          </span>
+                        </div>
+                        <ProgressBar pct={p.pct} />
+                        <div className="mt-3 flex items-center justify-between text-xs">
+                          <span className={`px-2 py-0.5 rounded-full font-medium ${p.status === 'active' ? 'bg-catalan-success/10 text-catalan-success' : 'bg-catalan-primary/10 text-catalan-primary'}`}>
+                            {p.status}
+                          </span>
+                          <span className="text-catalan-primary group-hover:underline text-xs">View details →</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── Selected program detail ── */}
+            {selectedProg && (
+              <>
+                {/* Program summary tile at top */}
+                {selectedProgData && (
+                  <div className="bg-catalan-surface border border-catalan-border rounded-xl p-5 mb-5">
+                    <div className="flex items-start justify-between mb-1">
+                      <div>
+                        <h2 className="text-lg font-bold text-catalan-text">{selectedProgData.name}</h2>
+                        {selectedProgData.scheme_name && <p className="text-sm text-catalan-textMuted">{selectedProgData.scheme_name}</p>}
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${selectedProgData.status === 'active' ? 'bg-catalan-success/10 text-catalan-success' : 'bg-catalan-primary/10 text-catalan-primary'}`}>
+                        {selectedProgData.status}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 sm:grid-cols-6 gap-3">
+                      <SummaryCard label="Target" value={selectedProgData.total_target.toLocaleString()} />
+                      <SummaryCard label="Collected" value={selectedProgData.total_collected.toLocaleString()} color="text-catalan-primary" />
+                      <SummaryCard label="Remaining" value={Math.max(0, selectedProgData.total_target - selectedProgData.total_collected).toLocaleString()} color="text-catalan-textMuted" />
+                      <SummaryCard label="Complete" value={`${selectedProgData.pct}%`}
+                        color={selectedProgData.pct >= 100 ? 'text-catalan-success' : 'text-catalan-primary'} />
+                      <SummaryCard label="Overdue" value={selectedProgData.overdue}
+                        color={selectedProgData.overdue > 0 ? 'text-catalan-error' : 'text-catalan-textMuted'} />
+                      <SummaryCard label="At Risk" value={selectedProgData.at_risk}
+                        color={selectedProgData.at_risk > 0 ? 'text-catalan-warning' : 'text-catalan-textMuted'} />
+                    </div>
+                    <div className="mt-3">
+                      <ProgressBar pct={selectedProgData.pct} />
+                    </div>
                   </div>
                 )}
 
-                {rows.length > 0 && (
-                  <div className="px-4 py-2 border-t border-catalan-border text-xs text-catalan-textMuted">
-                    {rows.length} location target(s) shown
+                {/* Filters */}
+                <div className="bg-catalan-surface border border-catalan-border rounded-xl p-4 mb-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                    <div>
+                      <label className="text-xs text-catalan-textMuted font-medium">Participant Type</label>
+                      <select className={`${inputCls} mt-0.5`} value={filters.participant_type_id}
+                        onChange={e => setFilter('participant_type_id', e.target.value)}>
+                        <option value="">— All —</option>
+                        {ptypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-catalan-textMuted font-medium">Questionnaire</label>
+                      <select className={`${inputCls} mt-0.5`} value={filters.questionnaire_id}
+                        onChange={e => setFilter('questionnaire_id', e.target.value)}>
+                        <option value="">— All —</option>
+                        {questionnaires.map(q => <option key={q.id} value={q.id}>{q.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-catalan-textMuted font-medium">District</label>
+                      <input className={`${inputCls} mt-0.5`} placeholder="Filter district…"
+                        value={filters.district} onChange={e => setFilter('district', e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-catalan-textMuted font-medium">Block</label>
+                      <input className={`${inputCls} mt-0.5`} placeholder="Filter block…"
+                        value={filters.block} onChange={e => setFilter('block', e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-catalan-textMuted font-medium">Status</label>
+                      <select className={`${inputCls} mt-0.5`} value={filters.status}
+                        onChange={e => setFilter('status', e.target.value)}>
+                        <option value="">— All —</option>
+                        {['not_started', 'in_progress', 'at_risk', 'completed', 'overdue'].map(s => (
+                          <option key={s} value={s}>{s.replace('_', ' ')}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                )}
-              </div>
+                </div>
+
+                {/* Location-target detail table */}
+                <div className="bg-catalan-surface border border-catalan-border rounded-xl overflow-hidden">
+                  <div className="px-4 py-3 border-b border-catalan-border flex items-center gap-3">
+                    <input
+                      className="flex-1 border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text placeholder:text-catalan-textMuted focus:ring-2 focus:ring-catalan-primary outline-none"
+                      placeholder="Search by district, block, village, questionnaire…"
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                    />
+                    <span className="text-xs text-catalan-textMuted whitespace-nowrap">
+                      {loading ? 'Loading…' : `${rows.length} row(s)`}
+                    </span>
+                  </div>
+
+                  {loading ? (
+                    <div className="py-12 text-center text-catalan-textMuted">Loading location-level progress…</div>
+                  ) : rows.length === 0 && data ? (
+                    <div className="py-10 text-center text-catalan-textMuted">
+                      <div className="text-3xl mb-3">📍</div>
+                      <p className="font-medium text-catalan-text mb-1">No location targets set up</p>
+                      <p className="text-sm max-w-md mx-auto">
+                        This program doesn't have location targets configured yet.
+                        Go to <strong>Programs</strong> → select this program → add questionnaires with location targets to see per-location progress here.
+                      </p>
+                      <p className="text-sm text-catalan-primary mt-2">
+                        Overall progress is shown in the summary above.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-catalan-bg border-b border-catalan-border">
+                          <tr>
+                            <th className="px-3 py-2.5 text-left text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Questionnaire</th>
+                            <th className="px-3 py-2.5 text-left text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Type</th>
+                            <Th k="district" label="District" />
+                            <th className="px-3 py-2.5 text-left text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Block</th>
+                            <th className="px-3 py-2.5 text-left text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Village</th>
+                            <Th k="remaining" label="Target" />
+                            <th className="px-3 py-2.5 text-left text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Collected</th>
+                            <Th k="pct" label="%" />
+                            <th className="px-3 py-2.5 text-left text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Progress</th>
+                            <Th k="status" label="Status" />
+                            <th className="px-3 py-2.5 text-left text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Deadline</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-catalan-border">
+                          {rows.map(r => (
+                            <tr key={r.target_id} className={`hover:bg-catalan-hover transition-colors ${STATUS_ROW[r.status] ?? ''}`}>
+                              <td className="px-3 py-2.5 font-medium text-catalan-text">{r.questionnaire_name}</td>
+                              <td className="px-3 py-2.5 text-catalan-textMuted">{r.participant_type_name || '—'}</td>
+                              <td className="px-3 py-2.5 text-catalan-text">{r.district}</td>
+                              <td className="px-3 py-2.5 text-catalan-textMuted">{r.block || '—'}</td>
+                              <td className="px-3 py-2.5 text-catalan-textMuted">{r.village || '—'}</td>
+                              <td className="px-3 py-2.5 text-center font-medium text-catalan-text">{r.target}</td>
+                              <td className="px-3 py-2.5 text-center text-catalan-primary font-medium">{r.collected}</td>
+                              <td className="px-3 py-2.5 text-center font-bold text-catalan-text">{r.pct}%</td>
+                              <td className="px-3 py-2.5 w-24"><ProgressBar pct={r.pct} size="sm" /></td>
+                              <td className="px-3 py-2.5">
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[r.status] ?? 'bg-catalan-textMuted/10 text-catalan-textMuted'}`}>
+                                  {r.status.replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 text-xs">
+                                {r.deadline ? (
+                                  <span className={
+                                    r.days_remaining !== null && r.days_remaining < 0
+                                      ? 'text-catalan-error font-medium'
+                                      : r.days_remaining !== null && r.days_remaining <= 7
+                                      ? 'text-catalan-warning'
+                                      : 'text-catalan-textMuted'
+                                  }>
+                                    {r.deadline}{' '}
+                                    {r.days_remaining !== null && (
+                                      <span>({r.days_remaining < 0 ? `${Math.abs(r.days_remaining)}d late` : `${r.days_remaining}d left`})</span>
+                                    )}
+                                  </span>
+                                ) : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         </main>

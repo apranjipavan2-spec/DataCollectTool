@@ -16,7 +16,7 @@ const STATUS_COLOR: Record<string, string> = {
 export default function FieldMapPage() {
   const user = getStoredUser()
   const [pins, setPins] = useState<Pin[]>([])
-  const [days, setDays] = useState(7)
+  const [days, setDays] = useState(30)
   const [filterForm, setFilterForm] = useState('')
   const [filterEnum, setFilterEnum] = useState('')
   const [loading, setLoading] = useState(false)
@@ -132,10 +132,12 @@ export default function FieldMapPage() {
               </select>
               <select value={days} onChange={e => setDays(Number(e.target.value))}
                 className="border border-catalan-border rounded-lg px-2 py-1.5 text-xs bg-catalan-bg text-catalan-text">
+                <option value={0}>All time</option>
                 <option value={1}>Today</option>
                 <option value={7}>Last 7 days</option>
                 <option value={30}>Last 30 days</option>
                 <option value={90}>Last 90 days</option>
+                <option value={365}>Last year</option>
               </select>
               <button onClick={load} disabled={loading}
                 className="px-3 py-1.5 text-xs border border-catalan-border rounded-lg text-catalan-text hover:bg-catalan-hover disabled:opacity-40">

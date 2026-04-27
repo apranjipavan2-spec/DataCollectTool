@@ -122,16 +122,27 @@ def delete_location(loc_id: str, user=Depends(require_supervisor), db: Session =
 
 @router.get("/overview")
 def progress_overview(user=Depends(require_supervisor), db: Session = Depends(get_db)):
-    """Cross-program summary for the dashboard."""
+    """Cross-program summary for the dashboard. Uses simple submission counts so it works
+    even without location targets configured."""
     programs = db.query(Program).filter(
         Program.tenant_id == user["tenant_id"],
         Program.status.in_(["active", "planning"]),
     ).all()
     result = []
     for p in programs:
+        questionnaires = db.query(ProgramQuestionnaire).filter(
+            ProgramQuestionnaire.program_id == p.id,
+            ProgramQuestionnaire.tenant_id == user["tenant_id"],
+        ).all()
+        tt = sum(q2.total_target for q2 in questionnaires)
+        tc = 0
+        for q2 in questionnaires:
+            tc += db.query(func.count(Submission.id)).filter(
+                Submission.questionnaire_id == q2.id,
+                Submission.tenant_id == user["tenant_id"],
+            ).scalar() or 0
+        # Location-target-based overdue/at-risk (best-effort, may be 0)
         rows = _build_progress_rows(str(p.id), user["tenant_id"], db)
-        tt = sum(r["target"] for r in rows)
-        tc = sum(r["collected"] for r in rows)
         result.append({
             "id": str(p.id), "name": p.name, "scheme_name": p.scheme_name,
             "status": p.status, "total_target": tt, "total_collected": tc,
