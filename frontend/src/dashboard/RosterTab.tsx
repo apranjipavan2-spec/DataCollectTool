@@ -126,7 +126,7 @@ export default function RosterTab({ forms, team }: { forms: Form[]; team: TeamMe
       if (filterForm) params.form_id = filterForm
       if (filterStatus) params.status = filterStatus
       const { data } = await api.get('/roster/', { params })
-      setRoster(data)
+      setRoster(Array.isArray(data) ? data : (data?.items ?? data?.results ?? []))
     } catch {
       toast.error('Failed to load roster')
     } finally {

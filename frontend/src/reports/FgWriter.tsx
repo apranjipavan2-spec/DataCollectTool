@@ -5,7 +5,7 @@ import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
 import {
-  loadTabulations, loadReports, saveReport, deleteReport,
+  loadTabulations, loadTabulationsCache, loadReports, saveReport, deleteReport,
   getLastProgram, setLastProgram,
   type SavedTabulation, type SavedReport,
 } from '@/lib/fgStorage'
@@ -130,7 +130,9 @@ export default function FgWriter() {
 
   const reload = useCallback(() => {
     if (!programId) return
-    setTabulations(loadTabulations(programId))
+    // loadTabulations is async — must not be passed directly to setState
+    setTabulations(loadTabulationsCache(programId))
+    loadTabulations(programId).then(setTabulations).catch(() => {})
     setVersions(loadReports(programId))
   }, [programId])
 
@@ -140,7 +142,8 @@ export default function FgWriter() {
     setProgramId(id); setProg(p)
     setReportMd(''); setError('')
     if (id) {
-      setTabulations(loadTabulations(id))
+      setTabulations(loadTabulationsCache(id))
+      loadTabulations(id).then(setTabulations).catch(() => {})
       setVersions(loadReports(id))
     }
     // pre-fill date range from program
