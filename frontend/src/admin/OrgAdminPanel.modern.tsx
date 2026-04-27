@@ -141,22 +141,33 @@ function FormsTab() {
   return (
     <Card>
       <div className="p-6">
-        <h3 className="text-lg font-semibold text-catalan-text mb-4">Form Templates</h3>
-        <div className="space-y-3">
-          <p className="text-catalan-textMuted">
-            Form templates and assignments are managed through the main Dashboard <strong className="text-catalan-primary">Forms tab</strong>.
-          </p>
-          <p className="text-sm text-catalan-textMuted">
-            You can view all available forms, create new ones, and assign them to enumerators from there.
-          </p>
-          <div className="mt-6">
-            <a
-              href="/"
-              className="inline-block px-4 py-2 bg-catalan-primary text-catalan-bg rounded font-medium hover:bg-catalan-primaryDark transition-colors"
-            >
-              Go to Dashboard
-            </a>
-          </div>
+        <h3 className="text-lg font-semibold text-catalan-text mb-2">Form Builder</h3>
+        <p className="text-sm text-catalan-textMuted mb-6">
+          Design questionnaires, configure skip logic, add photos and GPS fields, and publish forms to your field team.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <a
+            href="/builder"
+            className="inline-flex items-center gap-2 px-5 py-3 bg-catalan-primary text-catalan-bg rounded-xl font-semibold text-sm hover:bg-catalan-primaryDark transition-colors shadow-sm"
+          >
+            📋 Open Form Builder →
+          </a>
+          <a
+            href="/builder"
+            className="inline-flex items-center gap-2 px-5 py-3 border border-catalan-border text-catalan-text rounded-xl font-medium text-sm hover:bg-catalan-hover transition-colors"
+          >
+            ➕ Create New Form
+          </a>
+        </div>
+        <div className="mt-6 p-4 bg-catalan-bg border border-catalan-border rounded-xl text-sm text-catalan-textMuted">
+          <p className="font-medium text-catalan-text mb-1">What you can do in the Form Builder:</p>
+          <ul className="space-y-1 text-xs mt-2">
+            <li>• Build multi-section questionnaires with skip logic</li>
+            <li>• Add text, number, GPS, photo, audio, and choice fields</li>
+            <li>• Import existing XLSForm / KoboToolbox forms</li>
+            <li>• Publish and assign forms to enumerators</li>
+          </ul>
+        </div>
         </div>
       </div>
     </Card>
