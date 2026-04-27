@@ -767,6 +767,9 @@ export default function App() {
         )}
         <StatusBar dataset={dataset} result={currentResult} />
         {modal === 'metric_library' && <MetricLibrary onClose={() => setModal(null)} />}
+        <input ref={ribbonFileRef} type="file" accept=".xlsx,.xls,.csv,.tsv"
+          style={{ display: 'none' }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ''; }} />
       </div>
     );
   }

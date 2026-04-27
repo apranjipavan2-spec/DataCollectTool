@@ -125,9 +125,7 @@ export function TopBar({ onFileUpload, dataset, onAction, onToggleTheme, theme, 
         style={{ cursor: fgHomeUrl ? 'pointer' : 'default' }}
         onClick={() => { if (fgHomeUrl) window.location.href = fgHomeUrl; }}
         title={fgHomeUrl ? 'Back to FieldGovern dashboard' : undefined}>
-        <img src="/logo-icon.png" alt="FieldGovern" className="logo-img" style={{ width: 28, height: 28, marginRight: 6 }} />
-        <span className="brand-name">Analyzer</span>
-        <span className="brand-tag">FieldGovern</span>
+        <img src="/logo-wide.png" alt="FieldGovern" className="logo-img" style={{ height: 26, width: 'auto', marginRight: 8 }} />
       </div>
 
       {/* Ribbon tab buttons inline */}

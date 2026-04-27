@@ -1255,7 +1255,9 @@ export default function FgAnalyzer() {
         <TopNav
           titleNode={
             <div className="flex items-center gap-2.5">
-              <img src="/logo-wide.png" alt="FieldGovern" className="h-7 w-auto object-contain" />
+              <a href="/" className="flex items-center" title="Go to dashboard">
+                <img src="/logo-wide.png" alt="FieldGovern" className="h-7 w-auto object-contain hover:opacity-80 transition-opacity" />
+              </a>
               <span className="text-catalan-textMuted font-medium text-sm hidden sm:inline">·</span>
               <span className="text-catalan-text font-semibold text-base hidden sm:inline">Analyzer</span>
             </div>

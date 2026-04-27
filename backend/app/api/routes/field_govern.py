@@ -1381,29 +1381,42 @@ def export_program_xlsx(
             raise HTTPException(400, "Invalid questionnaire_id format")
     subs = q.all()
 
-    enum_map = _build_enumerator_map(db, user["tenant_id"])
+    try:
+        enum_map = _build_enumerator_map(db, user["tenant_id"])
 
-    rows = []
-    for s in subs:
-        flat = _flatten(s.data_json or {})
-        rows.append({
-            "serial_no": s.serial_no or "",
-            "submission_id": str(s.id),
-            "enumerator_name": enum_map.get(s.enumerator_id, ""),
-            "status": s.status or "",
-            "received_at": str(s.server_received_at) if s.server_received_at else "",
-            "household_id": s.household_id or "",
-            **flat,
-        })
+        rows = []
+        for s in subs:
+            try:
+                flat = _flatten(s.data_json or {})
+            except Exception:
+                flat = {}
+            rows.append({
+                "serial_no": s.serial_no or "",
+                "submission_id": str(s.id),
+                "enumerator_name": enum_map.get(s.enumerator_id, ""),
+                "status": s.status or "",
+                "received_at": str(s.server_received_at) if s.server_received_at else "",
+                "household_id": s.household_id or "",
+                **{k: (str(v) if not isinstance(v, (str, int, float, bool, type(None))) else v)
+                   for k, v in flat.items()},
+            })
 
-    df = pd.DataFrame(rows)
+        if not rows:
+            df = pd.DataFrame(columns=["serial_no", "submission_id", "enumerator_name", "status", "received_at", "household_id"])
+        else:
+            df = pd.DataFrame(rows)
 
-    buf = io.BytesIO()
-    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Submissions")
-    buf.seek(0)
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Submissions")
+        buf.seek(0)
 
-    safe_name = (prog.scheme_name or "program").replace(" ", "_")
+    except Exception as exc:
+        import traceback as _tb
+        _tb.print_exc()
+        raise HTTPException(500, f"Export failed: {exc}")
+
+    safe_name = (prog.scheme_name or prog.name or "program").replace(" ", "_")
     date_str = datetime.now().strftime("%Y%m%d")
     filename = f"{safe_name}_{date_str}.xlsx"
 
