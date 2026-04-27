@@ -118,6 +118,27 @@ def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
     return _make_token(user)
 
 
+# ── Admin contact lookup (public — for WhatsApp redirect on forgot-password) ─
+
+@router.get("/admin-contact")
+@limiter.limit("10/minute")
+def admin_contact(request: Request, phone: str, db: Session = Depends(get_db)):
+    """Return the org admin's name+phone for a given enumerator/supervisor phone.
+    Used by the forgot-password page to pre-fill a WhatsApp message to the right admin.
+    Always returns 200 to avoid user enumeration; returns nulls when not found."""
+    user = db.query(User).filter(User.phone == phone, User.is_active == True).first()
+    if not user:
+        return {"name": None, "phone": None}
+    admin = (
+        db.query(User)
+        .filter(User.tenant_id == user.tenant_id, User.role == "org_admin", User.is_active == True)
+        .first()
+    )
+    if not admin:
+        return {"name": None, "phone": None}
+    return {"name": admin.name or "Admin", "phone": admin.phone}
+
+
 # ── Set / change password ─────────────────────────────────────────────────
 
 # ── Forgot / reset password ──────────────────────────────────────────────
