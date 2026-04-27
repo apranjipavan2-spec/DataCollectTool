@@ -384,9 +384,10 @@ input, select, textarea { font-family: inherit; }
   <div class="sidebar" id="sidebar" style="width: 250px; min-width: 250px;">
     <div class="sidebar-header">
       <h1 style="display:flex;align-items:center;gap:7px;">
-        <img src="/static/logo-icon.png" alt="FG" style="width:20px;height:20px;border-radius:4px;" onerror="this.style.display='none'">
-        <span style="font-size:15px;font-weight:800;color:var(--text)">Cleaner</span>
-        <span style="font-size:10px;font-weight:500;color:var(--text3)">by FieldGovern</span>
+        <a id="fgHomeLink" href="/" title="Back to FieldGovern dashboard" style="display:flex;align-items:center;text-decoration:none;">
+          <img src="/static/logo-wide.png" alt="FieldGovern" style="height:22px;width:auto;" onerror="this.style.display='none'">
+        </a>
+        <span style="font-size:13px;font-weight:700;color:var(--text2)">· Cleaner</span>
       </h1>
       <div class="file-info" id="fileInfo">No file loaded</div>
     </div>
@@ -454,7 +455,7 @@ input, select, textarea { font-family: inherit; }
       <!-- Welcome card — FG-first when token present, file-upload otherwise -->
       <div id="welcomeCard" class="welcome-card">
         <div style="text-align:center;margin-bottom:24px;">
-          <img src="/static/logo-icon.png" alt="Cleaner" style="width:40px;height:40px;display:block;margin:0 auto 8px;" onerror="this.style.display='none'">
+          <img src="/static/logo-wide.png" alt="FieldGovern" style="height:32px;width:auto;display:block;margin:0 auto 8px;" onerror="this.style.display='none'">
           <h1>Cleaner</h1>
           <div class="sub">FieldGovern Data Cleaner</div>
         </div>
@@ -1837,6 +1838,12 @@ const _fgUrl       = _fgParams.get('fg_url');
 const _fgToken     = _fgParams.get('token');
 const _fgProgId    = _fgParams.get('program_id');
 let   _fgProgramId = _fgProgId;   // updated when user selects a program
+
+// Wire logo link to FG dashboard
+if (_fgUrl) {
+  const _homeLink = document.getElementById('fgHomeLink');
+  if (_homeLink) _homeLink.href = _fgUrl;
+}
 let   DATA_FILENAME = '';          // updated after load
 
 async function fgLoadData(programId, questionnaireId) {
