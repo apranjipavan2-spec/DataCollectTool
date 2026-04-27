@@ -9,16 +9,15 @@ const DEMO_ACCOUNTS = [
   { role: 'Enumerator',  icon: '📋',  phone: '+919999990003', password: 'test@123', color: '#059669' },
 ]
 
-// Logo shown always on light backgrounds — multiply blends away the white square
 function Logo({ size = 40, className = '' }: { size?: number; className?: string }) {
   return (
     <img
-      src="/logo.png"
+      src="/logo-icon.png"
       alt="FieldGovern"
       width={size}
       height={size}
       className={`object-contain flex-shrink-0 ${className}`}
-      style={{ mixBlendMode: 'multiply', width: size, height: size }}
+      style={{ width: size, height: size }}
     />
   )
 }
@@ -82,13 +81,13 @@ export default function LoginPage() {
              style={{ background: 'radial-gradient(circle, #7c3aed, transparent 70%)' }} />
 
         {/* Logo */}
-        <div className="relative z-10 flex items-center gap-3 mb-auto">
+        <div className="relative z-10 flex items-center gap-3">
           <Logo size={44} />
           <span className="text-slate-800 text-xl font-bold tracking-tight">FieldGovern</span>
         </div>
 
         {/* Headline */}
-        <div className="relative z-10 mt-16 mb-auto">
+        <div className="relative z-10 mt-8 mb-auto">
           <div className="inline-flex items-center gap-2 mb-4 px-3 py-1.5 rounded-full text-xs font-semibold border"
                style={{ background: 'linear-gradient(135deg,rgba(14,165,233,0.12),rgba(124,58,237,0.12))', borderColor: 'rgba(14,165,233,0.25)', color: '#0369a1' }}>
             <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
@@ -143,8 +142,8 @@ export default function LoginPage() {
 
             {/* Heading */}
             <div className="mb-7 pb-6 border-b border-slate-100 text-center">
-              <div className="flex items-center justify-center gap-3 mb-2">
-                <Logo size={44} />
+              <div className="flex flex-col items-center gap-2 mb-1">
+                <Logo size={52} />
                 <h1 className="text-2xl font-bold text-black tracking-tight">Welcome back</h1>
               </div>
               <p className="text-slate-500 text-sm">Sign in to continue to FieldGovern</p>
@@ -243,16 +242,39 @@ export default function LoginPage() {
             </button>
 
             <div className="mt-5 pt-5 border-t border-slate-100">
-              {/* Demo accounts toggle */}
-              <button
-                type="button"
-                onClick={() => setShowDemo(v => !v)}
-                className="w-full flex items-center justify-center gap-1.5 text-xs text-blue-500 hover:text-blue-700 font-semibold transition-colors py-1 rounded-lg hover:bg-blue-50"
-              >
-                <span className="text-sm">🔑</span>
-                Try a demo account
-                <span className={`transition-transform duration-200 ${showDemo ? 'rotate-180' : ''}`}>▾</span>
-              </button>
+              {/* Demo accounts toggle — animated to attract attention */}
+              <div className="relative">
+                {/* Ping ring — draws the eye */}
+                {!showDemo && (
+                  <span className="absolute inset-0 rounded-xl bg-blue-400 opacity-0 animate-[demo-ping_2s_ease-out_infinite]" />
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowDemo(v => !v)}
+                  className="relative w-full flex items-center justify-center gap-2 text-sm font-bold transition-all duration-200 py-2.5 px-4 rounded-xl border-2"
+                  style={showDemo ? {
+                    background: '#eff6ff',
+                    borderColor: '#93c5fd',
+                    color: '#1d4ed8',
+                  } : {
+                    background: 'linear-gradient(135deg, #dbeafe 0%, #ede9fe 100%)',
+                    borderColor: '#93c5fd',
+                    color: '#1d4ed8',
+                    boxShadow: '0 0 0 3px rgba(59,130,246,0.15), 0 2px 8px rgba(59,130,246,0.2)',
+                  }}
+                >
+                  <span className={`text-base transition-transform duration-300 ${!showDemo ? 'animate-bounce' : ''}`}>🔑</span>
+                  Try a demo account
+                  <span className={`ml-auto text-xs transition-transform duration-200 ${showDemo ? 'rotate-180' : ''}`}>▾</span>
+                </button>
+              </div>
+              <style>{`
+                @keyframes demo-ping {
+                  0%   { opacity: 0.3; transform: scale(1); }
+                  70%  { opacity: 0;   transform: scale(1.08); }
+                  100% { opacity: 0;   transform: scale(1.08); }
+                }
+              `}</style>
 
               {showDemo && (
                 <div className="mt-3 space-y-2">
