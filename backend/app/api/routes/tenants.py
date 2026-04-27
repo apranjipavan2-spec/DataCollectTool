@@ -60,6 +60,7 @@ def get_branding(user=Depends(get_current_user), db: Session = Depends(get_db)):
         "app_name": tenant.app_name if hasattr(tenant, "app_name") and tenant.app_name else tenant.name,
         "plan_tier": tenant.plan_tier,
         "allow_enumerator_edit": getattr(tenant, "allow_enumerator_edit", True),
+        "qr_login_enabled": bool((tenant.notification_config or {}).get("qr_login_enabled", False)),
     }
 
 
@@ -343,6 +344,43 @@ def update_notification_config(
     tenant.notification_config = existing
     db.commit()
     return {"ok": True}
+
+
+# ── Security settings (QR login toggle) ──────────────────────────────────────
+
+class SecuritySettingsUpdate(BaseModel):
+    qr_login_enabled: bool = False
+
+
+@router.get("/security")
+def get_security_settings(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Get security settings for the current tenant (org_admin only)."""
+    if user["role"] not in ("master_admin", "org_admin"):
+        raise HTTPException(403, "org_admin required")
+    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+    if not tenant:
+        raise HTTPException(404, "Tenant not found")
+    cfg = tenant.notification_config or {}
+    return {"qr_login_enabled": bool(cfg.get("qr_login_enabled", False))}
+
+
+@router.patch("/security")
+def update_security_settings(
+    body: SecuritySettingsUpdate,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Toggle QR login for the current tenant (org_admin only)."""
+    if user["role"] not in ("master_admin", "org_admin"):
+        raise HTTPException(403, "org_admin required")
+    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+    if not tenant:
+        raise HTTPException(404, "Tenant not found")
+    existing = dict(tenant.notification_config or {})
+    existing["qr_login_enabled"] = body.qr_login_enabled
+    tenant.notification_config = existing
+    db.commit()
+    return {"qr_login_enabled": body.qr_login_enabled}
 
 
 class FormSheetsSyncUpdate(BaseModel):

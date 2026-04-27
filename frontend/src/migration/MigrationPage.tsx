@@ -91,12 +91,7 @@ export default function MigrationPage() {
       <Sidebar items={sidebarItems} role={user.role} />
       <div className="flex-1 flex flex-col overflow-auto">
         <TopNav title="Import from Other Platforms" />
-        <div className="flex-1 p-6 max-w-4xl mx-auto w-full">
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold text-catalan-text mb-2">Platform Migration</h2>
-            <p className="text-catalan-textMuted">Import forms and historical submissions from XLSForm, KoboToolbox, SurveyCTO, or ODK Central.</p>
-          </div>
-
+        <div className="flex-1 p-6">
           {/* Tab bar */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
             {tabs.map(t => (

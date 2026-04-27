@@ -555,7 +555,7 @@ export default function FormBuilder() {
                 title="Add sub-section inside this section"
                 className="w-5 h-5 flex items-center justify-center rounded text-catalan-textMuted hover:text-catalan-primary hover:bg-catalan-primary/10 transition-colors text-xs"
               >
-                ⊕
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-3.5 h-3.5"><rect x="1" y="1" width="14" height="14" rx="2"/><path d="M8 5v6M5 8h6" strokeLinecap="round"/></svg>
               </button>
             )}
             {/* Delete section */}
@@ -882,7 +882,7 @@ function SectionEditor({ section, schema, onTitleChange, onSkipLogicChange, onAd
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-5 sm:p-6 max-w-2xl">
+      <div className="p-5 sm:p-6 max-w-3xl w-full">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6 pb-4 border-b border-catalan-border">
@@ -1042,7 +1042,7 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-5 sm:p-6 max-w-2xl">
+      <div className="p-5 sm:p-6 max-w-3xl w-full">
         <div className="flex items-center gap-3 mb-6 pb-4 border-b border-catalan-border">
           <div className="w-9 h-9 rounded-xl bg-catalan-primary/10 flex items-center justify-center text-catalan-primary font-bold flex-shrink-0 text-base">⚙</div>
           <div>

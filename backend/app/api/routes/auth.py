@@ -135,8 +135,11 @@ def admin_contact(request: Request, phone: str, db: Session = Depends(get_db)):
         .first()
     )
     if not admin:
-        return {"name": None, "phone": None}
-    return {"name": admin.name or "Admin", "phone": admin.phone}
+        return {"name": None, "phone": None, "qr_login_enabled": False}
+    from app.models.tenant import Tenant
+    tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+    qr_enabled = bool((tenant.notification_config or {}).get("qr_login_enabled", False)) if tenant else False
+    return {"name": admin.name or "Admin", "phone": admin.phone, "qr_login_enabled": qr_enabled}
 
 
 # ── Set / change password ─────────────────────────────────────────────────
@@ -257,6 +260,10 @@ class QrLoginRequest(BaseModel):
 
 @router.post("/qr-generate")
 def qr_generate(body: QrGenerateRequest, current_user=Depends(require_org_admin), db: Session = Depends(get_db)):
+    from app.models.tenant import Tenant
+    tenant = db.query(Tenant).filter(Tenant.id == current_user["tenant_id"]).first()
+    if not tenant or not (tenant.notification_config or {}).get("qr_login_enabled", False):
+        raise HTTPException(status_code=403, detail="QR login is not enabled for this organisation. Enable it in Settings → Security.")
     target = db.query(User).filter(User.id == body.user_id, User.is_active == True).first()
     if not target:
         raise HTTPException(status_code=404, detail="User not found")

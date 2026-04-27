@@ -71,6 +71,10 @@ export default function FileManagerPage() {
       const d = r.data
       setForms(Array.isArray(d) ? d : d?.forms ?? d?.results ?? [])
     }).catch(() => {})
+    // Load submission count upfront so sidebar shows correct number immediately
+    api.get('/submissions/', { params: { page: 1, page_size: 1 } }).then(({ data }) => {
+      setSubTotal(data?.total ?? data?.count ?? 0)
+    }).catch(() => {})
   }, [loadProjects])
 
   useEffect(() => {
