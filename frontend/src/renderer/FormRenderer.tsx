@@ -243,7 +243,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
   }
 
   return (
-    <div className="bg-catalan-bg flex flex-col font-sans" style={{ height: '100dvh', minHeight: '-webkit-fill-available' }}>
+    <div className="bg-catalan-bg flex flex-col font-sans h-full min-h-0">
 
       {/* ── Header ── */}
       <div className="px-4 pt-3 pb-3 border-b border-catalan-border bg-catalan-surface sticky top-0 z-10 flex-shrink-0">

@@ -5,7 +5,6 @@ import type { FormSchema } from '@/types/form'
 import FormRenderer, { type SubmissionDraft } from '@/renderer/FormRenderer'
 import { getStorage } from '@/storage'
 import { v4 as uuidv4 } from 'uuid'
-import { useLanguage, LANGUAGE_OPTIONS } from '@/i18n/LanguageContext'
 import { compressImage } from '@/utils/imageCompress'
 import { Button } from '@/components/ui'
 import Sidebar from '@/components/Sidebar'
@@ -133,8 +132,6 @@ export default function FieldApp() {
   const bgGpsWatchId = useRef<number | null>(null)
   const bestGpsRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
-  const { language, setLanguage } = useLanguage()
-
   // ── Sync to server ─────────────────────────────────────────
   const syncToServer = useCallback(async () => {
     setSyncMsg('Syncing…')
@@ -653,47 +650,46 @@ export default function FieldApp() {
     if (bestGpsRef.current && !draft.gpsSubmit) {
       draft = { ...draft, gpsSubmit: bestGpsRef.current }
     }
+    // Save text data to outbox immediately (fast — IndexedDB)
     await handleSave(draft)
     setOutboxCount(c => c + 1)
 
-    const store = await getStorage()
-    for (const [fieldName, value] of Object.entries(draft.values)) {
-      if (typeof value === 'string' && value.startsWith('data:image/')) {
-        const { dataUri: compressed, sizeKB } = await compressImage(value)
-        console.log(`[FieldApp] Photo '${fieldName}' compressed to ${sizeKB.toFixed(0)}KB`)
-        await store.saveMediaItem({
-          id: uuidv4(), submissionId: draft.id, fieldName,
-          fileType: 'photo', dataUri: compressed, status: 'pending',
-          createdAt: new Date().toISOString(),
-        })
-      } else if (typeof value === 'string' && value.startsWith('data:audio/')) {
-        await store.saveMediaItem({
-          id: uuidv4(), submissionId: draft.id, fieldName,
-          fileType: 'audio', dataUri: value, status: 'pending',
-          createdAt: new Date().toISOString(),
-        })
-      }
-    }
-
-    if ('serviceWorker' in navigator) {
-      try {
-        const reg = await navigator.serviceWorker.ready
-        await reg.sync?.register('sync-submissions')
-      } catch { }
-    }
-
-    syncToServer()
-
-    // If this was a back-check submission, mark the original as completed
-    if (activeBackcheck) {
-      try {
-        await api.post(`/submissions/${activeBackcheck.original_submission_id}/complete-backcheck`)
-        setBackchecks(prev => prev.filter(b => b.original_submission_id !== activeBackcheck.original_submission_id))
-      } catch { /* non-critical */ }
-      setActiveBackcheck(null)
-    }
-
+    // Show confirmation screen right away — don't block on media compression
     setScreen('submitted')
+
+    // Handle backcheck non-blocking
+    if (activeBackcheck) {
+      const bc = activeBackcheck
+      setActiveBackcheck(null)
+      api.post(`/submissions/${bc.original_submission_id}/complete-backcheck`)
+        .then(() => setBackchecks(prev => prev.filter(b => b.original_submission_id !== bc.original_submission_id)))
+        .catch(() => {})
+    }
+
+    // Background: compress photos, queue media, then sync
+    ;(async () => {
+      const store = await getStorage()
+      for (const [fieldName, value] of Object.entries(draft.values)) {
+        if (typeof value === 'string' && value.startsWith('data:image/')) {
+          const { dataUri: compressed } = await compressImage(value)
+          await store.saveMediaItem({
+            id: uuidv4(), submissionId: draft.id, fieldName,
+            fileType: 'photo', dataUri: compressed, status: 'pending',
+            createdAt: new Date().toISOString(),
+          })
+        } else if (typeof value === 'string' && value.startsWith('data:audio/')) {
+          await store.saveMediaItem({
+            id: uuidv4(), submissionId: draft.id, fieldName,
+            fileType: 'audio', dataUri: value, status: 'pending',
+            createdAt: new Date().toISOString(),
+          })
+        }
+      }
+      if ('serviceWorker' in navigator) {
+        try { const reg = await navigator.serviceWorker.ready; await reg.sync?.register('sync-submissions') } catch { }
+      }
+      syncToServer()
+    })()
   }
 
   const storedUser = getStoredUser()
@@ -916,16 +912,15 @@ export default function FieldApp() {
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="text-center max-w-sm w-full">
             <div className="text-6xl mb-6">✅</div>
-            <h2 className="text-2xl font-bold text-catalan-success mb-3">Submitted!</h2>
-            <p className="text-catalan-textMuted mb-2">
-              {outboxCount > 0
-                ? `${outboxCount} submission(s) in outbox — keep app open to sync`
-                : 'Synced to server'}
-            </p>
-            {syncMsg && <p className="text-catalan-info text-sm mb-6">{syncMsg}</p>}
-            <div className="flex gap-3 justify-center flex-col sm:flex-row mt-6">
-              <Button onClick={() => setScreen('list')} size="lg">Fill Another Form</Button>
-              <Button onClick={() => window.location.href = homeForRole(storedUser?.role ?? 'enumerator')} variant="secondary" size="lg">Home</Button>
+            <h2 className="text-2xl font-bold text-catalan-success mb-2">Saved!</h2>
+            <p className="text-sm text-catalan-textMuted mb-3">Your response has been recorded.</p>
+            <div className="inline-flex items-center gap-2 text-xs text-catalan-info bg-catalan-info/10 border border-catalan-info/20 rounded-full px-3 py-1.5 mb-8">
+              <span className="w-1.5 h-1.5 rounded-full bg-catalan-info animate-pulse" />
+              Syncing to server in background…
+            </div>
+            <div className="flex gap-3 flex-col sm:flex-row">
+              <Button onClick={() => setScreen('list')} size="lg">Submit Another Application</Button>
+              <Button onClick={() => window.location.href = homeForRole(storedUser?.role ?? 'enumerator')} variant="secondary" size="lg">Go to Forms</Button>
             </div>
           </div>
         </div>
@@ -945,7 +940,7 @@ export default function FieldApp() {
       startedAt: new Date().toISOString(),
     }
     return (
-      <div className="h-screen flex flex-col">
+      <div className="h-[100dvh] flex flex-col">
         <FormRenderer
           schema={activeForm.schema}
           onSave={async () => {}}
@@ -973,7 +968,7 @@ export default function FieldApp() {
   if (screen === 'collecting' && activeForm) {
     const clearProg = () => { setProgramContext(null); setSelectedLocationId(''); setAssignedArm(null); setGeofenceWarning(false); setRosterInitialValues(null) }
     return (
-      <div className="flex flex-col h-screen">
+      <div className="flex flex-col h-[100dvh]">
         {assignedArm && (
           <div className="bg-catalan-primary text-catalan-bg px-4 py-2 text-xs font-medium shrink-0 z-50 flex items-center gap-2">
             <span>📊 Arm: {assignedArm}</span>
@@ -1124,25 +1119,9 @@ export default function FieldApp() {
             </div>
           </div>
 
-          {/* Row 2: language + sync status */}
-          <div className="flex items-center justify-between gap-3 pb-3">
-            <div className="flex bg-catalan-hover rounded-full p-0.5 border border-catalan-border">
-              {LANGUAGE_OPTIONS.map(opt => (
-                <button
-                  key={opt.code}
-                  onClick={() => setLanguage(opt.code)}
-                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 ${
-                    language === opt.code
-                      ? 'bg-catalan-primary text-catalan-bg shadow-sm'
-                      : 'text-catalan-textMuted hover:text-catalan-text'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex gap-2 items-center flex-wrap">
+          {/* Row 2: sync status */}
+          {(outboxCount > 0 || mediaQueueCount > 0 || failedMediaCount > 0 || syncMsg) && (
+            <div className="flex gap-2 items-center flex-wrap pb-3">
               {(outboxCount > 0 || mediaQueueCount > 0) && (
                 <button
                   onClick={syncToServer}
@@ -1162,7 +1141,7 @@ export default function FieldApp() {
               )}
               {syncMsg && <span className="text-catalan-info text-xs">{syncMsg}</span>}
             </div>
-          </div>
+          )}
         </div>
       </div>
 
