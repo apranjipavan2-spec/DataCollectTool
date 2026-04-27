@@ -446,7 +446,11 @@ def get_map_data(
     from datetime import datetime, timezone, timedelta
     from app.models.form import Form
     from app.models.user import User as UserModel
-    q = db.query(Submission).filter(
+    from app.models.roster import RespondentRoster
+
+    q = db.query(Submission, RespondentRoster.name.label("roster_name")).outerjoin(
+        RespondentRoster, Submission.roster_id == RespondentRoster.id
+    ).filter(
         Submission.tenant_id == user["tenant_id"],
         Submission.gps_submit.isnot(None),
     )
@@ -458,10 +462,23 @@ def get_map_data(
     if enumerator_id:
         q = q.filter(Submission.enumerator_id == enumerator_id)
 
-    subs = q.order_by(Submission.server_received_at.desc()).limit(2000).all()
+    rows = q.order_by(Submission.server_received_at.desc()).limit(2000).all()
 
     enum_map = {str(u.id): u.name for u in db.query(UserModel).filter(UserModel.tenant_id == user["tenant_id"]).all()}
     form_map = {str(f.id): f.title for f in db.query(Form).filter(Form.tenant_id == user["tenant_id"]).all()}
+
+    _BENEFICIARY_KEYS = ("beneficiary_name", "name", "respondent_name", "farmer_name",
+                         "household_head", "participant_name", "applicant_name")
+
+    def _beneficiary_name(s: Submission, roster_name: Optional[str]) -> Optional[str]:
+        if roster_name:
+            return roster_name
+        dj = s.data_json or {}
+        for k in _BENEFICIARY_KEYS:
+            v = dj.get(k)
+            if v and isinstance(v, str):
+                return v
+        return None
 
     return [{
         "id": str(s.id),
@@ -471,8 +488,10 @@ def get_map_data(
         "status": s.status,
         "enumerator": enum_map.get(str(s.enumerator_id), "Unknown"),
         "form": form_map.get(str(s.form_id), "Unknown"),
+        "form_id": str(s.form_id),
         "received": s.server_received_at.isoformat() if s.server_received_at else None,
-    } for s in subs if (s.gps_submit or {}).get("lat")]
+        "beneficiary_name": _beneficiary_name(s, roster_name),
+    } for s, roster_name in rows if (s.gps_submit or {}).get("lat")]
 
 
 # ── Get single submission ─────────────────────────────────────────────────────

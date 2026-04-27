@@ -71,8 +71,8 @@ export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: F
   const enumerators = team.filter(u => u.role === 'enumerator')
 
   useEffect(() => {
-    api.get('/locations?type=district').then(({ data }) => setDistricts(data)).catch(() => {})
-    api.get('/locations/tree').then(({ data }) => setLocationTree(data)).catch(() => {})
+    api.get('/locations?type=district').then(({ data }) => setDistricts(Array.isArray(data) ? data : data?.results ?? data?.items ?? [])).catch(() => {})
+    api.get('/locations/tree').then(({ data }) => setLocationTree(Array.isArray(data) ? data : [])).catch(() => {})
   }, [])
 
   const handleDistrictFilter = async (districtId: string) => {
@@ -82,7 +82,7 @@ export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: F
     if (districtId) {
       try {
         const { data } = await api.get(`/locations?parent_id=${districtId}`)
-        setTalukas(data)
+        setTalukas(Array.isArray(data) ? data : data?.results ?? data?.items ?? [])
       } catch {}
     }
   }
@@ -277,10 +277,10 @@ export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: F
                 {locationTree.map(district => (
                   <div key={district.id}>
                     <div className="text-xs font-semibold text-catalan-text">📍 {district.name}</div>
-                    {district.children.map(taluka => (
+                    {(Array.isArray(district.children) ? district.children : []).map(taluka => (
                       <div key={taluka.id} className="ml-4">
                         <div className="text-xs text-catalan-textMuted">↳ {taluka.name}</div>
-                        {taluka.children.map(village => (
+                        {(Array.isArray(taluka.children) ? taluka.children : []).map(village => (
                           <div key={village.id} className="ml-4 text-xs text-catalan-textMuted/70">· {village.name}</div>
                         ))}
                       </div>

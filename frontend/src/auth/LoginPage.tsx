@@ -87,7 +87,7 @@ export default function LoginPage() {
         </div>
 
         {/* Headline */}
-        <div className="relative z-10 mt-8 mb-auto">
+        <div className="relative z-10 mt-4 mb-auto">
           <div className="inline-flex items-center gap-2 mb-4 px-3 py-1.5 rounded-full text-xs font-semibold border"
                style={{ background: 'linear-gradient(135deg,rgba(14,165,233,0.12),rgba(124,58,237,0.12))', borderColor: 'rgba(14,165,233,0.25)', color: '#0369a1' }}>
             <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />

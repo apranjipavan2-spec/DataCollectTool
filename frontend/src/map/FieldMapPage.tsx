@@ -6,12 +6,42 @@ import { getNavItems } from '@/lib/navigation'
 
 interface Pin {
   id: string; lat: number; lng: number; accuracy: number
-  status: string; enumerator: string; form: string; received: string | null
+  status: string; enumerator: string; form: string; form_id: string
+  received: string | null; beneficiary_name: string | null
+}
+
+interface SubmissionDetail {
+  id: string; form_id: string; form_version: number | null; serial_no: number | null
+  enumerator_name: string; status: string; flag_note: string | null
+  data_json: Record<string, any>
+  gps_open: { lat: number; lng: number; accuracy?: number } | null
+  gps_submit: { lat: number; lng: number; accuracy?: number } | null
+  local_created_at: string | null; server_received_at: string | null
+  backcheck_required: boolean; consent_given: boolean | null
 }
 
 const STATUS_COLOR: Record<string, string> = {
   synced: '#3B82F6', approved: '#22C55E', flagged: '#F59E0B', rejected: '#EF4444',
 }
+const STATUS_BG: Record<string, string> = {
+  synced: 'bg-blue-100 text-blue-700', approved: 'bg-green-100 text-green-700',
+  flagged: 'bg-amber-100 text-amber-700', rejected: 'bg-red-100 text-red-600',
+  pending: 'bg-gray-100 text-gray-500',
+}
+
+function fmtKey(k: string) {
+  return k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+function fmtVal(v: any): string {
+  if (v === null || v === undefined || v === '') return '—'
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+  if (Array.isArray(v)) return v.join(', ')
+  if (typeof v === 'object') return JSON.stringify(v)
+  return String(v)
+}
+
+const SKIP_KEYS = new Set(['_roster_id', '_program_id', '_questionnaire_id', '_location_id', '_participant_type_id'])
 
 export default function FieldMapPage() {
   const user = getStoredUser()
@@ -21,6 +51,8 @@ export default function FieldMapPage() {
   const [filterEnum, setFilterEnum] = useState('')
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<Pin | null>(null)
+  const [detail, setDetail] = useState<SubmissionDetail | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
   const [forms, setForms] = useState<{ id: string; title: string }[]>([])
   const [enumerators, setEnumerators] = useState<string[]>([])
   const [filterStatus, setFilterStatus] = useState('')
@@ -35,24 +67,31 @@ export default function FieldMapPage() {
       if (filterForm) params.form_id = filterForm
       const { data } = await api.get('/submissions/map-data', { params })
       setPins(data)
-      // Derive enumerator list from pin data
       const enumSet = new Set<string>(data.map((p: Pin) => p.enumerator).filter(Boolean))
       setEnumerators(Array.from(enumSet).sort())
     } catch { } finally { setLoading(false) }
   }, [days, filterForm])
 
-  // Load available forms for filter dropdown
   useEffect(() => {
     api.get('/forms/?status=active').then(r => setForms(r.data || [])).catch(() => {})
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  // Init Leaflet from CDN script tag
+  const selectPin = useCallback(async (pin: Pin) => {
+    setSelected(pin)
+    setDetail(null)
+    setLoadingDetail(true)
+    try {
+      const { data } = await api.get(`/submissions/${pin.id}`)
+      setDetail(data)
+    } catch { } finally { setLoadingDetail(false) }
+  }, [])
+
+  // Init Leaflet
   useEffect(() => {
     if (!mapRef.current) return
     const win = window as any
-
     const initMap = () => {
       if (leafletRef.current) return
       const L = win.L
@@ -63,9 +102,7 @@ export default function FieldMapPage() {
       }).addTo(map)
       leafletRef.current = map
     }
-
     if (win.L) { initMap(); return }
-
     if (!document.getElementById('leaflet-css')) {
       const link = document.createElement('link')
       link.id = 'leaflet-css'; link.rel = 'stylesheet'
@@ -81,7 +118,7 @@ export default function FieldMapPage() {
     }
   }, [])
 
-  // Re-render pins whenever filters change
+  // Re-render pins on filter/data change
   useEffect(() => {
     const L = (window as any).L
     const map = leafletRef.current
@@ -97,13 +134,14 @@ export default function FieldMapPage() {
     visiblePins.forEach(pin => {
       if (!pin.lat || !pin.lng) return
       const color = STATUS_COLOR[pin.status] || '#6B7280'
+      const hoverText = [pin.beneficiary_name, pin.form, pin.enumerator].filter(Boolean).join(' · ')
       const icon = L.divIcon({
-        html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)" title="${pin.form} · ${pin.enumerator}"></div>`,
+        html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer" title="${hoverText}"></div>`,
         iconSize: [12, 12], iconAnchor: [6, 6], className: '',
       })
       const marker = L.marker([pin.lat, pin.lng], { icon })
         .addTo(map)
-        .on('click', () => setSelected(pin))
+        .on('click', () => selectPin(pin))
       markersRef.current.push(marker)
     })
 
@@ -111,12 +149,19 @@ export default function FieldMapPage() {
       const latlngs = visiblePins.filter(p => p.lat && p.lng).map(p => [p.lat, p.lng])
       if (latlngs.length) map.fitBounds(latlngs, { padding: [40, 40] })
     }
-  }, [pins, filterEnum, filterStatus])
+  }, [pins, filterEnum, filterStatus, selectPin])
 
   const visible = pins
     .filter(p => !filterEnum || p.enumerator === filterEnum)
     .filter(p => !filterStatus || p.status === filterStatus)
   const counts = visible.reduce((acc, p) => { acc[p.status] = (acc[p.status] || 0) + 1; return acc }, {} as Record<string, number>)
+
+  // Build display rows from data_json
+  const formAnswers = detail
+    ? Object.entries(detail.data_json)
+        .filter(([k]) => !SKIP_KEYS.has(k) && !k.startsWith('_'))
+        .map(([k, v]) => ({ key: k, label: fmtKey(k), value: fmtVal(v) }))
+    : []
 
   return (
     <div className="flex h-screen bg-catalan-bg">
@@ -157,82 +202,139 @@ export default function FieldMapPage() {
           }
         />
 
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Stats bar */}
-          <div className="flex gap-4 px-4 py-2 bg-catalan-surface border-b border-catalan-border text-xs flex-wrap">
-            <span className="text-catalan-textMuted font-medium">{visible.length} submissions</span>
-            {Object.entries(STATUS_COLOR).map(([s, c]) => counts[s] ? (
-              <span key={s} className="flex items-center gap-1">
-                <span style={{ background: c }} className="w-2.5 h-2.5 rounded-full inline-block" />
-                <span className="capitalize">{s}</span>: <strong>{counts[s]}</strong>
-              </span>
-            ) : null)}
-            {loading && <span className="text-catalan-textMuted animate-pulse">Loading…</span>}
-          </div>
-
-          {/* Map */}
-          <div className="flex-1 relative">
-            <div ref={mapRef} className="absolute inset-0" />
-
-            {/* Legend */}
-            <div className="absolute bottom-4 left-4 z-[400] bg-catalan-surface/95 border border-catalan-border rounded-xl p-3 shadow-lg text-xs space-y-1.5">
-              {Object.entries(STATUS_COLOR).map(([s, c]) => (
-                <div key={s} className="flex items-center gap-2">
-                  <span style={{ background: c }} className="w-3 h-3 rounded-full inline-block flex-shrink-0" />
-                  <span className="capitalize text-catalan-text">{s}</span>
-                </div>
-              ))}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Map area */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Stats bar */}
+            <div className="flex gap-4 px-4 py-2 bg-catalan-surface border-b border-catalan-border text-xs flex-wrap flex-shrink-0">
+              <span className="text-catalan-textMuted font-medium">{visible.length} submissions</span>
+              {Object.entries(STATUS_COLOR).map(([s, c]) => counts[s] ? (
+                <span key={s} className="flex items-center gap-1">
+                  <span style={{ background: c }} className="w-2.5 h-2.5 rounded-full inline-block" />
+                  <span className="capitalize">{s}</span>: <strong>{counts[s]}</strong>
+                </span>
+              ) : null)}
+              {loading && <span className="text-catalan-textMuted animate-pulse">Loading…</span>}
             </div>
 
-            {/* Selected pin popup */}
-            {selected && (
-              <div className="absolute top-4 right-4 z-[500] bg-catalan-surface border border-catalan-border rounded-xl shadow-xl p-4 w-72">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                      style={{ background: (STATUS_COLOR[selected.status] || '#6B7280') + '22', color: STATUS_COLOR[selected.status] || '#6B7280' }}>
+            {/* Map */}
+            <div className="flex-1 relative">
+              <div ref={mapRef} className="absolute inset-0" />
+
+              {/* Legend */}
+              <div className="absolute bottom-4 left-4 z-[400] bg-catalan-surface/95 border border-catalan-border rounded-xl p-3 shadow-lg text-xs space-y-1.5">
+                {Object.entries(STATUS_COLOR).map(([s, c]) => (
+                  <div key={s} className="flex items-center gap-2">
+                    <span style={{ background: c }} className="w-3 h-3 rounded-full inline-block flex-shrink-0" />
+                    <span className="capitalize text-catalan-text">{s}</span>
+                  </div>
+                ))}
+              </div>
+
+              {visible.length === 0 && !loading && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="bg-catalan-surface/90 rounded-xl p-6 text-center shadow">
+                    <div className="text-4xl mb-2">🗺️</div>
+                    <div className="text-sm text-catalan-textMuted">No GPS submissions in the selected period</div>
+                    <div className="text-xs text-catalan-textMuted mt-1">Try expanding the date range or changing filters</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Detail panel — slides in when a pin is selected */}
+          {selected && (
+            <div className="w-96 flex-shrink-0 border-l border-catalan-border bg-catalan-surface flex flex-col overflow-hidden">
+              {/* Panel header */}
+              <div className="flex items-start justify-between px-4 py-3 border-b border-catalan-border flex-shrink-0">
+                <div className="flex-1 min-w-0 pr-2">
+                  {selected.beneficiary_name && (
+                    <div className="font-bold text-catalan-text text-base leading-snug truncate">{selected.beneficiary_name}</div>
+                  )}
+                  <div className={`truncate ${selected.beneficiary_name ? 'text-xs text-catalan-textMuted mt-0.5' : 'font-semibold text-catalan-text text-sm'}`}>
+                    {selected.form}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BG[selected.status] ?? 'bg-gray-100 text-gray-500'}`}>
                       {selected.status}
                     </span>
+                    {detail?.serial_no && (
+                      <span className="text-xs text-catalan-textMuted">#{detail.serial_no}</span>
+                    )}
                   </div>
-                  <button onClick={() => setSelected(null)} className="text-catalan-textMuted hover:text-catalan-text text-lg leading-none ml-2">×</button>
                 </div>
-                <div className="space-y-2 text-sm">
-                  <div className="font-semibold text-catalan-text text-base leading-snug">{selected.form}</div>
-                  <div className="flex items-center gap-1.5 text-catalan-textMuted text-xs">
+                <button onClick={() => { setSelected(null); setDetail(null) }}
+                  className="text-catalan-textMuted hover:text-catalan-text text-xl leading-none flex-shrink-0 mt-0.5">×</button>
+              </div>
+
+              {/* Panel body */}
+              <div className="flex-1 overflow-y-auto">
+                {/* Meta info */}
+                <div className="px-4 py-3 border-b border-catalan-border space-y-2 text-sm">
+                  <div className="flex items-center gap-2 text-catalan-textMuted text-xs">
                     <span>👤</span>
-                    <span>{selected.enumerator}</span>
+                    <span className="font-medium text-catalan-text">{selected.enumerator}</span>
+                    <span className="text-catalan-textMuted/60">Enumerator</span>
                   </div>
                   {selected.received && (
-                    <div className="flex items-center gap-1.5 text-catalan-textMuted text-xs">
+                    <div className="flex items-center gap-2 text-catalan-textMuted text-xs">
                       <span>🕐</span>
-                      <span>{new Date(selected.received).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                      <span>{new Date(selected.received).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-1.5 text-catalan-textMuted text-xs">
+                  <div className="flex items-center gap-2 text-catalan-textMuted text-xs">
                     <span>📍</span>
                     <span className="font-mono">{selected.lat?.toFixed(5)}, {selected.lng?.toFixed(5)}</span>
-                    {selected.accuracy && <span>(±{selected.accuracy.toFixed(0)}m)</span>}
+                    {selected.accuracy && <span className="text-catalan-textMuted/70">(±{selected.accuracy.toFixed(0)}m)</span>}
                   </div>
-                  <div className="pt-2 border-t border-catalan-border">
-                    <a
-                      href={`/dashboard?submission=${selected.id}`}
-                      className="text-xs text-catalan-primary hover:underline"
-                    >View submission →</a>
-                  </div>
+                  {detail?.flag_note && (
+                    <div className="flex items-start gap-2 text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-700">
+                      <span className="flex-shrink-0">🚩</span>
+                      <span>{detail.flag_note}</span>
+                    </div>
+                  )}
+                  {detail?.backcheck_required && (
+                    <div className="text-xs bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 text-blue-700">
+                      🔍 Backcheck required
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
 
-            {visible.length === 0 && !loading && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="bg-catalan-surface/90 rounded-xl p-6 text-center shadow">
-                  <div className="text-4xl mb-2">🗺️</div>
-                  <div className="text-sm text-catalan-textMuted">No GPS submissions in the selected period</div>
-                  <div className="text-xs text-catalan-textMuted mt-1">Try expanding the date range or changing filters</div>
+                {/* Form answers */}
+                <div className="px-4 py-3">
+                  <div className="text-[11px] font-semibold text-catalan-textMuted uppercase tracking-wider mb-3">
+                    Form Answers
+                  </div>
+
+                  {loadingDetail ? (
+                    <div className="py-8 text-center text-catalan-textMuted text-sm animate-pulse">Loading answers…</div>
+                  ) : formAnswers.length === 0 ? (
+                    <div className="py-6 text-center text-catalan-textMuted text-xs">No form data available</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {formAnswers.map(({ key, label, value }) => (
+                        <div key={key} className="border-b border-catalan-border/50 pb-2 last:border-0">
+                          <div className="text-xs text-catalan-textMuted mb-0.5">{label}</div>
+                          <div className={`text-sm text-catalan-text break-words ${value === '—' ? 'text-catalan-textMuted/60 italic' : 'font-medium'}`}>
+                            {value}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
-          </div>
+
+              {/* Panel footer */}
+              <div className="px-4 py-3 border-t border-catalan-border flex-shrink-0">
+                <a href={`/dashboard?submission=${selected.id}`}
+                  className="block w-full text-center py-2 text-xs font-semibold text-catalan-primary border border-catalan-primary/30 rounded-lg hover:bg-catalan-primary/5 transition-colors">
+                  Open full submission →
+                </a>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -6,7 +6,7 @@ import ThemeToggle from '@/components/ThemeToggle'
 
 interface TopNavProps {
   title?: string
-  breadcrumbs?: { label: string; path?: string }[]
+  breadcrumbs?: { label: string; path?: string; onClick?: () => void }[]
   rightContent?: React.ReactNode
 }
 
@@ -153,8 +153,8 @@ const TopNav: React.FC<TopNavProps> = ({ title, breadcrumbs, rightContent }) => 
               {breadcrumbs.map((item, i) => (
                 <React.Fragment key={i}>
                   {i > 0 && <span className="text-catalan-textMuted">/</span>}
-                  {item.path ? (
-                    <button onClick={() => navigate(item.path!)}
+                  {item.path || item.onClick ? (
+                    <button onClick={() => item.onClick ? item.onClick() : navigate(item.path!)}
                       className="text-catalan-primary hover:text-catalan-primaryLight transition-colors">
                       {item.label}
                     </button>
