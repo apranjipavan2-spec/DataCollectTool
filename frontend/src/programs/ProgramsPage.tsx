@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api, { getStoredUser } from '@/lib/api'
+import { getCached, setCached } from '@/lib/pageCache'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
@@ -377,7 +378,11 @@ export default function ProgramsPage() {
   const [schemeFilter, setSchemeFilter] = useState('')
 
   const load = useCallback(async () => {
-    setLoading(true)
+    const cp = getCached<Program[]>('programs/list')
+    const cf = getCached<Form[]>('forms/list')
+    if (cp) setPrograms(cp)
+    if (cf) setForms(cf)
+    if (cp) setLoading(false)
     try {
       const [pr, lo, fo] = await Promise.all([
         api.get('/programs/').then(r => r.data),
@@ -385,6 +390,7 @@ export default function ProgramsPage() {
         api.get('/forms/').then(r => r.data),
       ])
       setPrograms(pr); setLocations(lo); setForms(fo)
+      setCached('programs/list', pr); setCached('forms/list', fo)
     } finally { setLoading(false) }
   }, [])
 

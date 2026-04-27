@@ -15,7 +15,7 @@ const ALL_ITEMS: Record<string, NavItem> = {
   fgWriter:    { label: 'Writer',       path: '/fg/writer',    icon: '✍️' },
   fileManager: { label: 'Files',        path: '/fg/files',     icon: '📁' },
   fieldMap:    { label: 'Field Map',    path: '/map',          icon: '🗺️' },
-  settings:    { label: 'Settings',     path: '/admin/org',    icon: '⚙️' },
+  settings:    { label: 'Settings',     path: '/fg/settings',  icon: '⚙️' },
   migration:   { label: 'Import',       path: '/migration',    icon: '🔄' },
   admin:       { label: 'Admin',        path: '/admin',        icon: '🔧' },
   monitor:     { label: 'Monitor',      path: '/monitor',      icon: '🌐' },

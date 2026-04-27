@@ -16,7 +16,6 @@ import AiReportModal from '@/dashboard/AiReportModal'
 import AnalyticsTab from '@/dashboard/AnalyticsTab'
 
 const MiniMap = lazy(() => import('@/renderer/fields/MiniMap'))
-const SubmissionsMap = lazy(() => import('@/dashboard/SubmissionsMap'))
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -514,7 +513,7 @@ const TEAM_PAGE_SIZE = 20
 
 export default function Dashboard() {
   const toast = useToast()
-  const [tab, setTab] = useState<'overview' | 'submissions' | 'map' | 'analytics' | 'forms' | 'team' | 'roster'>('overview')
+  const [tab, setTab] = useState<'overview' | 'submissions' | 'analytics' | 'forms' | 'team' | 'roster'>('overview')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -676,10 +675,6 @@ export default function Dashboard() {
   const [newKeyPlaintext, setNewKeyPlaintext] = useState('')
 
   // Map
-  interface MapPoint { id: string; lat: number; lng: number; status: string; enumerator_name: string; form_title: string; collected_at: string | null }
-  const [mapPoints, setMapPoints] = useState<MapPoint[]>([])
-  const [loadingMap, setLoadingMap] = useState(false)
-  const [mapLoaded, setMapLoaded] = useState(false)
 
   // PDF export
   const [exportingPdf, setExportingPdf] = useState(false)
@@ -1029,22 +1024,6 @@ export default function Dashboard() {
     }
   }
 
-  const handleLoadMapPoints = async (forceFormId?: string) => {
-    setLoadingMap(true)
-    setMapLoaded(false)
-    try {
-      const params: Record<string, string> = {}
-      const fid = forceFormId ?? filterForm
-      if (fid) params.form_id = fid
-      const { data } = await api.get('/submissions/map-points', { params })
-      setMapPoints(data)
-      setMapLoaded(true)
-    } catch {
-      toast.error('Failed to load map data')
-    } finally {
-      setLoadingMap(false)
-    }
-  }
 
   const handleExportPdf = async () => {
     if (!filterForm) { toast.warning('Select a form first'); return }
@@ -1449,14 +1428,14 @@ export default function Dashboard() {
           {!loading && <><div className="hidden sm:flex gap-1 bg-catalan-surface rounded-lg p-1 w-fit flex-wrap">
             {(isEnumerator
               ? (['overview', 'submissions', 'forms'] as const)
-              : (['overview', 'submissions', 'map', 'analytics', 'forms', 'team', 'roster'] as const)
+              : (['overview', 'submissions', 'analytics', 'forms', 'team', 'roster'] as const)
             ).map(t => (
               <button
                 key={t}
                 onClick={() => {
                   setTab(t)
                   if (t === 'team') loadSchedules()
-                  if (t === 'map') handleLoadMapPoints()
+
 
                 }}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
@@ -2013,60 +1992,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* ── MAP ── */}
-          {tab === 'map' && (
-            <div className="space-y-4">
-              <Card>
-                <div className="flex flex-wrap gap-3 items-end mb-4">
-                  <div className="flex-1 min-w-[160px]">
-                    <label className="text-xs text-catalan-textMuted block mb-1">Filter by Form</label>
-                    <select
-                      value={filterForm}
-                      onChange={e => { setFilterForm(e.target.value); setMapLoaded(false) }}
-                      className="w-full bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
-                    >
-                      <option value="">All forms</option>
-                      {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-                    </select>
-                  </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => handleLoadMapPoints(filterForm)}
-                    disabled={loadingMap}
-                  >
-                    {loadingMap ? 'Loading…' : mapLoaded ? '↺ Refresh' : 'Load Map'}
-                  </Button>
-                </div>
-
-                {loadingMap && (
-                  <div className="h-[500px] flex items-center justify-center text-catalan-textMuted text-sm">
-                    Loading GPS points…
-                  </div>
-                )}
-
-                {!loadingMap && !mapLoaded && (
-                  <div className="h-[500px] flex flex-col items-center justify-center text-catalan-textMuted gap-3">
-                    <div className="text-4xl">🗺️</div>
-                    <p className="text-sm">Click "Load Map" to visualise submission locations</p>
-                  </div>
-                )}
-
-                {!loadingMap && mapLoaded && mapPoints.length === 0 && (
-                  <div className="h-[500px] flex flex-col items-center justify-center text-catalan-textMuted gap-3">
-                    <div className="text-4xl">📍</div>
-                    <p className="text-sm">No GPS data found for this filter. Ensure GPS fields are used in your forms.</p>
-                  </div>
-                )}
-
-                {!loadingMap && mapLoaded && mapPoints.length > 0 && (
-                  <Suspense fallback={<div className="h-[500px] bg-catalan-surface rounded-lg animate-pulse" />}>
-                    <SubmissionsMap points={mapPoints} />
-                  </Suspense>
-                )}
-              </Card>
-            </div>
-          )}
 
           {/* ── ANALYTICS ── */}
           {tab === 'analytics' && (

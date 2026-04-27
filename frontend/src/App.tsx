@@ -125,7 +125,8 @@ export default function App() {
                 </RequireAuth>
               } />
 
-              <Route path="/admin/org" element={
+              <Route path="/admin/org" element={<Navigate to="/fg/settings" replace />} />
+              <Route path="/fg/settings" element={
                 <RequireAuth roles={['master_admin', 'org_admin', 'supervisor']}>
                   <ErrorBoundary>
                     <OrgAdminPanel />

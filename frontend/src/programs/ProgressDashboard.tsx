@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api, { getStoredUser } from '@/lib/api'
+import { getCached, setCached } from '@/lib/pageCache'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
@@ -71,7 +72,9 @@ export default function ProgressDashboard() {
   const [sortAsc, setSortAsc] = useState(true)
 
   useEffect(() => {
-    api.get('/programs/overview').then(r => setPrograms(r.data)).catch(() => {})
+    const cached = getCached<Program[]>('programs/overview')
+    if (cached) setPrograms(cached)
+    api.get('/programs/overview').then(r => { setPrograms(r.data); setCached('programs/overview', r.data) }).catch(() => {})
   }, [])
 
   useEffect(() => {
