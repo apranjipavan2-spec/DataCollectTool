@@ -41,7 +41,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex-1 p-2 space-y-0.5">
+        <nav className="flex-1 p-2 space-y-1">
           {items.map((item) => (
             <button
               key={item.path}
@@ -148,7 +148,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
           </button>
         </div>
 
-        <nav className="p-2 space-y-0.5">
+        <nav className="p-2 space-y-1">
           {items.map((item) => (
             <button
               key={item.path}
