@@ -215,14 +215,22 @@ export default function FgWriter() {
   const saveCurrentReport = () => {
     if (!reportMd || !programId) return
     const versionNum = versions.length + 1
+    const label = `v${versionNum} — ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`
     const report: SavedReport = {
       id: crypto.randomUUID(),
-      label: `v${versionNum} — ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`,
+      label,
       style,
       content: reportMd,
       created_at: new Date().toISOString(),
     }
     saveReport(programId, report)
+    // Also persist to server so it appears in File Manager
+    api.post('/tool-projects/', {
+      tool: 'writer',
+      name: `${prog?.name || 'Report'} — ${label}`,
+      program_id: programId,
+      data: { content: reportMd, style, label, created_at: report.created_at },
+    }).catch(() => {})
     reload()
     toast.success('Report version saved')
   }

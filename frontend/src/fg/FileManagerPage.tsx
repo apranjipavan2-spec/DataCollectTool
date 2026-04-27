@@ -27,7 +27,7 @@ const STATUS_CLS: Record<string, string> = {
   pending:  'bg-gray-100 text-gray-500',
 }
 
-type Section = 'all' | 'analyzer' | 'cleaner' | 'submissions'
+type Section = 'recent' | 'analyzer' | 'cleaner' | 'writer' | 'submissions'
 
 export default function FileManagerPage() {
   const user = getStoredUser()
@@ -37,7 +37,7 @@ export default function FileManagerPage() {
   const [forms, setForms] = useState<{ id: string; title: string }[]>([])
   const [loadingProj, setLoadingProj] = useState(true)
   const [loadingSub, setLoadingSub] = useState(false)
-  const [section, setSection] = useState<Section>('all')
+  const [section, setSection] = useState<Section>('recent')
   const [subFormFilter, setSubFormFilter] = useState('')
   const [subStatusFilter, setSubStatusFilter] = useState('')
   const [subPage, setSubPage] = useState(1)
@@ -144,13 +144,21 @@ export default function FileManagerPage() {
     } catch { toast.error('Consent report download failed') }
   }
 
-  const visibleProjects = section === 'all' ? projects : projects.filter(p => p.tool === section)
+  const byTool = (tool: string) => projects.filter(p => p.tool === tool)
+  const recentProjects = [...projects].sort(
+    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  ).slice(0, 20)
+  const visibleProjects =
+    section === 'recent'    ? recentProjects :
+    section === 'submissions' ? [] :
+    byTool(section)
 
   const NAV_ITEMS = [
-    { key: 'all' as Section,         label: 'All Files',    icon: '📁', count: projects.length },
+    { key: 'recent' as Section,      label: 'Recent',       icon: '🕒', count: recentProjects.length },
     { key: 'submissions' as Section, label: 'Form Data',    icon: '📝', count: subTotal },
-    { key: 'analyzer' as Section,    label: 'Analyzer',     icon: '📊', count: projects.filter(p => p.tool === 'analyzer').length },
-    { key: 'cleaner' as Section,     label: 'Cleaner',      icon: '🧹', count: projects.filter(p => p.tool === 'cleaner').length },
+    { key: 'analyzer' as Section,    label: 'Analyzer',     icon: '📊', count: byTool('analyzer').length },
+    { key: 'cleaner' as Section,     label: 'Cleaner',      icon: '🧹', count: byTool('cleaner').length },
+    { key: 'writer' as Section,      label: 'Writer',       icon: '✍️', count: byTool('writer').length },
   ]
 
   const isLoading = section === 'submissions' ? loadingSub : loadingProj
@@ -297,7 +305,10 @@ export default function FileManagerPage() {
             {section !== 'submissions' && (
               <>
                 <p className="text-sm text-catalan-textMuted mb-4">
-                  Saved files from Analyzer and Cleaner. Download as CSV or open directly in the tool.
+                  {section === 'recent'  && 'Your 20 most recently saved files across all tools.'}
+                  {section === 'analyzer' && 'Saved analysis files from FG Analyzer.'}
+                  {section === 'cleaner'  && 'Cleaned datasets saved from FG Cleaner.'}
+                  {section === 'writer'   && 'Report versions saved from FG Writer.'}
                 </p>
                 {loadingProj ? (
                   <div className="py-16 text-center text-catalan-textMuted text-sm">Loading files…</div>
@@ -305,7 +316,11 @@ export default function FileManagerPage() {
                   <div className="py-16 text-center text-catalan-textMuted text-sm">
                     <div className="text-5xl mb-3">📂</div>
                     <div className="font-medium text-catalan-text mb-1">No saved files yet</div>
-                    <div className="text-xs">Use "Save to Account" in the Analyzer or Cleaner to store files here.</div>
+                    <div className="text-xs">
+                      {section === 'writer'
+                        ? 'Use "Save Version" in FG Writer to store reports here.'
+                        : 'Use "Save to Account" in the Analyzer or Cleaner to store files here.'}
+                    </div>
                   </div>
                 ) : (
                   <div className="overflow-x-auto rounded-xl border border-catalan-border">
@@ -314,36 +329,53 @@ export default function FileManagerPage() {
                         <tr className="border-b border-catalan-border bg-catalan-surface">
                           <th className="text-left px-4 py-3 text-xs font-semibold text-catalan-textMuted uppercase tracking-wider">Name</th>
                           <th className="text-left px-4 py-3 text-xs font-semibold text-catalan-textMuted uppercase tracking-wider">Tool</th>
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-catalan-textMuted uppercase tracking-wider">Rows</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-catalan-textMuted uppercase tracking-wider">Size</th>
                           <th className="text-left px-4 py-3 text-xs font-semibold text-catalan-textMuted uppercase tracking-wider">Saved</th>
                           <th className="px-4 py-3 text-xs font-semibold text-catalan-textMuted uppercase tracking-wider text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {visibleProjects.map(proj => (
-                          <tr key={proj.id} className="border-b border-catalan-border hover:bg-catalan-hover transition-colors">
-                            <td className="px-4 py-3 font-medium text-catalan-text">{proj.name}</td>
-                            <td className="px-4 py-3">
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                proj.tool === 'cleaner' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                              }`}>
-                                {proj.tool === 'cleaner' ? '🧹 Cleaner' : '📊 Analyzer'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-catalan-textMuted text-xs">{proj.data?.row_count ?? '—'}</td>
-                            <td className="px-4 py-3 text-catalan-textMuted text-xs">
-                              {proj.updated_at ? new Date(proj.updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex gap-3 justify-end">
-                                {proj.data?.csv_content && (
-                                  <button onClick={() => downloadCsv(proj)} className="text-xs text-catalan-primary hover:underline">⬇ CSV</button>
-                                )}
-                                <button onClick={() => remove(proj.id, proj.name)} className="text-xs text-red-500 hover:underline">Delete</button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                        {visibleProjects.map(proj => {
+                          const TOOL_BADGE: Record<string, string> = {
+                            analyzer: 'bg-blue-100 text-blue-700',
+                            cleaner:  'bg-green-100 text-green-700',
+                            writer:   'bg-purple-100 text-purple-700',
+                          }
+                          const TOOL_LABEL: Record<string, string> = {
+                            analyzer: '📊 Analyzer',
+                            cleaner:  '🧹 Cleaner',
+                            writer:   '✍️ Writer',
+                          }
+                          return (
+                            <tr key={proj.id} className="border-b border-catalan-border hover:bg-catalan-hover transition-colors">
+                              <td className="px-4 py-3 font-medium text-catalan-text max-w-[200px] truncate">{proj.name}</td>
+                              <td className="px-4 py-3">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TOOL_BADGE[proj.tool] ?? 'bg-gray-100 text-gray-600'}`}>
+                                  {TOOL_LABEL[proj.tool] ?? proj.tool}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-catalan-textMuted text-xs">
+                                {proj.tool === 'writer'
+                                  ? `${Math.round((proj.data?.content?.length ?? 0) / 1000)}k chars`
+                                  : (proj.data?.row_count != null ? `${proj.data.row_count} rows` : '—')}
+                              </td>
+                              <td className="px-4 py-3 text-catalan-textMuted text-xs">
+                                {proj.updated_at ? new Date(proj.updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex gap-3 justify-end">
+                                  {proj.tool === 'writer' && proj.data?.content && (
+                                    <a href="/fg/writer" className="text-xs text-catalan-primary hover:underline">Open Writer</a>
+                                  )}
+                                  {proj.data?.csv_content && (
+                                    <button onClick={() => downloadCsv(proj)} className="text-xs text-catalan-primary hover:underline">⬇ CSV</button>
+                                  )}
+                                  <button onClick={() => remove(proj.id, proj.name)} className="text-xs text-red-500 hover:underline">Delete</button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
