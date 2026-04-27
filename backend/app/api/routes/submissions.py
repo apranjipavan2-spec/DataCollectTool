@@ -68,6 +68,7 @@ def list_submissions(
     page_size: int = 50,
     backcheck_required: Optional[bool] = None,
     has_violations: Optional[bool] = None,
+    slim: bool = False,
     user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -75,7 +76,7 @@ def list_submissions(
     if role not in ("org_admin", "supervisor", "enumerator", "master_admin"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     try:
-        page_size = min(page_size, 200)
+        page_size = min(page_size, 5000)
         query = db.query(Submission, User.name).outerjoin(
             User, Submission.enumerator_id == User.id
         ).filter(Submission.tenant_id == user["tenant_id"])
@@ -127,7 +128,7 @@ def list_submissions(
                     "enumerator_name": name or "Unknown",
                     "status": s.status,
                     "serial_no": s.serial_no,
-                    "data_json": s.data_json,
+                    "data_json": {"_duplicate_suspect": s.data_json.get("_duplicate_suspect")} if slim and s.data_json else (s.data_json if not slim else {}),
                     "has_violations": bool(s.has_violations),
                     "backcheck_required": bool(s.backcheck_required),
                     "consent_given": s.consent_given,

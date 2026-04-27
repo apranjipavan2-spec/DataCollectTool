@@ -730,7 +730,7 @@ export default function Dashboard() {
     ]
     if (!isEnumerator) {
       calls.push(
-        api.get('/submissions/?page_size=200').then(r => setSubmissions(r.data.items ?? r.data.submissions ?? [])),
+        api.get('/submissions/?page_size=5000&slim=true').then(r => setSubmissions(r.data.items ?? r.data.submissions ?? [])),
         api.get('/users/?page_size=200').then(r => setTeam(r.data.items ?? r.data.users ?? [])),
         api.get('/assignments/').then(r => setAssignments(r.data ?? [])),
         api.get('/tenants/me/usage').then(r => setUsageData(r.data)).catch(() => {}),
