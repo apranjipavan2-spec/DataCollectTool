@@ -3,10 +3,10 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 export type AppLanguage = 'en' | 'hi' | 'kn' | 'te'
 
 export const LANGUAGE_OPTIONS: { code: AppLanguage; label: string }[] = [
-  { code: 'en', label: 'EN' },
-  { code: 'hi', label: 'HI' },
-  { code: 'kn', label: 'KN' },
-  { code: 'te', label: 'TE' },
+  { code: 'en', label: 'English' },
+  { code: 'hi', label: 'हिन्दी' },
+  { code: 'kn', label: 'ಕನ್ನಡ' },
+  { code: 'te', label: 'తెలుగు' },
 ]
 
 interface LanguageContextValue {

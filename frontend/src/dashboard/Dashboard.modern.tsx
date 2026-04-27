@@ -12,7 +12,6 @@ import BarChart from '@/components/charts/BarChart'
 import LineChart from '@/components/charts/LineChart'
 import AuditLog from '@/components/AuditLog'
 import RosterTab from '@/dashboard/RosterTab'
-import ProgressTab from '@/dashboard/ProgressTab'
 import AiReportModal from '@/dashboard/AiReportModal'
 import AnalyticsTab from '@/dashboard/AnalyticsTab'
 
@@ -515,7 +514,7 @@ const TEAM_PAGE_SIZE = 20
 
 export default function Dashboard() {
   const toast = useToast()
-  const [tab, setTab] = useState<'overview' | 'submissions' | 'map' | 'analytics' | 'forms' | 'team' | 'roster' | 'progress' | 'integrations' | 'files'>('overview')
+  const [tab, setTab] = useState<'overview' | 'submissions' | 'map' | 'analytics' | 'forms' | 'team' | 'roster' | 'files'>('overview')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -1455,18 +1454,17 @@ export default function Dashboard() {
           {!loading && <><div className="hidden sm:flex gap-1 bg-catalan-surface rounded-lg p-1 w-fit flex-wrap">
             {(isEnumerator
               ? (['overview', 'submissions', 'forms'] as const)
-              : (['overview', 'submissions', 'map', 'analytics', 'forms', 'team', 'roster', 'progress', 'files', 'integrations'] as const)
+              : (['overview', 'submissions', 'map', 'analytics', 'forms', 'team', 'roster', 'files'] as const)
             ).map(t => (
               <button
                 key={t}
                 onClick={() => {
                   setTab(t)
-                  if (t === 'integrations') { loadWebhooks(); loadApiKeys() }
                   if (t === 'team') loadSchedules()
                   if (t === 'map') handleLoadMapPoints()
                   if (t === 'files') {
                     setLoadingFiles(true)
-                    api.get('/tool-projects/').then(r => setToolProjects(r.data ?? [])).catch(() => {}).finally(() => setLoadingFiles(false))
+                    api.get('/tool-projects/').then(r => setToolProjects(Array.isArray(r.data) ? r.data : [])).catch(() => {}).finally(() => setLoadingFiles(false))
                   }
                 }}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
@@ -1475,7 +1473,7 @@ export default function Dashboard() {
                     : 'text-catalan-textMuted hover:text-catalan-text hover:bg-catalan-hover'
                 }`}
               >
-                {t === 'roster' ? 'Roster' : t === 'progress' ? 'Progress' : t === 'files' ? '📁 Files' : t.charAt(0).toUpperCase() + t.slice(1)}
+                {t === 'roster' ? 'Roster' : t === 'files' ? '📁 Files' : t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
             ))}
           </div>
@@ -2389,13 +2387,8 @@ export default function Dashboard() {
             <RosterTab forms={forms} team={team} />
           )}
 
-          {/* ── PROGRESS ── */}
-          {tab === 'progress' && (
-            <ProgressTab forms={forms} />
-          )}
-
-          {/* ── INTEGRATIONS ── */}
-          {tab === 'integrations' && (
+          {/* ── INTEGRATIONS moved to Settings (/admin/org) ── */}
+          {false && (
             <div className="space-y-6">
 
               {/* ── Compliance — Consent Reports ── */}
@@ -3294,13 +3287,11 @@ export default function Dashboard() {
             { key: 'submissions',   label: 'Data',      icon: '📋' },
             { key: 'forms',         label: 'Forms',     icon: '📝' },
             { key: 'team',          label: 'Team',      icon: '👥' },
-            { key: 'integrations',  label: 'Connect',   icon: '🔗' },
           ] as const).map(({ key, label, icon }) => (
             <button
               key={key}
               onClick={() => {
                 setTab(key)
-                if (key === 'integrations') { loadWebhooks(); loadApiKeys() }
                 if (key === 'team') loadSchedules()
               }}
               className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] text-[10px] font-medium transition-colors ${

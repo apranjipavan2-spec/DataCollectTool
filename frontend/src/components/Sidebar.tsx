@@ -41,13 +41,13 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-2 space-y-0.5">
           {items.map((item) => (
             <button
               key={item.path}
               onClick={() => navigate(item.path)}
               className={`
-                w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200
+                w-full flex items-center gap-3 px-3 py-1.5 rounded-lg transition-all duration-200
                 md:justify-center lg:justify-start
                 ${
                   location.pathname === item.path
@@ -57,32 +57,24 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
               `}
               title={item.label}
             >
-              <span className="text-lg flex-shrink-0">{item.icon}</span>
+              <span className="text-base flex-shrink-0">{item.icon}</span>
               <span className="text-sm hidden lg:inline">{item.label}</span>
             </button>
           ))}
         </nav>
 
-        {/* Language picker */}
-        <div className="px-3 pb-2 border-t border-catalan-border pt-3">
-          <div className="hidden lg:block text-[10px] font-semibold text-catalan-textMuted uppercase tracking-wider mb-1.5 px-1">Language</div>
-          <div className="flex gap-1 md:justify-center lg:justify-start flex-wrap">
+        {/* Language picker — dropdown */}
+        <div className="px-2 pb-2 border-t border-catalan-border pt-2">
+          <select
+            value={language}
+            onChange={e => setLanguage(e.target.value as any)}
+            title="Language"
+            className="w-full border border-catalan-border rounded-lg px-2 py-1.5 text-xs bg-catalan-bg text-catalan-text focus:outline-none focus:border-catalan-primary transition-colors cursor-pointer"
+          >
             {LANGUAGE_OPTIONS.map(opt => (
-              <button
-                key={opt.code}
-                onClick={() => setLanguage(opt.code)}
-                title={opt.code.toUpperCase()}
-                className={`text-xs font-semibold rounded-md transition-all
-                  md:px-1.5 md:py-1 lg:px-2.5 lg:py-1
-                  ${language === opt.code
-                    ? 'bg-catalan-primary text-catalan-bg'
-                    : 'text-catalan-textMuted hover:bg-catalan-hover hover:text-catalan-text border border-catalan-border'
-                  }`}
-              >
-                {opt.code.toUpperCase()}
-              </button>
+              <option key={opt.code} value={opt.code}>{opt.label}</option>
             ))}
-          </div>
+          </select>
         </div>
 
         {/* Help button */}
@@ -156,7 +148,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
           </button>
         </div>
 
-        <nav className="p-4 space-y-1">
+        <nav className="p-2 space-y-0.5">
           {items.map((item) => (
             <button
               key={item.path}
@@ -165,7 +157,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
                 setMobileOpen(false)
               }}
               className={`
-                w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200
+                w-full flex items-center gap-3 px-3 py-1.5 rounded-lg transition-all duration-200
                 ${
                   location.pathname === item.path
                     ? 'bg-catalan-primary text-catalan-bg font-semibold'
@@ -173,7 +165,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
                 }
               `}
             >
-              <span className="text-lg">{item.icon}</span>
+              <span className="text-base">{item.icon}</span>
               <span className="text-sm">{item.label}</span>
             </button>
           ))}
@@ -181,24 +173,18 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
 
         {/* Help, Language & Role - Mobile */}
         <div className="absolute bottom-4 left-4 right-4 space-y-2">
-          {/* Language picker */}
-          <div className="bg-catalan-hover rounded-lg border border-catalan-border px-3 py-2">
-            <div className="text-[10px] font-semibold text-catalan-textMuted uppercase tracking-wider mb-1.5">Language</div>
-            <div className="flex gap-1.5">
+          {/* Language dropdown */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-catalan-textMuted flex-shrink-0">🌐</span>
+            <select
+              value={language}
+              onChange={e => setLanguage(e.target.value as any)}
+              className="flex-1 border border-catalan-border rounded-lg px-2 py-1.5 text-xs bg-catalan-bg text-catalan-text focus:outline-none focus:border-catalan-primary cursor-pointer"
+            >
               {LANGUAGE_OPTIONS.map(opt => (
-                <button
-                  key={opt.code}
-                  onClick={() => setLanguage(opt.code)}
-                  className={`flex-1 text-xs font-semibold rounded-md py-1.5 transition-all
-                    ${language === opt.code
-                      ? 'bg-catalan-primary text-catalan-bg'
-                      : 'text-catalan-textMuted hover:bg-catalan-border'
-                    }`}
-                >
-                  {opt.code.toUpperCase()}
-                </button>
+                <option key={opt.code} value={opt.code}>{opt.label}</option>
               ))}
-            </div>
+            </select>
           </div>
 
           <button

@@ -23,6 +23,7 @@ export default function FieldMapPage() {
   const [selected, setSelected] = useState<Pin | null>(null)
   const [forms, setForms] = useState<{ id: string; title: string }[]>([])
   const [enumerators, setEnumerators] = useState<string[]>([])
+  const [filterStatus, setFilterStatus] = useState('')
   const mapRef = useRef<HTMLDivElement>(null)
   const leafletRef = useRef<any>(null)
   const markersRef = useRef<any[]>([])
@@ -80,7 +81,7 @@ export default function FieldMapPage() {
     }
   }, [])
 
-  // Re-render pins whenever pins or filterEnum changes
+  // Re-render pins whenever filters change
   useEffect(() => {
     const L = (window as any).L
     const map = leafletRef.current
@@ -89,13 +90,15 @@ export default function FieldMapPage() {
     markersRef.current.forEach(m => m.remove())
     markersRef.current = []
 
-    const visible = filterEnum ? pins.filter(p => p.enumerator === filterEnum) : pins
+    const visiblePins = pins
+      .filter(p => !filterEnum || p.enumerator === filterEnum)
+      .filter(p => !filterStatus || p.status === filterStatus)
 
-    visible.forEach(pin => {
+    visiblePins.forEach(pin => {
       if (!pin.lat || !pin.lng) return
       const color = STATUS_COLOR[pin.status] || '#6B7280'
       const icon = L.divIcon({
-        html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+        html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)" title="${pin.form} · ${pin.enumerator}"></div>`,
         iconSize: [12, 12], iconAnchor: [6, 6], className: '',
       })
       const marker = L.marker([pin.lat, pin.lng], { icon })
@@ -104,13 +107,15 @@ export default function FieldMapPage() {
       markersRef.current.push(marker)
     })
 
-    if (visible.length > 0) {
-      const latlngs = visible.filter(p => p.lat && p.lng).map(p => [p.lat, p.lng])
+    if (visiblePins.length > 0) {
+      const latlngs = visiblePins.filter(p => p.lat && p.lng).map(p => [p.lat, p.lng])
       if (latlngs.length) map.fitBounds(latlngs, { padding: [40, 40] })
     }
-  }, [pins, filterEnum])
+  }, [pins, filterEnum, filterStatus])
 
-  const visible = filterEnum ? pins.filter(p => p.enumerator === filterEnum) : pins
+  const visible = pins
+    .filter(p => !filterEnum || p.enumerator === filterEnum)
+    .filter(p => !filterStatus || p.status === filterStatus)
   const counts = visible.reduce((acc, p) => { acc[p.status] = (acc[p.status] || 0) + 1; return acc }, {} as Record<string, number>)
 
   return (
@@ -129,6 +134,11 @@ export default function FieldMapPage() {
                 className="border border-catalan-border rounded-lg px-2 py-1.5 text-xs bg-catalan-bg text-catalan-text max-w-[130px]">
                 <option value="">All enumerators</option>
                 {enumerators.map(e => <option key={e} value={e}>{e}</option>)}
+              </select>
+              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+                className="border border-catalan-border rounded-lg px-2 py-1.5 text-xs bg-catalan-bg text-catalan-text">
+                <option value="">All statuses</option>
+                {Object.keys(STATUS_COLOR).map(s => <option key={s} value={s}>{s}</option>)}
               </select>
               <select value={days} onChange={e => setDays(Number(e.target.value))}
                 className="border border-catalan-border rounded-lg px-2 py-1.5 text-xs bg-catalan-bg text-catalan-text">
@@ -176,25 +186,39 @@ export default function FieldMapPage() {
 
             {/* Selected pin popup */}
             {selected && (
-              <div className="absolute top-4 right-4 z-[500] bg-catalan-surface border border-catalan-border rounded-xl shadow-xl p-4 w-64">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                    style={{ background: (STATUS_COLOR[selected.status] || '#6B7280') + '22', color: STATUS_COLOR[selected.status] || '#6B7280' }}>
-                    {selected.status}
-                  </span>
-                  <button onClick={() => setSelected(null)} className="text-catalan-textMuted hover:text-catalan-text text-lg leading-none">×</button>
+              <div className="absolute top-4 right-4 z-[500] bg-catalan-surface border border-catalan-border rounded-xl shadow-xl p-4 w-72">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{ background: (STATUS_COLOR[selected.status] || '#6B7280') + '22', color: STATUS_COLOR[selected.status] || '#6B7280' }}>
+                      {selected.status}
+                    </span>
+                  </div>
+                  <button onClick={() => setSelected(null)} className="text-catalan-textMuted hover:text-catalan-text text-lg leading-none ml-2">×</button>
                 </div>
-                <div className="space-y-1.5 text-sm">
-                  <div><span className="text-catalan-textMuted">Form:</span> <span className="text-catalan-text">{selected.form}</span></div>
-                  <div><span className="text-catalan-textMuted">By:</span> <span className="text-catalan-text">{selected.enumerator}</span></div>
+                <div className="space-y-2 text-sm">
+                  <div className="font-semibold text-catalan-text text-base leading-snug">{selected.form}</div>
+                  <div className="flex items-center gap-1.5 text-catalan-textMuted text-xs">
+                    <span>👤</span>
+                    <span>{selected.enumerator}</span>
+                  </div>
                   {selected.received && (
-                    <div><span className="text-catalan-textMuted">Date:</span> <span className="text-catalan-text">
-                      {new Date(selected.received).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </span></div>
+                    <div className="flex items-center gap-1.5 text-catalan-textMuted text-xs">
+                      <span>🕐</span>
+                      <span>{new Date(selected.received).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
                   )}
-                  <div><span className="text-catalan-textMuted">GPS:</span> <span className="text-catalan-text text-xs font-mono">
-                    {selected.lat?.toFixed(4)}, {selected.lng?.toFixed(4)} (±{selected.accuracy?.toFixed(0)}m)
-                  </span></div>
+                  <div className="flex items-center gap-1.5 text-catalan-textMuted text-xs">
+                    <span>📍</span>
+                    <span className="font-mono">{selected.lat?.toFixed(5)}, {selected.lng?.toFixed(5)}</span>
+                    {selected.accuracy && <span>(±{selected.accuracy.toFixed(0)}m)</span>}
+                  </div>
+                  <div className="pt-2 border-t border-catalan-border">
+                    <a
+                      href={`/dashboard?submission=${selected.id}`}
+                      className="text-xs text-catalan-primary hover:underline"
+                    >View submission →</a>
+                  </div>
                 </div>
               </div>
             )}
