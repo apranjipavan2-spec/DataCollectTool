@@ -7,7 +7,8 @@ export interface NavItem {
 const ALL_ITEMS: Record<string, NavItem> = {
   dashboard:   { label: 'Dashboard',    path: '/',             icon: '📊' },
   forms:       { label: 'Form Builder',  path: '/builder',      icon: '📋' },
-  collect:     { label: 'Collect Data', path: '/collect',      icon: '📝' },
+  collect:     { label: 'Collect Data',   path: '/collect',                icon: '📝' },
+  mySubmissions: { label: 'My Submissions', path: '/collect?screen=history', icon: '📋' },
   programs:    { label: 'Programs',     path: '/programs',     icon: '🗂️' },
   fgAnalyzer:  { label: 'Analyzer',     path: '/fg/analyzer',  icon: '🔬' },
   fgCleaner:   { label: 'Cleaner',      path: '/fg/cleaner',   icon: '🧹' },
@@ -29,7 +30,7 @@ export const getNavItems = (role: string): NavItem[] => {
     case 'supervisor':
       return [ALL_ITEMS.dashboard, ALL_ITEMS.collect, ALL_ITEMS.programs, ALL_ITEMS.fgAnalyzer, ALL_ITEMS.fgCleaner, ALL_ITEMS.fgWriter, ALL_ITEMS.fileManager, ALL_ITEMS.fieldMap, ALL_ITEMS.settings]
     case 'enumerator':
-      return [ALL_ITEMS.dashboard, ALL_ITEMS.collect]
+      return [ALL_ITEMS.dashboard, ALL_ITEMS.collect, ALL_ITEMS.mySubmissions]
     default:
       return [ALL_ITEMS.collect]
   }

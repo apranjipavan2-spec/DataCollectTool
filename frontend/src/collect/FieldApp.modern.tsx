@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import api, { getStoredUser } from '@/lib/api'
 import { homeForRole } from '@/auth/RequireAuth'
 import type { FormSchema } from '@/types/form'
@@ -90,7 +91,9 @@ interface DraftEntry {
 }
 
 export default function FieldApp() {
-  const [screen, setScreen] = useState<Screen>('list')
+  const [searchParams] = useSearchParams()
+  const initialScreen = searchParams.get('screen') === 'history' ? 'history' : 'list'
+  const [screen, setScreen] = useState<Screen>(initialScreen)
   const [forms, setForms] = useState<FormMeta[]>([])
   const [activeForm, setActiveForm] = useState<{ meta: FormMeta; schema: FormSchema } | null>(null)
   const [outboxCount, setOutboxCount] = useState(0)
@@ -436,6 +439,7 @@ export default function FieldApp() {
         api.get('/schedules/').then(r => setSchedules(r.data)).catch(() => {})
         api.get('/programs/locations').then(r => setLocations(r.data)).catch(() => {})
         api.get('/submissions/my-backchecks').then(r => setBackchecks(r.data)).catch(() => {})
+        if (initialScreen === 'history') loadHistory()
 
         // Enumerator stats
         api.get('/submissions/?page_size=200').then(r => {
