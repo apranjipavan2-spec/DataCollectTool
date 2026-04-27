@@ -317,16 +317,24 @@ def get_map_summary(
         total = base.count()
         total_with_gps = base.filter(Submission.gps_submit.isnot(None)).count()
 
-        # GPS bounds — aggregate over gps_submit JSONB
+        # GPS bounds — aggregate from filtered base (no row fetch)
+        from sqlalchemy import text as _text
+        bounds_agg = (
+            base.filter(Submission.gps_submit.isnot(None))
+            .with_entities(
+                func.min(Submission.server_received_at).label("first_date"),
+                func.max(Submission.server_received_at).label("last_date"),
+            )
+            .one()
+        )
+        # lat/lng bounds via raw cast (SQLAlchemy JSONB cast to float in aggregate)
         bounds_row = db.execute(
-            __import__("sqlalchemy").text("""
+            _text("""
                 SELECT
                   MIN((gps_submit->>'lat')::float) AS lat_min,
                   MAX((gps_submit->>'lat')::float) AS lat_max,
                   MIN((gps_submit->>'lng')::float) AS lng_min,
-                  MAX((gps_submit->>'lng')::float) AS lng_max,
-                  MIN(server_received_at)::date AS first_date,
-                  MAX(server_received_at)::date AS last_date
+                  MAX((gps_submit->>'lng')::float) AS lng_max
                 FROM submissions
                 WHERE tenant_id = :tid AND gps_submit IS NOT NULL
             """), {"tid": str(user["tenant_id"])}
@@ -369,8 +377,8 @@ def get_map_summary(
             "forms": forms,
             "enumerators": enumerators,
             "date_range": {
-                "first": str(bounds_row.first_date) if bounds_row and bounds_row.first_date else None,
-                "last": str(bounds_row.last_date) if bounds_row and bounds_row.last_date else None,
+                "first": bounds_agg.first_date.strftime("%Y-%m-%d") if bounds_agg.first_date else None,
+                "last": bounds_agg.last_date.strftime("%Y-%m-%d") if bounds_agg.last_date else None,
             },
             "bounds": bounds,
         }

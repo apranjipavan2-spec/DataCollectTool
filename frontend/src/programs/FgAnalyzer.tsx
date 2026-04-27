@@ -1240,6 +1240,7 @@ type AnalyzerTab = 'overview' | 'tabulator' | 'panel' | 'csv'
 
 export default function FgAnalyzer() {
   const user = getStoredUser()
+  const toast = useToast()
   const isOrgAdmin = user?.role === 'org_admin'
   const TABS: { key: AnalyzerTab; label: string }[] = [
     { key: 'overview',  label: 'Overview' },

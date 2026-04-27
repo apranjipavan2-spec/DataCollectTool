@@ -49,6 +49,7 @@ interface SubmissionSummary {
   violations: number
   backcheck_required: number
   duplicate_suspects: number
+  by_status: Record<string, number>
   by_date: { date: string; count: number }[]
   by_enumerator: { enumerator_id: string | null; name: string; count: number }[]
   by_form: { form_id: string; form_title: string; count: number }[]
@@ -858,6 +859,12 @@ export default function Dashboard() {
   }), [summary, submissions, forms, team])
 
   const enumeratorStats = useMemo(() => {
+    if (!subsLoaded && summary?.by_enumerator) {
+      return summary.by_enumerator.map(e => ({
+        name: e.name, total: e.count,
+        approved: 0, flagged: 0, rejected: 0, synced: 0, last_at: '',
+      }))
+    }
     const map: Record<string, { name: string; total: number; approved: number; flagged: number; rejected: number; synced: number; last_at: string }> = {}
     for (const s of submissions) {
       if (!map[s.enumerator_id]) {
@@ -871,7 +878,7 @@ export default function Dashboard() {
       }
     }
     return Object.values(map).sort((a, b) => b.total - a.total)
-  }, [submissions])
+  }, [subsLoaded, summary, submissions])
 
   const openDetail = async (id: string) => {
     setDetailLoading(true)
@@ -2066,8 +2073,11 @@ export default function Dashboard() {
                   { label: 'Flagged', key: 'flagged', color: 'catalan-warning' },
                   { label: 'Rejected', key: 'rejected', color: 'catalan-error' },
                 ].map(({ label, key, color }) => {
-                  const cnt = submissions.filter(s => s.status === key).length
-                  const pct = submissions.length > 0 ? Math.round((cnt / submissions.length) * 100) : 0
+                  const cnt = subsLoaded
+                    ? submissions.filter(s => s.status === key).length
+                    : (summary?.by_status?.[key] ?? (summary as any)?.[key] ?? 0)
+                  const total = subsLoaded ? submissions.length : (summary?.total ?? 0)
+                  const pct = total > 0 ? Math.round((cnt / total) * 100) : 0
                   return (
                     <Card key={key} className={`border-l-4 border-l-${color}`}>
                       <div className="text-xs text-catalan-textMuted mb-1">{label}</div>
@@ -2080,7 +2090,9 @@ export default function Dashboard() {
 
               {/* Enumerator performance table */}
               <Card title="Enumerator Performance">
-                <p className="text-xs text-catalan-textMuted mb-3">Based on most recent {submissions.length} submissions loaded.</p>
+                <p className="text-xs text-catalan-textMuted mb-3">
+                  {subsLoaded ? `Based on ${submissions.length} submissions loaded.` : `Showing totals from summary (${summary?.total ?? 0} submissions). Load submissions for per-status breakdown.`}
+                </p>
                 {enumeratorStats.length === 0 ? (
                   <p className="text-sm text-catalan-textMuted text-center py-8">No data yet</p>
                 ) : (
