@@ -18,7 +18,7 @@ const Alert: React.FC<AlertProps> = ({
   const bgColor = {
     info: 'bg-catalan-info bg-opacity-10 border-catalan-info',
     success: 'bg-catalan-success bg-opacity-10 border-catalan-success',
-    warning: 'bg-catalan-warning bg-opacity-10 border-catalan-warning',
+    warning: 'bg-catalan-warning bg-opacity-20 border-catalan-warning',
     error: 'bg-catalan-error bg-opacity-5 border-catalan-error',
   }
 
