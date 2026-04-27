@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useHelp } from '@/help/HelpContext'
 import AppLogo from '@/components/AppLogo'
+import { useLanguage, LANGUAGE_OPTIONS } from '@/i18n/LanguageContext'
 
 interface SidebarItem {
   label: string
@@ -19,6 +20,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
   const navigate = useNavigate()
   const location = useLocation()
   const { togglePanel, isPanelOpen } = useHelp()
+  const { language, setLanguage } = useLanguage()
 
   return (
     <>
@@ -60,6 +62,28 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
             </button>
           ))}
         </nav>
+
+        {/* Language picker */}
+        <div className="px-3 pb-2 border-t border-catalan-border pt-3">
+          <div className="hidden lg:block text-[10px] font-semibold text-catalan-textMuted uppercase tracking-wider mb-1.5 px-1">Language</div>
+          <div className="flex gap-1 md:justify-center lg:justify-start flex-wrap">
+            {LANGUAGE_OPTIONS.map(opt => (
+              <button
+                key={opt.code}
+                onClick={() => setLanguage(opt.code)}
+                title={opt.code.toUpperCase()}
+                className={`text-xs font-semibold rounded-md transition-all
+                  md:px-1.5 md:py-1 lg:px-2.5 lg:py-1
+                  ${language === opt.code
+                    ? 'bg-catalan-primary text-catalan-bg'
+                    : 'text-catalan-textMuted hover:bg-catalan-hover hover:text-catalan-text border border-catalan-border'
+                  }`}
+              >
+                {opt.code.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Help button */}
         <div className="p-3 border-t border-catalan-border">
@@ -155,8 +179,28 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
           ))}
         </nav>
 
-        {/* Help & Role - Mobile */}
+        {/* Help, Language & Role - Mobile */}
         <div className="absolute bottom-4 left-4 right-4 space-y-2">
+          {/* Language picker */}
+          <div className="bg-catalan-hover rounded-lg border border-catalan-border px-3 py-2">
+            <div className="text-[10px] font-semibold text-catalan-textMuted uppercase tracking-wider mb-1.5">Language</div>
+            <div className="flex gap-1.5">
+              {LANGUAGE_OPTIONS.map(opt => (
+                <button
+                  key={opt.code}
+                  onClick={() => setLanguage(opt.code)}
+                  className={`flex-1 text-xs font-semibold rounded-md py-1.5 transition-all
+                    ${language === opt.code
+                      ? 'bg-catalan-primary text-catalan-bg'
+                      : 'text-catalan-textMuted hover:bg-catalan-border'
+                    }`}
+                >
+                  {opt.code.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button
             onClick={() => { setMobileOpen(false); togglePanel() }}
             className={`

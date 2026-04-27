@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { FormSchema, FormField } from '@/types/form'
 import { shouldShow, shouldShowSection, evalFormula, getAllFieldsInOrder } from '@/lib/formUtils'
 import { v4 as uuidv4 } from 'uuid'
-import { useLanguage, getLocalizedLabel } from '@/i18n/LanguageContext'
+import { useLanguage, getLocalizedLabel, LANGUAGE_OPTIONS } from '@/i18n/LanguageContext'
 
 import TextField        from './fields/TextField'
 import NumberField      from './fields/NumberField'
@@ -104,7 +104,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
   const currentField = allFields[page]
 
   // ── Localize current field's label + hint ──
-  const { language } = useLanguage()
+  const { language, setLanguage } = useLanguage()
   const localizedField = useMemo(() => {
     if (!currentField) return currentField
     return {
@@ -243,12 +243,12 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
   }
 
   return (
-    <div className="h-full bg-catalan-bg flex flex-col font-sans">
+    <div className="bg-catalan-bg flex flex-col font-sans" style={{ height: '100dvh', minHeight: '-webkit-fill-available' }}>
 
       {/* ── Header ── */}
-      <div className="px-4 pt-3 pb-3 border-b border-catalan-border bg-catalan-surface sticky top-0 z-10">
+      <div className="px-4 pt-3 pb-3 border-b border-catalan-border bg-catalan-surface sticky top-0 z-10 flex-shrink-0">
         <div className="max-w-2xl mx-auto">
-          {/* Row 1: Back button + form title + save status */}
+          {/* Row 1: Back button + form title + lang toggle + save status */}
           <div className="flex items-center gap-2 mb-2">
             {onCancel && (
               <button
@@ -276,6 +276,22 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
                 })()}
               </div>
             </div>
+            {/* Language toggle pill */}
+            <div className="flex gap-0.5 border border-catalan-border rounded-lg overflow-hidden flex-shrink-0">
+              {LANGUAGE_OPTIONS.map(opt => (
+                <button
+                  key={opt.code}
+                  onClick={() => setLanguage(opt.code)}
+                  className={`px-2 py-1 text-[11px] font-semibold transition-colors
+                    ${language === opt.code
+                      ? 'bg-catalan-primary text-catalan-bg'
+                      : 'text-catalan-textMuted hover:bg-catalan-hover'
+                    }`}
+                >
+                  {opt.code.toUpperCase()}
+                </button>
+              ))}
+            </div>
             <span className={`text-xs flex-shrink-0 ${syncStatus === 'saved' ? 'text-catalan-success' : syncStatus === 'saving' ? 'text-catalan-warning' : 'text-catalan-error'}`}>
               {syncStatus === 'saved' ? '● Saved' : syncStatus === 'saving' ? '●' : '⚠'}
             </span>
@@ -288,8 +304,8 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
       </div>
 
       {/* ── Field ── */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
-      <div className="max-w-2xl mx-auto px-5 py-7 md:py-12">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
+      <div className="max-w-2xl mx-auto px-5 py-7 pb-4 md:py-12">
         {localizedField.type === 'text' && (
           <TextField field={localizedField} value={draft.values[currentField.name] as string ?? ''} onChange={v => setValue(currentField.name, v)} />
         )}
@@ -370,7 +386,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
       </div>
 
       {/* ── Navigation ── */}
-      <div className="border-t border-catalan-border bg-catalan-surface" style={{paddingBottom:'env(safe-area-inset-bottom)'}}>
+      <div className="border-t border-catalan-border bg-catalan-surface flex-shrink-0" style={{paddingBottom:'max(env(safe-area-inset-bottom), 12px)'}}>
         <div className="max-w-2xl mx-auto px-4 py-3 flex gap-2.5">
           {page > 0 ? (
             <button
