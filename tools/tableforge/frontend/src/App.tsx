@@ -269,7 +269,7 @@ export default function App() {
     if (data.comparisonState) setComparisonState(data.comparisonState);
     if (data.projectFilters) setProjectFilters(data.projectFilters);
     if (data.source_file) {
-      setDataset({ dataset_id: data.source_file.dataset_id, filename: data.source_file.filename, row_count: data.source_file.row_count, columns: [] });
+      setDataset({ dataset_id: data.source_file.dataset_id, filename: data.source_file.filename, row_count: data.source_file.row_count, columns: [], sheets: [], preview: [] });
     }
     setActiveTableIdx(0);
     setResults(new Map());

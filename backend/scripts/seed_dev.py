@@ -290,6 +290,10 @@ _PATCHES = [
     "CREATE INDEX IF NOT EXISTS ix_sub_enumerator        ON submissions (enumerator_id)",
     "CREATE INDEX IF NOT EXISTS ix_sub_tenant_status     ON submissions (tenant_id, status)",
     "CREATE INDEX IF NOT EXISTS ix_sub_tenant_recvd      ON submissions (tenant_id, server_received_at DESC)",
+
+    # 0031 — per-form and per-program enumerator edit override
+    "ALTER TABLE forms    ADD COLUMN IF NOT EXISTS allow_enumerator_edit BOOLEAN",
+    "ALTER TABLE programs ADD COLUMN IF NOT EXISTS allow_enumerator_edit BOOLEAN",
 ]
 
 from sqlalchemy import text as _text

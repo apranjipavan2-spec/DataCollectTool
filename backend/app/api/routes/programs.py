@@ -39,6 +39,11 @@ class ProgramIn(BaseModel):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     status: str = "active"
+    allow_enumerator_edit: Optional[bool] = None
+
+
+class BulkProgEditSettingRequest(BaseModel):
+    allow_enumerator_edit: Optional[bool]
 
 class ParticipantTypeIn(BaseModel):
     name: str
@@ -169,6 +174,7 @@ def list_programs(
             "total_target": total_target, "total_collected": total_collected,
             "pct": round(total_collected / total_target * 100) if total_target else 0,
             "created_at": p.created_at.isoformat() if p.created_at else "",
+            "allow_enumerator_edit": p.allow_enumerator_edit,
         })
     return result
 
@@ -232,6 +238,15 @@ def update_program(prog_id: str, body: ProgramIn, user=Depends(require_superviso
         setattr(p, k, v)
     db.commit()
     return {"id": str(p.id)}
+
+
+@router.patch("/bulk-edit-setting")
+def bulk_update_program_edit_setting(body: BulkProgEditSettingRequest, user=Depends(require_supervisor), db: Session = Depends(get_db)):
+    db.query(Program).filter(Program.tenant_id == user["tenant_id"]).update(
+        {"allow_enumerator_edit": body.allow_enumerator_edit}
+    )
+    db.commit()
+    return {"updated": True}
 
 
 @router.delete("/{prog_id}")

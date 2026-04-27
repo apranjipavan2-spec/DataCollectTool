@@ -515,7 +515,7 @@ const TEAM_PAGE_SIZE = 20
 
 export default function Dashboard() {
   const toast = useToast()
-  const [tab, setTab] = useState<'overview' | 'submissions' | 'map' | 'analytics' | 'forms' | 'team' | 'roster' | 'progress' | 'integrations'>('overview')
+  const [tab, setTab] = useState<'overview' | 'submissions' | 'map' | 'analytics' | 'forms' | 'team' | 'roster' | 'progress' | 'integrations' | 'files'>('overview')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -605,6 +605,19 @@ export default function Dashboard() {
   const [allowEnumeratorEdit, setAllowEnumeratorEdit] = useState(true)
   const [savingEnumEdit, setSavingEnumEdit] = useState(false)
   const [myTenantId, setMyTenantId] = useState('')
+
+  // Per-form / per-program edit override
+  interface FormEditOverride { id: string; title: string; allow_enumerator_edit: boolean | null }
+  interface ProgramEditOverride { id: string; name: string; allow_enumerator_edit: boolean | null }
+  const [formEditOverrides, setFormEditOverrides] = useState<FormEditOverride[]>([])
+  const [programEditOverrides, setProgramEditOverrides] = useState<ProgramEditOverride[]>([])
+  const [savingEditOverride, setSavingEditOverride] = useState(false)
+
+  // File Manager
+  interface ToolProject { id: string; tool: string; name: string; program_id: string | null; data: any; created_at: string; updated_at: string }
+  const [toolProjects, setToolProjects] = useState<ToolProject[]>([])
+  const [loadingFiles, setLoadingFiles] = useState(false)
+  const [filesToolFilter, setFilesToolFilter] = useState<string>('all')
 
   // Duplicates view
   const [showDuplicates, setShowDuplicates] = useState(false)
@@ -719,7 +732,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     const calls: Promise<unknown>[] = [
-      api.get('/forms/').then(r => setForms(r.data.forms ?? r.data ?? [])),
+      api.get('/forms/').then(r => {
+        const fs = r.data.forms ?? r.data ?? []
+        setForms(fs)
+        setFormEditOverrides(fs.map((f: any) => ({ id: f.id, title: f.title, allow_enumerator_edit: f.allow_enumerator_edit ?? null })))
+      }),
       api.get('/submissions/?page_size=200').then(r => setSubmissions(r.data.items ?? r.data.submissions ?? [])),
       api.get('/tenants/branding').then(r => { if (r.data.id) setMyTenantId(r.data.id); if (typeof r.data.allow_enumerator_edit === 'boolean') setAllowEnumeratorEdit(r.data.allow_enumerator_edit) }).catch(() => {}),
     ]
@@ -729,6 +746,10 @@ export default function Dashboard() {
         api.get('/assignments/').then(r => setAssignments(r.data ?? [])),
         api.get('/tenants/me/usage').then(r => setUsageData(r.data)).catch(() => {}),
         api.get('/export/sheets/status').then(r => setSheetsConfigured(r.data.configured)).catch(() => setSheetsConfigured(false)),
+        api.get('/programs/').then(r => {
+          const ps = r.data ?? []
+          setProgramEditOverrides(ps.map((p: any) => ({ id: p.id, name: p.name, allow_enumerator_edit: p.allow_enumerator_edit ?? null })))
+        }).catch(() => {}),
       )
     }
     Promise.allSettled(calls).then(results => {
@@ -1434,7 +1455,7 @@ export default function Dashboard() {
           {!loading && <><div className="hidden sm:flex gap-1 bg-catalan-surface rounded-lg p-1 w-fit flex-wrap">
             {(isEnumerator
               ? (['overview', 'submissions', 'forms'] as const)
-              : (['overview', 'submissions', 'map', 'analytics', 'forms', 'team', 'roster', 'progress', 'integrations'] as const)
+              : (['overview', 'submissions', 'map', 'analytics', 'forms', 'team', 'roster', 'progress', 'files', 'integrations'] as const)
             ).map(t => (
               <button
                 key={t}
@@ -1443,6 +1464,10 @@ export default function Dashboard() {
                   if (t === 'integrations') { loadWebhooks(); loadApiKeys() }
                   if (t === 'team') loadSchedules()
                   if (t === 'map') handleLoadMapPoints()
+                  if (t === 'files') {
+                    setLoadingFiles(true)
+                    api.get('/tool-projects/').then(r => setToolProjects(r.data ?? [])).catch(() => {}).finally(() => setLoadingFiles(false))
+                  }
                 }}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
                   tab === t
@@ -1450,7 +1475,7 @@ export default function Dashboard() {
                     : 'text-catalan-textMuted hover:text-catalan-text hover:bg-catalan-hover'
                 }`}
               >
-                {t === 'roster' ? 'Roster' : t === 'progress' ? 'Progress' : t.charAt(0).toUpperCase() + t.slice(1)}
+                {t === 'roster' ? 'Roster' : t === 'progress' ? 'Progress' : t === 'files' ? '📁 Files' : t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
             ))}
           </div>
@@ -2465,13 +2490,16 @@ export default function Dashboard() {
 
               {/* ── Org Settings ── */}
               {user?.role && ['org_admin', 'master_admin'].includes(user.role) && (
-                <Card title="Organisation Settings">
-                  <div className="flex items-start justify-between gap-4">
+                <Card title="Organisation Settings — Enumerator Edit Access">
+                  <p className="text-xs text-catalan-textMuted mb-4 leading-relaxed">
+                    Control whether enumerators can edit their own previously submitted records. Set an org-wide default, then override individually per form or per program. Form-level overrides take priority.
+                  </p>
+
+                  {/* Org-wide default */}
+                  <div className="flex items-center justify-between gap-4 p-3 bg-catalan-hover rounded-lg mb-4">
                     <div>
-                      <div className="text-sm font-medium text-catalan-text">Allow enumerators to edit their submissions</div>
-                      <div className="text-xs text-catalan-textMuted mt-0.5">
-                        When enabled, enumerators can edit data in their own previously submitted records. Supervisors and admins can always edit.
-                      </div>
+                      <div className="text-sm font-semibold text-catalan-text">Org-wide default</div>
+                      <div className="text-xs text-catalan-textMuted mt-0.5">Applied to all forms/programs that don't have an individual override</div>
                     </div>
                     <button
                       onClick={async () => {
@@ -2480,20 +2508,136 @@ export default function Dashboard() {
                         try {
                           await api.patch(`/tenants/${myTenantId}`, { allow_enumerator_edit: next })
                           setAllowEnumeratorEdit(next)
-                          toast.success(next ? 'Enumerator editing enabled' : 'Enumerator editing disabled')
-                        } catch {
-                          toast.error('Failed to save setting')
-                        } finally {
-                          setSavingEnumEdit(false)
-                        }
+                          toast.success(next ? 'Default: editing enabled' : 'Default: editing disabled')
+                        } catch { toast.error('Failed to save setting') }
+                        finally { setSavingEnumEdit(false) }
                       }}
                       disabled={savingEnumEdit || !myTenantId}
                       className={`relative flex-shrink-0 w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${allowEnumeratorEdit ? 'bg-catalan-primary' : 'bg-catalan-border'}`}
-                      title={allowEnumeratorEdit ? 'Click to disable' : 'Click to enable'}
                     >
                       <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${allowEnumeratorEdit ? 'translate-x-6' : 'translate-x-0'}`} />
                     </button>
                   </div>
+
+                  {/* Per-form overrides */}
+                  {formEditOverrides.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-semibold text-catalan-textMuted uppercase tracking-wider">Per-Form Override</div>
+                        <div className="flex gap-2">
+                          <button onClick={async () => {
+                            setSavingEditOverride(true)
+                            try {
+                              await api.patch('/forms/bulk-edit-setting', { allow_enumerator_edit: true })
+                              setFormEditOverrides(prev => prev.map(f => ({ ...f, allow_enumerator_edit: true })))
+                              toast.success('All forms: editing enabled')
+                            } catch { toast.error('Failed') } finally { setSavingEditOverride(false) }
+                          }} disabled={savingEditOverride} className="text-xs px-2 py-1 rounded bg-catalan-primary/10 text-catalan-primary hover:bg-catalan-primary/20 transition-colors">Enable All</button>
+                          <button onClick={async () => {
+                            setSavingEditOverride(true)
+                            try {
+                              await api.patch('/forms/bulk-edit-setting', { allow_enumerator_edit: false })
+                              setFormEditOverrides(prev => prev.map(f => ({ ...f, allow_enumerator_edit: false })))
+                              toast.success('All forms: editing disabled')
+                            } catch { toast.error('Failed') } finally { setSavingEditOverride(false) }
+                          }} disabled={savingEditOverride} className="text-xs px-2 py-1 rounded bg-catalan-error/10 text-catalan-error hover:bg-catalan-error/20 transition-colors">Disable All</button>
+                          <button onClick={async () => {
+                            setSavingEditOverride(true)
+                            try {
+                              await api.patch('/forms/bulk-edit-setting', { allow_enumerator_edit: null })
+                              setFormEditOverrides(prev => prev.map(f => ({ ...f, allow_enumerator_edit: null })))
+                              toast.success('All forms reset to org default')
+                            } catch { toast.error('Failed') } finally { setSavingEditOverride(false) }
+                          }} disabled={savingEditOverride} className="text-xs px-2 py-1 rounded bg-catalan-hover border border-catalan-border text-catalan-textMuted hover:text-catalan-text transition-colors">Reset All</button>
+                        </div>
+                      </div>
+                      <div className="space-y-1 max-h-56 overflow-y-auto">
+                        {formEditOverrides.map(f => (
+                          <div key={f.id} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-catalan-hover/50">
+                            <span className="text-sm text-catalan-text truncate flex-1">{f.title}</span>
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                              {f.allow_enumerator_edit === null && <span className="text-xs text-catalan-textMuted italic">org default</span>}
+                              <button
+                                onClick={async () => {
+                                  const next = f.allow_enumerator_edit === null ? true : f.allow_enumerator_edit === true ? false : null
+                                  try {
+                                    await api.put(`/forms/${f.id}`, { allow_enumerator_edit: next })
+                                    setFormEditOverrides(prev => prev.map(x => x.id === f.id ? { ...x, allow_enumerator_edit: next } : x))
+                                  } catch { toast.error('Failed to update') }
+                                }}
+                                className={`relative w-10 h-5 rounded-full transition-colors duration-200 flex-shrink-0
+                                  ${f.allow_enumerator_edit === true ? 'bg-catalan-primary' : f.allow_enumerator_edit === false ? 'bg-catalan-error' : 'bg-catalan-border'}`}
+                                title={f.allow_enumerator_edit === null ? 'Uses org default — click to override' : f.allow_enumerator_edit ? 'Enabled — click to disable' : 'Disabled — click to reset'}
+                              >
+                                <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200
+                                  ${f.allow_enumerator_edit === true ? 'translate-x-5' : f.allow_enumerator_edit === false ? 'translate-x-0' : 'translate-x-2.5'}`} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Per-program overrides */}
+                  {programEditOverrides.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-semibold text-catalan-textMuted uppercase tracking-wider">Per-Program Override</div>
+                        <div className="flex gap-2">
+                          <button onClick={async () => {
+                            setSavingEditOverride(true)
+                            try {
+                              await api.patch('/programs/bulk-edit-setting', { allow_enumerator_edit: true })
+                              setProgramEditOverrides(prev => prev.map(p => ({ ...p, allow_enumerator_edit: true })))
+                              toast.success('All programs: editing enabled')
+                            } catch { toast.error('Failed') } finally { setSavingEditOverride(false) }
+                          }} disabled={savingEditOverride} className="text-xs px-2 py-1 rounded bg-catalan-primary/10 text-catalan-primary hover:bg-catalan-primary/20 transition-colors">Enable All</button>
+                          <button onClick={async () => {
+                            setSavingEditOverride(true)
+                            try {
+                              await api.patch('/programs/bulk-edit-setting', { allow_enumerator_edit: false })
+                              setProgramEditOverrides(prev => prev.map(p => ({ ...p, allow_enumerator_edit: false })))
+                              toast.success('All programs: editing disabled')
+                            } catch { toast.error('Failed') } finally { setSavingEditOverride(false) }
+                          }} disabled={savingEditOverride} className="text-xs px-2 py-1 rounded bg-catalan-error/10 text-catalan-error hover:bg-catalan-error/20 transition-colors">Disable All</button>
+                          <button onClick={async () => {
+                            setSavingEditOverride(true)
+                            try {
+                              await api.patch('/programs/bulk-edit-setting', { allow_enumerator_edit: null })
+                              setProgramEditOverrides(prev => prev.map(p => ({ ...p, allow_enumerator_edit: null })))
+                              toast.success('All programs reset to org default')
+                            } catch { toast.error('Failed') } finally { setSavingEditOverride(false) }
+                          }} disabled={savingEditOverride} className="text-xs px-2 py-1 rounded bg-catalan-hover border border-catalan-border text-catalan-textMuted hover:text-catalan-text transition-colors">Reset All</button>
+                        </div>
+                      </div>
+                      <div className="space-y-1 max-h-56 overflow-y-auto">
+                        {programEditOverrides.map(p => (
+                          <div key={p.id} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-catalan-hover/50">
+                            <span className="text-sm text-catalan-text truncate flex-1">{p.name}</span>
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                              {p.allow_enumerator_edit === null && <span className="text-xs text-catalan-textMuted italic">org default</span>}
+                              <button
+                                onClick={async () => {
+                                  const next = p.allow_enumerator_edit === null ? true : p.allow_enumerator_edit === true ? false : null
+                                  try {
+                                    await api.patch(`/programs/${p.id}`, { allow_enumerator_edit: next })
+                                    setProgramEditOverrides(prev => prev.map(x => x.id === p.id ? { ...x, allow_enumerator_edit: next } : x))
+                                  } catch { toast.error('Failed to update') }
+                                }}
+                                className={`relative w-10 h-5 rounded-full transition-colors duration-200 flex-shrink-0
+                                  ${p.allow_enumerator_edit === true ? 'bg-catalan-primary' : p.allow_enumerator_edit === false ? 'bg-catalan-error' : 'bg-catalan-border'}`}
+                                title={p.allow_enumerator_edit === null ? 'Uses org default — click to override' : p.allow_enumerator_edit ? 'Enabled — click to disable' : 'Disabled — click to reset'}
+                              >
+                                <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200
+                                  ${p.allow_enumerator_edit === true ? 'translate-x-5' : p.allow_enumerator_edit === false ? 'translate-x-0' : 'translate-x-2.5'}`} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </Card>
               )}
 
@@ -3019,6 +3163,102 @@ export default function Dashboard() {
               </Card>
             </div>
           )}
+          {/* ── FILES ── */}
+          {tab === 'files' && (
+            <div className="space-y-4">
+              <Card title="📁 File Manager">
+                <p className="text-sm text-catalan-textMuted mb-4">Saved projects from Analyzer and Cleaner. Download as CSV or open directly in the tool.</p>
+
+                {/* Filter tabs */}
+                <div className="flex gap-2 mb-4 flex-wrap">
+                  {['all', 'analyzer', 'cleaner'].map(f => (
+                    <button key={f} onClick={() => setFilesToolFilter(f)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border
+                        ${filesToolFilter === f ? 'bg-catalan-primary text-catalan-bg border-catalan-primary' : 'border-catalan-border text-catalan-textMuted hover:bg-catalan-hover'}`}>
+                      {f === 'all' ? 'All Files' : f === 'analyzer' ? '📊 Analyzer' : '🧹 Cleaner'}
+                    </button>
+                  ))}
+                  <button onClick={() => {
+                    setLoadingFiles(true)
+                    api.get('/tool-projects/').then(r => setToolProjects(r.data ?? [])).catch(() => {}).finally(() => setLoadingFiles(false))
+                  }} className="ml-auto px-3 py-1 rounded-full text-xs font-medium border border-catalan-border text-catalan-textMuted hover:bg-catalan-hover transition-colors">
+                    ↻ Refresh
+                  </button>
+                </div>
+
+                {loadingFiles ? (
+                  <div className="py-12 text-center text-catalan-textMuted text-sm">Loading files…</div>
+                ) : toolProjects.filter(p => filesToolFilter === 'all' || p.tool === filesToolFilter).length === 0 ? (
+                  <div className="py-12 text-center text-catalan-textMuted text-sm">
+                    <div className="text-4xl mb-3">📂</div>
+                    <div>No saved files yet.</div>
+                    <div className="text-xs mt-1">Use "Save to Account" in the Analyzer or Cleaner to store files here.</div>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-catalan-border">
+                          <th className="text-left px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Name</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Tool</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Rows</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Saved</th>
+                          <th className="px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {toolProjects
+                          .filter(p => filesToolFilter === 'all' || p.tool === filesToolFilter)
+                          .map(proj => (
+                            <tr key={proj.id} className="border-b border-catalan-border hover:bg-catalan-hover transition-colors">
+                              <td className="px-3 py-2 font-medium text-catalan-text">{proj.name}</td>
+                              <td className="px-3 py-2">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${proj.tool === 'cleaner' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
+                                  {proj.tool === 'cleaner' ? '🧹 Cleaner' : '📊 Analyzer'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-catalan-textMuted text-xs">{proj.data?.row_count ?? '—'}</td>
+                              <td className="px-3 py-2 text-catalan-textMuted text-xs">
+                                {proj.updated_at ? new Date(proj.updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                              </td>
+                              <td className="px-3 py-2">
+                                <div className="flex gap-2 justify-end">
+                                  {proj.data?.csv_content && (
+                                    <button
+                                      onClick={() => {
+                                        const blob = new Blob([proj.data.csv_content], { type: 'text/csv' })
+                                        const a = document.createElement('a')
+                                        a.href = URL.createObjectURL(blob)
+                                        a.download = `${proj.name}.csv`
+                                        a.click()
+                                        URL.revokeObjectURL(a.href)
+                                      }}
+                                      className="text-xs text-catalan-primary hover:underline"
+                                    >⬇ CSV</button>
+                                  )}
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm(`Delete "${proj.name}"?`)) return
+                                      try {
+                                        await api.delete(`/tool-projects/${proj.id}`)
+                                        setToolProjects(prev => prev.filter(p => p.id !== proj.id))
+                                        toast.success('File deleted')
+                                      } catch { toast.error('Failed to delete') }
+                                    }}
+                                    className="text-xs text-catalan-error hover:underline"
+                                  >Delete</button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
+            </div>
+          )}
+
           </>}
         </div>
       </div>

@@ -1425,6 +1425,45 @@ def proxy_fg_questionnaires():
         return jsonify(error=str(e)), 502
 
 
+@app.route("/api/save-to-account", methods=["POST"])
+def save_to_account():
+    """Save current cleaned data to the user's FG account as a tool project."""
+    body = request.json or {}
+    fg_base_url = body.get("fg_base_url", "").rstrip("/")
+    token = body.get("token", "")
+    name = body.get("name", "").strip() or "Cleaner Export"
+    program_id = body.get("program_id") or None
+    if not fg_base_url or not token:
+        return jsonify(error="fg_base_url and token required"), 400
+    df = _df()
+    if df is None:
+        return jsonify(error="No data loaded"), 400
+    # Export cleaned data as CSV string (capped at 5 MB to stay within JSONB)
+    buf = io.StringIO()
+    df.to_csv(buf, index=False)
+    csv_str = buf.getvalue()
+    if len(csv_str) > 5 * 1024 * 1024:
+        csv_str = csv_str[:5 * 1024 * 1024]
+    payload = {
+        "tool": "cleaner",
+        "name": name,
+        "program_id": program_id,
+        "data": {
+            "csv_content": csv_str,
+            "row_count": len(df),
+            "col_count": len(df.columns),
+            "columns": list(df.columns),
+            "filename": DATA.get("filename") or name,
+        },
+    }
+    try:
+        resp = _requests.post(f"{fg_base_url}/api/v1/tool-projects/", json=payload,
+                              headers={"Authorization": f"Bearer {token}"}, timeout=30)
+        return jsonify(resp.json()), resp.status_code
+    except Exception as e:
+        return jsonify(error=str(e)), 502
+
+
 @app.route("/api/fg/user-projects/save", methods=["POST"])
 def proxy_save_fg_project():
     body = request.json or {}

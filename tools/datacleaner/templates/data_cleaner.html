@@ -413,11 +413,12 @@ input, select, textarea { font-family: inherit; }
     <div class="col-list" id="colList">
       <div style="padding:20px;color:var(--text3);font-size:12px;text-align:center;">Upload a file to see columns</div>
     </div>
-    <div style="padding:10px; border-top:1px solid var(--border); display:flex; gap:4px;">
+    <div style="padding:10px; border-top:1px solid var(--border); display:flex; gap:4px; flex-wrap:wrap;">
       <button class="btn btn-secondary btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doUndo()" title="Undo last action">↩</button>
       <button class="btn btn-secondary btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doRedo()" title="Redo last action">↪</button>
       <button class="btn btn-success btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doExport('csv')">⬇ CSV</button>
       <button class="btn btn-success btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doExport('excel')">⬇ XLS</button>
+      <button id="saveToAccountBtn" class="btn btn-primary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; margin-top:4px; display:none;" onclick="doSaveToAccount()" title="Save cleaned data to your FieldGovern account">💾 Save to Account</button>
     </div>
   </div>
 
@@ -1460,6 +1461,30 @@ function doExport(fmt) {
   window.open(`/api/export?format=${fmt}`, '_blank');
 }
 
+// ── Save to Account ──────────────────────────────────────
+async function doSaveToAccount() {
+  if (!_fgUrl || !_fgToken) { toast('Not connected to FieldGovern', true); return; }
+  const defaultName = (DATA_FILENAME || 'cleaned_data').replace(/\.[^.]+$/, '') + '_cleaned';
+  const name = window.prompt('Save as:', defaultName);
+  if (!name) return;
+  const btn = document.getElementById('saveToAccountBtn');
+  btn.disabled = true; btn.textContent = '💾 Saving…';
+  try {
+    const res = await fetch(BASE_URL + '/api/save-to-account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken, name, program_id: _fgProgramId || null }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Save failed');
+    toast('Saved to your account ✓');
+  } catch (e) {
+    toast(e.message || 'Save failed', true);
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Save to Account';
+  }
+}
+
 // ── Preview ──────────────────────────────────────────────
 async function loadPreview(page = 1) {
   const data = await api(`preview?page=${page}&per_page=50`);
@@ -1807,10 +1832,12 @@ function toggleSection(sectionId, headerEl) {
 
 <script>
 // ── FieldGovern integration ───────────────────────────────────────────────────
-const _fgParams = new URLSearchParams(window.location.search);
-const _fgUrl    = _fgParams.get('fg_url');
-const _fgToken  = _fgParams.get('token');
-const _fgProgId = _fgParams.get('program_id');
+const _fgParams    = new URLSearchParams(window.location.search);
+const _fgUrl       = _fgParams.get('fg_url');
+const _fgToken     = _fgParams.get('token');
+const _fgProgId    = _fgParams.get('program_id');
+let   _fgProgramId = _fgProgId;   // updated when user selects a program
+let   DATA_FILENAME = '';          // updated after load
 
 async function fgLoadData(programId, questionnaireId) {
   if (!_fgUrl || !_fgToken || !programId) return;
@@ -1825,6 +1852,7 @@ async function fgLoadData(programId, questionnaireId) {
     const data = await res.json();
     hideLoading();
     if (data.error) { toast(data.error, 'error'); return; }
+    DATA_FILENAME = data.filename || '';
     toast(`Loaded ${data.filename} — ${data.rows} rows, ${data.cols} columns`);
     const wc = document.getElementById('welcomeCard');
     if (wc) wc.style.display = 'none';
@@ -1840,6 +1868,10 @@ async function fgLoadData(programId, questionnaireId) {
 // Build program / questionnaire selector if FG context present
 (async function () {
   if (!_fgUrl || !_fgToken) return;
+
+  // Show Save to Account button (only when connected to FG)
+  const saveBtn = document.getElementById('saveToAccountBtn');
+  if (saveBtn) saveBtn.style.display = '';
 
   // Hide the file upload zone — FG context is the primary data source
   const uploadZone = document.getElementById('uploadZone');
@@ -1896,6 +1928,7 @@ async function fgLoadData(programId, questionnaireId) {
   box.appendChild(errDiv);
 
   progSel.addEventListener('change', async function () {
+    _fgProgramId = this.value || null;
     qSel.innerHTML = '<option value="">All questionnaires</option>';
     qField.style.display = 'none';
     btn.disabled = !this.value;

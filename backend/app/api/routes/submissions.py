@@ -654,13 +654,22 @@ def edit_submission_data(
     if role == "enumerator":
         if str(sub.enumerator_id) != str(user["sub"]):
             raise HTTPException(status_code=403, detail="You can only edit your own submissions")
-        from app.models.tenant import Tenant
-        tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
-        if tenant and not getattr(tenant, "allow_enumerator_edit", True):
-            raise HTTPException(
-                status_code=403,
-                detail="Your administrator has disabled enumerator editing. Contact your supervisor."
-            )
+        # Check override hierarchy: form-level → org-level
+        form_override = None
+        if sub.form_id:
+            form = db.query(Form).filter(Form.id == sub.form_id).first()
+            form_override = form.allow_enumerator_edit if form else None
+        if form_override is not None:
+            if not form_override:
+                raise HTTPException(status_code=403, detail="Editing is disabled for this form.")
+        else:
+            from app.models.tenant import Tenant
+            tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+            if tenant and not getattr(tenant, "allow_enumerator_edit", True):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Your administrator has disabled enumerator editing. Contact your supervisor."
+                )
     elif role not in ("org_admin", "supervisor", "master_admin"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 

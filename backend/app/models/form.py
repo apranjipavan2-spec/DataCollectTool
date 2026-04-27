@@ -18,6 +18,7 @@ class Form(Base):
     sheets_sync_config = Column(JSONB, default=dict, server_default="'{}'::jsonb")
     public_token = Column(String(64), unique=True, nullable=True)
     is_public = Column(Boolean, default=False, server_default='false')
+    allow_enumerator_edit = Column(Boolean, nullable=True)  # null = use org default
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

@@ -29,6 +29,7 @@ class Program(Base):
     end_date = Column(Date, nullable=True)
     status = Column(String, default="active")  # planning|active|completed|archived
     is_panel_study = Column(Boolean, default=False, nullable=True)
+    allow_enumerator_edit = Column(Boolean, nullable=True)  # null = use org default
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

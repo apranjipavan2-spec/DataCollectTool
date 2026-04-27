@@ -28,6 +28,11 @@ class FormUpdate(BaseModel):
     title: Optional[str] = None
     json_schema: Optional[dict[str, Any]] = None
     status: Optional[str] = None
+    allow_enumerator_edit: Optional[bool] = None  # None = clear override (use org default)
+
+
+class BulkEditSettingRequest(BaseModel):
+    allow_enumerator_edit: Optional[bool]  # None = reset to org default
 
 
 class AssignArmRequest(BaseModel):
@@ -158,7 +163,8 @@ def list_forms(
 
     forms = q.order_by(Form.title).all()
     return [{"id": str(f.id), "title": f.title, "version": f.version,
-             "status": f.status, "updated_at": f.updated_at} for f in forms]
+             "status": f.status, "updated_at": f.updated_at,
+             "allow_enumerator_edit": f.allow_enumerator_edit} for f in forms]
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -229,9 +235,21 @@ def update_form(form_id: str, body: FormUpdate, user=Depends(require_org_admin),
     if body.status is not None:
         form.status = body.status
 
+    if "allow_enumerator_edit" in body.model_fields_set:
+        form.allow_enumerator_edit = body.allow_enumerator_edit
+
     db.commit()
     db.refresh(form)
     return {"id": str(form.id), "version": form.version, "status": form.status}
+
+
+@router.patch("/bulk-edit-setting")
+def bulk_update_edit_setting(body: BulkEditSettingRequest, user=Depends(require_org_admin), db: Session = Depends(get_db)):
+    db.query(Form).filter(Form.tenant_id == user["tenant_id"]).update(
+        {"allow_enumerator_edit": body.allow_enumerator_edit}
+    )
+    db.commit()
+    return {"updated": True}
 
 
 @router.delete("/{form_id}", status_code=status.HTTP_204_NO_CONTENT)

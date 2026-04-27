@@ -100,8 +100,10 @@ def detect_and_stamp():
             stamp = "0027"
         elif not table_exists(cur, "user_tool_projects"):
             stamp = "0028"
+        elif not col_exists(cur, "forms", "allow_enumerator_edit"):
+            stamp = "0030"
         else:
-            stamp = "0029"
+            stamp = "0031"
 
         print(f"Stamping alembic_version to {stamp}")
         if not has_alembic:
