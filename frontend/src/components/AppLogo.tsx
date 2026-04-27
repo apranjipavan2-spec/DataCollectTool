@@ -1,5 +1,3 @@
-import { useTheme } from '@/lib/ThemeContext'
-
 interface Props {
   size?: number
   className?: string

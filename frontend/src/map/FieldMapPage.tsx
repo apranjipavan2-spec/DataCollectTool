@@ -124,7 +124,7 @@ export default function FieldMapPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopNav title="Live Field Map"
           rightContent={
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-nowrap overflow-x-auto">
               <select value={filterForm} onChange={e => setFilterForm(e.target.value)}
                 className="border border-catalan-border rounded-lg px-2 py-1.5 text-xs bg-catalan-bg text-catalan-text max-w-[140px]">
                 <option value="">All forms</option>

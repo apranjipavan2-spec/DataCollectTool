@@ -28,7 +28,7 @@ export default function OrgAdminPanel() {
     { id: 'api-keys', label: '🔑 API Keys', description: 'Integration access' },
     { id: 'forms', label: '📋 Forms', description: 'Form templates' },
     { id: 'migration', label: '🔄 Import', description: 'Kobo · SurveyCTO · XLSForm' },
-    { id: 'integrations', label: '🔗 Integrations', description: 'WhatsApp · Google Sheets' },
+    { id: 'integrations', label: '🔗 Integrations', description: 'Alerts · Webhooks · Sheets · Access' },
     ...(isMasterAdmin ? [{ id: 'ai', label: '🤖 AI', description: 'OpenAI · Claude · Gemini' }] : []),
   ]
 

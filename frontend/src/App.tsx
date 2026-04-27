@@ -15,6 +15,7 @@ import FieldGovern         from '@/programs/FieldGovern'
 import FgAnalyzer          from '@/programs/FgAnalyzer'
 import FgCleaner           from '@/programs/FgCleaner'
 import FgWriter            from '@/reports/FgWriter'
+import FileManagerPage     from '@/fg/FileManagerPage'
 import ProgressDashboard   from '@/programs/ProgressDashboard'
 import SuperAdminMonitor   from '@/admin/SuperAdminMonitor'
 import MigrationPage      from '@/migration/MigrationPage'
@@ -202,6 +203,14 @@ export default function App() {
                 <RequireAuth roles={['org_admin', 'supervisor']}>
                   <ErrorBoundary>
                     <FgWriter />
+                  </ErrorBoundary>
+                </RequireAuth>
+              } />
+
+              <Route path="/fg/files" element={
+                <RequireAuth roles={['org_admin', 'supervisor']}>
+                  <ErrorBoundary>
+                    <FileManagerPage />
                   </ErrorBoundary>
                 </RequireAuth>
               } />

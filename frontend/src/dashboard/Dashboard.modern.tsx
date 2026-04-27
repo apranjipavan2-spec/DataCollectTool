@@ -514,7 +514,7 @@ const TEAM_PAGE_SIZE = 20
 
 export default function Dashboard() {
   const toast = useToast()
-  const [tab, setTab] = useState<'overview' | 'submissions' | 'map' | 'analytics' | 'forms' | 'team' | 'roster' | 'files'>('overview')
+  const [tab, setTab] = useState<'overview' | 'submissions' | 'map' | 'analytics' | 'forms' | 'team' | 'roster'>('overview')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -612,11 +612,6 @@ export default function Dashboard() {
   const [programEditOverrides, setProgramEditOverrides] = useState<ProgramEditOverride[]>([])
   const [savingEditOverride, setSavingEditOverride] = useState(false)
 
-  // File Manager
-  interface ToolProject { id: string; tool: string; name: string; program_id: string | null; data: any; created_at: string; updated_at: string }
-  const [toolProjects, setToolProjects] = useState<ToolProject[]>([])
-  const [loadingFiles, setLoadingFiles] = useState(false)
-  const [filesToolFilter, setFilesToolFilter] = useState<string>('all')
 
   // Duplicates view
   const [showDuplicates, setShowDuplicates] = useState(false)
@@ -1454,7 +1449,7 @@ export default function Dashboard() {
           {!loading && <><div className="hidden sm:flex gap-1 bg-catalan-surface rounded-lg p-1 w-fit flex-wrap">
             {(isEnumerator
               ? (['overview', 'submissions', 'forms'] as const)
-              : (['overview', 'submissions', 'map', 'analytics', 'forms', 'team', 'roster', 'files'] as const)
+              : (['overview', 'submissions', 'map', 'analytics', 'forms', 'team', 'roster'] as const)
             ).map(t => (
               <button
                 key={t}
@@ -1462,10 +1457,7 @@ export default function Dashboard() {
                   setTab(t)
                   if (t === 'team') loadSchedules()
                   if (t === 'map') handleLoadMapPoints()
-                  if (t === 'files') {
-                    setLoadingFiles(true)
-                    api.get('/tool-projects/').then(r => setToolProjects(Array.isArray(r.data) ? r.data : [])).catch(() => {}).finally(() => setLoadingFiles(false))
-                  }
+
                 }}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
                   tab === t
@@ -1473,7 +1465,7 @@ export default function Dashboard() {
                     : 'text-catalan-textMuted hover:text-catalan-text hover:bg-catalan-hover'
                 }`}
               >
-                {t === 'roster' ? 'Roster' : t === 'files' ? '📁 Files' : t.charAt(0).toUpperCase() + t.slice(1)}
+                {t === 'roster' ? 'Roster' : t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
             ))}
           </div>
@@ -3153,124 +3145,6 @@ export default function Dashboard() {
                     ))}
                   </div>
                 )}
-              </Card>
-            </div>
-          )}
-          {/* ── FILES ── */}
-          {tab === 'files' && (
-            <div className="space-y-4">
-              <Card title="📁 File Manager">
-                <div className="flex gap-0 min-h-[400px]">
-                  {/* Left panel */}
-                  <div className="w-44 flex-shrink-0 border-r border-catalan-border pr-4 mr-4 space-y-1">
-                    <p className="text-[11px] font-semibold text-catalan-textMuted uppercase tracking-wider mb-3">Filter</p>
-                    {[
-                      { key: 'all',      label: 'All Files',    icon: '📁' },
-                      { key: 'analyzer', label: 'Analyzer',     icon: '📊' },
-                      { key: 'cleaner',  label: 'Cleaner',      icon: '🧹' },
-                    ].map(f => (
-                      <button key={f.key} onClick={() => setFilesToolFilter(f.key)}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
-                          filesToolFilter === f.key
-                            ? 'bg-catalan-primary/10 text-catalan-primary border border-catalan-primary/20'
-                            : 'text-catalan-textMuted hover:bg-catalan-hover'
-                        }`}>
-                        <span>{f.icon}</span>
-                        {f.label}
-                        {f.key !== 'all' && (
-                          <span className="ml-auto text-xs text-catalan-textMuted">
-                            {toolProjects.filter(p => p.tool === f.key).length}
-                          </span>
-                        )}
-                        {f.key === 'all' && (
-                          <span className="ml-auto text-xs text-catalan-textMuted">{toolProjects.length}</span>
-                        )}
-                      </button>
-                    ))}
-                    <div className="pt-3 border-t border-catalan-border mt-2">
-                      <button onClick={() => {
-                        setLoadingFiles(true)
-                        api.get('/tool-projects/').then(r => setToolProjects(Array.isArray(r.data) ? r.data : [])).catch(() => {}).finally(() => setLoadingFiles(false))
-                      }} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-catalan-textMuted hover:bg-catalan-hover transition-colors">
-                        ↻ Refresh
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Right content */}
-                  <div className="flex-1 min-w-0">
-
-                {loadingFiles ? (
-                  <div className="py-12 text-center text-catalan-textMuted text-sm">Loading files…</div>
-                ) : toolProjects.filter(p => filesToolFilter === 'all' || p.tool === filesToolFilter).length === 0 ? (
-                  <div className="py-12 text-center text-catalan-textMuted text-sm">
-                    <div className="text-4xl mb-3">📂</div>
-                    <div>No saved files yet.</div>
-                    <div className="text-xs mt-1">Use "Save to Account" in the Analyzer or Cleaner to store files here.</div>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-catalan-border">
-                          <th className="text-left px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Name</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Tool</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Rows</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Saved</th>
-                          <th className="px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {toolProjects
-                          .filter(p => filesToolFilter === 'all' || p.tool === filesToolFilter)
-                          .map(proj => (
-                            <tr key={proj.id} className="border-b border-catalan-border hover:bg-catalan-hover transition-colors">
-                              <td className="px-3 py-2 font-medium text-catalan-text">{proj.name}</td>
-                              <td className="px-3 py-2">
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${proj.tool === 'cleaner' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
-                                  {proj.tool === 'cleaner' ? '🧹 Cleaner' : '📊 Analyzer'}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 text-catalan-textMuted text-xs">{proj.data?.row_count ?? '—'}</td>
-                              <td className="px-3 py-2 text-catalan-textMuted text-xs">
-                                {proj.updated_at ? new Date(proj.updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                              </td>
-                              <td className="px-3 py-2">
-                                <div className="flex gap-2 justify-end">
-                                  {proj.data?.csv_content && (
-                                    <button
-                                      onClick={() => {
-                                        const blob = new Blob([proj.data.csv_content], { type: 'text/csv' })
-                                        const a = document.createElement('a')
-                                        a.href = URL.createObjectURL(blob)
-                                        a.download = `${proj.name}.csv`
-                                        a.click()
-                                        URL.revokeObjectURL(a.href)
-                                      }}
-                                      className="text-xs text-catalan-primary hover:underline"
-                                    >⬇ CSV</button>
-                                  )}
-                                  <button
-                                    onClick={async () => {
-                                      if (!confirm(`Delete "${proj.name}"?`)) return
-                                      try {
-                                        await api.delete(`/tool-projects/${proj.id}`)
-                                        setToolProjects(prev => prev.filter(p => p.id !== proj.id))
-                                        toast.success('File deleted')
-                                      } catch { toast.error('Failed to delete') }
-                                    }}
-                                    className="text-xs text-catalan-error hover:underline"
-                                  >Delete</button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                  </div>{/* end right content */}
-                </div>{/* end flex row */}
               </Card>
             </div>
           )}
