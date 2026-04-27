@@ -81,9 +81,8 @@ export default function LoginPage() {
              style={{ background: 'radial-gradient(circle, #7c3aed, transparent 70%)' }} />
 
         {/* Logo */}
-        <div className="relative z-10 flex items-center gap-3">
-          <Logo size={44} />
-          <span className="text-slate-800 text-xl font-bold tracking-tight">FieldGovern</span>
+        <div className="relative z-10 flex items-center">
+          <img src="/logo-wide.png" alt="FieldGovern" className="h-12 w-auto object-contain" />
         </div>
 
         {/* Headline */}
@@ -131,9 +130,8 @@ export default function LoginPage() {
         <div className="w-full max-w-[420px]">
 
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-2 mb-8">
-            <Logo size={40} />
-            <span className="text-slate-800 text-xl font-bold">FieldGovern</span>
+          <div className="lg:hidden flex items-center justify-center mb-8">
+            <img src="/logo-wide.png" alt="FieldGovern" className="h-10 w-auto object-contain" />
           </div>
 
           {/* Card */}

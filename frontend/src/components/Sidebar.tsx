@@ -36,8 +36,8 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
       >
         {/* Header */}
         <div className="h-16 flex items-center px-3 border-b border-catalan-border gap-2.5">
-          <AppLogo size={32} className="flex-shrink-0" />
-          <span className="text-base font-bold text-catalan-primary hidden lg:block leading-tight">FieldGovern</span>
+          <AppLogo size={28} className="flex-shrink-0 lg:hidden" />
+          <AppLogo wide size={28} className="flex-shrink-0 hidden lg:block" />
         </div>
 
         {/* Navigation Items */}

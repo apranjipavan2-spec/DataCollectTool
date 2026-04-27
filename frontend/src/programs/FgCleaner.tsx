@@ -90,8 +90,13 @@ export default function FgCleaner() {
       <Sidebar items={getNavItems(user?.role ?? '')} role={user?.role} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopNav
-          title="FG Cleaner"
-          breadcrumbs={[{ label: 'FG Cleaner' }]}
+          titleNode={
+            <div className="flex items-center gap-2.5">
+              <img src="/logo-wide.png" alt="FieldGovern" className="h-7 w-auto object-contain" />
+              <span className="text-catalan-textMuted font-medium text-sm hidden sm:inline">·</span>
+              <span className="text-catalan-text font-semibold text-base hidden sm:inline">Cleaner</span>
+            </div>
+          }
           rightContent={
             <ProgramPicker value={programId} onChange={id => { setProgramId(id); setPage(1) }} />
           }

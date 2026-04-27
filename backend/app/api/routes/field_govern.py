@@ -61,6 +61,17 @@ class TabulateExecuteRequest(BaseModel):
     secondary_groupby: str = ""
 
 
+class TabulateCsvRequest(BaseModel):
+    rows: list
+    groupby_field: str
+    value_field: str = "*"
+    aggregation: str = "count"
+    chart_type: str = "bar"
+    title: str = ""
+    show_percent: bool = False
+    secondary_groupby: str = ""
+
+
 class WriterRequest(BaseModel):
     style: str = "field_survey"
     date_range: str = ""
@@ -482,6 +493,89 @@ def execute_tabulation(
         "aggregation": aggregation,
         "chart_type": body.chart_type,
         "title": body.title,
+    }
+
+
+# ── CSV Tabulation (org_admin only, rows provided directly) ──────────────────
+
+@router.post("/tabulate-csv")
+def tabulate_csv(
+    body: TabulateCsvRequest,
+    user: dict = Depends(require_org_admin),
+):
+    rows = body.rows
+    groupby_field = body.groupby_field
+    value_field = body.value_field
+    aggregation = body.aggregation
+    secondary_groupby = body.secondary_groupby or ""
+
+    def _str_val(raw):
+        if isinstance(raw, list):
+            return ", ".join(str(v) for v in raw)
+        return str(raw) if raw is not None else "__missing__"
+
+    if secondary_groupby:
+        cross: dict = defaultdict(lambda: defaultdict(int))
+        for row in rows:
+            g1 = _str_val(row.get(groupby_field, "__missing__"))
+            g2 = _str_val(row.get(secondary_groupby, "__missing__"))
+            cross[g1][g2] += 1
+        sub_keys = sorted({k for d in cross.values() for k in d})
+        result_rows = []
+        for g1, d in sorted(cross.items()):
+            total_g1 = sum(d.values())
+            r: dict = {"group": g1, "value": total_g1}
+            for k in sub_keys:
+                r[k] = d.get(k, 0)
+            result_rows.append(r)
+        result_rows.sort(key=lambda x: -x["value"])
+        grand_total = sum(r["value"] for r in result_rows)
+        if body.show_percent and grand_total:
+            for r in result_rows:
+                r["pct"] = round(r["value"] / grand_total * 100, 1)
+        return {
+            "rows": result_rows, "sub_keys": sub_keys, "is_cross_tab": True,
+            "show_percent": body.show_percent, "total": len(rows),
+            "groupby_field": groupby_field, "secondary_groupby": secondary_groupby,
+            "aggregation": aggregation, "chart_type": body.chart_type, "title": body.title,
+        }
+
+    groups: dict = defaultdict(list)
+    for row in rows:
+        group_val = _str_val(row.get(groupby_field, "__missing__"))
+        if value_field == "*" or aggregation == "count":
+            groups[group_val].append(1)
+        else:
+            val = row.get(value_field)
+            try:
+                groups[group_val].append(float(val))
+            except (TypeError, ValueError):
+                pass
+
+    result_rows = []
+    for group, values in sorted(groups.items()):
+        if aggregation == "count":
+            agg_val = len(values)
+        elif aggregation == "sum":
+            agg_val = sum(values)
+        elif aggregation == "mean":
+            agg_val = round(sum(values) / len(values), 2) if values else 0
+        else:
+            agg_val = len(values)
+        result_rows.append({"group": group, "value": agg_val})
+
+    result_rows.sort(key=lambda x: -x["value"])
+
+    if body.show_percent and aggregation == "count":
+        grand_total = sum(r["value"] for r in result_rows)
+        for r in result_rows:
+            r["pct"] = round(r["value"] / grand_total * 100, 1) if grand_total else 0
+
+    return {
+        "rows": result_rows, "is_cross_tab": False,
+        "show_percent": body.show_percent, "total": len(rows),
+        "groupby_field": groupby_field, "value_field": value_field,
+        "aggregation": aggregation, "chart_type": body.chart_type, "title": body.title,
     }
 
 

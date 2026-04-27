@@ -1032,6 +1032,156 @@ function PanelStudyTab({ programId }: { programId: string }) {
   )
 }
 
+// ── CSV Upload tab (org_admin only) ──────────────────────────────────────────
+
+function parseCsv(text: string): { headers: string[]; rows: Record<string, string>[] } {
+  const lines = text.trim().split(/\r?\n/)
+  if (lines.length < 2) return { headers: [], rows: [] }
+  const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim())
+  const rows = lines.slice(1).map(line => {
+    const vals = line.split(',').map(v => v.replace(/^"|"$/g, '').trim())
+    const obj: Record<string, string> = {}
+    headers.forEach((h, i) => { obj[h] = vals[i] ?? '' })
+    return obj
+  })
+  return { headers, rows }
+}
+
+function CsvTab() {
+  const toast = useToast()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [headers, setHeaders] = useState<string[]>([])
+  const [rows, setRows] = useState<Record<string, string>[]>([])
+  const [fileName, setFileName] = useState('')
+  const [groupby, setGroupby] = useState('')
+  const [valueField, setValueField] = useState('*')
+  const [aggregation, setAggregation] = useState('count')
+  const [chartType, setChartType] = useState('bar')
+  const [title, setTitle] = useState('')
+  const [running, setRunning] = useState(false)
+  const [result, setResult] = useState<any | null>(null)
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const { headers: h, rows: r } = parseCsv(ev.target?.result as string)
+      setHeaders(h); setRows(r); setFileName(f.name)
+      setGroupby(h[0] ?? ''); setValueField('*'); setResult(null)
+    }
+    reader.readAsText(f)
+  }
+
+  const runTable = async () => {
+    if (!groupby || rows.length === 0) return
+    setRunning(true)
+    try {
+      const res = await api.post('/fg/tabulate-csv', {
+        rows, groupby_field: groupby,
+        value_field: valueField || '*', aggregation,
+        chart_type: chartType,
+        title: title || `${groupby} breakdown`,
+        show_percent: false,
+      })
+      setResult(res.data)
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Tabulation failed')
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className={card}>
+        <div className={sh}>Upload CSV File</div>
+        <p className="text-xs text-catalan-textMuted mb-3">
+          Upload any CSV file to build cross-tabulation tables. Only visible to Org Admin.
+        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={() => fileRef.current?.click()} className={btnPr}>
+            Choose CSV
+          </button>
+          {fileName && <span className="text-sm text-catalan-textMuted">{fileName} · {rows.length} rows</span>}
+          <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFile} />
+        </div>
+      </div>
+
+      {headers.length > 0 && (
+        <div className={card}>
+          <div className={sh}>Build Table</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+            <div>
+              <label className="text-xs text-catalan-textMuted block mb-1">Group by *</label>
+              <select className={`${sel} w-full`} value={groupby} onChange={e => setGroupby(e.target.value)}>
+                {headers.map(h => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-catalan-textMuted block mb-1">Value field</label>
+              <select className={`${sel} w-full`} value={valueField} onChange={e => setValueField(e.target.value)}>
+                <option value="*">Count of records (*)</option>
+                {headers.map(h => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-catalan-textMuted block mb-1">Aggregation</label>
+              <select className={`${sel} w-full`} value={aggregation} onChange={e => setAggregation(e.target.value)}>
+                <option value="count">Count</option>
+                <option value="sum">Sum</option>
+                <option value="mean">Mean</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-catalan-textMuted block mb-1">Chart type</label>
+              <select className={`${sel} w-full`} value={chartType} onChange={e => setChartType(e.target.value)}>
+                <option value="bar">Bar</option>
+                <option value="line">Line</option>
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs text-catalan-textMuted block mb-1">Title (optional)</label>
+              <input className={`${inp} w-full`} value={title} onChange={e => setTitle(e.target.value)}
+                placeholder="e.g. District-wise count" />
+            </div>
+          </div>
+          <button onClick={runTable} disabled={running || !groupby} className={btnPr}>
+            {running ? 'Running…' : 'Build Table'}
+          </button>
+        </div>
+      )}
+
+      {result && (
+        <div className={card}>
+          <div className="font-semibold text-catalan-text mb-3">{result.title || 'Result'}</div>
+          <BarChart data={result.rows.slice(0, 20).map((r: any) => ({ label: r.group, value: r.value }))}
+            height={Math.max(120, Math.min(result.rows.length * 30 + 8, 300))} />
+          <div className="overflow-x-auto rounded-lg border border-catalan-border mt-4">
+            <table className="w-full text-sm">
+              <thead className="bg-catalan-bg border-b border-catalan-border">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs text-catalan-textMuted font-semibold uppercase">{result.groupby_field}</th>
+                  <th className="px-3 py-2 text-right text-xs text-catalan-textMuted font-semibold uppercase">{result.aggregation}({result.value_field})</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-catalan-border">
+                {result.rows.map((r: any, i: number) => (
+                  <tr key={i} className="hover:bg-catalan-hover">
+                    <td className="px-3 py-2 text-catalan-text">{r.group}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-catalan-primary">{r.value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="text-xs text-catalan-textMuted mt-2">{result.total} total records</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Program picker ─────────────────────────────────────────────────────────────
 
 function ProgramPicker({ value, onChange }: { value: string; onChange: (id: string, name: string) => void }) {
@@ -1056,15 +1206,17 @@ function ProgramPicker({ value, onChange }: { value: string; onChange: (id: stri
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-type AnalyzerTab = 'overview' | 'tabulator' | 'panel'
-const TABS: { key: AnalyzerTab; label: string }[] = [
-  { key: 'overview',  label: 'Overview' },
-  { key: 'tabulator', label: 'Tabulator' },
-  { key: 'panel',     label: 'Panel Study' },
-]
+type AnalyzerTab = 'overview' | 'tabulator' | 'panel' | 'csv'
 
 export default function FgAnalyzer() {
   const user = getStoredUser()
+  const isOrgAdmin = user?.role === 'org_admin'
+  const TABS: { key: AnalyzerTab; label: string }[] = [
+    { key: 'overview',  label: 'Overview' },
+    { key: 'tabulator', label: 'Tabulator' },
+    { key: 'panel',     label: 'Panel Study' },
+    ...(isOrgAdmin ? [{ key: 'csv' as AnalyzerTab, label: 'CSV Upload' }] : []),
+  ]
   const [programId, setProgramId] = useState(getLastProgram())
   const [progName, setProgName] = useState('')
   const [tab, setTab] = useState<AnalyzerTab>('overview')
@@ -1101,8 +1253,13 @@ export default function FgAnalyzer() {
       <Sidebar items={getNavItems(user?.role ?? '')} role={user?.role} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopNav
-          title="FG Analyzer"
-          breadcrumbs={[{ label: 'FG Analyzer' }]}
+          titleNode={
+            <div className="flex items-center gap-2.5">
+              <img src="/logo-wide.png" alt="FieldGovern" className="h-7 w-auto object-contain" />
+              <span className="text-catalan-textMuted font-medium text-sm hidden sm:inline">·</span>
+              <span className="text-catalan-text font-semibold text-base hidden sm:inline">Analyzer</span>
+            </div>
+          }
           rightContent={
             <div className="flex items-center gap-3">
               <ProgramPicker value={programId} onChange={(id, name) => { setProgramId(id); setProgName(name) }} />
@@ -1148,6 +1305,17 @@ export default function FgAnalyzer() {
               </div>
             )}
 
+            {/* CSV Upload tab is always accessible for org_admin, no program required */}
+            {isOrgAdmin && !programId && (
+              <div className="flex gap-1 mb-6 border-b border-catalan-border">
+                <button onClick={() => setTab('csv')}
+                  className="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors border-catalan-primary text-catalan-primary">
+                  CSV Upload
+                </button>
+              </div>
+            )}
+            {isOrgAdmin && !programId && <CsvTab />}
+
             {programId && data && !loading && (
               <>
                 <div className="flex gap-1 mb-6 border-b border-catalan-border">
@@ -1164,6 +1332,7 @@ export default function FgAnalyzer() {
                 {tab === 'overview'  && <OverviewTab data={data} />}
                 {tab === 'tabulator' && <TabulatorTab programId={programId} cols={data.column_headers} sampleRows={data.sample_rows ?? []} />}
                 {tab === 'panel'     && <PanelStudyTab programId={programId} />}
+                {tab === 'csv'       && <CsvTab />}
               </>
             )}
           </div>

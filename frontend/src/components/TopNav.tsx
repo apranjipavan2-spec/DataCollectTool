@@ -6,6 +6,7 @@ import ThemeToggle from '@/components/ThemeToggle'
 
 interface TopNavProps {
   title?: string
+  titleNode?: React.ReactNode
   breadcrumbs?: { label: string; path?: string; onClick?: () => void }[]
   rightContent?: React.ReactNode
 }
@@ -117,7 +118,7 @@ function NotificationBell() {
   )
 }
 
-const TopNav: React.FC<TopNavProps> = ({ title, breadcrumbs, rightContent }) => {
+const TopNav: React.FC<TopNavProps> = ({ title, titleNode, breadcrumbs, rightContent }) => {
   const navigate = useNavigate()
   const [showUserMenu, setShowUserMenu]           = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
@@ -148,7 +149,7 @@ const TopNav: React.FC<TopNavProps> = ({ title, breadcrumbs, rightContent }) => 
 
         {/* Left: Title/Breadcrumbs */}
         <div className="flex-1">
-          {breadcrumbs && breadcrumbs.length > 0 ? (
+          {titleNode ? titleNode : breadcrumbs && breadcrumbs.length > 0 ? (
             <div className="flex items-center gap-2 text-sm">
               {breadcrumbs.map((item, i) => (
                 <React.Fragment key={i}>
