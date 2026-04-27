@@ -116,6 +116,30 @@ export default function FileManagerPage() {
     URL.revokeObjectURL(a.href)
   }
 
+  async function downloadFormCsv(formId: string, formTitle: string) {
+    try {
+      const r = await api.get(`/export/${formId}/csv`, { responseType: 'blob' })
+      const url = URL.createObjectURL(r.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${formTitle.replace(/[^a-z0-9]/gi, '_')}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch { toast.error('Export failed') }
+  }
+
+  async function downloadConsentCsv(formId: string, formTitle: string) {
+    try {
+      const r = await api.get(`/export/consent-report?form_id=${formId}`, { responseType: 'blob' })
+      const url = URL.createObjectURL(r.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `consent_${formTitle.replace(/[^a-z0-9]/gi, '_')}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch { toast.error('Consent report download failed') }
+  }
+
   const visibleProjects = section === 'all' ? projects : projects.filter(p => p.tool === section)
 
   const NAV_ITEMS = [
@@ -134,11 +158,17 @@ export default function FileManagerPage() {
         <TopNav title="File Manager"
           rightContent={
             <div className="flex items-center gap-2">
-              {section === 'submissions' && submissions.length > 0 && (
-                <button onClick={exportSubmissionsCsv}
-                  className="px-3 py-1.5 text-xs border border-catalan-border rounded-lg text-catalan-text hover:bg-catalan-hover">
-                  ⬇ Export CSV
-                </button>
+              {section === 'submissions' && subFormFilter && forms.find(f => f.id === subFormFilter) && (
+                <div className="flex gap-2">
+                  <button onClick={() => { const f = forms.find(x => x.id === subFormFilter)!; downloadFormCsv(f.id, f.title) }}
+                    className="px-3 py-1.5 text-xs bg-catalan-primary text-catalan-bg rounded-lg hover:bg-catalan-primaryDark">
+                    ⬇ Form CSV
+                  </button>
+                  <button onClick={() => { const f = forms.find(x => x.id === subFormFilter)!; downloadConsentCsv(f.id, f.title) }}
+                    className="px-3 py-1.5 text-xs border border-catalan-border rounded-lg text-catalan-text hover:bg-catalan-hover">
+                    ⬇ Consent Report
+                  </button>
+                </div>
               )}
               <button onClick={load} disabled={isLoading}
                 className="px-3 py-1.5 text-xs border border-catalan-border rounded-lg text-catalan-text hover:bg-catalan-hover disabled:opacity-40">
@@ -185,7 +215,20 @@ export default function FileManagerPage() {
                       <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
-                  <span className="text-xs text-catalan-textMuted ml-auto">{subTotal} submissions</span>
+                  <div className="ml-auto flex items-center gap-3">
+                    <span className="text-xs text-catalan-textMuted">{subTotal} submissions</span>
+                    {forms.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {forms.map(f => (
+                          <button key={f.id} onClick={() => downloadFormCsv(f.id, f.title)}
+                            title={`Download all data for "${f.title}"`}
+                            className="text-[10px] px-2 py-1 bg-catalan-hover border border-catalan-border rounded text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/40 transition-colors">
+                            ⬇ {f.title.length > 20 ? f.title.slice(0, 20) + '…' : f.title}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {loadingSub ? (

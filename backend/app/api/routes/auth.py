@@ -140,9 +140,7 @@ def forgot_password(request: Request, body: ForgotPasswordRequest, db: Session =
     # Send email if user has an email address
     if user.email:
         send_password_reset_email(user.email, user.name or "User", raw_token)
-    else:
-        # Log for dev — in production this would go to SMS or be skipped
-        print(f"[DEV] Password reset token for {body.phone}: {raw_token}")
+    # No SMS gateway configured — admin can reset password manually from user management
 
     return {"message": "If an account exists, a reset link has been sent."}
 
@@ -223,8 +221,7 @@ def send_otp(request: Request, body: SendOTPRequest, db: Session = Depends(get_d
     user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRE_MINUTES)
     db.commit()
 
-    # TODO: integrate SMS gateway (MSG91 / Kaleyra)
-    print(f"[DEV] OTP for {body.phone}: {otp}")
+    # SMS gateway not yet integrated — OTP login is available for future 2FA
 
     return {"message": "OTP sent if phone is registered"}
 

@@ -445,25 +445,32 @@ export default function FieldApp() {
           setMyStats({ today: todayCount, total: r.data.total ?? items.length })
         }).catch(() => {})
 
+        // Show cached forms immediately so the list appears without waiting for network
+        try {
+          const cached = await store.listFormCache()
+          if (cached.length > 0) {
+            setForms(cached.map(c => ({ id: c.id, title: c.title, version: c.version })))
+            setLoading(false)
+          }
+        } catch { }
+
+        // Refresh from server; cache schemas in background without blocking UI
         try {
           const { data } = await api.get<Array<{ id: string; title: string; version: number }>>('/forms/?status=active')
           setForms(data)
-          await Promise.all(data.map(async f => {
-            try {
-              const detail = await api.get<{ json_schema: FormSchema }>(`/forms/${f.id}`)
-              await store.saveFormCache({
-                id: f.id, title: f.title, version: f.version, status: 'active',
-                schema: JSON.stringify(detail.data.json_schema),
-                cachedAt: new Date().toISOString(),
-              })
-            } catch { }
-          }))
-        } catch {
-          try {
-            const cached = await store.listFormCache()
-            setForms(cached.map(c => ({ id: c.id, title: c.title, version: c.version })))
-          } catch { }
-        }
+          ;(async () => {
+            await Promise.all(data.map(async f => {
+              try {
+                const detail = await api.get<{ json_schema: FormSchema }>(`/forms/${f.id}`)
+                await store.saveFormCache({
+                  id: f.id, title: f.title, version: f.version, status: 'active',
+                  schema: JSON.stringify(detail.data.json_schema),
+                  cachedAt: new Date().toISOString(),
+                })
+              } catch { }
+            }))
+          })()
+        } catch { }
       } catch { } finally {
         setLoading(false)
         setRefreshing(false)

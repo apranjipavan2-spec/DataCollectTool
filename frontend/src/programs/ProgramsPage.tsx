@@ -508,9 +508,13 @@ export default function ProgramsPage() {
                   </button>
                   {detail && user?.role && ['supervisor', 'org_admin', 'master_admin'].includes(user.role) && <>
                     <button onClick={() => { const t = token; window.location.href = `${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${selectedId}&token=${t}` }}
-                      className="px-3 py-1.5 text-sm bg-blue-50 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-100">Analyzer</button>
+                      className="px-3 py-1.5 text-sm bg-slate-800 text-white rounded-lg hover:bg-slate-700 active:scale-95 transition-all font-medium shadow-sm">
+                      🔬 Analyzer
+                    </button>
                     <button onClick={() => { const t = token; window.location.href = `${window.location.origin}/cleaner/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${selectedId}&token=${t}` }}
-                      className="px-3 py-1.5 text-sm bg-green-50 border border-green-200 text-green-700 rounded-lg hover:bg-green-100">Cleaner</button>
+                      className="px-3 py-1.5 text-sm bg-slate-800 text-white rounded-lg hover:bg-slate-700 active:scale-95 transition-all font-medium shadow-sm">
+                      🧹 Cleaner
+                    </button>
                   </>}
                   {detailTab === 'progress' && <>
                     <button disabled={exporting === 'xlsx'} onClick={() => exportProgress('xlsx')}
@@ -586,6 +590,12 @@ export default function ProgramsPage() {
                           <Badge label={p.status} cls={PROG_STATUS_CLS[p.status] ?? 'bg-gray-100 text-gray-500'} />
                           <span className="text-catalan-primary group-hover:underline">View details →</span>
                         </div>
+                        {((p as any).participant_type_count > 0 || (p as any).questionnaire_count > 0) && (
+                          <div className="mt-2 flex gap-2 flex-wrap text-[10px] text-catalan-textMuted">
+                            {(p as any).participant_type_count > 0 && <span className="bg-catalan-hover rounded px-1.5 py-0.5">👤 {(p as any).participant_type_count} type{(p as any).participant_type_count > 1 ? 's' : ''}</span>}
+                            {(p as any).questionnaire_count > 0 && <span className="bg-catalan-hover rounded px-1.5 py-0.5">📋 {(p as any).questionnaire_count} questionnaire{(p as any).questionnaire_count > 1 ? 's' : ''}</span>}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -693,11 +703,17 @@ export default function ProgramsPage() {
                             {questionnaires.map(q => <option key={q.id} value={q.id}>{q.name}</option>)}
                           </select></div>
                         <div><label className="text-xs text-catalan-textMuted font-medium">District</label>
-                          <input className={`${inputCls} mt-0.5`} placeholder="Filter…" value={progressFilters.district}
-                            onChange={e => setProgressFilters(p => ({ ...p, district: e.target.value }))} /></div>
+                          <input list="district-opts" className={`${inputCls} mt-0.5`} placeholder="Search…" value={progressFilters.district}
+                            onChange={e => setProgressFilters(p => ({ ...p, district: e.target.value }))} />
+                          <datalist id="district-opts">
+                            {[...new Set((progress?.rows ?? []).map(r => r.district).filter(Boolean))].sort().map(d => <option key={d} value={d} />)}
+                          </datalist></div>
                         <div><label className="text-xs text-catalan-textMuted font-medium">Block</label>
-                          <input className={`${inputCls} mt-0.5`} placeholder="Filter…" value={progressFilters.block}
-                            onChange={e => setProgressFilters(p => ({ ...p, block: e.target.value }))} /></div>
+                          <input list="block-opts" className={`${inputCls} mt-0.5`} placeholder="Search…" value={progressFilters.block}
+                            onChange={e => setProgressFilters(p => ({ ...p, block: e.target.value }))} />
+                          <datalist id="block-opts">
+                            {[...new Set((progress?.rows ?? []).map(r => r.block).filter(Boolean))].sort().map(b => <option key={b} value={b} />)}
+                          </datalist></div>
                         <div><label className="text-xs text-catalan-textMuted font-medium">Status</label>
                           <select className={`${inputCls} mt-0.5`} value={progressFilters.status}
                             onChange={e => setProgressFilters(p => ({ ...p, status: e.target.value }))}>
@@ -719,12 +735,35 @@ export default function ProgramsPage() {
                       </div>
                       {loadingDetail ? (
                         <div className="py-12 text-center text-catalan-textMuted">Loading progress…</div>
+                      ) : rows.length === 0 && progress && detail && detail.questionnaires.length > 0 ? (
+                        <div className="p-4">
+                          <p className="text-xs text-catalan-textMuted mb-3 uppercase tracking-wider font-semibold">Questionnaire Progress</p>
+                          <div className="space-y-3">
+                            {detail.questionnaires.map(q => (
+                              <div key={q.id} className="border border-catalan-border rounded-xl p-4 bg-catalan-surface">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div>
+                                    <span className="font-medium text-sm text-catalan-text">{q.name}</span>
+                                    {q.participant_type_name && <span className="ml-2 text-xs text-catalan-textMuted">👤 {q.participant_type_name}</span>}
+                                    {q.form_title && <span className="ml-2 text-xs text-catalan-textMuted">📋 {q.form_title}</span>}
+                                  </div>
+                                  <Badge label={q.status} cls={PROG_BADGE_CLS[q.status] ?? 'bg-gray-100 text-gray-500'} />
+                                </div>
+                                <div className="flex items-center gap-4 text-xs text-catalan-textMuted mb-1.5">
+                                  <span>Target: <strong className="text-catalan-text">{q.total_target.toLocaleString()}</strong></span>
+                                  {(q.start_date || q.end_date) && <span>📅 {q.start_date ?? '?'} → {q.end_date ?? 'ongoing'}</span>}
+                                </div>
+                                <ProgressBar pct={q.total_target > 0 ? 0 : 0} />
+                                <p className="text-xs text-catalan-textMuted mt-2">Add location targets in ⚙️ Setup to track per-location progress.</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       ) : rows.length === 0 && progress ? (
                         <div className="py-10 text-center text-catalan-textMuted">
                           <div className="text-3xl mb-3">📍</div>
-                          <p className="font-medium text-catalan-text mb-1">No location targets configured</p>
-                          <p className="text-sm max-w-md mx-auto">Switch to <strong>⚙️ Setup</strong> → add questionnaires with location targets to track per-location progress.</p>
-                          <p className="text-sm text-catalan-primary mt-1">Overall progress is shown in the summary above.</p>
+                          <p className="font-medium text-catalan-text mb-1">No questionnaires configured yet</p>
+                          <p className="text-sm max-w-md mx-auto">Switch to <strong>⚙️ Setup</strong> → add questionnaires and location targets to track progress.</p>
                         </div>
                       ) : (
                         <div className="overflow-x-auto">
