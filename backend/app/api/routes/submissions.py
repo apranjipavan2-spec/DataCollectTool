@@ -128,7 +128,8 @@ def list_submissions(
                     "enumerator_name": name or "Unknown",
                     "status": s.status,
                     "serial_no": s.serial_no,
-                    "data_json": {"_duplicate_suspect": s.data_json.get("_duplicate_suspect")} if slim and s.data_json else (s.data_json if not slim else {}),
+                    "duplicate_suspect": bool((s.data_json or {}).get("_duplicate_suspect") == "true" or (s.data_json or {}).get("_duplicate_suspect") is True),
+                    **({"data_json": s.data_json} if not slim else {}),
                     "has_violations": bool(s.has_violations),
                     "backcheck_required": bool(s.backcheck_required),
                     "consent_given": s.consent_given,
@@ -146,6 +147,98 @@ def list_submissions(
     except Exception as e:
         logger.exception("Error listing submissions")
         raise HTTPException(status_code=500, detail=f"Failed to list submissions: {type(e).__name__}: {str(e)}")
+
+
+# ── Submissions summary — accurate stats, no row fetching ────────────────────
+
+@router.get("/summary")
+def get_submissions_summary(
+    form_id: Optional[str] = None,
+    program_id: Optional[str] = None,
+    status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    from sqlalchemy import func, case, cast, Boolean
+    from sqlalchemy.dialects.postgresql import JSONB
+
+    base = db.query(Submission).filter(Submission.tenant_id == user["tenant_id"])
+    if form_id:
+        base = base.filter(Submission.form_id == form_id)
+    if program_id:
+        import uuid as _uuid
+        base = base.filter(Submission.program_id == _uuid.UUID(program_id))
+    if status:
+        base = base.filter(Submission.status == status)
+    if date_from:
+        base = base.filter(Submission.server_received_at >= datetime.fromisoformat(date_from))
+    if date_to:
+        end = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
+        base = base.filter(Submission.server_received_at <= end)
+
+    # Single aggregation query — no rows fetched
+    agg = base.with_entities(
+        func.count().label("total"),
+        func.sum(case((Submission.status == "approved",  1), else_=0)).label("approved"),
+        func.sum(case((Submission.status == "flagged",   1), else_=0)).label("flagged"),
+        func.sum(case((Submission.status == "synced",    1), else_=0)).label("synced"),
+        func.sum(case((Submission.has_violations == True, 1), else_=0)).label("violations"),
+        func.sum(case((Submission.backcheck_required == True, 1), else_=0)).label("backcheck_required"),
+    ).one()
+
+    # Duplicate suspects — count via JSONB operator (uses index if present)
+    dup_count = base.filter(
+        Submission.data_json["_duplicate_suspect"].astext == "true"
+    ).count()
+
+    # By-status breakdown
+    status_rows = base.with_entities(
+        Submission.status, func.count().label("cnt")
+    ).group_by(Submission.status).all()
+    by_status = {r.status: r.cnt for r in status_rows}
+
+    # By-form breakdown (join for title)
+    form_rows = base.with_entities(
+        Submission.form_id, Form.title, func.count().label("cnt")
+    ).outerjoin(Form, Submission.form_id == Form.id).group_by(
+        Submission.form_id, Form.title
+    ).all()
+    by_form = [{"form_id": str(r.form_id), "form_title": r.title or "", "count": r.cnt}
+               for r in form_rows]
+
+    # By-enumerator breakdown
+    enum_rows = base.with_entities(
+        Submission.enumerator_id, User.name, func.count().label("cnt")
+    ).outerjoin(User, Submission.enumerator_id == User.id).group_by(
+        Submission.enumerator_id, User.name
+    ).order_by(func.count().desc()).all()
+    by_enumerator = [{"enumerator_id": str(r.enumerator_id) if r.enumerator_id else None,
+                      "name": r.name or "Unknown", "count": r.cnt}
+                     for r in enum_rows]
+
+    # By-date (daily counts, last 60 days)
+    date_rows = base.with_entities(
+        func.date_trunc("day", Submission.server_received_at).label("day"),
+        func.count().label("cnt")
+    ).group_by("day").order_by("day").all()
+    by_date = [{"date": r.day.strftime("%Y-%m-%d"), "count": r.cnt}
+               for r in date_rows if r.day]
+
+    return {
+        "total": agg.total or 0,
+        "approved": agg.approved or 0,
+        "flagged": agg.flagged or 0,
+        "synced": agg.synced or 0,
+        "violations": agg.violations or 0,
+        "backcheck_required": agg.backcheck_required or 0,
+        "duplicate_suspects": dup_count,
+        "by_status": by_status,
+        "by_form": by_form,
+        "by_enumerator": by_enumerator,
+        "by_date": by_date,
+    }
 
 
 # ── Map points — GPS locations of all submissions ────────────────────────────
@@ -194,6 +287,98 @@ def get_map_points(
     except Exception as e:
         logger.exception("Error fetching map points")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Map summary — GPS stats without fetching rows ────────────────────────────
+
+@router.get("/map-summary")
+def get_map_summary(
+    form_id: Optional[str] = None,
+    program_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    from sqlalchemy import func, case
+    try:
+        base = db.query(Submission).filter(Submission.tenant_id == user["tenant_id"])
+        if form_id:
+            base = base.filter(Submission.form_id == form_id)
+        if program_id:
+            import uuid as _uuid2
+            base = base.filter(Submission.program_id == _uuid2.UUID(program_id))
+        if date_from:
+            base = base.filter(Submission.server_received_at >= datetime.fromisoformat(date_from))
+        if date_to:
+            end = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
+            base = base.filter(Submission.server_received_at <= end)
+
+        total = base.count()
+        total_with_gps = base.filter(Submission.gps_submit.isnot(None)).count()
+
+        # GPS bounds — aggregate over gps_submit JSONB
+        bounds_row = db.execute(
+            __import__("sqlalchemy").text("""
+                SELECT
+                  MIN((gps_submit->>'lat')::float) AS lat_min,
+                  MAX((gps_submit->>'lat')::float) AS lat_max,
+                  MIN((gps_submit->>'lng')::float) AS lng_min,
+                  MAX((gps_submit->>'lng')::float) AS lng_max,
+                  MIN(server_received_at)::date AS first_date,
+                  MAX(server_received_at)::date AS last_date
+                FROM submissions
+                WHERE tenant_id = :tid AND gps_submit IS NOT NULL
+            """), {"tid": str(user["tenant_id"])}
+        ).fetchone()
+
+        # By-form breakdown (GPS only)
+        form_rows = (
+            base.filter(Submission.gps_submit.isnot(None))
+            .with_entities(Submission.form_id, Form.title, func.count().label("cnt"))
+            .outerjoin(Form, Submission.form_id == Form.id)
+            .group_by(Submission.form_id, Form.title)
+            .all()
+        )
+        forms = [{"form_id": str(r.form_id), "title": r.title or "", "gps_count": r.cnt}
+                 for r in form_rows]
+
+        # By-enumerator breakdown (GPS only)
+        enum_rows = (
+            base.filter(Submission.gps_submit.isnot(None))
+            .with_entities(User.name, func.count().label("cnt"))
+            .outerjoin(User, Submission.enumerator_id == User.id)
+            .group_by(User.name)
+            .order_by(func.count().desc())
+            .all()
+        )
+        enumerators = [{"name": r.name or "Unknown", "gps_count": r.cnt} for r in enum_rows]
+
+        bounds = None
+        if bounds_row and bounds_row.lat_min is not None:
+            bounds = {
+                "lat_min": bounds_row.lat_min,
+                "lat_max": bounds_row.lat_max,
+                "lng_min": bounds_row.lng_min,
+                "lng_max": bounds_row.lng_max,
+            }
+
+        return {
+            "total_submissions": total,
+            "total_with_gps": total_with_gps,
+            "forms": forms,
+            "enumerators": enumerators,
+            "date_range": {
+                "first": str(bounds_row.first_date) if bounds_row and bounds_row.first_date else None,
+                "last": str(bounds_row.last_date) if bounds_row and bounds_row.last_date else None,
+            },
+            "bounds": bounds,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error fetching map summary")
+        raise HTTPException(status_code=500, detail=f"Map summary failed: {str(e)}")
 
 
 # ── Enumerator performance stats ─────────────────────────────────────────────

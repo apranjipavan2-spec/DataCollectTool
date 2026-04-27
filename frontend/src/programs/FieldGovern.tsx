@@ -66,13 +66,24 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
 
 // ── Tab: Analyzer ─────────────────────────────────────────────────────────────
 
+interface ProgramSummary {
+  program_id: string; program_name: string; scheme: string
+  total_submissions: number; approved: number; flagged: number; violations: number
+  quality_score: number
+  trend: { date: string; count: number }[]
+  status_counts: Record<string, number>
+  enumerators: { name: string; count: number }[]
+  wave_counts: { name: string; wave_number: number | null; count: number }[]
+  column_count: number
+}
+
 function AnalyzerTab({ programId }: { programId: string }) {
-  const [data, setData] = useState<AnalyzerData | null>(null)
+  const [data, setData] = useState<ProgramSummary | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setLoading(true)
-    api.get(`/fg/programs/${programId}/analyzer-data`)
+    api.get(`/fg/programs/${programId}/summary`)
       .then(r => setData(r.data))
       .finally(() => setLoading(false))
   }, [programId])
@@ -80,41 +91,47 @@ function AnalyzerTab({ programId }: { programId: string }) {
   if (loading) return <div className="text-catalan-textMuted text-sm py-8 text-center">Loading analytics…</div>
   if (!data) return <div className="text-catalan-error text-sm py-8 text-center">Failed to load</div>
 
-  const statusBars = Object.entries(data.status_counts).map(([k, v]) => ({ label: k, value: v }))
-  const enumBars = data.enumerators.slice(0, 12).map(e => ({ label: e.name, value: e.count }))
+  const statusBars = Object.entries(data.status_counts ?? {}).map(([k, v]) => ({ label: k, value: v as number }))
+  const enumBars = (data.enumerators ?? []).slice(0, 12).map(e => ({ label: e.name, value: e.count }))
 
   return (
     <div className="space-y-5">
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Total Submissions" value={data.total_submissions} />
-        <StatCard label="Quality Score" value={`${data.quality.quality_score}%`} />
-        <StatCard label="Flagged" value={data.quality.flagged} />
-        <StatCard label="Violations" value={data.quality.violations} />
+        <StatCard label="Quality Score" value={`${data.quality_score}%`} />
+        <StatCard label="Flagged" value={data.flagged} />
+        <StatCard label="Violations" value={data.violations} />
       </div>
 
       {/* Trend */}
-      <div className={card}>
-        <div className={sectionTitle}>Submission Trend (Daily)</div>
-        <LineChart data={data.trend} height={200} />
-      </div>
+      {(data.trend ?? []).length > 0 && (
+        <div className={card}>
+          <div className={sectionTitle}>Submission Trend (Daily)</div>
+          <LineChart data={data.trend} height={200} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Status */}
-        <div className={card}>
-          <div className={sectionTitle}>Status Breakdown</div>
-          <BarChart data={statusBars} height={180} />
-        </div>
+        {statusBars.length > 0 && (
+          <div className={card}>
+            <div className={sectionTitle}>Status Breakdown</div>
+            <BarChart data={statusBars} height={180} />
+          </div>
+        )}
 
         {/* Enumerators */}
-        <div className={card}>
-          <div className={sectionTitle}>Enumerator Performance</div>
-          <BarChart data={enumBars} height={180} />
-        </div>
+        {enumBars.length > 0 && (
+          <div className={card}>
+            <div className={sectionTitle}>Enumerator Performance</div>
+            <BarChart data={enumBars} height={180} />
+          </div>
+        )}
       </div>
 
       {/* Waves */}
-      {data.wave_counts.length > 0 && (
+      {(data.wave_counts ?? []).length > 0 && (
         <div className={card}>
           <div className={sectionTitle}>Wave / Questionnaire Breakdown</div>
           <div className="space-y-2">
@@ -131,16 +148,11 @@ function AnalyzerTab({ programId }: { programId: string }) {
         </div>
       )}
 
-      {/* Column headers */}
+      {/* Column count */}
       <div className={card}>
-        <div className={sectionTitle}>Form Fields ({data.column_headers.length})</div>
-        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-          {data.column_headers.map(c => (
-            <span key={c.id} className="px-2 py-0.5 text-xs bg-catalan-hover border border-catalan-border rounded text-catalan-textMuted" title={c.id}>
-              {c.label}
-            </span>
-          ))}
-        </div>
+        <div className={sectionTitle}>Form Fields</div>
+        <p className="text-2xl font-bold text-catalan-primary">{data.column_count ?? 0}</p>
+        <p className="text-xs text-catalan-textMuted mt-1">Open the Analyzer Wizard for full column details and AI tabulation.</p>
       </div>
     </div>
   )
@@ -764,7 +776,7 @@ export default function FieldGovern() {
 
   useEffect(() => {
     if (programId) {
-      api.get(`/fg/programs/${programId}/analyzer-data`)
+      api.get(`/fg/programs/${programId}/summary`)
         .then(r => setProgName(r.data.program_name || ''))
         .catch(() => {})
     }

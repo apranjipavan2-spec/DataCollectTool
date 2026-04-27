@@ -20,6 +20,15 @@ interface SubmissionDetail {
   backcheck_required: boolean; consent_given: boolean | null
 }
 
+interface MapSummary {
+  total_submissions: number
+  total_with_gps: number
+  forms: { form_id: string; title: string; gps_count: number }[]
+  enumerators: { name: string; gps_count: number }[]
+  date_range: { first: string | null; last: string | null }
+  bounds: { lat_min: number; lat_max: number; lng_min: number; lng_max: number } | null
+}
+
 const STATUS_COLOR: Record<string, string> = {
   synced: '#3B82F6', approved: '#22C55E', flagged: '#F59E0B', rejected: '#EF4444',
 }
@@ -46,6 +55,9 @@ const SKIP_KEYS = new Set(['_roster_id', '_program_id', '_questionnaire_id', '_l
 export default function FieldMapPage() {
   const user = getStoredUser()
   const [pins, setPins] = useState<Pin[]>([])
+  const [pinsLoaded, setPinsLoaded] = useState(false)
+  const [pinsLoading, setPinsLoading] = useState(false)
+  const [mapSummary, setMapSummary] = useState<MapSummary | null>(null)
   const [days, setDays] = useState(30)
   const [filterForm, setFilterForm] = useState('')
   const [filterEnum, setFilterEnum] = useState('')
@@ -60,7 +72,27 @@ export default function FieldMapPage() {
   const leafletRef = useRef<any>(null)
   const markersRef = useRef<any[]>([])
 
-  const load = useCallback(async () => {
+  // Load summary on mount (fast — no rows)
+  useEffect(() => {
+    api.get('/submissions/map-summary').then(r => setMapSummary(r.data)).catch(() => {})
+    api.get('/forms/?status=active').then(r => setForms(r.data || [])).catch(() => {})
+  }, [])
+
+  const loadPins = useCallback(async () => {
+    setPinsLoading(true)
+    try {
+      const params: Record<string, string | number> = { days }
+      if (filterForm) params.form_id = filterForm
+      const { data } = await api.get('/submissions/map-data', { params })
+      setPins(data)
+      setPinsLoaded(true)
+      const enumSet = new Set<string>(data.map((p: Pin) => p.enumerator).filter(Boolean))
+      setEnumerators(Array.from(enumSet).sort())
+    } catch { } finally { setPinsLoading(false) }
+  }, [days, filterForm])
+
+  const refresh = useCallback(async () => {
+    if (!pinsLoaded) return
     setLoading(true)
     try {
       const params: Record<string, string | number> = { days }
@@ -70,13 +102,7 @@ export default function FieldMapPage() {
       const enumSet = new Set<string>(data.map((p: Pin) => p.enumerator).filter(Boolean))
       setEnumerators(Array.from(enumSet).sort())
     } catch { } finally { setLoading(false) }
-  }, [days, filterForm])
-
-  useEffect(() => {
-    api.get('/forms/?status=active').then(r => setForms(r.data || [])).catch(() => {})
-  }, [])
-
-  useEffect(() => { load() }, [load])
+  }, [days, filterForm, pinsLoaded])
 
   const selectPin = useCallback(async (pin: Pin) => {
     setSelected(pin)
@@ -194,10 +220,12 @@ export default function FieldMapPage() {
                 <option value={90}>Last 90 days</option>
                 <option value={365}>Last year</option>
               </select>
-              <button onClick={load} disabled={loading}
-                className="px-3 py-1.5 text-xs border border-catalan-border rounded-lg text-catalan-text hover:bg-catalan-hover disabled:opacity-40">
-                {loading ? '…' : '↺ Refresh'}
-              </button>
+              {pinsLoaded && (
+                <button onClick={refresh} disabled={loading}
+                  className="px-3 py-1.5 text-xs border border-catalan-border rounded-lg text-catalan-text hover:bg-catalan-hover disabled:opacity-40">
+                  {loading ? '…' : '↺ Refresh'}
+                </button>
+              )}
             </div>
           }
         />
@@ -207,19 +235,62 @@ export default function FieldMapPage() {
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Stats bar */}
             <div className="flex gap-4 px-4 py-2 bg-catalan-surface border-b border-catalan-border text-xs flex-wrap flex-shrink-0">
-              <span className="text-catalan-textMuted font-medium">{visible.length} submissions</span>
-              {Object.entries(STATUS_COLOR).map(([s, c]) => counts[s] ? (
-                <span key={s} className="flex items-center gap-1">
-                  <span style={{ background: c }} className="w-2.5 h-2.5 rounded-full inline-block" />
-                  <span className="capitalize">{s}</span>: <strong>{counts[s]}</strong>
-                </span>
-              ) : null)}
-              {loading && <span className="text-catalan-textMuted animate-pulse">Loading…</span>}
+              {pinsLoaded ? (
+                <>
+                  <span className="text-catalan-textMuted font-medium">{visible.length} GPS points</span>
+                  {Object.entries(STATUS_COLOR).map(([s, c]) => counts[s] ? (
+                    <span key={s} className="flex items-center gap-1">
+                      <span style={{ background: c }} className="w-2.5 h-2.5 rounded-full inline-block" />
+                      <span className="capitalize">{s}</span>: <strong>{counts[s]}</strong>
+                    </span>
+                  ) : null)}
+                  {loading && <span className="text-catalan-textMuted animate-pulse">Refreshing…</span>}
+                </>
+              ) : (
+                <>
+                  {mapSummary ? (
+                    <>
+                      <span className="text-catalan-textMuted font-medium">
+                        {mapSummary.total_with_gps.toLocaleString()} GPS points available · {mapSummary.total_submissions.toLocaleString()} total submissions
+                      </span>
+                      {mapSummary.date_range.first && (
+                        <span className="text-catalan-textMuted">
+                          {mapSummary.date_range.first} – {mapSummary.date_range.last}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-catalan-textMuted animate-pulse">Loading summary…</span>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Map */}
             <div className="flex-1 relative">
               <div ref={mapRef} className="absolute inset-0" />
+
+              {/* Load GPS Points overlay — shown before pins are loaded */}
+              {!pinsLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center z-[500] bg-catalan-bg/60 backdrop-blur-sm">
+                  <div className="bg-catalan-surface border border-catalan-border rounded-2xl p-8 text-center shadow-xl max-w-sm mx-4">
+                    <div className="text-4xl mb-3">🗺️</div>
+                    <div className="text-base font-semibold text-catalan-text mb-1">Field Map</div>
+                    {mapSummary && (
+                      <div className="text-sm text-catalan-textMuted mb-4">
+                        {mapSummary.total_with_gps.toLocaleString()} GPS points ready to display
+                      </div>
+                    )}
+                    <button
+                      onClick={loadPins}
+                      disabled={pinsLoading}
+                      className="px-6 py-2.5 bg-catalan-primary text-catalan-bg rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 transition-opacity"
+                    >
+                      {pinsLoading ? 'Loading GPS Points…' : `Load${mapSummary ? ` ${mapSummary.total_with_gps.toLocaleString()}` : ''} GPS Points →`}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Legend */}
               <div className="absolute bottom-4 left-4 z-[400] bg-catalan-surface/95 border border-catalan-border rounded-xl p-3 shadow-lg text-xs space-y-1.5">
@@ -231,7 +302,7 @@ export default function FieldMapPage() {
                 ))}
               </div>
 
-              {visible.length === 0 && !loading && (
+              {pinsLoaded && visible.length === 0 && !loading && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="bg-catalan-surface/90 rounded-xl p-6 text-center shadow">
                     <div className="text-4xl mb-2">🗺️</div>

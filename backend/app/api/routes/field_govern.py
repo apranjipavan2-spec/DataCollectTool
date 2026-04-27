@@ -356,6 +356,132 @@ def get_analyzer_data(
     }
 
 
+# ── Program summary — accurate stats, no row fetching ────────────────────────
+
+@router.get("/programs/{program_id}/summary")
+def get_program_summary(
+    program_id: str,
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    from sqlalchemy import case as sa_case, func as sa_func
+
+    prog = db.query(Program).filter(
+        Program.id == program_id, Program.tenant_id == user["tenant_id"]
+    ).first()
+    if not prog:
+        raise HTTPException(404, "Program not found")
+
+    # Single aggregate query — no rows fetched
+    agg = db.query(
+        sa_func.count().label("total"),
+        sa_func.sum(sa_case((Submission.status == "approved",  1), else_=0)).label("approved"),
+        sa_func.sum(sa_case((Submission.status == "flagged",   1), else_=0)).label("flagged"),
+        sa_func.sum(sa_case((Submission.status == "synced",    1), else_=0)).label("synced"),
+        sa_func.sum(sa_case((Submission.has_violations == True, 1), else_=0)).label("violations"),
+        sa_func.sum(sa_case((Submission.backcheck_required == True, 1), else_=0)).label("backcheck_required"),
+        sa_func.min(Submission.server_received_at).label("first_date"),
+        sa_func.max(Submission.server_received_at).label("last_date"),
+    ).filter(
+        Submission.program_id == _uuid.UUID(program_id),
+        Submission.tenant_id == user["tenant_id"],
+    ).one()
+
+    total = agg.total or 0
+    violations = agg.violations or 0
+    quality_score = round((1 - violations / max(total, 1)) * 100, 1)
+
+    # Enumerator breakdown
+    enum_rows = (
+        db.query(User.name, sa_func.count().label("cnt"))
+        .join(Submission, Submission.enumerator_id == User.id)
+        .filter(
+            Submission.program_id == _uuid.UUID(program_id),
+            Submission.tenant_id == user["tenant_id"],
+        )
+        .group_by(User.name)
+        .order_by(sa_func.count().desc())
+        .all()
+    )
+    enumerators = [{"name": r.name or "Unknown", "count": r.cnt} for r in enum_rows]
+
+    # Wave/questionnaire breakdown
+    questionnaires = db.query(ProgramQuestionnaire).filter(
+        ProgramQuestionnaire.program_id == program_id,
+        ProgramQuestionnaire.tenant_id == user["tenant_id"],
+    ).order_by(ProgramQuestionnaire.wave_number).all()
+
+    wave_counts = []
+    for q in questionnaires:
+        cnt = db.query(sa_func.count()).filter(
+            Submission.questionnaire_id == q.id,
+            Submission.tenant_id == user["tenant_id"],
+        ).scalar() or 0
+        wave_counts.append({
+            "name": q.wave_label or q.name,
+            "wave_number": q.wave_number,
+            "count": cnt,
+            "form_id": str(q.form_id) if q.form_id else None,
+        })
+
+    # Daily trend — aggregate, no rows
+    trend_rows = db.execute(
+        text("""
+            SELECT DATE(server_received_at) AS d, COUNT(*) AS cnt
+            FROM submissions
+            WHERE program_id = :pid AND tenant_id = :tid
+            GROUP BY DATE(server_received_at)
+            ORDER BY d
+        """), {"pid": str(program_id), "tid": str(user["tenant_id"])}
+    ).fetchall()
+    trend = [{"date": str(r.d), "count": r.cnt} for r in trend_rows]
+
+    # Status counts
+    status_rows = db.execute(
+        text("""
+            SELECT status, COUNT(*) AS cnt FROM submissions
+            WHERE program_id = :pid AND tenant_id = :tid GROUP BY status
+        """), {"pid": str(program_id), "tid": str(user["tenant_id"])}
+    ).fetchall()
+    status_counts = {r.status: r.cnt for r in status_rows}
+
+    # Column count — from form schemas, no submission rows needed
+    form_ids = [q.form_id for q in questionnaires if q.form_id]
+    column_count = 0
+    seen_cols: set = set()
+    for fid in form_ids:
+        form = db.query(Form).filter(Form.id == fid).first()
+        if form and form.json_schema:
+            for section in form.json_schema.get("sections", []):
+                for field in section.get("fields", []):
+                    fkey = field.get("field_id") or field.get("label", "")
+                    if fkey and fkey not in seen_cols:
+                        seen_cols.add(fkey)
+                        column_count += 1
+
+    return {
+        "program_id": str(prog.id),
+        "program_name": prog.name,
+        "scheme": prog.scheme_name or "",
+        "total_submissions": total,
+        "approved": agg.approved or 0,
+        "flagged": agg.flagged or 0,
+        "synced": agg.synced or 0,
+        "violations": violations,
+        "backcheck_required": agg.backcheck_required or 0,
+        "quality_score": quality_score,
+        "enumerators": enumerators,
+        "wave_counts": wave_counts,
+        "trend": trend,
+        "status_counts": status_counts,
+        "column_count": column_count,
+        "date_range": {
+            "first": agg.first_date.strftime("%Y-%m-%d") if agg.first_date else None,
+            "last": agg.last_date.strftime("%Y-%m-%d") if agg.last_date else None,
+        },
+    }
+
+
 # ── AI Tabulation Suggest ─────────────────────────────────────────────────────
 
 @router.post("/programs/{program_id}/tabulate/suggest")

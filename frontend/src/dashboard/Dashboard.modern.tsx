@@ -41,6 +41,19 @@ interface Submission {
   data_json?: Record<string, unknown>
 }
 
+interface SubmissionSummary {
+  total: number
+  approved: number
+  flagged: number
+  synced: number
+  violations: number
+  backcheck_required: number
+  duplicate_suspects: number
+  by_date: { date: string; count: number }[]
+  by_enumerator: { enumerator_id: string | null; name: string; count: number }[]
+  by_form: { form_id: string; form_title: string; count: number }[]
+}
+
 interface SubDetail extends Submission {
   form_version: string
   serial_no: number | null
@@ -523,6 +536,9 @@ export default function Dashboard() {
   // Data
   const [forms, setForms] = useState<Form[]>([])
   const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [summary, setSummary] = useState<SubmissionSummary | null>(null)
+  const [subsLoaded, setSubsLoaded] = useState(false)
+  const [subsLoading, setSubsLoading] = useState(false)
   const [team, setTeam] = useState<TeamMember[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
 
@@ -730,7 +746,7 @@ export default function Dashboard() {
     ]
     if (!isEnumerator) {
       calls.push(
-        api.get('/submissions/?page_size=5000&slim=true').then(r => setSubmissions(r.data.items ?? r.data.submissions ?? [])),
+        api.get('/submissions/summary').then(r => setSummary(r.data)).catch(() => {}),
         api.get('/users/?page_size=200').then(r => setTeam(r.data.items ?? r.data.users ?? [])),
         api.get('/assignments/').then(r => setAssignments(r.data ?? [])),
         api.get('/tenants/me/usage').then(r => setUsageData(r.data)).catch(() => {}),
@@ -757,7 +773,7 @@ export default function Dashboard() {
     if (dateFrom && s.server_received_at < dateFrom) return false
     if (dateTo && s.server_received_at.slice(0, 10) > dateTo) return false
     if (filterViolations && !s.has_violations) return false
-    if (filterDupSuspect && !s.data_json?.['_duplicate_suspect']) return false
+    if (filterDupSuspect && !(s as any).duplicate_suspect) return false
     if (filterBackcheck && !s.backcheck_required) return false
     return true
   }), [submissions, filterForm, search, dateFrom, dateTo, filterViolations, filterDupSuspect, filterBackcheck])
@@ -809,31 +825,37 @@ export default function Dashboard() {
     setTeamPage(1)
   }
 
-  // Charts data
+  // Charts data — prefer summary (always accurate) over client-computed from loaded list
   const dailyCounts = useMemo(() => {
+    if (summary?.by_date && submissions.length === 0) {
+      return summary.by_date.map(r => ({ date: r.date, count: r.count }))
+    }
     const counts: Record<string, number> = {}
     for (const s of submissions) {
       const day = s.server_received_at?.slice(0, 10)
       if (day) counts[day] = (counts[day] ?? 0) + 1
     }
     return Object.entries(counts).sort(([a], [b]) => a.localeCompare(b)).map(([date, count]) => ({ date, count }))
-  }, [submissions])
+  }, [summary, submissions])
 
   const enumeratorBarData = useMemo(() => {
+    if (summary?.by_enumerator && submissions.length === 0) {
+      return summary.by_enumerator.slice(0, 10).map(r => ({ label: r.name, value: r.count }))
+    }
     const counts: Record<string, { name: string; count: number }> = {}
     for (const s of submissions) {
       if (!counts[s.enumerator_id]) counts[s.enumerator_id] = { name: s.enumerator_name, count: 0 }
       counts[s.enumerator_id].count++
     }
     return Object.values(counts).sort((a, b) => b.count - a.count).slice(0, 10).map(r => ({ label: r.name, value: r.count }))
-  }, [submissions])
+  }, [summary, submissions])
 
   const stats = useMemo(() => ({
-    totalSubs: submissions.length,
+    totalSubs: summary?.total ?? submissions.length,
     totalForms: forms.length,
     teamSize: team.length,
-    flagged: submissions.filter(s => s.status === 'flagged').length,
-  }), [submissions, forms, team])
+    flagged: summary?.flagged ?? submissions.filter(s => s.status === 'flagged').length,
+  }), [summary, submissions, forms, team])
 
   const enumeratorStats = useMemo(() => {
     const map: Record<string, { name: string; total: number; approved: number; flagged: number; rejected: number; synced: number; last_at: string }> = {}
@@ -969,6 +991,19 @@ export default function Dashboard() {
       toast.error('Failed to load duplicates')
     } finally {
       setLoadingDuplicates(false)
+    }
+  }
+
+  const loadSubmissions = async () => {
+    setSubsLoading(true)
+    try {
+      const r = await api.get('/submissions/?page_size=5000&slim=true')
+      setSubmissions(r.data.items ?? r.data.submissions ?? [])
+      setSubsLoaded(true)
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail ?? 'Failed to load submissions')
+    } finally {
+      setSubsLoading(false)
     }
   }
 
@@ -1822,8 +1857,28 @@ export default function Dashboard() {
                 </div>
               )}
 
+              {/* Load Submissions gate */}
+              {!subsLoaded && (
+                <Card>
+                  <div className="flex flex-col items-center justify-center py-12 gap-4">
+                    <p className="text-catalan-textMuted text-sm text-center">
+                      {summary
+                        ? `${summary.total.toLocaleString()} submissions available — click to load the list`
+                        : 'Click to load submissions list'}
+                    </p>
+                    <button
+                      onClick={loadSubmissions}
+                      disabled={subsLoading}
+                      className="px-6 py-2.5 bg-catalan-primary text-catalan-bg rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 transition-opacity"
+                    >
+                      {subsLoading ? 'Loading…' : `Load Submissions${summary ? ` (${summary.total.toLocaleString()})` : ''}`}
+                    </button>
+                  </div>
+                </Card>
+              )}
+
               {/* Submissions — desktop table + mobile cards */}
-              <Card>
+              {subsLoaded && <Card>
                 {detailLoading && (
                   <div className="text-xs text-catalan-textMuted mb-2">Loading detail…</div>
                 )}
@@ -1878,7 +1933,7 @@ export default function Dashboard() {
                       {filteredSubs.length === 0 ? (
                         <tr>
                           <td colSpan={isEnumerator ? 7 : 8} className="text-center py-10 text-catalan-textMuted text-sm">
-                            {submissions.length === 0 ? 'No submissions yet' : 'No submissions match your filters'}
+                            {'No submissions match your filters'}
                           </td>
                         </tr>
                       ) : (
@@ -1942,7 +1997,7 @@ export default function Dashboard() {
                 <div className="sm:hidden">
                   {filteredSubs.length === 0 ? (
                     <p className="text-center py-10 text-catalan-textMuted text-sm">
-                      {submissions.length === 0 ? 'No submissions yet' : 'No submissions match your filters'}
+                      No submissions match your filters
                     </p>
                   ) : (
                     <div className="divide-y divide-catalan-border">
@@ -1991,7 +2046,7 @@ export default function Dashboard() {
                   total={filteredSubs.length}
                   onChange={p => { setSubPage(p); setSelectedIds(new Set()) }}
                 />
-              </Card>
+              </Card>}
             </div>
           )}
 

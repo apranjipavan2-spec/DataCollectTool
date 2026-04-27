@@ -16,6 +16,18 @@ import {
 
 interface ColHeader { id: string; label: string; type: string; options: any[] }
 interface Program { id: string; name: string; scheme_name: string; status: string }
+interface ProgramSummary {
+  program_id: string; program_name: string; scheme: string
+  total_submissions: number; approved: number; flagged: number; synced: number
+  violations: number; backcheck_required: number; quality_score: number
+  trend: { date: string; count: number }[]
+  status_counts: Record<string, number>
+  enumerators: { name: string; count: number }[]
+  wave_counts: { name: string; wave_number: number | null; count: number }[]
+  column_count: number
+  date_range: { first: string | null; last: string | null }
+}
+
 interface AnalyzerData {
   program_id: string; program_name: string; scheme: string; is_panel_study: boolean
   total_submissions: number
@@ -57,41 +69,55 @@ function StatCard({ label, value, color = 'text-catalan-primary' }: { label: str
 
 // ── Overview tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ data }: { data: AnalyzerData }) {
-  const statusBars = Object.entries(data.status_counts).map(([k, v]) => ({ label: k, value: v }))
-  const enumBars   = data.enumerators.slice(0, 15).map(e => ({ label: e.name, value: e.count }))
+function OverviewTab({ summary, fullData }: { summary: ProgramSummary; fullData: AnalyzerData | null }) {
+  const d = fullData ?? summary
+  const quality_score = fullData ? fullData.quality.quality_score : summary.quality_score
+  const flagged = fullData ? fullData.quality.flagged : summary.flagged
+  const violations = fullData ? fullData.quality.violations : summary.violations
+  const trend = d.trend ?? []
+  const status_counts = d.status_counts ?? {}
+  const enumerators = d.enumerators ?? []
+  const wave_counts = d.wave_counts ?? []
+  const statusBars = Object.entries(status_counts).map(([k, v]) => ({ label: k, value: v as number }))
+  const enumBars   = enumerators.slice(0, 15).map(e => ({ label: e.name, value: e.count }))
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Total Submissions" value={data.total_submissions} />
-        <StatCard label="Quality Score" value={`${data.quality.quality_score}%`}
-          color={data.quality.quality_score >= 80 ? 'text-green-400' : data.quality.quality_score >= 60 ? 'text-catalan-warning' : 'text-catalan-error'} />
-        <StatCard label="Flagged" value={data.quality.flagged} color="text-catalan-warning" />
-        <StatCard label="QC Violations" value={data.quality.violations} color="text-catalan-error" />
+        <StatCard label="Total Submissions" value={d.total_submissions} />
+        <StatCard label="Quality Score" value={`${quality_score}%`}
+          color={quality_score >= 80 ? 'text-green-400' : quality_score >= 60 ? 'text-catalan-warning' : 'text-catalan-error'} />
+        <StatCard label="Flagged" value={flagged} color="text-catalan-warning" />
+        <StatCard label="QC Violations" value={violations} color="text-catalan-error" />
       </div>
 
-      <div className={card}>
-        <div className={sh}>Submission Trend (Daily)</div>
-        <LineChart data={data.trend} height={200} />
-      </div>
+      {trend.length > 0 && (
+        <div className={card}>
+          <div className={sh}>Submission Trend (Daily)</div>
+          <LineChart data={trend} height={200} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className={card}>
-          <div className={sh}>Status Breakdown</div>
-          <BarChart data={statusBars} height={160} />
-        </div>
-        <div className={card}>
-          <div className={sh}>Enumerator Performance (Top 15)</div>
-          <BarChart data={enumBars} height={Math.max(160, enumBars.length * 34 + 8)} />
-        </div>
+        {statusBars.length > 0 && (
+          <div className={card}>
+            <div className={sh}>Status Breakdown</div>
+            <BarChart data={statusBars} height={160} />
+          </div>
+        )}
+        {enumBars.length > 0 && (
+          <div className={card}>
+            <div className={sh}>Enumerator Performance (Top 15)</div>
+            <BarChart data={enumBars} height={Math.max(160, enumBars.length * 34 + 8)} />
+          </div>
+        )}
       </div>
 
-      {data.wave_counts.length > 0 && (
+      {wave_counts.length > 0 && (
         <div className={card}>
           <div className={sh}>Questionnaire / Wave Breakdown</div>
           <div className="divide-y divide-catalan-border">
-            {data.wave_counts.map((w, i) => (
+            {wave_counts.map((w, i) => (
               <div key={i} className="flex items-center justify-between py-2.5">
                 <div>
                   <span className="text-sm font-medium text-catalan-text">{w.name}</span>
@@ -105,15 +131,19 @@ function OverviewTab({ data }: { data: AnalyzerData }) {
       )}
 
       <div className={card}>
-        <div className={sh}>Form Fields ({data.column_headers.length})</div>
-        <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
-          {data.column_headers.map(c => (
-            <span key={c.id} title={`id: ${c.id} | type: ${c.type}`}
-              className="px-2 py-0.5 text-xs bg-catalan-hover border border-catalan-border rounded text-catalan-textMuted">
-              {c.label}
-            </span>
-          ))}
-        </div>
+        <div className={sh}>Form Fields ({fullData ? fullData.column_headers.length : (summary as any).column_count ?? 0})</div>
+        {fullData ? (
+          <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+            {fullData.column_headers.map(c => (
+              <span key={c.id} title={`id: ${c.id} | type: ${c.type}`}
+                className="px-2 py-0.5 text-xs bg-catalan-hover border border-catalan-border rounded text-catalan-textMuted">
+                {c.label}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-catalan-textMuted">Load Column Data in the Tabulator tab to see field names.</p>
+        )}
       </div>
     </div>
   )
@@ -1220,33 +1250,50 @@ export default function FgAnalyzer() {
   const [programId, setProgramId] = useState(getLastProgram())
   const [progName, setProgName] = useState('')
   const [tab, setTab] = useState<AnalyzerTab>('overview')
+  const [summary, setSummary] = useState<ProgramSummary | null>(null)
   const [data, setData] = useState<AnalyzerData | null>(null)
   const [loading, setLoading] = useState(false)
+  const [colDataLoading, setColDataLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const loadAnalyzer = useCallback(async (id: string) => {
+  // Fast summary load — no row fetching
+  const loadSummary = useCallback(async (id: string) => {
     if (!id) return
-    setLoading(true); setError('')
+    setLoading(true); setError(''); setSummary(null); setData(null)
+    try {
+      const res = await api.get(`/fg/programs/${id}/summary`)
+      const d = res.data
+      setSummary(d)
+      setProgName(d.program_name)
+    } catch (e: any) {
+      setError(e.response?.data?.detail || 'Failed to load program summary')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // Full column data — only when user clicks "Load Column Data"
+  const loadColumnData = useCallback(async (id: string) => {
+    if (!id) return
+    setColDataLoading(true)
     try {
       const res = await api.get(`/fg/programs/${id}/analyzer-data`)
       const d = res.data
       if (!d || typeof d !== 'object' || Array.isArray(d)) throw new Error('Unexpected response shape')
-      // Ensure array fields are always arrays
       d.trend = Array.isArray(d.trend) ? d.trend : []
       d.enumerators = Array.isArray(d.enumerators) ? d.enumerators : []
       d.wave_counts = Array.isArray(d.wave_counts) ? d.wave_counts : []
       d.column_headers = Array.isArray(d.column_headers) ? d.column_headers : []
       d.sample_rows = Array.isArray(d.sample_rows) ? d.sample_rows : []
       setData(d)
-      setProgName(d.program_name)
     } catch (e: any) {
-      setError(e.response?.data?.detail || 'Failed to load analyzer data')
+      toast.error(e.response?.data?.detail || 'Failed to load column data')
     } finally {
-      setLoading(false)
+      setColDataLoading(false)
     }
-  }, [])
+  }, [toast])
 
-  useEffect(() => { if (programId) loadAnalyzer(programId) }, [programId, loadAnalyzer])
+  useEffect(() => { if (programId) loadSummary(programId) }, [programId, loadSummary])
 
   return (
     <div className="flex h-screen bg-catalan-bg">
@@ -1265,7 +1312,7 @@ export default function FgAnalyzer() {
           rightContent={
             <div className="flex items-center gap-3">
               <ProgramPicker value={programId} onChange={(id, name) => { setProgramId(id); setProgName(name) }} />
-              {programId && <button onClick={() => loadAnalyzer(programId)} className={btnSe}>Refresh</button>}
+              {programId && <button onClick={() => loadSummary(programId)} className={btnSe}>Refresh</button>}
             </div>
           }
         />
@@ -1279,7 +1326,7 @@ export default function FgAnalyzer() {
             )}
 
             {programId && loading && (
-              <div className="flex items-center justify-center h-64 text-catalan-textMuted text-sm">Loading analyzer data…</div>
+              <div className="flex items-center justify-center h-64 text-catalan-textMuted text-sm">Loading program summary…</div>
             )}
 
             {programId && error && (
@@ -1318,7 +1365,7 @@ export default function FgAnalyzer() {
             )}
             {isOrgAdmin && !programId && <CsvTab />}
 
-            {programId && data && !loading && (
+            {programId && summary && !loading && (
               <>
                 <div className="flex gap-1 mb-6 border-b border-catalan-border">
                   {TABS.map(t => (
@@ -1331,8 +1378,25 @@ export default function FgAnalyzer() {
                   ))}
                 </div>
 
-                {tab === 'overview'  && <OverviewTab data={data} />}
-                {tab === 'tabulator' && <TabulatorTab programId={programId} cols={data.column_headers} sampleRows={data.sample_rows ?? []} />}
+                {tab === 'overview'  && <OverviewTab summary={summary} fullData={data} />}
+                {tab === 'tabulator' && (
+                  data
+                    ? <TabulatorTab programId={programId} cols={data.column_headers} sampleRows={data.sample_rows ?? []} />
+                    : (
+                      <div className={`${card} flex flex-col items-center justify-center py-16 gap-4`}>
+                        <p className="text-catalan-textMuted text-sm text-center">
+                          Column data loads form field definitions needed for AI suggestions and cross-tabulations.
+                        </p>
+                        <button
+                          onClick={() => loadColumnData(programId)}
+                          disabled={colDataLoading}
+                          className={btnPr}
+                        >
+                          {colDataLoading ? 'Loading Column Data…' : 'Load Column Data →'}
+                        </button>
+                      </div>
+                    )
+                )}
                 {tab === 'panel'     && <PanelStudyTab programId={programId} />}
                 {tab === 'csv'       && <CsvTab />}
               </>
