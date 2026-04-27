@@ -35,11 +35,11 @@ const STYLES = [
 
 // ── Program picker ─────────────────────────────────────────────────────────────
 
-function ProgramPicker({ value, onChange }: { value: string; onChange: (id: string, prog: Program | null) => void }) {
+function ProgramPicker({ value, onChange, size = 'normal' }: { value: string; onChange: (id: string, prog: Program | null) => void; size?: 'normal' | 'large' }) {
   const [programs, setPrograms] = useState<Program[]>([])
-  useEffect(() => { api.get('/programs/').then(r => setPrograms(r.data)).catch(() => {}) }, [])
+  useEffect(() => { api.get('/programs/').then(r => setPrograms(Array.isArray(r.data) ? r.data : [])).catch(() => {}) }, [])
   return (
-    <select className={`${sel} min-w-[220px]`} value={value}
+    <select className={size === 'large' ? `${sel} w-full py-3 text-base` : `${sel} min-w-[220px]`} value={value}
       onChange={e => {
         const p = programs.find(p => p.id === e.target.value) ?? null
         onChange(e.target.value, p)
@@ -53,26 +53,42 @@ function ProgramPicker({ value, onChange }: { value: string; onChange: (id: stri
 
 // ── Tabulation preview card ───────────────────────────────────────────────────
 
-function TabPreview({ tab }: { tab: SavedTabulation }) {
+function TabPreview({ tab, selected, onToggle }: { tab: SavedTabulation; selected?: boolean; onToggle?: () => void }) {
   return (
-    <div className="border border-catalan-border rounded-lg p-3 bg-catalan-hover/30">
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="text-sm font-medium text-catalan-text">{tab.title}</div>
-        <span className="text-xs text-catalan-textMuted">{tab.rows.length} groups · {tab.total} records</span>
-      </div>
-      <div className="text-xs text-catalan-textMuted mb-2">{tab.description}</div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <tbody className="divide-y divide-catalan-border">
-            {tab.rows.slice(0, 5).map((r, i) => (
-              <tr key={i}>
-                <td className="py-1 text-catalan-textMuted">{r.group}</td>
-                <td className="py-1 text-right font-semibold text-catalan-primary">{r.value}</td>
-              </tr>
-            ))}
-            {tab.rows.length > 5 && <tr><td colSpan={2} className="py-1 text-catalan-textMuted italic">…{tab.rows.length - 5} more rows</td></tr>}
-          </tbody>
-        </table>
+    <div
+      onClick={onToggle}
+      className={`border rounded-lg p-3 transition-all ${onToggle ? 'cursor-pointer' : ''} ${
+        selected ? 'border-catalan-primary bg-catalan-primary/5 shadow-sm' : 'border-catalan-border bg-catalan-hover/30'
+      }`}
+    >
+      <div className="flex items-start gap-2 mb-1.5">
+        {onToggle && (
+          <div className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+            selected ? 'border-catalan-primary bg-catalan-primary' : 'border-catalan-border'
+          }`}>
+            {selected && <span className="text-[9px] text-white font-bold">✓</span>}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium text-catalan-text">{tab.title}</div>
+            <span className="text-xs text-catalan-textMuted">{tab.rows.length} groups · {tab.total} records</span>
+          </div>
+          <div className="text-xs text-catalan-textMuted mt-0.5 mb-2">{tab.description}</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <tbody className="divide-y divide-catalan-border">
+                {tab.rows.slice(0, 5).map((r, i) => (
+                  <tr key={i}>
+                    <td className="py-1 text-catalan-textMuted">{r.group}</td>
+                    <td className="py-1 text-right font-semibold text-catalan-primary">{r.value}</td>
+                  </tr>
+                ))}
+                {tab.rows.length > 5 && <tr><td colSpan={2} className="py-1 text-catalan-textMuted italic">…{tab.rows.length - 5} more rows</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -117,6 +133,7 @@ export default function FgWriter() {
   const [programId, setProgramId] = useState(getLastProgram())
   const [prog, setProg]           = useState<Program | null>(null)
   const [tabulations, setTabulations] = useState<SavedTabulation[]>([])
+  const [selectedTabIds, setSelectedTabIds] = useState<Set<string>>(new Set())
   const [versions, setVersions]   = useState<SavedReport[]>([])
 
   // Writer form
@@ -128,11 +145,16 @@ export default function FgWriter() {
   const [error, setError]               = useState('')
   const [copied, setCopied]             = useState(false)
 
+  const applyTabulations = (tabs: SavedTabulation[]) => {
+    setTabulations(tabs)
+    setSelectedTabIds(new Set(tabs.map(t => t.id)))
+  }
+
   const reload = useCallback(() => {
     if (!programId) return
-    // loadTabulations is async — must not be passed directly to setState
-    setTabulations(loadTabulationsCache(programId))
-    loadTabulations(programId).then(setTabulations).catch(() => {})
+    const cached = loadTabulationsCache(programId)
+    applyTabulations(cached)
+    loadTabulations(programId).then(applyTabulations).catch(() => {})
     setVersions(loadReports(programId))
   }, [programId])
 
@@ -142,24 +164,35 @@ export default function FgWriter() {
     setProgramId(id); setProg(p)
     setReportMd(''); setError('')
     if (id) {
-      setTabulations(loadTabulationsCache(id))
-      loadTabulations(id).then(setTabulations).catch(() => {})
+      const cached = loadTabulationsCache(id)
+      applyTabulations(cached)
+      loadTabulations(id).then(applyTabulations).catch(() => {})
       setVersions(loadReports(id))
     }
-    // pre-fill date range from program
     if (p?.start_date || p?.end_date) {
       const fmt = (d: string) => new Date(d).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
       setDateRange([p.start_date && fmt(p.start_date), p.end_date && fmt(p.end_date)].filter(Boolean).join(' – '))
     }
   }
 
+  const toggleTab = (id: string) => {
+    setSelectedTabIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
   const generate = async () => {
     if (!programId) { toast.error('Select a program first'); return }
+    const activeTabs = tabulations.filter(t => selectedTabIds.has(t.id))
+    if (tabulations.length > 0 && activeTabs.length === 0) {
+      toast.error('Select at least one table to narrate'); return
+    }
     setGenerating(true); setError('')
     try {
-      // Serialize saved tabulations as structured context
-      const tabulationData = tabulations.length
-        ? tabulations.map(t =>
+      const tabulationData = activeTabs.length
+        ? activeTabs.map(t =>
             `### ${t.title}\n${t.description}\n\n` +
             t.rows.slice(0, 30).map(r => `${r.group}: ${r.value}`).join('\n')
           ).join('\n\n---\n\n')
@@ -227,10 +260,15 @@ export default function FgWriter() {
           <div className="max-w-4xl mx-auto p-6 space-y-5">
 
             {!programId && (
-              <div className="flex flex-col items-center justify-center h-64 text-catalan-textMuted">
-                <div className="text-5xl mb-4">✍️</div>
-                <p className="text-sm font-medium">Select a program to generate an AI-powered report</p>
-                <p className="text-xs mt-2 text-catalan-textMuted/70">Build tabulations first in FG Analyzer — the Writer will use them as data</p>
+              <div className={card}>
+                <div className="flex flex-col items-center text-center py-6">
+                  <div className="text-5xl mb-4">✍️</div>
+                  <h2 className="text-base font-semibold text-catalan-text mb-2">Step 1 — Select a Program</h2>
+                  <p className="text-sm text-catalan-textMuted mb-5 max-w-sm">Choose the program you want to generate a report for. The Writer will use your saved Analyzer tables as data.</p>
+                  <div className="w-full max-w-xs">
+                    <ProgramPicker value={programId} onChange={onProgramChange} size="large" />
+                  </div>
+                </div>
               </div>
             )}
 
@@ -254,11 +292,26 @@ export default function FgWriter() {
 
             {programId && (
               <>
-                {/* Tabulations from Analyzer */}
+                {/* Step 2 — Select tables */}
                 <div className={card}>
                   <div className="flex items-center justify-between mb-3">
-                    <div className={sh + ' mb-0'}>Data from FG Analyzer ({tabulations.length} tables)</div>
-                    <button onClick={reload} className={btnSe}>Refresh</button>
+                    <div>
+                      <div className={sh + ' mb-0'}>Step 2 — Select Tables to Narrate</div>
+                      {tabulations.length > 0 && (
+                        <p className="text-xs text-catalan-textMuted mt-1">
+                          {selectedTabIds.size} of {tabulations.length} selected
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      {tabulations.length > 0 && (
+                        <>
+                          <button onClick={() => setSelectedTabIds(new Set(tabulations.map(t => t.id)))} className={btnSe}>All</button>
+                          <button onClick={() => setSelectedTabIds(new Set())} className={btnSe}>None</button>
+                        </>
+                      )}
+                      <button onClick={reload} className={btnSe}>↻ Refresh</button>
+                    </div>
                   </div>
                   {tabulations.length === 0 ? (
                     <p className="text-sm text-catalan-textMuted">
@@ -267,14 +320,19 @@ export default function FgWriter() {
                     </p>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {tabulations.map(t => <TabPreview key={t.id} tab={t} />)}
+                      {tabulations.map(t => (
+                        <TabPreview key={t.id} tab={t}
+                          selected={selectedTabIds.has(t.id)}
+                          onToggle={() => toggleTab(t.id)}
+                        />
+                      ))}
                     </div>
                   )}
                 </div>
 
-                {/* Report config */}
+                {/* Step 3 — Report config */}
                 <div className={card}>
-                  <div className={sh}>Report Settings</div>
+                  <div className={sh}>Step 3 — Report Settings</div>
                   <div className="space-y-4">
                     <div>
                       <label className="text-xs text-catalan-textMuted block mb-2">Report Style</label>
@@ -306,7 +364,11 @@ export default function FgWriter() {
                 </div>
 
                 <button onClick={generate} disabled={generating} className={`${btnPr} w-full py-3 text-base`}>
-                  {generating ? '✨ Generating report…' : '✨ Generate AI Report'}
+                  {generating
+                    ? '✨ Generating report…'
+                    : selectedTabIds.size > 0
+                      ? `✨ Narrate ${selectedTabIds.size} Table${selectedTabIds.size > 1 ? 's' : ''}`
+                      : '✨ Generate AI Report'}
                 </button>
 
                 {error && (

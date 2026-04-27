@@ -3167,24 +3167,45 @@ export default function Dashboard() {
           {tab === 'files' && (
             <div className="space-y-4">
               <Card title="📁 File Manager">
-                <p className="text-sm text-catalan-textMuted mb-4">Saved projects from Analyzer and Cleaner. Download as CSV or open directly in the tool.</p>
+                <div className="flex gap-0 min-h-[400px]">
+                  {/* Left panel */}
+                  <div className="w-44 flex-shrink-0 border-r border-catalan-border pr-4 mr-4 space-y-1">
+                    <p className="text-[11px] font-semibold text-catalan-textMuted uppercase tracking-wider mb-3">Filter</p>
+                    {[
+                      { key: 'all',      label: 'All Files',    icon: '📁' },
+                      { key: 'analyzer', label: 'Analyzer',     icon: '📊' },
+                      { key: 'cleaner',  label: 'Cleaner',      icon: '🧹' },
+                    ].map(f => (
+                      <button key={f.key} onClick={() => setFilesToolFilter(f.key)}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
+                          filesToolFilter === f.key
+                            ? 'bg-catalan-primary/10 text-catalan-primary border border-catalan-primary/20'
+                            : 'text-catalan-textMuted hover:bg-catalan-hover'
+                        }`}>
+                        <span>{f.icon}</span>
+                        {f.label}
+                        {f.key !== 'all' && (
+                          <span className="ml-auto text-xs text-catalan-textMuted">
+                            {toolProjects.filter(p => p.tool === f.key).length}
+                          </span>
+                        )}
+                        {f.key === 'all' && (
+                          <span className="ml-auto text-xs text-catalan-textMuted">{toolProjects.length}</span>
+                        )}
+                      </button>
+                    ))}
+                    <div className="pt-3 border-t border-catalan-border mt-2">
+                      <button onClick={() => {
+                        setLoadingFiles(true)
+                        api.get('/tool-projects/').then(r => setToolProjects(Array.isArray(r.data) ? r.data : [])).catch(() => {}).finally(() => setLoadingFiles(false))
+                      }} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-catalan-textMuted hover:bg-catalan-hover transition-colors">
+                        ↻ Refresh
+                      </button>
+                    </div>
+                  </div>
 
-                {/* Filter tabs */}
-                <div className="flex gap-2 mb-4 flex-wrap">
-                  {['all', 'analyzer', 'cleaner'].map(f => (
-                    <button key={f} onClick={() => setFilesToolFilter(f)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border
-                        ${filesToolFilter === f ? 'bg-catalan-primary text-catalan-bg border-catalan-primary' : 'border-catalan-border text-catalan-textMuted hover:bg-catalan-hover'}`}>
-                      {f === 'all' ? 'All Files' : f === 'analyzer' ? '📊 Analyzer' : '🧹 Cleaner'}
-                    </button>
-                  ))}
-                  <button onClick={() => {
-                    setLoadingFiles(true)
-                    api.get('/tool-projects/').then(r => setToolProjects(r.data ?? [])).catch(() => {}).finally(() => setLoadingFiles(false))
-                  }} className="ml-auto px-3 py-1 rounded-full text-xs font-medium border border-catalan-border text-catalan-textMuted hover:bg-catalan-hover transition-colors">
-                    ↻ Refresh
-                  </button>
-                </div>
+                  {/* Right content */}
+                  <div className="flex-1 min-w-0">
 
                 {loadingFiles ? (
                   <div className="py-12 text-center text-catalan-textMuted text-sm">Loading files…</div>
@@ -3255,6 +3276,8 @@ export default function Dashboard() {
                     </table>
                   </div>
                 )}
+                  </div>{/* end right content */}
+                </div>{/* end flex row */}
               </Card>
             </div>
           )}

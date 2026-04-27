@@ -6,8 +6,8 @@ export interface NavItem {
 
 const ALL_ITEMS: Record<string, NavItem> = {
   dashboard:   { label: 'Dashboard',    path: '/',             icon: '📊' },
-  forms:       { label: 'Forms',        path: '/builder',      icon: '📋' },
-  collect:     { label: 'Collect',      path: '/collect',      icon: '📝' },
+  forms:       { label: 'Form Builder',  path: '/builder',      icon: '📋' },
+  collect:     { label: 'Collect Data', path: '/collect',      icon: '📝' },
   programs:    { label: 'Programs',     path: '/programs',     icon: '🗂️' },
   progress:    { label: 'Progress',     path: '/progress',     icon: '📈' },
   fgAnalyzer:  { label: 'Analyzer',     path: '/fg/analyzer',  icon: '🔬' },

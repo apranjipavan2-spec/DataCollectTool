@@ -43,7 +43,9 @@ const STATUS_COLORS: Record<string, string> = {
   refused:   'text-catalan-error bg-catalan-error/10',
 }
 
-export default function RosterTab({ forms, team }: { forms: Form[]; team: TeamMember[] }) {
+export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: Form[]; team: TeamMember[] }) {
+  const forms = Array.isArray(rawForms) ? rawForms : []
+  const team = Array.isArray(rawTeam) ? rawTeam : []
   const toast = useToast()
   const [roster, setRoster] = useState<RosterEntry[]>([])
   const [loading, setLoading] = useState(false)
