@@ -726,11 +726,11 @@ export default function Dashboard() {
         setForms(fs)
         setFormEditOverrides(fs.map((f: any) => ({ id: f.id, title: f.title, allow_enumerator_edit: f.allow_enumerator_edit ?? null })))
       }),
-      api.get('/submissions/?page_size=200').then(r => setSubmissions(r.data.items ?? r.data.submissions ?? [])),
       api.get('/tenants/branding').then(r => { if (r.data.id) setMyTenantId(r.data.id); if (typeof r.data.allow_enumerator_edit === 'boolean') setAllowEnumeratorEdit(r.data.allow_enumerator_edit) }).catch(() => {}),
     ]
     if (!isEnumerator) {
       calls.push(
+        api.get('/submissions/?page_size=200').then(r => setSubmissions(r.data.items ?? r.data.submissions ?? [])),
         api.get('/users/?page_size=200').then(r => setTeam(r.data.items ?? r.data.users ?? [])),
         api.get('/assignments/').then(r => setAssignments(r.data ?? [])),
         api.get('/tenants/me/usage').then(r => setUsageData(r.data)).catch(() => {}),
@@ -742,8 +742,11 @@ export default function Dashboard() {
       )
     }
     Promise.allSettled(calls).then(results => {
-      const failed = results.filter(r => r.status === 'rejected')
-      if (failed.length > 0) setError('Some data failed to load')
+      const failed = results.filter(r => r.status === 'rejected') as PromiseRejectedResult[]
+      if (failed.length > 0) {
+        const msgs = failed.map(f => f.reason?.response?.data?.detail || f.reason?.message || 'unknown error')
+        setError(`Some data failed to load: ${msgs.join('; ')}`)
+      }
     }).finally(() => setLoading(false))
   }, [])
 
