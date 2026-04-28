@@ -34,8 +34,41 @@ logging.basicConfig(
 
 
 # ── Lifespan (startup / shutdown) ─────────────────────────────────────────────
+def _seed_deepseek_key():
+    """Auto-seed DEEPSEEK_API_KEY env var into system_settings on first startup."""
+    import os
+    key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+    if not key:
+        return
+    try:
+        from app.core.database import SessionLocal
+        from app.models.system_setting import SystemSetting
+        from sqlalchemy.orm.attributes import flag_modified
+        with SessionLocal() as db:
+            row = db.query(SystemSetting).filter(SystemSetting.key == "ai_config").first()
+            cfg = dict(row.value or {}) if row else {}
+            if "keys" not in cfg:
+                cfg = {"keys": {}, "active_provider": cfg.get("provider", "")}
+            if not cfg["keys"].get("deepseek", {}).get("api_key"):
+                cfg["keys"].setdefault("deepseek", {})
+                cfg["keys"]["deepseek"]["api_key"] = key
+                cfg["keys"]["deepseek"]["model"] = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
+                if not cfg.get("active_provider"):
+                    cfg["active_provider"] = "deepseek"
+                if row:
+                    row.value = cfg
+                    flag_modified(row, "value")
+                else:
+                    db.add(SystemSetting(key="ai_config", value=cfg))
+                db.commit()
+                logging.info("DeepSeek API key seeded from environment.")
+    except Exception as e:
+        logging.warning(f"DeepSeek seed failed (non-fatal): {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _seed_deepseek_key()
     start_scheduler()
     yield
     stop_scheduler()

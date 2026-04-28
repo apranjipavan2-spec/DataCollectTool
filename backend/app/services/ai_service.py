@@ -37,6 +37,16 @@ async def _call_llm(cfg: dict, prompt: str) -> str:
         r = await m.generate_content_async(prompt)
         return r.text
 
+    elif provider == 'deepseek':
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(api_key=key, base_url="https://api.deepseek.com")
+        r = await client.chat.completions.create(
+            model=model or 'deepseek-v4-flash',
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=8192,
+        )
+        return r.choices[0].message.content or ""
+
     raise ValueError(f"Unsupported provider: {provider}")
 
 

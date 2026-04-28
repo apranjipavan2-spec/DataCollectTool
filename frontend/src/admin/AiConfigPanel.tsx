@@ -5,9 +5,10 @@ const PROVIDERS = [
   { id: 'openai',    label: 'OpenAI',    icon: '🟢', placeholder: 'sk-…',     defaultModel: 'gpt-4o',               models: ['gpt-4o','gpt-4o-mini','gpt-4-turbo','gpt-3.5-turbo'] },
   { id: 'anthropic', label: 'Anthropic', icon: '🟠', placeholder: 'sk-ant-…', defaultModel: 'claude-sonnet-4-6',     models: ['claude-opus-4-7','claude-sonnet-4-6','claude-haiku-4-5-20251001'] },
   { id: 'gemini',    label: 'Google',    icon: '🔵', placeholder: 'AIzaSy…',  defaultModel: 'gemini-2.0-flash',      models: ['gemini-2.0-flash','gemini-1.5-pro','gemini-1.5-flash'] },
+  { id: 'deepseek',  label: 'DeepSeek',  icon: '🐋', placeholder: 'sk-…',     defaultModel: 'deepseek-v4-flash',     models: ['deepseek-v4-flash','deepseek-v4-pro','deepseek-chat','deepseek-reasoner'] },
 ] as const
 
-type ProviderId = 'openai' | 'anthropic' | 'gemini'
+type ProviderId = 'openai' | 'anthropic' | 'gemini' | 'deepseek'
 
 interface KeysStatus { [p: string]: { configured: boolean; model: string } }
 interface ConfigData { active_provider: string; keys: KeysStatus; configured: boolean }
@@ -62,6 +63,7 @@ function MasterAiConfig({ initial, onUpdated }: { initial: ConfigData | null; on
     openai:    { apiKey: '', model: initial?.keys?.openai?.model    || 'gpt-4o' },
     anthropic: { apiKey: '', model: initial?.keys?.anthropic?.model || 'claude-sonnet-4-6' },
     gemini:    { apiKey: '', model: initial?.keys?.gemini?.model    || 'gemini-2.0-flash' },
+    deepseek:  { apiKey: '', model: initial?.keys?.deepseek?.model  || 'deepseek-v4-flash' },
   })
   const [saving, setSaving] = useState<ProviderId | null>(null)
   const [msgs, setMsgs] = useState<Record<string, string>>({})

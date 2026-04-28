@@ -31,25 +31,25 @@ def _get_global_ai_cfg(db: Session) -> dict:
 
 # ── AI Config (global — set by master_admin, visible to all) ──────────────
 
-PROVIDER_DEFAULTS = {"openai": "gpt-4o", "anthropic": "claude-sonnet-4-6", "gemini": "gemini-2.0-flash"}
+PROVIDER_DEFAULTS = {"openai": "gpt-4o", "anthropic": "claude-sonnet-4-6", "gemini": "gemini-2.0-flash", "deepseek": "deepseek-v4-flash"}
 
 @router.get("/config")
 def get_ai_config(user: dict = Depends(require_org_admin), db: Session = Depends(get_db)):
     row = db.query(SystemSetting).filter(SystemSetting.key == "ai_config").first()
     cfg = row.value if row else {}
 
+    ALL_PROVIDERS = ["openai", "anthropic", "gemini", "deepseek"]
     if "keys" in cfg:
         keys_status = {
             p: {"configured": bool(cfg["keys"].get(p, {}).get("api_key")),
                 "model": cfg["keys"].get(p, {}).get("model", PROVIDER_DEFAULTS.get(p, ""))}
-            for p in ["openai", "anthropic", "gemini"]
+            for p in ALL_PROVIDERS
         }
         active = cfg.get("active_provider", "")
         return {
             "active_provider": active,
             "keys": keys_status,
             "configured": bool(cfg["keys"].get(active, {}).get("api_key")),
-            # legacy compat
             "provider": active,
         }
 
@@ -58,7 +58,7 @@ def get_ai_config(user: dict = Depends(require_org_admin), db: Session = Depends
         "active_provider": cfg.get("provider", ""),
         "provider": cfg.get("provider", ""),
         "keys": {p: {"configured": cfg.get("provider") == p and bool(cfg.get("api_key")),
-                     "model": PROVIDER_DEFAULTS.get(p, "")} for p in ["openai","anthropic","gemini"]},
+                     "model": PROVIDER_DEFAULTS.get(p, "")} for p in ALL_PROVIDERS},
         "configured": bool(cfg.get("provider") and cfg.get("api_key")),
     }
 
