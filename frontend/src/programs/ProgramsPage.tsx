@@ -620,7 +620,7 @@ export default function ProgramsPage() {
         />
 
         <main className="flex-1 overflow-auto">
-          <div className="max-w-7xl mx-auto p-6">
+          <div className="w-full p-6">
 
             {/* Top-level tabs: Programs / Locations */}
             {!selectedId && (

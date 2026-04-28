@@ -1061,7 +1061,7 @@ export default function FieldApp() {
 
       {/* ── Top header ── */}
       <div className="bg-catalan-surface border-b border-catalan-border sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+        <div className="w-full px-4 sm:px-6">
           {/* Row 1: logo + nav actions */}
           <div className="flex justify-between items-center py-3 gap-4">
             <div className="flex items-center gap-3">
@@ -1162,7 +1162,7 @@ export default function FieldApp() {
       {/* Low storage banner */}
       {lowStorage && (
         <div className="bg-catalan-warning/10 border-b border-catalan-warning/30 text-catalan-warning text-xs px-4 py-2.5 flex items-center gap-2">
-          <div className="max-w-5xl mx-auto w-full flex items-center gap-2">
+          <div className="w-full w-full flex items-center gap-2">
             <span>⚠️</span>
             <span><strong>Low storage.</strong> Sync now and free space on your device.</span>
           </div>
@@ -1171,7 +1171,7 @@ export default function FieldApp() {
 
       {/* ── Main content ── */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5">
+        <div className="w-full px-4 sm:px-6 py-5">
 
           {/* Desktop 2-col: forms on left, sidebar on right */}
           <div className="lg:grid lg:grid-cols-[1fr_280px] lg:gap-6">
