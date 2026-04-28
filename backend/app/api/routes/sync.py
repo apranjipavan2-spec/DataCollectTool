@@ -178,8 +178,8 @@ def _post_push_side_effects(
             import asyncio as _asyncio
             try:
                 _asyncio.run(tg_notify(tenant, "submission.created", notify_params))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Telegram notification failed (non-fatal): %s", e)
 
         for item in synced_data:
             form_obj = db.query(Form).filter(Form.id == item["form_id"]).first()
@@ -201,6 +201,13 @@ def _post_push_side_effects(
 @limiter.limit("60/minute")
 def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks, user=Depends(require_enumerator), db: Session = Depends(get_db)):
     """Receive batched offline submissions from enumerator device."""
+    # ── Payload size guards ──────────────────────────────────────────────
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > 5 * 1024 * 1024:  # 5 MB JSON cap
+        raise HTTPException(status_code=413, detail="Request payload too large (max 5MB)")
+    if len(body.submissions) > 500:
+        raise HTTPException(status_code=400, detail="Batch too large (max 500 submissions per push)")
+
     # ── Plan enforcement — check before accepting any submissions ────────
     if body.submissions:
         from app.models.tenant import Tenant

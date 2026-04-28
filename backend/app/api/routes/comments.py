@@ -3,9 +3,12 @@ Submission comments — threaded review between supervisors and enumerators.
 GET/POST /submissions/{id}/comments
 DELETE   /submissions/{id}/comments/{comment_id}
 """
+import logging
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Session
@@ -92,8 +95,8 @@ def post_comment(submission_id: str, body: dict, user: dict = Depends(require_an
             _create_notification(db, str(user["tenant_id"]), str(sub[0]),
                                  "comment", f"New comment from {author_name}",
                                  text_body[:120], f"/submissions/{submission_id}")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Comment notification failed for submission %s: %s", submission_id, e)
 
     return {"id": cid, "author_name": author_name, "author_role": user.get("role", ""),
             "body": text_body, "created_at": datetime.now(timezone.utc).isoformat()}

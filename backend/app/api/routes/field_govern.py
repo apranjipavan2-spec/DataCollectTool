@@ -1,10 +1,13 @@
 """Field Govern API — Cleaner, Analyzer, Panel Study, AI Tabulation."""
 import io
+import logging
 import uuid as _uuid
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 import pandas as pd
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -1009,8 +1012,8 @@ def _fail_analysis(db: Session, analysis_id: str, error_text: str) -> None:
             rec.status = "failed"
             rec.error_text = error_text
             db.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("_fail_analysis: could not mark analysis %s as failed: %s", analysis_id, e)
 
 
 async def _run_ai_generation(
@@ -1125,8 +1128,8 @@ async def _run_ai_generation(
                 retry_result = await ai_service.suggest_tabulation(_get_global_ai_cfg(db), column_headers, sample_rows, strict)
                 valid2 = [c for c in retry_result.get("tables", []) if _is_valid(c)]
                 if len(valid2) > len(valid): valid = valid2
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("AI tabulation retry failed (non-fatal): %s", e)
 
         valid = valid[:10]  # cap at 10
 
@@ -1560,7 +1563,8 @@ def export_program_xlsx(
         for s in subs:
             try:
                 flat = _flatten(s.data_json or {})
-            except Exception:
+            except Exception as e:
+                logger.warning("_flatten failed for submission %s: %s", s.id, e)
                 flat = {}
             rows.append({
                 "serial_no": s.serial_no or "",

@@ -10,9 +10,11 @@ async def _call_llm(cfg: dict, prompt: str) -> str:
     if not provider or not key:
         raise ValueError("AI not configured. Contact your platform administrator.")
 
+    LLM_TIMEOUT = 60  # seconds — prevents a slow provider from stalling a uvicorn worker
+
     if provider == 'openai':
         from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=key)
+        client = AsyncOpenAI(api_key=key, timeout=LLM_TIMEOUT)
         r = await client.chat.completions.create(
             model=model or 'gpt-4o',
             messages=[{"role": "user", "content": prompt}],
@@ -22,7 +24,7 @@ async def _call_llm(cfg: dict, prompt: str) -> str:
 
     elif provider == 'anthropic':
         from anthropic import AsyncAnthropic
-        client = AsyncAnthropic(api_key=key)
+        client = AsyncAnthropic(api_key=key, timeout=LLM_TIMEOUT)
         r = await client.messages.create(
             model=model or 'claude-sonnet-4-6',
             max_tokens=4096,
@@ -31,15 +33,16 @@ async def _call_llm(cfg: dict, prompt: str) -> str:
         return r.content[0].text
 
     elif provider == 'gemini':
+        import asyncio
         import google.generativeai as genai
         genai.configure(api_key=key)
         m = genai.GenerativeModel(model or 'gemini-1.5-pro')
-        r = await m.generate_content_async(prompt)
+        r = await asyncio.wait_for(m.generate_content_async(prompt), timeout=LLM_TIMEOUT)
         return r.text
 
     elif provider == 'deepseek':
         from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=key, base_url="https://api.deepseek.com")
+        client = AsyncOpenAI(api_key=key, base_url="https://api.deepseek.com", timeout=LLM_TIMEOUT)
         r = await client.chat.completions.create(
             model=model or 'deepseek-v4-flash',
             messages=[{"role": "user", "content": prompt}],
