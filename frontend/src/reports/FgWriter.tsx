@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, ReactNode } from 'react'
 import api, { getStoredUser } from '@/lib/api'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
@@ -94,6 +94,46 @@ function TabPreview({ tab, selected, onToggle }: { tab: SavedTabulation; selecte
   )
 }
 
+// ── Lightweight markdown preview ─────────────────────────────────────────────
+
+function fmtInline(text: string): ReactNode {
+  const parts = text.split(/\*\*([^*]+)\*\*/)
+  return parts.map((p, i) => i % 2 === 1 ? <strong key={i}>{p}</strong> : p)
+}
+
+function MarkdownPreview({ md }: { md: string }) {
+  const blocks = md.split(/\n{2,}/)
+  return (
+    <div className="text-catalan-text text-sm leading-relaxed space-y-3" style={{ fontFamily: 'Georgia, serif' }}>
+      {blocks.map((block, i) => {
+        const t = block.trim()
+        if (!t) return null
+        if (t === '---') return <hr key={i} className="border-catalan-border my-2" />
+        if (t.startsWith('### ')) return <h3 key={i} className="text-base font-semibold mt-4">{fmtInline(t.slice(4))}</h3>
+        if (t.startsWith('## '))  return <h2 key={i} className="text-lg font-bold border-b border-catalan-border pb-1 mt-5">{fmtInline(t.slice(3))}</h2>
+        if (t.startsWith('# '))   return <h1 key={i} className="text-xl font-bold mt-5">{fmtInline(t.slice(2))}</h1>
+        const lines = t.split('\n')
+        const listItems = lines.filter(l => /^[-*] /.test(l))
+        if (listItems.length > 0 && listItems.length === lines.length) {
+          return (
+            <ul key={i} className="list-disc list-inside space-y-1 ml-3">
+              {listItems.map((l, j) => <li key={j}>{fmtInline(l.slice(2))}</li>)}
+            </ul>
+          )
+        }
+        const hasReview = t.includes('[REVIEW NEEDED]')
+        return (
+          <p key={i}>
+            {hasReview
+              ? <>{fmtInline(t.replace('[REVIEW NEEDED]', ''))}<span className="ml-1 px-1.5 py-0.5 text-xs rounded bg-yellow-500/20 text-yellow-500 font-medium">REVIEW NEEDED</span></>
+              : fmtInline(t)}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Report version card ───────────────────────────────────────────────────────
 
 function ReportVersionCard({ report, onRestore, onDelete }: {
@@ -144,6 +184,7 @@ export default function FgWriter() {
   const [generating, setGenerating]     = useState(false)
   const [error, setError]               = useState('')
   const [copied, setCopied]             = useState(false)
+  const [previewMode, setPreviewMode]   = useState(false)
 
   const applyTabulations = (tabs: SavedTabulation[]) => {
     setTabulations(tabs)
@@ -389,17 +430,29 @@ export default function FgWriter() {
                     <div className="flex items-center justify-between mb-3">
                       <div className={sh + ' mb-0'}>Generated Report</div>
                       <div className="flex gap-2">
+                        <button
+                          onClick={() => setPreviewMode(p => !p)}
+                          className={`${btnSe} ${previewMode ? 'border-catalan-primary text-catalan-primary' : ''}`}
+                        >
+                          {previewMode ? 'Edit' : 'Preview'}
+                        </button>
                         <button onClick={saveCurrentReport} className={btnSe}>Save Version</button>
                         <button onClick={downloadDocx} className={btnSe}>Download Word</button>
                         <button onClick={copyMarkdown} className={btnSe}>{copied ? '✓ Copied' : 'Copy MD'}</button>
                       </div>
                     </div>
-                    <textarea
-                      value={reportMd}
-                      onChange={e => setReportMd(e.target.value)}
-                      style={{ fontFamily: 'Georgia, serif', whiteSpace: 'pre-wrap' }}
-                      className={`${inp} w-full min-h-[540px] resize-y leading-relaxed`}
-                    />
+                    {previewMode ? (
+                      <div className="min-h-[540px] p-1">
+                        <MarkdownPreview md={reportMd} />
+                      </div>
+                    ) : (
+                      <textarea
+                        value={reportMd}
+                        onChange={e => setReportMd(e.target.value)}
+                        style={{ fontFamily: 'Georgia, serif', whiteSpace: 'pre-wrap' }}
+                        className={`${inp} w-full min-h-[540px] resize-y leading-relaxed`}
+                      />
+                    )}
                   </div>
                 )}
 

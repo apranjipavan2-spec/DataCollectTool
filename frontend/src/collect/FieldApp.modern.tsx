@@ -232,6 +232,9 @@ export default function FieldApp() {
     setFailedMediaCount(mediaFailed)
     setSyncMsg(parts.length > 0 ? `✓ ${parts.join(', ')}` : '')
     setTimeout(() => setSyncMsg(''), 4000)
+    if (textSynced > 0) {
+      setMyStats(prev => prev ? { today: prev.today + textSynced, total: prev.total + textSynced } : null)
+    }
 
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: 'SYNC_COMPLETE' })

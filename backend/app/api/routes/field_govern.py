@@ -233,6 +233,15 @@ def get_analyzer_data(
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
+    try:
+        return _get_analyzer_data_inner(program_id, user, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Analyzer data error: {e}")
+
+
+def _get_analyzer_data_inner(program_id, user, db):
     prog = db.query(Program).filter(
         Program.id == program_id, Program.tenant_id == user["tenant_id"]
     ).first()
@@ -331,7 +340,7 @@ def get_analyzer_data(
     _internal = {"_gps_lat", "_gps_lng", "_gps_accuracy", "_duplicate_suspect", "_validation_violations"}
     sample_rows = [
         {k: v for k, v in s.data_json.items() if k not in _internal}
-        for s in subs[:8] if s.data_json
+        for s in subs[:8] if s.data_json and isinstance(s.data_json, dict)
     ]
 
     return {
@@ -515,6 +524,15 @@ def execute_tabulation(
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
+    try:
+        return _execute_tabulation_inner(program_id, body, user, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Tabulation error: {e}")
+
+
+def _execute_tabulation_inner(program_id, body, user, db):
     prog = db.query(Program).filter(
         Program.id == program_id, Program.tenant_id == user["tenant_id"]
     ).first()
@@ -544,7 +562,7 @@ def execute_tabulation(
     if secondary_groupby:
         cross: dict = defaultdict(lambda: defaultdict(int))
         for s in subs:
-            if not s.data_json:
+            if not s.data_json or not isinstance(s.data_json, dict):
                 continue
             g1 = _str_val(s.data_json.get(groupby_field, "__missing__"))
             g2 = _str_val(s.data_json.get(secondary_groupby, "__missing__"))
@@ -578,7 +596,7 @@ def execute_tabulation(
     # Simple aggregation path
     groups: dict = defaultdict(list)
     for s in subs:
-        if not s.data_json:
+        if not s.data_json or not isinstance(s.data_json, dict):
             continue
         group_val = _str_val(s.data_json.get(groupby_field, "__missing__"))
         if value_field == "*" or aggregation == "count":
@@ -947,7 +965,7 @@ def _execute_config_rows(config: dict, subs: list) -> dict:
     if secondary:
         cross: dict = defaultdict(lambda: defaultdict(int))
         for s in subs:
-            if not s.data_json: continue
+            if not s.data_json or not isinstance(s.data_json, dict): continue
             cross[_sv(s.data_json.get(groupby_field, "__missing__"))][_sv(s.data_json.get(secondary, "__missing__"))] += 1
         sub_keys = sorted({k for row in cross.values() for k in row})
         rows = []
@@ -963,7 +981,7 @@ def _execute_config_rows(config: dict, subs: list) -> dict:
 
     groups: dict = defaultdict(list)
     for s in subs:
-        if not s.data_json: continue
+        if not s.data_json or not isinstance(s.data_json, dict): continue
         gv = _sv(s.data_json.get(groupby_field, "__missing__"))
         if value_field == "*" or aggregation == "count":
             groups[gv].append(1)
@@ -1431,17 +1449,38 @@ async def generate_program_report(
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
+    from sqlalchemy import case as sa_case
+
     prog = db.query(Program).filter(
         Program.id == program_id, Program.tenant_id == user["tenant_id"]
     ).first()
     if not prog:
         raise HTTPException(404, "Program not found")
 
-    # Gather program metadata
-    subs = db.query(Submission).filter(
-        Submission.program_id == program_id,
+    # Aggregate stats — no row fetching
+    agg = db.query(
+        func.count().label("total"),
+        func.sum(sa_case((Submission.status == "approved", 1), else_=0)).label("approved"),
+        func.sum(sa_case((Submission.status == "flagged",  1), else_=0)).label("flagged"),
+        func.sum(sa_case((Submission.has_violations == True, 1), else_=0)).label("violations"),
+        func.sum(sa_case((Submission.backcheck_required == True, 1), else_=0)).label("backcheck_required"),
+    ).filter(
+        Submission.program_id == _uuid.UUID(program_id),
         Submission.tenant_id == user["tenant_id"],
-    ).all()
+    ).one()
+
+    total              = agg.total or 0
+    approved           = agg.approved or 0
+    flagged            = agg.flagged or 0
+    violations         = agg.violations or 0
+    backcheck_required = agg.backcheck_required or 0
+    quality_score      = round((1 - violations / max(total, 1)) * 100, 1)
+
+    dup_count = db.query(func.count()).filter(
+        Submission.program_id == _uuid.UUID(program_id),
+        Submission.tenant_id == user["tenant_id"],
+        Submission.data_json["_duplicate_suspect"].astext == "true",
+    ).scalar() or 0
 
     waves = db.query(ProgramQuestionnaire).filter(
         ProgramQuestionnaire.program_id == program_id,
@@ -1464,7 +1503,13 @@ async def generate_program_report(
             program_name=prog.name,
             scheme=prog.scheme_name or "",
             date_range=date_range,
-            sample_size=len(subs),
+            sample_size=total,
+            approved=approved,
+            flagged=flagged,
+            violations=violations,
+            backcheck_required=backcheck_required,
+            duplicate_suspects=dup_count,
+            quality_score=quality_score,
             waves=wave_list,
             tabulations=body.tabulation_data,
             style=body.style,
@@ -1474,6 +1519,7 @@ async def generate_program_report(
         raise HTTPException(400, str(e))
     except Exception as e:
         raise HTTPException(503, f"AI error: {e}")
+    return {"report_md": report_md}
 
 
 # ── Program export (used by analyzer.fieldgovern.com and cleaner.fieldgovern.com) ──

@@ -3,8 +3,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell,
+  Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import api from '@/lib/api'
 
@@ -19,17 +19,6 @@ const COLORS = {
 interface Form {
   id: string
   title: string
-}
-
-interface TrendPoint {
-  date: string
-  count: number
-}
-
-interface EnumProgress {
-  name: string
-  count: number
-  target?: number
 }
 
 interface StatusCount {
@@ -82,8 +71,6 @@ function heatColor(count: number, max: number): string {
 
 export default function AnalyticsTab({ forms }: { forms: Form[] }) {
   const [selectedForm, setSelectedForm] = useState('')
-  const [trend, setTrend] = useState<TrendPoint[]>([])
-  const [enumProgress, setEnumProgress] = useState<EnumProgress[]>([])
   const [statusCounts, setStatusCounts] = useState<StatusCount[]>([])
   const [heatmapDays, setHeatmapDays] = useState<HeatmapDay[]>(buildHeatmapDays)
   const [loading, setLoading] = useState(false)
@@ -92,26 +79,9 @@ export default function AnalyticsTab({ forms }: { forms: Form[] }) {
     if (!formId) return
     setLoading(true)
     try {
-      const today = new Date().toISOString().slice(0, 10)
-
-      const [trendRes, progressRes, subsRes] = await Promise.allSettled([
-        api.get(`/analytics/trend?form_id=${formId}&days=30`),
-        api.get(`/analytics/daily-progress?form_id=${formId}&date=${today}`),
+      const [subsRes] = await Promise.allSettled([
         api.get(`/submissions/?form_id=${formId}&page_size=500`),
       ])
-
-      if (trendRes.status === 'fulfilled') {
-        const data = trendRes.value.data
-        setTrend(Array.isArray(data) ? data : data.trend ?? data.data ?? [])
-      }
-
-      if (progressRes.status === 'fulfilled') {
-        const data = progressRes.value.data
-        const items: EnumProgress[] = Array.isArray(data)
-          ? data
-          : data.enumerators ?? data.data ?? []
-        setEnumProgress(items.sort((a, b) => b.count - a.count))
-      }
 
       if (subsRes.status === 'fulfilled') {
         const subs: Array<{ status: string; server_received_at?: string }> = subsRes.value.data?.items ?? subsRes.value.data ?? []
@@ -174,55 +144,7 @@ export default function AnalyticsTab({ forms }: { forms: Form[] }) {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-          {/* 1. Submissions Trend */}
-          <ChartCard title="Submissions Trend" subtitle="Last 30 days">
-            {trend.length === 0 ? (
-              <p className="text-sm text-catalan-textMuted text-center py-8">No trend data</p>
-            ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={trend} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#313244" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6c7086' }} tickFormatter={v => v.slice(5)} />
-                  <YAxis tick={{ fontSize: 10, fill: '#6c7086' }} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{ background: '#1e1e2e', border: '1px solid #313244', borderRadius: 8 }}
-                    labelStyle={{ color: '#cdd6f4', fontSize: 12 }}
-                    itemStyle={{ color: COLORS.primary }}
-                  />
-                  <Line type="monotone" dataKey="count" stroke={COLORS.primary} strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </ChartCard>
-
-          {/* 2. Enumerator Performance */}
-          <ChartCard title="Enumerator Performance" subtitle="Submissions today">
-            {enumProgress.length === 0 ? (
-              <p className="text-sm text-catalan-textMuted text-center py-8">No data for today</p>
-            ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={enumProgress} layout="vertical" margin={{ top: 4, right: 8, left: 4, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#313244" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 10, fill: '#6c7086' }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#6c7086' }} width={90} />
-                  <Tooltip
-                    contentStyle={{ background: '#1e1e2e', border: '1px solid #313244', borderRadius: 8 }}
-                    labelStyle={{ color: '#cdd6f4', fontSize: 12 }}
-                  />
-                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                    {enumProgress.map((entry, i) => (
-                      <Cell
-                        key={i}
-                        fill={entry.target !== undefined && entry.count >= entry.target ? COLORS.green : COLORS.orange}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </ChartCard>
-
-          {/* 3. Status Breakdown */}
+          {/* Status Breakdown */}
           <ChartCard title="Submission Status" subtitle="Breakdown by status">
             {statusCounts.every(s => s.value === 0) ? (
               <p className="text-sm text-catalan-textMuted text-center py-8">No submissions yet</p>

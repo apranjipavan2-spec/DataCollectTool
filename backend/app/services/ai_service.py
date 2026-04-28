@@ -148,15 +148,40 @@ async def suggest_tabulation(cfg: dict, column_headers: list, sample_rows: list,
     return {"tables": []}
 
 
-async def generate_program_report(cfg: dict, program_name: str, scheme: str, date_range: str,
-                                   sample_size: int, waves: list, tabulations: str,
-                                   style: str = "field_survey", custom_context: str = "") -> str:
+async def generate_program_report(
+    cfg: dict,
+    program_name: str,
+    scheme: str,
+    date_range: str,
+    sample_size: int,
+    waves: list,
+    tabulations: str,
+    style: str = "field_survey",
+    custom_context: str = "",
+    approved: int = 0,
+    flagged: int = 0,
+    violations: int = 0,
+    backcheck_required: int = 0,
+    duplicate_suspects: int = 0,
+    quality_score: float = 0.0,
+) -> str:
     style_prompt = REPORT_STYLE_PROMPTS.get(style, REPORT_STYLE_PROMPTS["field_survey"])
     waves_str = ", ".join([f"Wave {w['wave_number']} ({w['wave_label']})" for w in waves]) if waves else "Single wave"
+    approval_pct = round(approved / max(sample_size, 1) * 100, 1)
+    stats_block = (
+        f"Total submissions: {sample_size}\n"
+        f"Approved: {approved} ({approval_pct}%)\n"
+        f"Flagged for review: {flagged}\n"
+        f"Data quality score: {quality_score}%\n"
+        f"Submissions with violations: {violations}\n"
+        f"Back-check required: {backcheck_required}\n"
+        f"Duplicate suspects: {duplicate_suspects}"
+    )
     prompt = (
         f"{style_prompt}\n\n"
         f"Program: {program_name}\nScheme/Study: {scheme}\nPeriod: {date_range}\n"
-        f"Total sample: {sample_size} respondents\nStudy design: {waves_str}\n\n"
+        f"Study design: {waves_str}\n\n"
+        f"Program statistics:\n{stats_block}\n\n"
         f"Tabulation data:\n{tabulations[:10000] if tabulations else 'No tabulation data — use placeholders.'}\n\n"
         f"Additional context: {custom_context or 'None.'}\n\n"
         f"Generate a complete, professional report in markdown. Use ## for sections, **bold** for key findings. "

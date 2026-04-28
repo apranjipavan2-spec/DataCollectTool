@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from typing import Any, Optional
 from sqlalchemy.orm import Session
@@ -20,6 +20,18 @@ import logging
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _fire_webhook_bg(tenant_id: str, event: str, payload: dict, submission_id: str):
+    """Fire a single webhook in a background task (new DB session)."""
+    from app.core.database import SessionLocal
+    db = SessionLocal()
+    try:
+        fire_webhooks(db, tenant_id, event, payload)
+    except Exception:
+        logger.warning("Background webhook fire failed for submission %s", submission_id)
+    finally:
+        db.close()
 
 
 class SubmissionCreate(BaseModel):
@@ -510,7 +522,7 @@ def list_potential_duplicates(
 
 @router.post("/", status_code=201)
 @limiter.limit("60/minute")
-def create_submission(request: Request, body: SubmissionCreate, user=Depends(require_enumerator), db: Session = Depends(get_db)):
+def create_submission(request: Request, body: SubmissionCreate, background_tasks: BackgroundTasks, user=Depends(require_enumerator), db: Session = Depends(get_db)):
     try:
         sub = Submission(
             tenant_id=user["tenant_id"],
@@ -525,16 +537,14 @@ def create_submission(request: Request, body: SubmissionCreate, user=Depends(req
         db.add(sub)
         db.commit()
         db.refresh(sub)
-        try:
-            fire_webhooks(db, user["tenant_id"], "submission.created", {
-                "submission_id": str(sub.id),
-                "form_id": str(sub.form_id),
-                "enumerator_id": str(sub.enumerator_id),
-                "data_json": sub.data_json,
-                "status": sub.status,
-            })
-        except Exception:
-            logger.warning("Webhook fire failed for submission %s", sub.id)
+        webhook_payload = {
+            "submission_id": str(sub.id),
+            "form_id": str(sub.form_id),
+            "enumerator_id": str(sub.enumerator_id),
+            "data_json": sub.data_json,
+            "status": sub.status,
+        }
+        background_tasks.add_task(_fire_webhook_bg, str(user["tenant_id"]), "submission.created", webhook_payload, str(sub.id))
         return {"id": str(sub.id), "status": sub.status}
     except HTTPException:
         raise

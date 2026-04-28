@@ -537,6 +537,7 @@ export default function Dashboard() {
   // Data
   const [forms, setForms] = useState<Form[]>([])
   const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [recentSubmissions, setRecentSubmissions] = useState<Submission[]>([])
   const [summary, setSummary] = useState<SubmissionSummary | null>(null)
   const [subsLoaded, setSubsLoaded] = useState(false)
   const [subsLoading, setSubsLoading] = useState(false)
@@ -748,6 +749,7 @@ export default function Dashboard() {
     if (!isEnumerator) {
       calls.push(
         api.get('/submissions/summary').then(r => setSummary(r.data)).catch(() => {}),
+        api.get('/submissions/?page_size=10&slim=true').then(r => setRecentSubmissions(r.data.items ?? [])).catch(() => {}),
         api.get('/users/?page_size=200').then(r => setTeam(r.data.items ?? r.data.users ?? [])),
         api.get('/assignments/').then(r => setAssignments(r.data ?? [])),
         api.get('/tenants/me/usage').then(r => setUsageData(r.data)).catch(() => {}),
@@ -766,6 +768,16 @@ export default function Dashboard() {
       }
     }).finally(() => setLoading(false))
   }, [])
+
+  // Poll summary every 30s so stats stay live without a full page reload
+  useEffect(() => {
+    if (isEnumerator) return
+    const t = setInterval(() => {
+      api.get('/submissions/summary').then(r => setSummary(r.data)).catch(() => {})
+      api.get('/submissions/?page_size=10&slim=true').then(r => setRecentSubmissions(r.data.items ?? [])).catch(() => {})
+    }, 30_000)
+    return () => clearInterval(t)
+  }, [isEnumerator])
 
   // Filtered submissions
   const filteredSubs = useMemo(() => submissions.filter(s => {
@@ -859,23 +871,36 @@ export default function Dashboard() {
   }), [summary, submissions, forms, team])
 
   const enumeratorStats = useMemo(() => {
-    if (!subsLoaded && summary?.by_enumerator) {
-      return summary.by_enumerator.map(e => ({
-        name: e.name, total: e.count,
-        approved: 0, flagged: 0, rejected: 0, synced: 0, last_at: '',
-      }))
-    }
+    // Build per-status breakdown from loaded submissions array
     const map: Record<string, { name: string; total: number; approved: number; flagged: number; rejected: number; synced: number; last_at: string }> = {}
-    for (const s of submissions) {
-      if (!map[s.enumerator_id]) {
-        map[s.enumerator_id] = { name: s.enumerator_name, total: 0, approved: 0, flagged: 0, rejected: 0, synced: 0, last_at: '' }
+    if (subsLoaded) {
+      for (const s of submissions) {
+        if (!map[s.enumerator_id]) {
+          map[s.enumerator_id] = { name: s.enumerator_name, total: 0, approved: 0, flagged: 0, rejected: 0, synced: 0, last_at: '' }
+        }
+        map[s.enumerator_id].total++
+        const st = s.status as 'approved' | 'flagged' | 'rejected' | 'synced'
+        if (st in map[s.enumerator_id]) map[s.enumerator_id][st]++
+        if (!map[s.enumerator_id].last_at || s.server_received_at > map[s.enumerator_id].last_at) {
+          map[s.enumerator_id].last_at = s.server_received_at
+        }
       }
-      map[s.enumerator_id].total++
-      const st = s.status as 'approved' | 'flagged' | 'rejected' | 'synced'
-      if (st in map[s.enumerator_id]) map[s.enumerator_id][st]++
-      if (!map[s.enumerator_id].last_at || s.server_received_at > map[s.enumerator_id].last_at) {
-        map[s.enumerator_id].last_at = s.server_received_at
-      }
+    }
+    // Always use summary.by_enumerator for accurate totals (DB-counted, not array-counted).
+    // Merge per-status breakdown from loaded submissions if available.
+    if (summary?.by_enumerator) {
+      return summary.by_enumerator.map(e => {
+        const loaded = map[e.enumerator_id ?? ''] ?? null
+        return {
+          name: e.name,
+          total: e.count,
+          approved: loaded?.approved ?? 0,
+          flagged: loaded?.flagged ?? 0,
+          rejected: loaded?.rejected ?? 0,
+          synced: loaded?.synced ?? 0,
+          last_at: loaded?.last_at ?? '',
+        }
+      }).sort((a, b) => b.total - a.total)
     }
     return Object.values(map).sort((a, b) => b.total - a.total)
   }, [subsLoaded, summary, submissions])
@@ -1005,7 +1030,9 @@ export default function Dashboard() {
     setSubsLoading(true)
     try {
       const r = await api.get('/submissions/?page_size=5000&slim=true')
-      setSubmissions(r.data.items ?? r.data.submissions ?? [])
+      const items = r.data.items ?? r.data.submissions ?? []
+      setSubmissions(items)
+      setRecentSubmissions(items.slice(0, 10))
       setSubsLoaded(true)
     } catch (err: any) {
       toast.error(err.response?.data?.detail ?? 'Failed to load submissions')
@@ -1516,14 +1543,14 @@ export default function Dashboard() {
               {/* Recent submissions + forms status */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card title="Recent Submissions">
-                  {submissions.length === 0 ? (
+                  {(subsLoaded ? submissions : recentSubmissions).length === 0 ? (
                     <div className="text-center py-8">
                       <div className="text-4xl mb-2">📋</div>
                       <p className="text-sm text-catalan-textMuted">No submissions yet</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {submissions.slice(0, 5).map(sub => (
+                      {(subsLoaded ? submissions : recentSubmissions).slice(0, 5).map(sub => (
                         <div
                           key={sub.id}
                           onClick={() => openDetail(sub.id)}
@@ -1538,12 +1565,12 @@ export default function Dashboard() {
                           <StatusBadge status={sub.status} />
                         </div>
                       ))}
-                      {submissions.length > 5 && (
+                      {(summary?.total ?? 0) > 5 && (
                         <button
                           onClick={() => setTab('submissions')}
                           className="text-xs text-catalan-primary hover:underline mt-1"
                         >
-                          View all {submissions.length} submissions →
+                          View all {(summary?.total ?? submissions.length).toLocaleString()} submissions →
                         </button>
                       )}
                     </div>
@@ -2073,10 +2100,8 @@ export default function Dashboard() {
                   { label: 'Flagged', key: 'flagged', color: 'catalan-warning' },
                   { label: 'Rejected', key: 'rejected', color: 'catalan-error' },
                 ].map(({ label, key, color }) => {
-                  const cnt = subsLoaded
-                    ? submissions.filter(s => s.status === key).length
-                    : (summary?.by_status?.[key] ?? (summary as any)?.[key] ?? 0)
-                  const total = subsLoaded ? submissions.length : (summary?.total ?? 0)
+                  const cnt = summary?.by_status?.[key] ?? (summary as any)?.[key] ?? 0
+                  const total = summary?.total ?? 0
                   const pct = total > 0 ? Math.round((cnt / total) * 100) : 0
                   return (
                     <Card key={key} className={`border-l-4 border-l-${color}`}>
@@ -2091,7 +2116,7 @@ export default function Dashboard() {
               {/* Enumerator performance table */}
               <Card title="Enumerator Performance">
                 <p className="text-xs text-catalan-textMuted mb-3">
-                  {subsLoaded ? `Based on ${submissions.length} submissions loaded.` : `Showing totals from summary (${summary?.total ?? 0} submissions). Load submissions for per-status breakdown.`}
+                  {summary?.total ? `${summary.total.toLocaleString()} submissions${subsLoaded ? ' loaded' : ' — counts from live summary'}.` : 'No data yet.'}
                 </p>
                 {enumeratorStats.length === 0 ? (
                   <p className="text-sm text-catalan-textMuted text-center py-8">No data yet</p>
@@ -2910,7 +2935,7 @@ export default function Dashboard() {
                         </tr>
                       ) : (
                         paginatedTeam.map(member => {
-                          const subCount = submissions.filter(s => s.enumerator_id === member.id).length
+                          const subCount = summary?.by_enumerator?.find(e => e.enumerator_id === member.id)?.count ?? submissions.filter(s => s.enumerator_id === member.id).length
                           return (
                             <tr key={member.id} className="border-b border-catalan-border hover:bg-catalan-hover transition-colors">
                               <td className="px-3 py-2">

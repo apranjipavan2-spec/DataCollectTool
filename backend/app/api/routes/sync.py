@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 import math
 import uuid as _uuid
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile, HTTPException, Request
+from sqlalchemy import func as _func
 from fastapi.params import Form as FormParam
 from pydantic import BaseModel
 from typing import Any, Optional
@@ -142,9 +143,63 @@ class PushRequest(BaseModel):
     submissions: list[SubmissionPayload]
 
 
+def _post_push_side_effects(
+    tenant_id: str,
+    enumerator_id: str,
+    enumerator_name: str,
+    synced_data: list,  # [{form_id, data_json, server_id, serial_no}]
+):
+    """Webhooks, WA/TG notifications, and Sheets sync — runs after response is sent."""
+    from app.core.database import SessionLocal
+    db = SessionLocal()
+    try:
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+        for item in synced_data:
+            try:
+                fire_webhooks(db, tenant_id, "submission.created", {
+                    "submission_id": item["server_id"],
+                    "form_id": item["form_id"],
+                    "enumerator_id": enumerator_id,
+                    "data_json": item["data_json"],
+                    "status": "synced",
+                })
+            except Exception:
+                logger.warning("Webhook fire failed for submission %s", item["server_id"])
+
+        if synced_data and tenant:
+            first_form_id = synced_data[0]["form_id"]
+            form_obj = db.query(Form).filter(Form.id == first_form_id).first()
+            notify_params = {
+                "count": len(synced_data),
+                "form_title": form_obj.title if form_obj else first_form_id,
+                "enumerator": enumerator_name,
+            }
+            wa_notify(tenant, "submission.created", notify_params)
+            import asyncio as _asyncio
+            try:
+                _asyncio.run(tg_notify(tenant, "submission.created", notify_params))
+            except Exception:
+                pass
+
+        for item in synced_data:
+            form_obj = db.query(Form).filter(Form.id == item["form_id"]).first()
+            if form_obj:
+                try:
+                    sync_submission(form_obj, item["data_json"], {
+                        "_sheet": form_obj.title,
+                        "_submission_id": item["server_id"],
+                        "_serial_no": item["serial_no"],
+                        "_synced_at": datetime.now(timezone.utc).isoformat(),
+                    })
+                except Exception:
+                    logger.warning("Sheets sync failed for submission %s", item["server_id"])
+    finally:
+        db.close()
+
+
 @router.post("/push")
 @limiter.limit("60/minute")
-def push(request: Request, body: PushRequest, user=Depends(require_enumerator), db: Session = Depends(get_db)):
+def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks, user=Depends(require_enumerator), db: Session = Depends(get_db)):
     """Receive batched offline submissions from enumerator device."""
     # ── Plan enforcement — check before accepting any submissions ────────
     if body.submissions:
@@ -157,6 +212,13 @@ def push(request: Request, body: PushRequest, user=Depends(require_enumerator), 
             raise HTTPException(status_code=402, detail=check["reason"])
 
     results = []
+    # Compute starting serial_no once (avoids N+1 queries in the batch loop)
+    serial_counter = (
+        db.query(_func.coalesce(_func.max(Submission.serial_no), 0))
+        .filter(Submission.tenant_id == user["tenant_id"])
+        .scalar()
+    ) or 0
+
     for item in body.submissions:
         # Idempotency: check if this local_id was already synced
         existing = db.query(Submission).filter(
@@ -167,13 +229,8 @@ def push(request: Request, body: PushRequest, user=Depends(require_enumerator), 
             results.append({"local_id": item.local_id, "server_id": str(existing.id), "status": "duplicate"})
             continue
 
-        # Auto-assign next serial_no for this tenant
-        from sqlalchemy import func as _func
-        next_serial = (
-            db.query(_func.coalesce(_func.max(Submission.serial_no), 0) + 1)
-            .filter(Submission.tenant_id == user["tenant_id"])
-            .scalar()
-        ) or 1
+        serial_counter += 1
+        next_serial = serial_counter
 
         consent_ts = None
         if item.consent_timestamp:
@@ -264,53 +321,27 @@ def push(request: Request, body: PushRequest, user=Depends(require_enumerator), 
     db.add(log)
     db.commit()
 
-    # Fire webhooks + WhatsApp + Sheets for each synced submission (never blocks response)
-    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
-    synced_items = []
-    for item in body.submissions:
-        matching = [r for r in results if r["local_id"] == item.local_id and r["status"] == "synced"]
-        if not matching:
-            continue
-        synced_items.append((item, matching[0]))
-        try:
-            fire_webhooks(db, user["tenant_id"], "submission.created", {
-                "submission_id": matching[0]["server_id"],
-                "form_id": item.form_id,
-                "enumerator_id": str(user["sub"]),
-                "data_json": item.data_json,
-                "status": "synced",
-            })
-        except Exception:
-            logger.warning("Webhook fire failed for synced submission %s", matching[0]["server_id"])
-
-    # WhatsApp + Telegram — batch notify (one message for all submissions in this push)
-    if synced_items and tenant:
-        first_form_id = synced_items[0][0].form_id
-        form_obj = db.query(Form).filter(Form.id == first_form_id).first()
-        notify_params = {
-            "count": len(synced_items),
-            "form_title": form_obj.title if form_obj else first_form_id,
-            "enumerator": user.get("name", str(user["sub"])),
+    # Schedule webhooks + notifications + Sheets sync as a background task so the
+    # response is returned immediately after the DB commit.
+    synced_data = [
+        {
+            "form_id": item.form_id,
+            "data_json": dict(item.data_json),
+            "server_id": r["server_id"],
+            "serial_no": r.get("serial_no", ""),
         }
-        wa_notify(tenant, "submission.created", notify_params)
-        import asyncio as _asyncio
-        try:
-            loop = _asyncio.get_event_loop()
-            if loop.is_running():
-                _asyncio.ensure_future(tg_notify(tenant, "submission.created", notify_params))
-        except Exception:
-            pass
-
-    # Sheets sync — per-submission, per-form
-    for item, matched in synced_items:
-        form_obj = db.query(Form).filter(Form.id == item.form_id).first()
-        if form_obj:
-            sync_submission(form_obj, item.data_json, {
-                "_sheet": form_obj.title,
-                "_submission_id": matched["server_id"],
-                "_serial_no": matched.get("serial_no", ""),
-                "_synced_at": datetime.now(timezone.utc).isoformat(),
-            })
+        for item in body.submissions
+        for r in results
+        if r["local_id"] == item.local_id and r["status"] == "synced"
+    ]
+    if synced_data:
+        background_tasks.add_task(
+            _post_push_side_effects,
+            str(user["tenant_id"]),
+            str(user["sub"]),
+            user.get("name", str(user["sub"])),
+            synced_data,
+        )
 
     return {"received": len(results), "results": results, "server_time": datetime.now(timezone.utc).isoformat()}
 
