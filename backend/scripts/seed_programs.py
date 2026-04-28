@@ -1239,10 +1239,11 @@ for (prog_name, scheme, desc, form_title, form_schema, data_fn,
             total_subs += made
         else:
             # Backfill program_id on existing unlinked submissions
-            db.execute(
+            from sqlalchemy import text
+            db.execute(text(
                 f"UPDATE submissions SET program_id='{prog.id}', questionnaire_id='{questionnaire.id}'"
                 f" WHERE tenant_id='{demo.id}' AND form_id='{form.id}' AND program_id IS NULL"
-            )
+            ))
 
         db.commit()
         status_str = "created" if prog_new else "updated"
