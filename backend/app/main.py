@@ -66,8 +66,16 @@ def _seed_deepseek_key():
         logging.warning(f"DeepSeek seed failed (non-fatal): {e}")
 
 
+def _assert_production_secrets():
+    if settings.JWT_SECRET in ("change-me-in-production", "your-super-secret-key-change-in-production-12345"):
+        import sys
+        logging.critical("FATAL: JWT_SECRET is set to a known default. Set a strong random secret in your environment.")
+        sys.exit(1)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _assert_production_secrets()
     _seed_deepseek_key()
     start_scheduler()
     yield
@@ -75,6 +83,35 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="FieldGovern API", version="0.1.0", lifespan=lifespan)
+
+
+# ── Security headers ──────────────────────────────────────────────────────────
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import Response as StarletteResponse
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response: StarletteResponse = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        # Allow the SPA to function; restrict everything else
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob:; "
+            "connect-src 'self' https://api.deepseek.com; "
+            "media-src 'self' blob:; "
+            "worker-src 'self' blob:; "
+            "frame-ancestors 'none';"
+        )
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 # ── Rate limiting (in-memory, no Redis needed) ───────────────────────────────
 app.state.limiter = limiter
