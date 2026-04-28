@@ -15,6 +15,7 @@ interface Questionnaire {
   id: string; name: string; participant_type_id: string | null; participant_type_name: string
   form_id: string | null; form_title: string; total_target: number; status: string
   start_date: string | null; end_date: string | null; location_targets: LocationTarget[]
+  wave_number: number | null; wave_label: string | null; panel_key: string | null
 }
 interface Program {
   id: string; name: string; scheme_name: string; description: string; status: string
@@ -23,6 +24,7 @@ interface Program {
   overdue?: number; at_risk?: number
 }
 interface ProgramDetail extends Program {
+  is_panel_study: boolean
   participant_types: ParticipantType[]
   questionnaires: Questionnaire[]
 }
@@ -167,6 +169,7 @@ function LocationModal({ initial, onSave, onClose }: {
 function SetupPanel({ prog, locations, forms, onRefresh }: {
   prog: ProgramDetail; locations: Location[]; forms: Form[]; onRefresh: () => void
 }) {
+  const toast = useToast()
   const [addingType, setAddingType] = useState(false)
   const [newTypeName, setNewTypeName] = useState('')
   const [addingQ, setAddingQ] = useState(false)
@@ -174,6 +177,7 @@ function SetupPanel({ prog, locations, forms, onRefresh }: {
   const [expandedQ, setExpandedQ] = useState<string | null>(null)
   const [addingTarget, setAddingTarget] = useState<string | null>(null)
   const [newTarget, setNewTarget] = useState({ location_id: '', target_count: 0, deadline: '' })
+  const [waveEditing, setWaveEditing] = useState<Record<string, { wave_number: string; wave_label: string; panel_key: string }>>({})
   const locMap = Object.fromEntries(locations.map(l => [l.id, l]))
 
   const addType = async () => {
@@ -206,6 +210,27 @@ function SetupPanel({ prog, locations, forms, onRefresh }: {
   }
   const delTarget = async (qId: string, tId: string) => {
     await api.delete(`/programs/${prog.id}/questionnaires/${qId}/targets/${tId}`); onRefresh()
+  }
+
+  const togglePanelStudy = async (val: boolean) => {
+    await api.patch(`/fg/programs/${prog.id}/panel-study`, { is_panel_study: val })
+    toast.success(val ? 'Panel study enabled' : 'Panel study disabled')
+    onRefresh()
+  }
+  const saveWave = async (qId: string) => {
+    const e = waveEditing[qId]; if (!e) return
+    await api.put(`/fg/programs/${prog.id}/waves`, {
+      questionnaire_id: qId,
+      wave_number: parseInt(e.wave_number) || 1,
+      wave_label: e.wave_label,
+      panel_key: e.panel_key || null,
+    })
+    setWaveEditing(p => { const n = { ...p }; delete n[qId]; return n })
+    toast.success('Wave saved'); onRefresh()
+  }
+  const clearWave = async (qId: string) => {
+    await api.delete(`/fg/programs/${prog.id}/waves/${qId}`)
+    toast.success('Wave cleared'); onRefresh()
   }
 
   return (
@@ -338,6 +363,67 @@ function SetupPanel({ prog, locations, forms, onRefresh }: {
           {prog.questionnaires.length === 0 && <p className="text-sm text-catalan-textMuted">No questionnaires yet</p>}
         </div>
       </div>
+
+      {/* Panel Study */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-semibold text-xs text-catalan-textMuted uppercase tracking-wide">Panel Study</h3>
+            <p className="text-xs text-catalan-textMuted mt-0.5">Track the same respondents across waves (baseline → midline → endline)</p>
+          </div>
+          <button onClick={() => togglePanelStudy(!prog.is_panel_study)}
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${prog.is_panel_study ? 'bg-catalan-primary' : 'bg-catalan-border'}`}>
+            <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${prog.is_panel_study ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+        {prog.is_panel_study && (
+          <div className="space-y-2">
+            <p className="text-xs text-catalan-textMuted mb-2">
+              Assign a wave number and label to each questionnaire. <strong>Panel Key</strong> is the form field ID that holds the respondent identifier (household ID, ASER child ID, etc.).
+            </p>
+            {prog.questionnaires.map(q => {
+              const e = waveEditing[q.id]
+              return (
+                <div key={q.id} className="flex flex-col sm:flex-row sm:items-center gap-3 border border-catalan-border rounded-xl p-3 bg-catalan-bg">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-catalan-text">{q.name}</div>
+                    {!e && q.wave_number != null && (
+                      <div className="text-xs text-catalan-textMuted mt-0.5">
+                        Wave {q.wave_number} — {q.wave_label || '(no label)'}
+                        {q.panel_key && <span className="ml-2">· Panel key: <code className="bg-catalan-hover px-1 rounded">{q.panel_key}</code></span>}
+                      </div>
+                    )}
+                    {!e && q.wave_number == null && (
+                      <div className="text-xs text-catalan-textMuted italic mt-0.5">Not assigned to a wave</div>
+                    )}
+                  </div>
+                  {e ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input type="number" className={`${inputSmCls} w-16 text-center`} placeholder="Wave #"
+                        value={e.wave_number} onChange={ev => setWaveEditing(p => ({ ...p, [q.id]: { ...p[q.id], wave_number: ev.target.value } }))} />
+                      <input className={`${inputSmCls} w-28`} placeholder="Label (e.g. Baseline)"
+                        value={e.wave_label} onChange={ev => setWaveEditing(p => ({ ...p, [q.id]: { ...p[q.id], wave_label: ev.target.value } }))} />
+                      <input className={`${inputSmCls} w-32`} placeholder="Panel key field ID"
+                        value={e.panel_key} onChange={ev => setWaveEditing(p => ({ ...p, [q.id]: { ...p[q.id], panel_key: ev.target.value } }))} />
+                      <button onClick={() => saveWave(q.id)} className={btnPrimary}>Save</button>
+                      <button onClick={() => setWaveEditing(p => { const n = { ...p }; delete n[q.id]; return n })} className={btnSecondary}>Cancel</button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 shrink-0">
+                      <button onClick={() => setWaveEditing(p => ({ ...p, [q.id]: { wave_number: q.wave_number?.toString() ?? '', wave_label: q.wave_label ?? '', panel_key: q.panel_key ?? '' } }))}
+                        className={btnSecondary}>Assign Wave</button>
+                      {q.wave_number != null && (
+                        <button onClick={() => clearWave(q.id)} className="px-3 py-1.5 text-sm border border-red-300/50 text-red-400 rounded-lg hover:bg-red-500/10 transition-colors">Clear</button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {prog.questionnaires.length === 0 && <p className="text-xs text-catalan-textMuted">Add questionnaires above to assign waves.</p>}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -464,12 +550,8 @@ export default function ProgramsPage() {
     p.name.toLowerCase().includes(schemeFilter.toLowerCase())
   )
 
-  const ptypes = [...new Map((progress?.rows ?? []).filter(r => (r as any).participant_type_id)
-    .map(r => [(r as any).participant_type_id, r.participant_type_name])).entries()]
-    .map(([id, name]) => ({ id, name }))
-  const questionnaires = [...new Map((progress?.rows ?? []).filter(r => (r as any).questionnaire_id)
-    .map(r => [(r as any).questionnaire_id, r.questionnaire_name])).entries()]
-    .map(([id, name]) => ({ id, name }))
+  const ptypes = detail?.participant_types ?? []
+  const questionnaires = detail?.questionnaires ?? []
 
   const toggleSort = (k: typeof sortKey) => { if (sortKey === k) setSortAsc(p => !p); else { setSortKey(k); setSortAsc(true) } }
 

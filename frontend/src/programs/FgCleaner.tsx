@@ -104,7 +104,7 @@ export default function FgCleaner() {
           }
         />
         <main className="flex-1 overflow-auto">
-          <div className="max-w-6xl mx-auto p-6 space-y-5">
+          <div className="w-full p-6 space-y-5">
 
             {!programId && (
               <div className="flex flex-col items-center justify-center h-64 text-catalan-textMuted">

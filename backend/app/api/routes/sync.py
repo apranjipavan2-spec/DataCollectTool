@@ -242,6 +242,16 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
         data_for_storage = dict(item.data_json)
         roster_id = data_for_storage.pop("_roster_id", None)
 
+        # Auto-inject location hierarchy from the linked ProgramLocation (zero burden on enumerator)
+        if item.location_id:
+            from app.models.program import ProgramLocation
+            _loc = db.query(ProgramLocation).filter(ProgramLocation.id == item.location_id).first()
+            if _loc:
+                data_for_storage["_location_state"]    = _loc.state or ""
+                data_for_storage["_location_district"] = _loc.district or ""
+                data_for_storage["_location_block"]    = _loc.block or ""
+                data_for_storage["_location_village"]  = _loc.village or ""
+
         sub = Submission(
             tenant_id=user["tenant_id"],
             form_id=item.form_id,

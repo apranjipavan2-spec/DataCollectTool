@@ -220,6 +220,9 @@ def get_program(prog_id: str, user=Depends(require_enumerator), db: Session = De
             "total_target": q2.total_target, "status": q2.status,
             "start_date": q2.start_date.isoformat() if q2.start_date else None,
             "end_date": q2.end_date.isoformat() if q2.end_date else None,
+            "wave_number": q2.wave_number,
+            "wave_label": q2.wave_label,
+            "panel_key": q2.panel_key,
             "location_targets": [
                 {"id": str(t.id), "location_id": str(t.location_id),
                  "target_count": t.target_count,
@@ -233,6 +236,7 @@ def get_program(prog_id: str, user=Depends(require_enumerator), db: Session = De
         "description": p.description, "status": p.status,
         "start_date": p.start_date.isoformat() if p.start_date else None,
         "end_date": p.end_date.isoformat() if p.end_date else None,
+        "is_panel_study": p.is_panel_study or False,
         "participant_types": [
             {"id": str(t.id), "name": t.name, "description": t.description, "sort_order": t.sort_order}
             for t in types

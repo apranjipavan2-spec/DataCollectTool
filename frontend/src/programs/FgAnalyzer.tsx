@@ -858,131 +858,43 @@ function TabulatorTab({ programId, cols, sampleRows }: { programId: string; cols
   )
 }
 
-// ── Panel Study tab ───────────────────────────────────────────────────────────
+// ── Panel Study tab (attrition report only — configure waves in Programs → Setup) ──
 
 function PanelStudyTab({ programId }: { programId: string }) {
-  const toast = useToast()
-  const [waves, setWaves] = useState<Wave[]>([])
   const [attrition, setAttrition] = useState<AttritionData | null>(null)
-  const [isPanelStudy, setIsPanelStudy] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [editing, setEditing] = useState<Record<string, { wave_number: string; wave_label: string; panel_key: string }>>({})
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [wRes, aRes] = await Promise.all([
-        api.get(`/fg/programs/${programId}/waves`),
-        api.get(`/fg/programs/${programId}/attrition`),
-      ])
-      setWaves(Array.isArray(wRes.data) ? wRes.data : [])
-      setAttrition(aRes.data)
-      setIsPanelStudy(aRes.data.is_panel_study ?? false)
-    } finally {
-      setLoading(false)
-    }
+  useEffect(() => {
+    api.get(`/fg/programs/${programId}/attrition`)
+      .then(r => setAttrition(r.data))
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [programId])
-
-  useEffect(() => { load() }, [load])
-
-  const togglePanel = async (val: boolean) => {
-    await api.patch(`/fg/programs/${programId}/panel-study`, { is_panel_study: val })
-    setIsPanelStudy(val)
-    toast.success(val ? 'Panel study enabled' : 'Disabled')
-    await load()
-  }
-
-  const startEdit = (w: Wave) => setEditing(p => ({
-    ...p, [w.questionnaire_id]: { wave_number: w.wave_number?.toString() ?? '', wave_label: w.wave_label ?? '', panel_key: w.panel_key ?? '' }
-  }))
-
-  const saveWave = async (qId: string) => {
-    const e = editing[qId]; if (!e) return
-    await api.put(`/fg/programs/${programId}/waves`, {
-      questionnaire_id: qId,
-      wave_number: parseInt(e.wave_number) || 1,
-      wave_label: e.wave_label,
-      panel_key: e.panel_key || null,
-    })
-    setEditing(p => { const n = { ...p }; delete n[qId]; return n })
-    toast.success('Wave saved'); await load()
-  }
-
-  const clearWave = async (qId: string) => {
-    await api.delete(`/fg/programs/${programId}/waves/${qId}`)
-    toast.success('Wave cleared'); await load()
-  }
 
   if (loading) return <div className="py-8 text-center text-catalan-textMuted text-sm">Loading…</div>
 
+  if (!attrition?.is_panel_study) {
+    return (
+      <div className={`${card} text-center py-10`}>
+        <div className="text-3xl mb-2">🔗</div>
+        <div className="text-sm font-medium text-catalan-text mb-1">Panel Study not enabled</div>
+        <div className="text-xs text-catalan-textMuted">Enable panel mode and assign waves in <strong>Programs → Setup</strong>.</div>
+      </div>
+    )
+  }
+
+  if ((attrition.waves?.length ?? 0) < 2) {
+    return (
+      <div className={`${card} text-center py-10`}>
+        <div className="text-3xl mb-2">📊</div>
+        <div className="text-sm font-medium text-catalan-text mb-1">Not enough waves yet</div>
+        <div className="text-xs text-catalan-textMuted">Assign at least 2 waves with data in <strong>Programs → Setup</strong> to see the attrition report.</div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5">
-      {/* Toggle */}
-      <div className={`${card} flex items-center justify-between`}>
-        <div>
-          <div className="text-sm font-semibold text-catalan-text">Panel Study Mode</div>
-          <div className="text-xs text-catalan-textMuted mt-0.5">
-            Track the same respondents across multiple waves (baseline → midline → endline). Submissions are linked by household ID.
-          </div>
-        </div>
-        <button onClick={() => togglePanel(!isPanelStudy)}
-          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${isPanelStudy ? 'bg-catalan-primary' : 'bg-catalan-border'}`}>
-          <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${isPanelStudy ? 'translate-x-6' : 'translate-x-1'}`} />
-        </button>
-      </div>
-
-      {/* Wave assignment */}
-      <div className={card}>
-        <div className={sh}>Questionnaire → Wave Assignment</div>
-        <p className="text-xs text-catalan-textMuted mb-3">
-          Assign a wave number and label to each questionnaire. The <strong>Panel Key</strong> is the field ID in the form that holds the household/respondent identifier — used to auto-link submissions across waves.
-        </p>
-        {waves.length === 0 ? (
-          <p className="text-sm text-catalan-textMuted">No questionnaires found for this program.</p>
-        ) : (
-          <div className="space-y-2">
-            {waves.map(w => {
-              const e = editing[w.questionnaire_id]
-              return (
-                <div key={w.questionnaire_id} className="flex flex-col sm:flex-row sm:items-center gap-3 border border-catalan-border rounded-lg p-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-catalan-text truncate">{w.name}</div>
-                    {!e && w.wave_number != null && (
-                      <div className="text-xs text-catalan-textMuted">
-                        Wave {w.wave_number} — {w.wave_label || '(no label)'}
-                        {w.panel_key && <span className="ml-2">· Panel key: <code className="bg-catalan-hover px-1 rounded">{w.panel_key}</code></span>}
-                      </div>
-                    )}
-                    {!e && w.wave_number == null && (
-                      <div className="text-xs text-catalan-textMuted italic">Not assigned to a wave</div>
-                    )}
-                  </div>
-                  {e ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <input type="number" className={`${inp} w-16 text-center`} placeholder="Wave#" value={e.wave_number}
-                        onChange={ev => setEditing(p => ({ ...p, [w.questionnaire_id]: { ...p[w.questionnaire_id], wave_number: ev.target.value } }))} />
-                      <input className={`${inp} w-24`} placeholder="Label e.g. Baseline" value={e.wave_label}
-                        onChange={ev => setEditing(p => ({ ...p, [w.questionnaire_id]: { ...p[w.questionnaire_id], wave_label: ev.target.value } }))} />
-                      <input className={`${inp} w-32`} placeholder="Panel key field ID" value={e.panel_key}
-                        onChange={ev => setEditing(p => ({ ...p, [w.questionnaire_id]: { ...p[w.questionnaire_id], panel_key: ev.target.value } }))} />
-                      <button onClick={() => saveWave(w.questionnaire_id)} className={btnPr}>Save</button>
-                      <button onClick={() => setEditing(p => { const n = { ...p }; delete n[w.questionnaire_id]; return n })} className={btnSe}>Cancel</button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2 shrink-0">
-                      <button onClick={() => startEdit(w)} className={btnSe}>Edit Wave</button>
-                      {w.wave_number != null && (
-                        <button onClick={() => clearWave(w.questionnaire_id)} className="px-3 py-1.5 text-sm border border-catalan-error/30 text-catalan-error rounded-lg hover:bg-catalan-error/10 transition-colors">Clear</button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
       {/* Attrition report */}
       {attrition?.is_panel_study && (attrition.waves?.length ?? 0) >= 2 && (
         <div className={card}>
@@ -1053,11 +965,6 @@ function PanelStudyTab({ programId }: { programId: string }) {
         </div>
       )}
 
-      {attrition?.is_panel_study && (attrition.waves?.length ?? 0) < 2 && (
-        <div className="py-6 text-center text-catalan-textMuted text-sm">
-          Attrition report requires at least 2 waves with data. Assign waves to questionnaires above.
-        </div>
-      )}
     </div>
   )
 }
@@ -1318,7 +1225,7 @@ export default function FgAnalyzer() {
           }
         />
         <main className="flex-1 overflow-auto">
-          <div className="max-w-5xl mx-auto p-6">
+          <div className="w-full p-6">
             {!programId && (
               <div className="flex flex-col items-center justify-center h-64 text-catalan-textMuted">
                 <div className="text-5xl mb-4">🔬</div>
