@@ -1,9 +1,9 @@
 """
-Backup all Railway tables to JSON files.
+Backup all database tables to JSON files.
 Usage:
-    DATABASE_URL="postgresql://..." python scripts/backup_railway.py
+    DATABASE_URL="postgresql://..." python scripts/backup_db.py
     # or if .env exists:
-    python scripts/backup_railway.py
+    python scripts/backup_db.py
 
 Output: backups/backup_YYYYMMDD_HHMMSS/  (one .json per table)
 """

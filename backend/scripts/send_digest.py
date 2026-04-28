@@ -4,7 +4,7 @@ Run this from the backend/ directory:
 
     python -m scripts.send_digest
 
-Schedule it as a cron job (Linux/Railway):
+Schedule it as a cron job (Linux):
     0 7 * * *  cd /app && python -m scripts.send_digest
 
 Or add to Procfile:

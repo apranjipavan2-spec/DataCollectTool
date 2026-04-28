@@ -14,10 +14,7 @@ def normalize_db_url(url: str) -> str:
 
 
 def _resolve_database_url() -> str:
-    """Get DATABASE_URL from env, falling back to DATABASE_PUBLIC_URL if empty."""
     url = os.environ.get("DATABASE_URL", "")
-    if not url:
-        url = os.environ.get("DATABASE_PUBLIC_URL", "")
     if not url:
         url = "postgresql://fieldgovern:password@localhost:5432/fieldgovern"
     return url

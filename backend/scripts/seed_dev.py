@@ -308,7 +308,7 @@ print("Schema patches done.")
 # ── Fast-path: skip seed data on warm restarts ────────────────────────────────
 # On every container restart (not just first deploy) the seed runs. If the DB
 # already has the Demo Org tenant the data is already in place — exit early so
-# uvicorn can start within Railway's 2-minute healthcheck window.
+# uvicorn can start quickly.
 _fast_check_db = SessionLocal()
 try:
     _already_seeded = _fast_check_db.query(Tenant).filter(Tenant.name == 'Demo Org').first()
