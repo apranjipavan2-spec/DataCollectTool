@@ -96,11 +96,24 @@ def update_ai_config(body: dict, user: dict = Depends(require_master), db: Sessi
 # ── AI Features ───────────────────────────────────────────────────────────
 
 @router.post("/report/{form_id}")
-async def generate_report(form_id: str, user: dict = Depends(require_supervisor), db: Session = Depends(get_db)):
+async def generate_report(
+    form_id: str,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Start async AI report generation. Returns {job_id}. Poll GET /fg/ai-jobs/{job_id}."""
+    from app.models.user_tool_project import UserToolProject
+    from sqlalchemy.orm.attributes import flag_modified
+
     cfg = _get_global_ai_cfg(db)
+    if not cfg.get("api_key"):
+        raise HTTPException(400, "AI not configured. Contact your platform administrator.")
+
     form = db.query(Form).filter(Form.id == form_id, Form.tenant_id == user["tenant_id"]).first()
     if not form:
         raise HTTPException(404, "Form not found")
+
     subs = db.query(Submission).filter(
         Submission.form_id == form_id, Submission.tenant_id == user["tenant_id"]
     ).limit(50).all()
@@ -110,13 +123,40 @@ async def generate_report(form_id: str, user: dict = Depends(require_supervisor)
         for f in section.get("fields", [])
     ]
     sub_data = [s.data_json for s in subs if s.data_json]
-    try:
-        report_md = await ai_service.generate_report(cfg, form.title or "Survey", field_labels, sub_data)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    except Exception as e:
-        raise HTTPException(503, f"AI provider error: {e}")
-    return {"report_md": report_md}
+    form_title = form.title or "Survey"
+
+    # Create job record
+    import uuid as _uuid_mod
+    job = UserToolProject(
+        tenant_id=user["tenant_id"], user_id=user["sub"],
+        tool="ai_job", name=f"Report: {form_title}",
+        data={"status": "pending", "steps": [], "result": None, "error": None},
+    )
+    db.add(job); db.commit(); db.refresh(job)
+    job_id = str(job.id)
+
+    def _upd(sess, status, step=None, result=None, error=None):
+        rec = sess.query(UserToolProject).filter(UserToolProject.id == job_id).first()
+        if not rec: return
+        d = dict(rec.data or {})
+        d["status"] = status
+        if step: d.setdefault("steps", []).append(step)
+        if result is not None: d["result"] = result
+        if error  is not None: d["error"]  = error
+        rec.data = d; flag_modified(rec, "data"); sess.commit()
+
+    async def _run():
+        from app.core.database import SessionLocal
+        with SessionLocal() as sess:
+            _upd(sess, "running", f"Loaded {len(sub_data)} submissions — calling AI model…")
+            try:
+                report_md = await ai_service.generate_report(cfg, form_title, field_labels, sub_data)
+                _upd(sess, "done", "Report complete!", result=report_md)
+            except Exception as e:
+                _upd(sess, "failed", error=str(e))
+
+    background_tasks.add_task(_run)
+    return {"job_id": job_id}
 
 
 @router.post("/suggest-skip-logic")

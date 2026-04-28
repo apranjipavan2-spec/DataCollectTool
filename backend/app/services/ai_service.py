@@ -10,7 +10,7 @@ async def _call_llm(cfg: dict, prompt: str) -> str:
     if not provider or not key:
         raise ValueError("AI not configured. Contact your platform administrator.")
 
-    LLM_TIMEOUT = 60  # seconds — prevents a slow provider from stalling a uvicorn worker
+    LLM_TIMEOUT = 300  # seconds — extended for large reports; runs in background tasks so no worker stall
 
     if provider == 'openai':
         from openai import AsyncOpenAI

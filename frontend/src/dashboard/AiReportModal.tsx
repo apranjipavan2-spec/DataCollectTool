@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import api from '@/lib/api'
+import { useAiJob } from '@/lib/useAiJob'
+import AiProgressBar from '@/components/AiProgressBar'
 
 interface Props {
   formId: string
@@ -8,23 +10,15 @@ interface Props {
 }
 
 export default function AiReportModal({ formId, formTitle, onClose }: Props) {
-  const [loading, setLoading] = useState(true)
-  const [report, setReport] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const aiJob = useAiJob({ storageKey: `ai_report_${formId}` })
 
   useEffect(() => {
-    api.post(`/ai/report/${formId}`)
-      .then(({ data }) => setReport(data.report_md))
-      .catch((err) => {
-        const status = err.response?.status
-        if (status === 400) {
-          setError('Configure AI in Org Settings → AI tab first')
-        } else {
-          setError(err.response?.data?.detail || 'Failed to generate report')
-        }
-      })
-      .finally(() => setLoading(false))
-  }, [formId])
+    if (!aiJob.job) {
+      aiJob.startJob(() => api.post(`/ai/report/${formId}`)).catch(() => {})
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const report = aiJob.job?.result ?? null
 
   const handleDownload = () => {
     if (!report) return
@@ -42,32 +36,14 @@ export default function AiReportModal({ formId, formTitle, onClose }: Props) {
       <div className="bg-catalan-surface rounded-xl shadow-xl w-full max-w-2xl mx-4 flex flex-col max-h-[80vh]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-catalan-border">
           <div>
-            <h2 className="text-base font-semibold text-catalan-text">🤖 AI Report</h2>
+            <h2 className="text-base font-semibold text-catalan-text">AI Report</h2>
             <p className="text-xs text-catalan-textMuted">{formTitle}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-catalan-textMuted hover:text-catalan-text transition-colors text-lg leading-none"
-          >
-            ✕
-          </button>
+          <button onClick={onClose} className="text-catalan-textMuted hover:text-catalan-text transition-colors text-lg leading-none">✕</button>
         </div>
 
-        <div className="flex-1 overflow-auto px-6 py-4">
-          {loading && (
-            <div className="flex items-center gap-3 text-catalan-textMuted text-sm">
-              <svg className="animate-spin h-5 w-5 text-catalan-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-              Generating report…
-            </div>
-          )}
-          {error && (
-            <div className="text-sm text-catalan-error bg-catalan-error/10 rounded-lg p-4">
-              {error}
-            </div>
-          )}
+        <div className="flex-1 overflow-auto px-6 py-4 space-y-4">
+          <AiProgressBar job={aiJob.job} label="Report" onReset={aiJob.reset} />
           {report && (
             <pre className="font-mono text-sm text-catalan-text whitespace-pre-wrap overflow-auto max-h-96 leading-relaxed">
               {report}
@@ -77,11 +53,8 @@ export default function AiReportModal({ formId, formTitle, onClose }: Props) {
 
         {report && (
           <div className="px-6 py-4 border-t border-catalan-border flex justify-end">
-            <button
-              onClick={handleDownload}
-              className="px-4 py-2 text-sm font-medium bg-catalan-primary text-white rounded-lg hover:opacity-90 transition-opacity"
-            >
-              📥 Download .txt
+            <button onClick={handleDownload} className="px-4 py-2 text-sm font-medium bg-catalan-primary text-white rounded-lg hover:opacity-90 transition-opacity">
+              Download .txt
             </button>
           </div>
         )}

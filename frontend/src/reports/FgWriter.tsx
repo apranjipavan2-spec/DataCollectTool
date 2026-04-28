@@ -4,6 +4,8 @@ import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
+import { useAiJob } from '@/lib/useAiJob'
+import AiProgressBar from '@/components/AiProgressBar'
 import {
   loadTabulations, loadTabulationsCache, loadReports, saveReport, deleteReport,
   getLastProgram, setLastProgram,
@@ -181,10 +183,10 @@ export default function FgWriter() {
   const [dateRange, setDateRange]       = useState('')
   const [customContext, setCustomContext] = useState('')
   const [reportMd, setReportMd]         = useState('')
-  const [generating, setGenerating]     = useState(false)
-  const [error, setError]               = useState('')
   const [copied, setCopied]             = useState(false)
   const [previewMode, setPreviewMode]   = useState(false)
+
+  const writerJob = useAiJob({ storageKey: `ai_writer_${programId || 'none'}` })
 
   const applyTabulations = (tabs: SavedTabulation[]) => {
     setTabulations(tabs)
@@ -201,9 +203,17 @@ export default function FgWriter() {
 
   useEffect(() => { reload() }, [reload])
 
+  // Capture result when job completes
+  useEffect(() => {
+    if (writerJob.job?.status === 'done' && writerJob.job.result) {
+      setReportMd(writerJob.job.result)
+    }
+  }, [writerJob.job?.status, writerJob.job?.result])
+
   const onProgramChange = (id: string, p: Program | null) => {
     setProgramId(id); setProg(p)
-    setReportMd(''); setError('')
+    setReportMd('')
+    writerJob.reset()
     if (id) {
       const cached = loadTabulationsCache(id)
       applyTabulations(cached)
@@ -230,26 +240,19 @@ export default function FgWriter() {
     if (tabulations.length > 0 && activeTabs.length === 0) {
       toast.error('Select at least one table to narrate'); return
     }
-    setGenerating(true); setError('')
+    const tabulationData = activeTabs.length
+      ? activeTabs.map(t =>
+          `### ${t.title}\n${t.description}\n\n` +
+          t.rows.slice(0, 30).map(r => `${r.group}: ${r.value}`).join('\n')
+        ).join('\n\n---\n\n')
+      : ''
+    setReportMd('')
     try {
-      const tabulationData = activeTabs.length
-        ? activeTabs.map(t =>
-            `### ${t.title}\n${t.description}\n\n` +
-            t.rows.slice(0, 30).map(r => `${r.group}: ${r.value}`).join('\n')
-          ).join('\n\n---\n\n')
-        : ''
-
-      const res = await api.post(`/fg/programs/${programId}/writer/generate`, {
-        style,
-        date_range: dateRange,
-        custom_context: customContext,
-        tabulation_data: tabulationData,
-      })
-      setReportMd(res.data.report_md || '')
+      await writerJob.startJob(() => api.post(`/fg/programs/${programId}/writer/generate`, {
+        style, date_range: dateRange, custom_context: customContext, tabulation_data: tabulationData,
+      }))
     } catch (e: any) {
-      setError(e.response?.data?.detail || 'Report generation failed — check AI config')
-    } finally {
-      setGenerating(false)
+      toast.error(e.response?.data?.detail || 'Failed to start report generation')
     }
   }
 
@@ -412,17 +415,19 @@ export default function FgWriter() {
                   </div>
                 </div>
 
-                <button onClick={generate} disabled={generating} className={`${btnPr} w-full py-3 text-base`}>
-                  {generating
-                    ? '✨ Generating report…'
-                    : selectedTabIds.size > 0
+                {!writerJob.isRunning && writerJob.job?.status !== 'done' && (
+                  <button onClick={generate} disabled={writerJob.isRunning} className={`${btnPr} w-full py-3 text-base`}>
+                    {selectedTabIds.size > 0
                       ? `✨ Narrate ${selectedTabIds.size} Table${selectedTabIds.size > 1 ? 's' : ''}`
                       : '✨ Generate AI Report'}
-                </button>
-
-                {error && (
-                  <div className="p-4 rounded-xl bg-catalan-error/10 border border-catalan-error/30 text-catalan-error text-sm">{error}</div>
+                  </button>
                 )}
+
+                <AiProgressBar
+                  job={writerJob.job}
+                  label="Report generation"
+                  onReset={() => { writerJob.reset(); setReportMd('') }}
+                />
 
                 {/* Report output */}
                 {reportMd && (

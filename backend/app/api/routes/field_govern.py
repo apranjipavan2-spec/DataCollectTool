@@ -1443,12 +1443,59 @@ def get_cleaner_data(
     }
 
 
+# ── AI Job store (uses UserToolProject with tool='ai_job') ──────────────────
+
+from app.models.user_tool_project import UserToolProject
+
+def _create_ai_job(db: Session, tenant_id: str, user_id: str, name: str, program_id: str | None = None) -> str:
+    job = UserToolProject(
+        tenant_id=_uuid.UUID(tenant_id),
+        user_id=_uuid.UUID(user_id),
+        tool="ai_job",
+        name=name,
+        program_id=_uuid.UUID(program_id) if program_id else None,
+        data={"status": "pending", "steps": [], "result": None, "error": None},
+    )
+    db.add(job); db.commit(); db.refresh(job)
+    return str(job.id)
+
+
+def _update_ai_job(db: Session, job_id: str, status: str, step: str | None = None, result: str | None = None, error: str | None = None):
+    from sqlalchemy.orm.attributes import flag_modified
+    job = db.query(UserToolProject).filter(UserToolProject.id == job_id, UserToolProject.tool == "ai_job").first()
+    if not job: return
+    data = dict(job.data or {})
+    data["status"] = status
+    if step:
+        data.setdefault("steps", []).append(step)
+    if result is not None:
+        data["result"] = result
+    if error is not None:
+        data["error"] = error
+    job.data = data
+    flag_modified(job, "data")
+    db.commit()
+
+
+@router.get("/ai-jobs/{job_id}")
+def get_ai_job(job_id: str, user: dict = Depends(require_supervisor), db: Session = Depends(get_db)):
+    job = db.query(UserToolProject).filter(
+        UserToolProject.id == job_id,
+        UserToolProject.tenant_id == user["tenant_id"],
+        UserToolProject.tool == "ai_job",
+    ).first()
+    if not job:
+        raise HTTPException(404, "Job not found")
+    return job.data
+
+
 # ── FG Writer: AI report from program data ───────────────────────────────────
 
 @router.post("/programs/{program_id}/writer/generate")
 async def generate_program_report(
     program_id: str,
     body: WriterRequest,
+    background_tasks: BackgroundTasks,
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
@@ -1460,7 +1507,10 @@ async def generate_program_report(
     if not prog:
         raise HTTPException(404, "Program not found")
 
-    # Aggregate stats — no row fetching
+    if not _get_global_ai_cfg(db).get("api_key"):
+        raise HTTPException(400, "AI not configured. Contact your platform administrator.")
+
+    # Gather all DB data synchronously before returning job_id
     agg = db.query(
         func.count().label("total"),
         func.sum(sa_case((Submission.status == "approved", 1), else_=0)).label("approved"),
@@ -1478,51 +1528,46 @@ async def generate_program_report(
     violations         = agg.violations or 0
     backcheck_required = agg.backcheck_required or 0
     quality_score      = round((1 - violations / max(total, 1)) * 100, 1)
-
     dup_count = db.query(func.count()).filter(
         Submission.program_id == _uuid.UUID(program_id),
         Submission.tenant_id == user["tenant_id"],
         Submission.data_json["_duplicate_suspect"].astext == "true",
     ).scalar() or 0
-
     waves = db.query(ProgramQuestionnaire).filter(
         ProgramQuestionnaire.program_id == program_id,
         ProgramQuestionnaire.tenant_id == user["tenant_id"],
         ProgramQuestionnaire.wave_number.isnot(None),
     ).order_by(ProgramQuestionnaire.wave_number).all()
-
-    wave_list = [
-        {"wave_number": w.wave_number, "wave_label": w.wave_label or f"Wave {w.wave_number}"}
-        for w in waves
-    ]
-
+    wave_list = [{"wave_number": w.wave_number, "wave_label": w.wave_label or f"Wave {w.wave_number}"} for w in waves]
     start_d = prog.start_date.isoformat() if prog.start_date else "—"
-    end_d = prog.end_date.isoformat() if prog.end_date else "—"
+    end_d   = prog.end_date.isoformat()   if prog.end_date   else "—"
     date_range = body.date_range or f"{start_d} to {end_d}"
+    ai_cfg  = _get_global_ai_cfg(db)
+    prog_name = prog.name
 
-    try:
-        report_md = await ai_service.generate_program_report(
-            cfg=_get_global_ai_cfg(db),
-            program_name=prog.name,
-            scheme=prog.scheme_name or "",
-            date_range=date_range,
-            sample_size=total,
-            approved=approved,
-            flagged=flagged,
-            violations=violations,
-            backcheck_required=backcheck_required,
-            duplicate_suspects=dup_count,
-            quality_score=quality_score,
-            waves=wave_list,
-            tabulations=body.tabulation_data,
-            style=body.style,
-            custom_context=body.custom_context,
-        )
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    except Exception as e:
-        raise HTTPException(503, f"AI error: {e}")
-    return {"report_md": report_md}
+    job_id = _create_ai_job(db, str(user["tenant_id"]), str(user["sub"]), f"Writer: {prog_name}", program_id)
+
+    async def _run():
+        from app.core.database import SessionLocal
+        with SessionLocal() as sess:
+            _update_ai_job(sess, job_id, "running", "Preparing report context…")
+            try:
+                _update_ai_job(sess, job_id, "running", "Calling AI model — this may take 1–3 minutes…")
+                report_md = await ai_service.generate_program_report(
+                    cfg=ai_cfg, program_name=prog_name,
+                    scheme=body.style, date_range=date_range,
+                    sample_size=total, approved=approved, flagged=flagged,
+                    violations=violations, backcheck_required=backcheck_required,
+                    duplicate_suspects=dup_count, quality_score=quality_score,
+                    waves=wave_list, tabulations=body.tabulation_data,
+                    style=body.style, custom_context=body.custom_context,
+                )
+                _update_ai_job(sess, job_id, "done", "Report complete!", result=report_md)
+            except Exception as e:
+                _update_ai_job(sess, job_id, "failed", error=str(e))
+
+    background_tasks.add_task(_run)
+    return {"job_id": job_id}
 
 
 # ── Program export (used by analyzer.fieldgovern.com and cleaner.fieldgovern.com) ──
