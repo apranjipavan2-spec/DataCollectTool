@@ -237,6 +237,7 @@ async def interpret_tabulation(
     column_labels: dict,
     focus_prompt: str,
     program_context: str,
+    previous_interpretation: str = "",
 ) -> str:
     def lbl(k: str) -> str:
         return column_labels.get(k, k)
@@ -276,6 +277,22 @@ async def interpret_tabulation(
         "any cross-variable interactions, and the practical implication for the program."
     )
 
+    refinement_block = ""
+    if previous_interpretation.strip():
+        refinement_block = (
+            f"\n--- PREVIOUS INTERPRETATION (written by an analyst earlier) ---\n"
+            f"{previous_interpretation.strip()}\n"
+            f"--- END OF PREVIOUS INTERPRETATION ---\n\n"
+            f"Your task is to produce a REFINED interpretation that:\n"
+            f"- Preserves accurate findings and good phrasing from the previous version\n"
+            f"- Corrects any errors, vague statements, or missed numbers\n"
+            f"- Adds insights the previous version overlooked\n"
+            f"- Sharpens the language and improves the overall flow\n"
+            f"- Incorporates the analyst's focus prompt below if it differs from the previous angle\n"
+            f"Output ONLY the final refined interpretation — do not include a comparison, "
+            f"commentary about the previous version, or headers. Just the improved prose.\n"
+        )
+
     prompt = (
         f"You are a senior research analyst writing an interpretation for a field survey data table.\n\n"
         f"{context_line}"
@@ -285,7 +302,8 @@ async def interpret_tabulation(
         f"Data ({len(rows)} rows total):\n"
         f"{header}\n"
         f"{'-' * max(len(header), 40)}\n"
-        f"{rows_str}\n\n"
+        f"{rows_str}\n"
+        f"{refinement_block}\n"
         f"Analyst focus: {focus_prompt.strip() if focus_prompt.strip() else default_focus}\n\n"
         f"Write a data-driven interpretation in flowing prose. Rules:\n"
         f"- Be specific — cite the actual numbers from the table\n"

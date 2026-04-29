@@ -113,6 +113,7 @@ class InterpretRequest(BaseModel):
     column_labels: dict = {}
     focus_prompt: str = ""
     extra_context: str = ""
+    previous_interpretation: str = ""
 
 
 # ── Program Wave CRUD ─────────────────────────────────────────────────────────
@@ -607,6 +608,7 @@ async def interpret_tabulation(
             aggregation=body.aggregation, show_percent=body.show_percent,
             column_labels=body.column_labels, focus_prompt=body.focus_prompt,
             program_context=prog_context,
+            previous_interpretation=body.previous_interpretation,
         )
         return {"interpretation": interpretation}
     except ValueError as e:

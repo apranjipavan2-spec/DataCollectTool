@@ -193,16 +193,11 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
   const [focusPrompt, setFocusPrompt] = useState('')
   const [interpretation, setInterpretation] = useState(tab.interpretation || '')
   const [interpChanged, setInterpChanged] = useState(false)
+  // Side-by-side compare state (set when re-generating over an existing interpretation)
+  const [pendingInterpretation, setPendingInterpretation] = useState<string | null>(null)
 
   const colLabels: Record<string, string> = { ...tab.column_labels, ...editColLabels }
   const lbl = (k: string) => colLabels[k] || k
-
-  // Column keys the user can relabel
-  const renamableKeys = [...new Set([
-    tab.groupby_field,
-    ...(tab.value_field && tab.value_field !== '*' ? [tab.value_field] : ['*']),
-    ...subKeys,
-  ])]
 
   const submitFeedback = async (vote: 'up' | 'down') => {
     const next = feedback === vote ? null : vote
@@ -250,6 +245,8 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
 
   const runInterpret = async () => {
     setInterpreting(true)
+    setPendingInterpretation(null)
+    const isRefinement = !!interpretation.trim()
     try {
       const res = await api.post(`/fg/programs/${programId}/tabulate/interpret`, {
         title: tab.title, subtitle: tab.description || '',
@@ -258,15 +255,33 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
         is_cross_tab: tab.is_cross_tab ?? false, sub_keys: subKeys,
         show_percent: tab.show_percent ?? false,
         column_labels: colLabels, focus_prompt: focusPrompt,
+        previous_interpretation: isRefinement ? interpretation : '',
       })
       const text = res.data.interpretation || ''
-      setInterpretation(text)
-      setInterpChanged(false)
-      onUpdate({ ...tab, interpretation: text })
+      if (isRefinement) {
+        // Show compare view — don't overwrite yet
+        setPendingInterpretation(text)
+      } else {
+        // First-time generate — apply directly
+        setInterpretation(text)
+        setInterpChanged(false)
+        onUpdate({ ...tab, interpretation: text })
+      }
     } catch (e: any) {
       toast.error(e.response?.data?.detail || 'Interpretation failed')
     } finally { setInterpreting(false) }
   }
+
+  const applyPending = () => {
+    if (!pendingInterpretation) return
+    setInterpretation(pendingInterpretation)
+    setPendingInterpretation(null)
+    setInterpChanged(false)
+    onUpdate({ ...tab, interpretation: pendingInterpretation })
+    toast.success('Refined interpretation applied')
+  }
+
+  const discardPending = () => setPendingInterpretation(null)
 
   const saveInterpretation = () => {
     onUpdate({ ...tab, interpretation })
@@ -408,12 +423,48 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
           </div>
 
           <button onClick={runInterpret} disabled={interpreting} className={btnPr}>
-            {interpreting ? '✨ Generating…' : interpretation ? '✨ Re-generate' : '✨ Generate Interpretation'}
+            {interpreting ? '✨ Generating…' : interpretation ? '✨ Refine & Compare' : '✨ Generate Interpretation'}
           </button>
 
-          {interpretation && (
+          {/* Side-by-side compare when re-generating */}
+          {pendingInterpretation && (
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center gap-2">
+                <div className="h-px flex-1 bg-catalan-border" />
+                <span className="text-xs font-semibold text-catalan-textMuted uppercase tracking-wider">Review Refinement</span>
+                <div className="h-px flex-1 bg-catalan-border" />
+              </div>
+              <p className="text-xs text-catalan-textMuted">The AI read your previous interpretation and produced a refined version. Review both and apply the one you prefer — or edit the refined version before applying.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold text-catalan-textMuted uppercase tracking-wider">Previous</div>
+                  <div className="border border-catalan-border rounded-lg p-3 bg-catalan-bg text-sm text-catalan-textMuted leading-relaxed overflow-y-auto max-h-64"
+                    style={{ fontFamily: 'Georgia, serif' }}>
+                    {interpretation}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold text-catalan-primary uppercase tracking-wider">Refined</div>
+                  <textarea
+                    className={`${inp} w-full resize-y text-sm leading-relaxed max-h-64`}
+                    style={{ fontFamily: 'Georgia, serif' }}
+                    rows={8}
+                    value={pendingInterpretation}
+                    onChange={e => setPendingInterpretation(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={applyPending} className={btnPr}>Apply Refined Version</button>
+                <button onClick={discardPending} className={btnSe}>Keep Previous</button>
+              </div>
+            </div>
+          )}
+
+          {/* Editable current interpretation (when no pending compare) */}
+          {!pendingInterpretation && interpretation && (
             <div className="space-y-2 pt-1">
-              <div className="text-xs text-catalan-textMuted">Edit interpretation below — changes are saved when you click Save</div>
+              <div className="text-xs text-catalan-textMuted">Edit below — saved when you click Save</div>
               <textarea
                 className={`${inp} w-full resize-y text-sm leading-relaxed`}
                 style={{ fontFamily: 'Georgia, serif' }}
@@ -422,7 +473,7 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
                 onChange={e => { setInterpretation(e.target.value); setInterpChanged(true) }}
               />
               {interpChanged && (
-                <button onClick={saveInterpretation} className={btnSe}>Save Interpretation</button>
+                <button onClick={saveInterpretation} className={btnSe}>Save</button>
               )}
             </div>
           )}
