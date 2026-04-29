@@ -62,25 +62,15 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // Vendor: core React ecosystem — loaded on every page
+          // Only split true third-party vendor libraries — never application code.
+          // Application chunks are created automatically by React.lazy() in App.tsx.
+          // Manually grouping app modules overrides Rollup's dependency tracking and
+          // produces cross-chunk circular references (TDZ "cannot access before init").
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
             return 'vendor-react'
           }
-          // Charts — only loaded when analytics/dashboard open
           if (id.includes('node_modules/recharts') || id.includes('node_modules/d3')) {
             return 'vendor-charts'
-          }
-          // Form builder — heavy, only on /builder route
-          if (id.includes('/src/builder/')) {
-            return 'chunk-builder'
-          }
-          // Admin — only on /admin route
-          if (id.includes('/src/admin/')) {
-            return 'chunk-admin'
-          }
-          // Programs / FieldGovern — only on /programs route
-          if (id.includes('/src/programs/') || id.includes('/src/fg/')) {
-            return 'chunk-programs'
           }
         },
       },

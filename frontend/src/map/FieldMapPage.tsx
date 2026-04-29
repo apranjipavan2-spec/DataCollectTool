@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import api, { getStoredUser } from '@/lib/api'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
@@ -69,8 +71,8 @@ export default function FieldMapPage() {
   const [enumerators, setEnumerators] = useState<string[]>([])
   const [filterStatus, setFilterStatus] = useState('')
   const mapRef = useRef<HTMLDivElement>(null)
-  const leafletRef = useRef<any>(null)
-  const markersRef = useRef<any[]>([])
+  const leafletRef = useRef<L.Map | null>(null)
+  const markersRef = useRef<L.Marker[]>([])
 
   // Load summary on mount (fast — no rows)
   useEffect(() => {
@@ -116,39 +118,19 @@ export default function FieldMapPage() {
 
   // Init Leaflet
   useEffect(() => {
-    if (!mapRef.current) return
-    const win = window as any
-    const initMap = () => {
-      if (leafletRef.current) return
-      const L = win.L
-      if (!L) return
-      const map = L.map(mapRef.current, { center: [20.5937, 78.9629], zoom: 5 })
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors', maxZoom: 18,
-      }).addTo(map)
-      leafletRef.current = map
-    }
-    if (win.L) { initMap(); return }
-    if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link')
-      link.id = 'leaflet-css'; link.rel = 'stylesheet'
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
-      document.head.appendChild(link)
-    }
-    if (!document.getElementById('leaflet-js')) {
-      const script = document.createElement('script')
-      script.id = 'leaflet-js'
-      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-      script.onload = initMap
-      document.head.appendChild(script)
-    }
+    if (!mapRef.current || leafletRef.current) return
+    const map = L.map(mapRef.current, { center: [20.5937, 78.9629], zoom: 5 })
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors', maxZoom: 18,
+    }).addTo(map)
+    leafletRef.current = map
+    return () => { map.remove(); leafletRef.current = null }
   }, [])
 
   // Re-render pins on filter/data change
   useEffect(() => {
-    const L = (window as any).L
     const map = leafletRef.current
-    if (!L || !map) return
+    if (!map) return
 
     markersRef.current.forEach(m => m.remove())
     markersRef.current = []
