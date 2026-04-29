@@ -14,8 +14,10 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('forms',    sa.Column('allow_enumerator_edit', sa.Boolean(), nullable=True))
-    op.add_column('programs', sa.Column('allow_enumerator_edit', sa.Boolean(), nullable=True))
+    conn = op.get_bind()
+    # IF NOT EXISTS guards against columns that were applied manually on production
+    conn.execute(sa.text("ALTER TABLE forms    ADD COLUMN IF NOT EXISTS allow_enumerator_edit BOOLEAN"))
+    conn.execute(sa.text("ALTER TABLE programs ADD COLUMN IF NOT EXISTS allow_enumerator_edit BOOLEAN"))
 
 
 def downgrade():
