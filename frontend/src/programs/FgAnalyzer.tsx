@@ -170,27 +170,52 @@ interface HistoryRecord {
   cleaning_summary: { total?: number; skipped?: number; cols_high_missing?: Record<string, number> }
 }
 
-function TabulationCard({ tab, onDelete, programId }: { tab: SavedTabulation; onDelete: () => void; programId: string }) {
+function TabulationCard({ tab, onDelete, onUpdate, programId }: {
+  tab: SavedTabulation; onDelete: () => void; onUpdate: (t: SavedTabulation) => void; programId: string
+}) {
+  const toast = useToast()
   const [expanded, setExpanded] = useState(false)
-  const [showRationale, setShowRationale] = useState(false)
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(tab.feedback ?? null)
   const barData = tab.rows.slice(0, 20).map(r => ({ label: r.group, value: r.value }))
   const subKeys = tab.sub_keys ?? []
+
+  // Polish (AI rename) state
+  const [showPolish, setShowPolish] = useState(false)
+  const [polishing, setPolishing] = useState(false)
+  const [editTitle, setEditTitle] = useState(tab.title)
+  const [editSubtitle, setEditSubtitle] = useState(tab.description || '')
+  const [editColLabels, setEditColLabels] = useState<Record<string, string>>(tab.column_labels || {})
+
+  // Interpretation state
+  const [showInterpret, setShowInterpret] = useState(!!tab.interpretation)
+  const [interpreting, setInterpreting] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState('')
+  const [focusPrompt, setFocusPrompt] = useState('')
+  const [interpretation, setInterpretation] = useState(tab.interpretation || '')
+  const [interpChanged, setInterpChanged] = useState(false)
+
+  const colLabels: Record<string, string> = { ...tab.column_labels, ...editColLabels }
+  const lbl = (k: string) => colLabels[k] || k
+
+  // Column keys the user can relabel
+  const renamableKeys = [...new Set([
+    tab.groupby_field,
+    ...(tab.value_field && tab.value_field !== '*' ? [tab.value_field] : ['*']),
+    ...subKeys,
+  ])]
 
   const submitFeedback = async (vote: 'up' | 'down') => {
     const next = feedback === vote ? null : vote
     setFeedback(next)
     try {
       await api.patch(`/fg/programs/${programId}/analysis/tabulations/${tab.id}/feedback`, { vote: next })
-    } catch {
-      setFeedback(feedback)
-    }
+    } catch { setFeedback(feedback) }
   }
 
   const copyCSV = () => {
     const headers = tab.is_cross_tab
-      ? ['Group', ...subKeys, 'Total', ...(tab.show_percent ? ['%'] : [])]
-      : ['Group', 'Value', ...(tab.show_percent ? ['%'] : [])]
+      ? [lbl(tab.groupby_field), ...subKeys.map(k => lbl(k)), 'Total', ...(tab.show_percent ? ['%'] : [])]
+      : [lbl(tab.groupby_field), lbl(tab.value_field !== '*' ? tab.value_field : '*'), ...(tab.show_percent ? ['%'] : [])]
     const rowLines = tab.rows.map(r =>
       tab.is_cross_tab
         ? [`"${r.group}"`, ...subKeys.map(k => r[k] ?? 0), r.value, ...(tab.show_percent ? [r.pct ?? ''] : [])]
@@ -199,56 +224,133 @@ function TabulationCard({ tab, onDelete, programId }: { tab: SavedTabulation; on
     navigator.clipboard.writeText([headers.join(','), ...rowLines.map(l => l.join(','))].join('\n'))
   }
 
+  const runPolish = async () => {
+    setPolishing(true)
+    try {
+      const res = await api.post(`/fg/programs/${programId}/tabulate/polish`, {
+        title: tab.title, groupby_field: tab.groupby_field, value_field: tab.value_field,
+        aggregation: tab.aggregation, rows: tab.rows.slice(0, 30),
+        is_cross_tab: tab.is_cross_tab ?? false, sub_keys: subKeys,
+      })
+      if (res.data.title) setEditTitle(res.data.title)
+      if (res.data.subtitle) setEditSubtitle(res.data.subtitle)
+      if (res.data.column_labels) setEditColLabels(res.data.column_labels)
+      setShowPolish(true)
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'AI rename failed')
+    } finally { setPolishing(false) }
+  }
+
+  const applyPolish = async () => {
+    const updated: SavedTabulation = { ...tab, title: editTitle, description: editSubtitle, column_labels: editColLabels }
+    onUpdate(updated)
+    setShowPolish(false)
+    toast.success('Table updated')
+  }
+
+  const runInterpret = async () => {
+    setInterpreting(true)
+    try {
+      const res = await api.post(`/fg/programs/${programId}/tabulate/interpret`, {
+        title: tab.title, subtitle: tab.description || '',
+        groupby_field: tab.groupby_field, value_field: tab.value_field,
+        aggregation: tab.aggregation, rows: tab.rows,
+        is_cross_tab: tab.is_cross_tab ?? false, sub_keys: subKeys,
+        show_percent: tab.show_percent ?? false,
+        column_labels: colLabels, focus_prompt: focusPrompt,
+      })
+      const text = res.data.interpretation || ''
+      setInterpretation(text)
+      setInterpChanged(false)
+      onUpdate({ ...tab, interpretation: text })
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Interpretation failed')
+    } finally { setInterpreting(false) }
+  }
+
+  const saveInterpretation = () => {
+    onUpdate({ ...tab, interpretation })
+    setInterpChanged(false)
+    toast.success('Interpretation saved')
+  }
+
   return (
     <div className={`${card} space-y-3`}>
+      {/* ── Header ── */}
       <div className="flex items-start justify-between gap-2">
-        <div>
+        <div className="flex-1 min-w-0">
           <div className="font-semibold text-catalan-text">{tab.title || 'Untitled'}</div>
           <div className="text-xs text-catalan-textMuted mt-0.5">
             {tab.description || `${tab.groupby_field}${tab.secondary_groupby ? ` × ${tab.secondary_groupby}` : ''} → ${tab.aggregation}(${tab.value_field})`}
           </div>
         </div>
-        <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-          {tab.description && (
-            <button onClick={() => setShowRationale(r => !r)} className={btnSe} title="Why did AI choose this?">Why?</button>
-          )}
-          <button
-            onClick={() => submitFeedback('up')}
-            className={`px-2 py-1.5 text-sm rounded-lg border transition-colors ${feedback === 'up' ? 'border-green-500 text-green-400 bg-green-500/10' : 'border-catalan-border text-catalan-textMuted hover:text-catalan-text'}`}
-            title="Useful table"
-          >👍</button>
-          <button
-            onClick={() => submitFeedback('down')}
-            className={`px-2 py-1.5 text-sm rounded-lg border transition-colors ${feedback === 'down' ? 'border-catalan-error text-catalan-error bg-catalan-error/10' : 'border-catalan-border text-catalan-textMuted hover:text-catalan-text'}`}
-            title="Not useful"
-          >👎</button>
-          <button onClick={copyCSV} className={btnSe} title="Copy as CSV">CSV</button>
+        <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
+          <button onClick={() => submitFeedback('up')}
+            className={`px-2 py-1.5 text-sm rounded-lg border transition-colors ${feedback === 'up' ? 'border-green-500 text-green-400 bg-green-500/10' : 'border-catalan-border text-catalan-textMuted hover:text-catalan-text'}`}>👍</button>
+          <button onClick={() => submitFeedback('down')}
+            className={`px-2 py-1.5 text-sm rounded-lg border transition-colors ${feedback === 'down' ? 'border-catalan-error text-catalan-error bg-catalan-error/10' : 'border-catalan-border text-catalan-textMuted hover:text-catalan-text'}`}>👎</button>
+          <button onClick={copyCSV} className={btnSe}>CSV</button>
+          <button onClick={runPolish} disabled={polishing} className={btnSe}>
+            {polishing ? '✨…' : '✨ Rename'}
+          </button>
+          <button onClick={() => setShowInterpret(s => !s)}
+            className={`${btnSe} ${showInterpret ? 'border-catalan-primary/60 text-catalan-primary' : ''}`}>
+            {interpretation ? '📝 Edit Interpretation' : '📝 Interpret'}
+          </button>
           <button onClick={() => setExpanded(e => !e)} className={btnSe}>{expanded ? 'Hide' : 'Expand'}</button>
           <button onClick={onDelete} className="px-2 py-1.5 text-sm border border-catalan-error/30 text-catalan-error rounded-lg hover:bg-catalan-error/10">✕</button>
         </div>
       </div>
 
-      {showRationale && tab.description && (
-        <div className="px-3 py-2 bg-catalan-primary/5 border border-catalan-primary/20 rounded-lg text-xs text-catalan-textMuted">
-          <span className="font-semibold text-catalan-primary">Why this table: </span>{tab.description}
+      {/* ── AI Rename panel ── */}
+      {showPolish && (
+        <div className="border border-catalan-primary/30 bg-catalan-primary/5 rounded-lg p-4 space-y-3">
+          <div className="text-xs font-semibold text-catalan-primary uppercase tracking-wider">AI Rename — Review & Apply</div>
+          <div>
+            <label className="text-xs text-catalan-textMuted block mb-1">Title</label>
+            <input className={`${inp} w-full`} value={editTitle} onChange={e => setEditTitle(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-xs text-catalan-textMuted block mb-1">Subtitle</label>
+            <input className={`${inp} w-full`} value={editSubtitle} onChange={e => setEditSubtitle(e.target.value)} />
+          </div>
+          {Object.keys(editColLabels).length > 0 && (
+            <div>
+              <label className="text-xs text-catalan-textMuted block mb-2">Column Labels (raw → clean)</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {Object.entries(editColLabels).map(([raw, clean]) => (
+                  <div key={raw} className="flex items-center gap-2">
+                    <span className="text-xs text-catalan-textMuted font-mono shrink-0 max-w-[110px] truncate" title={raw}>{raw}</span>
+                    <span className="text-xs text-catalan-textMuted">→</span>
+                    <input className={`${inp} flex-1 py-1 text-xs`} value={clean}
+                      onChange={e => setEditColLabels(p => ({ ...p, [raw]: e.target.value }))} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="flex gap-2 pt-1">
+            <button onClick={applyPolish} className={btnPr}>Apply</button>
+            <button onClick={() => setShowPolish(false)} className={btnSe}>Cancel</button>
+          </div>
         </div>
       )}
 
+      {/* ── Chart ── */}
       {!tab.is_cross_tab && <BarChart data={barData} height={Math.max(120, Math.min(barData.length * 30 + 8, 300))} />}
 
+      {/* ── Expanded data table ── */}
       {expanded && (
         <div className="overflow-x-auto rounded-lg border border-catalan-border">
           <table className="w-full text-sm">
             <thead className="bg-catalan-bg border-b border-catalan-border">
               <tr>
-                <th className="px-3 py-2 text-left text-xs text-catalan-textMuted font-semibold uppercase">{tab.groupby_field}</th>
-                {tab.is_cross_tab
-                  ? subKeys.map(k => (
-                      <th key={k} className="px-3 py-2 text-right text-xs text-catalan-textMuted font-semibold uppercase">{k}</th>
-                    ))
-                  : null}
+                <th className="px-3 py-2 text-left text-xs text-catalan-textMuted font-semibold uppercase">{lbl(tab.groupby_field)}</th>
+                {tab.is_cross_tab ? subKeys.map(k => (
+                  <th key={k} className="px-3 py-2 text-right text-xs text-catalan-textMuted font-semibold uppercase">{lbl(k)}</th>
+                )) : null}
                 <th className="px-3 py-2 text-right text-xs text-catalan-textMuted font-semibold uppercase">
-                  {tab.is_cross_tab ? 'Total' : `${tab.aggregation}(${tab.value_field})`}
+                  {tab.is_cross_tab ? 'Total' : lbl(tab.value_field !== '*' ? tab.value_field : '*')}
                 </th>
                 {tab.show_percent && <th className="px-3 py-2 text-right text-xs text-catalan-textMuted font-semibold uppercase">%</th>}
               </tr>
@@ -270,10 +372,91 @@ function TabulationCard({ tab, onDelete, programId }: { tab: SavedTabulation; on
           </table>
         </div>
       )}
+
+      {/* ── Interpretation panel ── */}
+      {showInterpret && (
+        <div className="border border-catalan-border rounded-lg p-4 space-y-3 bg-catalan-hover/20">
+          <div className="text-xs font-semibold text-catalan-textMuted uppercase tracking-wider">AI Interpretation</div>
+
+          <div>
+            <div className="text-xs text-catalan-textMuted mb-2">Focus template</div>
+            <div className="flex flex-wrap gap-1.5">
+              {INTERPRET_TEMPLATES.map(t => (
+                <button key={t.key} onClick={() => {
+                  setSelectedTemplate(t.key)
+                  if (t.prompt) setFocusPrompt(t.prompt)
+                }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                    selectedTemplate === t.key
+                      ? 'bg-catalan-primary text-catalan-bg border-catalan-primary'
+                      : 'bg-catalan-hover text-catalan-text border-catalan-border hover:border-catalan-primary/40'
+                  }`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-xs text-catalan-textMuted mb-1">What to focus on (edit freely)</div>
+            <textarea
+              className={`${inp} w-full resize-y text-xs`} rows={3}
+              value={focusPrompt}
+              onChange={e => { setFocusPrompt(e.target.value); setSelectedTemplate('custom') }}
+              placeholder="e.g. Focus on the gap between the highest and lowest values. Explain what this implies for program targeting in underperforming groups."
+            />
+          </div>
+
+          <button onClick={runInterpret} disabled={interpreting} className={btnPr}>
+            {interpreting ? '✨ Generating…' : interpretation ? '✨ Re-generate' : '✨ Generate Interpretation'}
+          </button>
+
+          {interpretation && (
+            <div className="space-y-2 pt-1">
+              <div className="text-xs text-catalan-textMuted">Edit interpretation below — changes are saved when you click Save</div>
+              <textarea
+                className={`${inp} w-full resize-y text-sm leading-relaxed`}
+                style={{ fontFamily: 'Georgia, serif' }}
+                rows={7}
+                value={interpretation}
+                onChange={e => { setInterpretation(e.target.value); setInterpChanged(true) }}
+              />
+              {interpChanged && (
+                <button onClick={saveInterpretation} className={btnSe}>Save Interpretation</button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Stored interpretation display (collapsed mode) ── */}
+      {!showInterpret && interpretation && (
+        <div className="px-3 py-2.5 bg-catalan-hover/30 border border-catalan-border/60 rounded-lg">
+          <div className="text-xs text-catalan-textMuted font-medium mb-1">Interpretation</div>
+          <p className="text-sm text-catalan-text leading-relaxed" style={{ fontFamily: 'Georgia, serif' }}>
+            {interpretation.length > 300 ? interpretation.slice(0, 300) + '…' : interpretation}
+          </p>
+        </div>
+      )}
+
       <div className="text-xs text-catalan-textMuted">{tab.total} total records · saved {new Date(tab.created_at).toLocaleString()}</div>
     </div>
   )
 }
+
+const INTERPRET_TEMPLATES = [
+  { key: '',            label: 'General Overview',        prompt: '' },
+  { key: 'distribution', label: 'Distribution & Spread',  prompt: 'Describe how values are distributed. Where is the concentration? What is the spread between the highest and lowest? Is the distribution even or skewed?' },
+  { key: 'top_bottom',  label: 'High vs Low Performers',  prompt: 'Identify the top 3 and bottom 3 groups. Quantify the gap. Explain what the gap implies for the program and whether it is expected or surprising.' },
+  { key: 'comparative', label: 'Group Comparison',        prompt: 'Compare groups against each other and against the overall average. Which groups are above average, which are below? Quantify the differences and note patterns.' },
+  { key: 'equity',      label: 'Equity & Disparity',      prompt: 'Assess whether outcomes or benefits are equitably distributed. Identify which groups are underserved, overrepresented, or left behind. Quantify the disparity.' },
+  { key: 'longitudinal', label: 'Change Over Time',       prompt: 'Analyse change across time periods or waves. What improved, what worsened, what stagnated? Quantify the change. Identify turning points or inflections.' },
+  { key: 'cross_tab',   label: 'Interaction Effect',      prompt: 'Analyse how the two variables interact. Are there conditional patterns — where one group responds differently to the other variable? Note asymmetries and exceptions.' },
+  { key: 'concentration', label: 'Concentration Analysis', prompt: 'Is value concentrated in a few groups or evenly spread? What proportion of the total does the top group account for? Is there a Pareto-type concentration?' },
+  { key: 'outlier',     label: 'Outlier & Anomaly',       prompt: 'Flag any values that are unexpectedly high, low, or inconsistent. What makes them outliers? Are they data quality issues or genuine programmatic differences?' },
+  { key: 'program_perf', label: 'Program Performance',    prompt: 'Interpret the data as a measure of program progress. Is the program on track? Where is performance strong and where does it need attention? What does this imply for the next phase?' },
+  { key: 'custom',      label: 'Custom…',                 prompt: '' },
+]
 
 const AI_MSGS = [
   'Analyzing dataset schema...',
@@ -327,6 +510,11 @@ function TabulatorTab({ programId, cols, sampleRows }: { programId: string; cols
     const fresh = await loadTabulations(programId)
     setSaved(fresh)
     if (fresh.length > 0) setLastRefreshedAt(new Date())
+  }, [programId])
+
+  const handleTabUpdate = useCallback(async (updated: SavedTabulation) => {
+    setSaved(prev => prev.map(t => t.id === updated.id ? updated : t))
+    await saveTabulation(programId, updated)
   }, [programId])
   useEffect(() => { reload() }, [reload])
   useEffect(() => { if (cols.length && !groupby) setGroupby(cols[0].id) }, [cols])
@@ -739,7 +927,8 @@ function TabulatorTab({ programId, cols, sampleRows }: { programId: string; cols
           </div>
           {saved.map(tab => (
             <TabulationCard key={tab.id} tab={tab} programId={programId}
-              onDelete={async () => { await deleteTabulation(programId, tab.id); await reload() }} />
+              onDelete={async () => { await deleteTabulation(programId, tab.id); await reload() }}
+              onUpdate={handleTabUpdate} />
           ))}
         </div>
       )}

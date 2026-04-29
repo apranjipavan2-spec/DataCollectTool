@@ -161,6 +161,146 @@ async def suggest_tabulation(cfg: dict, column_headers: list, sample_rows: list,
     return {"tables": []}
 
 
+async def polish_tabulation(
+    cfg: dict,
+    title: str,
+    groupby_field: str,
+    value_field: str,
+    aggregation: str,
+    rows: list,
+    is_cross_tab: bool,
+    sub_keys: list,
+) -> dict:
+    rows_preview = []
+    for r in rows[:20]:
+        if is_cross_tab and sub_keys:
+            cross_str = " | ".join(f"{k}={r.get(k, 0)}" for k in sub_keys[:6])
+            rows_preview.append(f"{r.get('group', '')} | {cross_str} | total={r.get('value', 0)}")
+        else:
+            line = f"{r.get('group', '')} → {r.get('value', 0)}"
+            if r.get('pct') is not None:
+                line += f" ({r['pct']}%)"
+            rows_preview.append(line)
+
+    all_col_keys = list(dict.fromkeys([groupby_field] + ([value_field] if value_field != '*' else []) + sub_keys + ['*']))
+    col_keys_json = json.dumps({k: f"clean label for {k}" for k in all_col_keys})
+
+    prompt = (
+        f"You are a research data analyst. A field survey tabulation has raw machine-generated names. Clean them up.\n\n"
+        f"Raw table info:\n"
+        f"- Title: {title}\n"
+        f"- Row variable (groupby): {groupby_field}\n"
+        f"- Value/column variable: {value_field}\n"
+        f"- Aggregation: {aggregation}\n"
+        f"- Is cross-tabulation: {is_cross_tab}\n"
+        f"- Cross-tab column keys: {sub_keys[:10]}\n"
+        f"- Sample data ({len(rows_preview)} rows):\n" +
+        "\n".join(rows_preview) + "\n\n"
+        f"Return ONLY valid JSON (no markdown, no explanation):\n"
+        f'{{\n'
+        f'  "title": "Human-readable table title (e.g. District-wise Beneficiary Coverage by Gender)",\n'
+        f'  "subtitle": "One sentence: what insight this table provides, not just what it contains",\n'
+        f'  "column_labels": {col_keys_json}\n'
+        f'}}\n\n'
+        f"Rules:\n"
+        f"- Title: concise and specific, not generic\n"
+        f"- subtitle: describes the insight or finding angle, not the method\n"
+        f"- column_labels keys must be exactly from: {all_col_keys}\n"
+        f"- Map raw field IDs (e.g. district_id, gender_v2) to clean human-readable labels (e.g. District, Gender)\n"
+        f"- For '*' key use: Count or Number of Records\n"
+        f"- For mean aggregation on a field, label it as 'Average [field meaning]'"
+    )
+    raw = await _call_llm(cfg, prompt)
+    match = re.search(r'\{.*\}', raw, re.DOTALL)
+    if match:
+        try:
+            result = json.loads(match.group())
+            if isinstance(result.get('column_labels'), dict):
+                result['column_labels'] = {str(k): str(v) for k, v in result['column_labels'].items()}
+            return result
+        except Exception:
+            pass
+    return {"title": title, "subtitle": "", "column_labels": {}}
+
+
+async def interpret_tabulation(
+    cfg: dict,
+    title: str,
+    subtitle: str,
+    rows: list,
+    is_cross_tab: bool,
+    sub_keys: list,
+    groupby_field: str,
+    value_field: str,
+    aggregation: str,
+    show_percent: bool,
+    column_labels: dict,
+    focus_prompt: str,
+    program_context: str,
+) -> str:
+    def lbl(k: str) -> str:
+        return column_labels.get(k, k)
+
+    if is_cross_tab and sub_keys:
+        header = f"{lbl(groupby_field)} | " + " | ".join(lbl(k) for k in sub_keys) + " | Total"
+        rows_str = "\n".join(
+            f"{r.get('group', '')} | " +
+            " | ".join(str(r.get(k, 0)) for k in sub_keys) +
+            f" | {r.get('value', 0)}"
+            for r in rows[:80]
+        )
+    else:
+        val_label = lbl(value_field) if value_field != '*' else "Count"
+        if aggregation == "mean":
+            val_label = f"Avg {val_label}"
+        pct_col = " | %" if show_percent else ""
+        header = f"{lbl(groupby_field)} | {val_label}{pct_col}"
+        rows_str = "\n".join(
+            f"{r.get('group', '')} | {r.get('value', 0)}" +
+            (f" | {r.get('pct', 0)}%" if show_percent and r.get('pct') is not None else "")
+            for r in rows[:80]
+        )
+        if len(rows) > 80:
+            rows_str += f"\n... ({len(rows) - 80} more rows not shown)"
+
+    context_line = f"Program context: {program_context}\n" if program_context else ""
+    cross_note = (
+        f"(Cross-tabulation: rows = {lbl(groupby_field)}, columns = "
+        f"{', '.join(lbl(k) for k in sub_keys)})\n"
+        if is_cross_tab else ""
+    )
+
+    default_focus = (
+        "Provide a comprehensive interpretation: identify the standout finding, "
+        "notable patterns or disparities, the highest and lowest values and what they suggest, "
+        "any cross-variable interactions, and the practical implication for the program."
+    )
+
+    prompt = (
+        f"You are a senior research analyst writing an interpretation for a field survey data table.\n\n"
+        f"{context_line}"
+        f"Table: {title}\n"
+        f"{subtitle}\n"
+        f"{cross_note}\n"
+        f"Data ({len(rows)} rows total):\n"
+        f"{header}\n"
+        f"{'-' * max(len(header), 40)}\n"
+        f"{rows_str}\n\n"
+        f"Analyst focus: {focus_prompt.strip() if focus_prompt.strip() else default_focus}\n\n"
+        f"Write a data-driven interpretation in flowing prose. Rules:\n"
+        f"- Be specific — cite the actual numbers from the table\n"
+        f"- Use the clean column labels, not raw field IDs\n"
+        f"- State the most important finding first\n"
+        f"- Note outliers, unexpected gaps, or strong patterns\n"
+        f"- For cross-tabs: explain the interaction between the two variables, not just row totals\n"
+        f"- Quantify comparisons (e.g. '3.2x higher', 'gap of 47 percentage points')\n"
+        f"- End with a practical implication or recommendation for the program\n"
+        f"- Do not describe what the table 'contains' — describe what it MEANS\n"
+        f"- Be as detailed or concise as the data and focus prompt warrant; do not artificially restrict length"
+    )
+    return await _call_llm(cfg, prompt)
+
+
 async def generate_program_report(
     cfg: dict,
     program_name: str,

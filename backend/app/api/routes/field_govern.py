@@ -90,6 +90,31 @@ class FeedbackRequest(BaseModel):
     vote: Optional[str] = None  # 'up' | 'down' | null
 
 
+class PolishRequest(BaseModel):
+    title: str
+    groupby_field: str
+    value_field: str = "*"
+    aggregation: str = "count"
+    rows: list = []
+    is_cross_tab: bool = False
+    sub_keys: list = []
+
+
+class InterpretRequest(BaseModel):
+    title: str
+    subtitle: str = ""
+    groupby_field: str
+    value_field: str = "*"
+    aggregation: str = "count"
+    rows: list = []
+    is_cross_tab: bool = False
+    sub_keys: list = []
+    show_percent: bool = False
+    column_labels: dict = {}
+    focus_prompt: str = ""
+    extra_context: str = ""
+
+
 # ── Program Wave CRUD ─────────────────────────────────────────────────────────
 
 @router.get("/programs/{program_id}/waves")
@@ -516,6 +541,78 @@ async def suggest_tabulation(
     except Exception as e:
         raise HTTPException(503, f"AI error: {e}")
     return result
+
+
+# ── AI Tabulation Polish (rename title, subtitle, column labels) ──────────────
+
+@router.post("/programs/{program_id}/tabulate/polish")
+async def polish_tabulation(
+    program_id: str,
+    body: PolishRequest,
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    prog = db.query(Program).filter(
+        Program.id == program_id, Program.tenant_id == user["tenant_id"]
+    ).first()
+    if not prog:
+        raise HTTPException(404, "Program not found")
+    cfg = _get_global_ai_cfg(db)
+    if not cfg.get("api_key"):
+        raise HTTPException(400, "AI not configured. Contact your platform administrator.")
+    try:
+        result = await ai_service.polish_tabulation(
+            cfg=cfg, title=body.title, groupby_field=body.groupby_field,
+            value_field=body.value_field, aggregation=body.aggregation,
+            rows=body.rows[:30], is_cross_tab=body.is_cross_tab, sub_keys=body.sub_keys,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(503, f"AI error: {e}")
+
+
+# ── AI Tabulation Interpret (narrative below table) ───────────────────────────
+
+@router.post("/programs/{program_id}/tabulate/interpret")
+async def interpret_tabulation(
+    program_id: str,
+    body: InterpretRequest,
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    prog = db.query(Program).filter(
+        Program.id == program_id, Program.tenant_id == user["tenant_id"]
+    ).first()
+    if not prog:
+        raise HTTPException(404, "Program not found")
+    cfg = _get_global_ai_cfg(db)
+    if not cfg.get("api_key"):
+        raise HTTPException(400, "AI not configured. Contact your platform administrator.")
+
+    prog_context = prog.name
+    if prog.scheme_name:
+        prog_context += f" ({prog.scheme_name})"
+    if prog.start_date or prog.end_date:
+        prog_context += f", {prog.start_date or '?'} to {prog.end_date or '?'}"
+    if body.extra_context:
+        prog_context += f". {body.extra_context}"
+
+    try:
+        interpretation = await ai_service.interpret_tabulation(
+            cfg=cfg, title=body.title, subtitle=body.subtitle,
+            rows=body.rows, is_cross_tab=body.is_cross_tab, sub_keys=body.sub_keys,
+            groupby_field=body.groupby_field, value_field=body.value_field,
+            aggregation=body.aggregation, show_percent=body.show_percent,
+            column_labels=body.column_labels, focus_prompt=body.focus_prompt,
+            program_context=prog_context,
+        )
+        return {"interpretation": interpretation}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(503, f"AI error: {e}")
 
 
 # ── AI Tabulation Execute (run actual aggregation) ────────────────────────────

@@ -16,6 +16,8 @@ export interface SavedTabulation {
   sub_keys?: string[]
   is_cross_tab?: boolean
   feedback?: 'up' | 'down' | null
+  interpretation?: string
+  column_labels?: Record<string, string>
 }
 
 export interface SavedReport {
