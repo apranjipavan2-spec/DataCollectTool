@@ -8,7 +8,7 @@ export interface SavedTabulation {
   value_field: string
   aggregation: string
   chart_type: string
-  rows: { group: string; value: number; pct?: number; [key: string]: any }[]
+  rows: { group: string; value: number; pct?: number; [key: string]: string | number | undefined }[]
   total: number
   created_at: string
   show_percent?: boolean

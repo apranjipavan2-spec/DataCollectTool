@@ -33,6 +33,7 @@ class SubmissionPayload(BaseModel):
     gps_open: Optional[dict] = None
     gps_submit: Optional[dict] = None
     local_created_at: str
+    last_modified_at: Optional[str] = None  # client-side edit timestamp for conflict resolution
     # Program tracking (optional — set when collecting under a program)
     program_id: Optional[str] = None
     participant_type_id: Optional[str] = None
@@ -233,6 +234,22 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
             Submission.enumerator_id == user["sub"],
         ).first()
         if existing:
+            # Last-write-wins: if client reports a newer edit timestamp, update the stored submission
+            if item.last_modified_at:
+                try:
+                    incoming_dt = datetime.fromisoformat(item.last_modified_at.replace("Z", "+00:00")).replace(tzinfo=None)
+                    reference_dt = getattr(existing, "updated_at", None) or existing.local_created_at
+                    existing_dt = reference_dt.replace(tzinfo=None) if reference_dt else None
+                    if existing_dt is None or incoming_dt > existing_dt:
+                        new_data = dict(item.data_json)
+                        new_data["_conflict_resolved"] = True
+                        existing.data_json = new_data
+                        existing.form_version = item.form_version
+                        db.flush()
+                        results.append({"local_id": item.local_id, "server_id": str(existing.id), "status": "conflict_resolved"})
+                        continue
+                except (ValueError, TypeError, AttributeError):
+                    pass
             results.append({"local_id": item.local_id, "server_id": str(existing.id), "status": "duplicate"})
             continue
 

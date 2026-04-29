@@ -1,9 +1,12 @@
 """Public survey endpoints — no auth required for submission."""
+import logging
 import secrets
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+
+logger = logging.getLogger(__name__)
 
 from app.core.database import get_db
 from app.core.deps import require_role
@@ -80,8 +83,8 @@ def public_survey_submit(token: str, body: dict, request: Request, db: Session =
         try:
             from app.services.sheets import sync_submission
             sync_submission(form, sub)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error("Sheets sync failed for submission %s: %s", sub.id, e, exc_info=True)
 
     return {"id": str(sub.id), "serial_no": sub.serial_no}
 

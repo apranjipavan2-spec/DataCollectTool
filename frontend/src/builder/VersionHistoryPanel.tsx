@@ -478,11 +478,11 @@ export default function VersionHistoryPanel({ formId, currentVersion, onClose }:
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function countFields(schema: Record<string, unknown>): number {
-  const sections = (schema as any)?.sections ?? []
-  const topFields = (schema as any)?.fields ?? []
-  return topFields.length + sections.reduce((acc: number, s: any) => acc + (s.fields?.length ?? 0), 0)
+  const sections = (schema.sections as { fields?: unknown[] }[] | undefined) ?? []
+  const topFields = (schema.fields as unknown[] | undefined) ?? []
+  return topFields.length + sections.reduce((acc, s) => acc + (s.fields?.length ?? 0), 0)
 }
 
 function countSections(schema: Record<string, unknown>): number {
-  return ((schema as any)?.sections ?? []).length
+  return ((schema.sections as unknown[] | undefined) ?? []).length
 }

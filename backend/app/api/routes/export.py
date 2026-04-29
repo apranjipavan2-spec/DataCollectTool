@@ -2,6 +2,9 @@
 
 import csv
 import io
+import logging
+
+logger = logging.getLogger(__name__)
 from datetime import datetime
 from typing import Optional
 
@@ -501,7 +504,8 @@ def export_dta(
             convert_dates=None,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate .dta file: {e}")
+        logger.exception("Stata .dta export failed")
+        raise HTTPException(status_code=500, detail="Failed to generate export file. Please try again.")
 
     buf.seek(0)
     filename = f"{form.title}.dta"
@@ -596,7 +600,8 @@ def export_spss(
         with open(tmp_path, "rb") as f:
             content = f.read()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate .sav file: {e}")
+        logger.exception("SPSS .sav export failed")
+        raise HTTPException(status_code=500, detail="Failed to generate export file. Please try again.")
     finally:
         os.unlink(tmp_path)
 
@@ -686,7 +691,8 @@ def export_sheets(
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Sheets export failed: {e}")
+        logger.exception("Google Sheets export failed")
+        raise HTTPException(status_code=500, detail="Sheets export failed. Please try again.")
 
     return {"url": url, "rows": len(value_rows), "title": sheet_title}
 

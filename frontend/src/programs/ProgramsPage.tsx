@@ -22,6 +22,7 @@ interface Program {
   start_date: string | null; end_date: string | null
   total_target: number; total_collected: number; pct: number
   overdue?: number; at_risk?: number
+  participant_type_count?: number; questionnaire_count?: number
 }
 interface ProgramDetail extends Program {
   is_panel_study: boolean
@@ -99,7 +100,7 @@ function Badge({ label, cls }: { label: string; cls: string }) {
 // ── Modals ────────────────────────────────────────────────────────────────────
 
 function ProgramModal({ initial, onSave, onClose }: {
-  initial?: Partial<Program>; onSave: (d: any) => Promise<void>; onClose: () => void
+  initial?: Partial<Program>; onSave: (d: Record<string, string>) => Promise<void>; onClose: () => void
 }) {
   const [d, setD] = useState({ name: '', scheme_name: '', description: '', status: 'active', start_date: '', end_date: '', ...initial })
   const [saving, setSaving] = useState(false)
@@ -138,7 +139,7 @@ function ProgramModal({ initial, onSave, onClose }: {
 }
 
 function LocationModal({ initial, onSave, onClose }: {
-  initial?: Partial<Location>; onSave: (d: any) => Promise<void>; onClose: () => void
+  initial?: Partial<Location>; onSave: (d: Record<string, string>) => Promise<void>; onClose: () => void
 }) {
   const [d, setD] = useState({ state: '', district: '', block: '', village: '', ...initial })
   const [saving, setSaving] = useState(false)
@@ -150,7 +151,7 @@ function LocationModal({ initial, onSave, onClose }: {
         <div className="space-y-3">
           {[['state', 'State'], ['district', 'District *'], ['block', 'Block / Taluk'], ['village', 'Village / GP']].map(([k, label]) => (
             <div key={k}><label className="text-sm font-medium text-catalan-text">{label}</label>
-              <input className={`${inputCls} mt-1`} value={(d as any)[k]} onChange={e => set(k, e.target.value)} /></div>
+              <input className={`${inputCls} mt-1`} value={(d as Record<string, string>)[k]} onChange={e => set(k, e.target.value)} /></div>
           ))}
         </div>
         <div className="flex justify-end gap-2 mt-5">
@@ -504,7 +505,7 @@ export default function ProgramsPage() {
 
   // ── CRUD ────────────────────────────────────────────────────────────────────
 
-  const saveProgram = async (d: any) => {
+  const saveProgram = async (d: Record<string, string>) => {
     if (editingProg?.id) await api.patch(`/programs/${editingProg.id}`, d)
     else await api.post('/programs/', d)
     setShowProgModal(false); setEditingProg(null)
@@ -518,7 +519,7 @@ export default function ProgramsPage() {
     await load(); toast.success('Program deleted')
   }
 
-  const saveLocation = async (d: any) => {
+  const saveLocation = async (d: Record<string, string>) => {
     if (editingLoc?.id) await api.patch(`/programs/locations/${editingLoc.id}`, d)
     else await api.post('/programs/locations', d)
     setShowLocModal(false); setEditingLoc(null); await load(); toast.success('Location saved')
@@ -672,10 +673,10 @@ export default function ProgramsPage() {
                           <Badge label={p.status} cls={PROG_STATUS_CLS[p.status] ?? 'bg-gray-100 text-gray-500'} />
                           <span className="text-catalan-primary group-hover:underline">View details →</span>
                         </div>
-                        {((p as any).participant_type_count > 0 || (p as any).questionnaire_count > 0) && (
+                        {((p.participant_type_count ?? 0) > 0 || (p.questionnaire_count ?? 0) > 0) && (
                           <div className="mt-2 flex gap-2 flex-wrap text-[10px] text-catalan-textMuted">
-                            {(p as any).participant_type_count > 0 && <span className="bg-catalan-hover rounded px-1.5 py-0.5">👤 {(p as any).participant_type_count} type{(p as any).participant_type_count > 1 ? 's' : ''}</span>}
-                            {(p as any).questionnaire_count > 0 && <span className="bg-catalan-hover rounded px-1.5 py-0.5">📋 {(p as any).questionnaire_count} questionnaire{(p as any).questionnaire_count > 1 ? 's' : ''}</span>}
+                            {(p.participant_type_count ?? 0) > 0 && <span className="bg-catalan-hover rounded px-1.5 py-0.5">👤 {p.participant_type_count} type{(p.participant_type_count ?? 0) > 1 ? 's' : ''}</span>}
+                            {(p.questionnaire_count ?? 0) > 0 && <span className="bg-catalan-hover rounded px-1.5 py-0.5">📋 {p.questionnaire_count} questionnaire{(p.questionnaire_count ?? 0) > 1 ? 's' : ''}</span>}
                           </div>
                         )}
                       </div>

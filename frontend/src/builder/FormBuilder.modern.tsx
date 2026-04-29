@@ -1,4 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
+
+interface RawImportField { id?: string; type?: string; label?: string; required?: boolean; options?: { value: string; label: string }[] }
+interface RawImportSection { title?: string; fields?: RawImportField[] }
 import InfoButton from '@/help/InfoButton'
 import { useSearchParams } from 'react-router-dom'
 import { v4 as uuidv4 } from 'uuid'
@@ -350,10 +353,10 @@ export default function FormBuilder() {
       const { data } = await api.post('/forms/import-excel', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
-      const sections: FormSection[] = (data.sections ?? []).map((sec: any) => ({
+      const sections: FormSection[] = (data.sections ?? []).map((sec: RawImportSection) => ({
         id: uuidv4(),
         title: sec.title || 'Section',
-        fields: (sec.fields ?? []).map((f: any): FormField => {
+        fields: (sec.fields ?? []).map((f: RawImportField): FormField => {
           const ft = toFieldType(f.type)
           const opts = toOptions(f.options)
           return {
@@ -1007,11 +1010,11 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
   const rand = schema.settings?.randomization ?? {}
   const geo = schema.settings?.geofence ?? {}
   const validationRules: Array<{ field_id: string; operator: string; value: string; message: string }> =
-    (schema.settings as any)?.validation_rules ?? []
+    (schema.settings?.validation_rules as typeof validationRules | undefined) ?? []
   const allFields = getAllFieldsInOrder(schema.sections)
 
   const updateValidationRules = (rules: typeof validationRules) =>
-    onChange({ ...schema, settings: { ...(schema.settings as any), validation_rules: rules } } as FormSchema)
+    onChange({ ...schema, settings: { ...schema.settings, validation_rules: rules } })
 
   const addValidationRule = () =>
     updateValidationRules([...validationRules, { field_id: '', operator: 'min', value: '', message: '' }])
@@ -1057,8 +1060,8 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
           <textarea
             className={inputCls + ' resize-none'}
             rows={3}
-            value={(schema.settings as any)?.purpose ?? ''}
-            onChange={e => onChange({ ...schema, settings: { ...(schema.settings as any), purpose: e.target.value || undefined } } as FormSchema)}
+            value={(schema.settings?.purpose as string | undefined) ?? ''}
+            onChange={e => onChange({ ...schema, settings: { ...schema.settings, purpose: e.target.value || undefined } })}
             placeholder="Describe why this data is being collected. If set, respondents will see a consent banner before starting."
           />
           <p className="text-xs text-catalan-textMuted mt-1">Leave blank to skip the consent banner.</p>

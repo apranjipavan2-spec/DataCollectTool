@@ -27,10 +27,10 @@ const selCls = 'bg-catalan-bg border border-catalan-border text-catalan-text rou
 const inpCls = 'flex-1 bg-catalan-bg border border-catalan-border text-catalan-text rounded-md px-2 py-1 text-xs focus:outline-none focus:border-catalan-primary placeholder-catalan-textMuted min-w-0'
 
 function makeCondition(allFields: FormField[]): SkipCondition {
-  return { field: allFields[0]?.name ?? '', operator: 'eq', value: '' }
+  return { _key: crypto.randomUUID(), field: allFields[0]?.name ?? '', operator: 'eq', value: '' }
 }
 function makeGroup(allFields: FormField[]): ConditionGroup {
-  return { logic: 'OR', conditions: [makeCondition(allFields)] }
+  return { _key: crypto.randomUUID(), logic: 'OR', conditions: [makeCondition(allFields)] }
 }
 
 function updateAtPath(
@@ -135,13 +135,13 @@ function GroupEditor({ group, allFields, depth, onUpdate, onRemove }: {
       {group.conditions.map((c, i) =>
         isConditionGroup(c) ? (
           <GroupEditor
-            key={i} group={c} allFields={allFields} depth={depth + 1}
+            key={c._key ?? i} group={c} allFields={allFields} depth={depth + 1}
             onUpdate={g => updateItem(i, () => g)}
             onRemove={() => updateItem(i, () => null)}
           />
         ) : (
           <ConditionRow
-            key={i} condition={c} allFields={allFields}
+            key={c._key ?? i} condition={c} allFields={allFields}
             onUpdate={patch => updateItem(i, prev => ({ ...(prev as SkipCondition), ...patch }))}
             onRemove={() => updateItem(i, () => null)}
           />
@@ -244,13 +244,13 @@ export default function SkipLogicEditor({ field, sections, onChange, prevFieldsO
       {logic.conditions.map((c, i) =>
         isConditionGroup(c) ? (
           <GroupEditor
-            key={i} group={c} allFields={allFields} depth={0}
+            key={c._key ?? i} group={c} allFields={allFields} depth={0}
             onUpdate={g => updateItem(i, () => g)}
             onRemove={() => updateItem(i, () => null)}
           />
         ) : (
           <ConditionRow
-            key={i} condition={c} allFields={allFields}
+            key={c._key ?? i} condition={c} allFields={allFields}
             onUpdate={patch => updateItem(i, prev => ({ ...(prev as SkipCondition), ...patch }))}
             onRemove={() => updateItem(i, () => null)}
           />

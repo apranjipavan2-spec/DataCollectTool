@@ -63,7 +63,7 @@ function validate(field: FormField, value: unknown): string {
 }
 
 export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initialDraft }: Props) {
-  const purpose = (schema as any).settings?.purpose as string | undefined
+  const purpose = schema.settings?.purpose as string | undefined
   const [consentGiven, setConsentGiven] = useState(!purpose || !!initialDraft?.consentTimestamp)
 
   const [draft, setDraft] = useState<SubmissionDraft>(() => initialDraft ?? {
@@ -322,7 +322,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
           <DateTimeField field={localizedField} value={draft.values[currentField.name] as string ?? ''} onChange={v => setValue(currentField.name, v)} />
         )}
         {localizedField.type === 'gps' && (
-          <GpsField field={localizedField} value={draft.values[currentField.name] as any ?? null} onChange={v => setValue(currentField.name, v)} />
+          <GpsField field={localizedField} value={draft.values[currentField.name] as { lat: number; lng: number; accuracy: number } | null ?? null} onChange={v => setValue(currentField.name, v)} />
         )}
         {localizedField.type === 'photo' && (
           <PhotoField field={localizedField} value={draft.values[currentField.name] as string ?? null} onChange={v => setValue(currentField.name, v)} />
@@ -331,7 +331,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
           <AudioField field={localizedField} value={draft.values[currentField.name] as string ?? null} onChange={v => setValue(currentField.name, v)} />
         )}
         {localizedField.type === 'repeat_group' && (
-          <RepeatGroupField field={localizedField} value={draft.values[currentField.name] as any[] ?? []} onChange={v => setValue(currentField.name, v)} />
+          <RepeatGroupField field={localizedField} value={draft.values[currentField.name] as { _id: string; [key: string]: unknown }[] ?? []} onChange={v => setValue(currentField.name, v)} />
         )}
         {localizedField.type === 'barcode' && (
           <BarcodeField field={localizedField} value={draft.values[currentField.name] as string ?? ''} onChange={v => setValue(currentField.name, v)} />

@@ -42,7 +42,7 @@ function fmtKey(k: string) {
   return k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
-function fmtVal(v: any): string {
+function fmtVal(v: unknown): string {
   if (v === null || v === undefined || v === '') return '—'
   if (typeof v === 'boolean') return v ? 'Yes' : 'No'
   if (Array.isArray(v)) return v.join(', ')

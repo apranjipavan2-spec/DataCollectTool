@@ -1,4 +1,5 @@
 """Cross-tenant monitoring endpoints — master_admin only."""
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -20,48 +21,74 @@ def get_overview(
     user=Depends(require_master_admin),
     db: Session = Depends(get_db),
 ):
-    """Per-tenant summary: programs, targets, collected submissions, user count."""
+    """Per-tenant summary: programs, targets, collected submissions, user count.
+    Uses 5 queries total regardless of tenant count (was 4N)."""
     tenants = db.query(Tenant).order_by(Tenant.name).all()
+    if not tenants:
+        return []
+
+    tenant_ids = [t.id for t in tenants]
+
+    # All programs for all tenants in one query
+    programs = db.query(Program).filter(Program.tenant_id.in_(tenant_ids)).all()
+    prog_ids = [p.id for p in programs]
+
+    # All questionnaires for all programs in one query
+    quests = (
+        db.query(ProgramQuestionnaire)
+        .filter(ProgramQuestionnaire.program_id.in_(prog_ids))
+        .all()
+    ) if prog_ids else []
+
+    # Submission counts keyed by tenant_id — filter to form_ids from questionnaires only
+    all_form_ids = list({q.form_id for q in quests if q.form_id})
+    quest_form_tenant: dict[str, str] = {
+        str(q.form_id): str(q.tenant_id) for q in quests if q.form_id
+    }
+    sub_by_tenant: dict[str, int] = {}
+    if all_form_ids:
+        for row in (
+            db.query(Submission.tenant_id, func.count(Submission.id).label("cnt"))
+            .filter(Submission.form_id.in_(all_form_ids))
+            .group_by(Submission.tenant_id)
+            .all()
+        ):
+            sub_by_tenant[str(row.tenant_id)] = row.cnt
+
+    # User counts per tenant in one query
+    user_by_tenant: dict[str, int] = {
+        str(r.tenant_id): r.cnt
+        for r in db.query(User.tenant_id, func.count(User.id).label("cnt"))
+        .filter(User.tenant_id.in_(tenant_ids))
+        .group_by(User.tenant_id)
+        .all()
+    }
+
+    # Group programs and questionnaires in Python
+    progs_by_tenant: dict[str, list] = {}
+    for p in programs:
+        progs_by_tenant.setdefault(str(p.tenant_id), []).append(p)
+
+    quests_by_prog: dict[str, list] = {}
+    for q in quests:
+        quests_by_prog.setdefault(str(q.program_id), []).append(q)
+
     result = []
     for t in tenants:
-        prog_ids = [
-            r[0] for r in db.query(Program.id).filter(Program.tenant_id == t.id).all()
-        ]
-
-        quest_count = 0
-        total_target = 0
-        form_ids: list = []
-
-        if prog_ids:
-            quests = db.query(ProgramQuestionnaire).filter(
-                ProgramQuestionnaire.program_id.in_(prog_ids)
-            ).all()
-            quest_count = len(quests)
-            total_target = sum(q.total_target or 0 for q in quests)
-            form_ids = [q.form_id for q in quests if q.form_id]
-
-        sub_count = 0
-        if form_ids:
-            sub_count = (
-                db.query(func.count(Submission.id))
-                .filter(Submission.tenant_id == t.id, Submission.form_id.in_(form_ids))
-                .scalar() or 0
-            )
-
-        user_count = (
-            db.query(func.count(User.id)).filter(User.tenant_id == t.id).scalar() or 0
-        )
-
+        tid = str(t.id)
+        t_progs = progs_by_tenant.get(tid, [])
+        t_quests = [q for p in t_progs for q in quests_by_prog.get(str(p.id), [])]
+        total_target = sum(q.total_target or 0 for q in t_quests)
         result.append({
-            "tenant_id": str(t.id),
+            "tenant_id": tid,
             "tenant_name": t.name,
             "plan_tier": t.plan_tier,
-            "user_count": user_count,
-            "program_count": len(prog_ids),
-            "questionnaire_count": quest_count,
+            "user_count": user_by_tenant.get(tid, 0),
+            "program_count": len(t_progs),
+            "questionnaire_count": len(t_quests),
             "total_target": total_target,
-            "total_collected": sub_count,
-            "pct": round(sub_count / total_target * 100, 1) if total_target else 0,
+            "total_collected": sub_by_tenant.get(tid, 0),
+            "pct": round(sub_by_tenant.get(tid, 0) / total_target * 100, 1) if total_target else 0,
         })
     return result
 
@@ -73,11 +100,9 @@ def get_all_programs(
     tenant_id: str = Query(None),
     status: str = Query(None),
 ):
-    """All programs across all tenants with tenant name and progress stats."""
-    stmt = (
-        db.query(Program, Tenant)
-        .join(Tenant, Tenant.id == Program.tenant_id)
-    )
+    """All programs across all tenants with progress stats.
+    Uses 3 queries total regardless of program count (was 2N)."""
+    stmt = db.query(Program, Tenant).join(Tenant, Tenant.id == Program.tenant_id)
     if tenant_id:
         try:
             stmt = stmt.filter(Program.tenant_id == _uuid.UUID(tenant_id))
@@ -85,27 +110,43 @@ def get_all_programs(
             pass
     if status:
         stmt = stmt.filter(Program.status == status)
-    stmt = stmt.order_by(Tenant.name, Program.name)
+    rows = stmt.order_by(Tenant.name, Program.name).all()
+
+    if not rows:
+        return []
+
+    # All questionnaires for all programs in one query
+    prog_ids = [prog.id for prog, _ in rows]
+    all_quests = (
+        db.query(ProgramQuestionnaire)
+        .filter(ProgramQuestionnaire.program_id.in_(prog_ids))
+        .all()
+    )
+
+    quests_by_prog: dict[str, list] = {}
+    for q in all_quests:
+        quests_by_prog.setdefault(str(q.program_id), []).append(q)
+
+    # Submission counts for all relevant form_ids in one aggregation
+    all_form_ids = list({q.form_id for q in all_quests if q.form_id})
+    sub_counts: dict[tuple, int] = {}
+    if all_form_ids:
+        for r in (
+            db.query(Submission.tenant_id, Submission.form_id, func.count(Submission.id).label("cnt"))
+            .filter(Submission.form_id.in_(all_form_ids))
+            .group_by(Submission.tenant_id, Submission.form_id)
+            .all()
+        ):
+            sub_counts[(str(r.tenant_id), str(r.form_id))] = r.cnt
 
     result = []
-    for prog, tenant in stmt.all():
-        quests = (
-            db.query(ProgramQuestionnaire)
-            .filter(ProgramQuestionnaire.program_id == prog.id)
-            .all()
-        )
+    for prog, tenant in rows:
+        quests = quests_by_prog.get(str(prog.id), [])
         total_target = sum(q.total_target or 0 for q in quests)
         fids = [q.form_id for q in quests if q.form_id]
-        sub_count = 0
-        if fids:
-            sub_count = (
-                db.query(func.count(Submission.id))
-                .filter(Submission.tenant_id == prog.tenant_id, Submission.form_id.in_(fids))
-                .scalar() or 0
-            )
-
+        sub_count = sum(sub_counts.get((str(prog.tenant_id), str(fid)), 0) for fid in fids)
         result.append({
-            "id":  str(prog.id),
+            "id": str(prog.id),
             "tenant_id": str(prog.tenant_id),
             "tenant_name": tenant.name,
             "name": prog.name,
@@ -120,6 +161,7 @@ def get_all_programs(
             "pct": round(sub_count / total_target * 100, 1) if total_target else 0,
         })
     return result
+
 
 def _resolve_tenant(tenant_id: str, db: Session) -> Tenant:
     try:
@@ -158,41 +200,67 @@ def get_tenant_enumerator_stats(tenant_id: str, user=Depends(require_master_admi
 
 @router.get("/platform-usage")
 def platform_usage(user=Depends(require_master_admin), db: Session = Depends(get_db)):
-    """Per-tenant usage summary for master_admin dashboard."""
-    from datetime import datetime, timezone, timedelta
-    from sqlalchemy import text
-
+    """Per-tenant usage summary for master_admin dashboard.
+    Uses 6 queries total regardless of tenant count (was 5N)."""
     month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     tenants = db.query(Tenant).filter(Tenant.name != "Platform").order_by(Tenant.created_at.desc()).all()
+    if not tenants:
+        return {"platform_totals": {"tenants": 0, "submissions_this_month": 0, "total_submissions": 0, "total_users": 0}, "tenants": []}
+
+    tenant_ids = [t.id for t in tenants]
+
+    total_subs: dict[str, int] = {
+        str(r.tenant_id): r.cnt
+        for r in db.query(Submission.tenant_id, func.count(Submission.id).label("cnt"))
+        .filter(Submission.tenant_id.in_(tenant_ids))
+        .group_by(Submission.tenant_id).all()
+    }
+    month_subs: dict[str, int] = {
+        str(r.tenant_id): r.cnt
+        for r in db.query(Submission.tenant_id, func.count(Submission.id).label("cnt"))
+        .filter(Submission.tenant_id.in_(tenant_ids), Submission.server_received_at >= month_start)
+        .group_by(Submission.tenant_id).all()
+    }
+    total_users: dict[str, int] = {
+        str(r.tenant_id): r.cnt
+        for r in db.query(User.tenant_id, func.count(User.id).label("cnt"))
+        .filter(User.tenant_id.in_(tenant_ids), User.is_active == True)
+        .group_by(User.tenant_id).all()
+    }
+    total_forms: dict[str, int] = {
+        str(r.tenant_id): r.cnt
+        for r in db.query(Form.tenant_id, func.count(Form.id).label("cnt"))
+        .filter(Form.tenant_id.in_(tenant_ids))
+        .group_by(Form.tenant_id).all()
+    }
+    last_sub: dict[str, datetime | None] = {
+        str(r.tenant_id): r.last
+        for r in db.query(Submission.tenant_id, func.max(Submission.server_received_at).label("last"))
+        .filter(Submission.tenant_id.in_(tenant_ids))
+        .group_by(Submission.tenant_id).all()
+    }
+
+    platform_totals = {
+        "tenants": len(tenants),
+        "submissions_this_month": sum(month_subs.values()),
+        "total_submissions": sum(total_subs.values()),
+        "total_users": sum(total_users.values()),
+    }
+
     result = []
-    platform_totals = {"tenants": len(tenants), "submissions_this_month": 0, "total_submissions": 0, "total_users": 0}
-
     for t in tenants:
-        total_subs = db.query(func.count(Submission.id)).filter(Submission.tenant_id == t.id).scalar() or 0
-        month_subs = db.query(func.count(Submission.id)).filter(
-            Submission.tenant_id == t.id,
-            Submission.server_received_at >= month_start,
-        ).scalar() or 0
-        total_users = db.query(func.count(User.id)).filter(
-            User.tenant_id == t.id, User.is_active == True
-        ).scalar() or 0
-        total_forms = db.query(func.count(Form.id)).filter(Form.tenant_id == t.id).scalar() or 0
-        last_sub = db.query(func.max(Submission.server_received_at)).filter(Submission.tenant_id == t.id).scalar()
-
-        platform_totals["submissions_this_month"] += month_subs
-        platform_totals["total_submissions"] += total_subs
-        platform_totals["total_users"] += total_users
-
+        tid = str(t.id)
+        ls = last_sub.get(tid)
         result.append({
-            "tenant_id": str(t.id),
+            "tenant_id": tid,
             "tenant_name": t.name,
             "plan": getattr(t, "plan", "starter"),
-            "total_submissions": total_subs,
-            "submissions_this_month": month_subs,
-            "total_users": total_users,
-            "total_forms": total_forms,
-            "last_activity": last_sub.isoformat() if last_sub else None,
+            "total_submissions": total_subs.get(tid, 0),
+            "submissions_this_month": month_subs.get(tid, 0),
+            "total_users": total_users.get(tid, 0),
+            "total_forms": total_forms.get(tid, 0),
+            "last_activity": ls.isoformat() if ls else None,
             "created_at": t.created_at.isoformat() if t.created_at else None,
         })
 

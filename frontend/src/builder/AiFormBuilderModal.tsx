@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import api from '@/lib/api'
+import AiProgressBar from '@/components/AiProgressBar'
+import type { AiJob } from '@/lib/useAiJob'
+import type { FormListItem } from '@/types/api'
 
 interface Props {
   onClose: () => void
@@ -35,31 +38,26 @@ export default function AiFormBuilderModal({ onClose, onFormGenerated }: Props) 
   const [objectives, setObjectives] = useState('')
   const [referenceForms, setReferenceForms] = useState<{ id: string; title: string }[]>([])
   const [selectedRefIds, setSelectedRefIds] = useState<string[]>([])
-  const [loadingMsg, setLoadingMsg] = useState(LOADING_MSGS[0])
   const [msgIdx, setMsgIdx] = useState(0)
   const [generatedFormId, setGeneratedFormId] = useState('')
   const [generatedTitle, setGeneratedTitle] = useState('')
   const [error, setError] = useState('')
-  const [isBackground, setIsBackground] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const STORAGE_KEY = 'ai_form_builder_job'
 
-  useEffect(() => {
-    api.get('/forms/?status=active').then(({ data }) => {
-      setReferenceForms((data as any[]).slice(0, 20).map((f: any) => ({ id: f.id, title: f.title })))
-    }).catch(() => {})
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
-      if (msgRef.current) clearInterval(msgRef.current)
-    }
-  }, [])
+  // Synthetic AiJob for AiProgressBar
+  const syntheticJob: AiJob | null = step === 'generating'
+    ? { status: 'running', steps: LOADING_MSGS.slice(0, msgIdx + 1), result: null, error: null }
+    : step === 'error'
+    ? { status: 'failed', steps: [], result: null, error }
+    : null
 
   const startLoadingMessages = () => {
     let i = 0
     msgRef.current = setInterval(() => {
       i = (i + 1) % LOADING_MSGS.length
       setMsgIdx(i)
-      setLoadingMsg(LOADING_MSGS[i])
     }, 3500)
   }
 
@@ -70,12 +68,14 @@ export default function AiFormBuilderModal({ onClose, onFormGenerated }: Props) 
         if (data.status === 'done') {
           clearInterval(pollRef.current!)
           clearInterval(msgRef.current!)
+          localStorage.removeItem(STORAGE_KEY)
           setGeneratedFormId(formId)
           setGeneratedTitle(data.title || 'Generated Form')
           setStep('done')
         } else if (data.status === 'failed') {
           clearInterval(pollRef.current!)
           clearInterval(msgRef.current!)
+          localStorage.removeItem(STORAGE_KEY)
           setError(data.error || 'AI generation failed. Please try again.')
           setStep('error')
         }
@@ -83,10 +83,24 @@ export default function AiFormBuilderModal({ onClose, onFormGenerated }: Props) 
     }, 4000)
   }
 
+  useEffect(() => {
+    api.get('/forms/?status=active').then(({ data }) => {
+      setReferenceForms((data as FormListItem[]).slice(0, 20).map((f) => ({ id: f.id, title: f.title })))
+    }).catch(() => {})
+    const savedFormId = localStorage.getItem(STORAGE_KEY)
+    if (savedFormId) {
+      setStep('generating')
+      startLoadingMessages()
+      pollStatus(savedFormId)
+    }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+      if (msgRef.current) clearInterval(msgRef.current)
+    }
+  }, [])
+
   const handleGenerate = async () => {
     if (!objectives.trim()) return
-    const estimatedSecs = objectives.length > 500 ? 90 : 60
-    setIsBackground(estimatedSecs > 60)
     setStep('generating')
     startLoadingMessages()
     try {
@@ -96,6 +110,7 @@ export default function AiFormBuilderModal({ onClose, onFormGenerated }: Props) 
         reference_form_ids: selectedRefIds,
       })
       if (data.status === 'pending') {
+        localStorage.setItem(STORAGE_KEY, data.form_id)
         pollStatus(data.form_id)
       } else {
         // Immediate (shouldn't happen but handle gracefully)
@@ -213,26 +228,18 @@ Examples:
 
           {/* STEP: Generating */}
           {step === 'generating' && (
-            <div className="flex flex-col items-center justify-center py-12 space-y-6 text-center">
-              <div className="relative">
-                <div className="w-20 h-20 rounded-full border-4 border-catalan-primary/20 border-t-catalan-primary animate-spin" />
-                <div className="absolute inset-0 flex items-center justify-center text-3xl">🤖</div>
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-catalan-text mb-2">Building your form…</h3>
-                <p className="text-sm text-catalan-primary font-medium min-h-[20px] transition-all">{loadingMsg}</p>
-              </div>
-              <div className="flex gap-1.5">
-                {LOADING_MSGS.map((_, i) => (
-                  <div key={i} className={`w-2 h-2 rounded-full transition-all ${i === msgIdx ? 'bg-catalan-primary' : 'bg-catalan-border'}`} />
-                ))}
-              </div>
-              {isBackground && (
-                <div className="bg-catalan-warning/10 border border-catalan-warning/30 rounded-xl p-4 max-w-sm text-sm text-catalan-warning">
-                  <strong>This is running in the background.</strong><br/>
-                  You can close this window and come back in 1–2 minutes. The form will be in your Drafts when ready.
+            <div className="py-8 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="relative shrink-0">
+                  <div className="w-14 h-14 rounded-full border-4 border-catalan-primary/20 border-t-catalan-primary animate-spin" />
+                  <div className="absolute inset-0 flex items-center justify-center text-2xl">🤖</div>
                 </div>
-              )}
+                <div>
+                  <h3 className="text-base font-bold text-catalan-text">Building your form…</h3>
+                  <p className="text-xs text-catalan-textMuted mt-0.5">AI is designing sections, fields, skip logic and validation</p>
+                </div>
+              </div>
+              <AiProgressBar job={syntheticJob} label="Form generation" />
             </div>
           )}
 
@@ -276,7 +283,7 @@ Examples:
               </div>
               <div className="flex gap-3">
                 <button
-                  onClick={() => { setStep('objectives'); setError('') }}
+                  onClick={() => { setStep('objectives'); setError(''); localStorage.removeItem(STORAGE_KEY) }}
                   className="px-5 py-2.5 bg-catalan-primary text-catalan-bg rounded-xl font-semibold text-sm hover:opacity-90"
                 >
                   Try Again

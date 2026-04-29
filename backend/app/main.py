@@ -1,18 +1,24 @@
 from pathlib import Path
+import json
 import logging
+import time
+import uuid as _uuid_mod
 from contextlib import asynccontextmanager
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from app.api.router import router
 from app.core.config import settings
+from app.core.database import get_db
 from app.core.rate_limit import limiter
 from app.core.scheduler import start_scheduler, stop_scheduler
 import app.models  # noqa: F401 — ensures all FK relationships are registered
@@ -101,7 +107,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Allow the SPA to function; restrict everything else
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: blob:; "
             "connect-src 'self' https://api.deepseek.com; "
@@ -112,6 +118,46 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+# ── Structured request logging ────────────────────────────────────────────────
+_req_logger = logging.getLogger("fieldgovern.request")
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        req_id = request.headers.get("X-Request-ID") or str(_uuid_mod.uuid4())[:8]
+        start = time.monotonic()
+
+        # Extract user_id from JWT without failing if absent/invalid
+        user_id: str | None = None
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            try:
+                from jose import jwt as _jwt, JWTError
+                payload = _jwt.decode(auth[7:], settings.JWT_SECRET, algorithms=["HS256"])
+                user_id = payload.get("sub")
+            except Exception:
+                pass
+
+        response: StarletteResponse = await call_next(request)
+        duration_ms = round((time.monotonic() - start) * 1000)
+        response.headers["X-Request-ID"] = req_id
+
+        # Skip logging for static assets to avoid noise
+        path = request.url.path
+        if not path.startswith("/media/") and not path.startswith("/static/"):
+            _req_logger.info(json.dumps({
+                "req_id": req_id,
+                "method": request.method,
+                "path": path,
+                "status": response.status_code,
+                "duration_ms": duration_ms,
+                "user_id": user_id,
+            }))
+
+        return response
+
+app.add_middleware(RequestLoggingMiddleware)
 
 # ── Rate limiting (in-memory, no Redis needed) ───────────────────────────────
 app.state.limiter = limiter
@@ -135,8 +181,12 @@ app.include_router(router, prefix="/api/v1")
 
 
 @app.get("/health")
-def health():
-    return {"status": "ok"}
+def health(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    return {"status": "ok", "db": "ok"}
 
 
 # Serve React SPA — catch-all must be last

@@ -828,7 +828,7 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
           <label className={labelCls}>Options</label>
           <div className="space-y-2 mb-3">
             {(field.options ?? []).map((opt, i) => (
-              <div key={i} className="flex gap-2 items-center">
+              <div key={opt.value || i} className="flex gap-2 items-center">
                 <input className={`${inputCls} flex-1`} value={opt.label} placeholder="Option label" onChange={e => updateOption(i, { label: e.target.value })} />
                 <input className={`${inputCls} w-32 font-mono text-xs`} value={opt.value} placeholder="value" onChange={e => updateOption(i, { value: e.target.value })} />
                 <button onClick={() => removeOption(i)} className="w-8 h-8 flex items-center justify-center rounded-lg text-catalan-textMuted hover:text-catalan-error hover:bg-catalan-error/10 transition-colors flex-shrink-0 text-sm">✕</button>

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_enumerator, require_supervisor
@@ -47,7 +47,7 @@ VALID_STATUSES = {"synced", "flagged", "approved", "rejected"}
 
 
 class SubmissionUpdate(BaseModel):
-    status: Optional[str] = None
+    status: Optional[Literal["synced", "flagged", "approved", "rejected"]] = None
     flag_note: Optional[str] = None
     reviewer_name: Optional[str] = None
 
@@ -750,9 +750,6 @@ def update_submission(submission_id: str, body: SubmissionUpdate, user=Depends(r
         ).first()
         if not sub:
             raise HTTPException(status_code=404, detail="Submission not found")
-
-        if body.status is not None and body.status not in VALID_STATUSES:
-            raise HTTPException(status_code=422, detail=f"Invalid status. Must be one of: {', '.join(sorted(VALID_STATUSES))}")
 
         old_status = sub.status
         old_flag_note = sub.flag_note

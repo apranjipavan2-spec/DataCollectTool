@@ -8,7 +8,7 @@ import { useToast } from '@/lib/ToastContext'
 
 interface ToolProject {
   id: string; tool: string; name: string; program_id: string | null
-  data: any; created_at: string; updated_at: string
+  data: Record<string, unknown>; created_at: string; updated_at: string
 }
 
 interface Submission {
@@ -16,7 +16,7 @@ interface Submission {
   enumerator_name: string; status: string
   submitted_at: string | null; synced_at: string | null
   location: string | null; beneficiary_name: string | null
-  data: Record<string, any>
+  data: Record<string, unknown>
 }
 
 const STATUS_CLS: Record<string, string> = {

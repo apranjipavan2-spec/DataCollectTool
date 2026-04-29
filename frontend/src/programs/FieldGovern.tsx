@@ -10,7 +10,7 @@ import BarChart from '@/components/charts/BarChart'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface ColHeader { id: string; label: string; type: string; options: any[] }
+interface ColHeader { id: string; label: string; type: string; options: { value: string; label: string }[] }
 
 interface AnalyzerData {
   program_id: string; program_name: string; scheme: string

@@ -82,6 +82,24 @@ interface BackcheckTask {
 }
 
 interface FormMeta { id: string; title: string; version: number }
+interface Schedule {
+  id: string
+  form_id: string
+  form_title: string
+  status: string
+  due_date: string | null
+  location: string | null
+  location_id: string | null
+  program_name: string | null
+  start_date: string | null
+  end_date: string | null
+  target_count: number
+  notes: string | null
+  program_context: { scheme_name?: string; program_name: string; participant_type_name?: string } | null
+  location_context: { district?: string; block?: string; village?: string } | null
+}
+interface HistorySubmission { id: string; form_title: string; status: string; server_received_at: string | null; submitted_at: string | null; beneficiary_name: string | null; location: string | null; serial_no?: number | null; local_created_at?: string | null; data_json?: Record<string, unknown> }
+interface LocationOption { id: string; district: string; block: string; village: string }
 
 interface DraftEntry {
   id: string
@@ -102,7 +120,7 @@ export default function FieldApp() {
   const [refreshing, setRefreshing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
-  const [schedules, setSchedules] = useState<any[]>([])
+  const [schedules, setSchedules] = useState<Schedule[]>([])
   const [myStats, setMyStats] = useState<{ today: number; total: number } | null>(null)
   const [cachingTiles, setCachingTiles] = useState(false)
   const [tilesCacheMsg, setTilesCacheMsg] = useState('')
@@ -110,7 +128,7 @@ export default function FieldApp() {
   const [loadingDrafts, setLoadingDrafts] = useState(false)
   const [failedMediaCount, setFailedMediaCount] = useState(0)
   const [retryingMedia, setRetryingMedia] = useState(false)
-  const [myHistory, setMyHistory] = useState<any[]>([])
+  const [myHistory, setMyHistory] = useState<HistorySubmission[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [lowStorage, setLowStorage] = useState(false)
   const [resumingDraft, setResumingDraft] = useState<SubmissionDraft | null>(null)
@@ -120,11 +138,11 @@ export default function FieldApp() {
     program_id: string; program_name: string; scheme_name: string; questionnaire_id: string;
     participant_type_name: string; location_id: string; location_district: string; location_block: string; location_village: string;
   }>(null)
-  const [locations, setLocations] = useState<any[]>([])
+  const [locations, setLocations] = useState<LocationOption[]>([])
   const [selectedLocationId, setSelectedLocationId] = useState('')
   const [assignedArm, setAssignedArm] = useState<string | null>(null)
   const [geofenceWarning, setGeofenceWarning] = useState(false)
-  const [rosterEntries, setRosterEntries] = useState<RosterEntry[]>([])
+  const [_rosterEntries, setRosterEntries] = useState<RosterEntry[]>([])
   const [showBeneficiaryList, setShowBeneficiaryList] = useState(false)
   const [rosterInitialValues, setRosterInitialValues] = useState<Record<string, unknown> | null>(null)
   const [backchecks, setBackchecks] = useState<BackcheckTask[]>([])
@@ -349,7 +367,7 @@ export default function FieldApp() {
     }
   }
 
-  const openEdit = async (submission: any) => {
+  const openEdit = async (submission: HistorySubmission) => {
     try {
       setSyncMsg('Loading…')
       const { data } = await api.get(`/submissions/${submission.id}`)
@@ -448,7 +466,7 @@ export default function FieldApp() {
         api.get('/submissions/?page_size=200').then(r => {
           const items = r.data.items ?? r.data.submissions ?? []
           const today = new Date().toISOString().slice(0, 10)
-          const todayCount = items.filter((s: any) => s.server_received_at?.slice(0, 10) === today).length
+          const todayCount = items.filter((s: HistorySubmission) => s.server_received_at?.slice(0, 10) === today).length
           setMyStats({ today: todayCount, total: r.data.total ?? items.length })
         }).catch(() => {})
 
@@ -562,7 +580,7 @@ export default function FieldApp() {
     }
   }
 
-  const openForm = async (meta: FormMeta, schedCtx?: { programContext: any; locationContext?: any; locationId?: string }, initialValues?: Record<string, unknown>) => {
+  const openForm = async (meta: FormMeta, schedCtx?: { programContext: Record<string, unknown>; locationContext?: Record<string, unknown>; locationId?: string }, initialValues?: Record<string, unknown>) => {
     let schema: FormSchema | null = null
     try {
       const { data } = await api.get<{ json_schema: FormSchema }>(`/forms/${meta.id}`)
@@ -836,7 +854,7 @@ export default function FieldApp() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {myHistory.map((s: any) => {
+            {myHistory.map((s) => {
               const beneficiary = extractBeneficiaryName(s.data_json)
               return (
               <div key={s.id} className="bg-catalan-surface border border-catalan-border rounded-xl p-4 flex flex-col gap-3">
@@ -971,7 +989,8 @@ export default function FieldApp() {
     return (
       <BeneficiaryListScreen
         formTitle={activeForm.meta.title}
-        entries={rosterEntries}
+        formId={activeForm.meta.id}
+        userId={storedUser?.id ?? ''}
         onSelect={handleBeneficiarySelect}
         onBack={() => { setShowBeneficiaryList(false); setRosterEntries([]); setActiveForm(null) }}
       />
@@ -1019,7 +1038,7 @@ export default function FieldApp() {
                 onChange={e => {
                   const lid = e.target.value
                   setSelectedLocationId(lid)
-                  const loc = locations.find((l: any) => l.id === lid)
+                  const loc = locations.find((l) => l.id === lid)
                   if (loc) setProgramContext(p => p ? { ...p, location_id: lid, location_district: loc.district, location_block: loc.block, location_village: loc.village } : p)
                   try {
                     const raw = localStorage.getItem(`fieldgovern_prog_ctx_${activeForm.meta.id}`)
@@ -1028,7 +1047,7 @@ export default function FieldApp() {
                   } catch { }
                 }}>
                 <option value="">📍 Pick collection location…</option>
-                {locations.map((l: any) => <option key={l.id} value={l.id}>{[l.district, l.block, l.village].filter(Boolean).join(' › ')}</option>)}
+                {locations.map((l) => <option key={l.id} value={l.id}>{[l.district, l.block, l.village].filter(Boolean).join(' › ')}</option>)}
               </select>
             )}
           </div>
@@ -1183,7 +1202,7 @@ export default function FieldApp() {
                 <div className="mb-6">
                   <h2 className="text-xs font-semibold text-catalan-textMuted uppercase tracking-wider mb-3">Your Schedules</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
-                    {schedules.filter(s => s.status === 'active' || s.status === 'upcoming').map((s: any) => {
+                    {schedules.filter(s => s.status === 'active' || s.status === 'upcoming').map((s) => {
                       const pc = s.program_context; const lc = s.location_context
                       const formMeta = forms.find(f => f.id === s.form_id) ?? { id: s.form_id, title: s.form_title, version: 1 }
                       return (
@@ -1209,7 +1228,7 @@ export default function FieldApp() {
                               <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-medium ${
                                 s.status === 'active' ? 'bg-catalan-success/10 text-catalan-success' : 'bg-catalan-info/10 text-catalan-info'
                               }`}>{s.status}</span>
-                              <button onClick={() => openForm(formMeta, pc ? { programContext: pc, locationContext: lc, locationId: s.location_id } : undefined)}
+                              <button onClick={() => openForm(formMeta, pc ? { programContext: pc as Record<string, unknown>, locationContext: lc as Record<string, unknown> | undefined, locationId: s.location_id ?? undefined } : undefined)}
                                 className="text-xs px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                                 Collect →
                               </button>

@@ -58,6 +58,34 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Vendor: core React ecosystem — loaded on every page
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
+            return 'vendor-react'
+          }
+          // Charts — only loaded when analytics/dashboard open
+          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3')) {
+            return 'vendor-charts'
+          }
+          // Form builder — heavy, only on /builder route
+          if (id.includes('/src/builder/')) {
+            return 'chunk-builder'
+          }
+          // Admin — only on /admin route
+          if (id.includes('/src/admin/')) {
+            return 'chunk-admin'
+          }
+          // Programs / FieldGovern — only on /programs route
+          if (id.includes('/src/programs/') || id.includes('/src/fg/')) {
+            return 'chunk-programs'
+          }
+        },
+      },
+    },
+  },
   // wa-sqlite ships WASM files that Emscripten loads via import.meta.url.
   // Excluding it from pre-bundling preserves those relative URL references.
   optimizeDeps: {

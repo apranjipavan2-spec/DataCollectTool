@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react'
+import type { FormListItem, ProgramListItem } from '@/types/api'
 import { getStorage } from '@/storage'
 import InfoButton from '@/help/InfoButton'
-import NewFormWizard from '@/builder/NewFormWizard'
 import api, { getStoredUser } from '@/lib/api'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
@@ -11,9 +11,10 @@ import { Card, Button, Modal, Loading, Alert, Pagination, DashboardSkeleton } fr
 import BarChart from '@/components/charts/BarChart'
 import LineChart from '@/components/charts/LineChart'
 import AuditLog from '@/components/AuditLog'
-import RosterTab from '@/dashboard/RosterTab'
 import AiReportModal from '@/dashboard/AiReportModal'
-import AnalyticsTab from '@/dashboard/AnalyticsTab'
+const RosterTab = lazy(() => import('@/dashboard/RosterTab'))
+const AnalyticsTab = lazy(() => import('@/dashboard/AnalyticsTab'))
+const NewFormWizard = lazy(() => import('@/builder/NewFormWizard'))
 
 const MiniMap = lazy(() => import('@/renderer/fields/MiniMap'))
 
@@ -38,6 +39,7 @@ interface Submission {
   server_received_at: string
   has_violations?: boolean
   backcheck_required?: boolean
+  duplicate_suspect?: boolean
   data_json?: Record<string, unknown>
 }
 
@@ -742,7 +744,7 @@ export default function Dashboard() {
       api.get('/forms/').then(r => {
         const fs = r.data.forms ?? r.data ?? []
         setForms(fs)
-        setFormEditOverrides(fs.map((f: any) => ({ id: f.id, title: f.title, allow_enumerator_edit: f.allow_enumerator_edit ?? null })))
+        setFormEditOverrides(fs.map((f: FormListItem) => ({ id: f.id, title: f.title, allow_enumerator_edit: f.allow_enumerator_edit ?? null })))
       }),
       api.get('/tenants/branding').then(r => { if (r.data.id) setMyTenantId(r.data.id); if (typeof r.data.allow_enumerator_edit === 'boolean') setAllowEnumeratorEdit(r.data.allow_enumerator_edit) }).catch(() => {}),
     ]
@@ -756,7 +758,7 @@ export default function Dashboard() {
         api.get('/export/sheets/status').then(r => setSheetsConfigured(r.data.configured)).catch(() => setSheetsConfigured(false)),
         api.get('/programs/').then(r => {
           const ps = r.data ?? []
-          setProgramEditOverrides(ps.map((p: any) => ({ id: p.id, name: p.name, allow_enumerator_edit: p.allow_enumerator_edit ?? null })))
+          setProgramEditOverrides(ps.map((p: ProgramListItem) => ({ id: p.id, name: p.name, allow_enumerator_edit: p.allow_enumerator_edit ?? null })))
         }).catch(() => {}),
       )
     }
@@ -786,7 +788,7 @@ export default function Dashboard() {
     if (dateFrom && s.server_received_at < dateFrom) return false
     if (dateTo && s.server_received_at.slice(0, 10) > dateTo) return false
     if (filterViolations && !s.has_violations) return false
-    if (filterDupSuspect && !(s as any).duplicate_suspect) return false
+    if (filterDupSuspect && !s.duplicate_suspect) return false
     if (filterBackcheck && !s.backcheck_required) return false
     return true
   }), [submissions, filterForm, search, dateFrom, dateTo, filterViolations, filterDupSuspect, filterBackcheck])
@@ -1349,7 +1351,11 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-catalan-bg">
       {/* New form wizard */}
-      {showNewFormWizard && <NewFormWizard onClose={() => setShowNewFormWizard(false)} />}
+      {showNewFormWizard && (
+        <Suspense fallback={null}>
+          <NewFormWizard onClose={() => setShowNewFormWizard(false)} />
+        </Suspense>
+      )}
 
       {/* Submission detail modal */}
       {detailSub && (
@@ -2090,7 +2096,9 @@ export default function Dashboard() {
             <div className="space-y-6">
 
               {/* Recharts analytics section */}
-              <AnalyticsTab forms={forms} />
+              <Suspense fallback={<div className="py-10 text-center text-catalan-textMuted text-sm">Loading…</div>}>
+                <AnalyticsTab forms={forms} />
+              </Suspense>
 
               {/* Status breakdown */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -2100,7 +2108,7 @@ export default function Dashboard() {
                   { label: 'Flagged', key: 'flagged', color: 'catalan-warning' },
                   { label: 'Rejected', key: 'rejected', color: 'catalan-error' },
                 ].map(({ label, key, color }) => {
-                  const cnt = summary?.by_status?.[key] ?? (summary as any)?.[key] ?? 0
+                  const cnt = summary?.by_status?.[key] ?? 0
                   const total = summary?.total ?? 0
                   const pct = total > 0 ? Math.round((cnt / total) * 100) : 0
                   return (
@@ -2396,7 +2404,9 @@ export default function Dashboard() {
 
           {/* ── ROSTER ── */}
           {tab === 'roster' && (
-            <RosterTab forms={forms} team={team} />
+            <Suspense fallback={<div className="py-20 text-center text-catalan-textMuted text-sm">Loading…</div>}>
+              <RosterTab forms={forms} team={team} />
+            </Suspense>
           )}
 
           {/* ── INTEGRATIONS moved to Settings (/admin/org) ── */}

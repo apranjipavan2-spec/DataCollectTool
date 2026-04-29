@@ -1,25 +1,6 @@
+import React, { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import Dashboard           from '@/dashboard/Dashboard.modern'
-import FormBuilder         from '@/builder/FormBuilder.modern'
-import LoginPage           from '@/auth/LoginPage'
-import ForgotPasswordPage  from '@/auth/ForgotPasswordPage'
-import ResetPasswordPage   from '@/auth/ResetPasswordPage'
-import QrLoginPage         from '@/auth/QrLoginPage'
 import RequireAuth, { homeForRole } from '@/auth/RequireAuth'
-import FieldApp       from '@/collect/FieldApp.modern'
-import AdminPanel     from '@/admin/AdminPanel.modern'
-import OrgAdminPanel  from '@/admin/OrgAdminPanel.modern'
-import UserProfile    from '@/profile/UserProfile'
-import ProgramsPage        from '@/programs/ProgramsPage'
-import FieldGovern         from '@/programs/FieldGovern'
-import FgAnalyzer          from '@/programs/FgAnalyzer'
-import FgCleaner           from '@/programs/FgCleaner'
-import FgWriter            from '@/reports/FgWriter'
-import FileManagerPage     from '@/fg/FileManagerPage'
-import SuperAdminMonitor   from '@/admin/SuperAdminMonitor'
-import MigrationPage      from '@/migration/MigrationPage'
-import FieldMapPage       from '@/map/FieldMapPage'
-import PublicSurveyPage   from '@/collect/PublicSurveyPage'
 import { LanguageProvider } from '@/i18n/LanguageContext'
 import { ToastProvider } from '@/lib/ToastContext'
 import { ThemeProvider } from '@/lib/ThemeContext'
@@ -31,6 +12,37 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 import { HelpProvider } from '@/help/HelpContext'
 import HelpPanel from '@/help/HelpPanel'
 import HelpSpotlight from '@/help/HelpSpotlight'
+
+// Route-level code splitting — each lazy() call becomes a separate dynamic import.
+// This is what makes manualChunks actually defer loading instead of just splitting files.
+const Dashboard       = lazy(() => import('@/dashboard/Dashboard.modern'))
+const FormBuilder     = lazy(() => import('@/builder/FormBuilder.modern'))
+const LoginPage       = lazy(() => import('@/auth/LoginPage'))
+const ForgotPasswordPage = lazy(() => import('@/auth/ForgotPasswordPage'))
+const ResetPasswordPage  = lazy(() => import('@/auth/ResetPasswordPage'))
+const QrLoginPage     = lazy(() => import('@/auth/QrLoginPage'))
+const FieldApp        = lazy(() => import('@/collect/FieldApp.modern'))
+const AdminPanel      = lazy(() => import('@/admin/AdminPanel.modern'))
+const OrgAdminPanel   = lazy(() => import('@/admin/OrgAdminPanel.modern'))
+const UserProfile     = lazy(() => import('@/profile/UserProfile'))
+const ProgramsPage    = lazy(() => import('@/programs/ProgramsPage'))
+const FieldGovern     = lazy(() => import('@/programs/FieldGovern'))
+const FgAnalyzer      = lazy(() => import('@/programs/FgAnalyzer'))
+const FgCleaner       = lazy(() => import('@/programs/FgCleaner'))
+const FgWriter        = lazy(() => import('@/reports/FgWriter'))
+const FileManagerPage = lazy(() => import('@/fg/FileManagerPage'))
+const SuperAdminMonitor = lazy(() => import('@/admin/SuperAdminMonitor'))
+const MigrationPage   = lazy(() => import('@/migration/MigrationPage'))
+const FieldMapPage    = lazy(() => import('@/map/FieldMapPage'))
+const PublicSurveyPage = lazy(() => import('@/collect/PublicSurveyPage'))
+
+function PageLoader() {
+  return (
+    <div className="min-h-screen bg-catalan-bg flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-catalan-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+}
 
 function FloatingContact() {
   return (
@@ -55,31 +67,21 @@ function RoleHome() {
   return <Navigate to={user ? homeForRole(user.role) : '/login'} replace />
 }
 
-// ── Session timeout manager ─────────────────────────────────────────────────
-// Lives inside BrowserRouter so it can read location (for future use)
-// but outside RequireAuth so it always runs.
-
 function SessionTimeoutManager() {
   const user = getStoredUser()
 
   const handleExpire = () => {
-    // Save any in-progress form draft before logging out
-    // The FormBuilder keeps draft in localStorage automatically (auto-save),
-    // but we do a final flush here just in case the debounce hadn't fired yet.
     const draft = loadFormDraft()
-    if (draft) {
-      saveFormDraft(draft.schema, draft.formId)   // re-save to ensure it's fresh
-    }
+    if (draft) saveFormDraft(draft.schema, draft.formId)
     logout()
   }
 
   const { remaining, isWarning, extend } = useSessionTimeout({
-    warnAfterMs:   28 * 60 * 1000,   // 28 minutes
-    expireAfterMs: 30 * 60 * 1000,   // 30 minutes
+    warnAfterMs:   28 * 60 * 1000,
+    expireAfterMs: 30 * 60 * 1000,
     onExpire: handleExpire,
   })
 
-  // Don't show modal if user is not logged in
   if (!user || !isWarning) return null
 
   return (
@@ -91,7 +93,15 @@ function SessionTimeoutManager() {
   )
 }
 
-// ── App ─────────────────────────────────────────────────────────────────────
+function LazyRoute({ children }: { children: React.ReactNode }) {
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<PageLoader />}>
+        {children}
+      </Suspense>
+    </ErrorBoundary>
+  )
+}
 
 export default function App() {
   return (
@@ -106,89 +116,69 @@ export default function App() {
             <HelpPanel />
             <HelpSpotlight />
             <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-              <Route path="/auth/qr-login" element={<QrLoginPage />} />
+              <Route path="/login" element={<LazyRoute><LoginPage /></LazyRoute>} />
+              <Route path="/forgot-password" element={<LazyRoute><ForgotPasswordPage /></LazyRoute>} />
+              <Route path="/reset-password" element={<LazyRoute><ResetPasswordPage /></LazyRoute>} />
+              <Route path="/auth/qr-login" element={<LazyRoute><QrLoginPage /></LazyRoute>} />
 
               <Route path="/" element={
                 <RequireAuth roles={['org_admin', 'supervisor', 'enumerator']}>
-                  <ErrorBoundary>
-                    <Dashboard />
-                  </ErrorBoundary>
+                  <LazyRoute><Dashboard /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/builder" element={
                 <RequireAuth roles={['org_admin']}>
-                  <ErrorBoundary>
-                    <FormBuilder />
-                  </ErrorBoundary>
+                  <LazyRoute><FormBuilder /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/collect" element={
                 <RequireAuth>
-                  <ErrorBoundary>
-                    <FieldApp />
-                  </ErrorBoundary>
+                  <LazyRoute><FieldApp /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/admin" element={
                 <RequireAuth roles={['master_admin']}>
-                  <ErrorBoundary>
-                    <AdminPanel />
-                  </ErrorBoundary>
+                  <LazyRoute><AdminPanel /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/admin/org" element={<Navigate to="/fg/settings" replace />} />
               <Route path="/fg/settings" element={
                 <RequireAuth roles={['master_admin', 'org_admin', 'supervisor']}>
-                  <ErrorBoundary>
-                    <OrgAdminPanel />
-                  </ErrorBoundary>
+                  <LazyRoute><OrgAdminPanel /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/programs" element={
                 <RequireAuth roles={['org_admin', 'supervisor']}>
-                  <ErrorBoundary>
-                    <ProgramsPage />
-                  </ErrorBoundary>
+                  <LazyRoute><ProgramsPage /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/programs/:programId/govern" element={
                 <RequireAuth roles={['org_admin', 'supervisor']}>
-                  <ErrorBoundary>
-                    <FieldGovern />
-                  </ErrorBoundary>
+                  <LazyRoute><FieldGovern /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/monitor" element={
                 <RequireAuth roles={['master_admin']}>
-                  <ErrorBoundary>
-                    <SuperAdminMonitor />
-                  </ErrorBoundary>
+                  <LazyRoute><SuperAdminMonitor /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/profile" element={
                 <RequireAuth>
-                  <ErrorBoundary>
-                    <UserProfile />
-                  </ErrorBoundary>
+                  <LazyRoute><UserProfile /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/migration" element={
                 <RequireAuth roles={['org_admin', 'master_admin']}>
-                  <ErrorBoundary>
-                    <MigrationPage />
-                  </ErrorBoundary>
+                  <LazyRoute><MigrationPage /></LazyRoute>
                 </RequireAuth>
               } />
 
@@ -196,48 +186,36 @@ export default function App() {
 
               <Route path="/fg/analyzer" element={
                 <RequireAuth roles={['org_admin', 'supervisor']}>
-                  <ErrorBoundary>
-                    <FgAnalyzer />
-                  </ErrorBoundary>
+                  <LazyRoute><FgAnalyzer /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/fg/cleaner" element={
                 <RequireAuth roles={['org_admin', 'supervisor']}>
-                  <ErrorBoundary>
-                    <FgCleaner />
-                  </ErrorBoundary>
+                  <LazyRoute><FgCleaner /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/fg/writer" element={
                 <RequireAuth roles={['org_admin', 'supervisor']}>
-                  <ErrorBoundary>
-                    <FgWriter />
-                  </ErrorBoundary>
+                  <LazyRoute><FgWriter /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/fg/files" element={
                 <RequireAuth roles={['org_admin', 'supervisor']}>
-                  <ErrorBoundary>
-                    <FileManagerPage />
-                  </ErrorBoundary>
+                  <LazyRoute><FileManagerPage /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/map" element={
                 <RequireAuth roles={['org_admin', 'supervisor']}>
-                  <ErrorBoundary>
-                    <FieldMapPage />
-                  </ErrorBoundary>
+                  <LazyRoute><FieldMapPage /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/survey/:token" element={
-                <ErrorBoundary>
-                  <PublicSurveyPage />
-                </ErrorBoundary>
+                <LazyRoute><PublicSurveyPage /></LazyRoute>
               } />
 
               <Route path="*" element={<RoleHome />} />

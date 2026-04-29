@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useHelp } from '@/help/HelpContext'
 import AppLogo from '@/components/AppLogo'
-import { useLanguage, LANGUAGE_OPTIONS } from '@/i18n/LanguageContext'
+import { useLanguage, LANGUAGE_OPTIONS, type AppLanguage } from '@/i18n/LanguageContext'
 
 interface SidebarItem {
   label: string
@@ -67,7 +67,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
         <div className="px-2 pb-2 border-t border-catalan-border pt-2">
           <select
             value={language}
-            onChange={e => setLanguage(e.target.value as any)}
+            onChange={e => setLanguage(e.target.value as AppLanguage)}
             title="Language"
             className="w-full border border-catalan-border rounded-lg px-2 py-1.5 text-xs bg-catalan-bg text-catalan-text focus:outline-none focus:border-catalan-primary transition-colors cursor-pointer"
           >
@@ -178,7 +178,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
             <span className="text-xs text-catalan-textMuted flex-shrink-0">🌐</span>
             <select
               value={language}
-              onChange={e => setLanguage(e.target.value as any)}
+              onChange={e => setLanguage(e.target.value as AppLanguage)}
               className="flex-1 border border-catalan-border rounded-lg px-2 py-1.5 text-xs bg-catalan-bg text-catalan-text focus:outline-none focus:border-catalan-primary cursor-pointer"
             >
               {LANGUAGE_OPTIONS.map(opt => (

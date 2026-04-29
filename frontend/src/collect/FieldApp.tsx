@@ -10,6 +10,7 @@ import { compressImage } from '@/utils/imageCompress'
 type Screen = 'list' | 'drafts' | 'collecting' | 'submitted'
 
 interface FormMeta { id: string; title: string; version: number }
+interface Schedule { id: string; form_title: string; status: string; due_date: string | null; location: string | null; program_name: string | null }
 
 export default function FieldApp() {
   const [screen, setScreen]           = useState<Screen>('list')
@@ -20,7 +21,7 @@ export default function FieldApp() {
   const [loading, setLoading]         = useState(true)
   const [syncMsg, setSyncMsg]         = useState('')
   const [isOffline, setIsOffline]     = useState(!navigator.onLine)
-  const [schedules, setSchedules]   = useState<any[]>([])
+  const [schedules, setSchedules]   = useState<Schedule[]>([])
   const syncRef = useRef<() => Promise<void>>()   // stable ref so online/SW handlers always call latest
   const { language, setLanguage } = useLanguage()
 
@@ -222,8 +223,7 @@ export default function FieldApp() {
     const store = await getStorage()
     for (const [fieldName, value] of Object.entries(draft.values)) {
       if (typeof value === 'string' && value.startsWith('data:image/')) {
-        const { dataUri: compressed, sizeKB } = await compressImage(value)
-        console.log(`[FieldApp] Photo '${fieldName}' compressed to ${sizeKB.toFixed(0)}KB`)
+        const { dataUri: compressed } = await compressImage(value)
         await store.saveMediaItem({
           id: uuidv4(), submissionId: draft.id, fieldName,
           fileType: 'photo', dataUri: compressed, status: 'pending',
@@ -322,7 +322,7 @@ export default function FieldApp() {
         {schedules.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             <div style={{ color: '#89b4fa', fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Your Schedules</div>
-            {schedules.filter(s => s.status === 'active' || s.status === 'upcoming').map((s: any) => (
+            {schedules.filter(s => s.status === 'active' || s.status === 'upcoming').map((s) => (
               <div key={s.id} style={{
                 background: '#1e1e2e', border: '1px solid #2a2a3e', borderRadius: 10,
                 padding: '12px 16px', marginBottom: 8,

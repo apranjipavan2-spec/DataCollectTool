@@ -40,12 +40,15 @@ export class OpfsAdapter implements StorageAdapter {
     })
 
     this.worker.addEventListener('error', (e) => {
-      console.error('[OpfsAdapter] Worker error', e.message)
+      const err = new Error(`SQLite worker crashed: ${e.message}`)
+      for (const [id, p] of this.pending) {
+        this.pending.delete(id)
+        p.reject(err)
+      }
     })
 
     // Warm-up: blocks until the Worker has finished its own init (schema creation)
     await this._query('SELECT 1')
-    console.log('[OpfsAdapter] init — wa-sqlite/OPFS')
   }
 
   async requestPersistence(): Promise<boolean> {
@@ -58,7 +61,14 @@ export class OpfsAdapter implements StorageAdapter {
   private _query(sql: string, params?: unknown[]): Promise<SQLiteResultSet[]> {
     return new Promise((resolve, reject) => {
       const id = this.nextId++
-      this.pending.set(id, { resolve, reject })
+      const timer = setTimeout(() => {
+        this.pending.delete(id)
+        reject(new Error(`SQLite query timed out after 10s: ${sql.slice(0, 80)}`))
+      }, 10_000)
+      this.pending.set(id, {
+        resolve: (r) => { clearTimeout(timer); resolve(r) },
+        reject:  (e) => { clearTimeout(timer); reject(e) },
+      })
       this.worker.postMessage({ id, sql, params })
     })
   }

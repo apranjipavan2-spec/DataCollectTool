@@ -4,6 +4,7 @@
  */
 import { useState, useEffect } from 'react'
 import api from '@/lib/api'
+import type { FormListItem, ProgramListItem } from '@/types/api'
 
 const ALL_EVENTS = [
   { id: 'submission.created',  label: 'New submission synced' },
@@ -527,11 +528,11 @@ function OrgSettingsSection() {
     }).catch(() => {})
     api.get('/forms/').then(r => {
       const fs = r.data?.forms ?? r.data ?? []
-      setFormOverrides(fs.map((f: any) => ({ id: f.id, title: f.title, allow_enumerator_edit: f.allow_enumerator_edit ?? null })))
+      setFormOverrides(fs.map((f: FormListItem) => ({ id: f.id, title: f.title, allow_enumerator_edit: f.allow_enumerator_edit ?? null })))
     }).catch(() => {})
     api.get('/programs/').then(r => {
       const ps = Array.isArray(r.data) ? r.data : []
-      setProgramOverrides(ps.map((p: any) => ({ id: p.id, name: p.name, allow_enumerator_edit: p.allow_enumerator_edit ?? null })))
+      setProgramOverrides(ps.map((p: ProgramListItem) => ({ id: p.id, name: p.name, allow_enumerator_edit: p.allow_enumerator_edit ?? null })))
     }).catch(() => {})
   }, [])
 

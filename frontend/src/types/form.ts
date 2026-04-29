@@ -6,6 +6,7 @@ export type FieldType =
   | 'calculated' | 'repeat_group' | 'note' | 'rating' | 'signature'
 
 export interface SkipCondition {
+  _key?: string  // stable React key — not sent to backend
   field: string
   operator: 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte' | 'contains' | 'is_empty' | 'is_not_empty'
   value?: string | number  // optional — not needed for is_empty / is_not_empty
@@ -13,6 +14,7 @@ export interface SkipCondition {
 
 /** A group of conditions joined by AND/OR, possibly containing nested sub-groups. */
 export interface ConditionGroup {
+  _key?: string  // stable React key — not sent to backend
   logic: 'AND' | 'OR'
   conditions: (SkipCondition | ConditionGroup)[]
 }

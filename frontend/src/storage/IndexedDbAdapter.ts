@@ -41,7 +41,6 @@ const db = new FieldGovernDB()
 export class IndexedDbAdapter implements StorageAdapter {
   async init(): Promise<void> {
     await db.open()
-    console.log('[IndexedDbAdapter] init — Dexie.js/IndexedDB')
   }
 
   async requestPersistence(): Promise<boolean> {

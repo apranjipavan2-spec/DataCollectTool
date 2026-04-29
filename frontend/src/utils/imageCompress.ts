@@ -61,11 +61,6 @@ export async function compressImage(
           sizeKB = compressed.length * 0.75 / 1024;
         }
 
-        console.log(
-          `[ImageCompress] ${img.naturalWidth}x${img.naturalHeight} → ${width}x${height}, ` +
-          `${sizeKB.toFixed(0)}KB (q=${q.toFixed(1)})`
-        );
-
         resolve({ dataUri: compressed, sizeKB });
       } catch (e) {
         reject(e);

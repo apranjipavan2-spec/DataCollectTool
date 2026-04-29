@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import api, { getStoredUser } from '@/lib/api'
+import AiProgressBar from '@/components/AiProgressBar'
+import type { AiJob } from '@/lib/useAiJob'
+import type { ApiFieldOption, TabulationRow } from '@/types/api'
 import Modal from '@/components/ui/Modal'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
@@ -14,7 +17,7 @@ import {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface ColHeader { id: string; label: string; type: string; options: any[] }
+interface ColHeader { id: string; label: string; type: string; options: ApiFieldOption[] }
 interface Program { id: string; name: string; scheme_name: string; status: string }
 interface ProgramSummary {
   program_id: string; program_name: string; scheme: string
@@ -131,7 +134,7 @@ function OverviewTab({ summary, fullData }: { summary: ProgramSummary; fullData:
       )}
 
       <div className={card}>
-        <div className={sh}>Form Fields ({fullData ? fullData.column_headers.length : (summary as any).column_count ?? 0})</div>
+        <div className={sh}>Form Fields ({fullData ? fullData.column_headers.length : summary.column_count ?? 0})</div>
         {fullData ? (
           <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
             {fullData.column_headers.map(c => (
@@ -557,13 +560,10 @@ function TabulatorTab({ programId, cols, sampleRows }: { programId: string; cols
         </div>
 
         {autoStatus === 'pending' ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 text-sm text-catalan-primary font-medium">
-              <div className="w-4 h-4 border-2 border-catalan-primary border-t-transparent rounded-full animate-spin shrink-0" />
-              {AI_MSGS[autoMsgIdx]}
-            </div>
-            <p className="text-xs text-catalan-textMuted">AI is analyzing your dataset — ~2 minutes. You can navigate away and come back.</p>
-          </div>
+          <AiProgressBar
+            job={{ status: 'running', steps: [AI_MSGS[autoMsgIdx]], result: null, error: null } satisfies AiJob}
+            label="AI Insights"
+          />
         ) : autoStatus === 'failed' ? (
           <div className="space-y-2">
             <p className="text-sm text-catalan-error">{autoError}</p>
@@ -614,6 +614,12 @@ function TabulatorTab({ programId, cols, sampleRows }: { programId: string; cols
             onChange={e => setPrompt(e.target.value)}
             placeholder={`e.g. "Create a district-wise distribution of samples across benefit year"\nor leave blank to let AI suggest all useful tables for this data`}
           />
+          {aiLoading && (
+            <AiProgressBar
+              job={{ status: 'running', steps: ['Analyzing columns and designing tabulations…'], result: null, error: null } satisfies AiJob}
+              label="AI Suggest"
+            />
+          )}
           <div className="flex gap-2">
             <button onClick={callSuggest} disabled={aiLoading || !cols.length} className={btnPr}>
               {aiLoading ? '✨ Thinking…' : '✨ AI Suggest'}
@@ -1092,7 +1098,7 @@ function CsvTab() {
       {result && (
         <div className={card}>
           <div className="font-semibold text-catalan-text mb-3">{result.title || 'Result'}</div>
-          <BarChart data={result.rows.slice(0, 20).map((r: any) => ({ label: r.group, value: r.value }))}
+          <BarChart data={result.rows.slice(0, 20).map((r: TabulationRow) => ({ label: r.group, value: r.value }))}
             height={Math.max(120, Math.min(result.rows.length * 30 + 8, 300))} />
           <div className="overflow-x-auto rounded-lg border border-catalan-border mt-4">
             <table className="w-full text-sm">
@@ -1103,7 +1109,7 @@ function CsvTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-catalan-border">
-                {result.rows.map((r: any, i: number) => (
+                {result.rows.map((r: TabulationRow, i: number) => (
                   <tr key={i} className="hover:bg-catalan-hover">
                     <td className="px-3 py-2 text-catalan-text">{r.group}</td>
                     <td className="px-3 py-2 text-right font-semibold text-catalan-primary">{r.value}</td>
