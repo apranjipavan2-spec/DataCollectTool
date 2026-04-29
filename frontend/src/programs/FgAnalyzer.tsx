@@ -42,10 +42,6 @@ interface AnalyzerData {
   sample_rows: Record<string, any>[]
   quality: { total: number; flagged: number; approved: number; violations: number; quality_score: number }
 }
-interface Wave {
-  questionnaire_id: string; name: string; wave_number: number | null
-  wave_label: string | null; panel_key: string | null
-}
 interface AttritionData {
   is_panel_study: boolean; program_name?: string
   waves: { questionnaire_id: string; wave_number: number; wave_label: string; total: number; unique_respondents: number }[]
@@ -172,7 +168,7 @@ interface HistoryRecord {
 }
 
 function TabulationCard({ tab, onDelete, onUpdate, programId }: {
-  tab: SavedTabulation; onDelete: () => void; onUpdate: (t: SavedTabulation) => void; programId: string
+  tab: SavedTabulation; onDelete: () => void; onUpdate: (t: SavedTabulation) => Promise<void> | void; programId: string
 }) {
   const toast = useToast()
   const [expanded, setExpanded] = useState(false)
@@ -198,7 +194,7 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
   const [pendingInterpretation, setPendingInterpretation] = useState<string | null>(null)
 
   const colLabels: Record<string, string> = { ...tab.column_labels, ...editColLabels }
-  const lbl = (k: string) => colLabels[k] || k
+  const lbl = (k: string) => (k && colLabels[k]) || k || ''
 
   const submitFeedback = async (vote: 'up' | 'down') => {
     const next = feedback === vote ? null : vote
@@ -284,10 +280,14 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
 
   const discardPending = () => setPendingInterpretation(null)
 
-  const saveInterpretation = useCallback(() => {
-    onUpdate({ ...tab, interpretation })
-    setInterpChanged(false)
-  }, [tab, interpretation, onUpdate])
+  const saveInterpretation = useCallback(async () => {
+    try {
+      await onUpdate({ ...tab, interpretation })
+      setInterpChanged(false)
+    } catch {
+      toast.error('Auto-save failed — changes not persisted')
+    }
+  }, [tab, interpretation, onUpdate, toast])
 
   // Auto-save interpretation 2s after user stops typing
   useEffect(() => {
@@ -1607,7 +1607,6 @@ export default function FgAnalyzer() {
     ...(isOrgAdmin ? [{ key: 'csv' as AnalyzerTab, label: 'CSV Upload' }] : []),
   ]
   const [programId, setProgramId] = useState(getLastProgram())
-  const [progName, setProgName] = useState('')
   const [tab, setTab] = useState<AnalyzerTab>('overview')
   const [summary, setSummary] = useState<ProgramSummary | null>(null)
   const [data, setData] = useState<AnalyzerData | null>(null)
@@ -1623,7 +1622,6 @@ export default function FgAnalyzer() {
       const res = await api.get(`/fg/programs/${id}/summary`)
       const d = res.data
       setSummary(d)
-      setProgName(d.program_name)
     } catch (e: any) {
       setError(e.response?.data?.detail || 'Failed to load program summary')
     } finally {
@@ -1670,7 +1668,7 @@ export default function FgAnalyzer() {
           }
           rightContent={
             <div className="flex items-center gap-3">
-              <ProgramPicker value={programId} onChange={(id, name) => { setProgramId(id); setProgName(name) }} />
+              <ProgramPicker value={programId} onChange={(id) => { setProgramId(id) }} />
               {programId && <button onClick={() => loadSummary(programId)} className={btnSe}>Refresh</button>}
             </div>
           }

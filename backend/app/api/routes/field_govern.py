@@ -1328,6 +1328,7 @@ async def _run_ai_generation(
                 "sub_keys": rd.get("sub_keys", []),
                 "is_cross_tab": rd["is_cross_tab"],
                 "total": rd["total"],
+                "column_labels": cfg.get("column_labels", {}),
                 "created_at": datetime.now(timezone.utc).isoformat(),
             })
 

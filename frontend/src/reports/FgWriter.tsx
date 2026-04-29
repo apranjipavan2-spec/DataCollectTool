@@ -243,7 +243,8 @@ export default function FgWriter() {
     const tabulationData = activeTabs.length
       ? activeTabs.map(t =>
           `### ${t.title}\n${t.description}\n\n` +
-          t.rows.slice(0, 30).map(r => `${r.group}: ${r.value}`).join('\n')
+          t.rows.slice(0, 30).map(r => `${r.group}: ${r.value}`).join('\n') +
+          (t.interpretation ? `\n\n**Interpretation:** ${t.interpretation}` : '')
         ).join('\n\n---\n\n')
       : ''
     setReportMd('')

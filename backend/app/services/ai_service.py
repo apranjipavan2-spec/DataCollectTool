@@ -77,7 +77,10 @@ async def suggest_skip_logic(cfg: dict, question_text: str, form_fields: list) -
     raw = await _call_llm(cfg, prompt)
     match = re.search(r'\[.*\]', raw, re.DOTALL)
     if match:
-        return json.loads(match.group())
+        try:
+            return json.loads(match.group())
+        except Exception:
+            pass
     return []
 
 
@@ -123,7 +126,10 @@ async def translate_labels(cfg: dict, labels: list, target_lang: str) -> list:
     raw = await _call_llm(cfg, prompt)
     match = re.search(r'\[.*\]', raw, re.DOTALL)
     if match:
-        return json.loads(match.group())
+        try:
+            return json.loads(match.group())
+        except Exception:
+            pass
     return labels
 
 
