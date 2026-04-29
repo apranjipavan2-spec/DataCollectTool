@@ -93,6 +93,10 @@
 4. **User dependency is a dict**: use `user["tenant_id"]`, not `user.tenant_id`
 5. **TopNav breadcrumbs**: use `path` not `href`
 6. **localStorage**: always namespace by entity ID (e.g. `fg_tabs_{programId}`)
+7. **Migrations — never use `CONCURRENTLY`**: `CREATE INDEX CONCURRENTLY` requires autocommit but Alembic wraps migrations in a transaction. Use plain `CREATE INDEX IF NOT EXISTS`. Same for `DROP INDEX CONCURRENTLY`.
+8. **Migrations — always idempotent**: Use `ADD COLUMN IF NOT EXISTS` via `op.get_bind().execute(sa.text(...))` — never `op.add_column()` which errors if column exists. Production DBs may have columns applied manually out of order.
+9. **Vite manualChunks — vendor only**: Never put `/src/` app code in `manualChunks`. Grouping app modules creates cross-chunk circular TDZ crashes. Only vendor packages (react, recharts, d3) belong in manual chunks. App chunks are created automatically by `React.lazy()` in App.tsx.
+10. **Leaflet**: Already installed as npm package. Always `import L from 'leaflet'` + `import 'leaflet/dist/leaflet.css'`. Never load from CDN — CSP blocks it. Map tiles need `https://*.tile.openstreetmap.org` in CSP `img-src`.
 
 ---
 
@@ -183,7 +187,7 @@ DataCollectTool/
 
 # Database Migrations
 
-Current: **0025** (`backend/alembic/versions/`)
+Current: **0033** (`backend/alembic/versions/`)
 
 | Migration | Key Change |
 |-----------|-----------|
@@ -197,6 +201,11 @@ Current: **0025** (`backend/alembic/versions/`)
 | 0023 | `submissions.roster_id`, `respondent_roster.extra_data` |
 | 0024 | `locations` table, `respondent_roster.location_id` |
 | 0025 | `program_questionnaires.{wave_number, wave_label, panel_key}`, `programs.is_panel_study`, `submissions.household_id` |
+| 0026–0029 | Program analysis, backcheck, program location, user tool projects |
+| 0030 | Indexes on `submissions` for program/tenant/enumerator/questionnaire queries |
+| 0031 | `forms.allow_enumerator_edit`, `programs.allow_enumerator_edit` |
+| 0032 | Partial index on `data_json->>'_duplicate_suspect'` |
+| 0033 | Composite index on `submissions(tenant_id, form_id)` |
 
 **Add migration:**
 ```bash
