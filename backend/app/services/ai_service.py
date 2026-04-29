@@ -161,6 +161,74 @@ async def suggest_tabulation(cfg: dict, column_headers: list, sample_rows: list,
     return {"tables": []}
 
 
+async def smart_build_tabulation(
+    cfg: dict,
+    selected_cols: list,
+    unique_values: dict,
+    sample_rows: list,
+    query: str = "",
+) -> dict:
+    """
+    Design ONE optimised table from user-selected columns or a natural language query.
+    Returns a single table spec with clean column_labels already set.
+    """
+    has_unique = bool(unique_values)
+
+    cols_block = "\n".join(
+        f"  - id={c.get('id')} | label=\"{c.get('label', c.get('id'))}\" | type={c.get('type','text')}"
+        + (
+            f" | unique values ({len(unique_values.get(c.get('id',''), []))}): "
+            f"{unique_values.get(c.get('id',''), [])[:12]}"
+            if has_unique and c.get('id') in unique_values else ""
+        )
+        for c in selected_cols
+    )
+
+    sample_block = json.dumps(sample_rows[:6], ensure_ascii=False) if sample_rows else "none"
+
+    if query.strip():
+        task = (
+            f"User question: \"{query.strip()}\"\n"
+            f"Design the best table to answer this question using the available columns above."
+        )
+    else:
+        task = "Design the most insightful cross-tabulation or aggregation from the selected columns."
+
+    prompt = (
+        f"You are a research data analyst. Design ONE tabulation table.\n\n"
+        f"Available columns:\n{cols_block}\n\n"
+        f"Sample data rows:\n{sample_block}\n\n"
+        f"{task}\n\n"
+        f"Decide:\n"
+        f"- groupby_field: column id to use as row variable (main grouping)\n"
+        f"- secondary_groupby: column id for cross-tab column variable ('' if simple table)\n"
+        f"- value_field: column id to aggregate, or '*' for row count\n"
+        f"- aggregation: 'count', 'sum', or 'mean' — pick based on the column type and query\n"
+        f"- show_percent: true if % of row total adds meaningful insight\n"
+        f"- chart_type: 'bar' or 'line'\n"
+        f"- title: clean human-readable title (e.g. 'District-wise Average Age by Gender')\n"
+        f"- description: one sentence on what this table reveals\n"
+        f"- column_labels: object mapping raw field ids to clean display names "
+        f"(e.g. {{\"district_id\": \"District\", \"gender_v2\": \"Gender\", \"*\": \"Count\"}})\n\n"
+        f"Only use column ids from the list above.\n"
+        f"Respond with ONLY valid JSON, no markdown:\n"
+        f'{{"groupby_field":"","secondary_groupby":"","value_field":"*",'
+        f'"aggregation":"count","show_percent":false,"chart_type":"bar",'
+        f'"title":"","description":"","column_labels":{{}}}}'
+    )
+    raw = await _call_llm(cfg, prompt)
+    match = re.search(r'\{.*\}', raw, re.DOTALL)
+    if match:
+        try:
+            result = json.loads(match.group())
+            if isinstance(result.get('column_labels'), dict):
+                result['column_labels'] = {str(k): str(v) for k, v in result['column_labels'].items()}
+            return result
+        except Exception:
+            pass
+    return {}
+
+
 async def polish_tabulation(
     cfg: dict,
     title: str,

@@ -158,6 +158,7 @@ interface AiSuggestion {
   title: string; groupby_field: string; value_field: string
   aggregation: string; chart_type: string; description: string
   show_percent?: boolean; secondary_groupby?: string
+  column_labels?: Record<string, string>
 }
 
 interface HistoryRecord {
@@ -283,11 +284,17 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
 
   const discardPending = () => setPendingInterpretation(null)
 
-  const saveInterpretation = () => {
+  const saveInterpretation = useCallback(() => {
     onUpdate({ ...tab, interpretation })
     setInterpChanged(false)
-    toast.success('Interpretation saved')
-  }
+  }, [tab, interpretation, onUpdate])
+
+  // Auto-save interpretation 2s after user stops typing
+  useEffect(() => {
+    if (!interpChanged) return
+    const timer = setTimeout(saveInterpretation, 2000)
+    return () => clearTimeout(timer)
+  }, [interpretation, interpChanged, saveInterpretation])
 
   return (
     <div className={`${card} space-y-3`}>
@@ -463,8 +470,11 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
 
           {/* Editable current interpretation (when no pending compare) */}
           {!pendingInterpretation && interpretation && (
-            <div className="space-y-2 pt-1">
-              <div className="text-xs text-catalan-textMuted">Edit below — saved when you click Save</div>
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-catalan-textMuted">Edit below — auto-saved</div>
+                {interpChanged && <div className="text-xs text-catalan-textMuted animate-pulse">saving…</div>}
+              </div>
               <textarea
                 className={`${inp} w-full resize-y text-sm leading-relaxed`}
                 style={{ fontFamily: 'Georgia, serif' }}
@@ -472,9 +482,6 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
                 value={interpretation}
                 onChange={e => { setInterpretation(e.target.value); setInterpChanged(true) }}
               />
-              {interpChanged && (
-                <button onClick={saveInterpretation} className={btnSe}>Save</button>
-              )}
             </div>
           )}
         </div>
@@ -548,6 +555,15 @@ function TabulatorTab({ programId, cols, sampleRows }: { programId: string; cols
   const [suggestions, setSuggestions] = useState<AiSuggestion[]>([])
   const [runningIdx, setRunningIdx] = useState<number | null>(null)
 
+  // Smart Builder state
+  const [smartMode, setSmartMode] = useState<'columns' | 'query'>('columns')
+  const [smartColIds, setSmartColIds] = useState<string[]>([])
+  const [smartColSearch, setSmartColSearch] = useState('')
+  const [smartQuery, setSmartQuery] = useState('')
+  const [smartBuilding, setSmartBuilding] = useState(false)
+  const [smartSuggestion, setSmartSuggestion] = useState<AiSuggestion | null>(null)
+  const [smartRunning, setSmartRunning] = useState(false)
+
   // Manual mode
   const [groupby, setGroupby] = useState(cols[0]?.id ?? '')
   const [valueField, setValueField] = useState('*')
@@ -567,6 +583,71 @@ function TabulatorTab({ programId, cols, sampleRows }: { programId: string; cols
     setSaved(prev => prev.map(t => t.id === updated.id ? updated : t))
     await saveTabulation(programId, updated)
   }, [programId])
+
+  const callSmartBuild = async () => {
+    if (smartMode === 'columns' && smartColIds.length === 0) {
+      toast.error('Select at least one column'); return
+    }
+    if (smartMode === 'query' && !smartQuery.trim()) {
+      toast.error('Enter a question'); return
+    }
+    setSmartBuilding(true); setSmartSuggestion(null)
+    try {
+      const colMeta = cols.map(c => ({ id: c.id, label: c.label, type: c.type }))
+      const res = await api.post(`/fg/programs/${programId}/tabulate/smart-build`, {
+        column_ids: smartMode === 'columns' ? smartColIds : [],
+        column_headers: smartMode === 'columns'
+          ? colMeta.filter(c => smartColIds.includes(c.id))
+          : colMeta,
+        query: smartQuery,
+      })
+      setSmartSuggestion(res.data.suggestion)
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Smart build failed')
+    } finally { setSmartBuilding(false) }
+  }
+
+  const runSmartSuggestion = async () => {
+    if (!smartSuggestion) return
+    setSmartRunning(true)
+    try {
+      const res = await api.post(`/fg/programs/${programId}/tabulate/execute`, {
+        groupby_field: smartSuggestion.groupby_field,
+        value_field: smartSuggestion.value_field || '*',
+        aggregation: smartSuggestion.aggregation || 'count',
+        chart_type: smartSuggestion.chart_type || 'bar',
+        title: smartSuggestion.title,
+        show_percent: smartSuggestion.show_percent ?? false,
+        secondary_groupby: smartSuggestion.secondary_groupby ?? '',
+      })
+      const tab: SavedTabulation = {
+        id: crypto.randomUUID(),
+        title: smartSuggestion.title,
+        description: smartSuggestion.description,
+        groupby_field: smartSuggestion.groupby_field,
+        value_field: smartSuggestion.value_field || '*',
+        aggregation: smartSuggestion.aggregation || 'count',
+        chart_type: smartSuggestion.chart_type || 'bar',
+        rows: res.data.rows,
+        total: res.data.total,
+        created_at: new Date().toISOString(),
+        show_percent: res.data.show_percent,
+        secondary_groupby: res.data.secondary_groupby,
+        sub_keys: res.data.sub_keys,
+        is_cross_tab: res.data.is_cross_tab,
+        column_labels: smartSuggestion.column_labels || {},
+      }
+      await saveTabulation(programId, tab)
+      await reload()
+      setSmartSuggestion(null)
+      toast.success(`"${smartSuggestion.title}" built and saved`)
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Build failed')
+    } finally { setSmartRunning(false) }
+  }
+
+  const toggleSmartCol = (id: string) =>
+    setSmartColIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   useEffect(() => { reload() }, [reload])
   useEffect(() => { if (cols.length && !groupby) setGroupby(cols[0].id) }, [cols])
 
@@ -836,6 +917,130 @@ function TabulatorTab({ programId, cols, sampleRows }: { programId: string; cols
                 Generate AI Insights
               </button>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Smart Builder ── */}
+      <div className={card}>
+        <div className="flex items-center justify-between mb-1">
+          <div className={`${sh} mb-0`}>Smart Builder</div>
+          <span className="text-xs text-catalan-textMuted">AI reads your actual data values, not just column names</span>
+        </div>
+        <p className="text-xs text-catalan-textMuted mb-3">
+          Pick specific columns and AI will inspect their real values to design the best table structure —
+          rows, columns, aggregation, and clean labels all in one step.
+          Or just ask in plain English.
+        </p>
+
+        {/* Mode toggle */}
+        <div className="flex gap-1 mb-4 bg-catalan-hover rounded-lg p-1 w-fit">
+          {(['columns', 'query'] as const).map(mode => (
+            <button key={mode} onClick={() => { setSmartMode(mode); setSmartSuggestion(null) }}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                smartMode === mode ? 'bg-catalan-surface text-catalan-text shadow-sm' : 'text-catalan-textMuted hover:text-catalan-text'
+              }`}>
+              {mode === 'columns' ? '📊 Column Picker' : '💬 Ask a Question'}
+            </button>
+          ))}
+        </div>
+
+        {smartMode === 'columns' && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <input
+                className={`${inp} flex-1`}
+                placeholder="Search columns…"
+                value={smartColSearch}
+                onChange={e => setSmartColSearch(e.target.value)}
+              />
+              {smartColIds.length > 0 && (
+                <button onClick={() => setSmartColIds([])} className={btnSe}>Clear</button>
+              )}
+            </div>
+            <div className="border border-catalan-border rounded-lg max-h-48 overflow-y-auto divide-y divide-catalan-border/50">
+              {cols
+                .filter(c => !smartColSearch || c.label.toLowerCase().includes(smartColSearch.toLowerCase()) || c.id.toLowerCase().includes(smartColSearch.toLowerCase()))
+                .map(c => (
+                  <label key={c.id}
+                    className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${
+                      smartColIds.includes(c.id) ? 'bg-catalan-primary/5' : 'hover:bg-catalan-hover'
+                    }`}>
+                    <input type="checkbox" className="w-4 h-4 rounded accent-catalan-primary"
+                      checked={smartColIds.includes(c.id)}
+                      onChange={() => toggleSmartCol(c.id)} />
+                    <span className="text-sm text-catalan-text flex-1 truncate">{c.label}</span>
+                    <span className="text-xs text-catalan-textMuted font-mono shrink-0">{c.type}</span>
+                  </label>
+                ))}
+            </div>
+            {smartColIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {smartColIds.map(id => {
+                  const c = cols.find(x => x.id === id)
+                  return (
+                    <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-catalan-primary/10 text-catalan-primary border border-catalan-primary/20 rounded-full">
+                      {c?.label ?? id}
+                      <button onClick={() => toggleSmartCol(id)} className="hover:text-catalan-error">×</button>
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {smartMode === 'query' && (
+          <div className="space-y-2">
+            <textarea
+              className={`${inp} w-full resize-none`} rows={3}
+              value={smartQuery}
+              onChange={e => setSmartQuery(e.target.value)}
+              placeholder={`e.g. "What is the average age of beneficiaries in each district by gender?"\n"Show beneficiary occupation breakdown by district with row percentages"\n"Compare survey completion across enumerators"`}
+            />
+            <p className="text-xs text-catalan-textMuted">AI will identify the right columns, aggregation, and structure from your question.</p>
+          </div>
+        )}
+
+        <button
+          onClick={callSmartBuild}
+          disabled={smartBuilding || !cols.length}
+          className={`${btnPr} mt-4`}
+        >
+          {smartBuilding ? '✨ Analysing data…' : '✨ Smart Build'}
+        </button>
+
+        {/* Suggestion result */}
+        {smartSuggestion && (
+          <div className="mt-4 border border-catalan-primary/30 bg-catalan-primary/5 rounded-xl p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-catalan-text">{smartSuggestion.title}</div>
+                <div className="text-xs text-catalan-textMuted mt-0.5">{smartSuggestion.description}</div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {[
+                    { label: `Rows: ${(smartSuggestion.column_labels?.[smartSuggestion.groupby_field] ?? smartSuggestion.groupby_field)}` },
+                    smartSuggestion.secondary_groupby
+                      ? { label: `Cols: ${(smartSuggestion.column_labels?.[smartSuggestion.secondary_groupby] ?? smartSuggestion.secondary_groupby)}` }
+                      : null,
+                    { label: `${smartSuggestion.aggregation}${smartSuggestion.show_percent ? ' + %' : ''}` },
+                    { label: `Chart: ${smartSuggestion.chart_type}` },
+                  ].filter(Boolean).map((tag, i) => (
+                    <span key={i} className="px-2 py-0.5 text-xs bg-catalan-primary/10 text-catalan-primary rounded-full">{tag!.label}</span>
+                  ))}
+                  {Object.keys(smartSuggestion.column_labels || {}).length > 0 && (
+                    <span className="px-2 py-0.5 text-xs bg-green-500/10 text-green-500 rounded-full">✓ Labels pre-cleaned</span>
+                  )}
+                </div>
+              </div>
+              <button onClick={() => setSmartSuggestion(null)} className="text-catalan-textMuted hover:text-catalan-text shrink-0">✕</button>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={runSmartSuggestion} disabled={smartRunning} className={btnPr}>
+                {smartRunning ? 'Building…' : '▶ Build This Table'}
+              </button>
+              <button onClick={callSmartBuild} disabled={smartBuilding} className={btnSe}>↻ Try Again</button>
+            </div>
           </div>
         )}
       </div>

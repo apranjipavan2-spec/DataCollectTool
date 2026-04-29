@@ -90,6 +90,12 @@ class FeedbackRequest(BaseModel):
     vote: Optional[str] = None  # 'up' | 'down' | null
 
 
+class SmartBuildRequest(BaseModel):
+    column_ids: list = []          # explicit column selection (column picker mode)
+    column_headers: list = []      # metadata [{id, label, type}] for selected or all cols
+    query: str = ""                # natural language query (alternative to column picker)
+
+
 class PolishRequest(BaseModel):
     title: str
     groupby_field: str
@@ -542,6 +548,75 @@ async def suggest_tabulation(
     except Exception as e:
         raise HTTPException(503, f"AI error: {e}")
     return result
+
+
+# ── Smart Builder: column picker + NL query → single optimised table spec ─────
+
+@router.post("/programs/{program_id}/tabulate/smart-build")
+async def smart_build_tabulation(
+    program_id: str,
+    body: SmartBuildRequest,
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    prog = db.query(Program).filter(
+        Program.id == program_id, Program.tenant_id == user["tenant_id"]
+    ).first()
+    if not prog:
+        raise HTTPException(404, "Program not found")
+    cfg = _get_global_ai_cfg(db)
+    if not cfg.get("api_key"):
+        raise HTTPException(400, "AI not configured. Contact your platform administrator.")
+    if not body.column_ids and not body.query.strip():
+        raise HTTPException(400, "Provide column selection or a natural language query.")
+
+    unique_values: dict = {}
+    sample_rows: list = []
+
+    if body.column_ids:
+        # Fetch real unique values for selected columns (cap at 500 submissions)
+        subs_data = db.query(Submission.data_json).filter(
+            Submission.program_id == _uuid.UUID(program_id),
+            Submission.tenant_id == user["tenant_id"],
+        ).limit(500).all()
+
+        buckets: dict = {col_id: set() for col_id in body.column_ids}
+        for (data_json,) in subs_data:
+            if not data_json or not isinstance(data_json, dict):
+                continue
+            row: dict = {}
+            for col_id in body.column_ids:
+                v = data_json.get(col_id)
+                if v is not None:
+                    sv = str(v)[:80].strip()
+                    if sv and sv not in ('__missing__',):
+                        buckets[col_id].add(sv)
+                    row[col_id] = sv
+            if len(sample_rows) < 8 and any(row.values()):
+                sample_rows.append(row)
+
+        unique_values = {k: sorted(v)[:25] for k, v in buckets.items()}
+
+    # Build column metadata for selected columns (or all for NL mode)
+    col_meta_map = {c.get('id'): c for c in body.column_headers}
+    selected_cols = (
+        [col_meta_map.get(cid, {"id": cid, "label": cid, "type": "text"}) for cid in body.column_ids]
+        if body.column_ids else body.column_headers[:40]
+    )
+
+    try:
+        suggestion = await ai_service.smart_build_tabulation(
+            cfg=cfg,
+            selected_cols=selected_cols,
+            unique_values=unique_values,
+            sample_rows=sample_rows,
+            query=body.query,
+        )
+        return {"suggestion": suggestion, "unique_values": unique_values}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(503, f"AI error: {e}")
 
 
 # ── AI Tabulation Polish (rename title, subtitle, column labels) ──────────────
