@@ -11,10 +11,14 @@
 
 /// <reference lib="WebWorker" />
 /// <reference types="vite-plugin-pwa/info" />
+import { clientsClaim } from 'workbox-core'
 import { precacheAndRoute } from 'workbox-precaching'
 import { registerRoute } from 'workbox-routing'
 import { CacheFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
+
+// Take control of all clients immediately after activation (pairs with skipWaiting below)
+clientsClaim()
 
 // ── Precache app shell (populated by vite-plugin-pwa at build time) ──────────
 precacheAndRoute(self.__WB_MANIFEST)
@@ -93,6 +97,9 @@ self.addEventListener('notificationclick', (event) => {
 
 // ── Messages from app ─────────────────────────────────────────────────────────
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
   if (event.data?.type === 'SYNC_COMPLETE') {
     // App confirmed sync — no action needed in SW
   }
