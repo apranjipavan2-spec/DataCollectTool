@@ -182,6 +182,17 @@ export default function FileManagerPage() {
 
   // ── Selection helpers ────────────────────────────────────────────────────
 
+  // ── Derived ───────────────────────────────────────────────────────────────
+
+  const byTool = (tool: string) => projects.filter(p => p.tool === tool)
+  const recentProjects = [...projects].sort(
+    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  ).slice(0, 20)
+  const visibleProjects =
+    section === 'recent'      ? recentProjects :
+    section === 'submissions' ? [] :
+    byTool(section)
+
   const allSubsSelected = submissions.length > 0 && submissions.every(s => selectedSubs.has(s.id))
   const toggleAllSubs = () => {
     if (allSubsSelected) setSelectedSubs(new Set())
@@ -214,17 +225,6 @@ export default function FileManagerPage() {
     if (sel.length === 0) { toast.error('No CSV files in selection'); return }
     sel.forEach(p => downloadCsv(p))
   }
-
-  // ── Derived ───────────────────────────────────────────────────────────────
-
-  const byTool = (tool: string) => projects.filter(p => p.tool === tool)
-  const recentProjects = [...projects].sort(
-    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-  ).slice(0, 20)
-  const visibleProjects =
-    section === 'recent'      ? recentProjects :
-    section === 'submissions' ? [] :
-    byTool(section)
 
   const NAV_ITEMS = [
     { key: 'recent' as Section,      label: 'Recent',    icon: '🕒', count: recentProjects.length },
