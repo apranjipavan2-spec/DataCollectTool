@@ -53,6 +53,7 @@ export default function ResetPasswordPage() {
     return (
       <div className="min-h-screen bg-catalan-bg flex items-center justify-center p-6">
         <div className="w-full max-w-md text-center space-y-4">
+          <img src="/logo-wide.png" alt="FieldGovern" className="h-10 w-auto object-contain mx-auto mb-2" />
           <div className="text-5xl mb-4">🔗</div>
           <h2 className="text-xl font-semibold text-catalan-text">Invalid Reset Link</h2>
           <p className="text-catalan-textMuted text-sm">
@@ -70,7 +71,7 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen bg-catalan-bg flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-catalan-primary mb-2">FieldGovern</h1>
+          <img src="/logo-wide.png" alt="FieldGovern" className="h-10 w-auto object-contain mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-catalan-text">Set New Password</h2>
           <p className="text-catalan-textMuted mt-2 text-sm">Enter your new password below.</p>
         </div>

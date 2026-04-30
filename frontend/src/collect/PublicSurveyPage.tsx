@@ -75,6 +75,13 @@ export default function PublicSurveyPage() {
 
   return (
     <div className="min-h-screen bg-catalan-bg">
+      {/* Branded header */}
+      <header className="bg-catalan-surface border-b border-catalan-border">
+        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center">
+          <img src="/logo-wide.png" alt="FieldGovern" className="h-7 w-auto object-contain" />
+        </div>
+      </header>
+
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="mb-6">
           <h1 className="text-xl font-bold text-catalan-text">{formTitle}</h1>

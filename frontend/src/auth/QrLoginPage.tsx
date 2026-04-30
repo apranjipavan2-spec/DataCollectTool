@@ -33,17 +33,24 @@ export default function QrLoginPage() {
   return (
     <div className="min-h-screen bg-catalan-bg flex items-center justify-center p-6">
       <div className="bg-catalan-surface border border-catalan-border rounded-2xl p-8 max-w-sm w-full text-center shadow-lg">
+        <img src="/logo-wide.png" alt="FieldGovern" className="h-8 w-auto object-contain mx-auto mb-6" />
         {error ? (
           <>
-            <div className="text-4xl mb-4">⚠️</div>
+            <div className="text-4xl mb-3">⚠️</div>
             <h2 className="text-lg font-semibold text-catalan-text mb-2">Login Failed</h2>
-            <p className="text-sm text-catalan-textMuted">{error}</p>
+            <p className="text-sm text-catalan-textMuted mb-4">{error}</p>
+            <button
+              onClick={() => window.location.href = '/login'}
+              className="text-sm text-catalan-primary hover:underline font-medium"
+            >
+              ← Back to Login
+            </button>
           </>
         ) : (
           <>
-            <div className="text-4xl mb-4 animate-spin">⏳</div>
-            <h2 className="text-lg font-semibold text-catalan-text mb-2">Logging you in…</h2>
-            <p className="text-sm text-catalan-textMuted">Please wait</p>
+            <div className="w-8 h-8 border-2 border-catalan-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <h2 className="text-lg font-semibold text-catalan-text mb-1">Logging you in…</h2>
+            <p className="text-sm text-catalan-textMuted">Verifying your QR code, please wait</p>
           </>
         )}
       </div>
