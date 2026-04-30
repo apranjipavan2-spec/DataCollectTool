@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.core.database import get_db
-from app.core.deps import require_enumerator
+from app.core.deps import get_current_user
 
 router = APIRouter()
 
@@ -37,7 +37,7 @@ def _ensure_table(db: Session):
 
 
 @router.get("/inbox/")
-def list_inbox(user: dict = Depends(require_enumerator), db: Session = Depends(get_db)):
+def list_inbox(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     _ensure_table(db)
     rows = db.execute(text("""
         SELECT id, type, title, body, link, read, created_at
@@ -58,7 +58,7 @@ def list_inbox(user: dict = Depends(require_enumerator), db: Session = Depends(g
 
 
 @router.post("/inbox/read-all", status_code=204)
-def mark_all_read(user: dict = Depends(require_enumerator), db: Session = Depends(get_db)):
+def mark_all_read(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     _ensure_table(db)
     db.execute(text(
         "UPDATE in_app_notifications SET read=TRUE WHERE recipient_id=:rid AND tenant_id=:tid AND read=FALSE"
@@ -67,7 +67,7 @@ def mark_all_read(user: dict = Depends(require_enumerator), db: Session = Depend
 
 
 @router.patch("/inbox/{notif_id}/read", status_code=204)
-def mark_one_read(notif_id: str, user: dict = Depends(require_enumerator), db: Session = Depends(get_db)):
+def mark_one_read(notif_id: str, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     _ensure_table(db)
     db.execute(text(
         "UPDATE in_app_notifications SET read=TRUE WHERE id=:id AND recipient_id=:rid"

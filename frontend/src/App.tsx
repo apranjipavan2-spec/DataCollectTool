@@ -12,6 +12,9 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 import { HelpProvider } from '@/help/HelpContext'
 import HelpPanel from '@/help/HelpPanel'
 import HelpSpotlight from '@/help/HelpSpotlight'
+import { SubscriptionProvider } from '@/lib/SubscriptionContext'
+import SubscriptionBanner from '@/components/SubscriptionBanner'
+import UpgradeModal from '@/components/UpgradeModal'
 
 // Route-level code splitting — each lazy() call becomes a separate dynamic import.
 // This is what makes manualChunks actually defer loading instead of just splitting files.
@@ -37,6 +40,7 @@ const FieldMapPage    = lazy(() => import('@/map/FieldMapPage'))
 const PublicSurveyPage   = lazy(() => import('@/collect/PublicSurveyPage'))
 const SubscriptionPage   = lazy(() => import('@/admin/SubscriptionPage'))
 const AdminPayments      = lazy(() => import('@/admin/AdminPayments'))
+const PricingPage        = lazy(() => import('@/pages/PricingPage'))
 
 function PageLoader() {
   return (
@@ -113,8 +117,11 @@ export default function App() {
         <LanguageProvider>
           <HelpProvider>
           <BrowserRouter>
+            <SubscriptionProvider>
             <SessionTimeoutManager />
             <FloatingContact />
+            <SubscriptionBanner />
+            <UpgradeModal />
             <HelpPanel />
             <HelpSpotlight />
             <Routes>
@@ -220,6 +227,10 @@ export default function App() {
                 <LazyRoute><PublicSurveyPage /></LazyRoute>
               } />
 
+              <Route path="/pricing" element={
+                <LazyRoute><PricingPage /></LazyRoute>
+              } />
+
               <Route path="/subscription" element={
                 <RequireAuth roles={['org_admin', 'master_admin']}>
                   <LazyRoute><SubscriptionPage /></LazyRoute>
@@ -234,6 +245,7 @@ export default function App() {
 
               <Route path="*" element={<RoleHome />} />
             </Routes>
+          </SubscriptionProvider>
           </BrowserRouter>
           </HelpProvider>
         </LanguageProvider>

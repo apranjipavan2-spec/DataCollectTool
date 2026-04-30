@@ -212,6 +212,26 @@ def send_daily_digest_email(
     return send_email(to, f"FieldGovern Daily Digest — {date_label}", html)
 
 
+def send_otp_email(to: str, name: str, otp: str) -> bool:
+    """Send a 6-digit login OTP to the user."""
+    html = f"""
+    <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+      <h2 style="color: #1e1e2e;">Your Login Code</h2>
+      <p>Hi {name},</p>
+      <p>Use the code below to complete your sign-in. It expires in <strong>10 minutes</strong>.</p>
+      <div style="text-align: center; margin: 28px 0; padding: 20px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+        <span style="font-size: 42px; font-weight: 700; letter-spacing: 14px; color: #2563eb; font-variant-numeric: tabular-nums;">{otp}</span>
+      </div>
+      <p style="color: #6c7086; font-size: 14px;">
+        Never share this code with anyone. FieldGovern staff will never ask for your OTP.
+      </p>
+      <hr style="border: none; border-top: 1px solid #d4d4de; margin: 24px 0;">
+      <p style="color: #6c7086; font-size: 12px;">FieldGovern — Field Data Collection</p>
+    </div>
+    """
+    return send_email(to, "Your FieldGovern Login Code", html)
+
+
 def send_assignment_email(to: str, enumerator_name: str, form_title: str) -> bool:
     """Notify an enumerator that a new form has been assigned to them."""
     url = f"{settings.APP_URL}/collect"

@@ -106,6 +106,10 @@ async def generate_report(
     from app.models.user_tool_project import UserToolProject
     from sqlalchemy.orm.attributes import flag_modified
 
+    if user.get("role") != "master_admin":
+        from app.api.routes.billing import check_feature
+        check_feature(user["tenant_id"], "ai_writer", db)
+
     cfg = _get_global_ai_cfg(db)
     if not cfg.get("api_key"):
         raise HTTPException(400, "AI not configured. Contact your platform administrator.")
@@ -161,6 +165,9 @@ async def generate_report(
 
 @router.post("/suggest-skip-logic")
 async def suggest_skip_logic(body: dict, user: dict = Depends(require_org_admin), db: Session = Depends(get_db)):
+    if user.get("role") != "master_admin":
+        from app.api.routes.billing import check_feature
+        check_feature(user["tenant_id"], "ai_cleaning", db)
     cfg = _get_global_ai_cfg(db)
     try:
         suggestions = await ai_service.suggest_skip_logic(cfg, body.get("question_text", ""), body.get("form_fields", []))
@@ -173,6 +180,9 @@ async def suggest_skip_logic(body: dict, user: dict = Depends(require_org_admin)
 
 @router.post("/translate")
 async def translate_labels(body: dict, user: dict = Depends(require_org_admin), db: Session = Depends(get_db)):
+    if user.get("role") != "master_admin":
+        from app.api.routes.billing import check_feature
+        check_feature(user["tenant_id"], "ai_cleaning", db)
     cfg = _get_global_ai_cfg(db)
     try:
         translated = await ai_service.translate_labels(cfg, body.get("labels", []), body.get("target_lang", "Hindi"))
@@ -185,6 +195,9 @@ async def translate_labels(body: dict, user: dict = Depends(require_org_admin), 
 
 @router.post("/writer")
 async def ai_writer(body: dict, user: dict = Depends(require_supervisor), db: Session = Depends(get_db)):
+    if user.get("role") != "master_admin":
+        from app.api.routes.billing import check_feature
+        check_feature(user["tenant_id"], "ai_writer", db)
     cfg = _get_global_ai_cfg(db)
     try:
         report_md = await ai_service.generate_styled_report(

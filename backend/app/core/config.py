@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = True
     APP_URL: str = "http://localhost:5173"
 
+    # Google OAuth (free — register at console.cloud.google.com)
+    GOOGLE_CLIENT_ID: str = ""
+
     # Sentry error monitoring
     SENTRY_DSN: str = ""
 

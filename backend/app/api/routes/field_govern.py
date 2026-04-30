@@ -30,7 +30,15 @@ from app.services import ai_service
 
 def _get_global_ai_cfg(db: Session) -> dict:
     row = db.query(SystemSetting).filter(SystemSetting.key == "ai_config").first()
-    return row.value if row else {}
+    if not row:
+        return {}
+    cfg = row.value or {}
+    # Multi-key format: resolve the active provider into a flat {provider, api_key, model} dict
+    if "keys" in cfg:
+        active = cfg.get("active_provider", "")
+        key_cfg = cfg.get("keys", {}).get(active, {})
+        return {"provider": active, "api_key": key_cfg.get("api_key", ""), "model": key_cfg.get("model", "")}
+    return cfg
 
 router = APIRouter()
 require_supervisor = require_role("org_admin", "supervisor")
@@ -535,6 +543,9 @@ async def suggest_tabulation(
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
+    if user.get("role") != "master_admin":
+        from app.api.routes.billing import check_feature
+        check_feature(user["tenant_id"], "ai_analyzer", db)
     try:
         result = await ai_service.suggest_tabulation(
             _get_global_ai_cfg(db),
@@ -559,6 +570,9 @@ async def smart_build_tabulation(
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
+    if user.get("role") != "master_admin":
+        from app.api.routes.billing import check_feature
+        check_feature(user["tenant_id"], "ai_smart_builder", db)
     prog = db.query(Program).filter(
         Program.id == program_id, Program.tenant_id == user["tenant_id"]
     ).first()
@@ -628,6 +642,9 @@ async def polish_tabulation(
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
+    if user.get("role") != "master_admin":
+        from app.api.routes.billing import check_feature
+        check_feature(user["tenant_id"], "ai_cleaning", db)
     prog = db.query(Program).filter(
         Program.id == program_id, Program.tenant_id == user["tenant_id"]
     ).first()
@@ -658,6 +675,9 @@ async def interpret_tabulation(
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
+    if user.get("role") != "master_admin":
+        from app.api.routes.billing import check_feature
+        check_feature(user["tenant_id"], "ai_interpret", db)
     prog = db.query(Program).filter(
         Program.id == program_id, Program.tenant_id == user["tenant_id"]
     ).first()
@@ -1360,6 +1380,9 @@ async def auto_generate(
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
+    if user.get("role") != "master_admin":
+        from app.api.routes.billing import check_feature
+        check_feature(user["tenant_id"], "ai_analyzer", db)
     prog = db.query(Program).filter(
         Program.id == program_id, Program.tenant_id == user["tenant_id"]
     ).first()
@@ -1674,6 +1697,9 @@ async def generate_program_report(
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
+    if user.get("role") != "master_admin":
+        from app.api.routes.billing import check_feature
+        check_feature(user["tenant_id"], "ai_writer", db)
     from sqlalchemy import case as sa_case
 
     prog = db.query(Program).filter(

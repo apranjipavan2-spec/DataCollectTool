@@ -523,6 +523,10 @@ def list_potential_duplicates(
 @router.post("/", status_code=201)
 @limiter.limit("60/minute")
 def create_submission(request: Request, body: SubmissionCreate, background_tasks: BackgroundTasks, user=Depends(require_enumerator), db: Session = Depends(get_db)):
+    if user.get("role") != "master_admin":
+        from app.api.routes.billing import check_submission_limit
+        check_submission_limit(user["tenant_id"], db)
+
     try:
         sub = Submission(
             tenant_id=user["tenant_id"],

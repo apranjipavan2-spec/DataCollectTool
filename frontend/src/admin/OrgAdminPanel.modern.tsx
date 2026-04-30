@@ -149,10 +149,12 @@ function FormsTab() {
 }
 
 function SecurityTab() {
-  const [qrEnabled, setQrEnabled] = useState(false)
+  const [qrEnabled,    setQrEnabled]    = useState(false)
+  const [twoFaEnabled, setTwoFaEnabled] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [saving,  setSaving]  = useState(false)
+  const [saved,   setSaved]   = useState(false)
+  const [twoFaError, setTwoFaError] = useState('')
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
@@ -162,7 +164,10 @@ function SecurityTab() {
 
   useEffect(() => {
     api.get('/tenants/security')
-      .then(({ data }) => setQrEnabled(data.qr_login_enabled ?? false))
+      .then(({ data }) => {
+        setQrEnabled(data.qr_login_enabled ?? false)
+        setTwoFaEnabled(data.two_fa_enabled ?? false)
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
@@ -170,10 +175,22 @@ function SecurityTab() {
   async function toggleQr() {
     setSaving(true); setSaved(false)
     try {
-      const { data } = await api.patch('/tenants/security', { qr_login_enabled: !qrEnabled })
+      const { data } = await api.patch('/tenants/security', { qr_login_enabled: !qrEnabled, two_fa_enabled: twoFaEnabled })
       setQrEnabled(data.qr_login_enabled)
       setSaved(true); setTimeout(() => setSaved(false), 2000)
     } catch { } finally { setSaving(false) }
+  }
+
+  async function toggleTwoFa() {
+    setTwoFaError('')
+    setSaving(true)
+    try {
+      const { data } = await api.patch('/tenants/security', { qr_login_enabled: qrEnabled, two_fa_enabled: !twoFaEnabled })
+      setTwoFaEnabled(data.two_fa_enabled)
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch (e: any) {
+      setTwoFaError(e?.response?.data?.detail ?? 'Failed to update 2FA setting')
+    } finally { setSaving(false) }
   }
 
   async function handlePasswordChange() {
@@ -217,6 +234,39 @@ function SecurityTab() {
             </button>
           </div>
           {saved && <p className="text-xs text-catalan-success mt-2">✓ Saved</p>}
+        </div>
+      </Card>
+
+      {/* 2FA toggle */}
+      <Card>
+        <div className="p-6">
+          <h3 className="text-base font-semibold text-catalan-text mb-1">Two-Factor Authentication (2FA)</h3>
+          <p className="text-sm text-catalan-textMuted mb-5">
+            When enabled, all users must enter a one-time code sent to their email after entering their password. Requires a plan that includes 2FA.
+          </p>
+          <div className="flex items-center justify-between p-4 bg-catalan-bg border border-catalan-border rounded-xl">
+            <div>
+              <p className="text-sm font-medium text-catalan-text">Require OTP on login</p>
+              <p className="text-xs text-catalan-textMuted mt-0.5">
+                {twoFaEnabled ? 'Enabled — users must verify via email OTP' : 'Disabled — password-only login'}
+              </p>
+            </div>
+            <button
+              onClick={toggleTwoFa}
+              disabled={saving}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${twoFaEnabled ? 'bg-catalan-primary' : 'bg-catalan-border'} ${saving ? 'opacity-50' : ''}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${twoFaEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+          {twoFaError && (
+            <p className="text-xs text-catalan-error mt-2 flex items-center gap-1">
+              <span>⚠</span>{twoFaError}
+              {twoFaError.includes('plan') && (
+                <a href="/subscription" className="underline ml-1 font-semibold">Upgrade →</a>
+              )}
+            </p>
+          )}
         </div>
       </Card>
 

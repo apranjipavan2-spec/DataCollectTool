@@ -91,6 +91,13 @@ api.interceptors.response.use(
       }))
     }
 
+    // ── 403 — feature not in plan ─────────────────────────────────────────
+    if (err.response?.status === 403 && err.response.data?.detail?.includes('plan')) {
+      window.dispatchEvent(new CustomEvent('fieldgovern:feature-gate', {
+        detail: { message: err.response.data?.detail ?? 'This feature requires a higher plan.' },
+      }))
+    }
+
     return Promise.reject(err)
   }
 )

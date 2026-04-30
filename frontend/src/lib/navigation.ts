@@ -16,17 +16,19 @@ const ALL_ITEMS: Record<string, NavItem> = {
   fileManager: { label: 'Files',        path: '/fg/files',     icon: '📁' },
   fieldMap:    { label: 'Field Map',    path: '/map',          icon: '🗺️' },
   settings:    { label: 'Settings',     path: '/fg/settings',  icon: '⚙️' },
-  migration:   { label: 'Import',       path: '/migration',    icon: '🔄' },
-  admin:       { label: 'Admin',        path: '/admin',        icon: '🔧' },
-  monitor:     { label: 'Monitor',      path: '/monitor',      icon: '🌐' },
+  migration:    { label: 'Import',       path: '/migration',       icon: '🔄' },
+  admin:        { label: 'Admin',        path: '/admin',           icon: '🔧' },
+  monitor:      { label: 'Monitor',      path: '/monitor',         icon: '🌐' },
+  subscription: { label: 'Subscription', path: '/subscription',    icon: '💳' },
+  payments:     { label: 'Payments',     path: '/admin/payments',  icon: '💰' },
 }
 
 export const getNavItems = (role: string): NavItem[] => {
   switch (role) {
     case 'master_admin':
-      return [ALL_ITEMS.admin, ALL_ITEMS.monitor]
+      return [ALL_ITEMS.admin, ALL_ITEMS.monitor, ALL_ITEMS.payments]
     case 'org_admin':
-      return [ALL_ITEMS.dashboard, ALL_ITEMS.collect, ALL_ITEMS.forms, ALL_ITEMS.programs, ALL_ITEMS.fgCleaner, ALL_ITEMS.fgAnalyzer, ALL_ITEMS.fgWriter, ALL_ITEMS.fileManager, ALL_ITEMS.fieldMap, ALL_ITEMS.settings]
+      return [ALL_ITEMS.dashboard, ALL_ITEMS.collect, ALL_ITEMS.forms, ALL_ITEMS.programs, ALL_ITEMS.fgCleaner, ALL_ITEMS.fgAnalyzer, ALL_ITEMS.fgWriter, ALL_ITEMS.fileManager, ALL_ITEMS.fieldMap, ALL_ITEMS.settings, ALL_ITEMS.subscription]
     case 'supervisor':
       return [ALL_ITEMS.dashboard, ALL_ITEMS.collect, ALL_ITEMS.forms, ALL_ITEMS.programs, ALL_ITEMS.fgCleaner, ALL_ITEMS.fgAnalyzer, ALL_ITEMS.fgWriter, ALL_ITEMS.fileManager, ALL_ITEMS.fieldMap, ALL_ITEMS.settings]
     case 'enumerator':

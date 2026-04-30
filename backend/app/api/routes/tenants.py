@@ -201,6 +201,19 @@ def create_tenant(body: TenantCreate, user=Depends(require_master), db: Session 
     db.add(admin)
     db.commit()
 
+    from datetime import timedelta
+    from app.models.billing import Subscription
+    trial_sub = Subscription(
+        tenant_id=tenant.id,
+        plan_id="ngo_free",
+        billing_cycle="monthly",
+        status="trialing",
+        trial_start=datetime.now(timezone.utc),
+        trial_end=datetime.now(timezone.utc) + timedelta(days=30),
+    )
+    db.add(trial_sub)
+    db.commit()
+
     return {
         "id": str(tenant.id),
         "name": tenant.name,
@@ -350,6 +363,7 @@ def update_notification_config(
 
 class SecuritySettingsUpdate(BaseModel):
     qr_login_enabled: bool = False
+    two_fa_enabled: bool = False
 
 
 @router.get("/security")
@@ -361,7 +375,10 @@ def get_security_settings(user=Depends(get_current_user), db: Session = Depends(
     if not tenant:
         raise HTTPException(404, "Tenant not found")
     cfg = tenant.notification_config or {}
-    return {"qr_login_enabled": bool(cfg.get("qr_login_enabled", False))}
+    return {
+        "qr_login_enabled": bool(cfg.get("qr_login_enabled", False)),
+        "two_fa_enabled": bool(cfg.get("two_fa_enabled", False)),
+    }
 
 
 @router.patch("/security")
@@ -370,17 +387,31 @@ def update_security_settings(
     user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Toggle QR login for the current tenant (org_admin only)."""
+    """Toggle security settings for the current tenant (org_admin only)."""
     if user["role"] not in ("master_admin", "org_admin"):
         raise HTTPException(403, "org_admin required")
     tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
     if not tenant:
         raise HTTPException(404, "Tenant not found")
+
+    if body.two_fa_enabled:
+        from app.models.billing import Subscription, Plan as BillingPlan
+        sub = (
+            db.query(Subscription)
+            .filter(Subscription.tenant_id == user["tenant_id"])
+            .order_by(Subscription.created_at.desc())
+            .first()
+        )
+        plan = db.query(BillingPlan).filter(BillingPlan.id == sub.plan_id).first() if sub else None
+        if not plan or not plan.two_fa:
+            raise HTTPException(403, "Two-factor authentication requires a plan that includes this feature. Upgrade your plan to unlock 2FA.")
+
     existing = dict(tenant.notification_config or {})
     existing["qr_login_enabled"] = body.qr_login_enabled
+    existing["two_fa_enabled"] = body.two_fa_enabled
     tenant.notification_config = existing
     db.commit()
-    return {"qr_login_enabled": body.qr_login_enabled}
+    return {"qr_login_enabled": body.qr_login_enabled, "two_fa_enabled": body.two_fa_enabled}
 
 
 class FormSheetsSyncUpdate(BaseModel):

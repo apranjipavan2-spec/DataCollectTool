@@ -13,11 +13,12 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, text
 
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_role
 from app.models.billing import Plan, Subscription, PaymentRequest, UsageRecord
+from app.models.system_setting import SystemSetting
 from app.models.tenant import Tenant
 from app.models.user import User
 
@@ -28,15 +29,53 @@ router = APIRouter(prefix="/billing", tags=["billing"])
 CYCLE_DISCOUNT = {"monthly": 0, "6month": 10, "annual": 20, "3year": 30}
 CYCLE_MONTHS   = {"monthly": 1, "6month": 6,  "annual": 12, "3year": 36}
 
-# UPI payment details — update these via SystemSetting or env in production
-UPI_ID        = "fieldgovernindia@upi"   # replace with actual UPI ID
-UPI_NAME      = "FieldGovern Technologies"
-BANK_ACCOUNT  = "XXXXXXXXXXXX"           # replace with actual account
-BANK_IFSC     = "XXXX0000000"           # replace with actual IFSC
-BANK_NAME     = "HDFC Bank"
+_PAYMENT_DEFAULTS = {
+    "upi_id":         "fieldgovernindia@upi",
+    "upi_name":       "FieldGovern Technologies",
+    "bank_account":   "",
+    "bank_ifsc":      "",
+    "bank_name":      "",
+    "admin_whatsapp": "",
+    "support_email":  "",
+}
+
+
+def _get_payment_cfg(db: Session) -> dict:
+    row = db.query(SystemSetting).filter(SystemSetting.key == "payment_config").first()
+    cfg = row.value if row else {}
+    return {**_PAYMENT_DEFAULTS, **cfg}
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
+def _notify(db: Session, recipient_id, tenant_id, ntype: str, title: str, body: str, link: str = "/"):
+    """Insert an in-app inbox notification. Silently skips if table not ready or tenant_id missing."""
+    if not recipient_id or not tenant_id:
+        return
+    try:
+        db.execute(text("""
+            INSERT INTO in_app_notifications (tenant_id, recipient_id, type, title, body, link)
+            VALUES (:tid, :rid, :type, :title, :body, :link)
+        """), {"tid": str(tenant_id), "rid": str(recipient_id),
+               "type": ntype, "title": title, "body": body, "link": link})
+        db.commit()
+    except Exception:
+        db.rollback()
+
+
+def _notify_master_admins(db: Session, title: str, body: str, link: str = "/admin/payments"):
+    """Send notification to all master_admin users."""
+    admins = db.query(User).filter(User.role == "master_admin").all()
+    for a in admins:
+        _notify(db, a.id, a.tenant_id, "payment", title, body, link)
+
+
+def _notify_org_admins(db: Session, tenant_id, title: str, body: str, link: str = "/subscription"):
+    """Send notification to all org_admin users of a tenant."""
+    admins = db.query(User).filter(User.tenant_id == tenant_id, User.role == "org_admin").all()
+    for a in admins:
+        _notify(db, a.id, tenant_id, "payment", title, body, link)
+
 
 def _order_ref() -> str:
     suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -145,8 +184,8 @@ def request_payment(body: RequestPaymentIn, user=Depends(get_current_user), db: 
     amount   = _calc_amount(plan, body.billing_cycle)
     discount = CYCLE_DISCOUNT[body.billing_cycle]
     ref      = _order_ref()
+    cfg      = _get_payment_cfg(db)
 
-    # Check for existing pending request for same tenant+plan
     existing = db.query(PaymentRequest).filter(
         and_(
             PaymentRequest.tenant_id == user["tenant_id"],
@@ -154,9 +193,8 @@ def request_payment(body: RequestPaymentIn, user=Depends(get_current_user), db: 
         )
     ).first()
     if existing:
-        # Return existing pending request rather than creating duplicate
         plan_obj = db.query(Plan).filter(Plan.id == existing.plan_id).first()
-        return _payment_response(existing, plan_obj)
+        return _payment_response(existing, plan_obj, cfg)
 
     req = PaymentRequest(
         order_ref=ref, tenant_id=user["tenant_id"],
@@ -164,30 +202,32 @@ def request_payment(body: RequestPaymentIn, user=Depends(get_current_user), db: 
         amount_inr=amount, discount_pct=discount,
     )
     db.add(req); db.commit(); db.refresh(req)
-    return _payment_response(req, plan)
+    return _payment_response(req, plan, cfg)
 
 
-def _payment_response(req: PaymentRequest, plan: Plan):
+def _payment_response(req: PaymentRequest, plan: Plan, cfg: dict):
+    upi_id   = cfg.get("upi_id", "")
+    upi_name = cfg.get("upi_name", "FieldGovern")
     upi_string = (
-        f"upi://pay?pa={UPI_ID}&pn={UPI_NAME.replace(' ', '%20')}"
+        f"upi://pay?pa={upi_id}&pn={upi_name.replace(' ', '%20')}"
         f"&am={req.amount_inr}&cu=INR&tn=FieldGovern%20{req.order_ref}"
-    )
+    ) if upi_id else ""
     return {
-        "order_ref":     req.order_ref,
-        "status":        req.status,
-        "plan_name":     plan.name,
-        "billing_cycle": req.billing_cycle,
-        "amount_inr":    req.amount_inr,
-        "discount_pct":  req.discount_pct,
-        # UPI QR — frontend generates QR from this string
-        "upi_string":    upi_string,
-        "upi_id":        UPI_ID,
-        "upi_name":      UPI_NAME,
-        # Bank transfer fallback
-        "bank_account":  BANK_ACCOUNT,
-        "bank_ifsc":     BANK_IFSC,
-        "bank_name":     BANK_NAME,
-        "payment_reference": req.order_ref,   # user must mention this in bank transfer
+        "order_ref":         req.order_ref,
+        "status":            req.status,
+        "plan_name":         plan.name,
+        "billing_cycle":     req.billing_cycle,
+        "amount_inr":        req.amount_inr,
+        "discount_pct":      req.discount_pct,
+        "upi_string":        upi_string,
+        "upi_id":            upi_id,
+        "upi_name":          upi_name,
+        "bank_account":      cfg.get("bank_account", ""),
+        "bank_ifsc":         cfg.get("bank_ifsc", ""),
+        "bank_name":         cfg.get("bank_name", ""),
+        "admin_whatsapp":    cfg.get("admin_whatsapp", ""),
+        "support_email":     cfg.get("support_email", ""),
+        "payment_reference": req.order_ref,
         "instructions": [
             f"Pay ₹{req.amount_inr:,} via UPI or bank transfer.",
             f"Mention reference code  {req.order_ref}  in payment description / remarks.",
@@ -216,6 +256,17 @@ def submit_utr(body: SubmitUTRIn, user=Depends(get_current_user), db: Session = 
 
     req.utr_number = body.utr_number.strip()
     db.commit()
+
+    tenant = db.query(Tenant).filter(Tenant.id == req.tenant_id).first()
+    plan   = db.query(Plan).filter(Plan.id == req.plan_id).first()
+    org_name  = tenant.name if tenant else "An organisation"
+    plan_name = plan.name   if plan   else req.plan_id
+    _notify_master_admins(
+        db,
+        title=f"Payment submitted — {org_name}",
+        body=f"{org_name} submitted UTR {req.utr_number} for {plan_name} (₹{req.amount_inr:,}). Order: {req.order_ref}",
+    )
+
     return {"message": "UTR submitted. Your plan will be activated within 2–4 business hours.", "order_ref": req.order_ref}
 
 
@@ -263,6 +314,63 @@ def my_subscription(user=Depends(get_current_user), db: Session = Depends(get_db
             "plan_id":    pending_req.plan_id    if pending_req else None,
         } if pending_req else None,
     }
+
+
+# ── Payment config endpoints ───────────────────────────────────────────────────
+
+@router.get("/payment-config")
+def get_payment_config(db: Session = Depends(get_db)):
+    """Public — returns payment config so SubscriptionPage can show QR/bank info."""
+    cfg = _get_payment_cfg(db)
+    # Never expose sensitive fields publicly — only what users need to pay
+    return {
+        "upi_id":        cfg["upi_id"],
+        "upi_name":      cfg["upi_name"],
+        "bank_account":  cfg["bank_account"],
+        "bank_ifsc":     cfg["bank_ifsc"],
+        "bank_name":     cfg["bank_name"],
+        "admin_whatsapp": cfg["admin_whatsapp"],
+        "support_email": cfg["support_email"],
+        "configured":    bool(cfg["upi_id"] or cfg["bank_account"]),
+    }
+
+
+@router.get("/admin/payment-config")
+def admin_get_payment_config(
+    user=Depends(require_role("master_admin")),
+    db: Session = Depends(get_db),
+):
+    return _get_payment_cfg(db)
+
+
+class PaymentConfigIn(BaseModel):
+    upi_id:         Optional[str] = None
+    upi_name:       Optional[str] = None
+    bank_account:   Optional[str] = None
+    bank_ifsc:      Optional[str] = None
+    bank_name:      Optional[str] = None
+    admin_whatsapp: Optional[str] = None
+    support_email:  Optional[str] = None
+
+
+@router.patch("/admin/payment-config")
+def admin_update_payment_config(
+    body: PaymentConfigIn,
+    user=Depends(require_role("master_admin")),
+    db: Session = Depends(get_db),
+):
+    row = db.query(SystemSetting).filter(SystemSetting.key == "payment_config").first()
+    current = row.value if row else {}
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    merged  = {**_PAYMENT_DEFAULTS, **current, **updates}
+    if row:
+        row.value = merged
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(row, "value")
+    else:
+        db.add(SystemSetting(key="payment_config", value=merged))
+    db.commit()
+    return merged
 
 
 # ── master_admin endpoints ─────────────────────────────────────────────────────
@@ -330,6 +438,13 @@ def admin_confirm(
     db.commit()
 
     _activate_subscription(db, req.tenant_id, req.plan_id, req.billing_cycle, req.amount_inr, req.discount_pct)
+
+    plan = db.query(Plan).filter(Plan.id == req.plan_id).first()
+    _notify_org_admins(
+        db, req.tenant_id,
+        title="Subscription activated!",
+        body=f"Your payment of ₹{req.amount_inr:,} has been confirmed. {plan.name if plan else 'Your plan'} is now active.",
+    )
     return {"message": f"Payment confirmed. Subscription activated for order {req.order_ref}."}
 
 
@@ -351,7 +466,107 @@ def admin_reject(
     req.confirmed_at     = datetime.now(timezone.utc)
     req.rejection_reason = body.reason
     db.commit()
+
+    _notify_org_admins(
+        db, req.tenant_id,
+        title="Payment request rejected",
+        body=f"Your payment request ({req.order_ref}) was not approved. Reason: {body.reason}",
+    )
     return {"message": "Payment request rejected."}
+
+
+# ── Subscription overview + manual assign ─────────────────────────────────────
+
+@router.get("/admin/subscriptions")
+def admin_list_subscriptions(
+    user=Depends(require_role("master_admin")),
+    db: Session = Depends(get_db),
+):
+    """All org subscriptions with plan, status, usage — for master_admin overview."""
+    from datetime import timezone as _tz
+    now = datetime.now(timezone.utc)
+    tenants = db.query(Tenant).all()
+    result  = []
+    for t in tenants:
+        sub   = db.query(Subscription).filter(Subscription.tenant_id == t.id).first()
+        plan  = db.query(Plan).filter(Plan.id == (sub.plan_id if sub else "ngo_free")).first()
+        usage = db.query(UsageRecord).filter(
+            UsageRecord.tenant_id    == t.id,
+            UsageRecord.period_year  == now.year,
+            UsageRecord.period_month == now.month,
+        ).first()
+        result.append({
+            "tenant_id":    str(t.id),
+            "org_name":     t.name,
+            "plan_id":      sub.plan_id      if sub  else "ngo_free",
+            "plan_name":    plan.name        if plan else "Free",
+            "status":       sub.status       if sub  else "none",
+            "billing_cycle":sub.billing_cycle if sub else None,
+            "period_end":   sub.current_period_end.isoformat() if sub and sub.current_period_end else None,
+            "trial_end":    sub.trial_end.isoformat()          if sub and sub.trial_end          else None,
+            "submissions_limit": plan.submissions_limit if plan else None,
+            "submissions_used":  usage.submissions_used if usage else 0,
+        })
+    return result
+
+
+class ManualAssignIn(BaseModel):
+    plan_id:       str
+    billing_cycle: str = "monthly"
+    notes:         Optional[str] = None
+
+
+@router.post("/admin/subscriptions/{tenant_id}/assign")
+def admin_assign_plan(
+    tenant_id: str,
+    body: ManualAssignIn,
+    user=Depends(require_role("master_admin")),
+    db: Session = Depends(get_db),
+):
+    """Manually assign a plan to any org (e.g. after offline payment / override)."""
+    import uuid as _uuid
+    plan = db.query(Plan).filter(Plan.id == body.plan_id, Plan.is_active == True).first()
+    if not plan:
+        raise HTTPException(404, "Plan not found")
+    if body.billing_cycle not in CYCLE_MONTHS:
+        raise HTTPException(400, f"Invalid billing cycle: {list(CYCLE_MONTHS)}")
+    try:
+        tid = _uuid.UUID(tenant_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid tenant_id")
+
+    amount   = _calc_amount(plan, body.billing_cycle)
+    discount = CYCLE_DISCOUNT.get(body.billing_cycle, 0)
+    _activate_subscription(db, tid, body.plan_id, body.billing_cycle, amount, discount)
+
+    _notify_org_admins(
+        db, tid,
+        title="Plan updated",
+        body=f"Your account has been assigned to the {plan.name} plan by the administrator.",
+    )
+    return {"message": f"Plan {plan.name} assigned to tenant {tenant_id}."}
+
+
+@router.delete("/admin/subscriptions/{tenant_id}")
+def admin_cancel_subscription(
+    tenant_id: str,
+    user=Depends(require_role("master_admin")),
+    db: Session = Depends(get_db),
+):
+    """Cancel / suspend an org's subscription."""
+    import uuid as _uuid
+    try:
+        tid = _uuid.UUID(tenant_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid tenant_id")
+    sub = db.query(Subscription).filter(Subscription.tenant_id == tid).first()
+    if not sub:
+        raise HTTPException(404, "No subscription found")
+    sub.status = "cancelled"
+    db.commit()
+    _notify_org_admins(db, tid, title="Subscription cancelled",
+        body="Your subscription has been cancelled. Contact support to reactivate.")
+    return {"message": "Subscription cancelled."}
 
 
 # ── Plan limit check helper (used by other routes) ────────────────────────────
@@ -394,5 +609,5 @@ def check_submission_limit(tenant_id, db: Session):
 def check_feature(tenant_id, feature: str, db: Session):
     """Raise 403 if the org's plan doesn't include the feature."""
     plan = get_org_plan(tenant_id, db)
-    if not getattr(plan, feature, False):
+    if plan is None or not getattr(plan, feature, False):
         raise HTTPException(403, f"Feature '{feature}' is not available on your current plan. Please upgrade.")

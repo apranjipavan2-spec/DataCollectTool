@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import api, { storeUser } from '@/lib/api'
 import { useNavigate } from 'react-router-dom'
 import { subscribeToPush } from '@/lib/pushNotifications'
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
 
 const DEMO_ACCOUNTS = [
   { role: 'Admin',       icon: '🛡',  phone: '+919999990001', password: 'test@123', color: '#2563eb' },
@@ -33,6 +35,45 @@ export default function LoginPage() {
   const [pwdErr, setPwdErr]     = useState('')
   const [showDemo, setShowDemo] = useState(false)
   const [filledRole, setFilledRole] = useState('')
+  const [step, setStep]           = useState<'login' | 'otp'>('login')
+  const [otp, setOtp]             = useState('')
+  const [maskedContact, setMaskedContact] = useState('')
+  const [pendingPhone, setPendingPhone]   = useState('')
+  const googleBtnRef = useRef<HTMLDivElement>(null)
+
+  // Load Google Identity Services and render Sign-In button
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || !googleBtnRef.current) return
+    const script = document.createElement('script')
+    script.src = 'https://accounts.google.com/gsi/client'
+    script.async = true
+    script.onload = () => {
+      const g = (window as any).google
+      if (!g) return
+      g.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: async (resp: { credential: string }) => {
+          setLoading(true); setError('')
+          try {
+            const { data } = await api.post('/auth/google', { credential: resp.credential })
+            storeUser(data)
+            subscribeToPush().catch(() => {})
+            const dest = data.role === 'master_admin' ? '/admin'
+                       : data.role === 'enumerator'   ? '/collect'
+                       : '/'
+            navigate(dest, { replace: true })
+          } catch (e: any) {
+            setError(e.response?.data?.detail ?? 'Google sign-in failed')
+          } finally { setLoading(false) }
+        },
+      })
+      g.accounts.id.renderButton(googleBtnRef.current!, {
+        theme: 'outline', size: 'large', width: 360, text: 'signin_with',
+      })
+    }
+    document.head.appendChild(script)
+    return () => { document.head.removeChild(script) }
+  }, [])
 
   const normalizePhone = (raw: string) => {
     const digits = raw.replace(/\D/g, '')
@@ -54,6 +95,12 @@ export default function LoginPage() {
     setLoading(true); setError('')
     try {
       const { data } = await api.post('/auth/login', { phone: normalizePhone(phone), password })
+      if (data['2fa_required']) {
+        setPendingPhone(data.phone)
+        setMaskedContact(data.masked_contact)
+        setStep('otp')
+        return
+      }
       storeUser(data)
       subscribeToPush().catch(() => {})
       const dest = data.role === 'master_admin' ? '/admin'
@@ -65,6 +112,31 @@ export default function LoginPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleVerifyOtp = async () => {
+    if (!otp.trim()) return
+    setLoading(true); setError('')
+    try {
+      const { data } = await api.post('/auth/verify-otp', { phone: pendingPhone, otp: otp.trim() })
+      storeUser(data)
+      subscribeToPush().catch(() => {})
+      const dest = data.role === 'master_admin' ? '/admin'
+                 : data.role === 'enumerator'   ? '/collect'
+                 : '/'
+      navigate(dest, { replace: true })
+    } catch {
+      setError('Invalid or expired code. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    setError('')
+    try {
+      await api.post('/auth/send-otp', { phone: pendingPhone })
+    } catch { }
   }
 
   return (
@@ -156,7 +228,54 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Form */}
+            {/* OTP step */}
+            {step === 'otp' && (
+              <div className="space-y-5">
+                <div className="text-center py-2">
+                  <div className="text-4xl mb-3">🔐</div>
+                  <p className="text-sm text-slate-600">
+                    We sent a 6-digit code to <strong>{maskedContact}</strong>
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">Check your email inbox · expires in 10 min</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Verification Code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="000000"
+                    autoFocus
+                    value={otp}
+                    onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); setError('') }}
+                    onKeyDown={e => e.key === 'Enter' && handleVerifyOtp()}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] text-slate-900 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+                    style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+                  />
+                </div>
+                <button
+                  onClick={handleVerifyOtp}
+                  disabled={loading || otp.length < 6}
+                  className="w-full py-3.5 rounded-xl font-bold text-sm text-white transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ background: 'linear-gradient(135deg, #0ea5e9 0%, #7c3aed 100%)', boxShadow: '0 4px 16px rgba(14,165,233,0.35)' }}
+                >
+                  {loading ? (
+                    <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Verifying…</span></>
+                  ) : 'Verify Code →'}
+                </button>
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <button onClick={() => { setStep('login'); setOtp(''); setError('') }} className="hover:text-slate-700 transition-colors">
+                    ← Back to login
+                  </button>
+                  <button onClick={handleResendOtp} className="text-blue-500 hover:text-blue-700 font-semibold transition-colors">
+                    Resend code
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Login form */}
+            {step === 'login' && (<>
             <div className="space-y-4 mb-4">
 
               {/* Phone */}
@@ -239,6 +358,17 @@ export default function LoginPage() {
               )}
             </button>
 
+            {GOOGLE_CLIENT_ID && (
+              <div className="mt-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex-1 h-px bg-slate-100" />
+                  <span className="text-xs text-slate-400 font-medium">or</span>
+                  <div className="flex-1 h-px bg-slate-100" />
+                </div>
+                <div ref={googleBtnRef} className="flex justify-center" />
+              </div>
+            )}
+
             <div className="mt-5 pt-5 border-t border-slate-100">
               {/* Demo accounts toggle — animated to attract attention */}
               <div className="relative">
@@ -315,6 +445,7 @@ export default function LoginPage() {
                 </p>
               )}
             </div>
+            </>)}
           </div>
 
         </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getStoredUser, logout } from '@/lib/api'
 import api from '@/lib/api'
 import ThemeToggle from '@/components/ThemeToggle'
+import { useSubscription } from '@/lib/SubscriptionContext'
 
 interface TopNavProps {
   title?: string
@@ -16,23 +17,80 @@ interface InboxItem {
   link: string; read: boolean; created_at: string | null
 }
 
+const TYPE_ICON: Record<string, string> = {
+  comment: '💬', assignment: '📋', flagged: '🚩', approved: '✅',
+  rejected: '❌', payment: '💳', info: 'ℹ️', system: '⚙️',
+}
+const TYPE_COLOR: Record<string, string> = {
+  flagged:  'bg-amber-500/8',
+  rejected: 'bg-red-500/8',
+  approved: 'bg-emerald-500/8',
+  payment:  'bg-blue-500/8',
+}
+const TYPE_ICON_BG: Record<string, string> = {
+  flagged:  'bg-amber-50',
+  rejected: 'bg-red-50',
+  approved: 'bg-emerald-50',
+  payment:  'bg-blue-50',
+}
+
+function timeAgo(dateStr: string | null): string {
+  if (!dateStr) return ''
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60_000)
+  if (mins < 1)  return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24)  return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days === 1) return 'Yesterday'
+  if (days < 7)   return `${days}d ago`
+  return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+}
+
+function NotifRow({ item, onClick }: { item: InboxItem; onClick: (i: InboxItem) => void }) {
+  const unread = !item.read
+  return (
+    <button
+      onClick={() => onClick(item)}
+      className={`w-full text-left px-4 py-3.5 border-b border-catalan-border/40 hover:bg-catalan-hover transition-colors ${unread ? (TYPE_COLOR[item.type] || 'bg-catalan-primary/5') : ''}`}
+    >
+      <div className="flex gap-3 items-start">
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 mt-0.5 ${unread ? (TYPE_ICON_BG[item.type] || 'bg-catalan-primary/10') : 'bg-catalan-bg'}`}>
+          {TYPE_ICON[item.type] || '🔔'}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className={`text-sm leading-snug ${unread ? 'font-semibold text-catalan-text' : 'font-medium text-catalan-textMuted'}`}>
+            {item.title}
+          </div>
+          <div className="text-xs text-catalan-textMuted mt-0.5 line-clamp-2 leading-relaxed">{item.body}</div>
+          <div className="text-[10px] text-catalan-textMuted/70 mt-1.5">{timeAgo(item.created_at)}</div>
+        </div>
+        {unread && <div className="w-2 h-2 rounded-full bg-catalan-primary mt-2 flex-shrink-0 animate-pulse" />}
+      </div>
+    </button>
+  )
+}
+
 function NotificationBell() {
-  const [open, setOpen] = useState(false)
-  const [items, setItems] = useState<InboxItem[]>([])
-  const [unread, setUnread] = useState(0)
+  const [open,        setOpen]        = useState(false)
+  const [items,       setItems]       = useState<InboxItem[]>([])
+  const [unread,      setUnread]      = useState(0)
+  const [fetchingNow, setFetchingNow] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setFetchingNow(true)
     try {
       const { data } = await api.get('/inbox/')
       setItems(data.items || [])
       setUnread(data.unread_count || 0)
     } catch { }
+    finally { setFetchingNow(false) }
   }, [])
 
   useEffect(() => { load() }, [load])
-  // Poll every 60s
   useEffect(() => {
     const t = setInterval(load, 60_000)
     return () => clearInterval(t)
@@ -60,61 +118,134 @@ function NotificationBell() {
     if (item.link) navigate(item.link)
   }
 
-  const TYPE_ICON: Record<string, string> = {
-    comment: '💬', assignment: '📋', flagged: '🚩', approved: '✅', info: 'ℹ️'
-  }
+  const unreadItems = items.filter(i => !i.read)
+  const readItems   = items.filter(i => i.read)
 
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => { setOpen(v => !v); if (!open) load() }}
-        className="relative p-2 rounded-lg hover:bg-catalan-hover transition-colors">
+      <button
+        onClick={() => { setOpen(v => { const next = !v; if (next) load(items.length === 0); return next }); }}
+        className={`relative p-2 rounded-lg transition-colors ${open ? 'bg-catalan-hover' : 'hover:bg-catalan-hover'}`}
+        aria-label="Notifications"
+      >
         <span className="text-xl">🔔</span>
         {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 bg-catalan-error text-white text-[10px] font-bold
-            rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+          <span className="absolute -top-0.5 -right-0.5 bg-catalan-error text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
             {unread > 99 ? '99+' : unread}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-catalan-surface border border-catalan-border rounded-xl shadow-xl z-50 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-catalan-border">
-            <span className="text-sm font-semibold text-catalan-text">Notifications</span>
+        <div className="absolute right-0 mt-2 w-96 bg-catalan-surface border border-catalan-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3.5 border-b border-catalan-border">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-catalan-text">Notifications</span>
+              {unread > 0 && (
+                <span className="text-[11px] font-bold bg-catalan-primary text-catalan-bg rounded-full px-2 py-0.5">
+                  {unread} new
+                </span>
+              )}
+            </div>
             {unread > 0 && (
-              <button onClick={markAllRead} className="text-xs text-catalan-primary hover:opacity-80">
+              <button onClick={markAllRead} className="text-xs text-catalan-primary hover:opacity-70 font-medium transition-opacity">
                 Mark all read
               </button>
             )}
           </div>
 
-          <div className="max-h-96 overflow-y-auto">
-            {items.length === 0 ? (
-              <div className="p-8 text-center text-catalan-textMuted text-sm">No notifications</div>
-            ) : items.map(item => (
-              <button key={item.id} onClick={() => handleClick(item)}
-                className={`w-full text-left px-4 py-3 border-b border-catalan-border/50 hover:bg-catalan-hover transition-colors ${!item.read ? 'bg-catalan-primary/5' : ''}`}>
-                <div className="flex gap-3 items-start">
-                  <span className="text-base mt-0.5 flex-shrink-0">{TYPE_ICON[item.type] || 'ℹ️'}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-sm font-medium text-catalan-text truncate ${!item.read ? 'font-semibold' : ''}`}>
-                      {item.title}
+          {/* Body */}
+          <div className="max-h-[420px] overflow-y-auto">
+            {fetchingNow ? (
+              <div className="p-4 space-y-3">
+                {[1, 2, 3].map(n => (
+                  <div key={n} className="flex gap-3 animate-pulse">
+                    <div className="w-8 h-8 rounded-xl bg-catalan-border flex-shrink-0" />
+                    <div className="flex-1 space-y-2 py-1">
+                      <div className="h-3 bg-catalan-border rounded w-3/4" />
+                      <div className="h-2.5 bg-catalan-border rounded w-full" />
+                      <div className="h-2 bg-catalan-border rounded w-1/4" />
                     </div>
-                    <div className="text-xs text-catalan-textMuted mt-0.5 line-clamp-2">{item.body}</div>
-                    {item.created_at && (
-                      <div className="text-[10px] text-catalan-textMuted mt-1">
-                        {new Date(item.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    )}
                   </div>
-                  {!item.read && <div className="w-2 h-2 rounded-full bg-catalan-primary mt-1.5 flex-shrink-0" />}
-                </div>
-              </button>
-            ))}
+                ))}
+              </div>
+            ) : items.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                <span className="text-4xl mb-3 opacity-20">🔔</span>
+                <p className="text-sm font-medium text-catalan-text mb-1">All caught up</p>
+                <p className="text-xs text-catalan-textMuted leading-relaxed">
+                  Notifications about submissions, payments, and assignments will appear here.
+                </p>
+              </div>
+            ) : (
+              <>
+                {unreadItems.length > 0 && (
+                  <>
+                    <div className="px-4 py-1.5 text-[10px] font-bold text-catalan-textMuted uppercase tracking-widest bg-catalan-bg/60">New</div>
+                    {unreadItems.map(item => <NotifRow key={item.id} item={item} onClick={handleClick} />)}
+                  </>
+                )}
+                {readItems.length > 0 && (
+                  <>
+                    {unreadItems.length > 0 && (
+                      <div className="px-4 py-1.5 text-[10px] font-bold text-catalan-textMuted uppercase tracking-widest bg-catalan-bg/60">Earlier</div>
+                    )}
+                    {readItems.map(item => <NotifRow key={item.id} item={item} onClick={handleClick} />)}
+                  </>
+                )}
+              </>
+            )}
           </div>
+
+          {/* Footer */}
+          {items.length > 0 && (
+            <div className="border-t border-catalan-border px-4 py-2.5 flex justify-end">
+              <button
+                onClick={markAllRead}
+                disabled={unread === 0}
+                className="text-xs text-catalan-textMuted hover:text-catalan-text disabled:opacity-30 transition-colors"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
+  )
+}
+
+function UsageBar() {
+  const user = getStoredUser()
+  const { data } = useSubscription()
+  const navigate = useNavigate()
+
+  if (!data || !['org_admin', 'supervisor'].includes(user?.role ?? '')) return null
+
+  const used  = data.usage.submissions_used
+  const limit = data.limits.submissions_limit
+  if (!limit) return null
+
+  const pct   = Math.min(100, Math.round((used / limit) * 100))
+  const color = pct >= 90 ? 'bg-catalan-error' : pct >= 70 ? 'bg-amber-500' : 'bg-catalan-primary'
+  const label = pct >= 90 ? 'text-catalan-error' : pct >= 70 ? 'text-amber-500' : 'text-catalan-textMuted'
+
+  return (
+    <button
+      onClick={() => navigate('/subscription')}
+      title={`${used.toLocaleString()} of ${limit.toLocaleString()} submissions used`}
+      className="hidden sm:flex flex-col gap-1 min-w-[110px] hover:opacity-80 transition-opacity"
+    >
+      <div className={`flex justify-between text-[10px] ${label}`}>
+        <span>Submissions</span>
+        <span>{used.toLocaleString()}/{limit.toLocaleString()}</span>
+      </div>
+      <div className="h-1.5 bg-catalan-border rounded-full overflow-hidden">
+        <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+      </div>
+    </button>
   )
 }
 
@@ -175,9 +306,10 @@ const TopNav: React.FC<TopNavProps> = ({ title, titleNode, breadcrumbs, rightCon
           <div className="flex-1 flex justify-center">{rightContent}</div>
         )}
 
-        {/* Right: Bell + User Menu */}
-        <div className="flex items-center gap-2">
-          {user.role !== 'master_admin' && <NotificationBell />}
+        {/* Right: Usage bar + Bell + User Menu */}
+        <div className="flex items-center gap-4">
+          <UsageBar />
+          <NotificationBell />
 
           <div className="relative" ref={menuRef}>
             <button

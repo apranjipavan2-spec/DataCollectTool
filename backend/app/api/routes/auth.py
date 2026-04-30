@@ -22,6 +22,16 @@ OTP_EXPIRE_MINUTES = 10
 RESET_TOKEN_EXPIRE_MINUTES = 60
 
 
+def _mask_email(email: str) -> str:
+    parts = email.split("@")
+    if len(parts) != 2:
+        return "****"
+    name, domain = parts
+    if len(name) <= 2:
+        return f"*@{domain}"
+    return f"{name[0]}{'*' * (len(name) - 2)}{name[-1]}@{domain}"
+
+
 class LoginRequest(BaseModel):
     phone: str
     password: str
@@ -84,17 +94,93 @@ def _make_token(user: User) -> dict:
     }
 
 
+# ── Google OAuth ─────────────────────────────────────────────────────────
+
+class GoogleLoginIn(BaseModel):
+    credential: str   # Google ID token from GSI
+
+
+@router.post("/google")
+@limiter.limit("20/minute")
+def google_login(request: Request, body: GoogleLoginIn, db: Session = Depends(get_db)):
+    """Verify a Google ID token and return FieldGovern JWTs."""
+    if not settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(503, "Google login is not configured on this server.")
+
+    try:
+        from google.oauth2 import id_token
+        from google.auth.transport import requests as _greq
+        idinfo = id_token.verify_oauth2_token(
+            body.credential, _greq.Request(), settings.GOOGLE_CLIENT_ID
+        )
+    except Exception as e:
+        raise HTTPException(401, f"Invalid Google credential: {e}")
+
+    google_id  = idinfo["sub"]
+    email      = idinfo.get("email", "")
+    name       = idinfo.get("name", "")
+    avatar_url = idinfo.get("picture")
+
+    # Find user: by google_id first, then by email (links existing account)
+    user = db.query(User).filter(User.google_id == google_id, User.is_active == True).first()
+    if not user and email:
+        user = db.query(User).filter(User.email == email, User.is_active == True).first()
+
+    if not user:
+        raise HTTPException(
+            404,
+            "No FieldGovern account found for this Google account. "
+            "Please ask your organisation admin to create your account first."
+        )
+
+    # Link google_id and update avatar on first Google login
+    changed = False
+    if not user.google_id:
+        user.google_id = google_id; changed = True
+    if avatar_url and not user.avatar_url:
+        user.avatar_url = avatar_url; changed = True
+    if changed:
+        db.commit()
+
+    return _make_token(user)
+
+
 # ── Password login (primary for MVP) ─────────────────────────────────────
 
 @router.post("/login")
 @limiter.limit("10/minute")
 def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
-    """Authenticate with phone + password."""
+    """Authenticate with phone + password. Returns 2fa_required if tenant has 2FA enabled."""
     user = db.query(User).filter(User.phone == body.phone, User.is_active == True).first()
     if not user or not user.password_hash:
         raise HTTPException(status_code=401, detail="Invalid phone or password")
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid phone or password")
+
+    # Check if tenant has 2FA enabled and plan supports it
+    from app.models.tenant import Tenant
+    from app.models.billing import Subscription, Plan as BillingPlan
+    tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+    cfg = (tenant.notification_config or {}) if tenant else {}
+    if cfg.get("two_fa_enabled", False):
+        sub = (
+            db.query(Subscription)
+            .filter(Subscription.tenant_id == user.tenant_id)
+            .order_by(Subscription.created_at.desc())
+            .first()
+        )
+        plan = db.query(BillingPlan).filter(BillingPlan.id == sub.plan_id).first() if sub else None
+        if plan and plan.two_fa:
+            otp = _generate_otp()
+            user.otp_hash = hash_otp(otp)
+            user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRE_MINUTES)
+            db.commit()
+            if user.email:
+                from app.services.email import send_otp_email
+                send_otp_email(user.email, user.name or "User", otp)
+            masked = _mask_email(user.email) if user.email else f"****{user.phone[-4:]}"
+            return {"2fa_required": True, "masked_contact": masked, "phone": user.phone}
+
     return _make_token(user)
 
 
@@ -245,7 +331,9 @@ def send_otp(request: Request, body: SendOTPRequest, db: Session = Depends(get_d
     user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRE_MINUTES)
     db.commit()
 
-    # SMS gateway not yet integrated — OTP login is available for future 2FA
+    if user.email:
+        from app.services.email import send_otp_email
+        send_otp_email(user.email, user.name or "User", otp)
 
     return {"message": "OTP sent if phone is registered"}
 
