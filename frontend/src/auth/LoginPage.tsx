@@ -194,7 +194,15 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="relative z-10 text-slate-400 text-xs mt-10">© 2026 FieldGovern · CEO: Pallavi Deshetty</p>
+        <div className="relative z-10 mt-10 flex items-center justify-between">
+          <p className="text-slate-400 text-xs">© 2026 FieldGovern · CEO: Pallavi Deshetty</p>
+          <button
+            onClick={() => navigate('/pricing')}
+            className="text-xs text-blue-500 hover:text-blue-700 hover:underline transition-colors font-medium"
+          >
+            View plans →
+          </button>
+        </div>
       </div>
 
       {/* ── Right form panel ── */}
@@ -217,6 +225,12 @@ export default function LoginPage() {
                 <h1 className="text-2xl font-bold text-black tracking-tight">Welcome back</h1>
               </div>
               <p className="text-slate-500 text-sm">Sign in to continue to FieldGovern</p>
+              <button
+                onClick={() => navigate('/pricing')}
+                className="mt-1.5 text-xs text-blue-500 hover:text-blue-700 hover:underline transition-colors font-medium"
+              >
+                New here? View pricing plans →
+              </button>
             </div>
 
             {/* Error */}

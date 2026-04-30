@@ -28,7 +28,7 @@ export const getNavItems = (role: string): NavItem[] => {
     case 'master_admin':
       return [ALL_ITEMS.admin, ALL_ITEMS.monitor, ALL_ITEMS.payments]
     case 'org_admin':
-      return [ALL_ITEMS.dashboard, ALL_ITEMS.collect, ALL_ITEMS.forms, ALL_ITEMS.programs, ALL_ITEMS.fgCleaner, ALL_ITEMS.fgAnalyzer, ALL_ITEMS.fgWriter, ALL_ITEMS.fileManager, ALL_ITEMS.fieldMap, ALL_ITEMS.settings, ALL_ITEMS.subscription]
+      return [ALL_ITEMS.dashboard, ALL_ITEMS.collect, ALL_ITEMS.forms, ALL_ITEMS.programs, ALL_ITEMS.fgCleaner, ALL_ITEMS.fgAnalyzer, ALL_ITEMS.fgWriter, ALL_ITEMS.fileManager, ALL_ITEMS.migration, ALL_ITEMS.fieldMap, ALL_ITEMS.settings, ALL_ITEMS.subscription]
     case 'supervisor':
       return [ALL_ITEMS.dashboard, ALL_ITEMS.collect, ALL_ITEMS.forms, ALL_ITEMS.programs, ALL_ITEMS.fgCleaner, ALL_ITEMS.fgAnalyzer, ALL_ITEMS.fgWriter, ALL_ITEMS.fileManager, ALL_ITEMS.fieldMap, ALL_ITEMS.settings]
     case 'enumerator':

@@ -311,6 +311,10 @@ export default function SubscriptionPage() {
           {/* 1-month free trial note */}
           <p className="text-xs text-catalan-textMuted text-center">
             All paid plans include a <b>1-month free trial</b> — full access, no payment required upfront. · Dual pricing: INR for India, USD for international.
+            {' '}<a href="/pricing" target="_blank" rel="noopener noreferrer"
+              className="text-catalan-primary hover:underline font-medium">
+              Compare all plans →
+            </a>
           </p>
         </main>
       </div>
