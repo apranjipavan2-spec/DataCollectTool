@@ -1594,20 +1594,19 @@ function ProgramPicker({ value, onChange }: { value: string; onChange: (id: stri
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-type AnalyzerTab = 'overview' | 'tabulator' | 'panel' | 'csv'
+type AnalyzerTab = 'tabulator' | 'panel' | 'csv'
 
 export default function FgAnalyzer() {
   const user = getStoredUser()
   const toast = useToast()
-  const isOrgAdmin = user?.role === 'org_admin'
+  const isMasterAdmin = user?.role === 'master_admin'
   const TABS: { key: AnalyzerTab; label: string }[] = [
-    { key: 'overview',  label: 'Overview' },
     { key: 'tabulator', label: 'Tabulator' },
     { key: 'panel',     label: 'Panel Study' },
-    ...(isOrgAdmin ? [{ key: 'csv' as AnalyzerTab, label: 'CSV Upload' }] : []),
+    ...(isMasterAdmin ? [{ key: 'csv' as AnalyzerTab, label: 'CSV Upload' }] : []),
   ]
   const [programId, setProgramId] = useState(getLastProgram())
-  const [tab, setTab] = useState<AnalyzerTab>('overview')
+  const [tab, setTab] = useState<AnalyzerTab>('tabulator')
   const [summary, setSummary] = useState<ProgramSummary | null>(null)
   const [data, setData] = useState<AnalyzerData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -1711,8 +1710,8 @@ export default function FgAnalyzer() {
               </div>
             )}
 
-            {/* CSV Upload tab is always accessible for org_admin, no program required */}
-            {isOrgAdmin && !programId && (
+            {/* CSV Upload tab is always accessible for master_admin, no program required */}
+            {isMasterAdmin && !programId && (
               <div className="flex gap-1 mb-6 border-b border-catalan-border">
                 <button onClick={() => setTab('csv')}
                   className="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors border-catalan-primary text-catalan-primary">
@@ -1720,7 +1719,7 @@ export default function FgAnalyzer() {
                 </button>
               </div>
             )}
-            {isOrgAdmin && !programId && <CsvTab />}
+            {isMasterAdmin && !programId && <CsvTab />}
 
             {programId && summary && !loading && (
               <>
@@ -1735,21 +1734,40 @@ export default function FgAnalyzer() {
                   ))}
                 </div>
 
-                {tab === 'overview'  && <OverviewTab summary={summary} fullData={data} />}
                 {tab === 'tabulator' && (
                   data
                     ? <TabulatorTab programId={programId} cols={data.column_headers} sampleRows={data.sample_rows ?? []} />
                     : (
-                      <div className={`${card} flex flex-col items-center justify-center py-16 gap-4`}>
-                        <p className="text-catalan-textMuted text-sm text-center">
-                          Column data loads form field definitions needed for AI suggestions and cross-tabulations.
-                        </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <button
                           onClick={() => loadColumnData(programId)}
                           disabled={colDataLoading}
-                          className={btnPr}
+                          className={`${card} flex flex-col items-start gap-3 text-left hover:border-catalan-primary/50 hover:bg-catalan-primary/5 transition-all disabled:opacity-40 cursor-pointer`}
                         >
-                          {colDataLoading ? 'Loading Column Data…' : 'Load Column Data →'}
+                          <div className="text-2xl">🤖</div>
+                          <div>
+                            <div className="text-sm font-semibold text-catalan-text mb-1">
+                              {colDataLoading ? 'Loading…' : 'Build with AI'}
+                            </div>
+                            <p className="text-xs text-catalan-textMuted leading-relaxed">
+                              Load your column data and let AI suggest cross-tabulations, run Smart Builder, and generate AI-powered insights from your program data.
+                            </p>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => {
+                            const token = localStorage.getItem('fp_token')
+                            window.location.href = `${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}`
+                          }}
+                          className={`${card} flex flex-col items-start gap-3 text-left hover:border-catalan-primary/50 hover:bg-catalan-primary/5 transition-all cursor-pointer`}
+                        >
+                          <div className="text-2xl">✏️</div>
+                          <div>
+                            <div className="text-sm font-semibold text-catalan-text mb-1">Build Manually</div>
+                            <p className="text-xs text-catalan-textMuted leading-relaxed">
+                              Open the full Analyzer Wizard to build cross-tabs, frequency tables, and statistical summaries manually with complete control.
+                            </p>
+                          </div>
                         </button>
                       </div>
                     )
