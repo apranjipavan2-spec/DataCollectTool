@@ -1649,7 +1649,14 @@ export default function FgAnalyzer() {
     }
   }, [toast])
 
+  const [savedTabs, setSavedTabs] = useState<SavedTabulation[]>([])
+  const loadSaved = useCallback(async (id: string) => {
+    setSavedTabs(loadTabulationsCache(id))
+    setSavedTabs(await loadTabulations(id))
+  }, [])
+
   useEffect(() => { if (programId) loadSummary(programId) }, [programId, loadSummary])
+  useEffect(() => { if (programId) loadSaved(programId) }, [programId, loadSaved])
 
   return (
     <div className="flex h-screen bg-catalan-bg">
@@ -1738,37 +1745,56 @@ export default function FgAnalyzer() {
                   data
                     ? <TabulatorTab programId={programId} cols={data.column_headers} sampleRows={data.sample_rows ?? []} />
                     : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <button
-                          onClick={() => loadColumnData(programId)}
-                          disabled={colDataLoading}
-                          className={`${card} flex flex-col items-start gap-3 text-left hover:border-catalan-primary/50 hover:bg-catalan-primary/5 transition-all disabled:opacity-40 cursor-pointer`}
-                        >
-                          <div className="text-2xl">🤖</div>
-                          <div>
-                            <div className="text-sm font-semibold text-catalan-text mb-1">
-                              {colDataLoading ? 'Loading…' : 'Build with AI'}
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <button
+                            onClick={() => loadColumnData(programId)}
+                            disabled={colDataLoading}
+                            className={`${card} flex flex-col items-start gap-3 text-left hover:border-catalan-primary/50 hover:bg-catalan-primary/5 transition-all disabled:opacity-40 cursor-pointer`}
+                          >
+                            <div className="text-2xl">🤖</div>
+                            <div>
+                              <div className="text-sm font-semibold text-catalan-text mb-1">
+                                {colDataLoading ? 'Loading…' : 'Build with AI'}
+                              </div>
+                              <p className="text-xs text-catalan-textMuted leading-relaxed">
+                                Load your column data and let AI suggest cross-tabulations, run Smart Builder, and generate AI-powered insights from your program data.
+                              </p>
                             </div>
-                            <p className="text-xs text-catalan-textMuted leading-relaxed">
-                              Load your column data and let AI suggest cross-tabulations, run Smart Builder, and generate AI-powered insights from your program data.
-                            </p>
-                          </div>
-                        </button>
-                        <button
-                          onClick={() => {
-                            const token = localStorage.getItem('fp_token')
-                            window.location.href = `${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}`
-                          }}
-                          className={`${card} flex flex-col items-start gap-3 text-left hover:border-catalan-primary/50 hover:bg-catalan-primary/5 transition-all cursor-pointer`}
-                        >
-                          <div className="text-2xl">✏️</div>
+                          </button>
+                          <button
+                            onClick={() => {
+                              const token = localStorage.getItem('fp_token')
+                              window.location.href = `${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}`
+                            }}
+                            className={`${card} flex flex-col items-start gap-3 text-left hover:border-catalan-primary/50 hover:bg-catalan-primary/5 transition-all cursor-pointer`}
+                          >
+                            <div className="text-2xl">✏️</div>
+                            <div>
+                              <div className="text-sm font-semibold text-catalan-text mb-1">Build Manually</div>
+                              <p className="text-xs text-catalan-textMuted leading-relaxed">
+                                Open the full Analyzer Wizard to build cross-tabs, frequency tables, and statistical summaries manually with complete control.
+                              </p>
+                            </div>
+                          </button>
+                        </div>
+
+                        {savedTabs.length > 0 && (
                           <div>
-                            <div className="text-sm font-semibold text-catalan-text mb-1">Build Manually</div>
-                            <p className="text-xs text-catalan-textMuted leading-relaxed">
-                              Open the full Analyzer Wizard to build cross-tabs, frequency tables, and statistical summaries manually with complete control.
-                            </p>
+                            <div className={sh}>Recent Tabulations</div>
+                            <div className="space-y-4">
+                              {savedTabs.map(t => (
+                                <TabulationCard key={t.id} tab={t} programId={programId}
+                                  onDelete={async () => { await deleteTabulation(programId, t.id); await loadSaved(programId) }}
+                                  onUpdate={async (updated) => {
+                                    setSavedTabs(prev => prev.map(x => x.id === updated.id ? updated : x))
+                                    await saveTabulation(programId, updated)
+                                  }}
+                                />
+                              ))}
+                            </div>
                           </div>
-                        </button>
+                        )}
                       </div>
                     )
                 )}
