@@ -25,7 +25,6 @@ REPLACEMENTS = [
     ('FIELDPULSE',          'FIELDGOVERN'),
     # Domain
     ('fieldpulse.in',       'fieldgovern.com'),
-    ('dct.up.railway.app',  'app.fieldgovern.com'),
 ]
 
 changed = []

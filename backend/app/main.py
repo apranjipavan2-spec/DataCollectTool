@@ -73,10 +73,28 @@ def _seed_deepseek_key():
 
 
 def _assert_production_secrets():
-    if settings.JWT_SECRET in ("change-me-in-production", "your-super-secret-key-change-in-production-12345"):
+    unsafe = {
+        "change-me-in-production",
+        "your-super-secret-key-change-in-production-12345",
+        "CHANGE_ME_USE_A_LONG_RANDOM_STRING",
+    }
+    if settings.JWT_SECRET in unsafe or len(settings.JWT_SECRET) < 32:
         import sys
-        logging.critical("FATAL: JWT_SECRET is set to a known default. Set a strong random secret in your environment.")
+        logging.critical(
+            "FATAL: JWT_SECRET is insecure. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_hex(48))\""
+        )
         sys.exit(1)
+
+    warnings = []
+    if not settings.SMTP_HOST:
+        warnings.append("SMTP_HOST not set — 2FA OTP emails and password reset will not be delivered.")
+    if not settings.GOOGLE_CLIENT_ID:
+        warnings.append("GOOGLE_CLIENT_ID not set — Google Sign-In will be disabled.")
+    if not settings.APP_URL or settings.APP_URL == "http://localhost:5173":
+        warnings.append("APP_URL is localhost — email links will point to localhost in production.")
+    for w in warnings:
+        logging.warning("[startup] %s", w)
 
 
 @asynccontextmanager
