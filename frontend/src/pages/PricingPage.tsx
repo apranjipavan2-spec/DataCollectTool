@@ -21,10 +21,14 @@ interface Plan {
 interface PaymentCfg { admin_whatsapp?: string; support_email?: string }
 
 const SEGMENTS = [
-  { key: 'ngo',       label: 'NGO / Social Impact', icon: '🌱' },
-  { key: 'govt',      label: 'Government',           icon: '🏛️' },
-  { key: 'research',  label: 'Research',             icon: '🔬' },
-  { key: 'corporate', label: 'Corporate',            icon: '🏢' },
+  { key: 'ngo',       label: 'NGO / Social Impact', icon: '🌱',
+    active: 'border-emerald-400 bg-emerald-50 shadow-emerald-100', text: 'text-emerald-700' },
+  { key: 'govt',      label: 'Government',           icon: '🏛️',
+    active: 'border-blue-400 bg-blue-50 shadow-blue-100',           text: 'text-blue-700'    },
+  { key: 'research',  label: 'Research',             icon: '🔬',
+    active: 'border-violet-400 bg-violet-50 shadow-violet-100',     text: 'text-violet-700'  },
+  { key: 'corporate', label: 'Corporate',            icon: '🏢',
+    active: 'border-amber-400 bg-amber-50 shadow-amber-100',        text: 'text-amber-700'   },
 ]
 
 const CYCLES = [
@@ -140,39 +144,49 @@ export default function PricingPage() {
       <section id="pricing" className="max-w-7xl mx-auto px-6 pb-24">
 
         {/* Billing cycle toggle */}
-        <div className="flex flex-wrap justify-center gap-2 mb-8">
-          {CYCLES.map(c => (
-            <button key={c.key} onClick={() => setCycle(c.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
-                cycle === c.key
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-md'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
-              }`}>
-              {c.label}
-              {c.save && (
-                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                  cycle === c.key ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700'
-                }`}>{c.save}</span>
-              )}
-            </button>
-          ))}
+        <div className="flex flex-wrap justify-center gap-3 mb-10">
+          {CYCLES.map(c => {
+            const isActive = cycle === c.key
+            return (
+              <button key={c.key} onClick={() => setCycle(c.key)}
+                className={`flex flex-col items-center justify-center min-w-[96px] px-5 py-3.5 rounded-2xl border-2 transition-all duration-150 ${
+                  isActive
+                    ? 'border-blue-500 bg-blue-50 shadow-md shadow-blue-100'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                }`}>
+                <span className={`text-sm font-bold leading-tight ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>
+                  {c.label}
+                </span>
+                {c.save ? (
+                  <span className={`text-[11px] font-semibold mt-1 px-2 py-0.5 rounded-full ${
+                    isActive ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-700'
+                  }`}>{c.save}</span>
+                ) : (
+                  <span className="text-[11px] text-slate-400 mt-1">standard</span>
+                )}
+              </button>
+            )
+          })}
         </div>
 
         {/* Segment tabs */}
-        <div className="flex justify-center mb-10">
-          <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
-            {SEGMENTS.map(s => (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl mx-auto mb-12">
+          {SEGMENTS.map(s => {
+            const isActive = segment === s.key
+            return (
               <button key={s.key} onClick={() => setSegment(s.key)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  segment === s.key
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
+                className={`flex flex-col items-center gap-2 px-4 py-5 rounded-2xl border-2 transition-all duration-150 ${
+                  isActive
+                    ? `${s.active} shadow-md`
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                 }`}>
-                <span>{s.icon}</span>
-                <span className="hidden sm:inline">{s.label}</span>
+                <span className="text-3xl leading-none">{s.icon}</span>
+                <span className={`text-xs font-semibold text-center leading-snug ${isActive ? s.text : 'text-slate-500'}`}>
+                  {s.label}
+                </span>
               </button>
-            ))}
-          </div>
+            )
+          })}
         </div>
 
         {/* Plan cards */}
