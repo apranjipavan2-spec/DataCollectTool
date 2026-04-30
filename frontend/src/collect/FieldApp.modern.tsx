@@ -470,12 +470,22 @@ export default function FieldApp() {
           setMyStats({ today: todayCount, total: r.data.total ?? items.length })
         }).catch(() => {})
 
-        // Show cached forms immediately so the list appears without waiting for network
+        // Show cached forms immediately — but only if they belong to the current user.
+        // Multiple users on the same device share IndexedDB; without this guard, forms
+        // from a previous session flash on screen before the network response arrives.
         try {
-          const cached = await store.listFormCache()
-          if (cached.length > 0) {
-            setForms(cached.map(c => ({ id: c.id, title: c.title, version: c.version })))
-            setLoading(false)
+          const currentUserId = getStoredUser()?.id ?? ''
+          const lastUserId = localStorage.getItem('fg_last_form_cache_user') ?? ''
+          if (currentUserId && currentUserId === lastUserId) {
+            const cached = await store.listFormCache()
+            if (cached.length > 0) {
+              setForms(cached.map(c => ({ id: c.id, title: c.title, version: c.version })))
+              setLoading(false)
+            }
+          } else if (currentUserId && currentUserId !== lastUserId) {
+            // User changed — clear stale cache to prevent cross-user data appearing in UI
+            const stale = await store.listFormCache()
+            await Promise.all(stale.map(f => store.deleteFormCache(f.id)))
           }
         } catch { }
 
@@ -483,6 +493,8 @@ export default function FieldApp() {
         try {
           const { data } = await api.get<Array<{ id: string; title: string; version: number }>>('/forms/?status=active')
           setForms(data)
+          const userId = getStoredUser()?.id ?? ''
+          if (userId) localStorage.setItem('fg_last_form_cache_user', userId)
           ;(async () => {
             await Promise.all(data.map(async f => {
               try {

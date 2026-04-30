@@ -26,7 +26,7 @@ const ALL_ITEMS: Record<string, NavItem> = {
 export const getNavItems = (role: string): NavItem[] => {
   switch (role) {
     case 'master_admin':
-      return [ALL_ITEMS.admin, ALL_ITEMS.monitor, ALL_ITEMS.payments]
+      return [ALL_ITEMS.admin, ALL_ITEMS.monitor, ALL_ITEMS.payments, ALL_ITEMS.fgAnalyzer, ALL_ITEMS.fgCleaner, ALL_ITEMS.fgWriter, ALL_ITEMS.fileManager]
     case 'org_admin':
       return [ALL_ITEMS.dashboard, ALL_ITEMS.collect, ALL_ITEMS.forms, ALL_ITEMS.programs, ALL_ITEMS.fgCleaner, ALL_ITEMS.fgAnalyzer, ALL_ITEMS.fgWriter, ALL_ITEMS.fileManager, ALL_ITEMS.migration, ALL_ITEMS.fieldMap, ALL_ITEMS.settings, ALL_ITEMS.subscription]
     case 'supervisor':

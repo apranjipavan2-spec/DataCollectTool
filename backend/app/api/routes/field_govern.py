@@ -1046,7 +1046,7 @@ def restore_analysis(
     if not source_rec.table_configs:
         raise HTTPException(400, "Selected run has no table configs to restore")
 
-    manual_rec = _get_or_create_manual_analysis(program_id, str(user["tenant_id"]), str(user["id"]), db)
+    manual_rec = _get_or_create_manual_analysis(program_id, str(user["tenant_id"]), str(user["sub"]), db)
     manual_rec.table_configs = source_rec.table_configs
     manual_rec.updated_at = datetime.now(timezone.utc)
     db.commit()
@@ -1111,7 +1111,7 @@ def save_tabulation(
     if not prog:
         raise HTTPException(404, "Program not found")
 
-    rec = _get_or_create_manual_analysis(program_id, user["tenant_id"], user["id"], db)
+    rec = _get_or_create_manual_analysis(program_id, user["tenant_id"], user["sub"], db)
     configs = list(rec.table_configs or [])
     tab = body.tabulation
     idx = next((i for i, t in enumerate(configs) if t.get("id") == tab.get("id")), -1)
@@ -1419,7 +1419,7 @@ async def auto_generate(
     ai_rec = ProgramAnalysis(
         program_id=program_id,
         tenant_id=user["tenant_id"],
-        created_by=user["id"],
+        created_by=user["sub"],
         status="pending",
         source="ai",
         objectives=body.objectives,
@@ -1436,7 +1436,7 @@ async def auto_generate(
         analysis_id=analysis_id,
         program_id=str(program_id),
         tenant_id=str(user["tenant_id"]),
-        user_id=str(user["id"]),
+        user_id=str(user["sub"]),
         objectives=body.objectives,
     )
 

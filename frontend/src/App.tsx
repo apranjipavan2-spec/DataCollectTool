@@ -194,25 +194,25 @@ export default function App() {
               <Route path="/writer" element={<Navigate to="/fg/writer" replace />} />
 
               <Route path="/fg/analyzer" element={
-                <RequireAuth roles={['org_admin', 'supervisor']}>
+                <RequireAuth roles={['org_admin', 'supervisor', 'master_admin']}>
                   <LazyRoute><FgAnalyzer /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/fg/cleaner" element={
-                <RequireAuth roles={['org_admin', 'supervisor']}>
+                <RequireAuth roles={['org_admin', 'supervisor', 'master_admin']}>
                   <LazyRoute><FgCleaner /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/fg/writer" element={
-                <RequireAuth roles={['org_admin', 'supervisor']}>
+                <RequireAuth roles={['org_admin', 'supervisor', 'master_admin']}>
                   <LazyRoute><FgWriter /></LazyRoute>
                 </RequireAuth>
               } />
 
               <Route path="/fg/files" element={
-                <RequireAuth roles={['org_admin', 'supervisor']}>
+                <RequireAuth roles={['org_admin', 'supervisor', 'master_admin']}>
                   <LazyRoute><FileManagerPage /></LazyRoute>
                 </RequireAuth>
               } />
