@@ -648,6 +648,25 @@ try:
             db.add(Submission(**d))
 
     db.commit()
+
+    # Refresh existing submission dates so the current-month usage bar always shows data.
+    # Submissions created in previous seed runs have old server_received_at — spread them
+    # across the last 28 days so the "this month" plan-usage counter reflects real activity.
+    now_utc = datetime.now(timezone.utc)
+    month_start = now_utc.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    stale_subs = db.query(Submission).filter(
+        Submission.tenant_id == demo_tenant.id,
+        Submission.server_received_at < month_start,
+    ).all()
+    for sub in stale_subs:
+        d = random.randint(0, min(27, (now_utc - month_start).days or 1))
+        new_ts = now_utc - timedelta(days=d, hours=random.randint(0, 6))
+        sub.server_received_at = new_ts
+        sub.local_created_at = new_ts - timedelta(minutes=random.randint(5, 60))
+    if stale_subs:
+        db.commit()
+        print(f"Refreshed dates : {len(stale_subs)} stale submissions → current month")
+
     print("Stage 2: forms + submissions OK")
     subs = db.query(Submission).filter(Submission.tenant_id == demo_tenant.id).count()
     print(f"Submissions     : {subs} total in Demo Org")
