@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Pricing — FieldGovern</title>
+  <link rel="icon" href="assets/logo-icon.png" type="image/png"/>
+  <meta name="description" content="Segment-specific pricing for NGOs, Government, Research and Corporate. Offline-first, AI-powered field data at 80% of KoboToolbox pricing. Pay by UPI."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    :root{--brand:#0ea5e9;--brand-dark:#0369a1;--accent:#7c3aed;--green:#10b981;--orange:#f59e0b;--red:#ef4444;--bg:#ffffff;--bg2:#f8fafc;--bg3:#f1f5f9;--dark:#0f172a;--text:#0f172a;--text2:#334155;--text3:#64748b;--border:#e2e8f0}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{font-family:'Inter',sans-serif;color:var(--text);background:var(--bg)}
+    body{overflow-x:hidden}
+
+    /* NAV */
+    nav{position:fixed;top:0;width:100%;z-index:100;padding:0 24px;height:68px;display:flex;align-items:center;justify-content:space-between;transition:all .3s}
+    nav.scrolled{background:rgba(255,255,255,.95);backdrop-filter:blur(16px);box-shadow:0 2px 20px rgba(0,0,0,.06);border-bottom:1px solid var(--border)}
+    .nav-logo{display:flex;align-items:center;text-decoration:none}
+    .nav-logo img{height:42px;width:auto}
+    .nav-links{display:flex;align-items:center;gap:28px;list-style:none}
+    .nav-links a{text-decoration:none;color:var(--text2);font-weight:500;font-size:.9rem;transition:color .2s;position:relative}
+    .nav-links a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;background:var(--brand);border-radius:2px;transition:width .3s}
+    .nav-links a:hover,.nav-links a.active{color:var(--brand)}
+    .nav-links a:hover::after,.nav-links a.active::after{width:100%}
+    .btn-primary{background:linear-gradient(135deg,var(--brand),var(--accent));color:white;border:none;border-radius:10px;padding:10px 22px;font-weight:600;font-size:.9rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all .3s;box-shadow:0 4px 16px rgba(14,165,233,.3)}
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(14,165,233,.4)}
+    .btn-outline{border:2px solid var(--brand);color:var(--brand);border-radius:10px;padding:10px 22px;font-weight:600;font-size:.9rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:transparent;transition:all .3s}
+    .btn-outline:hover{background:var(--brand);color:white;transform:translateY(-2px)}
+    .hamburger{display:none;flex-direction:column;justify-content:center;gap:5px;cursor:pointer;width:40px;height:40px;border-radius:9px;border:1.5px solid var(--border);background:white;padding:8px;flex-shrink:0}
+    .hamburger span{display:block;width:100%;height:2px;background:var(--text);border-radius:2px;transition:all .3s}
+    .hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+    .hamburger.open span:nth-child(2){opacity:0}
+    .hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+    #mobileMenu{display:none;position:fixed;top:64px;left:0;right:0;background:white;border-bottom:2px solid var(--border);box-shadow:0 12px 40px rgba(0,0,0,.12);z-index:98;padding:8px 0}
+    #mobileMenu.open{display:block}
+    #mobileMenu a{display:flex;align-items:center;padding:14px 24px;color:var(--text2);font-weight:500;font-size:.95rem;text-decoration:none;border-bottom:1px solid var(--border);transition:background .15s}
+    #mobileMenu a:last-child{border-bottom:none}
+    #mobileMenu a:hover{background:var(--bg2);color:var(--brand)}
+
+    /* PAGE HERO */
+    .page-hero{padding:130px 24px 64px;background:linear-gradient(160deg,#f0f9ff 0%,#fff 55%,#faf5ff 100%);text-align:center}
+    .section-tag{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(14,165,233,.1),rgba(124,58,237,.1));border:1px solid rgba(14,165,233,.2);border-radius:999px;padding:5px 14px;font-size:.78rem;font-weight:700;color:var(--brand-dark);letter-spacing:.04em;text-transform:uppercase;margin-bottom:16px}
+    .page-hero h1{font-size:2.8rem;font-weight:900;color:var(--text);line-height:1.15;margin-bottom:16px}
+    .grad-text{background:linear-gradient(135deg,var(--brand),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .page-hero p{font-size:1.05rem;color:var(--text2);line-height:1.7;max-width:560px;margin:0 auto 12px}
+    .hero-note{font-size:.82rem;color:var(--text3);margin-top:4px}
+    .badge-row{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:20px}
+    .badge{display:inline-flex;align-items:center;gap:5px;background:white;border:1px solid var(--border);border-radius:999px;padding:5px 14px;font-size:.78rem;font-weight:600;color:var(--text2);box-shadow:0 1px 4px rgba(0,0,0,.06)}
+
+    /* SECTION */
+    .section-inner{max-width:1180px;margin:0 auto;padding:72px 24px}
+
+    /* SEGMENT SWITCHER */
+    .segment-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:760px;margin:0 auto 52px}
+    .seg-btn{display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px 12px;border-radius:18px;border:2px solid var(--border);background:white;cursor:pointer;transition:all .2s;font-family:inherit}
+    .seg-btn:hover{border-color:#cbd5e1;background:var(--bg2)}
+    .seg-btn .seg-icon{font-size:2rem;line-height:1}
+    .seg-btn .seg-label{font-size:.75rem;font-weight:700;color:var(--text3);text-align:center;line-height:1.3}
+    .seg-btn.active-ngo{border-color:#34d399;background:#ecfdf5;box-shadow:0 4px 16px rgba(16,185,129,.12)}
+    .seg-btn.active-ngo .seg-label{color:#065f46}
+    .seg-btn.active-govt{border-color:#60a5fa;background:#eff6ff;box-shadow:0 4px 16px rgba(14,165,233,.12)}
+    .seg-btn.active-govt .seg-label{color:#1d4ed8}
+    .seg-btn.active-research{border-color:#a78bfa;background:#f5f3ff;box-shadow:0 4px 16px rgba(124,58,237,.12)}
+    .seg-btn.active-research .seg-label{color:#5b21b6}
+    .seg-btn.active-corporate{border-color:#fbbf24;background:#fffbeb;box-shadow:0 4px 16px rgba(245,158,11,.12)}
+    .seg-btn.active-corporate .seg-label{color:#92400e}
+
+    /* BILLING CYCLE */
+    .cycle-row{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:44px}
+    .cycle-btn{display:flex;flex-direction:column;align-items:center;padding:12px 20px;min-width:92px;border-radius:14px;border:2px solid var(--border);background:white;cursor:pointer;transition:all .2s;font-family:inherit}
+    .cycle-btn:hover{border-color:#94a3b8;background:var(--bg2)}
+    .cycle-btn .cy-label{font-size:.85rem;font-weight:700;color:var(--text2)}
+    .cycle-btn .cy-save{font-size:.72rem;font-weight:600;color:var(--text3);margin-top:3px}
+    .cycle-btn.active{border-color:var(--brand);background:#eff6ff;box-shadow:0 4px 14px rgba(14,165,233,.15)}
+    .cycle-btn.active .cy-label{color:var(--brand-dark)}
+    .cycle-btn.active .cy-save{color:var(--brand)}
+
+    /* PLAN GRID */
+    .plan-segment{display:none}
+    .plan-segment.visible{display:block}
+    .plan-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;align-items:start}
+    .plan-card{border:2px solid var(--border);border-radius:20px;padding:28px 22px;background:white;display:flex;flex-direction:column;gap:0;position:relative;transition:box-shadow .2s}
+    .plan-card:hover{box-shadow:0 8px 32px rgba(0,0,0,.08)}
+    .plan-card.popular{border-color:var(--brand);box-shadow:0 4px 24px rgba(14,165,233,.15)}
+    .popular-badge{position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--brand),var(--accent));color:white;font-size:.7rem;font-weight:800;padding:4px 14px;border-radius:999px;letter-spacing:.06em;white-space:nowrap}
+    .plan-tier{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:6px}
+    .plan-name{font-size:1.1rem;font-weight:800;color:var(--text);margin-bottom:8px}
+    .plan-desc{font-size:.8rem;color:var(--text3);line-height:1.5;margin-bottom:18px;min-height:48px}
+    .plan-price{font-size:2.2rem;font-weight:900;color:var(--text);line-height:1;margin-bottom:4px}
+    .plan-price span{font-size:1rem;font-weight:600;color:var(--text3)}
+    .plan-usd{font-size:.78rem;color:var(--text3);margin-bottom:4px}
+    .plan-period{font-size:.78rem;color:var(--text3);margin-bottom:20px}
+    .plan-divider{border:none;border-top:1px solid var(--border);margin:16px 0}
+    .plan-list{list-style:none;font-size:.82rem;color:var(--text2);display:flex;flex-direction:column;gap:8px;flex:1;margin-bottom:22px}
+    .plan-list li{display:flex;align-items:flex-start;gap:8px;line-height:1.4}
+    .plan-list li::before{content:'✓';color:var(--green);font-weight:800;flex-shrink:0;margin-top:1px}
+    .plan-list li.ai::before{content:'★';color:var(--brand)}
+    .plan-list li.cross{color:var(--text3)}
+    .plan-list li.cross::before{content:'–';color:#cbd5e1}
+    .plan-cta{display:block;text-align:center;padding:11px 0;border-radius:12px;font-weight:700;font-size:.88rem;text-decoration:none;transition:all .2s;margin-top:auto}
+    .cta-free{background:var(--bg3);color:var(--text2);border:2px solid var(--border)}
+    .cta-free:hover{background:var(--border)}
+    .cta-primary{background:linear-gradient(135deg,var(--brand),var(--accent));color:white;box-shadow:0 4px 14px rgba(14,165,233,.3)}
+    .cta-primary:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(14,165,233,.4)}
+    .cta-enterprise{background:var(--dark);color:white}
+    .cta-enterprise:hover{background:#1e293b}
+
+    /* BILLING CYCLE PRICES */
+    .price-monthly,.price-6month,.price-annual,.price-3year{display:none}
+
+    /* FEATURE STRIP */
+    .feat-strip{background:var(--bg2);border-radius:24px;padding:40px 32px;margin-top:48px}
+    .feat-strip h3{font-size:1.2rem;font-weight:800;color:var(--text);margin-bottom:24px;text-align:center}
+    .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .feat-item{display:flex;gap:12px;align-items:flex-start;background:white;border:1px solid var(--border);border-radius:14px;padding:16px}
+    .feat-item .fi-icon{font-size:1.4rem;flex-shrink:0;margin-top:2px}
+    .feat-item .fi-title{font-size:.85rem;font-weight:700;color:var(--text);margin-bottom:3px}
+    .feat-item .fi-desc{font-size:.78rem;color:var(--text3);line-height:1.5}
+
+    /* FAQ */
+    .faq-list{display:flex;flex-direction:column;gap:0;border:1px solid var(--border);border-radius:18px;overflow:hidden}
+    details.faq-item{border-bottom:1px solid var(--border)}
+    details.faq-item:last-child{border-bottom:none}
+    details.faq-item summary{padding:18px 22px;font-weight:600;font-size:.92rem;color:var(--text);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px;transition:background .15s}
+    details.faq-item summary:hover{background:var(--bg2)}
+    details.faq-item summary::after{content:'▾';color:var(--text3);font-size:.8rem;flex-shrink:0;transition:transform .2s}
+    details.faq-item[open] summary::after{transform:rotate(180deg)}
+    details.faq-item p{padding:0 22px 18px;font-size:.88rem;color:var(--text2);line-height:1.7}
+
+    /* CTA BLOCK */
+    .cta-block{background:linear-gradient(135deg,#eff6ff 0%,#f5f3ff 100%);border:1px solid rgba(14,165,233,.15);border-radius:28px;padding:60px 40px;text-align:center}
+    .cta-block h2{font-size:2rem;font-weight:900;color:var(--text);margin-bottom:12px}
+    .cta-block p{font-size:1rem;color:var(--text2);max-width:440px;margin:0 auto 32px}
+    .cta-buttons{display:flex;flex-wrap:wrap;justify-content:center;gap:14px}
+    .wa-btn{display:inline-flex;align-items:center;gap:8px;padding:13px 28px;background:#25d366;color:white;border-radius:12px;font-weight:700;font-size:.92rem;text-decoration:none;transition:all .2s}
+    .wa-btn:hover{background:#1ebe5d;transform:translateY(-2px)}
+
+    /* FOOTER */
+    footer{background:var(--dark);color:rgba(255,255,255,.75);padding:56px 24px 24px}
+    .footer-inner{max-width:1180px;margin:0 auto}
+    .footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;margin-bottom:40px}
+    .footer-brand p{font-size:.85rem;line-height:1.7;color:rgba(255,255,255,.5);margin-top:12px}
+    .footer-logo-box img{height:32px;width:auto;filter:brightness(0) invert(1)}
+    .footer-col h4{font-size:.78rem;font-weight:700;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px}
+    .footer-col ul{list-style:none;display:flex;flex-direction:column;gap:8px}
+    .footer-col a{color:rgba(255,255,255,.6);text-decoration:none;font-size:.85rem;transition:color .2s}
+    .footer-col a:hover{color:white}
+    .footer-bottom{border-top:1px solid rgba(255,255,255,.08);padding-top:20px;display:flex;justify-content:space-between;align-items:center;font-size:.78rem;color:rgba(255,255,255,.3);flex-wrap:wrap;gap:8px}
+
+    /* PAYMENT ROW */
+    .payment-row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:10px;padding:20px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:0 0 48px}
+    .pm-label{font-size:.82rem;font-weight:700;color:var(--text2)}
+    .pm-tag{background:var(--bg3);border:1px solid var(--border);border-radius:999px;padding:5px 14px;font-size:.78rem;font-weight:600;color:var(--text2)}
+    .pm-note{font-size:.75rem;color:var(--text3)}
+
+    /* RESPONSIVE */
+    @media(max-width:900px){
+      .plan-grid{grid-template-columns:repeat(2,1fr)}
+      .segment-row{grid-template-columns:repeat(2,1fr)}
+      .feat-grid{grid-template-columns:repeat(2,1fr)}
+      .footer-grid{grid-template-columns:1fr 1fr}
+    }
+    @media(max-width:640px){
+      .nav-links,.btn-outline{display:none}
+      .hamburger{display:flex}
+      .page-hero h1{font-size:2rem}
+      .plan-grid{grid-template-columns:1fr}
+      .feat-grid{grid-template-columns:1fr}
+      .footer-grid{grid-template-columns:1fr}
+      .section-inner{padding:48px 16px}
+      .cta-block{padding:40px 20px}
+    }
+  </style>
+</head>
+<body>
+
+<nav id="navbar">
+  <a href="index.html" class="nav-logo">
+    <img src="assets/logo-wide.png" alt="FieldGovern" style="height:40px;width:auto;mix-blend-mode:multiply"/>
+  </a>
+  <ul class="nav-links">
+    <li><a href="features.html">Features</a></li>
+    <li><a href="integrations.html">Integrations</a></li>
+    <li><a href="use-cases.html">Use Cases</a></li>
+    <li><a href="security.html">Security</a></li>
+    <li><a href="pricing.html" class="active">Pricing</a></li>
+    <li><a href="about.html">About</a></li>
+  </ul>
+  <div style="display:flex;gap:8px;align-items:center">
+    <a href="demo.html" class="btn-outline nav-cta-secondary">Try Demo</a>
+    <a href="https://app.fieldgovern.com" class="btn-primary">Open App →</a>
+    <button class="hamburger" id="hamburgerBtn" aria-label="Open menu" onclick="toggleMenu()">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<div id="mobileMenu" role="navigation">
+  <a href="features.html">✦ Features</a>
+  <a href="integrations.html">🔗 Integrations</a>
+  <a href="use-cases.html">📋 Use Cases</a>
+  <a href="pricing.html">💰 Pricing</a>
+  <a href="about.html">🏛️ About Us</a>
+  <a href="about.html#contact">✉️ Contact</a>
+  <a href="demo.html" style="color:var(--brand);font-weight:700">🚀 Try Free Demo</a>
+</div>
+
+<!-- HERO -->
+<div class="page-hero">
+  <div class="section-tag">💳 Pricing</div>
+  <h1>The AI-native alternative to KoboToolbox<br/><span class="grad-text">at 80% of the price</span></h1>
+  <p>Segment-specific plans for NGOs, Government, Research and Corporate. Built-in AI cleaning, FG Writer reports, and panel study.</p>
+  <p class="hero-note">Prices in INR · USD shown for reference · GST extra · Annual billing = 2 months free</p>
+  <div class="badge-row">
+    <span class="badge">📡 Offline-first</span>
+    <span class="badge">🤖 AI Data Cleaning</span>
+    <span class="badge">📝 FG Writer Reports</span>
+    <span class="badge">💳 Pay by UPI</span>
+    <span class="badge">🔒 No credit card</span>
+  </div>
+</div>
+
+<!-- PRICING SECTION -->
+<div class="section-inner" style="padding-top:48px">
+
+  <!-- Billing cycle -->
+  <div class="cycle-row">
+    <button class="cycle-btn active" data-cycle="monthly" onclick="setCycle('monthly')">
+      <span class="cy-label">Monthly</span>
+      <span class="cy-save">standard</span>
+    </button>
+    <button class="cycle-btn" data-cycle="6month" onclick="setCycle('6month')">
+      <span class="cy-label">6 Months</span>
+      <span class="cy-save">Save 10%</span>
+    </button>
+    <button class="cycle-btn" data-cycle="annual" onclick="setCycle('annual')">
+      <span class="cy-label">Annual</span>
+      <span class="cy-save">2 months free</span>
+    </button>
+    <button class="cycle-btn" data-cycle="3year" onclick="setCycle('3year')">
+      <span class="cy-label">3 Years</span>
+      <span class="cy-save">Save 30%</span>
+    </button>
+  </div>
+
+  <!-- Segment tabs -->
+  <div class="segment-row">
+    <button class="seg-btn active-ngo" data-seg="ngo" onclick="setSeg('ngo')">
+      <span class="seg-icon">🌱</span>
+      <span class="seg-label">NGO / Social Impact</span>
+    </button>
+    <button class="seg-btn" data-seg="govt" onclick="setSeg('govt')">
+      <span class="seg-icon">🏛️</span>
+      <span class="seg-label">Government</span>
+    </button>
+    <button class="seg-btn" data-seg="research" onclick="setSeg('research')">
+      <span class="seg-icon">🔬</span>
+      <span class="seg-label">Research</span>
+    </button>
+    <button class="seg-btn" data-seg="corporate" onclick="setSeg('corporate')">
+      <span class="seg-icon">🏢</span>
+      <span class="seg-label">Corporate</span>
+    </button>
+  </div>
+
+  <!-- Payment methods -->
+  <div class="payment-row">
+    <span class="pm-label">We accept:</span>
+    <span class="pm-tag">Google Pay</span>
+    <span class="pm-tag">PhonePe</span>
+    <span class="pm-tag">Paytm</span>
+    <span class="pm-tag">BHIM UPI</span>
+    <span class="pm-tag">NEFT / RTGS</span>
+    <span class="pm-note">· Plan activated within 2–4 business hours after payment</span>
+  </div>
+
+  <!-- ═══ NGO ═══ -->
+  <div class="plan-segment visible" id="seg-ngo">
+    <div class="plan-grid">
+      <!-- Free -->
+      <div class="plan-card">
+        <div class="plan-tier">Free</div>
+        <div class="plan-name">NGO Free</div>
+        <div class="plan-desc">For small NGOs and pilots. Start for free, upgrade when you're ready.</div>
+        <div class="plan-price">₹0</div>
+        <div class="plan-period">Forever free</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li><strong>1,000</strong> submissions / month</li>
+          <li>500 MB storage</li>
+          <li>1 Admin · 3 Supervisors · 10 Enumerators</li>
+          <li>All 25+ question types</li>
+          <li>Offline collection + auto-sync</li>
+          <li>CSV &amp; Excel export</li>
+          <li class="ai">1 AI report / month</li>
+          <li class="cross">AI Data Cleaning</li>
+          <li class="cross">Panel Study</li>
+        </ul>
+        <a href="https://app.fieldgovern.com/login" class="plan-cta cta-free">Start Free</a>
+      </div>
+      <!-- Starter -->
+      <div class="plan-card">
+        <div class="plan-tier">Starter</div>
+        <div class="plan-name">NGO Starter</div>
+        <div class="plan-desc">AI cleaning + unlimited FG Writer reports. Below Kobo Community ($88/mo).</div>
+        <div class="plan-price">
+          <span class="price-monthly" style="display:block">₹6,499<span>/mo</span></span>
+          <span class="price-6month">₹5,849<span>/mo</span></span>
+          <span class="price-annual">₹5,416<span>/mo</span></span>
+          <span class="price-3year">₹4,549<span>/mo</span></span>
+        </div>
+        <div class="plan-usd">≈ $78 / month</div>
+        <div class="plan-period">Billed per selected cycle · GST extra</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li><strong>5,000</strong> submissions / month</li>
+          <li>1 GB storage · 3 Admins</li>
+          <li class="ai">AI Data Cleaning with audit trail</li>
+          <li class="ai">Unlimited FG Writer reports</li>
+          <li class="ai">AI Analyzer (cross-tabs)</li>
+          <li>Map View + GPS tracking</li>
+          <li>10 min ASR · 6,000 chars translation</li>
+          <li>Email support (48hr SLA)</li>
+        </ul>
+        <a href="https://app.fieldgovern.com/login" class="plan-cta cta-primary">Get Started</a>
+      </div>
+      <!-- Growth -->
+      <div class="plan-card popular">
+        <div class="popular-badge">MOST POPULAR</div>
+        <div class="plan-tier">Growth</div>
+        <div class="plan-name">NGO Growth</div>
+        <div class="plan-desc">Full AI suite · Panel study · Donor templates. Below Kobo Pro Nonprofit ($129/mo).</div>
+        <div class="plan-price">
+          <span class="price-monthly" style="display:block">₹10,999<span>/mo</span></span>
+          <span class="price-6month">₹9,899<span>/mo</span></span>
+          <span class="price-annual">₹9,166<span>/mo</span></span>
+          <span class="price-3year">₹7,699<span>/mo</span></span>
+        </div>
+        <div class="plan-usd">≈ $132 / month</div>
+        <div class="plan-period">Billed per selected cycle · GST extra</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li><strong>25,000</strong> submissions / month</li>
+          <li>Unlimited storage · 10 Admins</li>
+          <li class="ai">Full AI suite: Clean, Write, Build, Interpret</li>
+          <li class="ai">Panel Study &amp; Attrition Reports</li>
+          <li class="ai">Donor templates (USAID, EU, Gates)</li>
+          <li>2FA · REST API + Webhooks</li>
+          <li>120 min ASR · 72,000 chars translation</li>
+          <li>Direct support (24hr SLA)</li>
+        </ul>
+        <a href="https://app.fieldgovern.com/login" class="plan-cta cta-primary">Get Started</a>
+      </div>
+      <!-- Enterprise -->
+      <div class="plan-card">
+        <div class="plan-tier">Enterprise</div>
+        <div class="plan-name">NGO Enterprise</div>
+        <div class="plan-desc">Multi-org · SSO · On-premise · DPDP compliance · White-label. Custom pricing.</div>
+        <div class="plan-price" style="font-size:1.6rem">Custom</div>
+        <div class="plan-period">Contact us for a quote</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li>Unlimited submissions &amp; storage</li>
+          <li>Multi-org / consortium dashboard</li>
+          <li>Single Sign-On (SSO)</li>
+          <li>On-premise deployment (DPDP)</li>
+          <li>White-label reports &amp; platform</li>
+          <li>Dedicated Customer Success Manager</li>
+          <li>Priority SLA (4hr response)</li>
+          <li>Custom training &amp; onboarding</li>
+        </ul>
+        <a href="https://wa.me/918088709011?text=Hi%2C%20I%27m%20interested%20in%20FieldGovern%20NGO%20Enterprise." target="_blank" class="plan-cta cta-enterprise">Talk to Us</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ GOVT ═══ -->
+  <div class="plan-segment" id="seg-govt">
+    <div class="plan-grid">
+      <div class="plan-card">
+        <div class="plan-tier">Free</div>
+        <div class="plan-name">Government Free</div>
+        <div class="plan-desc">Pilot and evaluation. Start collecting with zero cost.</div>
+        <div class="plan-price">₹0</div>
+        <div class="plan-period">Forever free</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li><strong>1,000</strong> submissions / month</li>
+          <li>500 MB storage</li>
+          <li>1 Admin · 3 Supervisors · 10 Enumerators</li>
+          <li>All 25+ question types · Offline collection</li>
+          <li>CSV &amp; Excel export</li>
+          <li class="ai">1 AI report / month</li>
+          <li class="cross">Audit log</li>
+          <li class="cross">RBAC</li>
+        </ul>
+        <a href="https://app.fieldgovern.com/login" class="plan-cta cta-free">Start Free</a>
+      </div>
+      <div class="plan-card">
+        <div class="plan-tier">Starter</div>
+        <div class="plan-name">Department</div>
+        <div class="plan-desc">AI cleaning · Audit log · RBAC · GPS fraud detection. At par with Kobo Professional ($166/mo).</div>
+        <div class="plan-price">
+          <span class="price-monthly" style="display:block">₹13,799<span>/mo</span></span>
+          <span class="price-6month">₹12,419<span>/mo</span></span>
+          <span class="price-annual">₹11,499<span>/mo</span></span>
+          <span class="price-3year">₹9,659<span>/mo</span></span>
+        </div>
+        <div class="plan-usd">≈ $166 / month</div>
+        <div class="plan-period">Billed per selected cycle · GST extra</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li><strong>25,000</strong> submissions / month</li>
+          <li>Unlimited storage · 5 Admins</li>
+          <li class="ai">AI Data Cleaning with full audit trail</li>
+          <li class="ai">Unlimited FG Writer reports</li>
+          <li>GPS spoofing &amp; fraud detection</li>
+          <li>Role-based access control (RBAC)</li>
+          <li>Audit log · 2FA · REST API + Webhooks</li>
+          <li>Direct support (24hr SLA)</li>
+        </ul>
+        <a href="https://app.fieldgovern.com/login" class="plan-cta cta-primary">Get Started</a>
+      </div>
+      <div class="plan-card popular">
+        <div class="popular-badge">MOST POPULAR</div>
+        <div class="plan-tier">Growth</div>
+        <div class="plan-name">State / Multi-Scheme</div>
+        <div class="plan-desc">Multi-scheme dashboard · Panel study · Advanced RBAC · Real-time monitoring.</div>
+        <div class="plan-price">
+          <span class="price-monthly" style="display:block">₹24,999<span>/mo</span></span>
+          <span class="price-6month">₹22,499<span>/mo</span></span>
+          <span class="price-annual">₹20,832<span>/mo</span></span>
+          <span class="price-3year">₹17,499<span>/mo</span></span>
+        </div>
+        <div class="plan-usd">≈ $301 / month</div>
+        <div class="plan-period">Billed per selected cycle · GST extra</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li><strong>1,00,000</strong> submissions / month</li>
+          <li>Unlimited storage &amp; admins</li>
+          <li class="ai">Full AI suite: Clean, Write, Build, Interpret</li>
+          <li class="ai">Panel Study (multi-wave beneficiary tracking)</li>
+          <li>Advanced RBAC (district/block/GP hierarchy)</li>
+          <li>Real-time field agent monitoring</li>
+          <li>2FA · Audit log · Webhooks</li>
+          <li>Priority support (8hr SLA)</li>
+        </ul>
+        <a href="https://app.fieldgovern.com/login" class="plan-cta cta-primary">Get Started</a>
+      </div>
+      <div class="plan-card">
+        <div class="plan-tier">Enterprise</div>
+        <div class="plan-name">National / Enterprise</div>
+        <div class="plan-desc">SSO · On-premise · DPDP compliance · GeM-compatible · White-label. Custom pricing.</div>
+        <div class="plan-price" style="font-size:1.6rem">Custom</div>
+        <div class="plan-period">Contact us for a quote</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li>Unlimited submissions &amp; storage</li>
+          <li>Single Sign-On (SSO)</li>
+          <li>On-premise / private cloud deployment</li>
+          <li>DPDP Act compliance framework</li>
+          <li>NIC/NICNET integration support</li>
+          <li>GeM-compatible contract structure</li>
+          <li>White-label (ministry branding)</li>
+          <li>Priority SLA (2hr response)</li>
+        </ul>
+        <a href="https://wa.me/918088709011?text=Hi%2C%20I%27m%20interested%20in%20FieldGovern%20Government%20Enterprise." target="_blank" class="plan-cta cta-enterprise">Talk to Us</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ RESEARCH ═══ -->
+  <div class="plan-segment" id="seg-research">
+    <div class="plan-grid">
+      <div class="plan-card">
+        <div class="plan-tier">Free</div>
+        <div class="plan-name">Research Free</div>
+        <div class="plan-desc">Student projects and pilot surveys. Suitable for dissertations and small studies.</div>
+        <div class="plan-price">₹0</div>
+        <div class="plan-period">Forever free</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li><strong>1,000</strong> submissions / month</li>
+          <li>500 MB storage</li>
+          <li>1 Admin · 3 Supervisors · 10 Enumerators</li>
+          <li>All 25+ question types · Offline collection</li>
+          <li>CSV &amp; Excel export</li>
+          <li class="ai">1 AI report / month</li>
+          <li class="cross">SPSS / Stata export</li>
+          <li class="cross">Panel Study</li>
+        </ul>
+        <a href="https://app.fieldgovern.com/login" class="plan-cta cta-free">Start Free</a>
+      </div>
+      <div class="plan-card">
+        <div class="plan-tier">Starter</div>
+        <div class="plan-name">Research</div>
+        <div class="plan-desc">AI cleaning · Panel study · Attrition tracking · SPSS/Stata export. Half the price of SurveyCTO ($299/mo).</div>
+        <div class="plan-price">
+          <span class="price-monthly" style="display:block">₹13,799<span>/mo</span></span>
+          <span class="price-6month">₹12,419<span>/mo</span></span>
+          <span class="price-annual">₹11,499<span>/mo</span></span>
+          <span class="price-3year">₹9,659<span>/mo</span></span>
+        </div>
+        <div class="plan-usd">≈ $166 / month</div>
+        <div class="plan-period">Billed per selected cycle · GST extra</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li><strong>25,000</strong> submissions / month</li>
+          <li>Unlimited storage · 5 Admins</li>
+          <li class="ai">AI Data Cleaning with audit trail</li>
+          <li class="ai">Panel Study with attrition tracking</li>
+          <li>SPSS &amp; Stata-compatible export</li>
+          <li>Data dictionary / codebook export</li>
+          <li>2FA · REST API + Webhooks</li>
+          <li>Direct support (24hr SLA)</li>
+        </ul>
+        <a href="https://app.fieldgovern.com/login" class="plan-cta cta-primary">Get Started</a>
+      </div>
+      <div class="plan-card popular">
+        <div class="popular-badge">MOST POPULAR</div>
+        <div class="plan-tier">Growth</div>
+        <div class="plan-name">Institutional</div>
+        <div class="plan-desc">Multi-PI · IRB audit trail · Nested waves · SSO option for university accounts.</div>
+        <div class="plan-price">
+          <span class="price-monthly" style="display:block">₹20,799<span>/mo</span></span>
+          <span class="price-6month">₹18,719<span>/mo</span></span>
+          <span class="price-annual">₹17,332<span>/mo</span></span>
+          <span class="price-3year">₹14,559<span>/mo</span></span>
+        </div>
+        <div class="plan-usd">≈ $250 / month</div>
+        <div class="plan-period">Billed per selected cycle · GST extra</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li><strong>75,000</strong> submissions / month</li>
+          <li>Unlimited storage &amp; admins</li>
+          <li class="ai">Full AI suite: Clean, Write, Build, Interpret</li>
+          <li class="ai">Advanced panel study (nested waves, cohorts)</li>
+          <li>Multi-PI sub-accounts with role limits</li>
+          <li>IRB / ethics audit trail (timestamped)</li>
+          <li>2FA · SSO option · Audit log</li>
+          <li>Priority support (12hr SLA)</li>
+        </ul>
+        <a href="https://app.fieldgovern.com/login" class="plan-cta cta-primary">Get Started</a>
+      </div>
+      <div class="plan-card">
+        <div class="plan-tier">Enterprise</div>
+        <div class="plan-name">University Enterprise</div>
+        <div class="plan-desc">University-wide licence · On-premise · Custom anonymisation pipeline. Custom pricing.</div>
+        <div class="plan-price" style="font-size:1.6rem">Custom</div>
+        <div class="plan-period">Contact us for a quote</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li>Unlimited submissions &amp; storage</li>
+          <li>University-wide licence (all departments)</li>
+          <li>On-premise for sensitive health/social data</li>
+          <li>Custom data anonymisation pipeline</li>
+          <li>Dedicated onboarding for research teams</li>
+          <li>SSO · Full audit log · White-label</li>
+          <li>Priority SLA (4hr response)</li>
+          <li>Roadmap input on research features</li>
+        </ul>
+        <a href="https://wa.me/918088709011?text=Hi%2C%20I%27m%20interested%20in%20FieldGovern%20University%20Enterprise." target="_blank" class="plan-cta cta-enterprise">Talk to Us</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CORPORATE ═══ -->
+  <div class="plan-segment" id="seg-corporate">
+    <div class="plan-grid">
+      <div class="plan-card">
+        <div class="plan-tier">Free</div>
+        <div class="plan-name">Corporate Free</div>
+        <div class="plan-desc">Pilot and proof-of-concept. Full platform access at zero cost.</div>
+        <div class="plan-price">₹0</div>
+        <div class="plan-period">Forever free</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li><strong>1,000</strong> submissions / month</li>
+          <li>500 MB storage</li>
+          <li>1 Admin · 3 Supervisors · 10 Enumerators</li>
+          <li>All 25+ question types · Offline collection</li>
+          <li>CSV &amp; Excel export</li>
+          <li class="ai">1 AI report / month</li>
+          <li class="cross">GPS fraud detection</li>
+          <li class="cross">Advanced RBAC</li>
+        </ul>
+        <a href="https://app.fieldgovern.com/login" class="plan-cta cta-free">Start Free</a>
+      </div>
+      <div class="plan-card">
+        <div class="plan-tier">Starter</div>
+        <div class="plan-name">Business</div>
+        <div class="plan-desc">AI cleaning · Smart Builder · GPS fraud detection · Photo audit. At par with Kobo Professional ($166/mo).</div>
+        <div class="plan-price">
+          <span class="price-monthly" style="display:block">₹13,799<span>/mo</span></span>
+          <span class="price-6month">₹12,419<span>/mo</span></span>
+          <span class="price-annual">₹11,499<span>/mo</span></span>
+          <span class="price-3year">₹9,659<span>/mo</span></span>
+        </div>
+        <div class="plan-usd">≈ $166 / month</div>
+        <div class="plan-period">Billed per selected cycle · GST extra</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li><strong>25,000</strong> submissions / month</li>
+          <li>Unlimited storage · 5 Admins</li>
+          <li class="ai">AI Data Cleaning with audit trail</li>
+          <li class="ai">Smart Builder (AI cross-tab design)</li>
+          <li>GPS spoofing &amp; fraud detection</li>
+          <li>Photo audit support</li>
+          <li>2FA · Audit log · REST API + Webhooks</li>
+          <li>Direct support (24hr SLA)</li>
+        </ul>
+        <a href="https://app.fieldgovern.com/login" class="plan-cta cta-primary">Get Started</a>
+      </div>
+      <div class="plan-card popular">
+        <div class="popular-badge">MOST POPULAR</div>
+        <div class="plan-tier">Growth</div>
+        <div class="plan-name">Corporate</div>
+        <div class="plan-desc">Multi-branch dashboard · AI Interpret · Advanced RBAC · ESG metrics. A fraction of Qualtrics ($1,500+/mo).</div>
+        <div class="plan-price">
+          <span class="price-monthly" style="display:block">₹20,799<span>/mo</span></span>
+          <span class="price-6month">₹18,719<span>/mo</span></span>
+          <span class="price-annual">₹17,332<span>/mo</span></span>
+          <span class="price-3year">₹14,559<span>/mo</span></span>
+        </div>
+        <div class="plan-usd">≈ $250 / month</div>
+        <div class="plan-period">Billed per selected cycle · GST extra</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li><strong>2,00,000</strong> submissions / month</li>
+          <li>Unlimited storage &amp; admins</li>
+          <li class="ai">Full AI suite: Clean, Write, Build, Interpret</li>
+          <li>Multi-branch / multi-district dashboard</li>
+          <li>Advanced RBAC (zone/region/branch)</li>
+          <li>ESG metric calculation</li>
+          <li>2FA · Audit log · REST API + Webhooks</li>
+          <li>Priority support (8hr SLA)</li>
+        </ul>
+        <a href="https://app.fieldgovern.com/login" class="plan-cta cta-primary">Get Started</a>
+      </div>
+      <div class="plan-card">
+        <div class="plan-tier">Enterprise</div>
+        <div class="plan-name">Corporate Enterprise</div>
+        <div class="plan-desc">SSO · White-label · On-premise · CRM integration · Dedicated CSM. Custom pricing.</div>
+        <div class="plan-price" style="font-size:1.6rem">Custom</div>
+        <div class="plan-period">Contact us for a quote</div>
+        <hr class="plan-divider"/>
+        <ul class="plan-list">
+          <li>Unlimited submissions &amp; storage</li>
+          <li>Single Sign-On (SSO)</li>
+          <li>White-label platform</li>
+          <li>On-premise / private cloud deployment</li>
+          <li>CRM / ERP integration support</li>
+          <li>Dedicated Customer Success Manager</li>
+          <li>Priority SLA (2hr response)</li>
+          <li>Custom AI model fine-tuning (roadmap)</li>
+        </ul>
+        <a href="https://wa.me/918088709011?text=Hi%2C%20I%27m%20interested%20in%20FieldGovern%20Corporate%20Enterprise." target="_blank" class="plan-cta cta-enterprise">Talk to Us</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURE STRIP -->
+  <div class="feat-strip">
+    <h3>Everything included on every plan</h3>
+    <div class="feat-grid">
+      <div class="feat-item">
+        <span class="fi-icon">📡</span>
+        <div>
+          <div class="fi-title">Offline-first</div>
+          <div class="fi-desc">Collect with zero internet. Auto-syncs the moment connectivity returns — no manual uploads.</div>
+        </div>
+      </div>
+      <div class="feat-item">
+        <span class="fi-icon">📋</span>
+        <div>
+          <div class="fi-title">25+ Question Types</div>
+          <div class="fi-desc">GPS, photo, audio, barcode, signature, matrix, repeat groups, calculations, cascading select.</div>
+        </div>
+      </div>
+      <div class="feat-item">
+        <span class="fi-icon">👥</span>
+        <div>
+          <div class="fi-title">Role-based Teams</div>
+          <div class="fi-desc">Admins, supervisors, enumerators with scoped, hierarchy-aware access control.</div>
+        </div>
+      </div>
+      <div class="feat-item">
+        <span class="fi-icon">📊</span>
+        <div>
+          <div class="fi-title">Cross-tabulation</div>
+          <div class="fi-desc">Pivot tables with grouping, filters, and exports. Live dashboard with charts.</div>
+        </div>
+      </div>
+      <div class="feat-item">
+        <span class="fi-icon">🌐</span>
+        <div>
+          <div class="fi-title">Multi-language</div>
+          <div class="fi-desc">Forms and platform UI in Hindi, Kannada, Telugu, English — more on roadmap.</div>
+        </div>
+      </div>
+      <div class="feat-item">
+        <span class="fi-icon">📁</span>
+        <div>
+          <div class="fi-title">Flexible Export</div>
+          <div class="fi-desc">CSV, Excel, GeoJSON, KML export. SPSS / Stata on Research &amp; higher plans.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FAQ -->
+<div class="section-inner" style="padding-top:0">
+  <h2 style="font-size:1.6rem;font-weight:900;text-align:center;margin-bottom:32px;color:var(--text)">Frequently asked questions</h2>
+  <div class="faq-list" style="max-width:720px;margin:0 auto">
+    <details class="faq-item">
+      <summary>How is FieldGovern different from KoboToolbox?</summary>
+      <p>KoboToolbox collects data — FieldGovern collects and analyses it. Every paid plan includes AI Data Cleaning (with audit trail), FG Writer for donor reports, Smart Builder for cross-tabs, and panel study tracking. On KoboToolbox these require a separate data analyst costing ₹30,000–₹50,000/month. FieldGovern includes them from ₹6,499/month.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Do I need a credit card to start?</summary>
+      <p>No. Your 30-day free trial starts the moment your organisation is created. No payment details required. Activate a paid plan at any time by UPI or bank transfer.</p>
+    </details>
+    <details class="faq-item">
+      <summary>How do I pay?</summary>
+      <p>We accept UPI (Google Pay, PhonePe, Paytm) and direct bank transfer (NEFT/RTGS). Our admin confirms payment and activates your plan within 2–4 business hours.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Can I switch plans mid-cycle?</summary>
+      <p>Yes. Contact us and we will upgrade or downgrade your plan. Upgrades are prorated; downgrades take effect at the next billing cycle.</p>
+    </details>
+    <details class="faq-item">
+      <summary>What happens when I hit the submission limit?</summary>
+      <p>New submissions are blocked and you receive an in-app notification. All existing data remains safe. Upgrade anytime to continue collecting.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Is there a discount for NGOs?</summary>
+      <p>The NGO segment already carries our lowest pricing — up to 20% below comparable KoboToolbox plans. Additional goodwill discounts for very small NGOs can be arranged — contact us on WhatsApp.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Can I get a demo before buying?</summary>
+      <p>Yes — try our live demo at <a href="demo.html" style="color:var(--brand)">fieldgovern.com/demo</a> with no signup. For a personalised walkthrough, message us on WhatsApp and we'll schedule a live demo for your team.</p>
+    </details>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-block" style="margin-top:64px">
+    <h2>Ready to get started?</h2>
+    <p>30-day free trial. No credit card. Activate your paid plan any time by UPI or bank transfer.</p>
+    <div class="cta-buttons">
+      <a href="https://app.fieldgovern.com/login" class="btn-primary" style="font-size:.95rem;padding:14px 28px">Start Free Trial →</a>
+      <a href="https://wa.me/918088709011?text=Hi%2C%20I%27d%20like%20to%20know%20more%20about%20FieldGovern." target="_blank" class="wa-btn">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Chat with us
+      </a>
+      <a href="demo.html" class="btn-outline" style="font-size:.95rem;padding:14px 28px">Try Live Demo</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" style="display:block;margin-bottom:2px">
+          <div class="footer-logo-box">
+            <img src="assets/logo-wide.png" alt="FieldGovern"/>
+          </div>
+        </a>
+        <p>Offline-first field data collection for India's research teams. Built to replace SurveyCTO at 1/3 the cost.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="features.html">Features</a></li>
+          <li><a href="integrations.html">Integrations</a></li>
+          <li><a href="security.html">Security</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="demo.html">Live Demo</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="about.html">About Us</a></li>
+          <li><a href="about.html#contact">Contact</a></li>
+          <li><a href="privacy.html">Privacy Policy</a></li>
+          <li><a href="terms.html">Terms of Service</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Contact</h4>
+        <ul>
+          <li><a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a></li>
+          <li><a href="https://app.fieldgovern.com" target="_blank">Live App ↗</a></li>
+          <li><a href="demo.html">Try Demo</a></li>
+        </ul>
+        <div style="margin-top:16px;font-size:.8rem;color:rgba(255,255,255,.3)">EN · हिन्दी · ಕನ್ನಡ · తెలుగు</div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 FieldGovern · <a href="privacy.html" style="color:rgba(255,255,255,.4)">Privacy</a> · <a href="terms.html" style="color:rgba(255,255,255,.4)">Terms</a> · <a href="about.html" style="color:rgba(255,255,255,.4)">About</a></span>
+      <span>Founded by Pallavi Deshetty · FastAPI + React + PostgreSQL</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  /* Nav scroll */
+  const navbar = document.getElementById('navbar');
+  window.addEventListener('scroll', () => navbar.classList.toggle('scrolled', scrollY > 20));
+
+  /* Mobile menu */
+  function toggleMenu() {
+    const m = document.getElementById('mobileMenu');
+    const b = document.getElementById('hamburgerBtn');
+    m.classList.toggle('open');
+    b.classList.toggle('open');
+  }
+
+  /* Segment switcher */
+  let currentSeg = 'ngo';
+  function setSeg(seg) {
+    document.querySelectorAll('.plan-segment').forEach(el => el.classList.remove('visible'));
+    document.getElementById('seg-' + seg).classList.add('visible');
+    document.querySelectorAll('.seg-btn').forEach(btn => {
+      btn.className = 'seg-btn';
+      if (btn.dataset.seg === seg) btn.classList.add('active-' + seg);
+    });
+    currentSeg = seg;
+  }
+
+  /* Billing cycle switcher */
+  let currentCycle = 'monthly';
+  function setCycle(cycle) {
+    currentCycle = cycle;
+    document.querySelectorAll('.cycle-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.cycle === cycle);
+    });
+    // Show/hide price spans
+    document.querySelectorAll('.price-monthly,.price-6month,.price-annual,.price-3year').forEach(el => {
+      el.style.display = 'none';
+    });
+    document.querySelectorAll('.price-' + cycle.replace('month','6month').replace('3year','3year')).forEach(el => {
+      el.style.display = 'block';
+    });
+    // Fix: handle the 6month key properly
+    const cls = cycle === '6month' ? '.price-6month' : cycle === '3year' ? '.price-3year' : cycle === 'annual' ? '.price-annual' : '.price-monthly';
+    document.querySelectorAll('.price-monthly,.price-6month,.price-annual,.price-3year').forEach(el => el.style.display='none');
+    document.querySelectorAll(cls).forEach(el => el.style.display='block');
+  }
+
+  // Init: show monthly prices
+  setCycle('monthly');
+</script>
+</body>
+</html>
