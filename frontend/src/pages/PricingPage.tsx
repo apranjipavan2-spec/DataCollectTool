@@ -29,34 +29,35 @@ const SEGMENTS = [
 
 const CYCLES = [
   { key: 'monthly', label: 'Monthly',  months: 1,  save: '' },
-  { key: '6month',  label: '6 Months', months: 6,  save: '10% off' },
-  { key: 'annual',  label: 'Annual',   months: 12, save: '20% off' },
-  { key: '3year',   label: '3 Years',  months: 36, save: '30% off' },
+  { key: '6month',  label: '6 Months', months: 6,  save: 'Save 10%' },
+  { key: 'annual',  label: 'Annual',   months: 12, save: '2 months free' },
+  { key: '3year',   label: '3 Years',  months: 36, save: 'Save 30%' },
 ]
 
 const FEATURES: { key: keyof PlanFeatures; label: string; desc: string }[] = [
-  { key: 'ai_cleaning',     label: 'AI Data Cleaning',     desc: 'Auto-fix inconsistencies and flag errors' },
-  { key: 'ai_analyzer',     label: 'AI Analyzer',          desc: 'AI-suggested cross-tabulations' },
-  { key: 'ai_writer',       label: 'FG Writer',            desc: 'Auto-generate field reports' },
-  { key: 'ai_smart_builder',label: 'Smart Form Builder',   desc: 'Build forms using natural language' },
-  { key: 'ai_interpret',    label: 'AI Interpretation',    desc: 'Narrative insights below tables' },
-  { key: 'map_view',        label: 'Map View',             desc: 'GPS submission tracking on map' },
-  { key: 'panel_study',     label: 'Panel Study',          desc: 'Longitudinal / wave-based surveys' },
-  { key: 'spss_export',     label: 'SPSS / Stata Export',  desc: 'Export data for statistical software' },
-  { key: 'api_write',       label: 'REST API (Write)',      desc: 'Push data programmatically' },
-  { key: 'webhooks',        label: 'Webhooks',             desc: 'Real-time submission events' },
-  { key: 'two_fa',          label: '2-Factor Auth',        desc: 'OTP-based login security' },
-  { key: 'white_label',     label: 'White-Label',          desc: 'Custom branding & domain' },
-  { key: 'priority_support',label: 'Priority Support',     desc: 'Dedicated support channel' },
+  { key: 'ai_cleaning',     label: 'AI Data Cleaning',     desc: 'Auto-detect and fix inconsistencies with a full cleaning audit trail' },
+  { key: 'ai_analyzer',     label: 'AI Analyzer',          desc: 'AI-suggested cross-tabulations and automatic pivot tables' },
+  { key: 'ai_writer',       label: 'FG Writer',            desc: 'Generate donor-ready reports (USAID, EU, Gates templates) in minutes' },
+  { key: 'ai_smart_builder',label: 'Smart Builder',        desc: 'Design survey tables and cross-tabs using natural language' },
+  { key: 'ai_interpret',    label: 'AI Interpretation',    desc: 'Narrative insights with iterative refinement below every tabulation' },
+  { key: 'map_view',        label: 'Map View',             desc: 'Visualise GPS submissions and flag spoofing attempts' },
+  { key: 'panel_study',     label: 'Panel Study',          desc: 'Longitudinal tracking with attrition reports and wave management' },
+  { key: 'spss_export',     label: 'SPSS / Stata Export',  desc: 'Publication-grade export with data dictionary / codebook' },
+  { key: 'api_write',       label: 'REST API (Write)',      desc: 'Read + write API for CRM / ERP / Zapier / n8n integration' },
+  { key: 'webhooks',        label: 'Webhooks',             desc: 'Real-time submission events to any endpoint' },
+  { key: 'two_fa',          label: '2-Factor Auth',        desc: 'Email OTP on every login — mandatory for sensitive data programmes' },
+  { key: 'white_label',     label: 'White-Label',          desc: 'Custom branding, logo, and domain for reports and the platform' },
+  { key: 'priority_support',label: 'Priority Support',     desc: 'Dedicated success manager with guaranteed SLA response times' },
 ]
 
 const FAQS = [
+  { q: 'How is FieldGovern different from KoboToolbox?', a: 'KoboToolbox collects data — FieldGovern collects and analyses it. Every paid plan includes AI Data Cleaning (with audit trail), FG Writer for donor reports, Smart Builder for cross-tabs, and panel study tracking. On KoboToolbox these require a separate data analyst costing ₹30,000–₹50,000/month. FieldGovern includes them from ₹6,499/month.' },
   { q: 'Do I need a credit card to start?', a: 'No. Your 30-day free trial starts the moment your organisation is created. No payment details required.' },
-  { q: 'How do I pay?', a: 'We accept UPI (Google Pay, PhonePe, Paytm) and direct bank transfer. Our admin confirms payment and activates your plan within 2–4 business hours.' },
-  { q: 'Can I switch plans mid-cycle?', a: 'Yes. Contact us and we will upgrade or downgrade your plan. Upgrades are prorated.' },
-  { q: 'What happens when I hit the submission limit?', a: 'New submissions are blocked and you receive an in-app notification. Existing data is safe. Upgrade to continue collecting.' },
-  { q: 'Is there a discount for NGOs?', a: 'Our NGO segment already carries the lowest pricing. Additional goodwill discounts can be arranged — contact us.' },
-  { q: 'Can I get a demo?', a: 'Yes — message us on WhatsApp or email and we will set up a live walkthrough.' },
+  { q: 'How do I pay?', a: 'We accept UPI (Google Pay, PhonePe, Paytm) and direct bank transfer (NEFT/RTGS). Our admin confirms payment and activates your plan within 2–4 business hours.' },
+  { q: 'Can I switch plans mid-cycle?', a: 'Yes. Contact us and we will upgrade or downgrade your plan. Upgrades are prorated; downgrades take effect at the next billing cycle.' },
+  { q: 'What happens when I hit the submission limit?', a: 'New submissions are blocked and you receive an in-app notification. All existing data remains safe. Upgrade anytime to continue collecting.' },
+  { q: 'Is there a discount for NGOs?', a: 'The NGO segment already carries our lowest pricing — up to 20% below comparable KoboToolbox plans. Additional goodwill discounts for very small NGOs can be arranged — contact us on WhatsApp.' },
+  { q: 'Can I get a demo?', a: 'Yes — message us on WhatsApp and we will schedule a live walkthrough for your team, including a sample data cleaning and AI report demonstration.' },
 ]
 
 function FmtINR(n: number) { return `₹${n.toLocaleString('en-IN')}` }
@@ -78,7 +79,7 @@ export default function PricingPage() {
     api.get('/billing/payment-config').then(r => setPaymentCfg(r.data)).catch(() => {})
   }, [])
 
-  const waNumber  = paymentCfg.admin_whatsapp?.replace(/\D/g, '') || '919876543210'
+  const waNumber  = paymentCfg.admin_whatsapp?.replace(/\D/g, '') || '918088709011'
   const waEnqLink = `https://wa.me/${waNumber}?text=Hi%2C%20I%27d%20like%20to%20know%20more%20about%20FieldGovern.`
   const waEntLink = `https://wa.me/${waNumber}?text=Hi%2C%20I%27m%20interested%20in%20FieldGovern%20Enterprise.`
   const supportEmail = paymentCfg.support_email || 'support@fieldgovern.in'
@@ -124,13 +125,13 @@ export default function PricingPage() {
           30-day free trial · No credit card
         </div>
         <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 mb-4 leading-tight">
-          Simple, transparent pricing<br />
+          The AI-native alternative to KoboToolbox<br />
           <span style={{ background: 'linear-gradient(135deg,#0ea5e9,#7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            for every organisation
+            at 80% of the price
           </span>
         </h1>
         <p className="text-slate-500 text-lg max-w-xl mx-auto mb-3">
-          Segment-specific plans for NGOs, Government, Research and Corporate. Offline-first. AI-powered. Pay by UPI.
+          Segment-specific plans for NGOs, Government, Research and Corporate. Built-in AI cleaning, FG Writer reports, and panel study. Pay by UPI.
         </p>
         <p className="text-sm text-slate-400">Prices in INR · USD shown for reference · GST extra</p>
       </section>
@@ -328,15 +329,15 @@ export default function PricingPage() {
           <p className="text-slate-500 text-center mb-10">Every plan includes offline data collection, GPS tagging, role-based access, and auto-sync.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
-              { icon: '📡', title: 'Offline-first',       desc: 'Collect with zero internet. Auto-syncs when connectivity returns.' },
-              { icon: '🔄', title: 'Auto-sync',           desc: 'Background sync — no manual uploads needed.' },
-              { icon: '📍', title: 'GPS tracking',        desc: 'Record location at form open and submit.' },
-              { icon: '👥', title: 'Role-based teams',    desc: 'Admins, supervisors, enumerators with scoped access.' },
-              { icon: '📋', title: 'Form builder',        desc: 'Skip logic, calculations, media capture, branching.' },
-              { icon: '📊', title: 'Cross-tabulation',    desc: 'Pivot tables with grouping, filters, and exports.' },
-              { icon: '🌐', title: 'Multi-language',      desc: 'Forms and UI in Hindi, Kannada, Telugu, English.' },
-              { icon: '🔔', title: 'Real-time alerts',    desc: 'In-app notifications and submission webhooks.' },
-              { icon: '📁', title: 'Excel / CSV export',  desc: 'One-click export for any form or date range.' },
+              { icon: '📡', title: 'Offline-first',          desc: 'Collect with zero internet. Auto-syncs the moment connectivity returns — no manual uploads.' },
+              { icon: '🤖', title: 'AI Data Cleaning',       desc: 'Auto-detect and fix data errors with a full cleaning audit trail. No analyst salary needed.' },
+              { icon: '📝', title: 'FG Writer Reports',      desc: 'AI-generated donor reports (USAID, EU, Gates templates) in minutes, not weeks.' },
+              { icon: '📍', title: 'GPS + Fraud Detection',  desc: 'Record location at every submission and automatically flag GPS spoofing attempts.' },
+              { icon: '👥', title: 'Role-based teams',       desc: 'Admins, supervisors, and enumerators with hierarchy-aware, scoped access control.' },
+              { icon: '📋', title: 'Smart Form Builder',     desc: '25+ question types, skip logic, cascading selects, XLSForm import/export.' },
+              { icon: '🌐', title: 'Multi-language',         desc: 'Forms and the platform UI in Hindi, Kannada, Telugu, English — more on roadmap.' },
+              { icon: '📊', title: 'Panel Study',            desc: 'Track the same respondents across multiple waves with attrition and retention reports.' },
+              { icon: '🔗', title: 'API + Webhooks',         desc: 'Push data to CRM, ERP, Zapier, or n8n in real time with read + write REST API.' },
             ].map(f => (
               <div key={f.title} className="flex gap-4 p-5 rounded-xl border border-slate-100 bg-slate-50 hover:border-slate-200 transition-colors">
                 <span className="text-2xl flex-shrink-0">{f.icon}</span>
