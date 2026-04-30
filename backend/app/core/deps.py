@@ -1,5 +1,5 @@
 """FastAPI dependencies — auth, tenant context, RBAC."""
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from jose import JWTError
@@ -17,6 +17,7 @@ def _get_token_payload(credentials: HTTPAuthorizationCredentials = Depends(beare
 
 
 def get_current_user(
+    request: Request,
     payload: dict = Depends(_get_token_payload),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -24,16 +25,23 @@ def get_current_user(
     tenant_id = payload.get("tenant_id")
     if not tenant_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing tenant")
+    # master_admin may pass X-Tenant-ID to act in another tenant's context
+    if payload.get("role") == "master_admin":
+        override = request.headers.get("X-Tenant-ID")
+        if override:
+            tenant_id = override
+            payload = {**payload, "tenant_id": override}
     set_tenant_context(db, tenant_id)
     return payload
 
 
 def require_role(*roles: str):
-    """Dependency factory — raises 403 if user's role is not in allowed list."""
+    """Dependency factory — raises 403 if user's role is not in allowed list.
+    master_admin always passes regardless of the role list."""
     def _check(user: dict = Depends(get_current_user)):
-        if user.get("role") not in roles:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
-        return user
+        if user.get("role") == "master_admin" or user.get("role") in roles:
+            return user
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
     return _check
 
 
