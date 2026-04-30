@@ -428,7 +428,9 @@ export default function FileManagerPage() {
                     <div className="text-xs">
                       {section === 'writer'
                         ? 'Use "Save Version" in FG Writer to store reports here.'
-                        : 'Use "Save to Account" in the Analyzer or Cleaner to store files here.'}
+                        : section === 'cleaner'
+                        ? 'Cleaned dataset exports from the Analyzer Wizard will appear here.'
+                        : 'Build and save tabulations in FG Analyzer to store files here.'}
                     </div>
                   </div>
                 ) : (

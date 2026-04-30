@@ -12,7 +12,7 @@ import LineChart from '@/components/charts/LineChart'
 import BarChart from '@/components/charts/BarChart'
 import {
   loadTabulations, loadTabulationsCache, saveTabulation, deleteTabulation,
-  getLastProgram, setLastProgram, type SavedTabulation,
+  saveAnalyzerToolProject, getLastProgram, setLastProgram, type SavedTabulation,
 } from '@/lib/fgStorage'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -525,7 +525,7 @@ const AI_MSGS = [
   'Almost ready...',
 ]
 
-function TabulatorTab({ programId, cols, sampleRows }: { programId: string; cols: ColHeader[]; sampleRows: Record<string, any>[] }) {
+function TabulatorTab({ programId, programName, cols, sampleRows }: { programId: string; programName: string; cols: ColHeader[]; sampleRows: Record<string, any>[] }) {
   const toast = useToast()
   const [saved, setSaved] = useState<SavedTabulation[]>([])
 
@@ -638,6 +638,7 @@ function TabulatorTab({ programId, cols, sampleRows }: { programId: string; cols
         column_labels: smartSuggestion.column_labels || {},
       }
       await saveTabulation(programId, tab)
+      saveAnalyzerToolProject(programId, programName, tab)
       await reload()
       setSmartSuggestion(null)
       toast.success(`"${smartSuggestion.title}" built and saved`)
@@ -819,6 +820,7 @@ function TabulatorTab({ programId, cols, sampleRows }: { programId: string; cols
         is_cross_tab: res.data.is_cross_tab,
       }
       await saveTabulation(programId, tab)
+      saveAnalyzerToolProject(programId, programName, tab)
       await reload()
       toast.success(`"${s.title}" saved`)
     } catch (e: any) {
@@ -858,6 +860,7 @@ function TabulatorTab({ programId, cols, sampleRows }: { programId: string; cols
         created_at: new Date().toISOString(),
       }
       await saveTabulation(programId, tab)
+      saveAnalyzerToolProject(programId, programName, tab)
       await reload()
       setManualTitle('')
       toast.success('Tabulation saved')
@@ -1743,7 +1746,7 @@ export default function FgAnalyzer() {
 
                 {tab === 'tabulator' && (
                   data
-                    ? <TabulatorTab programId={programId} cols={data.column_headers} sampleRows={data.sample_rows ?? []} />
+                    ? <TabulatorTab programId={programId} programName={summary?.program_name ?? ''} cols={data.column_headers} sampleRows={data.sample_rows ?? []} />
                     : (
                       <div className="space-y-6">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

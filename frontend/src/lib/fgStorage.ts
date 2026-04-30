@@ -83,6 +83,32 @@ export function deleteReport(programId: string, reportId: string) {
   localStorage.setItem(`fg_reports_${programId}`, JSON.stringify(all))
 }
 
+// ── Analyzer → ToolProject (Files menu) ──────────────────────────────────────
+
+function tabToCsv(tab: SavedTabulation): string {
+  const subKeys = tab.sub_keys ?? []
+  const headers = tab.is_cross_tab
+    ? [tab.groupby_field, ...subKeys, 'Total', ...(tab.show_percent ? ['pct'] : [])]
+    : [tab.groupby_field, tab.value_field !== '*' ? tab.value_field : 'count', ...(tab.show_percent ? ['pct'] : [])]
+  const rows = tab.rows.map(r =>
+    tab.is_cross_tab
+      ? [`"${r.group}"`, ...subKeys.map(k => String(r[k] ?? 0)), String(r.value), ...(tab.show_percent ? [String(r.pct ?? '')] : [])]
+      : [`"${r.group}"`, String(r.value), ...(tab.show_percent ? [String(r.pct ?? '')] : [])]
+  )
+  return [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+}
+
+export async function saveAnalyzerToolProject(programId: string, programName: string, tab: SavedTabulation): Promise<void> {
+  try {
+    await api.post('/tool-projects/', {
+      tool: 'analyzer',
+      name: `${programName} — ${tab.title}`,
+      program_id: programId,
+      data: { csv_content: tabToCsv(tab), title: tab.title, row_count: tab.rows.length, tab_id: tab.id },
+    })
+  } catch { /* non-blocking — tabulation is already saved to DB */ }
+}
+
 // ── Last selected program ─────────────────────────────────────────────────────
 
 export function getLastProgram(): string {
