@@ -454,6 +454,88 @@ def get_enumerator_stats(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/enumerator-scorecard")
+def get_enumerator_scorecard(
+    form_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Per-enumerator performance scorecard: submissions/day, accuracy rate, backcheck pass rate."""
+    from sqlalchemy import func, case
+    try:
+        q = (
+            db.query(
+                Submission.enumerator_id,
+                User.name,
+                User.phone,
+                func.count(Submission.id).label("total"),
+                func.sum(case((Submission.status == "approved", 1), else_=0)).label("approved"),
+                func.sum(case((Submission.status == "flagged", 1), else_=0)).label("flagged"),
+                func.sum(case((Submission.status == "rejected", 1), else_=0)).label("rejected"),
+                func.sum(case((Submission.has_violations == True, 1), else_=0)).label("violations"),
+                func.sum(case((Submission.backcheck_required == True, 1), else_=0)).label("bc_required"),
+                func.sum(case((Submission.backcheck_completed == True, 1), else_=0)).label("bc_completed"),
+                func.min(Submission.server_received_at).label("first_at"),
+                func.max(Submission.server_received_at).label("last_at"),
+            )
+            .outerjoin(User, Submission.enumerator_id == User.id)
+            .filter(Submission.tenant_id == user["tenant_id"])
+        )
+        if form_id:
+            q = q.filter(Submission.form_id == form_id)
+        if date_from:
+            q = q.filter(Submission.server_received_at >= date_from)
+        if date_to:
+            q = q.filter(Submission.server_received_at <= date_to)
+        q = q.group_by(Submission.enumerator_id, User.name, User.phone)
+        rows = q.all()
+
+        result = []
+        for r in rows:
+            total = r.total or 0
+            approved = int(r.approved or 0)
+            flagged = int(r.flagged or 0)
+            rejected = int(r.rejected or 0)
+            reviewed = approved + flagged + rejected
+            accuracy_rate = round(approved / reviewed * 100, 1) if reviewed > 0 else None
+
+            bc_required = int(r.bc_required or 0)
+            bc_completed = int(r.bc_completed or 0)
+            backcheck_pass_rate = round(bc_completed / bc_required * 100, 1) if bc_required > 0 else None
+
+            if r.first_at and r.last_at:
+                days = max(1, (r.last_at - r.first_at).days + 1)
+            else:
+                days = 1
+            submissions_per_day = round(total / days, 1)
+
+            result.append({
+                "enumerator_id": str(r.enumerator_id) if r.enumerator_id else "unknown",
+                "name": r.name or r.phone or "Unknown",
+                "total": total,
+                "approved": approved,
+                "flagged": flagged,
+                "rejected": rejected,
+                "violations": int(r.violations or 0),
+                "backcheck_required": bc_required,
+                "backcheck_completed": bc_completed,
+                "accuracy_rate": accuracy_rate,
+                "backcheck_pass_rate": backcheck_pass_rate,
+                "submissions_per_day": submissions_per_day,
+                "first_submission": r.first_at.isoformat() if r.first_at else None,
+                "last_submission": r.last_at.isoformat() if r.last_at else None,
+            })
+
+        return sorted(result, key=lambda x: -x["total"])
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error fetching enumerator scorecard")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ── Potential duplicates ──────────────────────────────────────────────────────
 
 @router.get("/potential-duplicates")

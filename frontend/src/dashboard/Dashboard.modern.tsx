@@ -13,7 +13,8 @@ import LineChart from '@/components/charts/LineChart'
 import AuditLog from '@/components/AuditLog'
 import AiReportModal from '@/dashboard/AiReportModal'
 const RosterTab = lazy(() => import('@/dashboard/RosterTab'))
-const AnalyticsTab = lazy(() => import('@/dashboard/AnalyticsTab'))
+const AnalyticsTab  = lazy(() => import('@/dashboard/AnalyticsTab'))
+const ScorecardTab  = lazy(() => import('@/dashboard/ScorecardTab'))
 const NewFormWizard = lazy(() => import('@/builder/NewFormWizard'))
 
 const MiniMap = lazy(() => import('@/renderer/fields/MiniMap'))
@@ -529,7 +530,7 @@ const TEAM_PAGE_SIZE = 20
 
 export default function Dashboard() {
   const toast = useToast()
-  const [tab, setTab] = useState<'overview' | 'submissions' | 'analytics' | 'forms' | 'team' | 'roster'>('overview')
+  const [tab, setTab] = useState<'overview' | 'submissions' | 'analytics' | 'scorecard' | 'forms' | 'team' | 'roster'>('overview')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -1506,7 +1507,7 @@ export default function Dashboard() {
           {!loading && <><div className="hidden sm:flex gap-1 bg-catalan-surface rounded-lg p-1 w-fit flex-wrap">
             {(isEnumerator
               ? (['overview', 'submissions', 'forms'] as const)
-              : (['overview', 'submissions', 'analytics', 'forms', 'team', 'roster'] as const)
+              : (['overview', 'submissions', 'analytics', 'scorecard', 'forms', 'team', 'roster'] as const)
             ).map(t => (
               <button
                 key={t}
@@ -2244,6 +2245,13 @@ export default function Dashboard() {
               </Card>
 
             </div>
+          )}
+
+          {/* ── SCORECARD ── */}
+          {tab === 'scorecard' && (
+            <Suspense fallback={<div className="py-10 text-center text-catalan-textMuted text-sm">Loading…</div>}>
+              <ScorecardTab forms={forms} />
+            </Suspense>
           )}
 
           {/* ── FORMS ── */}
