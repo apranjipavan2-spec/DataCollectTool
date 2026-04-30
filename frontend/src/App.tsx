@@ -34,7 +34,9 @@ const FileManagerPage = lazy(() => import('@/fg/FileManagerPage'))
 const SuperAdminMonitor = lazy(() => import('@/admin/SuperAdminMonitor'))
 const MigrationPage   = lazy(() => import('@/migration/MigrationPage'))
 const FieldMapPage    = lazy(() => import('@/map/FieldMapPage'))
-const PublicSurveyPage = lazy(() => import('@/collect/PublicSurveyPage'))
+const PublicSurveyPage   = lazy(() => import('@/collect/PublicSurveyPage'))
+const SubscriptionPage   = lazy(() => import('@/admin/SubscriptionPage'))
+const AdminPayments      = lazy(() => import('@/admin/AdminPayments'))
 
 function PageLoader() {
   return (
@@ -216,6 +218,18 @@ export default function App() {
 
               <Route path="/survey/:token" element={
                 <LazyRoute><PublicSurveyPage /></LazyRoute>
+              } />
+
+              <Route path="/subscription" element={
+                <RequireAuth roles={['org_admin', 'master_admin']}>
+                  <LazyRoute><SubscriptionPage /></LazyRoute>
+                </RequireAuth>
+              } />
+
+              <Route path="/admin/payments" element={
+                <RequireAuth roles={['master_admin']}>
+                  <LazyRoute><AdminPayments /></LazyRoute>
+                </RequireAuth>
               } />
 
               <Route path="*" element={<RoleHome />} />
