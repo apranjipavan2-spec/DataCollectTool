@@ -102,7 +102,7 @@ jobs:
 
             # ── 2b. Seed plans + bootstrap superuser (both idempotent) ───────────
             docker compose exec -T app sh -c "python -m scripts.seed_plans 2>&1"
-            docker compose exec -T app sh -c "python scripts/create_superuser.py 2>&1"
+            docker compose exec -T app sh -c "python -m scripts.create_superuser 2>&1"
 
             # ── 3. Build analyzer and cleaner images on VPS ─────────────────────
             docker build -t fieldgovern-analyzer:latest /opt/fieldgovern/tools/tableforge
