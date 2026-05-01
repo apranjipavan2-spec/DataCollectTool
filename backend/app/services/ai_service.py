@@ -65,20 +65,43 @@ async def generate_report(cfg: dict, form_title: str, field_labels: list, submis
     return await _call_llm(cfg, prompt)
 
 
-async def suggest_skip_logic(cfg: dict, question_text: str, form_fields: list) -> list:
-    fields_summary = [{"id": f.get("id"), "label": f.get("label"), "type": f.get("type")} for f in form_fields[:20]]
+async def suggest_skip_logic(cfg: dict, question_text: str, form_fields: list, user_description: str = "") -> list:
+    """Return 1-3 SkipLogic suggestions in frontend-compatible format."""
+    fields_summary = [{"id": f.get("id"), "name": f.get("name") or f.get("id"), "label": f.get("label"), "type": f.get("type"), "options": [o.get("label") for o in (f.get("options") or [])[:5]]} for f in form_fields[:20]]
+    desc_clause = f"User's plain-English description: \"{user_description}\"\n" if user_description else ""
     prompt = (
-        f"Survey question: '{question_text}'\n"
-        f"Existing fields: {json.dumps(fields_summary)}\n\n"
-        f"Suggest 1-3 skip logic conditions for this question. "
-        f"Return ONLY a JSON array like: "
-        f'[{{"if_field_id": "field_id", "operator": "equals", "value": "some_value", "explanation": "why"}}]'
+        f"You are helping configure skip logic for a survey.\n"
+        f"Current field/section: \"{question_text}\"\n"
+        f"{desc_clause}"
+        f"Available preceding fields (use 'name' as the field identifier):\n{json.dumps(fields_summary, indent=2)}\n\n"
+        f"Generate 1-3 skip logic rule suggestions. Each suggestion must be a complete SkipLogic rule.\n"
+        f"Allowed operators: eq, neq, gt, lt, gte, lte, contains, is_empty, is_not_empty\n"
+        f"Return ONLY a JSON array:\n"
+        f'[{{"logic":"AND","action":"show","conditions":[{{"field":"field_name","operator":"eq","value":"Yes"}}],"explanation":"Show when..."}}]'
     )
     raw = await _call_llm(cfg, prompt)
     match = re.search(r'\[.*\]', raw, re.DOTALL)
     if match:
         try:
-            return json.loads(match.group())
+            parsed = json.loads(match.group())
+            valid_ops = {"eq","neq","gt","lt","gte","lte","contains","is_empty","is_not_empty"}
+            result = []
+            for item in parsed:
+                conditions = item.get("conditions", [])
+                cleaned = []
+                for c in conditions:
+                    op = c.get("operator", "eq")
+                    if op not in valid_ops:
+                        op = "eq"
+                    cleaned.append({"field": c.get("field",""), "operator": op, "value": c.get("value","")})
+                if cleaned:
+                    result.append({
+                        "logic": item.get("logic","AND"),
+                        "action": item.get("action","show"),
+                        "conditions": cleaned,
+                        "explanation": item.get("explanation",""),
+                    })
+            return result
         except Exception:
             pass
     return []

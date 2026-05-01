@@ -170,7 +170,7 @@ async def suggest_skip_logic(body: dict, user: dict = Depends(require_org_admin)
         check_feature(user["tenant_id"], "ai_cleaning", db)
     cfg = _get_global_ai_cfg(db)
     try:
-        suggestions = await ai_service.suggest_skip_logic(cfg, body.get("question_text", ""), body.get("form_fields", []))
+        suggestions = await ai_service.suggest_skip_logic(cfg, body.get("question_text", ""), body.get("form_fields", []), body.get("user_description", ""))
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:

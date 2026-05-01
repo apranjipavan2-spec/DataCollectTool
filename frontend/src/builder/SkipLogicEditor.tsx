@@ -1,5 +1,22 @@
+import { useState } from 'react'
+import api from '@/lib/api'
 import type { FormField, FormSection, SkipLogic, SkipCondition, ConditionGroup } from '@/types/form'
 import { isConditionGroup } from '@/types/form'
+
+interface AiSuggestion {
+  logic: 'AND' | 'OR'; action: 'show' | 'skip'
+  conditions: { field: string; operator: SkipCondition['operator']; value?: string }[]
+  explanation: string
+}
+
+async function fetchAiSuggestions(fieldLabel: string, fields: FormField[], description: string): Promise<AiSuggestion[]> {
+  const res = await api.post('/ai/suggest-skip-logic', {
+    question_text: fieldLabel,
+    user_description: description,
+    form_fields: fields.map(f => ({ id: f.id, name: f.name, label: f.label, type: f.type, options: f.options })),
+  })
+  return res.data.suggestions ?? []
+}
 
 interface Props {
   field: FormField
@@ -168,8 +185,74 @@ function GroupEditor({ group, allFields, depth, onUpdate, onRemove }: {
   )
 }
 
+/* ─── AI Panel ─── */
+function AiSkipPanel({ field, allFields, onApply, onClose }: {
+  field: FormField; allFields: FormField[]
+  onApply: (s: AiSuggestion) => void; onClose: () => void
+}) {
+  const [desc, setDesc] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [suggestions, setSuggestions] = useState<AiSuggestion[]>([])
+  const [error, setError] = useState('')
+
+  const run = async () => {
+    if (!desc.trim()) return
+    setLoading(true); setError(''); setSuggestions([])
+    try {
+      const results = await fetchAiSuggestions(field.label || field.name, allFields, desc)
+      if (results.length === 0) setError('No suggestions returned — try rephrasing.')
+      else setSuggestions(results)
+    } catch (e: any) {
+      setError(e.response?.data?.detail || 'AI request failed')
+    } finally { setLoading(false) }
+  }
+
+  return (
+    <div className="mt-2 p-3 bg-catalan-hover border border-catalan-primary/30 rounded-lg space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-catalan-primary">AI Skip Logic Assistant</span>
+        <button onClick={onClose} className="text-xs text-catalan-textMuted hover:text-catalan-text">✕</button>
+      </div>
+      <textarea
+        className="w-full bg-catalan-bg border border-catalan-border rounded-md px-2.5 py-1.5 text-xs text-catalan-text placeholder-catalan-textMuted focus:outline-none focus:border-catalan-primary resize-none"
+        rows={2}
+        placeholder={`e.g. "Show this only if the respondent is female" or "Skip if income is above 50000"`}
+        value={desc}
+        onChange={e => setDesc(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); run() } }}
+      />
+      <button onClick={run} disabled={loading || !desc.trim()}
+        className="text-xs px-3 py-1.5 bg-catalan-primary text-catalan-bg rounded-lg font-medium hover:opacity-90 disabled:opacity-40">
+        {loading ? 'Thinking…' : 'Generate Rules'}
+      </button>
+      {error && <p className="text-xs text-catalan-error">{error}</p>}
+      {suggestions.map((s, i) => (
+        <div key={i} className="p-2.5 bg-catalan-surface border border-catalan-border rounded-lg space-y-1.5">
+          <p className="text-xs text-catalan-textMuted italic">{s.explanation}</p>
+          <div className="flex flex-wrap gap-1">
+            <span className="text-xs px-1.5 py-0.5 rounded bg-catalan-primary/10 text-catalan-primary font-mono">
+              {s.action === 'show' ? 'Show if' : 'Skip if'}
+            </span>
+            {s.conditions.map((c, ci) => (
+              <span key={ci} className="text-xs px-1.5 py-0.5 rounded bg-catalan-hover border border-catalan-border font-mono">
+                {c.field} {c.operator} {c.value ?? ''}
+              </span>
+            ))}
+          </div>
+          <button onClick={() => { onApply(s); onClose() }}
+            className="text-xs px-2.5 py-1 bg-catalan-primary text-catalan-bg rounded font-medium hover:opacity-90">
+            Apply this rule
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /* ─── Main Editor ─── */
 export default function SkipLogicEditor({ field, sections, onChange, prevFieldsOverride }: Props) {
+  const [showAi, setShowAi] = useState(false)
+
   // If prevFieldsOverride is supplied (e.g. section-level logic), use it directly.
   // Otherwise compute fields that appear before `field` in document order.
   const allFields = prevFieldsOverride ?? (() => {
@@ -199,6 +282,16 @@ export default function SkipLogicEditor({ field, sections, onChange, prevFieldsO
     updateLogic({ conditions: updateAtPath(logic!.conditions, [i], updater) })
   }
 
+  const applyAiSuggestion = (s: AiSuggestion) => {
+    const conditions: SkipCondition[] = s.conditions.map(c => ({
+      _key: crypto.randomUUID(),
+      field: c.field,
+      operator: c.operator,
+      value: c.value ?? '',
+    }))
+    onChange({ logic: s.logic, action: s.action, conditions })
+  }
+
   if (!logic) {
     if (allFields.length === 0) {
       return (
@@ -208,12 +301,26 @@ export default function SkipLogicEditor({ field, sections, onChange, prevFieldsO
       )
     }
     return (
-      <button
-        onClick={enable}
-        className="text-xs px-3 py-1.5 rounded-lg border border-dashed border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50 transition-colors"
-      >
-        + Add Skip Logic
-      </button>
+      <div>
+        <div className="flex gap-2">
+          <button
+            onClick={enable}
+            className="text-xs px-3 py-1.5 rounded-lg border border-dashed border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50 transition-colors"
+          >
+            + Add Skip Logic
+          </button>
+          <button
+            onClick={() => setShowAi(v => !v)}
+            className="text-xs px-3 py-1.5 rounded-lg border border-dashed border-catalan-primary/40 text-catalan-primary/70 hover:border-catalan-primary hover:text-catalan-primary transition-colors"
+          >
+            🤖 AI Suggest
+          </button>
+        </div>
+        {showAi && (
+          <AiSkipPanel field={field} allFields={allFields}
+            onApply={applyAiSuggestion} onClose={() => setShowAi(false)} />
+        )}
+      </div>
     )
   }
 
@@ -272,6 +379,12 @@ export default function SkipLogicEditor({ field, sections, onChange, prevFieldsO
           + Group
         </button>
         <button
+          className="text-xs px-2.5 py-1 rounded border border-dashed border-catalan-primary/40 text-catalan-primary/70 hover:border-catalan-primary hover:text-catalan-primary transition-colors"
+          onClick={() => setShowAi(v => !v)}
+        >
+          🤖 AI
+        </button>
+        <button
           className="text-xs px-3 py-1 rounded-lg bg-catalan-error/10 border border-catalan-error/30 text-catalan-error hover:bg-catalan-error/20 font-medium transition-colors ml-auto flex items-center gap-1"
           onClick={disable}
           title="Remove all conditions and turn off skip logic"
@@ -279,6 +392,11 @@ export default function SkipLogicEditor({ field, sections, onChange, prevFieldsO
           ✕ Remove skip logic
         </button>
       </div>
+      {showAi && (
+        <AiSkipPanel field={field} allFields={allFields}
+          onApply={s => { applyAiSuggestion(s); setShowAi(false) }}
+          onClose={() => setShowAi(false)} />
+      )}
     </div>
   )
 }
