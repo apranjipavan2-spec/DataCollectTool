@@ -166,6 +166,168 @@ function ReportVersionCard({ report, onRestore, onDelete }: {
   )
 }
 
+// ── Schedule Modal ────────────────────────────────────────────────────────────
+
+interface ScheduledReport {
+  id: string; name: string; program_id: string | null; style: string
+  frequency: string; send_hour: string; send_dow: string | null
+  recipient_emails: string[]; is_active: boolean; last_sent_at: string | null
+}
+
+function ScheduleModal({ programId, programName, style, onClose }: {
+  programId: string; programName: string; style: string; onClose: () => void
+}) {
+  const toast = useToast()
+  const [schedules, setSchedules] = useState<ScheduledReport[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({
+    name: `${programName} Report`,
+    frequency: 'weekly',
+    send_hour: '7',
+    send_dow: '1',
+    recipient_emails_raw: '',
+    style,
+  })
+
+  useEffect(() => {
+    api.get('/scheduled-reports/').then(r => setSchedules(r.data)).catch(() => {}).finally(() => setLoading(false))
+  }, [])
+
+  const save = async () => {
+    const emails = form.recipient_emails_raw.split(',').map(e => e.trim()).filter(Boolean)
+    if (!emails.length) { toast.error('Add at least one recipient email'); return }
+    setSaving(true)
+    try {
+      await api.post('/scheduled-reports/', {
+        name: form.name,
+        program_id: programId || null,
+        style: form.style,
+        frequency: form.frequency,
+        send_hour: parseInt(form.send_hour),
+        send_dow: form.frequency === 'weekly' ? parseInt(form.send_dow) : null,
+        recipient_emails: emails,
+      })
+      const r = await api.get('/scheduled-reports/')
+      setSchedules(r.data)
+      toast.success('Schedule created')
+      setForm(f => ({ ...f, recipient_emails_raw: '', name: `${programName} Report` }))
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Failed to save')
+    } finally { setSaving(false) }
+  }
+
+  const toggle = async (sr: ScheduledReport) => {
+    try {
+      await api.patch(`/scheduled-reports/${sr.id}`, { is_active: !sr.is_active })
+      setSchedules(prev => prev.map(s => s.id === sr.id ? { ...s, is_active: !sr.is_active } : s))
+    } catch { toast.error('Failed to update') }
+  }
+
+  const remove = async (sr: ScheduledReport) => {
+    if (!confirm(`Delete "${sr.name}"?`)) return
+    try {
+      await api.delete(`/scheduled-reports/${sr.id}`)
+      setSchedules(prev => prev.filter(s => s.id !== sr.id))
+    } catch { toast.error('Failed to delete') }
+  }
+
+  const DOW = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+  const f = (k: keyof typeof form, v: string) => setForm(prev => ({ ...prev, [k]: v }))
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+      <div className="bg-catalan-surface rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}>
+        <div className="p-6 space-y-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-catalan-text">Schedule Report Delivery</h2>
+            <button onClick={onClose} className="text-catalan-textMuted hover:text-catalan-text">✕</button>
+          </div>
+
+          {/* New schedule form */}
+          <div className="space-y-3">
+            <div>
+              <div className="text-xs text-catalan-textMuted mb-1">Schedule name</div>
+              <input className={inp} value={form.name} onChange={e => f('name', e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs text-catalan-textMuted mb-1">Frequency</div>
+                <select className={sel} value={form.frequency} onChange={e => f('frequency', e.target.value)}>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly (1st)</option>
+                </select>
+              </div>
+              <div>
+                <div className="text-xs text-catalan-textMuted mb-1">Send at (UTC hour)</div>
+                <select className={sel} value={form.send_hour} onChange={e => f('send_hour', e.target.value)}>
+                  {[0,4,6,7,8,9,10,12,14,16,18,20].map(h => (
+                    <option key={h} value={String(h)}>{String(h).padStart(2,'0')}:00 UTC</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {form.frequency === 'weekly' && (
+              <div>
+                <div className="text-xs text-catalan-textMuted mb-1">Day of week</div>
+                <select className={sel} value={form.send_dow} onChange={e => f('send_dow', e.target.value)}>
+                  {DOW.map((d, i) => <option key={i} value={String(i)}>{d}</option>)}
+                </select>
+              </div>
+            )}
+            <div>
+              <div className="text-xs text-catalan-textMuted mb-1">Recipient emails (comma-separated)</div>
+              <input className={inp} value={form.recipient_emails_raw}
+                onChange={e => f('recipient_emails_raw', e.target.value)}
+                placeholder="admin@org.com, boss@org.com" />
+            </div>
+          </div>
+
+          <button onClick={save} disabled={saving}
+            className={`${btnPr} w-full`}>
+            {saving ? 'Saving…' : 'Create Schedule'}
+          </button>
+
+          {/* Existing schedules */}
+          {!loading && schedules.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-catalan-textMuted uppercase tracking-wider pt-2 border-t border-catalan-border">
+                Active Schedules
+              </div>
+              {schedules.map(sr => (
+                <div key={sr.id} className="flex items-start justify-between p-3 bg-catalan-hover rounded-lg gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-catalan-text truncate">{sr.name}</div>
+                    <div className="text-xs text-catalan-textMuted mt-0.5">
+                      {sr.frequency} · {String(sr.send_hour).padStart(2,'0')}:00 UTC
+                      {sr.frequency === 'weekly' && sr.send_dow ? ` · ${DOW[parseInt(sr.send_dow)]}` : ''}
+                      · {sr.recipient_emails.length} recipient{sr.recipient_emails.length !== 1 ? 's' : ''}
+                    </div>
+                    {sr.last_sent_at && (
+                      <div className="text-xs text-catalan-textMuted mt-0.5">
+                        Last sent: {new Date(sr.last_sent_at).toLocaleDateString()}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => toggle(sr)}
+                      className={`text-xs px-2 py-1 rounded border font-medium transition-colors ${sr.is_active ? 'border-green-400/30 text-green-500 hover:bg-green-500/10' : 'border-catalan-border text-catalan-textMuted hover:text-catalan-text'}`}>
+                      {sr.is_active ? 'Active' : 'Paused'}
+                    </button>
+                    <button onClick={() => remove(sr)} className="text-xs text-catalan-error hover:underline">Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function FgWriter() {
@@ -185,6 +347,7 @@ export default function FgWriter() {
   const [reportMd, setReportMd]         = useState('')
   const [copied, setCopied]             = useState(false)
   const [previewMode, setPreviewMode]   = useState(false)
+  const [showSchedule, setShowSchedule] = useState(false)
 
   const writerJob = useAiJob({ storageKey: `ai_writer_${programId || 'none'}` })
 
@@ -445,6 +608,7 @@ export default function FgWriter() {
                         <button onClick={saveCurrentReport} className={btnSe}>Save Version</button>
                         <button onClick={downloadDocx} className={btnSe}>Download Word</button>
                         <button onClick={copyMarkdown} className={btnSe}>{copied ? '✓ Copied' : 'Copy MD'}</button>
+                        {programId && <button onClick={() => setShowSchedule(true)} className={btnSe}>Schedule</button>}
                       </div>
                     </div>
                     {previewMode ? (
@@ -484,6 +648,14 @@ export default function FgWriter() {
           </div>
         </main>
       </div>
+      {showSchedule && programId && (
+        <ScheduleModal
+          programId={programId}
+          programName={prog?.name ?? 'Program'}
+          style={style}
+          onClose={() => setShowSchedule(false)}
+        />
+      )}
     </div>
   )
 }

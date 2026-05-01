@@ -35,6 +35,23 @@ def _run_daily_digest():
         db.close()
 
 
+def _run_scheduled_reports():
+    """Check and deliver any scheduled reports that are due now."""
+    from app.core.database import SessionLocal
+    from app.services.scheduled_reports import run_scheduled_reports
+
+    logger.info("[Scheduler] Scheduled reports check starting")
+    db = SessionLocal()
+    try:
+        result = run_scheduled_reports(db)
+        logger.info("[Scheduler] Scheduled reports done — sent=%d skipped=%d errors=%d",
+                    result["sent"], result["skipped"], result["errors"])
+    except Exception:
+        logger.exception("[Scheduler] Scheduled reports job failed")
+    finally:
+        db.close()
+
+
 def _run_monthly_usage_reset():
     """Reset per-org monthly usage counters on the 1st of each month."""
     from app.core.database import SessionLocal
@@ -98,8 +115,18 @@ def start_scheduler():
         misfire_grace_time=3600,
     )
 
+    # Scheduled reports — check every hour at :00
+    _scheduler.add_job(
+        _run_scheduled_reports,
+        CronTrigger(minute=0),
+        id="scheduled_reports",
+        name="Scheduled Report Delivery",
+        replace_existing=True,
+        misfire_grace_time=1800,
+    )
+
     _scheduler.start()
-    logger.info("[Scheduler] Started — daily digest @ 07:00 UTC, monthly usage reset @ 1st 00:30 UTC")
+    logger.info("[Scheduler] Started — daily digest @ 07:00 UTC, monthly usage reset @ 1st 00:30 UTC, scheduled reports @ :00 each hour")
 
 
 def stop_scheduler():

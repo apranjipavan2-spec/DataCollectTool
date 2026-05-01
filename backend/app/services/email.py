@@ -7,6 +7,7 @@ configured so the app works without an email provider.
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
 import smtplib
 
 from app.core.config import settings
@@ -18,18 +19,28 @@ logger = logging.getLogger(__name__)
 # Core sender
 # ---------------------------------------------------------------------------
 
-def send_email(to: str, subject: str, html_body: str) -> bool:
+def send_email(
+    to: str, subject: str, html_body: str,
+    attachment_bytes: bytes | None = None,
+    attachment_filename: str | None = None,
+) -> bool:
     """Send an email via SMTP. Returns True on success, False on failure.
-    Fails silently if SMTP is not configured (empty host)."""
+    Fails silently if SMTP is not configured (empty host).
+    Optional binary attachment (e.g. DOCX) via attachment_bytes."""
     if not settings.SMTP_HOST:
         logger.info("[Email] SMTP not configured — skipping email to %s", to)
         return False
     try:
-        msg = MIMEMultipart("alternative")
+        msg = MIMEMultipart("mixed")
         msg["Subject"] = subject
         msg["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
         msg["To"] = to
         msg.attach(MIMEText(html_body, "html"))
+
+        if attachment_bytes and attachment_filename:
+            part = MIMEApplication(attachment_bytes, Name=attachment_filename)
+            part["Content-Disposition"] = f'attachment; filename="{attachment_filename}"'
+            msg.attach(part)
 
         with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
             if settings.SMTP_USE_TLS:

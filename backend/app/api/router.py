@@ -3,7 +3,7 @@ from app.api.routes import (
     auth, forms, submissions, users, sync, export, assignments, history,
     schedules, tenants, notifications, api_keys, webhooks, reports,
     templates, import_excel, bulk_upload, programs, admin_monitor, ai,
-    field_govern, user_tool_projects, billing,
+    field_govern, user_tool_projects, billing, scheduled_reports,
 )
 from app.api.routes.migration.router import router as migration_router
 from app.api.routes import public_survey, roster, analytics, locations, comments, inbox
@@ -40,3 +40,4 @@ router.include_router(comments.router, tags=["comments"])
 router.include_router(inbox.router, tags=["inbox"])
 router.include_router(user_tool_projects.router, tags=["tool-projects"])
 router.include_router(billing.router, tags=["billing"])
+router.include_router(scheduled_reports.router, tags=["scheduled-reports"])
