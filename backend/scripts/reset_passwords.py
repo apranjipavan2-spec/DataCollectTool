@@ -1,5 +1,5 @@
 """
-Run this if login stops working.
+Run this on the server if login stops working.
 Usage:  python scripts/reset_passwords.py
 
 Resets all seed-user passwords back to defaults WITHOUT touching any

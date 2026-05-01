@@ -100,7 +100,7 @@
       "Bash(./venv/Scripts/python.exe -c \"import app.models; from app.core.database import engine, Base; Base.metadata.create_all\\(bind=engine\\); print\\('[DB] Tables OK'\\)\")",
       "Bash(./venv/Scripts/uvicorn.exe app.main:app --host 0.0.0.0 --port 8000)",
       "Bash(cat backend/Dockerfile)",
-      "Bash(cat railway.toml)",
+      "Bash(cat deploy/docker-compose.prod.yml)",
       "Bash(cat Dockerfile)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",

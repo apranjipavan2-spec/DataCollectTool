@@ -17,7 +17,6 @@ from app.models.form import Form
 from app.models.form_version import FormVersion
 from app.models.submission import Submission
 from app.models.form_assignment import FormAssignment
-from app.models.program import Program, ProgramQuestionnaire, ProgramParticipantType
 import uuid
 from datetime import datetime, timezone, timedelta
 
@@ -104,196 +103,6 @@ _PATCHES = [
     "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS participant_type_id UUID REFERENCES program_participant_types(id) ON DELETE SET NULL",
     "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS questionnaire_id UUID REFERENCES program_questionnaires(id) ON DELETE SET NULL",
     "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES program_locations(id) ON DELETE SET NULL",
-    # 0019 — integrations
-    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS notification_config JSONB DEFAULT '{}'::jsonb",
-    "ALTER TABLE forms ADD COLUMN IF NOT EXISTS sheets_sync_config JSONB DEFAULT '{}'::jsonb",
-    # 0020 — QC / compliance
-    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS has_violations BOOLEAN DEFAULT false",
-    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS consent_given BOOLEAN DEFAULT true",
-    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS consent_timestamp TIMESTAMPTZ",
-    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS backcheck_required BOOLEAN DEFAULT false",
-    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS backcheck_form_id UUID",
-    # 0021 — public survey + respondent roster
-    "ALTER TABLE forms ADD COLUMN IF NOT EXISTS public_token VARCHAR(64)",
-    "ALTER TABLE forms ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT false",
-    """CREATE TABLE IF NOT EXISTS respondent_roster (
-        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        form_id UUID NOT NULL REFERENCES forms(id),
-        tenant_id UUID NOT NULL REFERENCES tenants(id),
-        name VARCHAR(255) NOT NULL,
-        phone VARCHAR(50),
-        address TEXT,
-        target_enumerator_id UUID REFERENCES users(id),
-        status VARCHAR(20) DEFAULT 'pending',
-        scheduled_date DATE,
-        notes TEXT,
-        created_at TIMESTAMPTZ DEFAULT now()
-    )""",
-    # 0022 — AI config
-    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ai_config JSONB DEFAULT '{}'::jsonb",
-    # 0023 — roster ↔ submission link
-    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS roster_id UUID REFERENCES respondent_roster(id)",
-    "ALTER TABLE respondent_roster ADD COLUMN IF NOT EXISTS extra_data JSONB DEFAULT '{}'::jsonb",
-    # 0024 — locations hierarchy
-    """CREATE TABLE IF NOT EXISTS locations (
-        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        tenant_id UUID NOT NULL REFERENCES tenants(id),
-        name VARCHAR(255) NOT NULL,
-        type VARCHAR(50) NOT NULL,
-        parent_id UUID REFERENCES locations(id),
-        code VARCHAR(100),
-        created_at TIMESTAMPTZ DEFAULT now()
-    )""",
-    "ALTER TABLE respondent_roster ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES locations(id)",
-    # 0025 — panel study / waves
-    "ALTER TABLE program_questionnaires ADD COLUMN IF NOT EXISTS wave_number INTEGER",
-    "ALTER TABLE program_questionnaires ADD COLUMN IF NOT EXISTS wave_label VARCHAR(100)",
-    "ALTER TABLE program_questionnaires ADD COLUMN IF NOT EXISTS panel_key VARCHAR(200)",
-    "ALTER TABLE programs ADD COLUMN IF NOT EXISTS is_panel_study BOOLEAN DEFAULT false",
-    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS household_id VARCHAR(500)",
-    "CREATE INDEX IF NOT EXISTS ix_submissions_household_id ON submissions (household_id, tenant_id)",
-
-    # 0026 — program_analysis
-    """CREATE TABLE IF NOT EXISTS program_analysis (
-        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        program_id UUID NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
-        tenant_id UUID NOT NULL,
-        created_by UUID REFERENCES users(id) ON DELETE SET NULL,
-        created_at TIMESTAMPTZ DEFAULT now(),
-        updated_at TIMESTAMPTZ DEFAULT now(),
-        status TEXT DEFAULT 'done',
-        source TEXT DEFAULT 'manual',
-        objectives TEXT,
-        table_configs JSONB DEFAULT '[]',
-        cleaning_summary JSONB DEFAULT '{}',
-        ai_rationale TEXT,
-        error_text TEXT,
-        run_count INTEGER DEFAULT 0,
-        last_run_at TIMESTAMPTZ
-    )""",
-    "CREATE INDEX IF NOT EXISTS ix_program_analysis_program_id ON program_analysis (program_id, tenant_id)",
-
-    # 0027 — backcheck completion, system_settings, form generation status
-    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS backcheck_completed BOOLEAN DEFAULT false",
-    """CREATE TABLE IF NOT EXISTS system_settings (
-        key TEXT PRIMARY KEY,
-        value JSONB NOT NULL DEFAULT '{}',
-        updated_at TIMESTAMPTZ DEFAULT now()
-    )""",
-    "INSERT INTO system_settings (key, value) VALUES ('ai_config', '{}') ON CONFLICT DO NOTHING",
-    "ALTER TABLE forms ADD COLUMN IF NOT EXISTS generation_status TEXT DEFAULT 'done'",
-    "ALTER TABLE forms ADD COLUMN IF NOT EXISTS generation_error TEXT",
-
-    # 0028 — program_id on program_locations
-    "ALTER TABLE program_locations ADD COLUMN IF NOT EXISTS program_id UUID REFERENCES programs(id) ON DELETE CASCADE",
-    "CREATE INDEX IF NOT EXISTS ix_program_locations_program_id ON program_locations (program_id, tenant_id)",
-
-    # DATA: deactivate extra demo enumerators/supervisors (keep 3 enum + 1 supervisor)
-    """UPDATE users SET is_active = false
-       WHERE phone IN ('+919333333332', '+919111111111', '+919222222222')
-       AND tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)""",
-
-    # DATA: rename BulkUser1 to a realistic field name
-    """UPDATE users SET name = 'Arjun Das'
-       WHERE phone = '+919333333331'
-       AND tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)""",
-
-    # DATA: add participant types for all demo programs that have none yet
-    """INSERT INTO program_participant_types (id, program_id, tenant_id, name, description, sort_order)
-       SELECT gen_random_uuid(), p.id, p.tenant_id, 'Household', 'Household-level respondent', 0
-       FROM programs p
-       WHERE p.tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)
-       AND NOT EXISTS (
-           SELECT 1 FROM program_participant_types pt WHERE pt.program_id = p.id
-       )
-       AND p.name NOT ILIKE '%health%' AND p.name NOT ILIKE '%education%'
-       AND p.name NOT ILIKE '%student%' AND p.name NOT ILIKE '%farmer%'""",
-
-    """INSERT INTO program_participant_types (id, program_id, tenant_id, name, description, sort_order)
-       SELECT gen_random_uuid(), p.id, p.tenant_id, 'Beneficiary', 'Direct program beneficiary', 1
-       FROM programs p
-       WHERE p.tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)
-       AND NOT EXISTS (
-           SELECT 1 FROM program_participant_types pt WHERE pt.program_id = p.id AND pt.name = 'Beneficiary'
-       )""",
-
-    # DATA: add Health Worker type for health programs
-    """INSERT INTO program_participant_types (id, program_id, tenant_id, name, description, sort_order)
-       SELECT gen_random_uuid(), p.id, p.tenant_id, 'Patient / Community Member', 'Health program participant', 0
-       FROM programs p
-       WHERE p.tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)
-       AND (p.name ILIKE '%health%' OR p.name ILIKE '%nutrition%' OR p.name ILIKE '%sanitation%')
-       AND NOT EXISTS (
-           SELECT 1 FROM program_participant_types pt WHERE pt.program_id = p.id AND pt.name = 'Patient / Community Member'
-       )""",
-
-    # DATA: add Student type for education programs
-    """INSERT INTO program_participant_types (id, program_id, tenant_id, name, description, sort_order)
-       SELECT gen_random_uuid(), p.id, p.tenant_id, 'Student', 'School-going child', 0
-       FROM programs p
-       WHERE p.tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)
-       AND (p.name ILIKE '%education%' OR p.name ILIKE '%school%' OR p.name ILIKE '%student%' OR p.name ILIKE '%learning%')
-       AND NOT EXISTS (
-           SELECT 1 FROM program_participant_types pt WHERE pt.program_id = p.id AND pt.name = 'Student'
-       )""",
-
-    # DATA: add Farmer type for agriculture programs
-    """INSERT INTO program_participant_types (id, program_id, tenant_id, name, description, sort_order)
-       SELECT gen_random_uuid(), p.id, p.tenant_id, 'Farmer / Cultivator', 'Agricultural household', 0
-       FROM programs p
-       WHERE p.tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)
-       AND (p.name ILIKE '%farm%' OR p.name ILIKE '%agri%' OR p.name ILIKE '%crop%' OR p.name ILIKE '%kisan%' OR p.name ILIKE '%pm-kisan%')
-       AND NOT EXISTS (
-           SELECT 1 FROM program_participant_types pt WHERE pt.program_id = p.id AND pt.name = 'Farmer / Cultivator'
-       )""",
-
-    # DATA: update questionnaire total_target to realistic numbers
-    """UPDATE program_questionnaires SET total_target = CASE
-           WHEN name ILIKE '%baseline%' THEN 500
-           WHEN name ILIKE '%midline%' THEN 450
-           WHEN name ILIKE '%endline%' THEN 400
-           WHEN name ILIKE '%household%' THEN 300
-           WHEN name ILIKE '%health%' THEN 250
-           WHEN name ILIKE '%education%' OR name ILIKE '%school%' THEN 200
-           ELSE 250
-       END
-       WHERE tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)
-       AND total_target = 0""",
-
-    # DATA: link questionnaires to participant types where possible
-    """UPDATE program_questionnaires pq SET participant_type_id = (
-           SELECT pt.id FROM program_participant_types pt
-           WHERE pt.program_id = pq.program_id
-           ORDER BY pt.sort_order LIMIT 1
-       )
-       WHERE pq.tenant_id = (SELECT id FROM tenants WHERE name = 'Demo Org' LIMIT 1)
-       AND pq.participant_type_id IS NULL""",
-
-    # 0029 — user_tool_projects
-    """CREATE TABLE IF NOT EXISTS user_tool_projects (
-        id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        tenant_id   UUID NOT NULL REFERENCES tenants(id)  ON DELETE CASCADE,
-        user_id     UUID NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
-        tool        VARCHAR(20)  NOT NULL,
-        name        VARCHAR(255) NOT NULL,
-        program_id  UUID REFERENCES programs(id) ON DELETE SET NULL,
-        data        JSONB NOT NULL DEFAULT '{}',
-        created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-    )""",
-    "CREATE INDEX IF NOT EXISTS ix_utp_user_tool ON user_tool_projects (user_id, tool)",
-    "CREATE INDEX IF NOT EXISTS ix_utp_tenant    ON user_tool_projects (tenant_id)",
-
-    # 0030 — performance indexes on submissions
-    "CREATE INDEX IF NOT EXISTS ix_sub_tenant_program    ON submissions (tenant_id, program_id) WHERE program_id IS NOT NULL",
-    "CREATE INDEX IF NOT EXISTS ix_sub_questionnaire     ON submissions (questionnaire_id) WHERE questionnaire_id IS NOT NULL",
-    "CREATE INDEX IF NOT EXISTS ix_sub_enumerator        ON submissions (enumerator_id)",
-    "CREATE INDEX IF NOT EXISTS ix_sub_tenant_status     ON submissions (tenant_id, status)",
-    "CREATE INDEX IF NOT EXISTS ix_sub_tenant_recvd      ON submissions (tenant_id, server_received_at DESC)",
-
-    # 0031 — per-form and per-program enumerator edit override
-    "ALTER TABLE forms    ADD COLUMN IF NOT EXISTS allow_enumerator_edit BOOLEAN",
-    "ALTER TABLE programs ADD COLUMN IF NOT EXISTS allow_enumerator_edit BOOLEAN",
 ]
 
 from sqlalchemy import text as _text
@@ -308,7 +117,7 @@ print("Schema patches done.")
 # ── Fast-path: skip seed data on warm restarts ────────────────────────────────
 # On every container restart (not just first deploy) the seed runs. If the DB
 # already has the Demo Org tenant the data is already in place — exit early so
-# uvicorn can start quickly.
+# uvicorn can start within the healthcheck window.
 _fast_check_db = SessionLocal()
 try:
     _already_seeded = _fast_check_db.query(Tenant).filter(Tenant.name == 'Demo Org').first()
@@ -577,9 +386,12 @@ demo_user_specs = [
     (demo_tenant.id,     '+919999990001', 'org_admin',    'Admin User',           None),
     (demo_tenant.id,     '+918123105186', 'org_admin',    'PavanDeshetty',        None),
     (demo_tenant.id,     '+919999990002', 'supervisor',   'Supervisor User',      None),
+    (demo_tenant.id,     '+919222222222', 'supervisor',   'New Supervisor',       None),
     (demo_tenant.id,     '+919999990003', 'enumerator',   'Enumerator User',      None),
     (demo_tenant.id,     '+919999990004', 'enumerator',   'Priya Sharma',         None),
-    (demo_tenant.id,     '+919333333331', 'enumerator',   'Arjun Das',            None),
+    (demo_tenant.id,     '+919333333331', 'enumerator',   'BulkUser1',            None),
+    (demo_tenant.id,     '+919333333332', 'enumerator',   'BulkUser2',            None),
+    (demo_tenant.id,     '+919111111111', 'enumerator',   'Test Field Worker',    None),
 ]
 dataworx_user_specs = [
     (dataworx_tenant.id, '+919999991001', 'org_admin',    'Dataworx Admin',   None),
@@ -648,25 +460,6 @@ try:
             db.add(Submission(**d))
 
     db.commit()
-
-    # Refresh existing submission dates so the current-month usage bar always shows data.
-    # Submissions created in previous seed runs have old server_received_at — spread them
-    # across the last 28 days so the "this month" plan-usage counter reflects real activity.
-    now_utc = datetime.now(timezone.utc)
-    month_start = now_utc.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    stale_subs = db.query(Submission).filter(
-        Submission.tenant_id == demo_tenant.id,
-        Submission.server_received_at < month_start,
-    ).all()
-    for sub in stale_subs:
-        d = random.randint(0, min(27, (now_utc - month_start).days or 1))
-        new_ts = now_utc - timedelta(days=d, hours=random.randint(0, 6))
-        sub.server_received_at = new_ts
-        sub.local_created_at = new_ts - timedelta(minutes=random.randint(5, 60))
-    if stale_subs:
-        db.commit()
-        print(f"Refreshed dates : {len(stale_subs)} stale submissions → current month")
-
     print("Stage 2: forms + submissions OK")
     subs = db.query(Submission).filter(Submission.tenant_id == demo_tenant.id).count()
     print(f"Submissions     : {subs} total in Demo Org")
@@ -674,128 +467,6 @@ try:
 except Exception as e:
     db.rollback()
     print(f"Stage 2 warning (sample data skipped): {e}")
-
-# ── Stage 3: programs + link submissions (non-critical) ───────────────────────
-try:
-    enum1     = user_objs['+919999990003']
-    enum2     = user_objs['+919999990004']
-    org_admin = user_objs['+919999990001']
-
-    hs_form = db.query(Form).filter(Form.tenant_id == demo_tenant.id, Form.title == 'Household Survey').first()
-    ha_form = db.query(Form).filter(Form.tenant_id == demo_tenant.id, Form.title == 'Health Assessment').first()
-
-    if hs_form and ha_form:
-        # Ensure all enumerators have form assignments
-        all_enums = [u for u in user_objs.values() if u.tenant_id == demo_tenant.id and u.role == 'enumerator']
-        for enum in all_enums:
-            for form in [hs_form, ha_form]:
-                exists = db.query(FormAssignment).filter(
-                    FormAssignment.form_id == form.id,
-                    FormAssignment.enumerator_id == enum.id,
-                ).first()
-                if not exists:
-                    db.add(FormAssignment(
-                        tenant_id=demo_tenant.id,
-                        form_id=form.id,
-                        enumerator_id=enum.id,
-                        assigned_by=org_admin.id,
-                    ))
-        db.flush()
-
-        # Create demo program if it doesn't exist
-        prog = db.query(Program).filter(
-            Program.tenant_id == demo_tenant.id,
-            Program.name == 'Rural Health Survey 2024',
-        ).first()
-        if not prog:
-            prog = Program(
-                tenant_id=demo_tenant.id,
-                name='Rural Health Survey 2024',
-                scheme_name='Karnataka Rural Health Mission',
-                description='Baseline household and health survey across 5 districts in Karnataka.',
-                status='active',
-                start_date=datetime(2024, 1, 1).date(),
-                end_date=datetime(2024, 12, 31).date(),
-                created_by=org_admin.id,
-            )
-            db.add(prog)
-            db.flush()
-
-        # Add participant types if not present
-        if not db.query(ProgramParticipantType).filter(ProgramParticipantType.program_id == prog.id).first():
-            for i, (pname, pdesc) in enumerate([
-                ('Household', 'Household head or representative'),
-                ('Patient / Community Member', 'Individual health status respondent'),
-                ('ASHA / Health Worker', 'Community health worker'),
-            ]):
-                db.add(ProgramParticipantType(
-                    program_id=prog.id, tenant_id=demo_tenant.id,
-                    name=pname, description=pdesc, sort_order=i,
-                ))
-            db.flush()
-
-        household_pt = db.query(ProgramParticipantType).filter(
-            ProgramParticipantType.program_id == prog.id,
-            ProgramParticipantType.name == 'Household',
-        ).first()
-        health_pt = db.query(ProgramParticipantType).filter(
-            ProgramParticipantType.program_id == prog.id,
-            ProgramParticipantType.name == 'Patient / Community Member',
-        ).first()
-
-        # Create questionnaires linked to forms
-        hs_q = db.query(ProgramQuestionnaire).filter(
-            ProgramQuestionnaire.program_id == prog.id,
-            ProgramQuestionnaire.form_id == hs_form.id,
-        ).first()
-        if not hs_q:
-            hs_q = ProgramQuestionnaire(
-                program_id=prog.id,
-                form_id=hs_form.id,
-                tenant_id=demo_tenant.id,
-                name='Household Survey',
-                total_target=300,
-                status='active',
-                participant_type_id=household_pt.id if household_pt else None,
-            )
-            db.add(hs_q)
-            db.flush()
-
-        ha_q = db.query(ProgramQuestionnaire).filter(
-            ProgramQuestionnaire.program_id == prog.id,
-            ProgramQuestionnaire.form_id == ha_form.id,
-        ).first()
-        if not ha_q:
-            ha_q = ProgramQuestionnaire(
-                program_id=prog.id,
-                form_id=ha_form.id,
-                tenant_id=demo_tenant.id,
-                name='Health Assessment',
-                total_target=250,
-                status='active',
-                participant_type_id=health_pt.id if health_pt else None,
-            )
-            db.add(ha_q)
-            db.flush()
-
-        # Link all unlinked submissions to the program
-        from sqlalchemy import text as _sql
-        db.execute(_sql(
-            f"""UPDATE submissions SET program_id = '{prog.id}', questionnaire_id = '{hs_q.id}'
-                WHERE tenant_id = '{demo_tenant.id}' AND form_id = '{hs_form.id}' AND program_id IS NULL"""
-        ))
-        db.execute(_sql(
-            f"""UPDATE submissions SET program_id = '{prog.id}', questionnaire_id = '{ha_q.id}'
-                WHERE tenant_id = '{demo_tenant.id}' AND form_id = '{ha_form.id}' AND program_id IS NULL"""
-        ))
-        db.commit()
-        print("Stage 3: program + questionnaires + submission links OK")
-    else:
-        print("Stage 3: skipped (forms not found, run seed after forms are created)")
-
-except Exception as e:
-    db.rollback()
-    print(f"Stage 3 warning (program seed skipped): {e}")
 
 finally:
     db.close()
