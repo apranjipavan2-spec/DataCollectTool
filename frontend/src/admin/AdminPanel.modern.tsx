@@ -555,7 +555,12 @@ export default function AdminPanel() {
                             <td className="py-2 pr-4 text-catalan-textMuted text-xs">{f.created_at ? new Date(f.created_at).toLocaleDateString() : '—'}</td>
                             <td className="py-2">
                               <div className="flex gap-2">
-                                <a href={`${api.defaults.baseURL}/shared-files/${f.id}/download`} target="_blank" rel="noopener" className="text-xs text-catalan-primary hover:underline">Download</a>
+                                <button onClick={async () => {
+                                  const res = await api.get(`/shared-files/${f.id}/download`, { responseType: 'blob' })
+                                  const url = URL.createObjectURL(res.data)
+                                  const a = document.createElement('a'); a.href = url; a.download = f.filename; a.click()
+                                  URL.revokeObjectURL(url)
+                                }} className="text-xs text-catalan-primary hover:underline">Download</button>
                                 <button onClick={() => handleDeleteFile(f.id)} className="text-xs text-red-500 hover:underline">Delete</button>
                                 <button onClick={() => {
                                   const allIds = tenants.map(t => t.id)

@@ -1,17 +1,16 @@
 """Shared Files — master_admin uploads files and shares with tenants."""
 import os
 import uuid
-import shutil
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
-from typing import Optional, List
-from app.core.deps import get_current_user, require_master_admin, require_supervisor, get_db
+from typing import List
+from app.core.deps import get_current_user, require_master_admin, get_db
 from app.models.shared_file import SharedFile
 
 router = APIRouter(prefix="/shared-files", tags=["shared-files"])
 
-SHARED_FILES_DIR = Path("/app/uploads/shared_files")
+SHARED_FILES_DIR = Path(os.environ.get("MEDIA_DIR", "uploads")) / "shared_files"
 SHARED_FILES_DIR.mkdir(parents=True, exist_ok=True)
 
 
