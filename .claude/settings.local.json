@@ -109,6 +109,20 @@
       "Bash(git commit *)"
     ]
   },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx sigmap --quiet",
+            "if": "Bash(git commit *)"
+          }
+        ]
+      }
+    ]
+  },
   "mcpServers": {
     "sigmap": {
       "command": "node",

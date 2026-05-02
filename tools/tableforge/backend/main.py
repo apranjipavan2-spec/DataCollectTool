@@ -11,7 +11,7 @@ from datetime import datetime
 
 import pandas as pd
 import numpy as np
-from fastapi import FastAPI, UploadFile, File, HTTPException, Query
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
@@ -48,6 +48,21 @@ for d in [PROJECTS_DIR, EXPORTS_DIR, CACHE_DIR, METRICS_DIR, LIBRARY_DIR, PARQUE
     d.mkdir(exist_ok=True)
 
 LARGE_FILE_THRESHOLD = 50 * 1024 * 1024  # 50 MB — use chunked reading above this
+
+SUPER_ADMIN_ROLE = "master_admin"
+
+
+def get_user_projects_dir(user_id: Optional[str]) -> Path:
+    """Get the user-scoped projects directory. Falls back to shared dir if no user."""
+    if user_id:
+        user_dir = PROJECTS_DIR / user_id
+        user_dir.mkdir(exist_ok=True)
+        return user_dir
+    return PROJECTS_DIR
+
+
+def is_super_admin(role: Optional[str]) -> bool:
+    return role == SUPER_ADMIN_ROLE
 MEMORY_LIMIT = 500 * 1024 * 1024  # 500 MB — sample/page data above this
 
 
@@ -1208,29 +1223,43 @@ async def tabulate(config: TableConfig):
                 result = result.sort_values(config.sort_by, ascending=(config.sort_order == "asc"))
 
             # Subtotals for hierarchical rows
-            if config.subtotals and len(config.rows) > 1:
-                subtotal_frames = [result]
-                for level in range(len(config.rows) - 1):
-                    group_cols = config.rows[:level + 1]
-                    sub = df.groupby(group_cols, dropna=False).agg(agg_dict).reset_index()
-                    sub_labels = list(group_cols)
-                    for r in config.rows[level + 1:]:
-                        sub[r] = f"Subtotal"
-                    sub_value_labels = value_labels.copy()
-                    sub.columns = sub_labels + list(config.rows[level + 1:]) + sub_value_labels
-                    sub = sub[col_names]
-                    sub["__subtotal_level__"] = level + 1
-                    subtotal_frames.append(sub)
-                result["__subtotal_level__"] = 0  # detail rows
-                result = pd.concat(subtotal_frames, ignore_index=True)
-                # For 'top': subtotal rows (level > 0) before detail rows (level 0)
-                # For 'bottom' (default): detail rows first, then subtotals
-                if config.subtotals_position == "top":
-                    result["__sort_key__"] = result["__subtotal_level__"].apply(lambda x: 0 if x > 0 else 1)
+            if config.subtotals and len(config.rows) >= 1:
+                if len(config.rows) > 1:
+                    # Multi-level rows: subtotal at each hierarchy level
+                    subtotal_frames = [result]
+                    for level in range(len(config.rows) - 1):
+                        group_cols = config.rows[:level + 1]
+                        sub = df.groupby(group_cols, dropna=False).agg(agg_dict).reset_index()
+                        sub_labels = list(group_cols)
+                        for r in config.rows[level + 1:]:
+                            sub[r] = f"Subtotal"
+                        sub_value_labels = value_labels.copy()
+                        sub.columns = sub_labels + list(config.rows[level + 1:]) + sub_value_labels
+                        sub = sub[col_names]
+                        sub["__subtotal_level__"] = level + 1
+                        subtotal_frames.append(sub)
+                    result["__subtotal_level__"] = 0  # detail rows
+                    result = pd.concat(subtotal_frames, ignore_index=True)
+                    if config.subtotals_position == "top":
+                        result["__sort_key__"] = result["__subtotal_level__"].apply(lambda x: 0 if x > 0 else 1)
+                    else:
+                        result["__sort_key__"] = result["__subtotal_level__"].apply(lambda x: 1 if x > 0 else 0)
+                    result = result.sort_values(list(config.rows) + ["__sort_key__"]).reset_index(drop=True)
+                    result.drop(columns=["__subtotal_level__", "__sort_key__"], inplace=True)
                 else:
-                    result["__sort_key__"] = result["__subtotal_level__"].apply(lambda x: 1 if x > 0 else 0)
-                result = result.sort_values(list(config.rows) + ["__sort_key__"]).reset_index(drop=True)
-                result.drop(columns=["__subtotal_level__", "__sort_key__"], inplace=True)
+                    # Single row field: add subtotal per unique value of that row field
+                    row_field = config.rows[0]
+                    subtotal_frames = []
+                    for group_val, group_df in result.groupby(row_field, dropna=False):
+                        subtotal_frames.append(group_df)
+                        sub_row = {}
+                        sub_row[row_field] = f"{group_val} Subtotal"
+                        for col in value_labels:
+                            numeric_vals = pd.to_numeric(group_df[col], errors="coerce")
+                            sub_row[col] = numeric_vals.sum()
+                        subtotal_frames.append(pd.DataFrame([sub_row]))
+                    if subtotal_frames:
+                        result = pd.concat(subtotal_frames, ignore_index=True)
 
             # Grand total
             want_row_total = config.grand_total_rows if config.grand_total_rows is not None else config.grand_total
@@ -1369,10 +1398,29 @@ async def tabulate(config: TableConfig):
 
             column_groups = None
             if isinstance(pivot.columns, pd.MultiIndex):
+                # Insert column-group subtotals before flattening
+                if config.subtotals:
+                    from collections import OrderedDict
+                    top_level_values = list(OrderedDict.fromkeys(
+                        str(col[0]) for col in pivot.columns if str(col[0]) != "Grand Total"
+                    ))
+                    if len(top_level_values) > 1:
+                        new_cols_order = []
+                        for top_val in top_level_values:
+                            group_cols = [c for c in pivot.columns if str(c[0]) == top_val]
+                            new_cols_order.extend(group_cols)
+                            if len(group_cols) > 1:
+                                subtotal_col_name = (top_val, "Subtotal")
+                                pivot[subtotal_col_name] = pivot[group_cols].sum(axis=1)
+                                new_cols_order.append(subtotal_col_name)
+                        # Add Grand Total columns at the end if they exist
+                        gt_cols = [c for c in pivot.columns if str(c[0]) == "Grand Total"]
+                        new_cols_order.extend(gt_cols)
+                        pivot = pivot[new_cols_order]
+
                 # Build column groups for multi-level header merging
                 raw_levels = list(pivot.columns)
                 n_row_cols = len(config.rows)
-                # Extract top-level groups for display (after pivot.reset_index() adds row cols)
                 top_labels = [col[0] if len(col) > 0 else "" for col in raw_levels]
                 bot_labels = [col[1] if len(col) > 1 else str(col[0]) for col in raw_levels]
                 # Build groups: consecutive same top_labels get merged
@@ -1394,6 +1442,30 @@ async def tabulate(config: TableConfig):
 
             pivot = pivot.reset_index()
 
+            # Subtotals for pivot table with hierarchical rows
+            if config.subtotals and len(config.rows) > 1:
+                numeric_cols = pivot.select_dtypes(include=[np.number]).columns.tolist()
+                subtotal_frames = []
+                for level in range(len(config.rows) - 1):
+                    group_cols = config.rows[:level + 1]
+                    sub = pivot.groupby(group_cols, dropna=False)[numeric_cols].sum().reset_index()
+                    for r in config.rows[level + 1:]:
+                        sub[r] = "Subtotal"
+                    for c in pivot.columns:
+                        if c not in sub.columns:
+                            sub[c] = ""
+                    sub = sub[pivot.columns]
+                    sub["__subtotal_level__"] = level + 1
+                    subtotal_frames.append(sub)
+                pivot["__subtotal_level__"] = 0
+                pivot = pd.concat([pivot] + subtotal_frames, ignore_index=True)
+                if config.subtotals_position == "top":
+                    pivot["__sort_key__"] = pivot["__subtotal_level__"].apply(lambda x: 0 if x > 0 else 1)
+                else:
+                    pivot["__sort_key__"] = pivot["__subtotal_level__"].apply(lambda x: 1 if x > 0 else 0)
+                pivot = pivot.sort_values(list(config.rows) + ["__sort_key__"]).reset_index(drop=True)
+                pivot.drop(columns=["__subtotal_level__", "__sort_key__"], inplace=True)
+
             # Percentage of row/column total for pivot
             v0 = config.values[0]
             show_as = v0.get("show_as", "normal")
@@ -1405,9 +1477,8 @@ async def tabulate(config: TableConfig):
 
             def apply_pivot_show_as(pivot_df, sa, decimal_places):
                 numeric_cols = pivot_df.select_dtypes(include=[np.number]).columns
-                # Exclude the Grand Total margin column from percentage calculations
-                # to avoid double-counting in row/col/grand percentages
-                data_cols = [c for c in numeric_cols if str(c) != "Grand Total"]
+                # Exclude Grand Total and Subtotal columns from percentage calculations
+                data_cols = [c for c in numeric_cols if str(c) != "Grand Total" and "| Subtotal" not in str(c)]
                 has_margin_col = "Grand Total" in [str(c) for c in numeric_cols]
 
                 if sa == "pct_row":
@@ -2212,12 +2283,13 @@ class ProjectData(BaseModel):
 
 
 @app.post("/api/project/save")
-async def save_project(project: ProjectData):
+async def save_project(project: ProjectData, x_user_id: Optional[str] = Header(None), x_user_role: Optional[str] = Header(None)):
     project_id = str(uuid.uuid4())
     safe_name = "".join(c for c in project.name if c.isalnum() or c in " _-").strip()
     if not safe_name:
         safe_name = "project"
-    filepath = PROJECTS_DIR / f"{safe_name}.tableforge"
+    projects_dir = get_user_projects_dir(x_user_id)
+    filepath = projects_dir / f"{safe_name}.tableforge"
     timestamp = datetime.now().isoformat()
 
     # Keep version history — load existing file if present
@@ -2249,11 +2321,21 @@ async def save_project(project: ProjectData):
             p = CACHE_DIR / f"{dataset_id}.{ext}"
             if p.exists():
                 cache_path = str(p); break
+        # Copy source file to projects dir for persistence
+        project_file_path = cache_path
+        if cache_path:
+            src_p = Path(cache_path)
+            if src_p.exists():
+                dest_p = PROJECTS_DIR / f"{safe_name}_data{src_p.suffix}"
+                if not dest_p.exists() or dest_p.stat().st_size != src_p.stat().st_size:
+                    import shutil
+                    shutil.copy2(str(src_p), str(dest_p))
+                project_file_path = str(dest_p)
         source_file = {
             "filename": ds.get("filename", ""),
             "row_count": int(df_shape[0]),
             "col_count": int(df_shape[1]),
-            "cache_path": cache_path,
+            "cache_path": project_file_path,
             "dataset_id": dataset_id,
         }
     # Allow frontend-provided source_file (e.g. including the user-picked path) to override/merge
@@ -2291,21 +2373,39 @@ async def save_project(project: ProjectData):
 
 
 @app.get("/api/projects")
-async def list_projects():
+async def list_projects(x_user_id: Optional[str] = Header(None), x_user_role: Optional[str] = Header(None)):
     projects = []
-    for f in PROJECTS_DIR.glob("*.tableforge"):
-        try:
-            data = json.loads(f.read_text())
-            meta = data.get("meta", {})
-            projects.append({
-                "name": meta.get("name", f.stem),
-                "path": str(f),
-                "created": meta.get("created", ""),
-                "version_count": len(data.get("versions", [])),
-                "source_file": meta.get("source_file") or None,
-            })
-        except Exception:
-            pass
+
+    def scan_dir(d: Path):
+        for f in d.glob("*.tableforge"):
+            try:
+                data = json.loads(f.read_text())
+                meta = data.get("meta", {})
+                projects.append({
+                    "name": meta.get("name", f.stem),
+                    "path": str(f),
+                    "created": meta.get("created", ""),
+                    "version_count": len(data.get("versions", [])),
+                    "source_file": meta.get("source_file") or None,
+                    "owner_id": f.parent.name if f.parent != PROJECTS_DIR else None,
+                })
+            except Exception:
+                pass
+
+    if is_super_admin(x_user_role):
+        # Super admin sees all projects (shared + all user dirs)
+        scan_dir(PROJECTS_DIR)
+        for user_dir in PROJECTS_DIR.iterdir():
+            if user_dir.is_dir():
+                scan_dir(user_dir)
+    elif x_user_id:
+        # Regular user sees only their own projects
+        user_dir = get_user_projects_dir(x_user_id)
+        scan_dir(user_dir)
+    else:
+        # No auth: show shared projects (backward compat for local dev)
+        scan_dir(PROJECTS_DIR)
+
     return {"projects": sorted(projects, key=lambda p: p.get("created", ""), reverse=True), "projects_dir": str(PROJECTS_DIR)}
 
 
@@ -2372,10 +2472,15 @@ class ProjectLoadRequest(BaseModel):
 
 
 @app.get("/api/project/load")
-async def load_project(path: str, password: Optional[str] = None):
+async def load_project(path: str, password: Optional[str] = None, x_user_id: Optional[str] = Header(None), x_user_role: Optional[str] = Header(None)):
     p = Path(path)
     if not p.exists():
         raise HTTPException(404, "Project file not found")
+    # Access control: users can only load their own projects unless super admin
+    if x_user_id and not is_super_admin(x_user_role):
+        user_dir = get_user_projects_dir(x_user_id)
+        if not str(p.resolve()).startswith(str(user_dir.resolve())):
+            raise HTTPException(403, "Access denied: you can only access your own projects")
     raw = json.loads(p.read_text())
     if raw.get("encrypted"):
         if not password:
@@ -2389,6 +2494,72 @@ async def load_project(path: str, password: Optional[str] = None):
         except Exception:
             raise HTTPException(403, "Incorrect password")
     return raw
+
+
+@app.post("/api/project/reload-file")
+async def reload_project_file(body: dict):
+    """Re-import the cached source file associated with a project."""
+    cache_path = body.get("cache_path") or ""
+    dataset_id_hint = body.get("dataset_id") or ""
+    filename = body.get("filename") or "unknown"
+
+    # Try to find the cached file
+    p = Path(cache_path) if cache_path else None
+    if not p or not p.exists():
+        # Fallback: search cache dir by dataset_id
+        for ext in ("xlsx", "xls", "csv", "tsv"):
+            candidate = CACHE_DIR / f"{dataset_id_hint}.{ext}"
+            if candidate.exists():
+                p = candidate
+                break
+    if not p or not p.exists():
+        raise HTTPException(404, "Source file not found in cache. Please re-import the file manually.")
+
+    ext = p.suffix.lstrip(".").lower()
+    dataset_id = str(uuid.uuid4())
+
+    try:
+        if ext in ("xlsx", "xls"):
+            xls = pd.ExcelFile(p, engine="openpyxl" if ext == "xlsx" else "xlrd")
+            sheets = xls.sheet_names
+            df = pd.read_excel(xls, sheet_name=sheets[0])
+        elif ext in ("csv", "tsv"):
+            sep = "\t" if ext == "tsv" else ","
+            df = pd.read_csv(p, sep=sep)
+        else:
+            raise HTTPException(400, f"Unsupported file format: .{ext}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, f"Failed to read cached file: {str(e)}")
+
+    columns = []
+    for col in df.columns:
+        dtype = str(df[col].dtype)
+        if "int" in dtype or "float" in dtype:
+            col_type = "numeric"
+        elif "datetime" in dtype:
+            col_type = "date"
+        elif "bool" in dtype:
+            col_type = "boolean"
+        else:
+            col_type = "text"
+        sample = df[col].dropna().head(5).astype(str).tolist()
+        stats = {"nulls": int(df[col].isna().sum()), "unique": int(df[col].nunique())}
+        if col_type == "numeric":
+            stats.update({"min": df[col].min(), "max": df[col].max(), "mean": float(df[col].mean()) if not df[col].isna().all() else None})
+        columns.append({"name": col, "type": col_type, "sample_values": sample, "stats": stats})
+
+    datasets[dataset_id] = {"df": df, "filename": filename, "sheets": [sheets[0]] if ext in ("xlsx", "xls") else [], "columns": columns}
+
+    return {
+        "dataset_id": dataset_id,
+        "filename": filename,
+        "sheets": datasets[dataset_id].get("sheets", []),
+        "row_count": len(df),
+        "columns": columns,
+        "preview": df.head(20).fillna("").to_dict(orient="records"),
+    }
 
 
 class BatchProcessConfig(BaseModel):
@@ -3958,11 +4129,444 @@ async def proxy_list_fg_projects(body: FGBaseBody):
 
 
 # ═══════════════════════════════════════════════════
+# Module AI: AI-Smart Features
+# ═══════════════════════════════════════════════════
+
+import re as _re
+
+AI_CONFIG_FILE = BASE_DIR / "ai_config.json"
+
+
+def _load_ai_cfg() -> dict:
+    """Load AI config from file, env vars, or FieldGovern's database."""
+    if AI_CONFIG_FILE.exists():
+        try:
+            cfg = json.loads(AI_CONFIG_FILE.read_text())
+            if cfg.get("api_key"):
+                return cfg
+        except Exception:
+            pass
+    # Fallback to env vars
+    provider = os.environ.get("AI_PROVIDER", "")
+    api_key = os.environ.get("AI_API_KEY", "")
+    model = os.environ.get("AI_MODEL", "")
+    if provider and api_key:
+        return {"provider": provider, "api_key": api_key, "model": model}
+    # Fallback: try FieldGovern's database directly (when co-deployed)
+    db_url = os.environ.get("DATABASE_URL", "")
+    if db_url:
+        try:
+            from sqlalchemy import create_engine, text
+            engine = create_engine(db_url)
+            with engine.connect() as conn:
+                row = conn.execute(text("SELECT value FROM system_settings WHERE key = 'ai_config'")).fetchone()
+                if row:
+                    cfg = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                    if "keys" in cfg:
+                        active = cfg.get("active_provider", "")
+                        key_cfg = cfg.get("keys", {}).get(active, {})
+                        return {"provider": active, "api_key": key_cfg.get("api_key", ""), "model": key_cfg.get("model", "")}
+                    return cfg
+        except Exception:
+            pass
+    return {}
+
+
+async def _call_llm(cfg: dict, prompt: str) -> str:
+    """Call configured LLM provider."""
+    provider = cfg.get("provider")
+    key = cfg.get("api_key")
+    model = cfg.get("model")
+    if not provider or not key:
+        raise HTTPException(400, "AI not configured. Set AI_PROVIDER and AI_API_KEY env vars or configure via /api/ai/config.")
+
+    LLM_TIMEOUT = 300
+
+    if provider == "openai":
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(api_key=key, timeout=LLM_TIMEOUT)
+        r = await client.chat.completions.create(
+            model=model or "gpt-4o", messages=[{"role": "user", "content": prompt}], max_tokens=4096,
+        )
+        return r.choices[0].message.content or ""
+
+    elif provider == "anthropic":
+        from anthropic import AsyncAnthropic
+        client = AsyncAnthropic(api_key=key, timeout=LLM_TIMEOUT)
+        r = await client.messages.create(
+            model=model or "claude-sonnet-4-6", max_tokens=4096,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return r.content[0].text
+
+    elif provider == "gemini":
+        import asyncio
+        import google.generativeai as genai
+        genai.configure(api_key=key)
+        m = genai.GenerativeModel(model or "gemini-2.0-flash")
+        r = await asyncio.wait_for(m.generate_content_async(prompt), timeout=LLM_TIMEOUT)
+        return r.text
+
+    elif provider == "deepseek":
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(api_key=key, base_url="https://api.deepseek.com", timeout=LLM_TIMEOUT)
+        r = await client.chat.completions.create(
+            model=model or "deepseek-v4-flash", messages=[{"role": "user", "content": prompt}], max_tokens=8192,
+        )
+        return r.choices[0].message.content or ""
+
+    raise HTTPException(400, f"Unsupported AI provider: {provider}")
+
+
+@app.get("/api/ai/config")
+async def get_ai_config():
+    cfg = _load_ai_cfg()
+    return {"provider": cfg.get("provider", ""), "model": cfg.get("model", ""), "configured": bool(cfg.get("api_key"))}
+
+
+@app.post("/api/ai/config")
+async def set_ai_config(body: dict):
+    provider = body.get("provider", "")
+    api_key = body.get("api_key", "")
+    model = body.get("model", "")
+    data = {"provider": provider, "api_key": api_key, "model": model}
+    AI_CONFIG_FILE.write_text(json.dumps(data))
+    return {"status": "ok", "provider": provider, "model": model}
+
+
+class AIPolishRequest(BaseModel):
+    dataset_id: str
+    table_title: str = ""
+    rows: list = []
+    columns: list = []
+    values: list = []
+    headers: list = []
+    sample_rows: list = []
+
+
+@app.post("/api/ai/polish")
+async def ai_polish_table(body: AIPolishRequest):
+    """AI-powered title, subtitle, and column label generation."""
+    cfg = _load_ai_cfg()
+    groupby = body.rows[0] if body.rows else ""
+    value_field = body.values[0].get("field", "*") if body.values else "*"
+    aggregation = body.values[0].get("agg", "count") if body.values else "count"
+    is_cross_tab = len(body.columns) > 0
+    sub_keys = body.columns
+
+    rows_preview = []
+    for r in body.sample_rows[:20]:
+        if isinstance(r, list):
+            rows_preview.append(" | ".join(str(v) for v in r))
+        elif isinstance(r, dict):
+            rows_preview.append(" | ".join(f"{k}={v}" for k, v in list(r.items())[:8]))
+
+    all_col_keys = list(dict.fromkeys([groupby] + ([value_field] if value_field != "*" else []) + sub_keys + body.headers))
+    col_keys_json = json.dumps({k: f"clean label for {k}" for k in all_col_keys[:15]})
+
+    prompt = (
+        f"You are a research data analyst. A data tabulation has raw machine-generated names. Clean them up.\n\n"
+        f"Raw table info:\n"
+        f"- Title: {body.table_title or 'Untitled'}\n"
+        f"- Row variable (groupby): {groupby}\n"
+        f"- Value/column variable: {value_field}\n"
+        f"- Aggregation: {aggregation}\n"
+        f"- Is cross-tabulation: {is_cross_tab}\n"
+        f"- Column headers: {body.headers[:15]}\n"
+        f"- Sample data ({len(rows_preview)} rows):\n" +
+        "\n".join(rows_preview) + "\n\n"
+        f"Return ONLY valid JSON (no markdown, no explanation):\n"
+        f'{{\n'
+        f'  "title": "Human-readable table title",\n'
+        f'  "subtitle": "One sentence: what insight this table provides",\n'
+        f'  "column_labels": {col_keys_json}\n'
+        f'}}\n\n'
+        f"Rules:\n"
+        f"- Title: concise and specific, not generic\n"
+        f"- subtitle: describes the insight or finding angle\n"
+        f"- column_labels: map raw field names to clean human-readable labels\n"
+        f"- For '*' use 'Count' or 'Number of Records'\n"
+        f"- For mean aggregation label as 'Average [field meaning]'"
+    )
+    raw = await _call_llm(cfg, prompt)
+    match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+    if match:
+        try:
+            result = json.loads(match.group())
+            if isinstance(result.get("column_labels"), dict):
+                result["column_labels"] = {str(k): str(v) for k, v in result["column_labels"].items()}
+            return result
+        except Exception:
+            pass
+    return {"title": body.table_title, "subtitle": "", "column_labels": {}}
+
+
+class AIInterpretRequest(BaseModel):
+    dataset_id: str
+    table_title: str = ""
+    subtitle: str = ""
+    headers: list = []
+    rows_data: list = []
+    row_fields: list = []
+    column_fields: list = []
+    value_fields: list = []
+    focus: str = ""
+    previous_interpretation: str = ""
+
+
+@app.post("/api/ai/interpret")
+async def ai_interpret_table(body: AIInterpretRequest):
+    """AI-powered table interpretation — generates narrative analysis."""
+    cfg = _load_ai_cfg()
+
+    # Build table text representation
+    header_line = " | ".join(body.headers[:20])
+    rows_str = "\n".join(
+        " | ".join(str(v) for v in row[:20])
+        for row in body.rows_data[:60]
+    )
+    if len(body.rows_data) > 60:
+        rows_str += f"\n... ({len(body.rows_data) - 60} more rows not shown)"
+
+    default_focus = (
+        "Provide a comprehensive interpretation: identify the standout finding, "
+        "notable patterns or disparities, the highest and lowest values and what they suggest, "
+        "any cross-variable interactions, and practical implications."
+    )
+
+    refinement_block = ""
+    if body.previous_interpretation.strip():
+        refinement_block = (
+            f"\n--- PREVIOUS INTERPRETATION ---\n"
+            f"{body.previous_interpretation.strip()}\n"
+            f"--- END ---\n\n"
+            f"Produce a REFINED interpretation that:\n"
+            f"- Preserves accurate findings from previous version\n"
+            f"- Corrects errors or vague statements\n"
+            f"- Adds missed insights\n"
+            f"- Sharpens language and flow\n"
+            f"Output ONLY the final refined interpretation.\n"
+        )
+
+    prompt = (
+        f"You are a senior data analyst writing an interpretation for a data table.\n\n"
+        f"Table: {body.table_title}\n"
+        f"{body.subtitle}\n"
+        f"Row dimensions: {body.row_fields}\n"
+        f"Column dimensions: {body.column_fields}\n"
+        f"Value fields: {[v.get('field','') + ' (' + v.get('agg','sum') + ')' for v in body.value_fields]}\n\n"
+        f"Data ({len(body.rows_data)} rows):\n"
+        f"{header_line}\n"
+        f"{'-' * max(len(header_line), 40)}\n"
+        f"{rows_str}\n"
+        f"{refinement_block}\n"
+        f"Analyst focus: {body.focus.strip() if body.focus.strip() else default_focus}\n\n"
+        f"Write a data-driven interpretation in flowing prose:\n"
+        f"- Be specific — cite actual numbers from the table\n"
+        f"- State the most important finding first\n"
+        f"- Note outliers, unexpected gaps, or strong patterns\n"
+        f"- For cross-tabs: explain interaction between variables\n"
+        f"- Quantify comparisons (e.g. '3.2x higher', 'gap of 47 points')\n"
+        f"- End with practical implication or recommendation\n"
+        f"- Describe what the data MEANS, not what the table contains\n"
+        f"- Be as detailed as the data warrants"
+    )
+    interpretation = await _call_llm(cfg, prompt)
+    return {"interpretation": interpretation}
+
+
+class AISuggestRequest(BaseModel):
+    dataset_id: str
+    prompt: str = ""
+
+
+@app.post("/api/ai/suggest")
+async def ai_suggest_tables(body: AISuggestRequest):
+    """AI suggests optimal table configurations from the dataset."""
+    cfg = _load_ai_cfg()
+    if body.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    ds = datasets[body.dataset_id]
+    df = ds["df"]
+
+    cols_info = []
+    for col in df.columns[:60]:
+        dtype = str(df[col].dtype)
+        uniq = int(df[col].nunique())
+        sample = df[col].dropna().head(5).astype(str).tolist()
+        cols_info.append({"id": col, "type": "numeric" if "int" in dtype or "float" in dtype else "text", "unique": uniq, "sample": sample})
+
+    sample_rows = df.head(8).fillna("").to_dict(orient="records")
+
+    prompt = (
+        f"You are a research data analyst designing tabulations.\n\n"
+        f"Available columns (use ONLY these ids):\n{json.dumps(cols_info, indent=1)}\n\n"
+        f"Sample data rows:\n{json.dumps(sample_rows[:6])}\n\n"
+        f"User request: {body.prompt or 'Suggest the most insightful tabulations for this dataset.'}\n\n"
+        f"For each table decide:\n"
+        f"  - groupby_field: column id to group rows by (required)\n"
+        f"  - value_field: column id to aggregate, or '*' for row count\n"
+        f"  - aggregation: 'count', 'sum', or 'mean'\n"
+        f"  - secondary_groupby: second column for cross-tab, or ''\n"
+        f"  - title: clean human-readable title\n"
+        f"  - description: one sentence explaining insight\n\n"
+        f"Suggest 2-5 tables. Respond with ONLY valid JSON:\n"
+        f'{{"rationale": "...", "tables": [{{"title":"...","groupby_field":"...","value_field":"*","aggregation":"count","secondary_groupby":"","description":"..."}}]}}'
+    )
+    raw = await _call_llm(cfg, prompt)
+    match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group())
+        except Exception:
+            pass
+    return {"rationale": "Could not parse AI response", "tables": []}
+
+
+class AISmartBuildRequest(BaseModel):
+    dataset_id: str
+    selected_columns: list = []
+    query: str = ""
+
+
+@app.post("/api/ai/smart-build")
+async def ai_smart_build(body: AISmartBuildRequest):
+    """AI designs one optimized table from selected columns or NL query."""
+    cfg = _load_ai_cfg()
+    if body.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    ds = datasets[body.dataset_id]
+    df = ds["df"]
+
+    if body.selected_columns:
+        cols = [c for c in body.selected_columns if c in df.columns]
+    else:
+        cols = list(df.columns[:30])
+
+    cols_block = []
+    for col in cols:
+        dtype = str(df[col].dtype)
+        uniq_vals = df[col].dropna().unique()[:12].tolist()
+        cols_block.append(f"  - id={col} | type={'numeric' if 'int' in dtype or 'float' in dtype else 'text'} | unique values ({df[col].nunique()}): {uniq_vals}")
+
+    sample_rows = df[cols].head(6).fillna("").to_dict(orient="records")
+
+    task = f'User question: "{body.query.strip()}"\nDesign the best table to answer this.' if body.query.strip() else "Design the most insightful cross-tabulation or aggregation from these columns."
+
+    prompt = (
+        f"You are a research data analyst. Design ONE tabulation table.\n\n"
+        f"Available columns:\n" + "\n".join(cols_block) + f"\n\n"
+        f"Sample data:\n{json.dumps(sample_rows, ensure_ascii=False)}\n\n"
+        f"{task}\n\n"
+        f"Decide:\n"
+        f"- groupby_field: column id for row grouping\n"
+        f"- secondary_groupby: column id for cross-tab ('' if simple)\n"
+        f"- value_field: column id to aggregate, or '*' for count\n"
+        f"- aggregation: 'count', 'sum', or 'mean'\n"
+        f"- title: clean human-readable title\n"
+        f"- description: one sentence insight\n"
+        f"- column_labels: mapping raw ids to clean names\n\n"
+        f"Only use column ids from list. Respond ONLY valid JSON:\n"
+        f'{{"groupby_field":"","secondary_groupby":"","value_field":"*","aggregation":"count","title":"","description":"","column_labels":{{}}}}'
+    )
+    raw = await _call_llm(cfg, prompt)
+    match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+    if match:
+        try:
+            result = json.loads(match.group())
+            if isinstance(result.get("column_labels"), dict):
+                result["column_labels"] = {str(k): str(v) for k, v in result["column_labels"].items()}
+            return result
+        except Exception:
+            pass
+    return {}
+
+
+REPORT_STYLE_PROMPTS = {
+    "progress": "You are writing a field program progress report for NGO/government management. Use clear sections: Executive Summary, Progress Against Targets, Data Quality, Issues & Resolutions, Next Steps. Professional but accessible tone.",
+    "field_survey": "You are writing a field survey report for a research team. Sections: Background, Methodology, Sample Description, Key Findings, Data Quality Assessment, Limitations, Recommendations. Technical but readable.",
+    "research": "You are writing an academic research paper. Sections: Abstract, Introduction, Methods, Results, Discussion, Conclusion. Use formal academic language.",
+    "government": "You are writing an official government administrative report. Sections: Executive Summary, Objectives, Methodology, Findings, Recommendations, Action Points. Formal bureaucratic style.",
+    "ngo": "You are writing an NGO/donor impact report. Sections: Program Overview, Impact Summary, Key Indicators, Challenges, Lessons Learned. Warm but evidence-based tone.",
+    "executive": "You are writing a concise executive summary for leadership. Maximum 2 pages. Focus on key numbers, decisions needed, and actionable next steps.",
+}
+
+
+class AIReportRequest(BaseModel):
+    dataset_id: str
+    tables_data: list = []
+    style: str = "field_survey"
+    custom_context: str = ""
+    filename: str = ""
+
+
+@app.post("/api/ai/report")
+async def ai_generate_report(body: AIReportRequest):
+    """Generate a full report from table data."""
+    cfg = _load_ai_cfg()
+    style_prompt = REPORT_STYLE_PROMPTS.get(body.style, REPORT_STYLE_PROMPTS["field_survey"])
+
+    tables_text = ""
+    for i, t in enumerate(body.tables_data[:10]):
+        title = t.get("title", f"Table {i+1}")
+        headers = t.get("headers", [])
+        rows = t.get("rows", [])
+        tables_text += f"\n### {title}\n"
+        tables_text += " | ".join(str(h) for h in headers) + "\n"
+        tables_text += " | ".join("---" for _ in headers) + "\n"
+        for row in rows[:30]:
+            tables_text += " | ".join(str(v) for v in row) + "\n"
+        if len(rows) > 30:
+            tables_text += f"... ({len(rows) - 30} more rows)\n"
+
+    row_count = 0
+    if body.dataset_id in datasets:
+        row_count = len(datasets[body.dataset_id]["df"])
+
+    prompt = (
+        f"{style_prompt}\n\n"
+        f"Dataset: {body.filename or 'Data Analysis'}\n"
+        f"Total records: {row_count}\n"
+        f"Number of tables analyzed: {len(body.tables_data)}\n\n"
+        f"Tabulation data:\n{tables_text[:10000] if tables_text else 'No tabulation data — use placeholders.'}\n\n"
+        f"Additional context: {body.custom_context or 'None.'}\n\n"
+        f"Generate a complete, professional report in markdown. Use ## for sections, **bold** for key findings. "
+        f"Be specific and data-driven. Mark sections needing human input with [REVIEW NEEDED]."
+    )
+    report = await _call_llm(cfg, prompt)
+    return {"report": report}
+
+
+# AI proxy to FieldGovern (when embedded)
+@app.post("/api/ai/fg-proxy")
+async def ai_fg_proxy(body: dict):
+    """Proxy AI requests to FieldGovern backend when embedded."""
+    import httpx
+    fg_url = body.get("fg_url", "").rstrip("/")
+    token = body.get("token", "")
+    endpoint = body.get("endpoint", "")
+    payload = body.get("payload", {})
+    if not fg_url or not token or not endpoint:
+        raise HTTPException(400, "Missing fg_url, token, or endpoint")
+    internal_base = os.environ.get("FG_INTERNAL_URL", "").rstrip("/")
+    base = internal_base if internal_base else fg_url
+    url = f"{base}{endpoint}"
+    try:
+        async with httpx.AsyncClient(timeout=120.0, verify=bool(not internal_base)) as client:
+            resp = await client.post(url, json=payload, headers={"Authorization": f"Bearer {token}"})
+        if resp.status_code != 200:
+            raise HTTPException(resp.status_code, f"FG returned {resp.status_code}: {resp.text[:200]}")
+        return resp.json()
+    except httpx.RequestError as e:
+        raise HTTPException(502, f"Could not reach FieldGovern: {e}")
+
+
+# ═══════════════════════════════════════════════════
 # Serve Frontend (production)
 # ═══════════════════════════════════════════════════
 
 STATIC_DIR = BASE_DIR / "static"
-if STATIC_DIR.exists():
+if STATIC_DIR.exists() and (STATIC_DIR / "assets").exists():
     app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")
 
     @app.get("/{full_path:path}")

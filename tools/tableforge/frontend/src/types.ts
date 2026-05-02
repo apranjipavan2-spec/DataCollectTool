@@ -175,6 +175,10 @@ export interface TableConfig {
     [key: string]: any;
   };
   _lastValueConfig?: Partial<ValueField>;
+  // Cell alignment
+  cell_align?: 'left' | 'center' | 'right';         // Values area alignment
+  header_align?: 'left' | 'center' | 'right';       // Header row alignment
+  row_label_align?: 'left' | 'center' | 'right';    // Row labels alignment
 }
 
 export interface ColumnGroup {

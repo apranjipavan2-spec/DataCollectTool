@@ -12,7 +12,7 @@ interface Props {
   fgHomeUrl?: string;
 }
 
-const ribbonTabs = ['Home', 'Insert', 'Data', 'Statistics', 'Format', 'View'];
+const ribbonTabs = ['Home', 'Insert', 'Data', 'Statistics', 'Format', 'View', 'AI-Smart'];
 
 interface MenuItem {
   label: string;

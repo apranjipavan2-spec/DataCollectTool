@@ -16,6 +16,7 @@ import { ExportDialog } from './components/ExportDialog';
 import { DataQualityPanel } from './components/DataQualityPanel';
 import { ComparisonPanel } from './components/ComparisonPanel';
 import { ReportBuilder } from './components/ReportBuilder';
+import { AISmartPanel } from './components/AISmartPanel';
 import { AuditTrail } from './components/AuditTrail';
 import { ProjectManager } from './components/ProjectManager';
 import { SummaryDashboard } from './components/SummaryDashboard';
@@ -50,7 +51,7 @@ function generateAutoTitle(t: TableConfig): { title: string; subtitle: string; n
   return { title, subtitle, name: nameShort };
 }
 
-type ModalType = null | 'metrics' | 'bins' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency';
+type ModalType = null | 'metrics' | 'bins' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-report' | 'ai-config';
 
 interface ReconcileState {
   pendingTables: TableConfig[];
@@ -80,6 +81,7 @@ export default function App() {
   type AnnotationType = { rowIdx: number; colIdx: number; text: string; color: string };
   const [annotationsMap, setAnnotationsMap] = useState<Record<string, AnnotationType[]>>({});
   const [reportTemplate, setReportTemplate] = useState<{ elements: any[]; docStyle: any } | null>(null);
+  const [tableInterpretations, setTableInterpretations] = useState<Record<string, string>>({});
   const [auditLog, setAuditLog] = useState<{ timestamp: string; action: string; details: string }[]>([]);
   const [metricNames, setMetricNames] = useState<string[]>([]);
   const [binNames, setBinNames] = useState<string[]>([]);
@@ -789,7 +791,8 @@ export default function App() {
               setPendingProjectData(proj.data);
               setError(null);
             }
-          }} />
+          }}
+          onLoadLocalProject={(path) => handleLoadProjectByPath(path)} />
         {pendingProjectData && (
           <div style={{ position: 'fixed', top: 120, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.4)', borderRadius: 8, padding: '12px 20px', maxWidth: 500, textAlign: 'center', fontSize: 13, color: 'var(--text)' }}>
             <strong>Project "{pendingProjectData.meta?.name || 'Untitled'}" loaded</strong> ({pendingProjectData.tables?.length || 0} table(s))
@@ -1094,6 +1097,14 @@ export default function App() {
               updateTable({ header_renames: renames });
             }}
           />}
+          {tableInterpretations[activeTable?.id] && (
+            <div style={{ margin: '8px 12px', padding: '12px 16px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 8, fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', position: 'relative' }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>AI Interpretation</div>
+              {tableInterpretations[activeTable.id]}
+              <button onClick={() => setTableInterpretations(prev => { const n = { ...prev }; delete n[activeTable.id]; return n; })}
+                style={{ position: 'absolute', top: 8, right: 8, background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 14 }} title="Remove">×</button>
+            </div>
+          )}
         </div>
       </div>
       <StatusBar dataset={dataset} result={currentResult} undoCount={undoStack.length} redoCount={redoStack.length} />
@@ -1184,6 +1195,62 @@ export default function App() {
         />
       )}
       {modal === 'audit' && <AuditTrail datasetId={dataset.dataset_id} onClose={() => setModal(null)} />}
+      {(modal === 'ai-polish' || modal === 'ai-interpret' || modal === 'ai-refine' || modal === 'ai-suggest' || modal === 'ai-smart-build' || modal === 'ai-report' || modal === 'ai-config') && (
+        <AISmartPanel
+          mode={modal.replace('ai-', '') as any}
+          table={tables[activeTableIdx] || null}
+          dataset={dataset}
+          result={results.get(tables[activeTableIdx]?.id) || null}
+          interpretation={tableInterpretations[tables[activeTableIdx]?.id] || ''}
+          onClose={() => setModal(null)}
+          onApplyPolish={(title, subtitle, renames) => {
+            const t = tables[activeTableIdx];
+            if (t) {
+              const updated = { ...t, title, subtitle, header_renames: { ...(t.header_renames || {}), ...renames }, _autoTitle: false };
+              setTables(prev => prev.map(x => x.id === t.id ? updated : x));
+            }
+          }}
+          onApplyInterpretation={(text) => {
+            const t = tables[activeTableIdx];
+            if (t) setTableInterpretations(prev => ({ ...prev, [t.id]: text }));
+          }}
+          onApplySuggestion={(suggested) => {
+            const newTables = suggested.map((s: any, i: number) => ({
+              id: `ai_${Date.now()}_${i}`,
+              name: s.title || `AI Table ${i + 1}`,
+              rows: [s.groupby_field].filter(Boolean),
+              columns: s.secondary_groupby ? [s.secondary_groupby] : [],
+              values: [{ field: s.value_field || '*', agg: s.aggregation || 'count', label: '' }],
+              filters: {},
+              grand_total: true,
+              subtotals: false,
+              missing_data: '',
+              title: s.title || '',
+              subtitle: s.description || '',
+            }));
+            setTables(prev => [...prev, ...newTables]);
+            setActiveTableIdx(tables.length);
+          }}
+          onApplySmartBuild={(config) => {
+            const newTable = {
+              id: `ai_${Date.now()}`,
+              name: config.title || 'AI Table',
+              rows: [config.groupby_field].filter(Boolean),
+              columns: config.secondary_groupby ? [config.secondary_groupby] : [],
+              values: [{ field: config.value_field || '*', agg: config.aggregation || 'count', label: '' }],
+              filters: {},
+              grand_total: true,
+              subtotals: false,
+              missing_data: '',
+              title: config.title || '',
+              subtitle: config.description || '',
+              header_renames: config.column_labels || {},
+            };
+            setTables(prev => [...prev, newTable]);
+            setActiveTableIdx(tables.length);
+          }}
+        />
+      )}
       {modal === 'projects' && <ProjectManager currentTables={tables}
         currentAnnotationsMap={annotationsMap} currentComparisonState={comparisonState} currentProjectFilters={projectFilters} currentFilename={dataset?.filename}
         currentDatasetId={dataset?.dataset_id} currentRowCount={dataset?.row_count} currentColCount={dataset?.columns?.length}
@@ -1200,6 +1267,35 @@ export default function App() {
             );
           }
           if (!dataset) {
+            // Try to reload the source file from cache if available
+            if (loadedExtra?.source_file?.cache_path || loadedExtra?.source_file?.dataset_id) {
+              fetch(`${API_BASE}/project/reload-file`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(loadedExtra.source_file),
+              }).then(r => r.ok ? r.json() : null).then(meta => {
+                if (meta) {
+                  setDataset(meta);
+                  pushUndo();
+                  setTables(loadedTables);
+                  setActiveTableIdx(0);
+                  setResults(new Map());
+                } else {
+                  pushUndo();
+                  setTables(loadedTables);
+                  setActiveTableIdx(0);
+                  setResults(new Map());
+                }
+                setModal(null);
+              }).catch(() => {
+                pushUndo();
+                setTables(loadedTables);
+                setActiveTableIdx(0);
+                setResults(new Map());
+                setModal(null);
+              });
+              return;
+            }
             pushUndo();
             setTables(loadedTables);
             setActiveTableIdx(0);

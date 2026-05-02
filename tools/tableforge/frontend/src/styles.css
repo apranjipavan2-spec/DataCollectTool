@@ -2334,3 +2334,25 @@ textarea.fdrop-input { resize: vertical; }
 .fp-cf-type { font-weight: 600; font-size: 11px; }
 .fp-cf-field { flex: 1; text-align: right; color: var(--text-dim); font-size: 10px; }
 .fp-cf-body { padding: 8px 10px; background: var(--bg-card); border-top: 1px solid var(--border); }
+
+/* AI-Smart Panel */
+.ai-panel-body { padding: 8px 0; }
+.ai-desc { font-size: 13px; color: var(--text-dim); margin-bottom: 14px; }
+.ai-result { margin-top: 14px; padding: 12px; background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.2); border-radius: 8px; }
+.ai-result-field { margin-bottom: 10px; font-size: 13px; }
+.ai-result-field label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 3px; }
+.ai-labels-grid { display: grid; gap: 4px; margin-top: 6px; }
+.ai-label-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 8px; background: rgba(0,0,0,0.15); border-radius: 4px; }
+.ai-label-key { color: var(--text-dim); font-family: monospace; font-size: 11px; }
+.ai-label-val { color: var(--primary); font-weight: 500; }
+.ai-focus-select { margin-bottom: 8px; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.ai-focus-custom { margin-bottom: 12px; }
+.ai-interpretation-text { white-space: pre-wrap; font-size: 13px; line-height: 1.6; max-height: 300px; overflow: auto; }
+.ai-rationale { font-size: 12px; color: var(--text-dim); margin-bottom: 12px; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px; }
+.ai-suggestions { display: grid; gap: 8px; }
+.ai-suggestion-card { padding: 10px 12px; background: rgba(0,0,0,0.15); border: 1px solid var(--border); border-radius: 6px; font-size: 12px; }
+.ai-suggestion-card strong { font-size: 13px; display: block; margin-bottom: 4px; }
+.ai-suggestion-card p { color: var(--text-dim); margin: 2px 0 6px; }
+.ai-suggestion-meta { font-size: 11px; color: var(--text-dim); font-family: monospace; }
+.ai-config-form { display: grid; gap: 10px; }
+.ai-col-picker { border: 1px solid var(--border); border-radius: 6px; padding: 8px; }

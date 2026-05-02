@@ -1,6 +1,16 @@
 // import.meta.env.BASE_URL is '/' in dev, '/analyzer/' in production build
 export const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api';
 
+export function getUserHeaders(): Record<string, string> {
+  const params = new URLSearchParams(window.location.search);
+  const headers: Record<string, string> = {};
+  const userId = params.get('user_id') || localStorage.getItem('tf_user_id') || '';
+  const userRole = params.get('user_role') || localStorage.getItem('tf_user_role') || '';
+  if (userId) { headers['X-User-Id'] = userId; localStorage.setItem('tf_user_id', userId); }
+  if (userRole) { headers['X-User-Role'] = userRole; localStorage.setItem('tf_user_role', userRole); }
+  return headers;
+}
+
 async function parseError(res: Response): Promise<string> {
   const text = await res.text();
   try {
@@ -159,7 +169,7 @@ export async function logAuditEvent(datasetId: string, action: string, details: 
 export async function saveProject(name: string, config: any) {
   const res = await fetch(`${API_BASE}/project/save`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getUserHeaders() },
     body: JSON.stringify({ name, config }),
   });
   if (!res.ok) throw new Error(await parseError(res));
@@ -167,7 +177,7 @@ export async function saveProject(name: string, config: any) {
 }
 
 export async function listProjects() {
-  const res = await fetch(`${API_BASE}/projects`);
+  const res = await fetch(`${API_BASE}/projects`, { headers: getUserHeaders() });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 }
@@ -175,7 +185,7 @@ export async function listProjects() {
 export async function rollbackProject(path: string, versionIndex: number) {
   const res = await fetch(`${API_BASE}/project/rollback`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getUserHeaders() },
     body: JSON.stringify({ path, version_index: versionIndex }),
   });
   if (!res.ok) throw new Error(await parseError(res));

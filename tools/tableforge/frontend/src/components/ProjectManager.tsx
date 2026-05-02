@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TableConfig } from '../types';
-import { rollbackProject, fgSaveProject, fgListUserProjects, API_BASE } from '../api';
+import { rollbackProject, fgSaveProject, fgListUserProjects, API_BASE, getUserHeaders } from '../api';
 
 interface ProjectEntry {
   name: string;
@@ -65,7 +65,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
   const [loadingFg, setLoadingFg] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_BASE}/projects`)
+    fetch(`${API_BASE}/projects`, { headers: getUserHeaders() })
       .then(r => r.json())
       .then(d => { setProjects(d.projects || []); setProjectsDir(d.projects_dir || ''); })
       .catch(() => setProjects([]))
@@ -119,7 +119,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
       } else {
         const res = await fetch(`${API_BASE}/project/save`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getUserHeaders() },
           body: JSON.stringify({ name: saveName.trim(), config: { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, dataset_id: currentDatasetId, source_file: sourceFileInfo }, password: projectPassword || undefined }),
         });
         if (!res.ok) throw new Error(await res.text());
@@ -135,7 +135,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
           } catch { /* non-fatal */ }
         }
         setSuccess(`Project "${saveName}" saved!\nLocation: ${savedPath}`);
-        const listRes = await fetch(`${API_BASE}/projects`);
+        const listRes = await fetch(`${API_BASE}/projects`, { headers: getUserHeaders() });
         const listData = await listRes.json();
         setProjects(listData.projects || []);
       }
@@ -151,7 +151,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
 
   const handleLoad = async (path: string) => {
     try {
-      const res = await fetch(`${API_BASE}/project/load?path=` + encodeURIComponent(path));
+      const res = await fetch(`${API_BASE}/project/load?path=` + encodeURIComponent(path), { headers: getUserHeaders() });
       if (!res.ok) throw new Error('Failed to load project');
       const data = await res.json();
       if (data.tables && Array.isArray(data.tables)) {
@@ -159,6 +159,8 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
         if (data.reportTemplate) extra.reportTemplate = data.reportTemplate;
         if (data.comparisonState) extra.comparisonState = data.comparisonState;
         if (data.projectFilters) extra.projectFilters = data.projectFilters;
+        const sourceFile = data.meta?.source_file || data.source_file;
+        if (sourceFile) extra.source_file = sourceFile;
         onLoad(data.tables, data.annotationsMap, extra);
       }
     } catch (e: any) {

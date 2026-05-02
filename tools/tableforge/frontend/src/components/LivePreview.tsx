@@ -85,6 +85,9 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
   const titleItalic = tableConfig?.title_italic ?? false;
   const titleSize = tableConfig?.title_size || 18;
   const titleAlign = tableConfig?.title_align || 'left';
+  const cellAlign = tableConfig?.cell_align || 'right';
+  const headerAlign = tableConfig?.header_align || 'center';
+  const rowLabelAlign = tableConfig?.row_label_align || 'left';
 
   const handleCellClick = async (ri: number, ci: number) => {
     if (!datasetId || !tableConfig || !result) return;
@@ -407,6 +410,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                 const displayH = result.column_groups?.has_multi_level
                   ? (result.column_groups.bottom[i - (tableConfig?.rows?.length || 0)] || displayHeaders[i])
                   : displayHeaders[i];
+                const isSubtotalCol = displayH === 'Subtotal';
                 return (
                   <th key={i} onClick={() => handleHeaderClick(i)}
                     onDoubleClick={(e) => {
@@ -416,7 +420,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                         setEditHeaderVal(displayH);
                       }
                     }}
-                    style={{ cursor: 'pointer', borderColor: tv.borderColor, ...getHeaderStyle(h, tv) }}>
+                    style={{ cursor: 'pointer', borderColor: tv.borderColor, textAlign: headerAlign as any, ...(isSubtotalCol ? { fontWeight: 'bold', background: '#e8e8e8' } : {}), ...getHeaderStyle(h, tv) }}>
                     {editingHeader === i ? (
                       <input
                         autoFocus
@@ -488,13 +492,17 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                     const isHovered = hoveredCell?.ri === ri && hoveredCell?.ci === ci;
                     const colW = columnWidths[result.headers[ci]] || columnWidths[displayHeaders[ci]];
                     const isKbFocused = kbCell?.r === ri && kbCell?.c === ci;
+                    const bottomLabel = result.column_groups?.has_multi_level ? result.column_groups.bottom[ci - (tableConfig?.rows?.length || 0)] : '';
+                    const isSubtotalCol = bottomLabel === 'Subtotal';
                     return (
                       <td key={ci}
                         className={`${typeof cell === 'number' ? 'num-cell' : ''} ${datasetId ? 'clickable-cell' : ''} ${ann ? 'annotated-cell' : ''} ${isError ? 'cell-error' : ''} ${isKbFocused ? 'kb-focused' : ''}`}
                         style={{
                           borderColor: tv.borderColor, position: 'relative',
+                          textAlign: (ci < numRowFields ? rowLabelAlign : cellAlign) as any,
                           ...(ci < numRowFields && rowLabelBg && !isGrandTotal ? { backgroundColor: rowLabelBg } : {}),
                           ...(ci >= numRowFields && tableBgColor && !isGrandTotal ? { backgroundColor: tableBgColor } : {}),
+                          ...(isSubtotalCol && !isGrandTotal ? { fontWeight: 'bold', backgroundColor: '#f0f0f0' } : {}),
                           ...cfStyle, ...annStyle, ...(colW ? { minWidth: colW } : {}),
                         }}
                         onClick={() => { setKbCell({ r: ri, c: ci }); handleCellClick(ri, ci); }}

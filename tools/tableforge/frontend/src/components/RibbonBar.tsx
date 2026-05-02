@@ -14,7 +14,7 @@ interface Props {
   projectFilterCount?: number;   // number of active project-level filters
 }
 
-type TabKey = 'home' | 'insert' | 'data' | 'statistics' | 'format' | 'view';
+type TabKey = 'home' | 'insert' | 'data' | 'statistics' | 'format' | 'view' | 'ai-smart';
 
 // ── Constants ──────────────────────────────────────────────
 const BUILT_IN_THEMES = [
@@ -66,6 +66,7 @@ export function RibbonBar({ table, dataset, onAction, onUpdate, theme, activeTab
       {activeTab === 'statistics' && <StatisticsRibbon dataset={dataset} onAction={onAction} />}
       {activeTab === 'format'     && <FormatRibbon    table={table} onUpdate={onUpdate} columns={columns} onColumnTypeChange={onColumnTypeChange} />}
       {activeTab === 'view'       && <ViewRibbon      table={table} dataset={dataset} onAction={onAction} onUpdate={onUpdate} theme={theme} />}
+      {activeTab === 'ai-smart'   && <AISmartRibbon   table={table} dataset={dataset} onAction={onAction} onUpdate={onUpdate} />}
     </div>
   );
 }
@@ -745,6 +746,34 @@ function FormatRibbon({ table, onUpdate, columns = [], onColumnTypeChange }: {
               <FToggle label="Hide Zero / Blank Rows" checked={t.blank_suppress ?? false} onChange={v => onUpdate({ blank_suppress: v })} />
             </div>
             <FDivider />
+            <FTitle>Cell Alignment</FTitle>
+            <div className="fdrop-row" style={{ gap: 8 }}>
+              <FField label="Headers">
+                <select value={t.header_align || 'center'} className="fdrop-select"
+                  onChange={e => onUpdate({ header_align: e.target.value as any })}>
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                </select>
+              </FField>
+              <FField label="Row Labels">
+                <select value={t.row_label_align || 'left'} className="fdrop-select"
+                  onChange={e => onUpdate({ row_label_align: e.target.value as any })}>
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                </select>
+              </FField>
+              <FField label="Values">
+                <select value={t.cell_align || 'right'} className="fdrop-select"
+                  onChange={e => onUpdate({ cell_align: e.target.value as any })}>
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                </select>
+              </FField>
+            </div>
+            <FDivider />
             <div className="fdrop-row" style={{ gap: 8 }}>
               <FField label="Zoom">
                 <select value={t.zoom_level || 100} className="fdrop-select"
@@ -1047,6 +1076,32 @@ function ViewRibbon({ table, dataset, onAction, onUpdate, theme }: {
       <RGroup label="Help">
         <RBtn icon="❓" label="Tour"     onClick={() => onAction('tour')} />
         <RBtn icon="🗂" label="Projects" onClick={() => onAction('projects')} />
+      </RGroup>
+    </>
+  );
+}
+
+
+// ── AI-Smart Ribbon ───────────────────────────────────────────
+function AISmartRibbon({ table, dataset, onAction, onUpdate }: { table: TableConfig | null; dataset: boolean; onAction: (a: string) => void; onUpdate: (u: Partial<TableConfig>) => void }) {
+  return (
+    <>
+      <RGroup label="AI Rename">
+        <RBtn icon="✨" label="Polish Title & Headers" onClick={() => onAction('ai-polish')} disabled={!table || !dataset} />
+      </RGroup>
+      <RGroup label="AI Interpret">
+        <RBtn icon="📝" label="Interpret Table" onClick={() => onAction('ai-interpret')} disabled={!table || !dataset} />
+        <RBtn icon="🔄" label="Refine" onClick={() => onAction('ai-refine')} disabled={!table || !dataset} />
+      </RGroup>
+      <RGroup label="AI Build">
+        <RBtn icon="🧠" label="Smart Build" onClick={() => onAction('ai-smart-build')} disabled={!dataset} />
+        <RBtn icon="💡" label="Suggest Tables" onClick={() => onAction('ai-suggest')} disabled={!dataset} />
+      </RGroup>
+      <RGroup label="AI Report">
+        <RBtn icon="📄" label="Generate Report" onClick={() => onAction('ai-report')} disabled={!dataset} />
+      </RGroup>
+      <RGroup label="Settings">
+        <RBtn icon="⚙" label="AI Config" onClick={() => onAction('ai-config')} />
       </RGroup>
     </>
   );

@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { fgListPrograms, fgListQuestionnaires, importFromFg, fgListUserProjects } from '../api';
+import { fgListPrograms, fgListQuestionnaires, importFromFg, fgListUserProjects, listProjects } from '../api';
 
 interface FgContext { fgUrl: string; token: string; programId?: string }
 
@@ -12,11 +12,13 @@ interface Props {
   error: string | null;
   uploadProgress?: number | null;
   onLoadFgProject?: (project: any) => void;
+  onLoadLocalProject?: (path: string) => void;
 }
 
 interface Program { id: string; name: string; scheme_name: string }
 interface Questionnaire { questionnaire_id: string; name: string; form_title: string }
 interface RecentProject { id: string; name: string; updated_at: string; program_id?: string }
+interface LocalProject { name: string; path: string; created: string; version_count: number; source_file?: string }
 
 const s = {
   wrap: {
@@ -65,7 +67,7 @@ function formatRelative(dateStr: string) {
   } catch { return ''; }
 }
 
-export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, fgContext, loading, error, uploadProgress, onLoadFgProject }: Props) {
+export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, fgContext, loading, error, uploadProgress, onLoadFgProject, onLoadLocalProject }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const projectFileRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<HTMLDivElement>(null);
@@ -77,12 +79,21 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
   const [fgLoading, setFgLoading]           = useState(false);
   const [fgError, setFgError]               = useState('');
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
+  const [localProjects, setLocalProjects]   = useState<LocalProject[]>([]);
+
+  useEffect(() => {
+    listProjects()
+      .then((res: any) => {
+        const projs = (res.projects || []).slice(0, 5);
+        setLocalProjects(projs);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!fgContext) return;
     fgListPrograms(fgContext.fgUrl, fgContext.token).then(setPrograms).catch(() => {});
     if (fgContext.programId) setSelProgram(fgContext.programId);
-    // Load recent FG projects
     fgListUserProjects(fgContext.fgUrl, fgContext.token, 'analyzer')
       .then((projs: any[]) => {
         const valid = projs.filter(p => p.name && p.name !== '__autosave__');
@@ -192,7 +203,7 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
 
             {fgError && <div style={s.errorMsg}>{fgError}</div>}
 
-            {/* Recent projects */}
+            {/* Recent FG projects */}
             {recentProjects.length > 0 && (
               <>
                 <div style={s.divider}>
@@ -212,6 +223,29 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
                         <span style={{ fontSize: 13, color: '#e2e8f0' }}>{proj.name}</span>
                       </span>
                       <span style={{ fontSize: 11, color: '#475569' }}>{formatRelative(proj.updated_at)}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Recent local projects */}
+            {localProjects.length > 0 && (
+              <>
+                <div style={s.divider}>
+                  <div style={s.dividerLine} />
+                  <span style={s.dividerText}>saved projects</span>
+                  <div style={s.dividerLine} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {localProjects.map(proj => (
+                    <button key={proj.path} style={{ ...s.linkBtn, justifyContent: 'space-between' }}
+                      onClick={() => onLoadLocalProject?.(proj.path)}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 14 }}>📋</span>
+                        <span style={{ fontSize: 13, color: '#e2e8f0' }}>{proj.name}</span>
+                      </span>
+                      <span style={{ fontSize: 11, color: '#475569' }}>{proj.created ? formatRelative(proj.created) : ''}</span>
                     </button>
                   ))}
                 </div>
@@ -255,6 +289,28 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
               </>
             )}
             {error && <div style={s.errorMsg}>{error}</div>}
+
+            {localProjects.length > 0 && !loading && (
+              <>
+                <div style={s.divider}>
+                  <div style={s.dividerLine} />
+                  <span style={s.dividerText}>recent projects</span>
+                  <div style={s.dividerLine} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {localProjects.map(proj => (
+                    <button key={proj.path} style={{ ...s.linkBtn, justifyContent: 'space-between' }}
+                      onClick={() => onLoadLocalProject?.(proj.path)}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 14 }}>📊</span>
+                        <span style={{ fontSize: 13, color: '#e2e8f0' }}>{proj.name}</span>
+                      </span>
+                      <span style={{ fontSize: 11, color: '#475569' }}>{proj.created ? formatRelative(proj.created) : ''}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
