@@ -529,7 +529,36 @@ export default function App() {
       if (!res.ok) throw new Error('Failed to load project');
       const data = await res.json();
       if (!data.tables || !Array.isArray(data.tables)) throw new Error('Invalid project data');
-      // Check column mismatches (same reconcile logic as ProjectManager)
+
+      if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
+      if (data.comparisonState) setComparisonState(data.comparisonState);
+      if (data.projectFilters) setProjectFilters(data.projectFilters);
+
+      // If no dataset loaded yet, reload the source file first then defer reconciliation
+      if (allColumns.length === 0 && data.meta?.source_file) {
+        const sf = data.meta.source_file;
+        try {
+          const reloadRes = await fetch(`${API_BASE}/project/reload-file`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sf),
+          });
+          if (reloadRes.ok) {
+            const meta = await reloadRes.json();
+            setDataset(meta);
+            setPendingProjectData(data);
+            return;
+          }
+        } catch {}
+        // Reload failed — just set tables without reconciliation
+        pushUndo();
+        setTables(data.tables);
+        setActiveTableIdx(0);
+        setResults(new Map());
+        return;
+      }
+
+      // Dataset already loaded — check column mismatches
       const colNames = allColumns.map(c => c.name);
       const mismatches: ReconcileState['mismatches'] = [];
       for (const t of data.tables) {
@@ -545,9 +574,6 @@ export default function App() {
           }
         }
       }
-      if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
-      if (data.comparisonState) setComparisonState(data.comparisonState);
-      if (data.projectFilters) setProjectFilters(data.projectFilters);
       if (mismatches.length > 0) {
         setReconcileState({ pendingTables: data.tables, mismatches, mapping: Object.fromEntries(mismatches.map(m => [m.field, m.suggestion])) });
       } else {
