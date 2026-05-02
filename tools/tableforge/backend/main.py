@@ -3809,11 +3809,14 @@ class FGImportBody(BaseModel):
 async def import_from_fg(body: FGImportBody):
     """Fetch program submissions from FieldGovern and load as a dataset (same shape as /api/upload)."""
     import httpx
-    url = f"{body.fg_base_url.rstrip('/')}/api/v1/fg/programs/{body.program_id}/export.xlsx"
+    # Use internal Docker network URL if available (avoids SSL/DNS issues between containers)
+    internal_base = os.environ.get("FG_INTERNAL_URL", "").rstrip("/")
+    base = internal_base if internal_base else body.fg_base_url.rstrip("/")
+    url = f"{base}/api/v1/fg/programs/{body.program_id}/export.xlsx"
     if body.questionnaire_id:
         url += f"?questionnaire_id={body.questionnaire_id}"
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=120.0, verify=bool(not internal_base)) as client:
             resp = await client.get(url, headers={"Authorization": f"Bearer {body.token}"})
         if resp.status_code != 200:
             raise HTTPException(502, f"FieldGovern returned {resp.status_code}")
@@ -3901,11 +3904,19 @@ class FGSaveProjectBody(BaseModel):
     program_id: Optional[str] = None
     data: dict = {}
 
+def _fg_base(external_url: str) -> tuple:
+    """Return (base_url, verify_ssl) using internal Docker URL when available."""
+    internal = os.environ.get("FG_INTERNAL_URL", "").rstrip("/")
+    if internal:
+        return internal, False
+    return external_url.rstrip("/"), True
+
 @app.post("/api/fg/programs")
 async def proxy_fg_programs(body: FGBaseBody):
     import httpx
-    url = f"{body.fg_base_url.rstrip('/')}/api/v1/programs/"
-    async with httpx.AsyncClient(timeout=30) as client:
+    base, verify = _fg_base(body.fg_base_url)
+    url = f"{base}/api/v1/programs/"
+    async with httpx.AsyncClient(timeout=30, verify=verify) as client:
         resp = await client.get(url, headers={"Authorization": f"Bearer {body.token}"})
     if resp.status_code != 200:
         raise HTTPException(resp.status_code, "FieldGovern programs fetch failed")
@@ -3914,8 +3925,9 @@ async def proxy_fg_programs(body: FGBaseBody):
 @app.post("/api/fg/questionnaires")
 async def proxy_fg_questionnaires(body: FGQuestionnairesBody):
     import httpx
-    url = f"{body.fg_base_url.rstrip('/')}/api/v1/programs/{body.program_id}/questionnaires"
-    async with httpx.AsyncClient(timeout=30) as client:
+    base, verify = _fg_base(body.fg_base_url)
+    url = f"{base}/api/v1/programs/{body.program_id}/questionnaires"
+    async with httpx.AsyncClient(timeout=30, verify=verify) as client:
         resp = await client.get(url, headers={"Authorization": f"Bearer {body.token}"})
     if resp.status_code != 200:
         raise HTTPException(resp.status_code, "FieldGovern questionnaires fetch failed")
@@ -3924,9 +3936,10 @@ async def proxy_fg_questionnaires(body: FGQuestionnairesBody):
 @app.post("/api/fg/user-projects/save")
 async def proxy_save_fg_project(body: FGSaveProjectBody):
     import httpx
-    url = f"{body.fg_base_url.rstrip('/')}/api/v1/tool-projects/"
+    base, verify = _fg_base(body.fg_base_url)
+    url = f"{base}/api/v1/tool-projects/"
     payload = {"tool": body.tool, "name": body.name, "program_id": body.program_id, "data": body.data}
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=30, verify=verify) as client:
         resp = await client.post(url, json=payload, headers={"Authorization": f"Bearer {body.token}"})
     if resp.status_code not in (200, 201):
         raise HTTPException(resp.status_code, "Failed to save project to FieldGovern")
@@ -3935,8 +3948,9 @@ async def proxy_save_fg_project(body: FGSaveProjectBody):
 @app.post("/api/fg/user-projects/list")
 async def proxy_list_fg_projects(body: FGBaseBody):
     import httpx
-    url = f"{body.fg_base_url.rstrip('/')}/api/v1/tool-projects/?tool=analyzer"
-    async with httpx.AsyncClient(timeout=30) as client:
+    base, verify = _fg_base(body.fg_base_url)
+    url = f"{base}/api/v1/tool-projects/?tool=analyzer"
+    async with httpx.AsyncClient(timeout=30, verify=verify) as client:
         resp = await client.get(url, headers={"Authorization": f"Bearer {body.token}"})
     if resp.status_code != 200:
         raise HTTPException(resp.status_code, "Failed to list projects from FieldGovern")

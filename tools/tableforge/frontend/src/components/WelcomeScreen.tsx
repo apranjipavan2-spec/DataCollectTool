@@ -134,7 +134,7 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
       <div style={s.card}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <img src="/logo-icon.png" alt="FieldGovern" style={{ width: 40, height: 40, display: 'block', margin: '0 auto 8px' }} />
+          <img src={import.meta.env.BASE_URL + 'logo-icon.png'} alt="FieldGovern" style={{ width: 40, height: 40, display: 'block', margin: '0 auto 8px' }} />
           <div style={{ fontSize: 20, fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.02em' }}>Analyzer</div>
           <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>FieldGovern Data Analyzer</div>
         </div>

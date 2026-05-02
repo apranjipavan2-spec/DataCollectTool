@@ -34,6 +34,8 @@ services:
       context: ../tools/tableforge
       dockerfile: Dockerfile
     restart: always
+    environment:
+      FG_INTERNAL_URL: "http://app:8000"
     volumes:
       - tableforge_data:/app/projects
       - tableforge_exports:/app/exports
