@@ -109,6 +109,11 @@ Base path: `/api/v1`
 | PATCH | `/tenants/{id}` | org_admin+ | Update settings incl. allow_enumerator_edit |
 | GET | `/export/submissions/{form_id}/csv` | supervisor+ | CSV export |
 | GET | `/health` | public | Health check |
+| POST | `/shared-files/` | master_admin | Upload file, optionally share with tenants |
+| GET | `/shared-files/` | any auth | List files (master sees all, others see shared) |
+| GET | `/shared-files/{id}/download` | any auth | Download a shared file |
+| PATCH | `/shared-files/{id}/share` | master_admin | Update tenant sharing list |
+| DELETE | `/shared-files/{id}` | master_admin | Delete file from storage |
 
 ---
 
@@ -245,6 +250,11 @@ npm run dev            # → http://localhost:5173
 | Dashboard serial_no column | `dashboard/Dashboard.modern.tsx` |
 | Allow-enumerator-edit toggle | Dashboard → Integrations → Org Settings |
 | Demo quick-fill on login | `auth/LoginPage.tsx` |
+| TableForge (data analyzer) | `tools/tableforge/` — upload, tabulate, clean, export |
+| Text cleaning (trim/case) | TableForge Data ribbon, `clean_bulk` endpoint |
+| Upload progress bar | TableForge WelcomeScreen + XHR progress |
+| Save to FieldGovern Account | TableForge ProjectManager 'fg' mode |
+| Master admin file sharing | `shared_files.py` route + AdminPanel Files tab |
 
 ---
 
