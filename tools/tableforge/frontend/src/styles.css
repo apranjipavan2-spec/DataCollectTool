@@ -272,6 +272,7 @@ body {
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes indeterminate { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 
 /* ─── Workspace ─── */
 .workspace { flex: 1; display: flex; overflow: hidden; }

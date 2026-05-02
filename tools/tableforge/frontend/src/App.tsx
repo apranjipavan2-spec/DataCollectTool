@@ -66,6 +66,7 @@ export default function App() {
   const [activeTableIdx, setActiveTableIdx] = useState(0);
   const [results, setResults] = useState<Map<string, TableResult>>(new Map());
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [showDataPreview, setShowDataPreview] = useState(false);
   const [draggedField, setDraggedField] = useState<string | null>(null);
@@ -227,15 +228,15 @@ export default function App() {
     if (!fgUrl || !token) return;
     setFgContext({ fgUrl, token, programId: programId || undefined });
     if (!programId) return; // no auto-load; user will pick in WelcomeScreen
-    setLoading(true);
+    setLoading(true); setLoadingMsg('Importing data from FieldGovern…');
     fetch(import.meta.env.BASE_URL.replace(/\/$/, '') + '/api/import-from-fg', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fg_base_url: fgUrl, program_id: programId, token }),
     })
       .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(e.detail || 'Import failed')))
-      .then(meta => { setDataset(meta); setLoading(false); })
-      .catch(err => { setLoading(false); setError(`Failed to load FieldGovern data: ${err}`); });
+      .then(meta => { setDataset(meta); setLoading(false); setLoadingMsg(''); })
+      .catch(err => { setLoading(false); setLoadingMsg(''); setError(`Failed to load FieldGovern data: ${err}`); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -296,10 +297,10 @@ export default function App() {
   }, [resumePrompt]);
 
   const handleFileUpload = useCallback(async (file: File) => {
-    setLoading(true); setError(null); setUploadProgress(0);
+    setLoading(true); setLoadingMsg('Uploading file…'); setError(null); setUploadProgress(0);
     try {
-      const meta = await uploadFile(file, pct => setUploadProgress(pct));
-      setUploadProgress(null);
+      const meta = await uploadFile(file, pct => { setUploadProgress(pct); if (pct >= 100) setLoadingMsg('Processing file…'); });
+      setUploadProgress(null); setLoadingMsg('');
       setDataset(meta);
       setTables([createEmptyTable('1', 'Table 1')]);
       setActiveTableIdx(0); setResults(new Map()); setExtraColumns([]);
@@ -325,7 +326,7 @@ export default function App() {
       setResults(prev => { const next = new Map(prev); next.delete(config.id); return next; });
       return;
     }
-    setLoading(true); setError(null);
+    setLoading(true); setLoadingMsg('Generating table…'); setError(null);
     try {
       const res = await tabulate({
         dataset_id: dataset.dataset_id,
@@ -338,6 +339,7 @@ export default function App() {
         date_groupings: config.date_groupings,
         blank_suppress: config.blank_suppress,
       });
+      setLoadingMsg('');
       setResults(prev => {
         const next = new Map(prev);
         next.set(config.id, res);
@@ -361,7 +363,7 @@ export default function App() {
       });
     } catch (e: any) {
       setError(e.message || 'Tabulation failed');
-    } finally { setLoading(false); }
+    } finally { setLoading(false); setLoadingMsg(''); }
   }, [dataset, annotationsMap, tables]);
 
   const updateTable = useCallback((update: Partial<TableConfig>) => {
@@ -524,6 +526,7 @@ export default function App() {
   }, [activeTable, updateTable]);
 
   const handleLoadProjectByPath = useCallback(async (path: string) => {
+    setLoading(true); setLoadingMsg('Loading project…');
     try {
       const res = await fetch(`${API_BASE}/project/load?path=` + encodeURIComponent(path));
       if (!res.ok) throw new Error('Failed to load project');
@@ -537,6 +540,7 @@ export default function App() {
       // If no dataset loaded yet, reload the source file first then defer reconciliation
       if (allColumns.length === 0 && data.meta?.source_file) {
         const sf = data.meta.source_file;
+        setLoadingMsg('Reloading source data file…');
         try {
           const reloadRes = await fetch(`${API_BASE}/project/reload-file`, {
             method: 'POST',
@@ -547,6 +551,7 @@ export default function App() {
             const meta = await reloadRes.json();
             setDataset(meta);
             setPendingProjectData(data);
+            setLoading(false); setLoadingMsg('');
             return;
           }
         } catch {}
@@ -555,6 +560,7 @@ export default function App() {
         setTables(data.tables);
         setActiveTableIdx(0);
         setResults(new Map());
+        setLoading(false); setLoadingMsg('');
         return;
       }
 
@@ -585,7 +591,7 @@ export default function App() {
       }
     } catch (e: any) {
       setError(e.message || 'Failed to load project');
-    }
+    } finally { setLoading(false); setLoadingMsg(''); }
   }, [allColumns, pushUndo, runTabulation]);
 
   const handleReorderTables = useCallback((fromIdx: number, toIdx: number) => {
@@ -721,17 +727,17 @@ export default function App() {
   const handleDataRefresh = useCallback(async () => {
     if (!dataset) return;
     try {
-      setLoading(true);
+      setLoading(true); setLoadingMsg('Refreshing data…');
       await refreshDataset(dataset.dataset_id);
       tables.forEach(t => { if (t.values.length > 0) runTabulation(t); });
     } catch (e: any) {
       setError('Refresh failed: ' + (e.message || ''));
-    } finally { setLoading(false); }
+    } finally { setLoading(false); setLoadingMsg(''); }
   }, [dataset, tables, runTabulation]);
 
   const handleTextClean = useCallback(async (action: string, caseType?: string) => {
     if (!dataset) return;
-    setLoading(true); setError(null);
+    setLoading(true); setLoadingMsg('Cleaning text data…'); setError(null);
     try {
       const actions: any[] = action === 'trim_whitespace'
         ? [{ action: 'trim_whitespace' }]
@@ -750,7 +756,7 @@ export default function App() {
       alert(data.messages?.join('\n') || 'Done');
     } catch (e: any) {
       setError(e.message || 'Clean failed');
-    } finally { setLoading(false); }
+    } finally { setLoading(false); setLoadingMsg(''); }
   }, [dataset, tables, runTabulation]);
 
   const handleColumnTypeChange = useCallback(async (column: string, newType: string) => {
@@ -773,19 +779,18 @@ export default function App() {
   const reloadFileRef = useRef<HTMLInputElement>(null);
   const handleReloadFile = useCallback(async (file: File) => {
     if (!dataset) return;
-    setLoading(true); setError(null);
+    setLoading(true); setLoadingMsg('Reloading data file…'); setError(null);
     try {
       const meta = await uploadFile(file);
-      // Keep all tables, just update dataset and re-run tabulations
       setDataset(meta);
       setExtraColumns([]);
-      // Re-run all tabulations with new data
+      setLoadingMsg('Regenerating tables…');
       setTimeout(() => {
         tables.forEach(t => { if (t.values.length > 0) runTabulation(t); });
       }, 100);
     } catch (e: any) {
       setError('Reload failed: ' + (e.message || ''));
-    } finally { setLoading(false); }
+    } finally { setLoading(false); setLoadingMsg(''); }
   }, [dataset, tables, runTabulation]);
 
   if (!dataset) {
@@ -804,6 +809,7 @@ export default function App() {
           }}
           onUpdate={() => {}} theme={theme} />
         <WelcomeScreen onFileUpload={handleFileUpload} loading={loading}
+          loadingMsg={loadingMsg}
           uploadProgress={uploadProgress}
           fgContext={fgContext}
           onDatasetLoaded={meta => { setDataset(meta); setError(null); }}
@@ -1134,13 +1140,20 @@ export default function App() {
         </div>
       </div>
       <StatusBar dataset={dataset} result={currentResult} undoCount={undoStack.length} redoCount={redoStack.length} />
-      {uploadProgress != null && (
+      {(uploadProgress != null || (loading && loadingMsg)) && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999 }}>
           <div style={{ height: 3, background: 'rgba(59,130,246,0.2)' }}>
-            <div style={{ height: '100%', width: `${uploadProgress}%`, background: '#3b82f6', transition: 'width 0.2s' }} />
+            {uploadProgress != null ? (
+              <div style={{ height: '100%', width: `${uploadProgress}%`, background: '#3b82f6', transition: 'width 0.2s' }} />
+            ) : (
+              <div style={{ height: '100%', width: '100%', background: '#3b82f6', animation: 'indeterminate 1.5s ease-in-out infinite' }} />
+            )}
           </div>
-          <div style={{ position: 'absolute', top: 6, left: '50%', transform: 'translateX(-50%)', background: 'rgba(15,23,42,0.9)', color: '#e2e8f0', padding: '4px 16px', borderRadius: 4, fontSize: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-            {uploadProgress < 100 ? `Uploading… ${uploadProgress}%` : 'Processing file…'}
+          <div style={{ position: 'absolute', top: 6, left: '50%', transform: 'translateX(-50%)', background: 'rgba(15,23,42,0.95)', color: '#e2e8f0', padding: '5px 18px', borderRadius: 6, fontSize: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 12, height: 12, border: '2px solid rgba(59,130,246,0.3)', borderTop: '2px solid #3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+            {uploadProgress != null
+              ? (uploadProgress < 100 ? `Uploading… ${uploadProgress}%` : 'Processing file…')
+              : loadingMsg}
           </div>
         </div>
       )}

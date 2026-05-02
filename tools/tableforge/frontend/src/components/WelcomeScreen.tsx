@@ -9,6 +9,7 @@ interface Props {
   onDatasetLoaded?: (meta: any) => void;
   fgContext?: FgContext | null;
   loading: boolean;
+  loadingMsg?: string;
   error: string | null;
   uploadProgress?: number | null;
   onLoadFgProject?: (project: any) => void;
@@ -67,7 +68,7 @@ function formatRelative(dateStr: string) {
   } catch { return ''; }
 }
 
-export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, fgContext, loading, error, uploadProgress, onLoadFgProject, onLoadLocalProject }: Props) {
+export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, fgContext, loading, loadingMsg, error, uploadProgress, onLoadFgProject, onLoadLocalProject }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const projectFileRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<HTMLDivElement>(null);
@@ -155,13 +156,16 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
           <>
             {(loading || fgLoading) && (
               <div style={{ textAlign: 'center', padding: '20px 0', marginBottom: 16 }}>
-                <div style={{ fontSize: 14, color: '#94a3b8', marginBottom: 10 }}>
-                  {fgLoading ? 'Loading program data…' : 'Importing data from FieldGovern…'}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 10 }}>
+                  <div style={{ width: 18, height: 18, border: '2.5px solid rgba(59,130,246,0.2)', borderTop: '2.5px solid #3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  <span style={{ fontSize: 14, color: '#94a3b8' }}>
+                    {fgLoading ? 'Loading program data…' : (loadingMsg || 'Importing data from FieldGovern…')}
+                  </span>
                 </div>
-                <div style={{ width: '100%', height: 6, background: 'rgba(100,116,139,0.2)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ width: '60%', height: '100%', background: '#3b82f6', borderRadius: 3, animation: 'pulse 1.5s ease-in-out infinite' }} />
+                <div style={{ width: '100%', height: 4, background: 'rgba(100,116,139,0.15)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ width: '100%', height: '100%', background: '#3b82f6', borderRadius: 3, animation: 'indeterminate 1.5s ease-in-out infinite' }} />
                 </div>
-                <style>{`@keyframes pulse { 0%,100% { opacity: 0.6; width: 40%; } 50% { opacity: 1; width: 80%; } }`}</style>
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes indeterminate { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }`}</style>
               </div>
             )}
             <div style={{ marginBottom: 16 }}>
@@ -262,16 +266,21 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
             style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
           >
             {loading ? (
-              <div style={{ textAlign: 'center', color: '#64748b', fontSize: 13, padding: 16 }}>
+              <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: 20 }}>
                 {uploadProgress != null ? (
                   <div>
-                    <div style={{ marginBottom: 8 }}>Uploading… {uploadProgress}%</div>
+                    <div style={{ marginBottom: 10, fontWeight: 600 }}>Uploading… {uploadProgress}%</div>
                     <div style={{ width: '100%', height: 6, background: 'rgba(100,116,139,0.2)', borderRadius: 3, overflow: 'hidden' }}>
                       <div style={{ width: `${uploadProgress}%`, height: '100%', background: '#3b82f6', borderRadius: 3, transition: 'width 0.2s' }} />
                     </div>
-                    {uploadProgress >= 100 && <div style={{ marginTop: 8, fontSize: 12 }}>Processing file…</div>}
+                    {uploadProgress >= 100 && <div style={{ marginTop: 8, fontSize: 12, color: '#64748b' }}>Processing file…</div>}
                   </div>
-                ) : 'Loading…'}
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 24, height: 24, border: '3px solid rgba(59,130,246,0.2)', borderTop: '3px solid #3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    <span>{loadingMsg || 'Loading…'}</span>
+                  </div>
+                )}
               </div>
             ) : (
               <>
