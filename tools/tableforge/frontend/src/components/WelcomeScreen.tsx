@@ -11,6 +11,7 @@ interface Props {
   loading: boolean;
   error: string | null;
   uploadProgress?: number | null;
+  onLoadFgProject?: (project: any) => void;
 }
 
 interface Program { id: string; name: string; scheme_name: string }
@@ -64,7 +65,7 @@ function formatRelative(dateStr: string) {
   } catch { return ''; }
 }
 
-export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, fgContext, loading, error, uploadProgress }: Props) {
+export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, fgContext, loading, error, uploadProgress, onLoadFgProject }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const projectFileRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<HTMLDivElement>(null);
@@ -141,6 +142,17 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
         {/* FG program picker */}
         {fgContext ? (
           <>
+            {(loading || fgLoading) && (
+              <div style={{ textAlign: 'center', padding: '20px 0', marginBottom: 16 }}>
+                <div style={{ fontSize: 14, color: '#94a3b8', marginBottom: 10 }}>
+                  {fgLoading ? 'Loading program data…' : 'Importing data from FieldGovern…'}
+                </div>
+                <div style={{ width: '100%', height: 6, background: 'rgba(100,116,139,0.2)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ width: '60%', height: '100%', background: '#3b82f6', borderRadius: 3, animation: 'pulse 1.5s ease-in-out infinite' }} />
+                </div>
+                <style>{`@keyframes pulse { 0%,100% { opacity: 0.6; width: 40%; } 50% { opacity: 1; width: 80%; } }`}</style>
+              </div>
+            )}
             <div style={{ marginBottom: 16 }}>
               <div style={s.label}>Program</div>
               <select style={s.select} value={selProgram} onChange={e => setSelProgram(e.target.value)}>
@@ -193,6 +205,7 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
                     <button key={proj.id} style={{ ...s.linkBtn, justifyContent: 'space-between' }}
                       onClick={() => {
                         if (proj.program_id) setSelProgram(proj.program_id);
+                        if ((proj as any).data && onLoadFgProject) onLoadFgProject(proj);
                       }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span>📊</span>

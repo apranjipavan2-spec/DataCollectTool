@@ -783,6 +783,12 @@ export default function App() {
           onProjectImport={(data) => {
             setPendingProjectData(data);
             setError(null);
+          }}
+          onLoadFgProject={(proj) => {
+            if (proj.data?.tables) {
+              setPendingProjectData(proj.data);
+              setError(null);
+            }
           }} />
         {pendingProjectData && (
           <div style={{ position: 'fixed', top: 120, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.4)', borderRadius: 8, padding: '12px 20px', maxWidth: 500, textAlign: 'center', fontSize: 13, color: 'var(--text)' }}>
@@ -856,7 +862,7 @@ export default function App() {
         }}
         onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} theme={theme}
         ribbonTab={ribbonTab} onRibbonTabChange={setRibbonTab}
-        fgHomeUrl={fgContext ? fgContext.fgUrl : undefined}
+        fgHomeUrl={fgContext ? fgContext.fgUrl + '/dashboard' : undefined}
       />
       <RibbonBar
         table={activeTable}

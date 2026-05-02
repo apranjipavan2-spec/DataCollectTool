@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TableConfig } from '../types';
-import { rollbackProject, fgSaveProject, API_BASE } from '../api';
+import { rollbackProject, fgSaveProject, fgListUserProjects, API_BASE } from '../api';
 
 interface ProjectEntry {
   name: string;
@@ -61,6 +61,8 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
   ];
 
   const [projectsDir, setProjectsDir] = useState('');
+  const [fgProjects, setFgProjects] = useState<any[]>([]);
+  const [loadingFg, setLoadingFg] = useState(false);
 
   useEffect(() => {
     fetch(`${API_BASE}/projects`)
@@ -68,6 +70,13 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
       .then(d => { setProjects(d.projects || []); setProjectsDir(d.projects_dir || ''); })
       .catch(() => setProjects([]))
       .finally(() => setLoading(false));
+    if (fgContext) {
+      setLoadingFg(true);
+      fgListUserProjects(fgContext.fgUrl, fgContext.token, 'analyzer')
+        .then(projs => setFgProjects(projs.filter((p: any) => p.name && p.name !== '__autosave__')))
+        .catch(() => {})
+        .finally(() => setLoadingFg(false));
+    }
   }, []);
 
   const handleSave = async () => {
@@ -286,6 +295,37 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
                   ))}
                 </div>
               )}
+              {/* FG Account Projects */}
+              {fgContext && (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    FieldGovern Account Projects
+                  </div>
+                  {loadingFg ? (
+                    <div className="loading-spinner">Loading account projects...</div>
+                  ) : fgProjects.length === 0 ? (
+                    <div style={{ fontSize: 12, color: '#64748b', padding: '8px 0' }}>No saved projects in your account.</div>
+                  ) : (
+                    <div className="project-list">
+                      {fgProjects.map((p: any) => (
+                        <div key={p.id} className="project-item">
+                          <div className="project-info">
+                            <div className="project-name">☁️ {p.name}</div>
+                            <div className="project-date">{p.updated_at ? new Date(p.updated_at).toLocaleDateString() : ''}</div>
+                          </div>
+                          <button className="btn-primary" style={{ padding: '4px 12px', fontSize: 12 }}
+                            onClick={() => {
+                              if (p.data?.tables) {
+                                onLoad(p.data.tables, p.data.annotationsMap, { comparisonState: p.data.comparisonState });
+                              }
+                            }}>Load</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="import-export-row">
                 <button className="btn-secondary" onClick={handleExportProject}>↓ Export .tableforge</button>
                 <label className="btn-secondary" style={{ cursor: 'pointer' }}>
