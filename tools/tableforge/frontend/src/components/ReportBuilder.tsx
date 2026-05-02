@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TableConfig, TableResult } from '../types';
+import { API_BASE } from '../api';
 
 interface DocStyle {
   font: string;
@@ -216,7 +217,7 @@ export function ReportBuilder({ tables, results, onClose, initialElements, initi
 
     try {
       setExportStatus('Exporting...');
-      const res = await fetch('/api/report/export', {
+      const res = await fetch(`${API_BASE}/report/export`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dataset_id: '', elements: reportContent, filename: 'TableForge_Report', doc_style: docStyle }),
@@ -226,7 +227,7 @@ export function ReportBuilder({ tables, results, onClose, initialElements, initi
         setExportStatus(`Saved: ${data.download_filename}`);
         if (data.download_filename) {
           const a = document.createElement('a');
-          a.href = `/api/export/download/${data.download_filename}`;
+          a.href = `${API_BASE}/export/download/${data.download_filename}`;
           a.download = data.download_filename;
           document.body.appendChild(a);
           a.click();

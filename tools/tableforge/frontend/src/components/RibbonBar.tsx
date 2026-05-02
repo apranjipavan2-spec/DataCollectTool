@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TableConfig, NumberFormat, ConditionalFormat, ColumnInfo } from '../types';
+import { API_BASE } from '../api';
 
 interface Props {
   table: TableConfig | null;
@@ -153,7 +154,7 @@ function ImportDropdownBtn({ onAction }: { onAction: (action: string) => void })
     if (fetched) return;
     setFetching(true);
     try {
-      const res = await fetch('/api/projects');
+      const res = await fetch(`${API_BASE}/projects`);
       const data = await res.json();
       setProjects(data.projects || []);
       setFetched(true);
@@ -363,6 +364,12 @@ function DataRibbon({ dataset, onAction }: { dataset: boolean; onAction: (action
       <RGroup label="Quality & Clean">
         <RBtn icon="🔍" label="Quality & Clean" onClick={() => onAction('quality')} disabled={!dataset} />
         <RBtn icon="📝" label="Audit"   onClick={() => onAction('audit')}   disabled={!dataset} />
+      </RGroup>
+      <RGroup label="Text Clean">
+        <RBtn icon="✂" label="Trim All" onClick={() => onAction('clean_trim')} disabled={!dataset} />
+        <RBtn icon="AA" label="UPPER"    onClick={() => onAction('clean_upper')} disabled={!dataset} />
+        <RBtn icon="aa" label="lower"    onClick={() => onAction('clean_lower')} disabled={!dataset} />
+        <RBtn icon="Aa" label="Proper"   onClick={() => onAction('clean_proper')} disabled={!dataset} />
       </RGroup>
       <RGroup label="Manage">
         <RBtn icon="🗂" label="Projects" onClick={() => onAction('projects')} />

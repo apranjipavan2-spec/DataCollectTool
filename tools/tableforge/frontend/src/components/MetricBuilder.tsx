@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ColumnInfo } from '../types';
-import { createMetric } from '../api';
+import { API_BASE, createMetric } from '../api';
 
 interface Props {
   datasetId: string;
@@ -109,7 +109,7 @@ export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLi
     const def = buildMetricDef();
     setSaving(true); setError('');
     try {
-      const res = await fetch('/api/library/metrics', {
+      const res = await fetch(`${API_BASE}/library/metrics`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

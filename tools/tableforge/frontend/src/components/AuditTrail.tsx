@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_BASE } from '../api';
 
 interface Props {
   datasetId: string;
@@ -63,7 +64,7 @@ export function AuditTrail({ datasetId, onClose }: Props) {
   const [filter, setFilter] = useState('');
 
   useEffect(() => {
-    fetch(`/api/audit/${datasetId}`)
+    fetch(`${API_BASE}/audit/${datasetId}`)
       .then(r => r.json())
       .then(d => setLogs(d.logs || []))
       .finally(() => setLoading(false));

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { QualityReport } from '../types';
-import { getDataQuality } from '../api';
+import { getDataQuality, API_BASE } from '../api';
 
 interface Props {
   datasetId: string;
@@ -20,7 +20,7 @@ export function DataQualityPanel({ datasetId, onClose, onDataChanged }: Props) {
   const showDrillDown = async (column: string, issueType: string) => {
     setDrillLoading(true);
     try {
-      const res = await fetch(`/api/quality/${datasetId}/drilldown?column=${encodeURIComponent(column)}&issue_type=${issueType}`);
+      const res = await fetch(`${API_BASE}/quality/${datasetId}/drilldown?column=${encodeURIComponent(column)}&issue_type=${issueType}`);
       if (res.ok) { const data = await res.json(); setDrillDown({ ...data, column, issueType }); }
     } catch {} finally { setDrillLoading(false); }
   };
@@ -43,7 +43,7 @@ export function DataQualityPanel({ datasetId, onClose, onDataChanged }: Props) {
   const handleCleanAction = async (action: string, column?: string, extra?: Record<string, any>) => {
     setCleanMsg(null);
     try {
-      const res = await fetch('/api/dataset/clean_bulk', {
+      const res = await fetch(`${API_BASE}/dataset/clean_bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -67,7 +67,7 @@ export function DataQualityPanel({ datasetId, onClose, onDataChanged }: Props) {
 
   const handleCheckType = async (column: string) => {
     try {
-      const res = await fetch(`/api/dataset/${datasetId}/column/${encodeURIComponent(column)}/type_info`);
+      const res = await fetch(`${API_BASE}/dataset/${datasetId}/column/${encodeURIComponent(column)}/type_info`);
       if (res.ok) {
         const info = await res.json();
         setTypeModal({ column, info });
@@ -77,7 +77,7 @@ export function DataQualityPanel({ datasetId, onClose, onDataChanged }: Props) {
 
   const handleConvertType = async (column: string, targetType: string, action: string) => {
     try {
-      const res = await fetch('/api/dataset/clean_column', {
+      const res = await fetch(`${API_BASE}/dataset/clean_column`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dataset_id: datasetId, column, target_type: targetType, action }),

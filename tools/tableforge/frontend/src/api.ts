@@ -1,5 +1,5 @@
 // import.meta.env.BASE_URL is '/' in dev, '/analyzer/' in production build
-const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api';
+export const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api';
 
 async function parseError(res: Response): Promise<string> {
   const text = await res.text();
@@ -11,12 +11,31 @@ async function parseError(res: Response): Promise<string> {
   }
 }
 
-export async function uploadFile(file: File) {
+export async function uploadFile(file: File, onProgress?: (pct: number) => void) {
   const formData = new FormData();
   formData.append('file', file);
-  const res = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
-  if (!res.ok) throw new Error(await parseError(res));
-  return res.json();
+  return new Promise<any>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}/upload`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(JSON.parse(xhr.responseText)); }
+        catch { reject(new Error('Invalid response')); }
+      } else {
+        try {
+          const err = JSON.parse(xhr.responseText);
+          reject(new Error(err.detail || err.message || `HTTP ${xhr.status}`));
+        } catch { reject(new Error(xhr.responseText || `HTTP ${xhr.status}`)); }
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network error'));
+    xhr.send(formData);
+  });
 }
 
 export async function tabulate(config: {

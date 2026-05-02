@@ -10,6 +10,7 @@ interface Props {
   fgContext?: FgContext | null;
   loading: boolean;
   error: string | null;
+  uploadProgress?: number | null;
 }
 
 interface Program { id: string; name: string; scheme_name: string }
@@ -63,7 +64,7 @@ function formatRelative(dateStr: string) {
   } catch { return ''; }
 }
 
-export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, fgContext, loading, error }: Props) {
+export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, fgContext, loading, error, uploadProgress }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const projectFileRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<HTMLDivElement>(null);
@@ -214,7 +215,17 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
             style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
           >
             {loading ? (
-              <div style={{ textAlign: 'center', color: '#64748b', fontSize: 13, padding: 16 }}>Loading…</div>
+              <div style={{ textAlign: 'center', color: '#64748b', fontSize: 13, padding: 16 }}>
+                {uploadProgress != null ? (
+                  <div>
+                    <div style={{ marginBottom: 8 }}>Uploading… {uploadProgress}%</div>
+                    <div style={{ width: '100%', height: 6, background: 'rgba(100,116,139,0.2)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: `${uploadProgress}%`, height: '100%', background: '#3b82f6', borderRadius: 3, transition: 'width 0.2s' }} />
+                    </div>
+                    {uploadProgress >= 100 && <div style={{ marginTop: 8, fontSize: 12 }}>Processing file…</div>}
+                  </div>
+                ) : 'Loading…'}
+              </div>
             ) : (
               <>
                 <button style={s.linkBtn} onClick={() => fileRef.current?.click()}>

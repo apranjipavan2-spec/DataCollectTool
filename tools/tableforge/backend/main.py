@@ -2022,6 +2022,31 @@ async def clean_bulk(req: CleanBulkRequest):
                 results.append(f"Removed {removed} outliers from '{col}'")
                 add_audit_log(req.dataset_id, "clean_bulk", f"Removed {removed} outliers from '{col}'")
 
+        elif act == "trim_whitespace":
+            cols = [col] if col else [c for c in df.columns if df[c].dtype == object]
+            trimmed = 0
+            for c in cols:
+                if c in df.columns and df[c].dtype == object:
+                    before = df[c].copy()
+                    df[c] = df[c].where(df[c].isna(), df[c].astype(str).str.strip())
+                    trimmed += int((before.fillna("__NA__") != df[c].fillna("__NA__")).sum())
+            results.append(f"Trimmed whitespace in {len(cols)} column(s), {trimmed} cells changed")
+            add_audit_log(req.dataset_id, "clean_bulk", f"Trimmed whitespace: {trimmed} cells")
+
+        elif act == "text_case" and col in df.columns:
+            case_type = action.get("case_type", "lower")
+            if df[col].dtype == object:
+                before = df[col].copy()
+                if case_type == "upper":
+                    df[col] = df[col].where(df[col].isna(), df[col].astype(str).str.upper())
+                elif case_type == "lower":
+                    df[col] = df[col].where(df[col].isna(), df[col].astype(str).str.lower())
+                elif case_type == "proper":
+                    df[col] = df[col].where(df[col].isna(), df[col].astype(str).str.title())
+                changed = int((before.fillna("__NA__") != df[col].fillna("__NA__")).sum())
+                results.append(f"Converted '{col}' to {case_type} case, {changed} cells changed")
+                add_audit_log(req.dataset_id, "clean_bulk", f"Text case {case_type} on '{col}': {changed} cells")
+
     datasets[req.dataset_id]["df"] = df
     columns = _detect_columns(df)
     return {"messages": results, "row_count": len(df), "columns": columns}

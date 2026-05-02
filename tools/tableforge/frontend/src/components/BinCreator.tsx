@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ColumnInfo } from '../types';
-import { createBin } from '../api';
+import { API_BASE, createBin } from '../api';
 
 interface Props {
   datasetId: string;
@@ -134,7 +134,7 @@ export function BinCreator({ datasetId, columns, onCreated, onClose }: Props) {
   const autoDetectCodings = async () => {
     if (!sourceCol) return;
     try {
-      const res = await fetch(`/api/bin/auto_detect?dataset_id=${datasetId}&column=${encodeURIComponent(sourceCol)}`);
+      const res = await fetch(`${API_BASE}/bin/auto_detect?dataset_id=${datasetId}&column=${encodeURIComponent(sourceCol)}`);
       if (res.ok) {
         const data = await res.json();
         if (data.mapping && Object.keys(data.mapping).length > 0) {

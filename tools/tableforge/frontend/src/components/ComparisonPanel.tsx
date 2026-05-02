@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ColumnInfo, TableResult, ComparisonConfig } from '../types';
+import { API_BASE } from '../api';
 
 interface Props {
   datasetId: string;
@@ -84,7 +85,7 @@ export function ComparisonPanel({ datasetId, columns, onClose, initialConfig, on
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/compare', {
+      const res = await fetch(`${API_BASE}/compare`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

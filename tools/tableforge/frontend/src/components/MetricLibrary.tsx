@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { API_BASE } from '../api';
 
 interface LibraryMetric {
   id: string;
@@ -47,7 +48,7 @@ export function MetricLibrary({ datasetId, onImported, onClose, metricToSave }: 
       if (search) params.set('search', search);
       if (filterCategory) params.set('category', filterCategory);
       if (filterTag) params.set('tag', filterTag);
-      const res = await fetch(`/api/library/metrics?${params}`);
+      const res = await fetch(`${API_BASE}/library/metrics?${params}`);
       if (res.ok) {
         const data = await res.json();
         setMetrics(data.metrics || []);
@@ -68,7 +69,7 @@ export function MetricLibrary({ datasetId, onImported, onClose, metricToSave }: 
     setImporting(metricId);
     setError('');
     try {
-      const res = await fetch(`/api/library/metrics/${metricId}/import?dataset_id=${datasetId}`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/library/metrics/${metricId}/import?dataset_id=${datasetId}`, { method: 'POST' });
       if (res.ok) {
         setResultMsg(`Imported "${metricName}" into project`);
         if (onImported) onImported(metricName);
@@ -86,7 +87,7 @@ export function MetricLibrary({ datasetId, onImported, onClose, metricToSave }: 
   const handleDelete = async (metricId: string, metricName: string) => {
     if (!window.confirm(`Remove "${metricName}" from library?`)) return;
     try {
-      const res = await fetch(`/api/library/metrics/${metricId}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/library/metrics/${metricId}`, { method: 'DELETE' });
       if (res.ok) { setResultMsg(`Deleted "${metricName}"`); fetchMetrics(); }
     } catch {
       setError('Delete failed');
@@ -97,7 +98,7 @@ export function MetricLibrary({ datasetId, onImported, onClose, metricToSave }: 
     if (!saveName.trim() || !metricToSave) return;
     setSaving(true); setError('');
     try {
-      const res = await fetch('/api/library/metrics', {
+      const res = await fetch(`${API_BASE}/library/metrics`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

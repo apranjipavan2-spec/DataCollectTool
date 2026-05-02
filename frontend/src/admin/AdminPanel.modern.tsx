@@ -75,7 +75,7 @@ export default function AdminPanel() {
   const user = getStoredUser() || { name: '', role: '' }
   const sidebarItems = getNavItems(user.role)
 
-  const [tab, setTab] = useState<'overview' | 'tenants' | 'progress'>('overview')
+  const [tab, setTab] = useState<'overview' | 'tenants' | 'progress' | 'files'>('overview')
   const [error, setError] = useState('')
 
   // ── Tenants ──
@@ -97,6 +97,14 @@ export default function AdminPanel() {
   const [drillUsers, setDrillUsers] = useState<DrillUser[]>([])
   const [drillStats, setDrillStats] = useState<EnumStat[]>([])
   const [loadingDrill, setLoadingDrill] = useState(false)
+
+  // ── Shared Files ──
+  const [sharedFiles, setSharedFiles] = useState<any[]>([])
+  const [loadingFiles, setLoadingFiles] = useState(false)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [fileDesc, setFileDesc] = useState('')
+  const [fileShareTenants, setFileShareTenants] = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
 
   const totals = useMemo(() => ({
     users: tenants.reduce((s, t) => s + t.users_count, 0),
@@ -172,6 +180,50 @@ export default function AdminPanel() {
     setTab('tenants')
   }
 
+  // ── Shared Files ──
+  const loadSharedFiles = async () => {
+    setLoadingFiles(true)
+    try {
+      const { data } = await api.get('/shared-files/')
+      setSharedFiles(data)
+    } catch { /* ignore */ }
+    finally { setLoadingFiles(false) }
+  }
+
+  useEffect(() => {
+    if (tab === 'files') loadSharedFiles()
+  }, [tab])
+
+  const handleUploadFile = async () => {
+    if (!uploadFile) return
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', uploadFile)
+      fd.append('description', fileDesc)
+      fd.append('shared_with_tenants', fileShareTenants.join(','))
+      await api.post('/shared-files/', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      setUploadFile(null); setFileDesc(''); setFileShareTenants([])
+      await loadSharedFiles()
+    } catch (e: any) { setError(e.response?.data?.detail || 'Upload failed') }
+    finally { setUploading(false) }
+  }
+
+  const handleDeleteFile = async (id: string) => {
+    if (!confirm('Delete this file?')) return
+    try {
+      await api.delete(`/shared-files/${id}`)
+      await loadSharedFiles()
+    } catch (e: any) { setError(e.response?.data?.detail || 'Delete failed') }
+  }
+
+  const handleUpdateSharing = async (id: string, tenantIds: string[]) => {
+    try {
+      await api.patch(`/shared-files/${id}/share`, tenantIds)
+      await loadSharedFiles()
+    } catch (e: any) { setError(e.response?.data?.detail || 'Update failed') }
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -206,10 +258,10 @@ export default function AdminPanel() {
 
           {/* Tabs */}
           <div className="flex gap-1 bg-catalan-surface rounded-lg p-1 w-fit">
-            {(['overview', 'tenants', 'progress'] as const).map(t => (
+            {(['overview', 'tenants', 'progress', 'files'] as const).map(t => (
               <button key={t} onClick={() => { setTab(t); setSelectedTenant(null) }}
                 className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all capitalize ${tab === t ? 'bg-catalan-primary text-white shadow-sm' : 'text-catalan-textMuted hover:text-catalan-text hover:bg-catalan-hover'}`}>
-                {t === 'overview' ? 'Overview' : t === 'tenants' ? 'Tenants' : 'Team Progress'}
+                {t === 'overview' ? 'Overview' : t === 'tenants' ? 'Tenants' : t === 'progress' ? 'Team Progress' : 'Files'}
               </button>
             ))}
           </div>
@@ -435,6 +487,93 @@ export default function AdminPanel() {
                   </Card>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* ── Files Tab ── */}
+          {tab === 'files' && (
+            <div className="space-y-5">
+              {/* Upload Section */}
+              <Card>
+                <h3 className="text-sm font-semibold text-catalan-text mb-3">Upload New File</h3>
+                <div className="space-y-3">
+                  <input type="file" onChange={e => setUploadFile(e.target.files?.[0] || null)} className="block w-full text-sm text-catalan-text file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-catalan-primary file:text-white hover:file:opacity-80" />
+                  <Input label="Description (optional)" value={fileDesc} onChange={e => setFileDesc(e.target.value)} placeholder="What is this file?" />
+                  <div>
+                    <label className="block text-sm font-medium text-catalan-text mb-2">Share with Tenants</label>
+                    <div className="flex flex-wrap gap-2">
+                      {tenants.map(t => (
+                        <label key={t.id} className="flex items-center gap-1.5 text-xs bg-catalan-hover px-2 py-1 rounded cursor-pointer">
+                          <input type="checkbox" checked={fileShareTenants.includes(t.id)} onChange={e => {
+                            if (e.target.checked) setFileShareTenants([...fileShareTenants, t.id])
+                            else setFileShareTenants(fileShareTenants.filter(x => x !== t.id))
+                          }} />
+                          {t.name}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs text-catalan-textMuted mt-1">Leave unchecked to keep file private (only you can see it)</p>
+                  </div>
+                  <Button onClick={handleUploadFile} disabled={!uploadFile || uploading}>
+                    {uploading ? 'Uploading...' : 'Upload File'}
+                  </Button>
+                </div>
+              </Card>
+
+              {/* File List */}
+              <Card>
+                <h3 className="text-sm font-semibold text-catalan-text mb-3">Uploaded Files</h3>
+                {loadingFiles ? <p className="text-sm text-catalan-textMuted">Loading...</p> : sharedFiles.length === 0 ? (
+                  <p className="text-sm text-catalan-textMuted">No files uploaded yet.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-catalan-border text-left text-catalan-textMuted">
+                          <th className="pb-2 pr-4">File</th>
+                          <th className="pb-2 pr-4">Size</th>
+                          <th className="pb-2 pr-4">Description</th>
+                          <th className="pb-2 pr-4">Shared With</th>
+                          <th className="pb-2 pr-4">Uploaded</th>
+                          <th className="pb-2">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sharedFiles.map(f => (
+                          <tr key={f.id} className="border-b border-catalan-border/50">
+                            <td className="py-2 pr-4 font-medium text-catalan-text">{f.filename}</td>
+                            <td className="py-2 pr-4 text-catalan-textMuted">{(f.size / 1024).toFixed(1)} KB</td>
+                            <td className="py-2 pr-4 text-catalan-textMuted">{f.description || '—'}</td>
+                            <td className="py-2 pr-4">
+                              <div className="flex flex-wrap gap-1">
+                                {(f.shared_with || []).length === 0 ? <span className="text-xs text-catalan-textMuted">Private</span> : (f.shared_with as string[]).map((tid: string) => {
+                                  const tn = tenants.find(t => t.id === tid)
+                                  return <span key={tid} className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">{tn?.name || tid.slice(0, 8)}</span>
+                                })}
+                              </div>
+                            </td>
+                            <td className="py-2 pr-4 text-catalan-textMuted text-xs">{f.created_at ? new Date(f.created_at).toLocaleDateString() : '—'}</td>
+                            <td className="py-2">
+                              <div className="flex gap-2">
+                                <a href={`${api.defaults.baseURL}/shared-files/${f.id}/download`} target="_blank" rel="noopener" className="text-xs text-catalan-primary hover:underline">Download</a>
+                                <button onClick={() => handleDeleteFile(f.id)} className="text-xs text-red-500 hover:underline">Delete</button>
+                                <button onClick={() => {
+                                  const allIds = tenants.map(t => t.id)
+                                  const current = f.shared_with || []
+                                  const newIds = current.length === allIds.length ? [] : allIds
+                                  handleUpdateSharing(f.id, newIds)
+                                }} className="text-xs text-blue-500 hover:underline">
+                                  {(f.shared_with || []).length === tenants.length ? 'Unshare All' : 'Share All'}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
             </div>
           )}
         </div>

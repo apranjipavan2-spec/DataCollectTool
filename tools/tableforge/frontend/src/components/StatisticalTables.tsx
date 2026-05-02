@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ColumnInfo } from '../types';
+import { API_BASE } from '../api';
 
 type StatType = 'correlation' | 'descriptive' | 'crosstab' | 'ttest' | 'anova' | 'regression' | 'normality' | 'outlier' | 'frequency';
 
@@ -55,7 +56,7 @@ export function StatisticalTables({ type, datasetId, columns, onClose }: Props) 
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/stat/${type}`, {
+      const res = await fetch(`${API_BASE}/stat/${type}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dataset_id: datasetId, columns: selectedCols }),

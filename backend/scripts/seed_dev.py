@@ -103,6 +103,21 @@ _PATCHES = [
     "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS participant_type_id UUID REFERENCES program_participant_types(id) ON DELETE SET NULL",
     "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS questionnaire_id UUID REFERENCES program_questionnaires(id) ON DELETE SET NULL",
     "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES program_locations(id) ON DELETE SET NULL",
+    # shared_files table for master_admin file sharing
+    """CREATE TABLE IF NOT EXISTS shared_files (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        uploaded_by UUID NOT NULL REFERENCES users(id),
+        filename VARCHAR NOT NULL,
+        original_filename VARCHAR NOT NULL,
+        mime_type VARCHAR,
+        file_size_bytes INTEGER,
+        description TEXT DEFAULT '',
+        disk_path VARCHAR NOT NULL,
+        shared_with_tenants UUID[] DEFAULT '{}',
+        is_global BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ DEFAULT now()
+    )""",
 ]
 
 from sqlalchemy import text as _text

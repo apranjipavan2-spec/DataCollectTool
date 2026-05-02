@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { TableResult, TableConfig, NumberFormat, ConditionalFormat, ColumnGroup } from '../types';
+import { API_BASE } from '../api';
 import { AnnotationContextMenu, Annotation } from './AnnotationOverlay';
 
 interface Props {
@@ -101,7 +102,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
     }
 
     try {
-      const res = await fetch('/api/drilldown', {
+      const res = await fetch(`${API_BASE}/drilldown`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

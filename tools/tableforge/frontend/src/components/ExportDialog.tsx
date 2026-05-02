@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TableResult, TableConfig } from '../types';
+import { API_BASE } from '../api';
 
 interface Props {
   datasetId: string;
@@ -76,7 +77,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
         return;
       }
 
-      const res = await fetch('/api/export', {
+      const res = await fetch(`${API_BASE}/export`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -91,7 +92,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
 
       // Trigger browser download
       if (data.download_filename) {
-        triggerDownload(`/api/export/download/${data.download_filename}`, data.download_filename);
+        triggerDownload(`${API_BASE}/export/download/${data.download_filename}`, data.download_filename);
       }
     } catch (e: any) {
       setError(e.message || 'Export failed');
@@ -128,20 +129,20 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
 
     try {
       const [xlsxRes, docxRes] = await Promise.all([
-        fetch('/api/export', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        fetch(`${API_BASE}/export`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dataset_id: datasetId, tables: exportData, format: 'xlsx', filename: filename + '_batch', options: opts }) }),
-        fetch('/api/export', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        fetch(`${API_BASE}/export`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dataset_id: datasetId, tables: exportData, format: 'docx', filename: filename + '_batch', options: opts }) }),
       ]);
       const xlsxData = xlsxRes.ok ? await xlsxRes.json() : null;
       const docxData = docxRes.ok ? await docxRes.json() : null;
       if (xlsxData?.download_filename) {
-        triggerDownload(`/api/export/download/${xlsxData.download_filename}`, xlsxData.download_filename);
+        triggerDownload(`${API_BASE}/export/download/${xlsxData.download_filename}`, xlsxData.download_filename);
       }
       if (docxData?.download_filename) {
         // Small delay to ensure first download starts before triggering second
         await new Promise(r => setTimeout(r, 100));
-        triggerDownload(`/api/export/download/${docxData.download_filename}`, docxData.download_filename);
+        triggerDownload(`${API_BASE}/export/download/${docxData.download_filename}`, docxData.download_filename);
       }
       setResultMsg('Batch export complete: Excel + Word downloaded');
     } catch (e: any) {

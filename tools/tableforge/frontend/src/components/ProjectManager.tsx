@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TableConfig } from '../types';
-import { rollbackProject, fgSaveProject } from '../api';
+import { rollbackProject, fgSaveProject, API_BASE } from '../api';
 
 interface ProjectEntry {
   name: string;
@@ -47,7 +47,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchResults, setBatchResults] = useState<any[]>([]);
   const [projectPassword, setProjectPassword] = useState('');
-  const [saveMode, setSaveMode] = useState<'server' | 'download'>('server');
+  const [saveMode, setSaveMode] = useState<'server' | 'download' | 'fg'>('server');
 
   // Auto-association: check if there's a last project for the current file
   const lastProjectName = currentFilename ? localStorage.getItem(`tableforge_last_project_${currentFilename}`) : null;
@@ -63,7 +63,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
   const [projectsDir, setProjectsDir] = useState('');
 
   useEffect(() => {
-    fetch('/api/projects')
+    fetch(`${API_BASE}/projects`)
       .then(r => r.json())
       .then(d => { setProjects(d.projects || []); setProjectsDir(d.projects_dir || ''); })
       .catch(() => setProjects([]))
@@ -81,7 +81,6 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
         col_count: currentColCount,
       } : undefined;
       if (saveMode === 'download') {
-        // Download to user-chosen location via browser Save As dialog
         const projectData = {
           meta: {
             name: saveName.trim(), version: '2.1', created: new Date().toISOString(),
@@ -101,9 +100,15 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         setSuccess(`Project "${saveName}" downloaded! You can import it later from any location.`);
+      } else if (saveMode === 'fg' && fgContext) {
+        await fgSaveProject(
+          fgContext.fgUrl, fgContext.token, saveName.trim(),
+          fgContext.programId || null,
+          { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null },
+        );
+        setSuccess(`Project "${saveName}" saved to FieldGovern! Access it from any device via your account.`);
       } else {
-        // Save to server projects directory
-        const res = await fetch('/api/project/save', {
+        const res = await fetch(`${API_BASE}/project/save`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: saveName.trim(), config: { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, dataset_id: currentDatasetId, source_file: sourceFileInfo }, password: projectPassword || undefined }),
@@ -111,7 +116,6 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
         if (!res.ok) throw new Error(await res.text());
         const saveResult = await res.json();
         const savedPath = saveResult.path || '';
-        // Also save to FieldGovern DB if authenticated
         if (fgContext) {
           try {
             await fgSaveProject(
@@ -122,8 +126,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
           } catch { /* non-fatal */ }
         }
         setSuccess(`Project "${saveName}" saved!\nLocation: ${savedPath}`);
-        // Refresh list
-        const listRes = await fetch('/api/projects');
+        const listRes = await fetch(`${API_BASE}/projects`);
         const listData = await listRes.json();
         setProjects(listData.projects || []);
       }
@@ -139,7 +142,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
 
   const handleLoad = async (path: string) => {
     try {
-      const res = await fetch('/api/project/load?path=' + encodeURIComponent(path));
+      const res = await fetch(`${API_BASE}/project/load?path=` + encodeURIComponent(path));
       if (!res.ok) throw new Error('Failed to load project');
       const data = await res.json();
       if (data.tables && Array.isArray(data.tables)) {
@@ -249,7 +252,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
                                 if (expandedVersions[p.path]) {
                                   setExpandedVersions(e => { const n = {...e}; delete n[p.path]; return n; });
                                 } else {
-                                  const res = await fetch('/api/project/versions?path=' + encodeURIComponent(p.path));
+                                  const res = await fetch(`${API_BASE}/project/versions?path=` + encodeURIComponent(p.path));
                                   const data = await res.json();
                                   setExpandedVersions(e => ({ ...e, [p.path]: data.versions || [] }));
                                 }
@@ -302,11 +305,17 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
               </div>
               <div className="form-group">
                 <label>Save Location</label>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '6px 12px', borderRadius: 6, border: `1px solid ${saveMode === 'server' ? 'var(--accent)' : 'var(--border)'}`, background: saveMode === 'server' ? 'rgba(59,130,246,0.1)' : 'transparent', fontSize: 13 }}>
                     <input type="radio" name="saveMode" checked={saveMode === 'server'} onChange={() => setSaveMode('server')} />
                     App Storage (quick access)
                   </label>
+                  {fgContext && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '6px 12px', borderRadius: 6, border: `1px solid ${saveMode === 'fg' ? '#22c55e' : 'var(--border)'}`, background: saveMode === 'fg' ? 'rgba(34,197,94,0.1)' : 'transparent', fontSize: 13 }}>
+                      <input type="radio" name="saveMode" checked={saveMode === 'fg'} onChange={() => setSaveMode('fg')} />
+                      FieldGovern Account
+                    </label>
+                  )}
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '6px 12px', borderRadius: 6, border: `1px solid ${saveMode === 'download' ? 'var(--accent)' : 'var(--border)'}`, background: saveMode === 'download' ? 'rgba(59,130,246,0.1)' : 'transparent', fontSize: 13 }}>
                     <input type="radio" name="saveMode" checked={saveMode === 'download'} onChange={() => setSaveMode('download')} />
                     Download to My Computer
@@ -315,6 +324,8 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
                 <div className="hint-text" style={{ marginTop: 4 }}>
                   {saveMode === 'server'
                     ? <>Saves to: <code style={{ background: 'rgba(0,0,0,0.2)', padding: '1px 4px', borderRadius: 3, fontSize: 11 }}>{projectsDir || 'projects/'}</code>. Shows up in the Recent tab.</>
+                    : saveMode === 'fg'
+                    ? 'Saves to your FieldGovern account. Access from any device when logged in.'
                     : 'Downloads a .tableforge file to your chosen folder. Import it later from Recent tab.'}
                 </div>
               </div>
@@ -380,7 +391,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
                 onClick={async () => {
                   setBatchRunning(true); setBatchResults([]);
                   try {
-                    const res = await fetch('/api/project/batch', {
+                    const res = await fetch(`${API_BASE}/project/batch`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({

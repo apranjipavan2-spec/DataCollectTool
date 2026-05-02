@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType } from './types';
-import { uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, logAuditEvent } from './api';
+import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, logAuditEvent } from './api';
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
 import { LivePreview } from './components/LivePreview';
@@ -92,6 +92,7 @@ export default function App() {
   // Ref so runTabulation always reads the latest project filters without needing them in its dep array
   const projectFiltersRef = useRef<Record<string, string[]>>({});
   const [isDirty, setIsDirty] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [lastProjectHint, setLastProjectHint] = useState<string | null>(null);
   const [pendingProjectData, setPendingProjectData] = useState<any>(null);
   const [resumePrompt, setResumePrompt] = useState<{ data: any; filename: string } | null>(null);
@@ -293,9 +294,10 @@ export default function App() {
   }, [resumePrompt]);
 
   const handleFileUpload = useCallback(async (file: File) => {
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setUploadProgress(0);
     try {
-      const meta = await uploadFile(file);
+      const meta = await uploadFile(file, pct => setUploadProgress(pct));
+      setUploadProgress(null);
       setDataset(meta);
       setTables([createEmptyTable('1', 'Table 1')]);
       setActiveTableIdx(0); setResults(new Map()); setExtraColumns([]);
@@ -311,6 +313,7 @@ export default function App() {
       }
     } catch (e: any) {
       setError(e.message || 'Upload failed');
+      setUploadProgress(null);
     } finally { setLoading(false); }
   }, []);
 
@@ -520,7 +523,7 @@ export default function App() {
 
   const handleLoadProjectByPath = useCallback(async (path: string) => {
     try {
-      const res = await fetch('/api/project/load?path=' + encodeURIComponent(path));
+      const res = await fetch(`${API_BASE}/project/load?path=` + encodeURIComponent(path));
       if (!res.ok) throw new Error('Failed to load project');
       const data = await res.json();
       if (!data.tables || !Array.isArray(data.tables)) throw new Error('Invalid project data');
@@ -622,7 +625,7 @@ export default function App() {
   const refreshAuditLog = useCallback(async () => {
     if (!dataset) return;
     try {
-      const res = await fetch(`/api/audit/${dataset.dataset_id}`);
+      const res = await fetch(`${API_BASE}/audit/${dataset.dataset_id}`);
       if (res.ok) { const data = await res.json(); setAuditLog(data.logs || []); }
     } catch {}
   }, [dataset]);
@@ -634,13 +637,13 @@ export default function App() {
   const handleApplyLastProject = useCallback(async (projectName: string) => {
     try {
       // First list projects to find the path
-      const listRes = await fetch('/api/projects');
+      const listRes = await fetch(`${API_BASE}/projects`);
       const listData = await listRes.json();
       const proj = (listData.projects || []).find((p: any) => p.name === projectName);
       if (!proj) { setError(`Project "${projectName}" not found`); return; }
 
       // Load the project
-      const res = await fetch('/api/project/load?path=' + encodeURIComponent(proj.path));
+      const res = await fetch(`${API_BASE}/project/load?path=` + encodeURIComponent(proj.path));
       if (!res.ok) throw new Error('Failed to load project');
       const data = await res.json();
       if (!data.tables || !Array.isArray(data.tables)) throw new Error('Invalid project data');
@@ -698,6 +701,30 @@ export default function App() {
     } finally { setLoading(false); }
   }, [dataset, tables, runTabulation]);
 
+  const handleTextClean = useCallback(async (action: string, caseType?: string) => {
+    if (!dataset) return;
+    setLoading(true); setError(null);
+    try {
+      const actions: any[] = action === 'trim_whitespace'
+        ? [{ action: 'trim_whitespace' }]
+        : dataset.columns.filter(c => c.type === 'text').map(c => ({ action: 'text_case', column: c.name, case_type: caseType }));
+      if (actions.length === 0) { setError('No text columns found'); setLoading(false); return; }
+      const res = await fetch(`${API_BASE}/dataset/clean_bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataset_id: dataset.dataset_id, actions }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      if (data.columns) setDataset(prev => prev ? { ...prev, columns: data.columns } : prev);
+      tables.forEach(t => { if (t.values.length > 0) runTabulation(t); });
+      setError(null);
+      alert(data.messages?.join('\n') || 'Done');
+    } catch (e: any) {
+      setError(e.message || 'Clean failed');
+    } finally { setLoading(false); }
+  }, [dataset, tables, runTabulation]);
+
   const handleColumnTypeChange = useCallback(async (column: string, newType: string) => {
     if (!dataset) return;
     try {
@@ -749,6 +776,7 @@ export default function App() {
           }}
           onUpdate={() => {}} theme={theme} />
         <WelcomeScreen onFileUpload={handleFileUpload} loading={loading}
+          uploadProgress={uploadProgress}
           fgContext={fgContext}
           onDatasetLoaded={meta => { setDataset(meta); setError(null); }}
           error={pendingProjectData ? null : error}
@@ -847,6 +875,10 @@ export default function App() {
           else if (a === 'dashboard') setActiveTableIdx(-1);
           else if (a === 'theme') setTheme(t => t === 'dark' ? 'light' : 'dark');
           else if (a === 'import' || a === 'import_file') { ribbonFileRef.current?.click(); }
+          else if (a === 'clean_trim') handleTextClean('trim_whitespace');
+          else if (a === 'clean_upper') handleTextClean('text_case', 'upper');
+          else if (a === 'clean_lower') handleTextClean('text_case', 'lower');
+          else if (a === 'clean_proper') handleTextClean('text_case', 'proper');
           else if (a === 'filter_panel') setShowFilterPanel(s => !s);
           else if (a === 'project_filter') setShowProjectFilterPanel(s => !s);
           else if (a.startsWith('load_project:')) handleLoadProjectByPath(a.slice('load_project:'.length));
@@ -1059,6 +1091,16 @@ export default function App() {
         </div>
       </div>
       <StatusBar dataset={dataset} result={currentResult} undoCount={undoStack.length} redoCount={redoStack.length} />
+      {uploadProgress != null && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999 }}>
+          <div style={{ height: 3, background: 'rgba(59,130,246,0.2)' }}>
+            <div style={{ height: '100%', width: `${uploadProgress}%`, background: '#3b82f6', transition: 'width 0.2s' }} />
+          </div>
+          <div style={{ position: 'absolute', top: 6, left: '50%', transform: 'translateX(-50%)', background: 'rgba(15,23,42,0.9)', color: '#e2e8f0', padding: '4px 16px', borderRadius: 4, fontSize: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+            {uploadProgress < 100 ? `Uploading… ${uploadProgress}%` : 'Processing file…'}
+          </div>
+        </div>
+      )}
       {showTour && <OnboardingTour onClose={() => setShowTour(false)} />}
 
       {/* Date grouping suggestion modal */}
