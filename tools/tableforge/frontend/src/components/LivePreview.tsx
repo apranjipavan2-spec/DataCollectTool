@@ -420,7 +420,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                         setEditHeaderVal(displayH);
                       }
                     }}
-                    style={{ cursor: 'pointer', borderColor: tv.borderColor, textAlign: headerAlign as any, ...(isSubtotalCol ? { fontWeight: 'bold', background: '#e8e8e8' } : {}), ...getHeaderStyle(h, tv) }}>
+                    style={{ cursor: 'pointer', borderColor: tv.borderColor, textAlign: headerAlign as any, ...(isSubtotalCol ? { fontWeight: 600, background: 'rgba(59,130,246,0.08)' } : {}), ...getHeaderStyle(h, tv) }}>
                     {editingHeader === i ? (
                       <input
                         autoFocus
@@ -502,7 +502,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                           textAlign: (ci < numRowFields ? rowLabelAlign : cellAlign) as any,
                           ...(ci < numRowFields && rowLabelBg && !isGrandTotal ? { backgroundColor: rowLabelBg } : {}),
                           ...(ci >= numRowFields && tableBgColor && !isGrandTotal ? { backgroundColor: tableBgColor } : {}),
-                          ...(isSubtotalCol && !isGrandTotal ? { fontWeight: 'bold', backgroundColor: '#f0f0f0' } : {}),
+                          ...(isSubtotalCol && !isGrandTotal ? { fontWeight: 600, backgroundColor: 'rgba(59,130,246,0.04)' } : {}),
                           ...cfStyle, ...annStyle, ...(colW ? { minWidth: colW } : {}),
                         }}
                         onClick={() => { setKbCell({ r: ri, c: ci }); handleCellClick(ri, ci); }}

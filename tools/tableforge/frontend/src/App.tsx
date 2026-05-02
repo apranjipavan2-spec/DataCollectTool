@@ -83,6 +83,8 @@ export default function App() {
   const [annotationsMap, setAnnotationsMap] = useState<Record<string, AnnotationType[]>>({});
   const [reportTemplate, setReportTemplate] = useState<{ elements: any[]; docStyle: any } | null>(null);
   const [tableInterpretations, setTableInterpretations] = useState<Record<string, string>>({});
+  const [expandedInterpretations, setExpandedInterpretations] = useState<Record<string, boolean>>({});
+  const [editingInterpretation, setEditingInterpretation] = useState<string | null>(null);
   const [auditLog, setAuditLog] = useState<{ timestamp: string; action: string; details: string }[]>([]);
   const [metricNames, setMetricNames] = useState<string[]>([]);
   const [binNames, setBinNames] = useState<string[]>([]);
@@ -1130,11 +1132,35 @@ export default function App() {
             }}
           />}
           {tableInterpretations[activeTable?.id] && (
-            <div style={{ margin: '8px 12px', padding: '12px 16px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 8, fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', position: 'relative' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>AI Interpretation</div>
-              {tableInterpretations[activeTable.id]}
-              <button onClick={() => setTableInterpretations(prev => { const n = { ...prev }; delete n[activeTable.id]; return n; })}
-                style={{ position: 'absolute', top: 8, right: 8, background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 14 }} title="Remove">×</button>
+            <div style={{ margin: '8px 12px', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 8, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => setExpandedInterpretations(prev => ({ ...prev, [activeTable.id]: !(prev[activeTable.id] ?? true) }))}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, transform: (expandedInterpretations[activeTable.id] ?? true) ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s', display: 'inline-block' }}>▼</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>AI Interpretation</span>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={e => { e.stopPropagation(); setEditingInterpretation(editingInterpretation === activeTable.id ? null : activeTable.id); }}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 12, padding: '2px 6px' }} title="Edit">✏️</button>
+                  <button onClick={e => { e.stopPropagation(); setTableInterpretations(prev => { const n = { ...prev }; delete n[activeTable.id]; return n; }); }}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 12, padding: '2px 6px' }} title="Remove">×</button>
+                </div>
+              </div>
+              {(expandedInterpretations[activeTable.id] ?? true) && (
+                <div style={{ padding: '0 14px 12px' }}>
+                  {editingInterpretation === activeTable.id ? (
+                    <textarea
+                      value={tableInterpretations[activeTable.id]}
+                      onChange={e => setTableInterpretations(prev => ({ ...prev, [activeTable.id]: e.target.value }))}
+                      onBlur={() => setEditingInterpretation(null)}
+                      style={{ width: '100%', minHeight: 120, resize: 'vertical', fontSize: 13, lineHeight: 1.6, padding: '8px 10px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, color: 'var(--text)', fontFamily: 'inherit' }}
+                      autoFocus
+                    />
+                  ) : (
+                    <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', color: 'var(--text)' }}>{tableInterpretations[activeTable.id]}</div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -56,12 +56,16 @@ export function AISmartPanel({ mode, table, dataset, result, interpretation, onC
   const [configProvider, setConfigProvider] = useState('');
   const [configApiKey, setConfigApiKey] = useState('');
   const [configModel, setConfigModel] = useState('');
+  const [configHasKey, setConfigHasKey] = useState(false);
+  const [availableModels, setAvailableModels] = useState<Record<string, { id: string; name: string }[]>>({});
 
   useEffect(() => {
     if (mode === 'config') {
       fetch(`${API_BASE}/ai/config`).then(r => r.json()).then(d => {
         setConfigProvider(d.provider || '');
         setConfigModel(d.model || '');
+        setConfigHasKey(d.has_key || false);
+        if (d.models) setAvailableModels(d.models);
       }).catch(() => {});
     }
   }, [mode]);
@@ -350,13 +354,14 @@ export function AISmartPanel({ mode, table, dataset, result, interpretation, onC
         );
 
       case 'config':
+        const providerModels = availableModels[configProvider] || [];
         return (
           <div className="ai-panel-body">
             <p className="ai-desc">Configure your AI provider for TableForge analysis features.</p>
             <div className="ai-config-form">
               <div className="ai-result-field">
                 <label>Provider:</label>
-                <select value={configProvider} onChange={e => setConfigProvider(e.target.value)} className="fdrop-select" style={{ width: '100%' }}>
+                <select value={configProvider} onChange={e => { setConfigProvider(e.target.value); setConfigModel(''); }} className="fdrop-select" style={{ width: '100%' }}>
                   <option value="">-- Select --</option>
                   <option value="openai">OpenAI (GPT-4o)</option>
                   <option value="anthropic">Anthropic (Claude)</option>
@@ -365,15 +370,28 @@ export function AISmartPanel({ mode, table, dataset, result, interpretation, onC
                 </select>
               </div>
               <div className="ai-result-field">
-                <label>API Key:</label>
+                <label>API Key:{configHasKey && !configApiKey && <span style={{ fontSize: 11, color: '#22c55e', marginLeft: 6 }}>(saved)</span>}</label>
                 <input type="password" value={configApiKey} onChange={e => setConfigApiKey(e.target.value)}
-                  placeholder="Enter API key..." className="fdrop-input" style={{ width: '100%' }} />
+                  placeholder={configHasKey ? '••••••••  (leave blank to keep current)' : 'Enter API key...'}
+                  className="fdrop-input" style={{ width: '100%' }} />
+                {configHasKey && configApiKey && (
+                  <button style={{ fontSize: 11, color: '#f87171', background: 'none', border: 'none', cursor: 'pointer', marginTop: 4, padding: 0 }}
+                    onClick={() => setConfigApiKey('')}>Clear (keep saved key)</button>
+                )}
               </div>
               <div className="ai-result-field">
-                <label>Model (optional):</label>
-                <input type="text" value={configModel} onChange={e => setConfigModel(e.target.value)}
-                  placeholder={configProvider === 'deepseek' ? 'deepseek-v4-flash' : configProvider === 'gemini' ? 'gemini-2.0-flash' : 'auto'}
-                  className="fdrop-input" style={{ width: '100%' }} />
+                <label>Model:</label>
+                {providerModels.length > 0 ? (
+                  <select value={configModel} onChange={e => setConfigModel(e.target.value)} className="fdrop-select" style={{ width: '100%' }}>
+                    <option value="">Auto (recommended)</option>
+                    {providerModels.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input type="text" value={configModel} onChange={e => setConfigModel(e.target.value)}
+                    placeholder="Select a provider first" className="fdrop-input" style={{ width: '100%' }} />
+                )}
               </div>
               <button className="btn-primary" onClick={handleSaveConfig} disabled={loading} style={{ marginTop: 12 }}>
                 {loading ? 'Saving...' : 'Save Configuration'}

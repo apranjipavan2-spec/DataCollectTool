@@ -1438,7 +1438,7 @@ async def tabulate(config: TableConfig):
                     "bottom": [str(b) for b in bot_labels],
                     "has_multi_level": len(set(str(t) for t in top_labels)) > 1,
                 }
-                pivot.columns = [" | ".join(str(c) for c in col).strip() for col in pivot.columns]
+                pivot.columns = [" | ".join(str(c) for c in col if str(c) != "").strip() for col in pivot.columns]
 
             pivot = pivot.reset_index()
 
@@ -1478,22 +1478,22 @@ async def tabulate(config: TableConfig):
             def apply_pivot_show_as(pivot_df, sa, decimal_places):
                 numeric_cols = pivot_df.select_dtypes(include=[np.number]).columns
                 # Exclude Grand Total and Subtotal columns from percentage calculations
-                data_cols = [c for c in numeric_cols if str(c) != "Grand Total" and "| Subtotal" not in str(c)]
-                has_margin_col = "Grand Total" in [str(c) for c in numeric_cols]
+                data_cols = [c for c in numeric_cols if not str(c).startswith("Grand Total") and "| Subtotal" not in str(c)]
+                has_margin_col = any(str(c).startswith("Grand Total") for c in numeric_cols)
+
+                def _is_gt_col(col_name):
+                    return str(col_name).startswith("Grand Total")
+
+                def _is_subtotal_col(col_name):
+                    return "| Subtotal" in str(col_name)
 
                 if sa == "pct_row":
-                    # Use only data columns (not Grand Total column) for row sums
                     row_sums = pivot_df[data_cols].sum(axis=1) if data_cols else pivot_df[numeric_cols].sum(axis=1)
                     for c in numeric_cols:
                         pivot_df[c] = (pivot_df[c] / row_sums.replace(0, np.nan) * 100).round(decimal_places)
-                    # Grand Total column for each row should be 100%
-                    if has_margin_col and "Grand Total" in pivot_df.columns:
-                        # For the Grand Total row, set margin cell to 100%
-                        pass  # already correct: GT col = row_sum / row_sum * 100 = 100%
                 elif sa == "pct_col":
                     for c in numeric_cols:
-                        # For pct_col, exclude the Grand Total row from the column sum
-                        if str(c) == "Grand Total":
+                        if _is_gt_col(c) or _is_subtotal_col(c):
                             continue
                         col_data = pivot_df[c]
                         # Use the Grand Total row value as the denominator if margins exist
@@ -1508,8 +1508,9 @@ async def tabulate(config: TableConfig):
                         if col_sum != 0:
                             pivot_df[c] = (pivot_df[c] / col_sum * 100).round(decimal_places)
                     # Grand Total column should show 100% for each row
-                    if has_margin_col and "Grand Total" in pivot_df.columns:
-                        pivot_df["Grand Total"] = 100.0
+                    gt_col = next((c for c in pivot_df.columns if _is_gt_col(c)), None)
+                    if has_margin_col and gt_col:
+                        pivot_df[gt_col] = 100.0
                 elif sa == "pct_grand":
                     # Use only data columns to calculate the grand total (exclude margin column)
                     grand = pivot_df[data_cols].values.sum() if data_cols else pivot_df[numeric_cols].values.sum()
@@ -1538,6 +1539,11 @@ async def tabulate(config: TableConfig):
                     pivot[c] = combined
             elif show_as and show_as != "normal":
                 apply_pivot_show_as(pivot, show_as, dec)
+
+            # Apply decimal rounding to all numeric columns
+            if dec is not None:
+                for c in pivot.select_dtypes(include=[np.number]).columns:
+                    pivot[c] = pivot[c].round(int(dec))
 
             headers = [str(c) for c in pivot.columns]
             rows = sanitize_for_json(pivot.fillna(config.missing_data).values.tolist())
@@ -4182,53 +4188,93 @@ async def _call_llm(cfg: dict, prompt: str) -> str:
 
     LLM_TIMEOUT = 300
 
-    if provider == "openai":
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=key, timeout=LLM_TIMEOUT)
-        r = await client.chat.completions.create(
-            model=model or "gpt-4o", messages=[{"role": "user", "content": prompt}], max_tokens=4096,
-        )
-        return r.choices[0].message.content or ""
+    try:
+        if provider == "openai":
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=key, timeout=LLM_TIMEOUT)
+            r = await client.chat.completions.create(
+                model=model or "gpt-4o", messages=[{"role": "user", "content": prompt}], max_tokens=4096,
+            )
+            return r.choices[0].message.content or ""
 
-    elif provider == "anthropic":
-        from anthropic import AsyncAnthropic
-        client = AsyncAnthropic(api_key=key, timeout=LLM_TIMEOUT)
-        r = await client.messages.create(
-            model=model or "claude-sonnet-4-6", max_tokens=4096,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return r.content[0].text
+        elif provider == "anthropic":
+            from anthropic import AsyncAnthropic
+            client = AsyncAnthropic(api_key=key, timeout=LLM_TIMEOUT)
+            r = await client.messages.create(
+                model=model or "claude-sonnet-4-6", max_tokens=4096,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return r.content[0].text
 
-    elif provider == "gemini":
-        import asyncio
-        import google.generativeai as genai
-        genai.configure(api_key=key)
-        m = genai.GenerativeModel(model or "gemini-2.0-flash")
-        r = await asyncio.wait_for(m.generate_content_async(prompt), timeout=LLM_TIMEOUT)
-        return r.text
+        elif provider == "gemini":
+            import asyncio
+            import google.generativeai as genai
+            genai.configure(api_key=key)
+            m = genai.GenerativeModel(model or "gemini-2.5-flash")
+            r = await asyncio.wait_for(m.generate_content_async(prompt), timeout=LLM_TIMEOUT)
+            return r.text
 
-    elif provider == "deepseek":
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=key, base_url="https://api.deepseek.com", timeout=LLM_TIMEOUT)
-        r = await client.chat.completions.create(
-            model=model or "deepseek-v4-flash", messages=[{"role": "user", "content": prompt}], max_tokens=8192,
-        )
-        return r.choices[0].message.content or ""
+        elif provider == "deepseek":
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=key, base_url="https://api.deepseek.com", timeout=LLM_TIMEOUT)
+            r = await client.chat.completions.create(
+                model=model or "deepseek-v4-flash", messages=[{"role": "user", "content": prompt}], max_tokens=8192,
+            )
+            return r.choices[0].message.content or ""
 
-    raise HTTPException(400, f"Unsupported AI provider: {provider}")
+        else:
+            raise HTTPException(400, f"Unsupported AI provider: {provider}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(502, f"AI provider error ({provider}): {str(e)}")
+
+
+AI_MODELS = {
+    "gemini": [
+        {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash (fast, recommended)"},
+        {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro (best quality)"},
+        {"id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash"},
+        {"id": "gemini-1.5-flash", "name": "Gemini 1.5 Flash (legacy)"},
+    ],
+    "openai": [
+        {"id": "gpt-4o", "name": "GPT-4o (recommended)"},
+        {"id": "gpt-4o-mini", "name": "GPT-4o Mini (faster, cheaper)"},
+        {"id": "gpt-4-turbo", "name": "GPT-4 Turbo"},
+    ],
+    "anthropic": [
+        {"id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6 (recommended)"},
+        {"id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5 (fast)"},
+    ],
+    "deepseek": [
+        {"id": "deepseek-chat", "name": "DeepSeek Chat (V3)"},
+        {"id": "deepseek-reasoner", "name": "DeepSeek Reasoner (R1)"},
+    ],
+}
 
 
 @app.get("/api/ai/config")
 async def get_ai_config():
     cfg = _load_ai_cfg()
-    return {"provider": cfg.get("provider", ""), "model": cfg.get("model", ""), "configured": bool(cfg.get("api_key"))}
+    return {
+        "provider": cfg.get("provider", ""),
+        "model": cfg.get("model", ""),
+        "configured": bool(cfg.get("api_key")),
+        "has_key": bool(cfg.get("api_key")),
+        "models": AI_MODELS,
+    }
 
 
 @app.post("/api/ai/config")
 async def set_ai_config(body: dict):
-    provider = body.get("provider", "")
-    api_key = body.get("api_key", "")
-    model = body.get("model", "")
+    # Load existing config to preserve API key if not re-entered
+    existing = {}
+    if AI_CONFIG_FILE.exists():
+        try: existing = json.loads(AI_CONFIG_FILE.read_text())
+        except Exception: pass
+    provider = body.get("provider") or existing.get("provider", "")
+    api_key = body.get("api_key") or existing.get("api_key", "")
+    model = body.get("model") or ""
     data = {"provider": provider, "api_key": api_key, "model": model}
     AI_CONFIG_FILE.write_text(json.dumps(data))
     return {"status": "ok", "provider": provider, "model": model}
