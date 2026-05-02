@@ -395,6 +395,16 @@ export function AISmartPanel({ mode, table, dataset, result, interpretation, onC
     'config': '⚙ AI Configuration',
   };
 
+  const loadingMessages: Record<string, string> = {
+    'polish': 'Analyzing table structure and generating polished labels…',
+    'interpret': 'Reading data patterns and writing interpretation…',
+    'refine': 'Refining interpretation with new focus…',
+    'suggest': 'Analyzing dataset and recommending table configurations…',
+    'smart-build': 'Designing optimal table from your columns…',
+    'report': 'Composing full analysis report…',
+    'config': 'Saving configuration…',
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 600, maxHeight: '80vh' }} onClick={e => e.stopPropagation()}>
@@ -402,9 +412,21 @@ export function AISmartPanel({ mode, table, dataset, result, interpretation, onC
           <h2>{titles[mode] || 'AI-Smart'}</h2>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
-        <div className="modal-body" style={{ overflow: 'auto' }}>
+        <div className="modal-body" style={{ overflow: 'auto', position: 'relative' }}>
           {error && <div className="error-msg" style={{ marginBottom: 10 }}>{error}</div>}
-          {renderContent()}
+          {loading && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '32px 20px' }}>
+              <div style={{ width: 36, height: 36, border: '3px solid rgba(59,130,246,0.15)', borderTop: '3px solid #3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              <span style={{ fontSize: 13, color: 'var(--text-dim, #94a3b8)', textAlign: 'center' }}>
+                {loadingMessages[mode] || 'Processing…'}
+              </span>
+              <div style={{ width: '80%', height: 3, background: 'rgba(59,130,246,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ width: '100%', height: '100%', background: '#3b82f6', animation: 'indeterminate 1.5s ease-in-out infinite' }} />
+              </div>
+              <style>{`@keyframes spin{to{transform:rotate(360deg)}}@keyframes indeterminate{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}`}</style>
+            </div>
+          )}
+          {!loading && renderContent()}
         </div>
       </div>
     </div>
