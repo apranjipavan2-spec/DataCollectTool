@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, StreamingResponse
 from pathlib import Path
 
 # Import all route routers
@@ -49,12 +50,12 @@ app.include_router(compare_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
 app.include_router(fg_router, prefix="/api")
 
-# Serve frontend static files
+# Serve frontend static files (production)
 STATIC_DIR = BASE_DIR / "static"
 STATIC_DIR.mkdir(exist_ok=True)
 app.mount("/assets", StaticFiles(directory=str(STATIC_DIR)), name="assets")
 
-# Health check
+# Health check endpoint
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
