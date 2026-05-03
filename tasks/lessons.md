@@ -41,6 +41,21 @@
 **Why:** Avoids adding ~150KB to the main bundle for a feature only supervisors use. CDN load is cached after first visit.  
 **How to apply:** Check `window.L` before injecting; use `script.onload = initMap` callback; guard with `if (!document.getElementById('leaflet-js'))` to prevent double-inject.
 
+## L011 — JWT payload user ID is under `sub`, not `id`
+**Pattern:** The `get_current_user` dependency returns a dict where the user's UUID is at `user["sub"]`, not `user["id"]`.  
+**Why:** JWTs use the standard `sub` (subject) claim. `user["id"]` does not exist and silently causes `KeyError` or `None` in FK fields.  
+**How to apply:** Always use `user["sub"]` for the user's ID, `user["tenant_id"]` for tenant, `user["role"]` for role.
+
+## L012 — IndexedDB / localStorage keys must include user ID to prevent cross-user cache bleed
+**Pattern:** Use `fg_last_form_cache_{userId}` not `fg_last_form_cache` when caching per-user data in IndexedDB/localStorage.  
+**Why:** On shared devices, the previous user's cached form/program selection persists for the next login — causes wrong data displayed.  
+**How to apply:** Any localStorage key that caches user-specific state must include the user's ID in the key.
+
+## L013 — master_admin nav items require both navigation.ts AND route guard
+**Pattern:** Adding a nav item for master_admin in `navigation.ts` without a matching role guard in App.tsx allows other roles to navigate directly via URL.  
+**Why:** Nav visibility and route access are independent. A supervisor can type `/admin/...` directly if the route has no role check.  
+**How to apply:** Every nav item that's role-restricted must have a matching `<Route>` wrapped in a role-guard component in App.tsx.
+
 ## L007 — seed_dev.py fast-path skips patches on warm restart
 **Pattern:** The seed exits early if `Demo Org` tenant exists. Schema patches run BEFORE that check, so they always apply.  
 **Why:** This is intentional — patches must always run to handle incremental column additions on existing DBs.

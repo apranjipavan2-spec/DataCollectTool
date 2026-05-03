@@ -54,13 +54,15 @@
 - [x] AI tab hidden from org_admin (master_admin only)
 - [x] Import item removed from org_admin sidebar
 
-## 📋 Next Sprint Candidates
+## ✅ Completed (sprint 4)
 
-### Medium Priority
-- [ ] AI form builder assistant (skip logic from plain English)
-- [ ] Auto-translate form labels (one-click Hindi/Kannada/Telugu)
-- [ ] Enumerator performance scorecard (submissions/day, accuracy rate, backcheck pass rate)
-- [ ] Scheduled report delivery (email PDF of FG Writer report on cron)
+- [x] AI form builder assistant — `SkipLogicEditor.tsx` + `suggest_skip_logic()` in `ai_service.py`; AI panel with description input, Generate Rules button, suggestion cards with Apply; endpoint updated to pass `user_description`
+- [x] Auto-translate form labels — verified already fully implemented (lines 85–113 `FormBuilder.modern.tsx`), wired to `/ai/translate`
+- [x] Enumerator performance scorecard — `GET /submissions/enumerator-scorecard`; `ScorecardTab.tsx` lazy-loaded; SQLAlchemy `case()` aggregations for accuracy_rate, backcheck_pass_rate, submissions_per_day
+- [x] Scheduled report delivery — `ScheduledReport` model + migration 0035; `services/scheduled_reports.py`; APScheduler job every hour; `ScheduleModal` in FgWriter; MIME DOCX email attachments
+- [x] Analyzer tabulations saved to Files menu — `saveAnalyzerToolProject()` in `fgStorage.ts`; `tabToCsv()` generates CSV; fire-and-forget on every tabulation save in FgAnalyzer.tsx
+
+## 📋 Next Sprint Candidates
 
 ### Low Priority
 - [ ] DHIS2 push integration

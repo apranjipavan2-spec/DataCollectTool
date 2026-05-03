@@ -38,6 +38,7 @@ credentials/
 
 # Claude Code local settings
 .claude/settings.local.json
+.claude/worktrees/
 
 # External tool sources (not part of FieldPulse)
 caveman-main/
@@ -78,6 +79,7 @@ tools/tableforge/logs/
 tools/tableforge/parquet_cache/
 tools/tableforge/projects/
 tools/tableforge/__pycache__/
+tools/tableforge/backend/*.backup
 tools/tableforge/*.db
 tools/datacleaner/working_copies/
 tools/datacleaner/__pycache__/
