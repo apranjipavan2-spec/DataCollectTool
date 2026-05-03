@@ -4734,22 +4734,43 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
             f"Respond with ONLY valid JSON:\n"
             f'{{"tables": [{{"groupby_field":"...","secondary_groupby":"","value_field":"...","aggregation":"count","template":"frequency","title":"...","description":"..."}}]}}'
         )
-        raw = await _call_llm(cfg, prompt)
-        match = _re.search(r'\{.*\}', raw, _re.DOTALL)
-        if match:
-            try:
-                result = json.loads(match.group())
-                tables = result.get("tables", [])
-                for t in tables:
-                    if t.get("value_field") == "*":
-                        t["value_field"] = t.get("groupby_field", "")
-                        t["aggregation"] = "count"
-                    if not t.get("template"):
-                        t["template"] = "frequency" if not t.get("secondary_groupby") else "count_pct_row"
-                return {"tables": tables}
-            except json.JSONDecodeError:
-                raise HTTPException(502, "AI returned invalid JSON. Try again.")
-        raise HTTPException(502, "AI returned empty response. Try again.")
+        all_tables = []
+        batch_size = 30
+        remaining = body.max_tables
+        batch_num = 0
+        while remaining > 0:
+            this_batch = min(remaining, batch_size)
+            batch_prompt = prompt.replace(
+                f"Generate {body.max_tables} tables",
+                f"Generate {this_batch} tables"
+            )
+            if batch_num > 0 and all_tables:
+                existing_titles = [t.get("title", "") for t in all_tables]
+                batch_prompt += f"\n\nYou already generated these tables (do NOT repeat them):\n{json.dumps(existing_titles)}"
+            raw = await _call_llm(cfg, batch_prompt)
+            match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+            if match:
+                try:
+                    result = json.loads(match.group())
+                    batch_tables = result.get("tables", [])
+                    for t in batch_tables:
+                        if t.get("value_field") == "*":
+                            t["value_field"] = t.get("groupby_field", "")
+                            t["aggregation"] = "count"
+                        if not t.get("template"):
+                            t["template"] = "frequency" if not t.get("secondary_groupby") else "count_pct_row"
+                    all_tables.extend(batch_tables)
+                except json.JSONDecodeError:
+                    if not all_tables:
+                        raise HTTPException(502, "AI returned invalid JSON. Try again.")
+                    break
+            else:
+                if not all_tables:
+                    raise HTTPException(502, "AI returned empty response. Try again.")
+                break
+            remaining -= this_batch
+            batch_num += 1
+        return {"tables": all_tables}
     except HTTPException:
         raise
     except Exception as e:
@@ -4786,26 +4807,41 @@ async def ai_create_column(body: AICreateColumnRequest):
             })
 
         prompt = (
-            f"You are a data engineer. The user wants to create a new computed column in their dataset.\n\n"
+            f"You are a data engineer. The user wants to create a new computed column.\n"
+            f"Think of it like Excel formulas or Power BI conditional columns.\n\n"
             f"Available columns:\n{json.dumps(cols_info, indent=1)}\n\n"
             f"User request: \"{body.description}\"\n\n"
-            f"Decide if this is a METRIC (computation) or a BIN (categorization/grouping).\n\n"
-            f"For METRIC, return JSON with:\n"
-            f'{{"type": "metric", "definition": {{"name": "column_name", "metric_type": "formula|ratio|percentage|growth|weighted_average|conditional|index|rank|cumulative|composite", '
-            f'"column_a": "col_id", "column_b": "col_id", "operator": "+|-|*|/", '
-            f'"numerator": "col_id", "denominator": "col_id", '
-            f'"part": "col_id", "whole": "col_id", '
-            f'"condition_column": "col_id", "condition_op": "==|!=|>|<|>=|<=|contains|not_contains", "condition_value": "val", '
-            f'"then_value_type": "literal|column", "then_value": "val_or_col", "else_value_type": "literal|column", "else_value": "val_or_col", '
-            f'"decimal_places": 2}}}}\n\n'
-            f"For BIN, return JSON with:\n"
-            f'{{"type": "bin", "definition": {{"name": "column_name", "bin_type": "numeric|text|group", '
-            f'"source_column": "col_id", '
-            f'"method": "equal_width|quartiles|custom", "n_bins": 5, '
-            f'"custom_edges": [val1, val2, ...], "custom_labels": ["label1", "label2", ...], '
-            f'"mappings": [{{"from": "original_value", "to": "new_label"}}]}}}}\n\n'
-            f"Use ONLY column ids from the available columns list.\n"
-            f"Return ONLY valid JSON, nothing else."
+            f"Decide if this is a METRIC (computation/formula/conditional) or BIN (categorization/grouping).\n\n"
+            f"METRIC types and their required fields:\n"
+            f"  formula: column_a, operator (+,-,*,/), column_b\n"
+            f"  ratio: numerator, denominator\n"
+            f"  percentage: part, whole\n"
+            f"  growth: current, previous, growth_type (percentage|absolute)\n"
+            f"  weighted_average: value_column, weight_column\n"
+            f"  index: base_column, base_value\n"
+            f"  rank: rank_column, rank_order (asc|desc)\n"
+            f"  cumulative: value_column\n"
+            f"  composite: column_a, operator, column_b (for combining metrics)\n"
+            f"  conditional: cond_column, cond_operator (gt|gte|lt|lte|eq|neq|contains|not_contains), cond_value,\n"
+            f"    cond_then_type (literal|column), cond_then_val or cond_then_col,\n"
+            f"    cond_else_type (literal|column), cond_else_val or cond_else_col\n\n"
+            f"For conditional with multiple conditions (nested IF), use metric_type='conditional' for the outer.\n"
+            f"Set cond_else_type='literal' and cond_else_val to a label for the else case.\n\n"
+            f"BIN types: numeric (ranges), text (mapping), group (category collapsing),\n"
+            f"  equal_width (auto bins), quartile, decile\n"
+            f"  For numeric bins use: source_column, bin_type='numeric',\n"
+            f"    ranges: [{{label, lower, upper}}, ...]\n"
+            f"  For text mapping: source_column, bin_type='text',\n"
+            f"    mapping: {{\"original_value\": \"new_label\", ...}}\n"
+            f"  For category grouping: source_column, bin_type='group',\n"
+            f"    group_map: {{\"group_label\": [\"val1\", \"val2\"], ...}}\n\n"
+            f"Return JSON:\n"
+            f'{{"type": "metric"|"bin", "definition": {{...}}}}\n\n'
+            f"IMPORTANT:\n"
+            f"- Use ONLY column ids from the available columns list\n"
+            f"- Always include a 'name' field for the new column\n"
+            f"- For conditional columns, text comparisons: cond_operator='eq' with cond_value as the text\n"
+            f"- Return ONLY valid JSON, nothing else"
         )
         raw = await _call_llm(cfg, prompt)
         match = _re.search(r'\{.*\}', raw, _re.DOTALL)
