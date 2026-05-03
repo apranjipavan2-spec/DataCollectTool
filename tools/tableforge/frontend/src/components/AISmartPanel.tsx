@@ -5,12 +5,16 @@ import { API_BASE } from '../api';
 interface Props {
   mode: 'polish' | 'interpret' | 'refine' | 'suggest' | 'smart-build' | 'report' | 'config';
   table: TableConfig | null;
+  tables: TableConfig[];
+  allResults: Map<string, TableResult>;
   dataset: DatasetMeta | null;
   result: TableResult | null;
   interpretation?: string;
   onClose: () => void;
   onApplyPolish?: (title: string, subtitle: string, renames: Record<string, string>) => void;
+  onApplyPolishAll?: (updates: { tableId: string; title: string; subtitle: string; renames: Record<string, string> }[]) => void;
   onApplyInterpretation?: (text: string) => void;
+  onApplyInterpretationAll?: (updates: { tableId: string; text: string }[]) => void;
   onApplySuggestion?: (tables: any[]) => void;
   onApplySmartBuild?: (config: any) => void;
 }
@@ -35,14 +39,19 @@ const REPORT_STYLES = [
   { key: 'executive', label: 'Executive Summary' },
 ];
 
-export function AISmartPanel({ mode, table, dataset, result, interpretation, onClose, onApplyPolish, onApplyInterpretation, onApplySuggestion, onApplySmartBuild }: Props) {
+export function AISmartPanel({ mode, table, tables, allResults, dataset, result, interpretation, onClose, onApplyPolish, onApplyPolishAll, onApplyInterpretation, onApplyInterpretationAll, onApplySuggestion, onApplySmartBuild }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [aiResult, setAiResult] = useState<any>(null);
 
+  // Scope: single table or all tables
+  const [scope, setScope] = useState<'single' | 'all'>('single');
+
   // Interpret state
   const [focus, setFocus] = useState('');
   const [customFocus, setCustomFocus] = useState('');
+  const [interpretLength, setInterpretLength] = useState<'auto' | 'short' | 'medium' | 'long'>('auto');
+  const [includeRecommendations, setIncludeRecommendations] = useState(true);
 
   // Smart build state
   const [query, setQuery] = useState('');
@@ -71,53 +80,70 @@ export function AISmartPanel({ mode, table, dataset, result, interpretation, onC
   }, [mode]);
 
   const handlePolish = async () => {
-    if (!table || !dataset || !result) return;
+    if (!dataset) return;
     setLoading(true); setError('');
     try {
-      const res = await fetch(`${API_BASE}/ai/polish`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          dataset_id: dataset.dataset_id,
-          table_title: table.title || table.name,
-          rows: table.rows,
-          columns: table.columns,
-          values: table.values,
-          headers: result.headers,
-          sample_rows: result.rows.slice(0, 15),
-        }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      setAiResult(data);
+      const targetTables = scope === 'all' ? tables : (table ? [table] : []);
+      const allPolishResults: any[] = [];
+      for (const t of targetTables) {
+        const r = allResults.get(t.id);
+        if (!r) continue;
+        const res = await fetch(`${API_BASE}/ai/polish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dataset_id: dataset.dataset_id,
+            table_title: t.title || t.name,
+            rows: t.rows,
+            columns: t.columns,
+            values: t.values,
+            headers: r.headers,
+            sample_rows: r.rows.slice(0, 15),
+          }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        allPolishResults.push({ tableId: t.id, tableName: t.title || t.name, ...data });
+      }
+      setAiResult(scope === 'all' ? { allTables: allPolishResults } : allPolishResults[0]);
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   };
 
   const handleInterpret = async (refine = false) => {
-    if (!table || !dataset || !result) return;
+    if (!dataset) return;
     setLoading(true); setError('');
-    const focusText = customFocus || FOCUS_TEMPLATES.find(f => f.key === focus)?.prompt || '';
+    const templateFocus = FOCUS_TEMPLATES.find(f => f.key === focus)?.prompt || '';
+    const focusText = [templateFocus, customFocus].filter(Boolean).join(' Additionally: ');
     try {
-      const res = await fetch(`${API_BASE}/ai/interpret`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          dataset_id: dataset.dataset_id,
-          table_title: table.title || table.name,
-          subtitle: table.subtitle || '',
-          headers: result.headers,
-          rows_data: result.rows.slice(0, 80),
-          row_fields: table.rows,
-          column_fields: table.columns,
-          value_fields: table.values,
-          focus: focusText,
-          previous_interpretation: refine ? (interpretation || '') : '',
-        }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      setAiResult(data);
+      const targetTables = scope === 'all' ? tables : (table ? [table] : []);
+      const allInterpretResults: any[] = [];
+      for (const t of targetTables) {
+        const r = allResults.get(t.id);
+        if (!r) continue;
+        const res = await fetch(`${API_BASE}/ai/interpret`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dataset_id: dataset.dataset_id,
+            table_title: t.title || t.name,
+            subtitle: t.subtitle || '',
+            headers: r.headers,
+            rows_data: r.rows.slice(0, 80),
+            row_fields: t.rows,
+            column_fields: t.columns,
+            value_fields: t.values,
+            focus: focusText,
+            length: interpretLength,
+            include_recommendations: includeRecommendations,
+            previous_interpretation: refine ? (interpretation || '') : '',
+          }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        allInterpretResults.push({ tableId: t.id, tableName: t.title || t.name, ...data });
+      }
+      setAiResult(scope === 'all' ? { allTables: allInterpretResults } : allInterpretResults[0]);
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   };
@@ -194,8 +220,42 @@ export function AISmartPanel({ mode, table, dataset, result, interpretation, onC
         return (
           <div className="ai-panel-body">
             <p className="ai-desc">AI will analyze your table and suggest a clean title, subtitle, and column labels.</p>
+            {tables.length > 1 && !aiResult && (
+              <div className="ai-scope-select" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <button className={`fdrop-token ${scope === 'single' ? 'active' : ''}`}
+                  style={{ padding: '4px 12px', background: scope === 'single' ? 'rgba(59,130,246,0.3)' : undefined }}
+                  onClick={() => setScope('single')}>Current Table</button>
+                <button className={`fdrop-token ${scope === 'all' ? 'active' : ''}`}
+                  style={{ padding: '4px 12px', background: scope === 'all' ? 'rgba(59,130,246,0.3)' : undefined }}
+                  onClick={() => setScope('all')}>All Tables ({tables.length})</button>
+              </div>
+            )}
             {!aiResult && <button className="btn-primary" onClick={handlePolish} disabled={loading}>{loading ? 'Generating...' : '✨ Polish Title & Headers'}</button>}
-            {aiResult && (
+            {aiResult?.allTables ? (
+              <div className="ai-result">
+                {aiResult.allTables.map((tr: any, idx: number) => (
+                  <div key={tr.tableId} style={{ marginBottom: 16, padding: 10, background: 'rgba(0,0,0,0.1)', borderRadius: 6 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Table {idx + 1}: {tr.tableName}</div>
+                    <div className="ai-result-field"><label>Title:</label><strong>{tr.title}</strong></div>
+                    <div className="ai-result-field"><label>Subtitle:</label><em>{tr.subtitle}</em></div>
+                    {tr.column_labels && Object.keys(tr.column_labels).length > 0 && (
+                      <div className="ai-result-field">
+                        <label>Column Labels:</label>
+                        <div className="ai-labels-grid">
+                          {Object.entries(tr.column_labels).map(([k, v]) => (
+                            <div key={k} className="ai-label-row"><span className="ai-label-key">{k}</span><span>→</span><span className="ai-label-val">{v as string}</span></div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <button className="btn-primary" style={{ marginTop: 12 }} onClick={() => {
+                  onApplyPolishAll?.(aiResult.allTables.map((tr: any) => ({ tableId: tr.tableId, title: tr.title, subtitle: tr.subtitle, renames: tr.column_labels || {} })));
+                  onClose();
+                }}>Apply All Changes</button>
+              </div>
+            ) : aiResult && (
               <div className="ai-result">
                 <div className="ai-result-field"><label>Title:</label><strong>{aiResult.title}</strong></div>
                 <div className="ai-result-field"><label>Subtitle:</label><em>{aiResult.subtitle}</em></div>
@@ -223,6 +283,16 @@ export function AISmartPanel({ mode, table, dataset, result, interpretation, onC
         return (
           <div className="ai-panel-body">
             <p className="ai-desc">{mode === 'refine' ? 'AI will refine your existing interpretation.' : 'AI will generate a narrative interpretation of the table data.'}</p>
+            {tables.length > 1 && !aiResult && (
+              <div className="ai-scope-select" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <button className={`fdrop-token ${scope === 'single' ? 'active' : ''}`}
+                  style={{ padding: '4px 12px', background: scope === 'single' ? 'rgba(59,130,246,0.3)' : undefined }}
+                  onClick={() => setScope('single')}>Current Table</button>
+                <button className={`fdrop-token ${scope === 'all' ? 'active' : ''}`}
+                  style={{ padding: '4px 12px', background: scope === 'all' ? 'rgba(59,130,246,0.3)' : undefined }}
+                  onClick={() => setScope('all')}>All Tables ({tables.length})</button>
+              </div>
+            )}
             <div className="ai-focus-select">
               <label>Focus:</label>
               <select value={focus} onChange={e => setFocus(e.target.value)} className="fdrop-select">
@@ -231,12 +301,37 @@ export function AISmartPanel({ mode, table, dataset, result, interpretation, onC
             </div>
             <div className="ai-focus-custom">
               <input type="text" value={customFocus} onChange={e => setCustomFocus(e.target.value)}
-                placeholder="Or type custom focus prompt..." className="fdrop-input" style={{ width: '100%' }} />
+                placeholder="Add custom instructions (combines with focus above)..." className="fdrop-input" style={{ width: '100%' }} />
             </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+              <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Length:</label>
+              {(['auto', 'short', 'medium', 'long'] as const).map(l => (
+                <button key={l} className={`fdrop-token ${interpretLength === l ? 'active' : ''}`}
+                  style={{ fontSize: 11, padding: '2px 8px', textTransform: 'capitalize', background: interpretLength === l ? 'rgba(59,130,246,0.3)' : undefined }}
+                  onClick={() => setInterpretLength(l)}>{l}</button>
+              ))}
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-dim)', marginBottom: 10, cursor: 'pointer' }}>
+              <input type="checkbox" checked={includeRecommendations} onChange={e => setIncludeRecommendations(e.target.checked)} />
+              Include recommendations & conclusions
+            </label>
             {!aiResult && <button className="btn-primary" onClick={() => handleInterpret(mode === 'refine')} disabled={loading}>
               {loading ? 'Generating...' : mode === 'refine' ? '🔄 Refine Interpretation' : '📝 Generate Interpretation'}
             </button>}
-            {aiResult?.interpretation && (
+            {aiResult?.allTables ? (
+              <div className="ai-result">
+                {aiResult.allTables.map((tr: any, idx: number) => (
+                  <div key={tr.tableId} style={{ marginBottom: 16, padding: 10, background: 'rgba(0,0,0,0.1)', borderRadius: 6 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Table {idx + 1}: {tr.tableName}</div>
+                    <div className="ai-interpretation-text">{tr.interpretation}</div>
+                  </div>
+                ))}
+                <button className="btn-primary" style={{ marginTop: 12 }} onClick={() => {
+                  onApplyInterpretationAll?.(aiResult.allTables.map((tr: any) => ({ tableId: tr.tableId, text: tr.interpretation })));
+                  onClose();
+                }}>Apply All Interpretations</button>
+              </div>
+            ) : aiResult?.interpretation && (
               <div className="ai-result">
                 <div className="ai-interpretation-text">{aiResult.interpretation}</div>
                 <button className="btn-primary" style={{ marginTop: 12 }} onClick={() => {
@@ -286,15 +381,15 @@ export function AISmartPanel({ mode, table, dataset, result, interpretation, onC
             <input type="text" value={query} onChange={e => setQuery(e.target.value)}
               placeholder="Ask a question about your data (or leave empty for best suggestion)..." className="fdrop-input" style={{ width: '100%', marginBottom: 10 }} />
             {dataset && (
-              <div className="ai-col-picker" style={{ maxHeight: 150, overflow: 'auto', marginBottom: 10 }}>
+              <div className="ai-col-picker" style={{ maxHeight: 180, overflow: 'auto', marginBottom: 10 }}>
                 <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Select columns (optional):</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-                  {dataset.columns.map(c => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
+                  {dataset.columns.map((c, idx) => (
                     <button key={c.name}
                       className={`fdrop-token ${selectedCols.includes(c.name) ? 'active' : ''}`}
-                      style={{ fontSize: 11, padding: '2px 6px', background: selectedCols.includes(c.name) ? 'rgba(59,130,246,0.3)' : undefined }}
+                      style={{ fontSize: 11, padding: '3px 8px', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', background: selectedCols.includes(c.name) ? 'rgba(59,130,246,0.3)' : undefined }}
                       onClick={() => setSelectedCols(prev => prev.includes(c.name) ? prev.filter(x => x !== c.name) : [...prev, c.name])}>
-                      {c.name}
+                      <span style={{ color: 'var(--text-dim)', marginRight: 6, minWidth: 18, display: 'inline-block' }}>{idx + 1}.</span>{c.name}
                     </button>
                   ))}
                 </div>
@@ -425,7 +520,7 @@ export function AISmartPanel({ mode, table, dataset, result, interpretation, onC
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 600, maxHeight: '80vh' }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: mode === 'smart-build' ? 480 : 600, maxHeight: '70vh' }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{titles[mode] || 'AI-Smart'}</h2>
           <button className="modal-close" onClick={onClose}>×</button>

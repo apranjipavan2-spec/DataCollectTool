@@ -1261,6 +1261,8 @@ export default function App() {
         <AISmartPanel
           mode={modal.replace('ai-', '') as any}
           table={tables[activeTableIdx] || null}
+          tables={tables}
+          allResults={results}
           dataset={dataset}
           result={results.get(tables[activeTableIdx]?.id) || null}
           interpretation={tableInterpretations[tables[activeTableIdx]?.id] || ''}
@@ -1272,34 +1274,53 @@ export default function App() {
               setTables(prev => prev.map(x => x.id === t.id ? updated : x));
             }
           }}
+          onApplyPolishAll={(updates) => {
+            setTables(prev => prev.map(t => {
+              const u = updates.find(u => u.tableId === t.id);
+              if (!u) return t;
+              return { ...t, title: u.title, subtitle: u.subtitle, header_renames: { ...(t.header_renames || {}), ...u.renames }, _autoTitle: false };
+            }));
+          }}
           onApplyInterpretation={(text) => {
             const t = tables[activeTableIdx];
             if (t) setTableInterpretations(prev => ({ ...prev, [t.id]: text }));
           }}
+          onApplyInterpretationAll={(updates) => {
+            setTableInterpretations(prev => {
+              const next = { ...prev };
+              updates.forEach(u => { next[u.tableId] = u.text; });
+              return next;
+            });
+          }}
           onApplySuggestion={(suggested) => {
-            const newTables = suggested.map((s: any, i: number) => ({
+            const newTables = suggested.map((s: any, i: number) => {
+              const valField = (!s.value_field || s.value_field === '*') ? s.groupby_field : s.value_field;
+              const valAgg = (!s.value_field || s.value_field === '*') ? 'count' : (s.aggregation || 'count');
+              return {
               id: `ai_${Date.now()}_${i}`,
               name: s.title || `AI Table ${i + 1}`,
               rows: [s.groupby_field].filter(Boolean),
               columns: s.secondary_groupby ? [s.secondary_groupby] : [],
-              values: [{ field: s.value_field || '*', agg: s.aggregation || 'count', label: '' }],
+              values: [{ field: valField, agg: valAgg, label: '' }],
               filters: {},
               grand_total: true,
               subtotals: false,
               missing_data: '',
               title: s.title || '',
               subtitle: s.description || '',
-            }));
+            };});
             setTables(prev => [...prev, ...newTables]);
             setActiveTableIdx(tables.length);
           }}
           onApplySmartBuild={(config) => {
+            const valField = (!config.value_field || config.value_field === '*') ? config.groupby_field : config.value_field;
+            const valAgg = (!config.value_field || config.value_field === '*') ? 'count' : (config.aggregation || 'count');
             const newTable = {
               id: `ai_${Date.now()}`,
               name: config.title || 'AI Table',
               rows: [config.groupby_field].filter(Boolean),
               columns: config.secondary_groupby ? [config.secondary_groupby] : [],
-              values: [{ field: config.value_field || '*', agg: config.aggregation || 'count', label: '' }],
+              values: [{ field: valField, agg: valAgg, label: '' }],
               filters: {},
               grand_total: true,
               subtotals: false,

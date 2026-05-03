@@ -944,13 +944,16 @@ async def tabulate(config: TableConfig):
 
             for v in config.values:
                 field = v["field"]
+                agg = v.get("agg", "sum")
+                # Handle '*' (row count) — use first row field as proxy with count agg
+                if field == "*":
+                    field = config.rows[0]
+                    agg = "count"
                 safe_field = field
                 if field in config.rows:
                     safe_field = f"__temp_{field}__"
                     df[safe_field] = df[field]
                 safe_fields.append(safe_field)
-
-                agg = v.get("agg", "sum")
                 show_as = v.get("show_as", "normal")
                 combo_show_as = v.get("combo_show_as", "normal")
                 decimals = v.get("decimals", 2)
@@ -1270,6 +1273,8 @@ async def tabulate(config: TableConfig):
                 for v, label in zip(config.values, value_labels):
                     field = v["field"]
                     agg = v.get("agg", "sum")
+                    if field == "*":
+                        agg = "count"
                     combo_sa = v.get("combo_show_as", "normal")
                     dec = v.get("decimals") if v.get("decimals") is not None else 2
                     if agg in ("sum", "running_total", "cumulative_sum"):
@@ -1331,6 +1336,10 @@ async def tabulate(config: TableConfig):
         elif config.rows and config.columns:
             val_field = config.values[0]["field"]
             _raw_agg = config.values[0].get("agg", "sum")
+            # Handle '*' (row count) — use first row field as proxy with count agg
+            if val_field == "*":
+                val_field = config.rows[0]
+                _raw_agg = "count"
             # Auto-downgrade numeric agg to 'count' for text/multi-choice value columns
             if _raw_agg in NUMERIC_ONLY_AGGS and _col_is_text(df, val_field):
                 _raw_agg = "count"
@@ -1562,6 +1571,8 @@ async def tabulate(config: TableConfig):
             for v in config.values:
                 field = v["field"]
                 agg = v.get("agg", "sum")
+                if field == "*":
+                    agg = "count"
                 label = v.get("label", f"{agg.title()} of {field}")
                 if agg == "sum":
                     result[label] = df[field].sum()
@@ -4403,6 +4414,8 @@ class AIInterpretRequest(BaseModel):
     value_fields: list = []
     focus: str = ""
     previous_interpretation: str = ""
+    length: str = "auto"
+    include_recommendations: bool = True
 
 
 @app.post("/api/ai/interpret")
@@ -4439,6 +4452,20 @@ async def ai_interpret_table(body: AIInterpretRequest):
             f"Output ONLY the final refined interpretation.\n"
         )
 
+    length_guide = {
+        "short": "Write 2-3 sentences. Only the top finding and one key pattern.",
+        "medium": "Write 1-2 short paragraphs. Cover the main finding, key patterns, and notable outliers.",
+        "long": "Write a thorough multi-paragraph analysis. Cover all significant findings, patterns, comparisons, and outliers in detail.",
+        "auto": "Be as detailed as the data warrants — more rows/complexity = longer interpretation.",
+    }
+    length_instruction = length_guide.get(body.length, length_guide["auto"])
+
+    rec_instruction = (
+        "- End with practical implication or recommendation\n"
+        if body.include_recommendations
+        else "- Do NOT include recommendations or conclusions — only describe findings and patterns\n"
+    )
+
     prompt = (
         f"You are a senior data analyst writing an interpretation for a data table.\n\n"
         f"Table: {body.table_title}\n"
@@ -4452,15 +4479,15 @@ async def ai_interpret_table(body: AIInterpretRequest):
         f"{rows_str}\n"
         f"{refinement_block}\n"
         f"Analyst focus: {body.focus.strip() if body.focus.strip() else default_focus}\n\n"
+        f"Length: {length_instruction}\n\n"
         f"Write a data-driven interpretation in flowing prose:\n"
         f"- Be specific — cite actual numbers from the table\n"
         f"- State the most important finding first\n"
         f"- Note outliers, unexpected gaps, or strong patterns\n"
         f"- For cross-tabs: explain interaction between variables\n"
         f"- Quantify comparisons (e.g. '3.2x higher', 'gap of 47 points')\n"
-        f"- End with practical implication or recommendation\n"
-        f"- Describe what the data MEANS, not what the table contains\n"
-        f"- Be as detailed as the data warrants"
+        f"{rec_instruction}"
+        f"- Describe what the data MEANS, not what the table contains"
     )
     interpretation = await _call_llm(cfg, prompt)
     return {"interpretation": interpretation}
