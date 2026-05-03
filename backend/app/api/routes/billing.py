@@ -429,6 +429,8 @@ def admin_confirm(
         raise HTTPException(404, "Request not found")
     if req.status != "pending":
         raise HTTPException(400, f"Request is already {req.status}")
+    if not req.utr_number:
+        raise HTTPException(400, "Cannot confirm — no UTR has been submitted yet.")
 
     req.status       = "confirmed"
     req.confirmed_by = user["user_id"]

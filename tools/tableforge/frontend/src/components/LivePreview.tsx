@@ -210,8 +210,8 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
     // Apply number format to value columns (after row/col dimension fields)
     const valColOffset = numRowFields;
     const valIdx = colIdx - valColOffset;
-    if (typeof cell === 'number' && valIdx >= 0 && valFormats[valIdx]) {
-      return applyFormat(cell, valFormats[valIdx]);
+    if (typeof cell === 'number' && valIdx >= 0 && valFormats.length > 0) {
+      return applyFormat(cell, valFormats[valIdx % valFormats.length]);
     }
     return formatCell(cell);
   };

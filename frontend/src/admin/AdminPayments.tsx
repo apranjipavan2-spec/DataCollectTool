@@ -85,6 +85,7 @@ export default function AdminPayments() {
   const [allPlans,     setAllPlans]     = useState<{ id: string; name: string }[]>([])
   const [filter,  setFilter]  = useState<'pending' | 'confirmed' | 'rejected' | 'all'>('pending')
   const [requests, setRequests] = useState<PaymentRequest[]>([])
+  const [pendingCount, setPendingCount] = useState(0)
   const [loading,  setLoading]  = useState(false)
   const [acting,   setActing]   = useState<string | null>(null)
   const [rejectId, setRejectId] = useState<string | null>(null)
@@ -99,8 +100,12 @@ export default function AdminPayments() {
     setLoading(true)
     try {
       const params = filter !== 'all' ? `?status=${filter}` : ''
-      const res = await api.get(`/billing/admin/requests${params}`)
+      const [res, pendingRes] = await Promise.all([
+        api.get(`/billing/admin/requests${params}`),
+        api.get('/billing/admin/requests?status=pending'),
+      ])
       setRequests(res.data)
+      setPendingCount(pendingRes.data.length)
     } catch {
       toast.error('Failed to load payment requests')
     } finally {
@@ -199,7 +204,7 @@ export default function AdminPayments() {
     )
   }
 
-  const pending = requests.filter(r => r.status === 'pending').length
+  const pending = pendingCount
 
   return (
     <div className="flex h-screen bg-catalan-bg">
@@ -287,7 +292,7 @@ export default function AdminPayments() {
 
                       {r.status === 'pending' && (
                         <div className="flex gap-2 shrink-0">
-                          <button onClick={() => confirm(r.id)} disabled={acting === r.id} className={btnPr}>
+                          <button onClick={() => confirm(r.id)} disabled={acting === r.id || !r.utr_number} className={btnPr} title={!r.utr_number ? 'UTR not submitted yet' : ''}>
                             {acting === r.id ? 'Confirming…' : '✓ Confirm & Activate'}
                           </button>
                           <button onClick={() => { setRejectId(r.id); setRejectReason('') }} disabled={acting === r.id} className={btnDa}>

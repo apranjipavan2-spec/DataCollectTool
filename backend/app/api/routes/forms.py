@@ -4,7 +4,7 @@ from app.core.rate_limit import limiter
 from pydantic import BaseModel
 from typing import Any, Optional
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 from app.core.database import get_db
 from app.core.deps import require_org_admin, require_enumerator
 from app.models.form import Form
@@ -161,7 +161,7 @@ def list_forms(
         ).subquery()
         q = q.filter(Form.id.in_(assigned_ids))
 
-    forms = q.order_by(Form.title).all()
+    forms = q.options(load_only(Form.id, Form.title, Form.version, Form.status, Form.updated_at, Form.allow_enumerator_edit)).order_by(Form.title).all()
     return [{"id": str(f.id), "title": f.title, "version": f.version,
              "status": f.status, "updated_at": f.updated_at,
              "allow_enumerator_edit": f.allow_enumerator_edit} for f in forms]

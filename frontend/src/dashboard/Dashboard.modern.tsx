@@ -544,6 +544,7 @@ export default function Dashboard() {
   const [summary, setSummary] = useState<SubmissionSummary | null>(null)
   const [subsLoaded, setSubsLoaded] = useState(false)
   const [subsLoading, setSubsLoading] = useState(false)
+  const [subsTotal, setSubsTotal] = useState(0)
   const [team, setTeam] = useState<TeamMember[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
 
@@ -729,14 +730,14 @@ export default function Dashboard() {
       const media = await store.getMediaQueueCount()
       setSyncQueue({ outbox: outbox.length, media })
     }).catch(() => {})
-    // Refresh every 30s
+    // Refresh every 2 min
     const t = setInterval(() => {
       getStorage().then(async store => {
         const outbox = await store.getOutbox()
         const media = await store.getMediaQueueCount()
         setSyncQueue({ outbox: outbox.length, media })
       }).catch(() => {})
-    }, 30_000)
+    }, 120_000)
     return () => clearInterval(t)
   }, [])
 
@@ -753,14 +754,6 @@ export default function Dashboard() {
       calls.push(
         api.get('/submissions/summary').then(r => setSummary(r.data)).catch(() => {}),
         api.get('/submissions/?page_size=10&slim=true').then(r => setRecentSubmissions(r.data.items ?? [])).catch(() => {}),
-        api.get('/users/?page_size=200').then(r => setTeam(r.data.items ?? r.data.users ?? [])),
-        api.get('/assignments/').then(r => setAssignments(r.data ?? [])),
-        api.get('/tenants/me/usage').then(r => setUsageData(r.data)).catch(() => {}),
-        api.get('/export/sheets/status').then(r => setSheetsConfigured(r.data.configured)).catch(() => setSheetsConfigured(false)),
-        api.get('/programs/').then(r => {
-          const ps = r.data ?? []
-          setProgramEditOverrides(ps.map((p: ProgramListItem) => ({ id: p.id, name: p.name, allow_enumerator_edit: p.allow_enumerator_edit ?? null })))
-        }).catch(() => {}),
       )
     }
     Promise.allSettled(calls).then(results => {
@@ -772,15 +765,36 @@ export default function Dashboard() {
     }).finally(() => setLoading(false))
   }, [])
 
-  // Poll summary every 30s so stats stay live without a full page reload
+  // Poll summary every 2 min so stats stay live without a full page reload
   useEffect(() => {
     if (isEnumerator) return
     const t = setInterval(() => {
       api.get('/submissions/summary').then(r => setSummary(r.data)).catch(() => {})
       api.get('/submissions/?page_size=10&slim=true').then(r => setRecentSubmissions(r.data.items ?? [])).catch(() => {})
-    }, 30_000)
+    }, 120_000)
     return () => clearInterval(t)
   }, [isEnumerator])
+
+  // Lazy-load tab-specific data only when needed
+  useEffect(() => {
+    if (isEnumerator) return
+    if (tab === 'team' && team.length === 0) {
+      api.get('/users/?page_size=200').then(r => setTeam(r.data.items ?? r.data.users ?? [])).catch(() => {})
+      api.get('/assignments/').then(r => setAssignments(r.data ?? [])).catch(() => {})
+    }
+  }, [tab])
+
+  useEffect(() => {
+    if (isEnumerator) return
+    if (tab === 'forms' && programEditOverrides.length === 0) {
+      api.get('/programs/').then(r => {
+        const ps = r.data ?? []
+        setProgramEditOverrides(ps.map((p: ProgramListItem) => ({ id: p.id, name: p.name, allow_enumerator_edit: p.allow_enumerator_edit ?? null })))
+      }).catch(() => {})
+      api.get('/tenants/me/usage').then(r => setUsageData(r.data)).catch(() => {})
+      api.get('/export/sheets/status').then(r => setSheetsConfigured(r.data.configured)).catch(() => setSheetsConfigured(false))
+    }
+  }, [tab])
 
   // Filtered submissions
   const filteredSubs = useMemo(() => submissions.filter(s => {
@@ -805,11 +819,8 @@ export default function Dashboard() {
     })
   }, [filteredSubs, subSortKey, subSortDir])
 
-  // Paginated submissions
-  const paginatedSubs = useMemo(() => {
-    const start = (subPage - 1) * SUB_PAGE_SIZE
-    return sortedSubs.slice(start, start + SUB_PAGE_SIZE)
-  }, [sortedSubs, subPage])
+  // When using server-side pagination, submissions state already contains one page
+  const paginatedSubs = useMemo(() => sortedSubs, [sortedSubs])
 
   // Sorted team
   const sortedTeam = useMemo(() => {
@@ -1029,13 +1040,19 @@ export default function Dashboard() {
     }
   }
 
-  const loadSubmissions = async () => {
+  const loadSubmissions = async (page = 1) => {
     setSubsLoading(true)
     try {
-      const r = await api.get('/submissions/?page_size=5000&slim=true')
+      const params = new URLSearchParams({ page_size: String(SUB_PAGE_SIZE), page: String(page), slim: 'true' })
+      if (filterForm) params.set('form_id', filterForm)
+      if (search) params.set('q', search)
+      if (dateFrom) params.set('date_from', dateFrom)
+      if (dateTo) params.set('date_to', dateTo)
+      const r = await api.get(`/submissions/?${params}`)
       const items = r.data.items ?? r.data.submissions ?? []
       setSubmissions(items)
-      setRecentSubmissions(items.slice(0, 10))
+      setSubsTotal(r.data.total ?? items.length)
+      setSubPage(page)
       setSubsLoaded(true)
     } catch (err: any) {
       toast.error(err.response?.data?.detail ?? 'Failed to load submissions')
@@ -2084,8 +2101,8 @@ export default function Dashboard() {
                 <Pagination
                   page={subPage}
                   pageSize={SUB_PAGE_SIZE}
-                  total={filteredSubs.length}
-                  onChange={p => { setSubPage(p); setSelectedIds(new Set()) }}
+                  total={subsTotal}
+                  onChange={p => { loadSubmissions(p); setSelectedIds(new Set()) }}
                 />
               </Card>}
             </div>
