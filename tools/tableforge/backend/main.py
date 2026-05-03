@@ -4250,10 +4250,13 @@ async def _call_llm(cfg: dict, prompt: str) -> str:
 
         elif provider == "gemini":
             import asyncio
-            import google.generativeai as genai
-            genai.configure(api_key=key)
-            m = genai.GenerativeModel(model or "gemini-2.5-flash")
-            r = await asyncio.wait_for(m.generate_content_async(prompt), timeout=LLM_TIMEOUT)
+            from google import genai
+            client = genai.Client(api_key=key)
+            r = await asyncio.to_thread(
+                client.models.generate_content,
+                model=model or "gemini-2.5-flash",
+                contents=prompt,
+            )
             return r.text
 
         elif provider == "deepseek":
@@ -4520,54 +4523,67 @@ class AISmartBuildRequest(BaseModel):
 @app.post("/api/ai/smart-build")
 async def ai_smart_build(body: AISmartBuildRequest):
     """AI designs one optimized table from selected columns or NL query."""
-    cfg = _load_ai_cfg()
-    if body.dataset_id not in datasets:
-        raise HTTPException(404, "Dataset not found")
-    ds = datasets[body.dataset_id]
-    df = ds["df"]
+    try:
+        cfg = _load_ai_cfg()
+        if not cfg.get("api_key"):
+            raise HTTPException(400, "AI not configured. Go to AI Settings and add your API key.")
+        if body.dataset_id not in datasets:
+            raise HTTPException(404, "Dataset not found")
+        ds = datasets[body.dataset_id]
+        df = ds["df"]
 
-    if body.selected_columns:
-        cols = [c for c in body.selected_columns if c in df.columns]
-    else:
-        cols = list(df.columns[:30])
+        if body.selected_columns:
+            cols = [c for c in body.selected_columns if c in df.columns]
+        else:
+            cols = list(df.columns[:30])
 
-    cols_block = []
-    for col in cols:
-        dtype = str(df[col].dtype)
-        uniq_vals = df[col].dropna().unique()[:12].tolist()
-        cols_block.append(f"  - id={col} | type={'numeric' if 'int' in dtype or 'float' in dtype else 'text'} | unique values ({df[col].nunique()}): {uniq_vals}")
+        if not cols:
+            raise HTTPException(400, "No valid columns found for analysis")
 
-    sample_rows = df[cols].head(6).fillna("").to_dict(orient="records")
+        cols_block = []
+        for col in cols:
+            dtype = str(df[col].dtype)
+            try:
+                uniq_vals = [str(v) for v in df[col].dropna().unique()[:12]]
+            except Exception:
+                uniq_vals = []
+            cols_block.append(f"  - id={col} | type={'numeric' if 'int' in dtype or 'float' in dtype else 'text'} | unique values ({df[col].nunique()}): {uniq_vals}")
 
-    task = f'User question: "{body.query.strip()}"\nDesign the best table to answer this.' if body.query.strip() else "Design the most insightful cross-tabulation or aggregation from these columns."
+        sample_rows = sanitize_for_json(df[cols].head(6).fillna("").to_dict(orient="records"))
 
-    prompt = (
-        f"You are a research data analyst. Design ONE tabulation table.\n\n"
-        f"Available columns:\n" + "\n".join(cols_block) + f"\n\n"
-        f"Sample data:\n{json.dumps(sample_rows, ensure_ascii=False)}\n\n"
-        f"{task}\n\n"
-        f"Decide:\n"
-        f"- groupby_field: column id for row grouping\n"
-        f"- secondary_groupby: column id for cross-tab ('' if simple)\n"
-        f"- value_field: column id to aggregate, or '*' for count\n"
-        f"- aggregation: 'count', 'sum', or 'mean'\n"
-        f"- title: clean human-readable title\n"
-        f"- description: one sentence insight\n"
-        f"- column_labels: mapping raw ids to clean names\n\n"
-        f"Only use column ids from list. Respond ONLY valid JSON:\n"
-        f'{{"groupby_field":"","secondary_groupby":"","value_field":"*","aggregation":"count","title":"","description":"","column_labels":{{}}}}'
-    )
-    raw = await _call_llm(cfg, prompt)
-    match = _re.search(r'\{.*\}', raw, _re.DOTALL)
-    if match:
-        try:
-            result = json.loads(match.group())
-            if isinstance(result.get("column_labels"), dict):
-                result["column_labels"] = {str(k): str(v) for k, v in result["column_labels"].items()}
-            return result
-        except Exception:
-            pass
-    return {}
+        task = f'User question: "{body.query.strip()}"\nDesign the best table to answer this.' if body.query.strip() else "Design the most insightful cross-tabulation or aggregation from these columns."
+
+        prompt = (
+            f"You are a research data analyst. Design ONE tabulation table.\n\n"
+            f"Available columns:\n" + "\n".join(cols_block) + f"\n\n"
+            f"Sample data:\n{json.dumps(sample_rows, ensure_ascii=False, default=str)}\n\n"
+            f"{task}\n\n"
+            f"Decide:\n"
+            f"- groupby_field: column id for row grouping\n"
+            f"- secondary_groupby: column id for cross-tab ('' if simple)\n"
+            f"- value_field: column id to aggregate, or '*' for count\n"
+            f"- aggregation: 'count', 'sum', or 'mean'\n"
+            f"- title: clean human-readable title\n"
+            f"- description: one sentence insight\n"
+            f"- column_labels: mapping raw ids to clean names\n\n"
+            f"Only use column ids from list. Respond ONLY valid JSON:\n"
+            f'{{"groupby_field":"","secondary_groupby":"","value_field":"*","aggregation":"count","title":"","description":"","column_labels":{{}}}}'
+        )
+        raw = await _call_llm(cfg, prompt)
+        match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+        if match:
+            try:
+                result = json.loads(match.group())
+                if isinstance(result.get("column_labels"), dict):
+                    result["column_labels"] = {str(k): str(v) for k, v in result["column_labels"].items()}
+                return result
+            except json.JSONDecodeError:
+                raise HTTPException(502, "AI returned invalid JSON. Try again.")
+        raise HTTPException(502, "AI returned empty response. Try again.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Smart Build failed: {str(e)}")
 
 
 REPORT_STYLE_PROMPTS = {
