@@ -540,6 +540,7 @@ class TableConfig(BaseModel):
     filters: dict = {}
     subtotals: bool = False
     subtotals_position: str = "bottom"
+    subtotal_pct_base: str = "grand_total"  # "grand_total" | "subtotal"
     grand_total: bool = True
     grand_total_rows: Optional[bool] = None    # None = follow grand_total
     grand_total_columns: Optional[bool] = None # None = follow grand_total
@@ -1103,7 +1104,7 @@ async def tabulate(config: TableConfig):
             # Skip columns that are already combo-formatted strings
             combo_labels = {pc["label"] for pc in post_calcs if pc["agg"].startswith("combo_")}
             for v, lbl in zip(config.values, value_labels):
-                dec = v.get("decimals")
+                dec = v.get("decimals") if v.get("decimals") is not None else 2
                 if dec is not None and lbl in result.columns and lbl not in combo_labels:
                     try:
                         numeric_vals = pd.to_numeric(result[lbl], errors="coerce")
@@ -1497,9 +1498,38 @@ async def tabulate(config: TableConfig):
                     return "| Subtotal" in str(col_name)
 
                 if sa == "pct_row":
-                    row_sums = pivot_df[data_cols].sum(axis=1) if data_cols else pivot_df[numeric_cols].sum(axis=1)
-                    for c in numeric_cols:
-                        pivot_df[c] = (pivot_df[c] / row_sums.replace(0, np.nan) * 100).round(decimal_places)
+                    if config.subtotal_pct_base == "subtotal":
+                        subtotal_cols = [c for c in numeric_cols if _is_subtotal_col(c)]
+                        if subtotal_cols:
+                            col_to_subtotal = {}
+                            for sc in subtotal_cols:
+                                prefix = str(sc).split(" | Subtotal")[0].strip()
+                                for dc in data_cols:
+                                    if str(dc).startswith(prefix + " |") or str(dc) == prefix:
+                                        col_to_subtotal[dc] = sc
+                            for c in numeric_cols:
+                                if _is_gt_col(c):
+                                    row_sums = pivot_df[data_cols].sum(axis=1) if data_cols else pivot_df[numeric_cols].sum(axis=1)
+                                    pivot_df[c] = (pivot_df[c] / row_sums.replace(0, np.nan) * 100).round(decimal_places)
+                                elif _is_subtotal_col(c):
+                                    prefix = str(c).split(" | Subtotal")[0].strip()
+                                    group_cols = [dc for dc in data_cols if str(dc).startswith(prefix + " |") or str(dc) == prefix]
+                                    group_sum = pivot_df[group_cols].sum(axis=1) if group_cols else pivot_df[c]
+                                    pivot_df[c] = (pivot_df[c] / group_sum.replace(0, np.nan) * 100).round(decimal_places)
+                                elif c in col_to_subtotal:
+                                    group_sum = pivot_df[col_to_subtotal[c]]
+                                    pivot_df[c] = (pivot_df[c] / group_sum.replace(0, np.nan) * 100).round(decimal_places)
+                                else:
+                                    row_sums = pivot_df[data_cols].sum(axis=1)
+                                    pivot_df[c] = (pivot_df[c] / row_sums.replace(0, np.nan) * 100).round(decimal_places)
+                        else:
+                            row_sums = pivot_df[data_cols].sum(axis=1) if data_cols else pivot_df[numeric_cols].sum(axis=1)
+                            for c in numeric_cols:
+                                pivot_df[c] = (pivot_df[c] / row_sums.replace(0, np.nan) * 100).round(decimal_places)
+                    else:
+                        row_sums = pivot_df[data_cols].sum(axis=1) if data_cols else pivot_df[numeric_cols].sum(axis=1)
+                        for c in numeric_cols:
+                            pivot_df[c] = (pivot_df[c] / row_sums.replace(0, np.nan) * 100).round(decimal_places)
                 elif sa == "pct_col":
                     for c in numeric_cols:
                         if _is_gt_col(c) or _is_subtotal_col(c):
@@ -4611,6 +4641,157 @@ async def ai_smart_build(body: AISmartBuildRequest):
         raise
     except Exception as e:
         raise HTTPException(500, f"Smart Build failed: {str(e)}")
+
+
+class AIAutoGenerateRequest(BaseModel):
+    dataset_id: str
+    table_descriptions: str = ""
+    max_tables: int = 20
+
+
+@app.post("/api/ai/auto-generate")
+async def ai_auto_generate(body: AIAutoGenerateRequest):
+    """AI generates a comprehensive set of tables from all columns."""
+    try:
+        cfg = _load_ai_cfg()
+        if not cfg.get("api_key"):
+            raise HTTPException(400, "AI not configured. Go to AI Settings and add your API key.")
+        if body.dataset_id not in datasets:
+            raise HTTPException(404, "Dataset not found")
+        ds = datasets[body.dataset_id]
+        df = ds["df"]
+
+        cols_info = []
+        for col in df.columns[:100]:
+            dtype = str(df[col].dtype)
+            uniq = int(df[col].nunique())
+            sample = df[col].dropna().head(5).astype(str).tolist()
+            cols_info.append({
+                "id": col,
+                "type": "numeric" if "int" in dtype or "float" in dtype else "text",
+                "unique": uniq,
+                "sample": sample,
+            })
+
+        sample_rows = df.head(10).fillna("").to_dict(orient="records")
+
+        guidance = ""
+        if body.table_descriptions.strip():
+            guidance = (
+                f"\n--- USER TABLE DESCRIPTIONS ---\n"
+                f"{body.table_descriptions.strip()}\n"
+                f"--- END ---\n\n"
+                f"Follow the user's table descriptions closely. Create EXACTLY the tables described. "
+                f"If the descriptions mention specific columns, use those. "
+                f"If they mention cross-tabs, set secondary_groupby accordingly.\n\n"
+            )
+
+        prompt = (
+            f"You are a senior research data analyst designing a comprehensive tabulation plan.\n\n"
+            f"Available columns (use ONLY these exact ids):\n{json.dumps(cols_info, indent=1)}\n\n"
+            f"Sample data rows:\n{json.dumps(sample_rows[:8], ensure_ascii=False, default=str)}\n\n"
+            f"{guidance}"
+            f"Generate {body.max_tables} tables covering all major dimensions of this dataset.\n"
+            f"Include a mix of:\n"
+            f"- Simple frequency tables (count by category)\n"
+            f"- Cross-tabulations (category x category)\n"
+            f"- Mean/sum aggregations for numeric columns\n"
+            f"- Key demographic breakdowns\n\n"
+            f"For each table provide:\n"
+            f"  - groupby_field: column id for row grouping (required)\n"
+            f"  - secondary_groupby: column id for cross-tab columns, or '' for simple table\n"
+            f"  - value_field: column id to aggregate, or the groupby_field with 'count' aggregation\n"
+            f"  - aggregation: 'count', 'sum', or 'mean'\n"
+            f"  - title: clean descriptive title\n"
+            f"  - description: one sentence explaining the insight\n\n"
+            f"IMPORTANT: Do NOT use '*' as value_field. For count tables, use the groupby_field as value_field with aggregation 'count'.\n\n"
+            f"Respond with ONLY valid JSON:\n"
+            f'{{"tables": [{{"groupby_field":"...","secondary_groupby":"","value_field":"...","aggregation":"count","title":"...","description":"..."}}]}}'
+        )
+        raw = await _call_llm(cfg, prompt)
+        match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+        if match:
+            try:
+                result = json.loads(match.group())
+                tables = result.get("tables", [])
+                for t in tables:
+                    if t.get("value_field") == "*":
+                        t["value_field"] = t.get("groupby_field", "")
+                        t["aggregation"] = "count"
+                return {"tables": tables}
+            except json.JSONDecodeError:
+                raise HTTPException(502, "AI returned invalid JSON. Try again.")
+        raise HTTPException(502, "AI returned empty response. Try again.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Auto-generate failed: {str(e)}")
+
+
+class AICreateColumnRequest(BaseModel):
+    dataset_id: str
+    description: str
+
+
+@app.post("/api/ai/create-column")
+async def ai_create_column(body: AICreateColumnRequest):
+    """AI creates a new computed column (metric or bin) from natural language."""
+    try:
+        cfg = _load_ai_cfg()
+        if not cfg.get("api_key"):
+            raise HTTPException(400, "AI not configured. Go to AI Settings and add your API key.")
+        if body.dataset_id not in datasets:
+            raise HTTPException(404, "Dataset not found")
+        ds = datasets[body.dataset_id]
+        df = ds["df"]
+
+        cols_info = []
+        for col in df.columns[:80]:
+            dtype = str(df[col].dtype)
+            uniq = int(df[col].nunique())
+            sample = df[col].dropna().head(5).astype(str).tolist()
+            cols_info.append({
+                "id": col,
+                "type": "numeric" if "int" in dtype or "float" in dtype else "text",
+                "unique": uniq,
+                "sample": sample,
+            })
+
+        prompt = (
+            f"You are a data engineer. The user wants to create a new computed column in their dataset.\n\n"
+            f"Available columns:\n{json.dumps(cols_info, indent=1)}\n\n"
+            f"User request: \"{body.description}\"\n\n"
+            f"Decide if this is a METRIC (computation) or a BIN (categorization/grouping).\n\n"
+            f"For METRIC, return JSON with:\n"
+            f'{{"type": "metric", "definition": {{"name": "column_name", "metric_type": "formula|ratio|percentage|growth|weighted_average|conditional|index|rank|cumulative|composite", '
+            f'"column_a": "col_id", "column_b": "col_id", "operator": "+|-|*|/", '
+            f'"numerator": "col_id", "denominator": "col_id", '
+            f'"part": "col_id", "whole": "col_id", '
+            f'"condition_column": "col_id", "condition_op": "==|!=|>|<|>=|<=|contains|not_contains", "condition_value": "val", '
+            f'"then_value_type": "literal|column", "then_value": "val_or_col", "else_value_type": "literal|column", "else_value": "val_or_col", '
+            f'"decimal_places": 2}}}}\n\n'
+            f"For BIN, return JSON with:\n"
+            f'{{"type": "bin", "definition": {{"name": "column_name", "bin_type": "numeric|text|group", '
+            f'"source_column": "col_id", '
+            f'"method": "equal_width|quartiles|custom", "n_bins": 5, '
+            f'"custom_edges": [val1, val2, ...], "custom_labels": ["label1", "label2", ...], '
+            f'"mappings": [{{"from": "original_value", "to": "new_label"}}]}}}}\n\n'
+            f"Use ONLY column ids from the available columns list.\n"
+            f"Return ONLY valid JSON, nothing else."
+        )
+        raw = await _call_llm(cfg, prompt)
+        match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+        if match:
+            try:
+                result = json.loads(match.group())
+                return result
+            except json.JSONDecodeError:
+                raise HTTPException(502, "AI returned invalid JSON. Try again.")
+        raise HTTPException(502, "AI returned empty response. Try again.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"AI column creation failed: {str(e)}")
 
 
 REPORT_STYLE_PROMPTS = {

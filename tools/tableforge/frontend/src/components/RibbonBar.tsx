@@ -332,6 +332,7 @@ function InsertRibbon({ dataset, onAction }: { dataset: boolean; onAction: (acti
   return (
     <>
       <RGroup label="Computed">
+        <RBtn icon="➕" label="Create Column" onClick={() => onAction('column-creator')} disabled={!dataset} />
         <RBtn icon="𝑓" label="Metric" onClick={() => onAction('metrics')} disabled={!dataset} />
         <RBtn icon="⊕" label="Bin"    onClick={() => onAction('bins')}    disabled={!dataset} />
       </RGroup>
@@ -830,6 +831,7 @@ function FormatRibbon({ table, onUpdate, columns = [], onColumnTypeChange }: {
               <FToggle label="Subtotals (hierarchical)" checked={t.subtotals}      onChange={v => onUpdate({ subtotals: v })} />
             </div>
             {t.subtotals && (
+              <>
               <FField label="Subtotal Position" style={{ marginTop: 8 }}>
                 <select value={t.subtotals_position || 'bottom'} className="fdrop-select"
                   onChange={e => onUpdate({ subtotals_position: e.target.value as any })}>
@@ -837,6 +839,14 @@ function FormatRibbon({ table, onUpdate, columns = [], onColumnTypeChange }: {
                   <option value="top">Top of Group</option>
                 </select>
               </FField>
+              <FField label="Percentage Base" style={{ marginTop: 8 }}>
+                <select value={t.subtotal_pct_base || 'grand_total'} className="fdrop-select"
+                  onChange={e => onUpdate({ subtotal_pct_base: e.target.value as any })}>
+                  <option value="grand_total">% of Grand Total (row)</option>
+                  <option value="subtotal">% of Subtotal Group</option>
+                </select>
+              </FField>
+              </>
             )}
             <FDivider />
             <FField label="Missing Data Display">
@@ -1096,6 +1106,7 @@ function AISmartRibbon({ table, dataset, onAction, onUpdate }: { table: TableCon
       <RGroup label="AI Build">
         <RBtn icon="🧠" label="Smart Build" onClick={() => onAction('ai-smart-build')} disabled={!dataset} />
         <RBtn icon="💡" label="Suggest Tables" onClick={() => onAction('ai-suggest')} disabled={!dataset} />
+        <RBtn icon="🚀" label="Auto Generate" onClick={() => onAction('ai-auto-generate')} disabled={!dataset} />
       </RGroup>
       <RGroup label="AI Report">
         <RBtn icon="📄" label="Generate Report" onClick={() => onAction('ai-report')} disabled={!dataset} />

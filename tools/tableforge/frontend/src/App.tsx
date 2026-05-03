@@ -17,6 +17,7 @@ import { DataQualityPanel } from './components/DataQualityPanel';
 import { ComparisonPanel } from './components/ComparisonPanel';
 import { ReportBuilder } from './components/ReportBuilder';
 import { AISmartPanel } from './components/AISmartPanel';
+import { ColumnCreator } from './components/ColumnCreator';
 import { AuditTrail } from './components/AuditTrail';
 import { ProjectManager } from './components/ProjectManager';
 import { SummaryDashboard } from './components/SummaryDashboard';
@@ -51,7 +52,7 @@ function generateAutoTitle(t: TableConfig): { title: string; subtitle: string; n
   return { title, subtitle, name: nameShort };
 }
 
-type ModalType = null | 'metrics' | 'bins' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-report' | 'ai-config';
+type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config';
 
 interface ReconcileState {
   pendingTables: TableConfig[];
@@ -1218,6 +1219,9 @@ export default function App() {
         onClose={() => setModal(null)} />}
       {modal === 'bins' && <BinCreator datasetId={dataset.dataset_id} columns={allColumns}
         onCreated={() => { setModal(null); refreshExtraColumns(); }} onClose={() => setModal(null)} />}
+      {modal === 'column-creator' && <ColumnCreator datasetId={dataset.dataset_id} columns={allColumns}
+        onCreated={() => { refreshExtraColumns(); }} onClose={() => setModal(null)}
+        onOpenLibrary={() => setModal('metric_library')} />}
       {modal === 'export' && <ExportDialog datasetId={dataset.dataset_id} tables={tables} results={results}
         annotationsMap={annotationsMap}
         onClose={() => setModal(null)} />}
@@ -1257,7 +1261,7 @@ export default function App() {
         />
       )}
       {modal === 'audit' && <AuditTrail datasetId={dataset.dataset_id} onClose={() => setModal(null)} />}
-      {(modal === 'ai-polish' || modal === 'ai-interpret' || modal === 'ai-refine' || modal === 'ai-suggest' || modal === 'ai-smart-build' || modal === 'ai-report' || modal === 'ai-config') && (
+      {(modal === 'ai-polish' || modal === 'ai-interpret' || modal === 'ai-refine' || modal === 'ai-suggest' || modal === 'ai-smart-build' || modal === 'ai-auto-generate' || modal === 'ai-report' || modal === 'ai-config') && (
         <AISmartPanel
           mode={modal.replace('ai-', '') as any}
           table={tables[activeTableIdx] || null}

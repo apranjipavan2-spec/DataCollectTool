@@ -3,7 +3,7 @@ import { TableConfig, DatasetMeta, TableResult } from '../types';
 import { API_BASE } from '../api';
 
 interface Props {
-  mode: 'polish' | 'interpret' | 'refine' | 'suggest' | 'smart-build' | 'report' | 'config';
+  mode: 'polish' | 'interpret' | 'refine' | 'suggest' | 'smart-build' | 'auto-generate' | 'report' | 'config';
   table: TableConfig | null;
   tables: TableConfig[];
   allResults: Map<string, TableResult>;
@@ -56,6 +56,11 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
   // Smart build state
   const [query, setQuery] = useState('');
   const [selectedCols, setSelectedCols] = useState<string[]>([]);
+
+  // Auto-generate state
+  const [tableDescriptions, setTableDescriptions] = useState('');
+  const [maxTables, setMaxTables] = useState(20);
+  const [selectedAutoTables, setSelectedAutoTables] = useState<Set<number>>(new Set());
 
   // Report state
   const [reportStyle, setReportStyle] = useState('field_survey');
@@ -174,6 +179,23 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
       });
       if (!res.ok) throw new Error(await res.text());
       setAiResult(await res.json());
+    } catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const handleAutoGenerate = async () => {
+    if (!dataset) return;
+    setLoading(true); setError('');
+    try {
+      const res = await fetch(`${API_BASE}/ai/auto-generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataset_id: dataset.dataset_id, table_descriptions: tableDescriptions, max_tables: maxTables }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setAiResult(data);
+      if (data.tables) setSelectedAutoTables(new Set(data.tables.map((_: any, i: number) => i)));
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   };
@@ -413,6 +435,59 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
           </div>
         );
 
+      case 'auto-generate':
+        return (
+          <div className="ai-panel-body">
+            <p className="ai-desc">AI analyzes all columns and generates a comprehensive set of tables. Optionally provide a list of tables you need.</p>
+            <textarea value={tableDescriptions} onChange={e => setTableDescriptions(e.target.value)}
+              placeholder={"Describe the tables you need (optional). Example:\n- Demographics by district\n- Income source by beneficiary type\n- Average landholding by region\n\nLeave empty for AI to decide."}
+              className="fdrop-input" style={{ width: '100%', minHeight: 80, resize: 'vertical', marginBottom: 10, fontSize: 12 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Max tables:</label>
+              <input type="range" min={5} max={50} value={maxTables} onChange={e => setMaxTables(Number(e.target.value))}
+                style={{ flex: 1 }} />
+              <span style={{ fontSize: 12, minWidth: 24 }}>{maxTables}</span>
+            </div>
+            {!aiResult && <button className="btn-primary" onClick={handleAutoGenerate} disabled={loading}>{loading ? 'Generating...' : '🚀 Auto-Generate Tables'}</button>}
+            {aiResult?.tables && (
+              <div className="ai-result">
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>{aiResult.tables.length} tables generated — select which to create:</div>
+                <div style={{ maxHeight: 300, overflow: 'auto' }}>
+                  {aiResult.tables.map((t: any, i: number) => (
+                    <label key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '6px 4px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <input type="checkbox" checked={selectedAutoTables.has(i)}
+                        onChange={() => setSelectedAutoTables(prev => {
+                          const next = new Set(prev);
+                          next.has(i) ? next.delete(i) : next.add(i);
+                          return next;
+                        })} style={{ marginTop: 2 }} />
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 600 }}>{t.title || `Table ${i + 1}`}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{t.description}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-dim)', opacity: 0.7 }}>
+                          Rows: {t.groupby_field} | Values: {t.value_field} ({t.aggregation}){t.secondary_groupby && ` | Columns: ${t.secondary_groupby}`}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button className="btn-primary" onClick={() => {
+                    const selected = aiResult.tables.filter((_: any, i: number) => selectedAutoTables.has(i));
+                    onApplySuggestion?.(selected);
+                    onClose();
+                  }}>Create {selectedAutoTables.size} Tables</button>
+                  <button className="fdrop-btn-action" style={{ fontSize: 11 }} onClick={() => {
+                    selectedAutoTables.size === aiResult.tables.length
+                      ? setSelectedAutoTables(new Set())
+                      : setSelectedAutoTables(new Set(aiResult.tables.map((_: any, i: number) => i)));
+                  }}>{selectedAutoTables.size === aiResult.tables.length ? 'Deselect All' : 'Select All'}</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
       case 'report':
         return (
           <div className="ai-panel-body">
@@ -504,6 +579,7 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
     'refine': '🔄 AI Refine Interpretation',
     'suggest': '💡 AI Table Suggestions',
     'smart-build': '🧠 AI Smart Build',
+    'auto-generate': '🚀 AI Auto-Generate Tables',
     'report': '📄 AI Report Writer',
     'config': '⚙ AI Configuration',
   };
@@ -514,13 +590,14 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
     'refine': 'Refining interpretation with new focus…',
     'suggest': 'Analyzing dataset and recommending table configurations…',
     'smart-build': 'Designing optimal table from your columns…',
+    'auto-generate': 'Analyzing all columns and generating comprehensive tables…',
     'report': 'Composing full analysis report…',
     'config': 'Saving configuration…',
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: mode === 'smart-build' ? 480 : 600, maxHeight: '70vh' }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: mode === 'smart-build' ? 480 : mode === 'auto-generate' ? 700 : 600, maxHeight: mode === 'auto-generate' ? '85vh' : '70vh' }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{titles[mode] || 'AI-Smart'}</h2>
           <button className="modal-close" onClick={onClose}>×</button>
