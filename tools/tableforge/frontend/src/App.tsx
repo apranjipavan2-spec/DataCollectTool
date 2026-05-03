@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType } from './types';
-import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, logAuditEvent } from './api';
+import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, logAuditEvent, importFromFg } from './api';
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
 import { LivePreview } from './components/LivePreview';
@@ -230,13 +230,10 @@ export default function App() {
     if (!fgUrl || !token) return;
     setFgContext({ fgUrl, token, programId: programId || undefined });
     if (!programId) return; // no auto-load; user will pick in WelcomeScreen
-    setLoading(true); setLoadingMsg('Importing data from FieldGovern…');
-    fetch(import.meta.env.BASE_URL.replace(/\/$/, '') + '/api/import-from-fg', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fg_base_url: fgUrl, program_id: programId, token }),
+    setLoading(true); setLoadingMsg('Connecting to FieldGovern…');
+    importFromFg(fgUrl, token, programId, undefined, (ev) => {
+      setLoadingMsg(ev.message);
     })
-      .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(e.detail || 'Import failed')))
       .then(meta => { setDataset(meta); setLoading(false); setLoadingMsg(''); })
       .catch(err => { setLoading(false); setLoadingMsg(''); setError(`Failed to load FieldGovern data: ${err}`); });
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -4169,7 +4169,7 @@ AI_CONFIG_FILE = BASE_DIR / "ai_config.json"
 
 
 def _load_ai_cfg() -> dict:
-    """Load AI config from file, env vars, or FieldGovern's database."""
+    """Load AI config from file, env vars, FieldGovern API, or database."""
     if AI_CONFIG_FILE.exists():
         try:
             cfg = json.loads(AI_CONFIG_FILE.read_text())
@@ -4183,6 +4183,23 @@ def _load_ai_cfg() -> dict:
     model = os.environ.get("AI_MODEL", "")
     if provider and api_key:
         return {"provider": provider, "api_key": api_key, "model": model}
+    # Fallback: fetch from FieldGovern main app API (when running as sidecar)
+    fg_internal = os.environ.get("FG_INTERNAL_URL", "").rstrip("/")
+    if fg_internal:
+        try:
+            import httpx
+            resp = httpx.get(f"{fg_internal}/api/v1/system-settings/ai_config", timeout=5.0)
+            if resp.status_code == 200:
+                cfg = resp.json()
+                if isinstance(cfg, dict) and "keys" in cfg:
+                    active = cfg.get("active_provider", "")
+                    key_cfg = cfg.get("keys", {}).get(active, {})
+                    if key_cfg.get("api_key"):
+                        return {"provider": active, "api_key": key_cfg["api_key"], "model": key_cfg.get("model", "")}
+                elif isinstance(cfg, dict) and cfg.get("api_key"):
+                    return cfg
+        except Exception:
+            pass
     # Fallback: try FieldGovern's database directly (when co-deployed)
     db_url = os.environ.get("DATABASE_URL", "")
     if db_url:

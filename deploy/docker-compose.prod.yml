@@ -36,6 +36,7 @@ services:
     restart: always
     environment:
       FG_INTERNAL_URL: "http://app:8000"
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     volumes:
       - tableforge_data:/app/projects
       - tableforge_exports:/app/exports
