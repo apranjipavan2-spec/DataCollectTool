@@ -26,7 +26,7 @@ import { TableComparison } from './components/TableComparison';
 import { MetricLibrary } from './components/MetricLibrary';
 import { AnnotationReconcileDialog, detectOrphanedAnnotations, ReconcileAnnotation } from './components/AnnotationReconcile';
 import { ChartBuilder } from './components/ChartBuilder';
-import { RibbonBar } from './components/RibbonBar';
+import { RibbonBar, TABLE_TEMPLATES } from './components/RibbonBar';
 import { StatisticalTables } from './components/StatisticalTables';
 
 function createEmptyTable(id: string, name: string): TableConfig {
@@ -89,6 +89,7 @@ export default function App() {
   const [auditLog, setAuditLog] = useState<{ timestamp: string; action: string; details: string }[]>([]);
   const [metricNames, setMetricNames] = useState<string[]>([]);
   const [binNames, setBinNames] = useState<string[]>([]);
+  const [columnDescriptions, setColumnDescriptions] = useState<Record<string, string>>({});
   const [comparisonState, setComparisonState] = useState<any>(null);
   const [orphanedAnnotations, setOrphanedAnnotations] = useState<ReconcileAnnotation[] | null>(null);
   // tabContextMenu removed — tables now listed in SourcePanel sidebar
@@ -411,6 +412,26 @@ export default function App() {
       ...(decimals !== undefined ? { decimals } : {}),
     };
   }, [allColumns]);
+
+  const handleApplyTemplate = useCallback((templateId: string) => {
+    const tpl = TABLE_TEMPLATES.find(t => t.id === templateId);
+    if (!tpl) return;
+    const table = tables[activeTableIdx];
+    if (!table) return;
+    const patch = tpl.apply(table);
+    // For templates that produce a placeholder value (field=''), keep existing fields
+    if (patch.values && patch.values.length === 1 && !patch.values[0].field && table.values.length > 0) {
+      patch.values = table.values.map(v => ({ ...v, ...patch.values![0], field: v.field }));
+    } else if (patch.values && table.values.length > 0) {
+      // Preserve existing field names, apply template's agg/show_as/combo
+      patch.values = table.values.map((v, i) => ({
+        ...v,
+        ...(patch.values![i] || patch.values![0]),
+        field: v.field,
+      }));
+    }
+    updateTable(patch);
+  }, [tables, activeTableIdx, updateTable]);
 
   const handleDrop = useCallback((zone: DropZoneType, fieldName: string) => {
     const table = tables[activeTableIdx];
@@ -892,6 +913,7 @@ export default function App() {
           else if (a === 'tour') setShowTour(true);
           else if (a === 'dashboard') setActiveTableIdx(-1);
           else if (a === 'import_file') ribbonFileRef.current?.click();
+          else if (a.startsWith('apply_template:')) handleApplyTemplate(a.slice('apply_template:'.length));
           else if (a.startsWith('load_project:')) handleLoadProjectByPath(a.slice('load_project:'.length));
           else setModal(a as ModalType);
         }}
@@ -922,6 +944,7 @@ export default function App() {
           else if (a === 'clean_proper') handleTextClean('text_case', 'proper');
           else if (a === 'filter_panel') setShowFilterPanel(s => !s);
           else if (a === 'project_filter') setShowProjectFilterPanel(s => !s);
+          else if (a.startsWith('apply_template:')) handleApplyTemplate(a.slice('apply_template:'.length));
           else if (a.startsWith('load_project:')) handleLoadProjectByPath(a.slice('load_project:'.length));
           else setModal(a as ModalType);
         }}
@@ -949,6 +972,8 @@ export default function App() {
         <SourcePanel columns={allColumns}
           onDragStart={f => setDraggedField(f)} onDragEnd={() => setDraggedField(null)}
           metricNames={metricNames} binNames={binNames}
+          columnDescriptions={columnDescriptions}
+          onColumnDescriptionChange={(col, desc) => setColumnDescriptions(prev => ({ ...prev, [col]: desc }))}
           usedColumns={activeTable ? { rows: activeTable.rows, columns: activeTable.columns, values: activeTable.values.map(v => v.field) } : undefined}
           onMultiDrop={(zone, fields) => {
             if (activeTableIdx < 0) return;
@@ -1270,6 +1295,7 @@ export default function App() {
           dataset={dataset}
           result={results.get(tables[activeTableIdx]?.id) || null}
           interpretation={tableInterpretations[tables[activeTableIdx]?.id] || ''}
+          columnDescriptions={columnDescriptions}
           onClose={() => setModal(null)}
           onApplyPolish={(title, subtitle, renames) => {
             const t = tables[activeTableIdx];
@@ -1300,19 +1326,31 @@ export default function App() {
             const newTables = suggested.map((s: any, i: number) => {
               const valField = (!s.value_field || s.value_field === '*') ? s.groupby_field : s.value_field;
               const valAgg = (!s.value_field || s.value_field === '*') ? 'count' : (s.aggregation || 'count');
-              return {
-              id: `ai_${Date.now()}_${i}`,
-              name: s.title || `AI Table ${i + 1}`,
-              rows: [s.groupby_field].filter(Boolean),
-              columns: s.secondary_groupby ? [s.secondary_groupby] : [],
-              values: [{ field: valField, agg: valAgg, label: '' }],
-              filters: {},
-              grand_total: true,
-              subtotals: false,
-              missing_data: '',
-              title: s.title || '',
-              subtitle: s.description || '',
-            };});
+              const hasCols = !!s.secondary_groupby;
+              const tplId = s.template || (hasCols ? 'count_pct_row' : 'frequency');
+              const tpl = TABLE_TEMPLATES.find(t => t.id === tplId);
+              const baseTable: TableConfig = {
+                id: `ai_${Date.now()}_${i}`,
+                name: s.title || `AI Table ${i + 1}`,
+                rows: [s.groupby_field].filter(Boolean),
+                columns: s.secondary_groupby ? [s.secondary_groupby] : [],
+                values: [{ field: valField, agg: valAgg, label: '' }],
+                filters: {},
+                grand_total: true,
+                subtotals: false,
+                missing_data: '',
+                title: s.title || '',
+                subtitle: s.description || '',
+              };
+              if (tpl) {
+                const patch = tpl.apply(baseTable);
+                if (patch.values) {
+                  patch.values = baseTable.values.map(v => ({ ...v, ...(patch.values![0] || {}), field: v.field }));
+                }
+                Object.assign(baseTable, patch);
+              }
+              return baseTable;
+            });
             setTables(prev => [...prev, ...newTables]);
             setActiveTableIdx(tables.length);
           }}

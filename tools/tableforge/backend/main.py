@@ -4647,6 +4647,8 @@ class AIAutoGenerateRequest(BaseModel):
     dataset_id: str
     table_descriptions: str = ""
     max_tables: int = 20
+    column_descriptions: dict = {}
+    template: str = ""
 
 
 @app.post("/api/ai/auto-generate")
@@ -4666,12 +4668,16 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
             dtype = str(df[col].dtype)
             uniq = int(df[col].nunique())
             sample = df[col].dropna().head(5).astype(str).tolist()
-            cols_info.append({
+            col_entry = {
                 "id": col,
-                "type": "numeric" if "int" in dtype or "float" in dtype else "text",
+                "dtype": dtype,
+                "analysis_type": "numeric" if "int" in dtype or "float" in dtype else ("date" if "datetime" in dtype else "categorical"),
                 "unique": uniq,
                 "sample": sample,
-            })
+            }
+            if col in body.column_descriptions and body.column_descriptions[col]:
+                col_entry["description"] = body.column_descriptions[col]
+            cols_info.append(col_entry)
 
         sample_rows = df.head(10).fillna("").to_dict(orient="records")
 
@@ -4686,27 +4692,47 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
                 f"If they mention cross-tabs, set secondary_groupby accordingly.\n\n"
             )
 
+        template_guide = (
+            "TEMPLATE FORMATS — choose the best template for each table:\n"
+            "  'count_pct_row': Count + % of Row total. Best for cross-tabs comparing distributions.\n"
+            "  'count_pct_col': Count + % of Column total. Best for demographic breakdowns.\n"
+            "  'count_pct_grand': Count + % of Grand Total. Best for overall composition.\n"
+            "  'frequency': Simple frequency distribution (count only). Best for single categorical variable.\n"
+            "  'average_totals': Average with subtotals and grand totals. Best for numeric measures.\n"
+            "  'sum_pct_row': Sum + % of Row total. Best for monetary/volume cross-tabs.\n"
+            "  'crosstab_full': Count + row % + subtotals + grand totals. Best for full cross-tabulations.\n\n"
+            "ANALYSIS TYPE GUIDANCE:\n"
+            "  - Categorical columns (low unique values <20): frequency distribution, cross-tabs\n"
+            "  - Numeric columns: mean/sum aggregations, averages by category\n"
+            "  - Text columns with high cardinality: skip or use as row grouping only\n"
+            "  - Date columns: use for time-based groupings\n"
+            "  - Boolean columns: frequency counts, cross-tabs with demographics\n\n"
+        )
+
         prompt = (
             f"You are a senior research data analyst designing a comprehensive tabulation plan.\n\n"
             f"Available columns (use ONLY these exact ids):\n{json.dumps(cols_info, indent=1)}\n\n"
             f"Sample data rows:\n{json.dumps(sample_rows[:8], ensure_ascii=False, default=str)}\n\n"
             f"{guidance}"
+            f"{template_guide}"
             f"Generate {body.max_tables} tables covering all major dimensions of this dataset.\n"
             f"Include a mix of:\n"
-            f"- Simple frequency tables (count by category)\n"
-            f"- Cross-tabulations (category x category)\n"
-            f"- Mean/sum aggregations for numeric columns\n"
-            f"- Key demographic breakdowns\n\n"
+            f"- Simple frequency tables for each categorical variable\n"
+            f"- Cross-tabulations (category x category) for related variables\n"
+            f"- Mean/sum aggregations for numeric columns grouped by categories\n"
+            f"- Key demographic breakdowns\n"
+            f"- Any analysis suggested by column descriptions or data patterns\n\n"
             f"For each table provide:\n"
             f"  - groupby_field: column id for row grouping (required)\n"
             f"  - secondary_groupby: column id for cross-tab columns, or '' for simple table\n"
             f"  - value_field: column id to aggregate, or the groupby_field with 'count' aggregation\n"
             f"  - aggregation: 'count', 'sum', or 'mean'\n"
+            f"  - template: one of 'count_pct_row', 'count_pct_col', 'count_pct_grand', 'frequency', 'average_totals', 'sum_pct_row', 'crosstab_full'\n"
             f"  - title: clean descriptive title\n"
             f"  - description: one sentence explaining the insight\n\n"
             f"IMPORTANT: Do NOT use '*' as value_field. For count tables, use the groupby_field as value_field with aggregation 'count'.\n\n"
             f"Respond with ONLY valid JSON:\n"
-            f'{{"tables": [{{"groupby_field":"...","secondary_groupby":"","value_field":"...","aggregation":"count","title":"...","description":"..."}}]}}'
+            f'{{"tables": [{{"groupby_field":"...","secondary_groupby":"","value_field":"...","aggregation":"count","template":"frequency","title":"...","description":"..."}}]}}'
         )
         raw = await _call_llm(cfg, prompt)
         match = _re.search(r'\{.*\}', raw, _re.DOTALL)
@@ -4718,6 +4744,8 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
                     if t.get("value_field") == "*":
                         t["value_field"] = t.get("groupby_field", "")
                         t["aggregation"] = "count"
+                    if not t.get("template"):
+                        t["template"] = "frequency" if not t.get("secondary_groupby") else "count_pct_row"
                 return {"tables": tables}
             except json.JSONDecodeError:
                 raise HTTPException(502, "AI returned invalid JSON. Try again.")

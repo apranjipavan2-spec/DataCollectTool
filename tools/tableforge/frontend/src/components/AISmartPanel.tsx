@@ -17,6 +17,7 @@ interface Props {
   onApplyInterpretationAll?: (updates: { tableId: string; text: string }[]) => void;
   onApplySuggestion?: (tables: any[]) => void;
   onApplySmartBuild?: (config: any) => void;
+  columnDescriptions?: Record<string, string>;
 }
 
 const FOCUS_TEMPLATES = [
@@ -39,7 +40,7 @@ const REPORT_STYLES = [
   { key: 'executive', label: 'Executive Summary' },
 ];
 
-export function AISmartPanel({ mode, table, tables, allResults, dataset, result, interpretation, onClose, onApplyPolish, onApplyPolishAll, onApplyInterpretation, onApplyInterpretationAll, onApplySuggestion, onApplySmartBuild }: Props) {
+export function AISmartPanel({ mode, table, tables, allResults, dataset, result, interpretation, onClose, onApplyPolish, onApplyPolishAll, onApplyInterpretation, onApplyInterpretationAll, onApplySuggestion, onApplySmartBuild, columnDescriptions = {} }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [aiResult, setAiResult] = useState<any>(null);
@@ -190,7 +191,7 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
       const res = await fetch(`${API_BASE}/ai/auto-generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataset_id: dataset.dataset_id, table_descriptions: tableDescriptions, max_tables: maxTables }),
+        body: JSON.stringify({ dataset_id: dataset.dataset_id, table_descriptions: tableDescriptions, max_tables: maxTables, column_descriptions: columnDescriptions }),
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
@@ -466,6 +467,7 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
                         <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{t.description}</div>
                         <div style={{ fontSize: 10, color: 'var(--text-dim)', opacity: 0.7 }}>
                           Rows: {t.groupby_field} | Values: {t.value_field} ({t.aggregation}){t.secondary_groupby && ` | Columns: ${t.secondary_groupby}`}
+                          {t.template && <span style={{ marginLeft: 6, padding: '1px 5px', background: 'rgba(59,130,246,0.2)', borderRadius: 3, color: '#93c5fd' }}>{t.template}</span>}
                         </div>
                       </div>
                     </label>

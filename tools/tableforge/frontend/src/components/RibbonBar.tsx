@@ -53,6 +53,144 @@ const DEFAULT_NUM_FMT: NumberFormat = {
   style: 'number', decimals: 2, separator: true, prefix: '', suffix: '', currency_symbol: '$',
 };
 
+// ── Table Templates ───────────────────────────────────────
+export interface TableTemplate {
+  id: string;
+  label: string;
+  icon: string;
+  description: string;
+  apply: (table: TableConfig) => Partial<TableConfig>;
+}
+
+export const TABLE_TEMPLATES: TableTemplate[] = [
+  {
+    id: 'count_pct_row',
+    label: 'Count + % of Row',
+    icon: '#',
+    description: 'Count with row percentages. Subtotals if cross-tab.',
+    apply: (t) => ({
+      values: t.values.map(v => ({ ...v, agg: 'count', show_as: 'normal', combo_show_as: 'pct_row', decimals: 1 })),
+      grand_total: true, grand_total_rows: true, grand_total_columns: true,
+      subtotals: t.columns.length > 0,
+    }),
+  },
+  {
+    id: 'count_pct_col',
+    label: 'Count + % of Column',
+    icon: '#',
+    description: 'Count with column percentages and totals.',
+    apply: (t) => ({
+      values: t.values.map(v => ({ ...v, agg: 'count', show_as: 'normal', combo_show_as: 'pct_col', decimals: 1 })),
+      grand_total: true, grand_total_rows: true, grand_total_columns: true,
+      subtotals: t.columns.length > 0,
+    }),
+  },
+  {
+    id: 'count_pct_grand',
+    label: 'Count + % of Grand Total',
+    icon: '%',
+    description: 'Count with percentage of grand total.',
+    apply: (t) => ({
+      values: t.values.map(v => ({ ...v, agg: 'count', show_as: 'normal', combo_show_as: 'pct_grand', decimals: 1 })),
+      grand_total: true, grand_total_rows: true, grand_total_columns: true,
+      subtotals: t.columns.length > 0,
+    }),
+  },
+  {
+    id: 'frequency',
+    label: 'Frequency Distribution',
+    icon: 'F',
+    description: 'Simple count table — frequency distribution.',
+    apply: () => ({
+      values: [{ field: '', agg: 'count', label: 'Count' } as any],
+      grand_total: true, grand_total_rows: true,
+      subtotals: false,
+    }),
+  },
+  {
+    id: 'average_totals',
+    label: 'Average + Totals',
+    icon: 'x',
+    description: 'Average aggregation with subtotals and grand totals.',
+    apply: (t) => ({
+      values: t.values.map(v => ({ ...v, agg: 'average', show_as: 'normal', combo_show_as: undefined, decimals: 2 })),
+      grand_total: true, grand_total_rows: true, grand_total_columns: true,
+      subtotals: t.columns.length > 0,
+    }),
+  },
+  {
+    id: 'sum_pct_row',
+    label: 'Sum + % of Row',
+    icon: 'S',
+    description: 'Sum aggregation with row percentages.',
+    apply: (t) => ({
+      values: t.values.map(v => ({ ...v, agg: 'sum', show_as: 'normal', combo_show_as: 'pct_row', decimals: 2 })),
+      grand_total: true, grand_total_rows: true, grand_total_columns: true,
+      subtotals: t.columns.length > 0,
+    }),
+  },
+  {
+    id: 'count_only',
+    label: 'Count Only',
+    icon: 'N',
+    description: 'Plain count without percentages.',
+    apply: () => ({
+      values: [{ field: '', agg: 'count', show_as: 'normal', combo_show_as: undefined, label: 'Count' } as any],
+      grand_total: true, grand_total_rows: true,
+      subtotals: false,
+    }),
+  },
+  {
+    id: 'crosstab_full',
+    label: 'Cross-tab Full',
+    icon: '+',
+    description: 'Count + row % + subtotals + grand totals. Full cross-tabulation.',
+    apply: (t) => ({
+      values: t.values.map(v => ({ ...v, agg: 'count', show_as: 'normal', combo_show_as: 'pct_row', decimals: 1 })),
+      grand_total: true, grand_total_rows: true, grand_total_columns: true,
+      subtotals: true, subtotals_position: 'bottom' as const,
+    }),
+  },
+];
+
+function TemplateDropdown({ table, onAction, disabled }: { table: TableConfig | null; onAction: (a: string) => void; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div style={{ position: 'relative' }} ref={ref}>
+      <button className={`ribbon-btn ${open ? 'active' : ''}`} onClick={() => setOpen(!open)} disabled={disabled} title="Apply a table template">
+        <span className="ribbon-btn-icon">T</span>
+        <span className="ribbon-btn-label">Templates</span>
+      </button>
+      {open && (
+        <div className="import-drop-panel" style={{ width: 280 }}>
+          <div className="import-drop-section-title">Table Templates</div>
+          {TABLE_TEMPLATES.map(tpl => (
+            <button key={tpl.id} className="import-drop-item"
+              onClick={() => { onAction('apply_template:' + tpl.id); setOpen(false); }}
+              title={tpl.description}>
+              <span className="import-drop-icon" style={{ fontWeight: 700, fontSize: 14 }}>{tpl.icon}</span>
+              <span className="import-drop-info">
+                <span className="import-drop-name">{tpl.label}</span>
+                <span className="import-drop-meta">{tpl.description}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Root component ─────────────────────────────────────────
 export function RibbonBar({ table, dataset, onAction, onUpdate, theme, activeTab: externalTab, columns, onColumnTypeChange, projectFilterCount = 0 }: Props) {
   const [internalTab, setInternalTab] = useState<TabKey>('home');
@@ -267,6 +405,7 @@ function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0
         <RBtn icon="⧉" label="Duplicate" onClick={() => onAction('duplicate')} disabled={!dataset} />
       </RGroup>
       <RGroup label="Table">
+        <TemplateDropdown table={table} onAction={onAction} disabled={!dataset} />
         <RBtn icon="Σ" label="Totals"    onClick={() => table && onUpdate({ grand_total: !table.grand_total, grand_total_rows: !table.grand_total, grand_total_columns: !table.grand_total })} disabled={!dataset} active={table?.grand_total} />
         <RBtn icon="⊞" label="Subtotals" onClick={() => table && onUpdate({ subtotals: !table.subtotals })}    disabled={!dataset} active={table?.subtotals} />
         <RBtn icon="⇄" label="Transpose" onClick={() => onAction('transpose')} disabled={!dataset} />

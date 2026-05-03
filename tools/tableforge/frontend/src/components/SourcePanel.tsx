@@ -9,6 +9,8 @@ interface Props {
   metricNames?: string[];
   binNames?: string[];
   usedColumns?: { rows: string[]; columns: string[]; values: string[] };
+  columnDescriptions?: Record<string, string>;
+  onColumnDescriptionChange?: (column: string, description: string) => void;
   // Table list props
   tables?: TableConfig[];
   activeTableIdx?: number;
@@ -61,7 +63,8 @@ function HighlightText({ text, search }: { text: string; search: string }) {
 
 export function SourcePanel({
   columns, onDragStart, onDragEnd, onMultiDrop, metricNames = [], binNames = [],
-  usedColumns, tables = [], activeTableIdx = 0, results, error,
+  usedColumns, columnDescriptions = {}, onColumnDescriptionChange,
+  tables = [], activeTableIdx = 0, results, error,
   onTableSelect, onAddTable, onDuplicateTable, onDuplicateTables, onRenameTable, onDeleteTable, onDeleteTables,
   onReorderTables,
 }: Props) {
@@ -70,6 +73,8 @@ export function SourcePanel({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showUsed, setShowUsed] = useState(true);
   const [tableSearch, setTableSearch] = useState('');
+  const [editingDesc, setEditingDesc] = useState<string | null>(null);
+  const [descDraft, setDescDraft] = useState('');
   const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set());
 
   // Resizable sidebars
@@ -182,13 +187,41 @@ export function SourcePanel({
         {metricNames.includes(col.name) && <span className="col-badge col-metric-badge" title="Has metric">f</span>}
         {binNames.includes(col.name) && <span className="col-badge col-bin-badge" title="Has bin">+</span>}
         {selected.has(col.name) && <span className="col-selected-check">✓</span>}
-        {hoveredCol === col.name && !selected.has(col.name) && (
+        {hoveredCol === col.name && !selected.has(col.name) && editingDesc !== col.name && (
           <div className="col-tooltip">
             <div><strong>{col.name}</strong> ({col.type})</div>
             <div>{col.stats.unique} unique · {col.stats.nulls} nulls</div>
             {col.stats.min != null && <div>Range: {col.stats.min} – {col.stats.max}</div>}
             <div className="sample-vals">
               {col.sample_values.slice(0, 5).join(', ')}
+            </div>
+            {columnDescriptions[col.name] && (
+              <div style={{ marginTop: 4, fontStyle: 'italic', color: '#93c5fd' }}>{columnDescriptions[col.name]}</div>
+            )}
+            {onColumnDescriptionChange && (
+              <button onClick={e => { e.stopPropagation(); setEditingDesc(col.name); setDescDraft(columnDescriptions[col.name] || ''); }}
+                style={{ marginTop: 4, fontSize: 10, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 3, color: 'var(--text-dim)', cursor: 'pointer', padding: '2px 6px' }}>
+                {columnDescriptions[col.name] ? 'Edit description' : 'Add description'}
+              </button>
+            )}
+          </div>
+        )}
+        {editingDesc === col.name && (
+          <div className="col-tooltip" style={{ padding: 8 }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 11, marginBottom: 4 }}><strong>{col.name}</strong> — Description</div>
+            <input value={descDraft} onChange={e => setDescDraft(e.target.value)}
+              placeholder="e.g. Household size (number of members)"
+              autoFocus
+              onKeyDown={e => {
+                if (e.key === 'Enter') { onColumnDescriptionChange?.(col.name, descDraft); setEditingDesc(null); }
+                if (e.key === 'Escape') setEditingDesc(null);
+              }}
+              style={{ width: '100%', fontSize: 11, padding: '4px 6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 3, color: 'inherit' }} />
+            <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+              <button onClick={() => { onColumnDescriptionChange?.(col.name, descDraft); setEditingDesc(null); }}
+                style={{ fontSize: 10, padding: '2px 8px', background: '#3b82f6', border: 'none', borderRadius: 3, color: '#fff', cursor: 'pointer' }}>Save</button>
+              <button onClick={() => setEditingDesc(null)}
+                style={{ fontSize: 10, padding: '2px 8px', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 3, color: 'var(--text-dim)', cursor: 'pointer' }}>Cancel</button>
             </div>
           </div>
         )}
