@@ -8,6 +8,7 @@ interface Props {
   onCreated: (name: string) => void;
   onClose: () => void;
   onOpenLibrary?: () => void;
+  embedded?: boolean;
 }
 
 const METRIC_TYPES = [
@@ -23,7 +24,7 @@ const METRIC_TYPES = [
   { value: 'conditional', label: 'Conditional / IF', desc: 'IF column condition THEN value ELSE value' },
 ];
 
-export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLibrary }: Props) {
+export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLibrary, embedded }: Props) {
   const [name, setName] = useState('');
   const [metricType, setMetricType] = useState('formula');
   const [columnA, setColumnA] = useState('');
@@ -140,14 +141,9 @@ export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLi
     </div>
   );
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Visual Metric Builder</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
-        </div>
-        <div className="modal-body">
+  const body = (
+    <>
+        <div className={embedded ? '' : 'modal-body'}>
           <div className="form-group">
             <label>Metric Name</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
@@ -387,6 +383,19 @@ export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLi
             {saving ? 'Creating...' : 'Create Metric'}
           </button>
         </div>
+    </>
+  );
+
+  if (embedded) return body;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Visual Metric Builder</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        {body}
       </div>
     </div>
   );

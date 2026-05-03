@@ -7,9 +7,10 @@ interface Props {
   columns: ColumnInfo[];
   onCreated: (name: string) => void;
   onClose: () => void;
+  embedded?: boolean;
 }
 
-export function BinCreator({ datasetId, columns, onCreated, onClose }: Props) {
+export function BinCreator({ datasetId, columns, onCreated, onClose, embedded }: Props) {
   const [name, setName] = useState('');
   const [sourceCol, setSourceCol] = useState('');
   const [binType, setBinType] = useState('numeric');
@@ -158,14 +159,9 @@ export function BinCreator({ datasetId, columns, onCreated, onClose }: Props) {
     { value: 'group', label: 'Category Collapse' },
   ];
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Bin Creator & Data Recoding</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
-        </div>
-        <div className="modal-body">
+  const body = (
+    <>
+        <div className={embedded ? '' : 'modal-body'}>
           <div className="form-row">
             <div className="form-group" style={{ flex: 1 }}>
               <label>Bin Name</label>
@@ -441,6 +437,19 @@ export function BinCreator({ datasetId, columns, onCreated, onClose }: Props) {
             {saving ? 'Creating...' : 'Create Bin'}
           </button>
         </div>
+    </>
+  );
+
+  if (embedded) return body;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Bin Creator & Data Recoding</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        {body}
       </div>
     </div>
   );

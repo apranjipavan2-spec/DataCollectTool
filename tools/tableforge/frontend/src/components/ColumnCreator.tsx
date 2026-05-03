@@ -173,12 +173,12 @@ export function ColumnCreator({ datasetId, columns, onCreated, onClose, onOpenLi
 
             {tab === 'ai' && renderAITab()}
             {tab === 'metric' && (
-              <MetricBuilder datasetId={datasetId} columns={columns}
+              <MetricBuilder datasetId={datasetId} columns={columns} embedded
                 onCreated={(name) => { onCreated(name); setExistingCols(prev => [...prev, { name, type: 'metric' }]); }}
                 onClose={onClose} onOpenLibrary={onOpenLibrary} />
             )}
             {tab === 'bin' && (
-              <BinCreator datasetId={datasetId} columns={columns}
+              <BinCreator datasetId={datasetId} columns={columns} embedded
                 onCreated={(name) => { onCreated(name); setExistingCols(prev => [...prev, { name, type: 'bin' }]); }}
                 onClose={onClose} />
             )}
