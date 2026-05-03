@@ -3984,82 +3984,107 @@ class FGImportBody(BaseModel):
 
 @app.post("/api/import-from-fg")
 async def import_from_fg(body: FGImportBody):
-    """Fetch program submissions from FieldGovern and load as a dataset (same shape as /api/upload)."""
+    """Fetch program submissions from FieldGovern and load as a dataset, streaming progress via SSE."""
     import httpx
-    # Use internal Docker network URL if available (avoids SSL/DNS issues between containers)
-    internal_base = os.environ.get("FG_INTERNAL_URL", "").rstrip("/")
-    base = internal_base if internal_base else body.fg_base_url.rstrip("/")
-    url = f"{base}/api/v1/fg/programs/{body.program_id}/export.xlsx"
-    if body.questionnaire_id:
-        url += f"?questionnaire_id={body.questionnaire_id}"
-    try:
-        async with httpx.AsyncClient(timeout=120.0, verify=bool(not internal_base)) as client:
-            resp = await client.get(url, headers={"Authorization": f"Bearer {body.token}"})
-        if resp.status_code != 200:
-            raise HTTPException(502, f"FieldGovern returned {resp.status_code}")
-    except httpx.RequestError as e:
-        raise HTTPException(502, f"Could not reach FieldGovern: {e}")
 
-    dataset_id = str(uuid.uuid4())
-    filename = f"fg_program_{body.program_id}.xlsx"
-    tmp_path = CACHE_DIR / f"{dataset_id}.xlsx"
-    tmp_path.write_bytes(resp.content)
+    async def progress_stream():
+        try:
+            yield f"data: {json.dumps({'step': 'connecting', 'message': 'Connecting to FieldGovern…', 'percent': 5})}\n\n"
 
-    try:
-        xls = pd.ExcelFile(tmp_path, engine="openpyxl")
-        df = pd.read_excel(xls, sheet_name=xls.sheet_names[0])
-    except Exception as e:
-        raise HTTPException(400, f"Failed to parse export: {e}")
+            internal_base = os.environ.get("FG_INTERNAL_URL", "").rstrip("/")
+            base = internal_base if internal_base else body.fg_base_url.rstrip("/")
+            url = f"{base}/api/v1/fg/programs/{body.program_id}/export.xlsx"
+            if body.questionnaire_id:
+                url += f"?questionnaire_id={body.questionnaire_id}"
 
-    # Full column detection — same logic as /api/upload
-    columns = []
-    for col in df.columns:
-        dtype = str(df[col].dtype)
-        if "int" in dtype or "float" in dtype:
-            col_type = "numeric"
-        elif "datetime" in dtype:
-            col_type = "date"
-        elif "bool" in dtype:
-            col_type = "boolean"
-        else:
+            yield f"data: {json.dumps({'step': 'downloading', 'message': 'Downloading data from server…', 'percent': 15})}\n\n"
+
+            async with httpx.AsyncClient(timeout=120.0, verify=bool(not internal_base)) as client:
+                resp = await client.get(url, headers={"Authorization": f"Bearer {body.token}"})
+
+            if resp.status_code != 200:
+                yield f"data: {json.dumps({'step': 'error', 'message': f'FieldGovern returned {resp.status_code}', 'percent': 0})}\n\n"
+                return
+
+            file_size = len(resp.content)
+            yield f"data: {json.dumps({'step': 'saving', 'message': f'Downloaded {file_size // 1024} KB — saving…', 'percent': 40})}\n\n"
+
+            dataset_id = str(uuid.uuid4())
+            filename = f"fg_program_{body.program_id}.xlsx"
+            tmp_path = CACHE_DIR / f"{dataset_id}.xlsx"
+            tmp_path.write_bytes(resp.content)
+
+            yield f"data: {json.dumps({'step': 'parsing', 'message': 'Parsing Excel file…', 'percent': 55})}\n\n"
+
             try:
-                col_type = "multi_choice" if _is_multi_choice(df[col]) else "text"
-            except Exception:
-                col_type = "text"
-        sample_values = df[col].dropna().head(5).tolist()
-        stats: dict = {"nulls": int(df[col].isna().sum()), "unique": int(df[col].nunique())}
-        if col_type == "numeric":
-            try:
-                stats.update({
-                    "min": float(df[col].min()) if not pd.isna(df[col].min()) else None,
-                    "max": float(df[col].max()) if not pd.isna(df[col].max()) else None,
-                    "mean": float(df[col].mean()) if not pd.isna(df[col].mean()) else None,
+                xls = pd.ExcelFile(tmp_path, engine="openpyxl")
+                df = pd.read_excel(xls, sheet_name=xls.sheet_names[0])
+            except Exception as e:
+                yield f"data: {json.dumps({'step': 'error', 'message': f'Failed to parse: {str(e)}', 'percent': 0})}\n\n"
+                return
+
+            row_count = len(df)
+            col_count = len(df.columns)
+            yield f"data: {json.dumps({'step': 'extracting', 'message': f'Extracting {col_count} columns from {row_count} rows…', 'percent': 70})}\n\n"
+
+            columns = []
+            for i, col in enumerate(df.columns):
+                dtype = str(df[col].dtype)
+                if "int" in dtype or "float" in dtype:
+                    col_type = "numeric"
+                elif "datetime" in dtype:
+                    col_type = "date"
+                elif "bool" in dtype:
+                    col_type = "boolean"
+                else:
+                    try:
+                        col_type = "multi_choice" if _is_multi_choice(df[col]) else "text"
+                    except Exception:
+                        col_type = "text"
+                sample_values = df[col].dropna().head(5).tolist()
+                stats: dict = {"nulls": int(df[col].isna().sum()), "unique": int(df[col].nunique())}
+                if col_type == "numeric":
+                    try:
+                        stats.update({
+                            "min": float(df[col].min()) if not pd.isna(df[col].min()) else None,
+                            "max": float(df[col].max()) if not pd.isna(df[col].max()) else None,
+                            "mean": float(df[col].mean()) if not pd.isna(df[col].mean()) else None,
+                        })
+                    except Exception:
+                        pass
+                columns.append({
+                    "name": col,
+                    "type": col_type,
+                    "sample_values": [str(v) for v in sample_values],
+                    "stats": sanitize_for_json(stats),
                 })
-            except Exception:
-                pass
-        columns.append({
-            "name": col,
-            "type": col_type,
-            "sample_values": [str(v) for v in sample_values],
-            "stats": sanitize_for_json(stats),
-        })
 
-    datasets[dataset_id] = {"df": df, "filename": filename, "sheets": xls.sheet_names}
-    custom_metrics[dataset_id] = []
-    custom_bins[dataset_id] = []
-    audit_logs[dataset_id] = []
-    annotations[dataset_id] = {}
-    column_type_overrides[dataset_id] = {}
-    add_audit_log(dataset_id, "fg_import", f"Imported from FieldGovern program {body.program_id}: {len(df)} rows")
+            pct = 70 + int((i + 1) / col_count * 20) if col_count > 0 else 90
+            yield f"data: {json.dumps({'step': 'finalizing', 'message': f'Building dataset ({row_count} rows, {col_count} columns)…', 'percent': 92})}\n\n"
 
-    return {
-        "dataset_id": dataset_id,
-        "filename": filename,
-        "sheets": xls.sheet_names,
-        "row_count": len(df),
-        "columns": columns,
-        "preview": sanitize_for_json(df.head(50).fillna("").to_dict(orient="records")),
-    }
+            datasets[dataset_id] = {"df": df, "filename": filename, "sheets": xls.sheet_names}
+            custom_metrics[dataset_id] = []
+            custom_bins[dataset_id] = []
+            audit_logs[dataset_id] = []
+            annotations[dataset_id] = {}
+            column_type_overrides[dataset_id] = {}
+            add_audit_log(dataset_id, "fg_import", f"Imported from FieldGovern program {body.program_id}: {row_count} rows")
+
+            result = {
+                "dataset_id": dataset_id,
+                "filename": filename,
+                "sheets": xls.sheet_names,
+                "row_count": row_count,
+                "columns": columns,
+                "preview": sanitize_for_json(df.head(50).fillna("").to_dict(orient="records")),
+            }
+
+            yield f"data: {json.dumps({'step': 'done', 'message': 'Ready!', 'percent': 100, 'result': result})}\n\n"
+
+        except Exception as e:
+            yield f"data: {json.dumps({'step': 'error', 'message': str(e), 'percent': 0})}\n\n"
+
+    return StreamingResponse(progress_stream(), media_type="text/event-stream")
 
 
 # ── FG proxy: list programs ───────────────────────────────────────────────────

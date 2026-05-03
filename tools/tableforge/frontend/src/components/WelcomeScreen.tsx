@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { fgListPrograms, fgListQuestionnaires, importFromFg, fgListUserProjects, listProjects } from '../api';
+import { fgListPrograms, fgListQuestionnaires, importFromFg, fgListUserProjects, listProjects, FgProgressEvent } from '../api';
 
 interface FgContext { fgUrl: string; token: string; programId?: string }
 
@@ -79,6 +79,7 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
   const [selQ, setSelQ]                     = useState('');
   const [fgLoading, setFgLoading]           = useState(false);
   const [fgError, setFgError]               = useState('');
+  const [fgProgress, setFgProgress]         = useState<FgProgressEvent | null>(null);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [localProjects, setLocalProjects]   = useState<LocalProject[]>([]);
 
@@ -112,13 +113,16 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
 
   const handleFgLoad = async () => {
     if (!fgContext || !selProgram) return;
-    setFgLoading(true); setFgError('');
+    setFgLoading(true); setFgError(''); setFgProgress(null);
     try {
-      const meta = await importFromFg(fgContext.fgUrl, fgContext.token, selProgram, selQ || undefined);
+      const meta = await importFromFg(
+        fgContext.fgUrl, fgContext.token, selProgram, selQ || undefined,
+        (ev) => setFgProgress(ev),
+      );
       onDatasetLoaded?.(meta);
     } catch (e: any) {
       setFgError(e.message || 'Failed to load data from FieldGovern');
-    } finally { setFgLoading(false); }
+    } finally { setFgLoading(false); setFgProgress(null); }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -159,12 +163,31 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 10 }}>
                   <div style={{ width: 18, height: 18, border: '2.5px solid rgba(59,130,246,0.2)', borderTop: '2.5px solid #3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                   <span style={{ fontSize: 14, color: '#94a3b8' }}>
-                    {fgLoading ? 'Loading program data…' : (loadingMsg || 'Importing data from FieldGovern…')}
+                    {fgProgress?.message || (fgLoading ? 'Connecting…' : (loadingMsg || 'Importing data from FieldGovern…'))}
                   </span>
                 </div>
+                {fgProgress && fgProgress.percent > 0 && (
+                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>{fgProgress.percent}%</div>
+                )}
                 <div style={{ width: '100%', height: 4, background: 'rgba(100,116,139,0.15)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ width: '100%', height: '100%', background: '#3b82f6', borderRadius: 3, animation: 'indeterminate 1.5s ease-in-out infinite' }} />
+                  <div style={{
+                    width: fgProgress && fgProgress.percent > 0 ? `${fgProgress.percent}%` : '100%',
+                    height: '100%', background: '#3b82f6', borderRadius: 3,
+                    transition: fgProgress ? 'width 0.3s ease' : 'none',
+                    ...(fgProgress && fgProgress.percent > 0 ? {} : { animation: 'indeterminate 1.5s ease-in-out infinite' }),
+                  }} />
                 </div>
+                {fgProgress && (
+                  <div style={{ marginTop: 8, fontSize: 11, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {fgProgress.step === 'connecting' && '● Connecting to server'}
+                    {fgProgress.step === 'downloading' && '● Downloading data'}
+                    {fgProgress.step === 'saving' && '● Saving file'}
+                    {fgProgress.step === 'parsing' && '● Parsing Excel'}
+                    {fgProgress.step === 'extracting' && '● Extracting columns'}
+                    {fgProgress.step === 'finalizing' && '● Building dataset'}
+                    {fgProgress.step === 'done' && '● Complete'}
+                  </div>
+                )}
                 <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes indeterminate { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }`}</style>
               </div>
             )}

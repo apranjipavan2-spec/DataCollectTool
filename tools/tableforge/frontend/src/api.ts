@@ -234,7 +234,17 @@ export async function fgListUserProjects(fgUrl: string, token: string, tool = 'a
   return res.json() as Promise<{ id: string; name: string; program_id: string | null; data: any; updated_at: string }[]>;
 }
 
-export async function importFromFg(fgUrl: string, token: string, programId: string, questionnaireId?: string) {
+export interface FgProgressEvent {
+  step: string;
+  message: string;
+  percent: number;
+  result?: any;
+}
+
+export async function importFromFg(
+  fgUrl: string, token: string, programId: string, questionnaireId?: string,
+  onProgress?: (ev: FgProgressEvent) => void,
+) {
   const body: any = { fg_base_url: fgUrl, program_id: programId, token };
   if (questionnaireId) body.questionnaire_id = questionnaireId;
   const res = await fetch(`${API_BASE}/import-from-fg`, {
@@ -243,7 +253,35 @@ export async function importFromFg(fgUrl: string, token: string, programId: stri
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await parseError(res));
-  return res.json();
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('No response stream');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let finalResult: any = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      try {
+        const ev: FgProgressEvent = JSON.parse(line.slice(6));
+        onProgress?.(ev);
+        if (ev.step === 'error') throw new Error(ev.message);
+        if (ev.step === 'done' && ev.result) finalResult = ev.result;
+      } catch (e: any) {
+        if (e.message && e.message !== 'Unexpected end of JSON input') throw e;
+      }
+    }
+  }
+
+  if (!finalResult) throw new Error('Import completed without result');
+  return finalResult;
 }
 
 // Module A: Sheet Selection
