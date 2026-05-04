@@ -63,6 +63,7 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
   const [objectives, setObjectives] = useState('');
   const [maxTables, setMaxTables] = useState(20);
   const [selectedAutoTables, setSelectedAutoTables] = useState<Set<number>>(new Set());
+  const [phaseProgress, setPhaseProgress] = useState<{ phase: number; total: number; message: string } | null>(null);
 
   // Unified build sub-mode
   const [buildSubMode, setBuildSubMode] = useState<'ask' | 'generate' | 'suggest'>('ask');
@@ -190,7 +191,8 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
 
   const handleAutoGenerate = async () => {
     if (!dataset) return;
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setPhaseProgress(null);
+    const accumulated: any[] = [];
     try {
       const res = await fetch(`${API_BASE}/ai/auto-generate`, {
         method: 'POST',
@@ -205,11 +207,47 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      setAiResult(data);
-      if (data.tables) setSelectedAutoTables(new Set(data.tables.map((_: any, i: number) => i)));
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error('No response stream');
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const ev = JSON.parse(line.slice(6));
+            if (ev.step === 'start') {
+              setPhaseProgress({ phase: 0, total: ev.phases || 1, message: ev.message });
+            } else if (ev.step === 'phase') {
+              setPhaseProgress(prev => ({ phase: ev.phase, total: prev?.total || 1, message: ev.message }));
+            } else if (ev.step === 'phase_done') {
+              accumulated.push(...(ev.tables || []));
+              setAiResult({ tables: [...accumulated] });
+              setSelectedAutoTables(new Set(accumulated.map((_: any, i: number) => i)));
+              setPhaseProgress(prev => ({ phase: ev.phase, total: prev?.total || 1, message: ev.message }));
+            } else if (ev.step === 'phase_error') {
+              setPhaseProgress(prev => ({ phase: ev.phase, total: prev?.total || 1, message: ev.message }));
+            } else if (ev.step === 'done') {
+              if (ev.tables?.length && ev.tables.length > accumulated.length) {
+                accumulated.length = 0;
+                accumulated.push(...ev.tables);
+              }
+              setAiResult({ tables: [...accumulated] });
+              setSelectedAutoTables(new Set(accumulated.map((_: any, i: number) => i)));
+            }
+          } catch {}
+        }
+      }
+      if (!accumulated.length) throw new Error('No tables generated');
     } catch (e: any) { setError(e.message); }
-    finally { setLoading(false); }
+    finally { setLoading(false); setPhaseProgress(null); }
   };
 
   const handleReport = async () => {
@@ -505,10 +543,23 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
                       <span style={{ fontSize: 12, minWidth: 28 }}>{maxTables}</span>
                     </div>
                     {!aiResult && (
-                      <button className="btn-primary" onClick={handleAutoGenerate} disabled={loading}
-                        style={{ alignSelf: 'flex-start', padding: '8px 20px' }}>
-                        {loading ? 'Generating...' : 'Auto-Generate Tables'}
-                      </button>
+                      <div>
+                        <button className="btn-primary" onClick={handleAutoGenerate} disabled={loading}
+                          style={{ padding: '8px 20px' }}>
+                          {loading ? 'Generating...' : 'Auto-Generate Tables'}
+                        </button>
+                        {loading && phaseProgress && (
+                          <div style={{ marginTop: 10, padding: '10px 14px', background: 'rgba(59,130,246,0.08)', borderRadius: 8, fontSize: 12 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                              <span style={{ color: '#93c5fd' }}>{phaseProgress.message}</span>
+                              <span style={{ color: 'var(--text-dim)' }}>Phase {phaseProgress.phase}/{phaseProgress.total}</span>
+                            </div>
+                            <div style={{ width: '100%', height: 4, background: 'rgba(59,130,246,0.15)', borderRadius: 3, overflow: 'hidden' }}>
+                              <div style={{ width: `${Math.max(5, (phaseProgress.phase / phaseProgress.total) * 100)}%`, height: '100%', background: '#3b82f6', borderRadius: 3, transition: 'width 0.5s ease' }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                     {aiResult?.tables && (
                       <div className="ai-result">
@@ -708,7 +759,7 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
         </div>
         <div className="modal-body" style={{ overflow: 'auto', position: 'relative' }}>
           {error && <div className="error-msg" style={{ marginBottom: 10 }}>{error}</div>}
-          {loading && (
+          {loading && !phaseProgress && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '32px 20px' }}>
               <div style={{ width: 36, height: 36, border: '3px solid rgba(59,130,246,0.15)', borderTop: '3px solid #3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
               <span style={{ fontSize: 13, color: 'var(--text-dim, #94a3b8)', textAlign: 'center' }}>
@@ -720,7 +771,7 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
               <style>{`@keyframes spin{to{transform:rotate(360deg)}}@keyframes indeterminate{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}`}</style>
             </div>
           )}
-          {!loading && renderContent()}
+          {(!loading || mode === 'auto-generate' || (mode === 'smart-build' && buildSubMode === 'generate')) && renderContent()}
         </div>
       </div>
     </div>

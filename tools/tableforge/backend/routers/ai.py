@@ -485,118 +485,103 @@ class AIAutoGenerateRequest(BaseModel):
 
 @router.post("/api/ai/auto-generate")
 async def ai_auto_generate(body: AIAutoGenerateRequest):
-    """AI generates a comprehensive set of tables from all columns."""
-    try:
-        cfg = _load_ai_cfg()
-        if not cfg.get("api_key"):
-            raise HTTPException(400, "AI not configured. Go to AI Settings and add your API key.")
-        if body.dataset_id not in datasets:
-            raise HTTPException(404, "Dataset not found")
-        ds = datasets[body.dataset_id]
-        df = ds["df"]
+    """AI generates tables in column-based phases to handle large datasets.
 
-        target_cols = body.selected_columns if body.selected_columns else list(df.columns[:100])
-        cols_info = []
-        for col in target_cols:
-            if col not in df.columns:
-                continue
-            dtype = str(df[col].dtype)
-            uniq = int(df[col].nunique())
-            sample = [str(v)[:50] for v in df[col].dropna().head(3).tolist()]
-            col_entry = {
-                "id": col,
-                "dtype": dtype,
-                "analysis_type": "numeric" if "int" in dtype or "float" in dtype else ("date" if "datetime" in dtype else "categorical"),
-                "unique": uniq,
-                "sample": sample,
-            }
-            if col in body.column_descriptions and body.column_descriptions[col]:
-                col_entry["description"] = body.column_descriptions[col]
-            cols_info.append(col_entry)
+    Columns are split into chunks of ~25. Each chunk gets its own LLM call
+    with a proportional share of the requested table count. Results are
+    streamed back via SSE so the frontend can show progress per phase.
+    """
+    from fastapi.responses import StreamingResponse
 
-        sample_rows = df[target_cols[:30]].head(5).fillna("").to_dict(orient="records")
+    cfg = _load_ai_cfg()
+    if not cfg.get("api_key"):
+        raise HTTPException(400, "AI not configured. Go to AI Settings and add your API key.")
+    if body.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    ds = datasets[body.dataset_id]
+    df = ds["df"]
 
-        guidance = ""
-        if body.objectives.strip():
-            guidance += (
-                f"\n--- RESEARCH OBJECTIVES & QUESTIONS ---\n"
-                f"{body.objectives.strip()}\n"
-                f"--- END ---\n\n"
-                f"Generate tables that directly answer these research objectives and questions. "
-                f"Each table should map to one or more objectives. "
-                f"Include the relevant objective in each table's description.\n\n"
-            )
-        if body.table_descriptions.strip():
-            guidance += (
-                f"\n--- USER TABLE DESCRIPTIONS ---\n"
-                f"{body.table_descriptions.strip()}\n"
-                f"--- END ---\n\n"
-                f"Follow the user's table descriptions closely. Create EXACTLY the tables described. "
-                f"If the descriptions mention specific columns, use those. "
-                f"If they mention cross-tabs, set secondary_groupby accordingly.\n\n"
-            )
+    target_cols = body.selected_columns if body.selected_columns else list(df.columns[:150])
+    target_cols = [c for c in target_cols if c in df.columns]
 
-        template_guide = (
-            "TEMPLATE FORMATS — choose the best template for each table:\n"
-            "  'count_pct_row': Count + % of Row total. Best for cross-tabs comparing distributions.\n"
-            "  'count_pct_col': Count + % of Column total. Best for demographic breakdowns.\n"
-            "  'count_pct_grand': Count + % of Grand Total. Best for overall composition.\n"
-            "  'frequency': Simple frequency distribution (count only). Best for single categorical variable.\n"
-            "  'average_totals': Average with subtotals and grand totals. Best for numeric measures.\n"
-            "  'sum_pct_row': Sum + % of Row total. Best for monetary/volume cross-tabs.\n"
-            "  'crosstab_full': Count + row % + subtotals + grand totals. Best for full cross-tabulations.\n\n"
-            "ANALYSIS TYPE GUIDANCE:\n"
-            "  - Categorical columns (low unique values <20): frequency distribution, cross-tabs\n"
-            "  - Numeric columns: mean/sum aggregations, averages by category\n"
-            "  - Text columns with high cardinality: skip or use as row grouping only\n"
-            "  - Date columns: use for time-based groupings\n"
-            "  - Boolean columns: frequency counts, cross-tabs with demographics\n\n"
+    def _col_info(col):
+        dtype = str(df[col].dtype)
+        uniq = int(df[col].nunique())
+        sample = [str(v)[:50] for v in df[col].dropna().head(3).tolist()]
+        entry = {
+            "id": col,
+            "dtype": dtype,
+            "analysis_type": "numeric" if "int" in dtype or "float" in dtype else ("date" if "datetime" in dtype else "categorical"),
+            "unique": uniq,
+            "sample": sample,
+        }
+        if col in body.column_descriptions and body.column_descriptions[col]:
+            entry["description"] = body.column_descriptions[col]
+        return entry
+
+    guidance = ""
+    if body.objectives.strip():
+        guidance += (
+            f"\n--- RESEARCH OBJECTIVES & QUESTIONS ---\n"
+            f"{body.objectives.strip()}\n--- END ---\n\n"
+            f"Generate tables that directly answer these research objectives. "
+            f"Include the relevant objective in each table's description.\n\n"
+        )
+    if body.table_descriptions.strip():
+        guidance += (
+            f"\n--- USER TABLE DESCRIPTIONS ---\n"
+            f"{body.table_descriptions.strip()}\n--- END ---\n\n"
+            f"Follow the user's table descriptions closely. Create EXACTLY the tables described.\n\n"
         )
 
-        prompt = (
-            f"You are a senior research data analyst designing a comprehensive tabulation plan.\n\n"
-            f"Available columns (use ONLY these exact ids):\n{json.dumps(cols_info, ensure_ascii=False, default=str)}\n\n"
-            f"Sample data rows:\n{json.dumps(sample_rows[:4], ensure_ascii=False, default=str)}\n\n"
-            f"{guidance}"
-            f"{template_guide}"
-            f"Generate {body.max_tables} tables covering all major dimensions of this dataset.\n"
-            f"Include a mix of:\n"
-            f"- Simple frequency tables for each categorical variable\n"
-            f"- Cross-tabulations (category x category) for related variables\n"
-            f"- Mean/sum aggregations for numeric columns grouped by categories\n"
-            f"- Key demographic breakdowns\n"
-            f"- Any analysis suggested by column descriptions or data patterns\n\n"
-            f"For each table provide:\n"
-            f"  - groupby_field: column id for row grouping (required)\n"
-            f"  - secondary_groupby: column id for cross-tab columns, or '' for simple table\n"
-            f"  - value_field: column id to aggregate, or the groupby_field with 'count' aggregation\n"
-            f"  - aggregation: 'count', 'sum', or 'mean'\n"
-            f"  - template: one of 'count_pct_row', 'count_pct_col', 'count_pct_grand', 'frequency', 'average_totals', 'sum_pct_row', 'crosstab_full'\n"
-            f"  - title: clean descriptive title\n"
-            f"  - description: one sentence explaining the insight\n\n"
-            f"IMPORTANT: Do NOT use '*' as value_field. For count tables, use the groupby_field as value_field with aggregation 'count'.\n\n"
-            f"Respond with ONLY valid JSON:\n"
-            f'{{"tables": [{{"groupby_field":"...","secondary_groupby":"","value_field":"...","aggregation":"count","template":"frequency","title":"...","description":"..."}}]}}'
-        )
+    template_guide = (
+        "TEMPLATE FORMATS:\n"
+        "  'frequency': count only | 'count_pct_row': count + row % | 'count_pct_col': count + col %\n"
+        "  'count_pct_grand': count + grand % | 'average_totals': mean + totals\n"
+        "  'sum_pct_row': sum + row % | 'crosstab_full': count + row % + subtotals + grand\n\n"
+    )
+
+    CHUNK_SIZE = 25
+    chunks = [target_cols[i:i + CHUNK_SIZE] for i in range(0, len(target_cols), CHUNK_SIZE)]
+    actual_cols = list(df.columns)
+
+    async def stream():
         all_tables = []
-        batch_size = 30
-        remaining = body.max_tables
-        batch_num = 0
-        while remaining > 0:
-            this_batch = min(remaining, batch_size)
-            batch_prompt = prompt.replace(
-                f"Generate {body.max_tables} tables",
-                f"Generate {this_batch} tables"
+        total_phases = len(chunks)
+
+        yield f"data: {json.dumps({'step': 'start', 'message': f'Analyzing {len(target_cols)} columns in {total_phases} phase(s)…', 'phases': total_phases, 'tables': []})}\n\n"
+
+        for phase_idx, chunk in enumerate(chunks):
+            tables_for_chunk = max(3, body.max_tables // total_phases + (1 if phase_idx < body.max_tables % total_phases else 0))
+            cols_info = [_col_info(c) for c in chunk]
+            sample_cols = chunk[:15]
+            sample_rows = df[sample_cols].head(4).fillna("").to_dict(orient="records")
+
+            existing_titles = [t.get("title", "") for t in all_tables]
+            dedup_block = ""
+            if existing_titles:
+                dedup_block = f"\nAlready created (do NOT repeat): {json.dumps(existing_titles[:50])}\n"
+
+            prompt = (
+                f"You are a senior research data analyst designing tabulations.\n\n"
+                f"Available columns (use ONLY these exact ids):\n{json.dumps(cols_info, ensure_ascii=False, default=str)}\n\n"
+                f"Sample data:\n{json.dumps(sample_rows, ensure_ascii=False, default=str)}\n\n"
+                f"{guidance}{template_guide}"
+                f"Generate {tables_for_chunk} tables from these columns. Include frequency tables, cross-tabs, and aggregations as appropriate.\n"
+                f"For each table: groupby_field, secondary_groupby ('' if simple), value_field, aggregation ('count'|'sum'|'mean'), template, title, description.\n"
+                f"IMPORTANT: Do NOT use '*' as value_field. Use the groupby_field with 'count' instead.\n"
+                f"{dedup_block}\n"
+                f"Respond ONLY valid JSON:\n"
+                f'{{"tables": [{{"groupby_field":"...","secondary_groupby":"","value_field":"...","aggregation":"count","template":"frequency","title":"...","description":"..."}}]}}'
             )
-            if batch_num > 0 and all_tables:
-                existing_titles = [t.get("title", "") for t in all_tables]
-                batch_prompt += f"\n\nYou already generated these tables (do NOT repeat them):\n{json.dumps(existing_titles)}"
-            raw = await _call_llm(cfg, batch_prompt)
-            match = _re.search(r'\{.*\}', raw, _re.DOTALL)
-            if match:
-                try:
+
+            yield f"data: {json.dumps({'step': 'phase', 'phase': phase_idx + 1, 'message': f'Phase {phase_idx + 1}/{total_phases}: Analyzing columns {phase_idx * CHUNK_SIZE + 1}–{min((phase_idx + 1) * CHUNK_SIZE, len(target_cols))}…', 'tables': []})}\n\n"
+
+            try:
+                raw = await _call_llm(cfg, prompt)
+                match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+                if match:
                     result = json.loads(match.group())
-                    actual_cols = list(df.columns)
                     batch_tables = result.get("tables", [])
                     for t in batch_tables:
                         _validate_table_cols(t, actual_cols)
@@ -606,21 +591,13 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
                         if not t.get("template"):
                             t["template"] = "frequency" if not t.get("secondary_groupby") else "count_pct_row"
                     all_tables.extend(batch_tables)
-                except json.JSONDecodeError:
-                    if not all_tables:
-                        raise HTTPException(502, "AI returned invalid JSON. Try again.")
-                    break
-            else:
-                if not all_tables:
-                    raise HTTPException(502, "AI returned empty response. Try again.")
-                break
-            remaining -= this_batch
-            batch_num += 1
-        return {"tables": all_tables}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, f"Auto-generate failed: {str(e)}")
+                    yield f"data: {json.dumps({'step': 'phase_done', 'phase': phase_idx + 1, 'message': f'Phase {phase_idx + 1} complete — {len(batch_tables)} tables', 'tables': batch_tables})}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'step': 'phase_error', 'phase': phase_idx + 1, 'message': f'Phase {phase_idx + 1} error: {str(e)}', 'tables': []})}\n\n"
+
+        yield f"data: {json.dumps({'step': 'done', 'message': f'Generated {len(all_tables)} tables', 'tables': all_tables})}\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
 
 
 class AICreateColumnRequest(BaseModel):
