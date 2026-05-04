@@ -343,12 +343,26 @@ async def union_sheets(config: UnionConfig):
 
 @router.post("/api/dataset/{dataset_id}/refresh")
 async def refresh_dataset(dataset_id: str):
-    """Reload the source file without losing configuration."""
+    """Reload the source file without losing configuration.
+    If loaded from a server file, re-copies from uploads/ to get the latest version.
+    """
     if dataset_id not in datasets:
         raise HTTPException(404, "Dataset not found")
     filename = datasets[dataset_id]["filename"]
     ext = filename.rsplit(".", 1)[-1].lower()
     tmp_path = CACHE_DIR / f"{dataset_id}.{ext}"
+
+    server_file_id = datasets[dataset_id].get("server_file_id")
+    if server_file_id:
+        import shutil
+        from .files import UPLOADS_DIR, _load_manifest
+        manifest = _load_manifest()
+        entry = next((f for f in manifest if f["id"] == server_file_id), None)
+        if entry:
+            src = UPLOADS_DIR / entry["stored_name"]
+            if src.exists():
+                shutil.copy2(str(src), str(tmp_path))
+
     if not tmp_path.exists():
         raise HTTPException(404, "Source file no longer cached")
     try:
@@ -357,7 +371,7 @@ async def refresh_dataset(dataset_id: str):
         else:
             df = pd.read_csv(tmp_path)
         datasets[dataset_id]["df"] = df
-        add_audit_log(dataset_id, "data_refresh", f"Reloaded {filename}")
+        add_audit_log(dataset_id, "data_refresh", f"Reloaded {filename}" + (" (from server)" if server_file_id else ""))
         columns = _detect_columns(df)
         return {"row_count": len(df), "columns": columns}
     except Exception as e:

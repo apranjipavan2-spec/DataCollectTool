@@ -420,6 +420,7 @@ input, select, textarea { font-family: inherit; }
       <button class="btn btn-success btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doExport('csv')">⬇ CSV</button>
       <button class="btn btn-success btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doExport('excel')">⬇ XLS</button>
       <button id="saveToAccountBtn" class="btn btn-primary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; margin-top:4px; display:none;" onclick="doSaveToAccount()" title="Save cleaned data to your FieldGovern account">💾 Save to Account</button>
+      <button id="saveToServerBtn" class="btn btn-primary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; margin-top:4px; display:none;" onclick="doSaveToServer()" title="Save cleaned data back to server file (shared with Analyzer)">💾 Save to Server</button>
     </div>
   </div>
 
@@ -472,6 +473,12 @@ input, select, textarea { font-family: inherit; }
             <span class="upload-btn">Choose File</span>
             <input type="file" accept=".csv,.xlsx,.xls" onchange="uploadFile(this.files[0])">
           </label>
+        </div>
+
+        <!-- Server Files -->
+        <div id="serverFilesSection" style="margin-top:16px;display:none;">
+          <div class="divider-or"><span>server files</span></div>
+          <div id="serverFilesList" style="display:flex;flex-direction:column;gap:6px;"></div>
         </div>
       </div>
 
@@ -591,6 +598,61 @@ async function apiPost(path, body, showSpinner = true) {
     if (showSpinner) hideLoading();
   }
 }
+
+// ── Server Files ─────────────────────────────────────────
+async function loadServerFiles() {
+  try {
+    const res = await fetch(BASE_URL + '/api/files');
+    const data = await res.json();
+    const files = data.files || [];
+    const section = document.getElementById('serverFilesSection');
+    const list = document.getElementById('serverFilesList');
+    if (!files.length) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    list.innerHTML = files.map(f => `
+      <button class="upload-btn" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;padding:8px 12px;font-size:13px;" onclick="loadFromServer('${f.id}')">
+        <span>${f.ext === 'csv' || f.ext === 'tsv' ? '📄' : '📊'} ${f.original_name}</span>
+        <span style="font-size:11px;color:var(--text3);">${f.size_mb > 0 ? f.size_mb + ' MB' : Math.round(f.size_bytes/1024) + ' KB'}</span>
+      </button>
+    `).join('');
+  } catch {}
+}
+
+let _activeServerFileId = null;
+
+async function loadFromServer(fileId) {
+  showLoading("Loading file from server...");
+  try {
+    const res = await fetch(BASE_URL + '/api/files/' + fileId + '/load', { method: 'POST' });
+    const data = await res.json();
+    if (data.error) { toast(data.error, 'error'); return; }
+    if (data.needs_sheet_selection) {
+      _activeServerFileId = fileId;
+      const wc = document.getElementById('welcomeCard'); if (wc) wc.style.display = 'none';
+      await showSheetModal(data.sheets, data.copy_path, data.filename);
+      return;
+    }
+    _activeServerFileId = data.server_file_id || fileId;
+    toast(`Loaded ${data.filename} — ${data.rows} rows, ${data.cols} columns`);
+    const wc = document.getElementById('welcomeCard'); if (wc) wc.style.display = 'none';
+    const ssb = document.getElementById('saveToServerBtn');
+    if (ssb) ssb.style.display = '';
+    await refreshAll();
+  } finally { hideLoading(); }
+}
+
+async function doSaveToServer() {
+  if (!_activeServerFileId) { toast('No server file linked', 'error'); return; }
+  showLoading("Saving cleaned data to server...");
+  try {
+    const res = await fetch(BASE_URL + '/api/files/' + _activeServerFileId + '/save-back', { method: 'POST' });
+    const data = await res.json();
+    if (data.error) { toast(data.error, 'error'); return; }
+    toast(data.message || 'Saved to server!');
+  } finally { hideLoading(); }
+}
+
+document.addEventListener('DOMContentLoaded', loadServerFiles);
 
 // ── Upload ───────────────────────────────────────────────
 async function uploadFile(file) {

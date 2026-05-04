@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { fgListPrograms, fgListQuestionnaires, importFromFg, fgListUserProjects, listProjects, FgProgressEvent } from '../api';
+import { fgListPrograms, fgListQuestionnaires, importFromFg, fgListUserProjects, listProjects, FgProgressEvent, listServerFiles, uploadToServer, loadServerFile, deleteServerFile, ServerFile } from '../api';
 
 interface FgContext { fgUrl: string; token: string; programId?: string }
 
@@ -82,6 +82,10 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
   const [fgProgress, setFgProgress]         = useState<FgProgressEvent | null>(null);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [localProjects, setLocalProjects]   = useState<LocalProject[]>([]);
+  const [serverFiles, setServerFiles]       = useState<ServerFile[]>([]);
+  const [sfLoading, setSfLoading]           = useState('');
+  const [sfUploading, setSfUploading]       = useState(false);
+  const serverFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     listProjects()
@@ -90,7 +94,36 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
         setLocalProjects(projs);
       })
       .catch(() => {});
+    listServerFiles()
+      .then(res => setServerFiles(res.files || []))
+      .catch(() => {});
   }, []);
+
+  const handleServerUpload = async (file: File) => {
+    setSfUploading(true);
+    try {
+      await uploadToServer(file);
+      const res = await listServerFiles();
+      setServerFiles(res.files || []);
+    } catch {}
+    setSfUploading(false);
+  };
+
+  const handleServerLoad = async (f: ServerFile) => {
+    setSfLoading(f.id);
+    try {
+      const meta = await loadServerFile(f.id);
+      onDatasetLoaded?.(meta);
+    } catch {}
+    setSfLoading('');
+  };
+
+  const handleServerDelete = async (f: ServerFile) => {
+    try {
+      await deleteServerFile(f.id);
+      setServerFiles(prev => prev.filter(x => x.id !== f.id));
+    } catch {}
+  };
 
   useEffect(() => {
     if (!fgContext) return;
@@ -144,6 +177,51 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
   };
 
   const selectedProgName = programs.find(p => p.id === selProgram)?.name;
+
+  const serverFilesSection = serverFiles.length > 0 || !loading ? (
+    <>
+      <div style={s.divider}>
+        <div style={s.dividerLine} />
+        <span style={s.dividerText}>server files</span>
+        <div style={s.dividerLine} />
+      </div>
+      {serverFiles.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {serverFiles.map(f => (
+            <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button
+                style={{ ...s.linkBtn, flex: 1, opacity: sfLoading === f.id ? 0.5 : 1 }}
+                disabled={!!sfLoading}
+                onClick={() => handleServerLoad(f)}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                  <span style={{ fontSize: 14 }}>{f.ext === 'csv' || f.ext === 'tsv' ? '\ud83d\udcc4' : '\ud83d\udcca'}</span>
+                  <span style={{ fontSize: 13, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.original_name}</span>
+                </span>
+                <span style={{ fontSize: 11, color: '#475569', whiteSpace: 'nowrap' }}>
+                  {f.size_mb > 0 ? `${f.size_mb} MB` : `${Math.round(f.size_bytes / 1024)} KB`} · {formatRelative(f.uploaded_at)}
+                </span>
+              </button>
+              <button
+                onClick={() => handleServerDelete(f)}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px 6px', fontSize: 14 }}
+                title="Delete from server"
+              >&times;</button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: 12, color: '#475569', textAlign: 'center' }}>No files saved on server yet</div>
+      )}
+      <button
+        style={{ ...s.linkBtn, justifyContent: 'center', marginTop: 6, opacity: sfUploading ? 0.5 : 1 }}
+        disabled={sfUploading}
+        onClick={() => serverFileRef.current?.click()}
+      >
+        {sfUploading ? 'Uploading…' : '\u2b06 Save file to server'}
+      </button>
+    </>
+  ) : null;
 
   return (
     <div style={s.wrap}>
@@ -278,6 +356,8 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
                 </div>
               </>
             )}
+
+            {!loading && !fgLoading && serverFilesSection}
           </>
         ) : (
           /* No FG context — plain file upload */
@@ -322,6 +402,8 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
             )}
             {error && <div style={s.errorMsg}>{error}</div>}
 
+            {!loading && serverFilesSection}
+
             {localProjects.length > 0 && !loading && (
               <>
                 <div style={s.divider}>
@@ -351,6 +433,8 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
         onChange={e => { const f = e.target.files?.[0]; if (f) onFileUpload(f); e.target.value = ''; }} />
       <input ref={projectFileRef} type="file" accept=".tableforge,.json" style={{ display: 'none' }}
         onChange={e => { const f = e.target.files?.[0]; if (f) handleProjectFile(f); e.target.value = ''; }} />
+      <input ref={serverFileRef} type="file" accept=".xlsx,.xls,.csv,.tsv" style={{ display: 'none' }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleServerUpload(f); e.target.value = ''; }} />
     </div>
   );
 }

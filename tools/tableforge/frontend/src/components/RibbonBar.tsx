@@ -981,10 +981,15 @@ function FormatRibbon({ table, onUpdate, columns = [], onColumnTypeChange }: {
               <FField label="Percentage Base" style={{ marginTop: 8 }}>
                 <select value={t.subtotal_pct_base || 'grand_total'} className="fdrop-select"
                   onChange={e => onUpdate({ subtotal_pct_base: e.target.value as any })}>
-                  <option value="grand_total">% of Grand Total (row)</option>
-                  <option value="subtotal">% of Subtotal Group</option>
+                  <option value="grand_total">100% = Grand Total (full row)</option>
+                  <option value="subtotal">100% = Each Subtotal Group</option>
                 </select>
               </FField>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4, padding: '4px 2px' }}>
+                {(t.subtotal_pct_base || 'grand_total') === 'subtotal'
+                  ? 'Each subtotal group sums to 100%. Use when comparing within groups (e.g. user types).'
+                  : 'Full row sums to 100%. Subtotals show their share of the grand total.'}
+              </div>
               </>
             )}
             <FDivider />

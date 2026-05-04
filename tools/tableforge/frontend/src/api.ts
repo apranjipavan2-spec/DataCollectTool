@@ -284,6 +284,58 @@ export async function importFromFg(
   return finalResult;
 }
 
+// ── Server File Storage ─────────────────────────────────────────────────────
+
+export interface ServerFile {
+  id: string;
+  original_name: string;
+  stored_name: string;
+  size_bytes: number;
+  size_mb: number;
+  uploaded_at: string;
+  ext: string;
+}
+
+export async function uploadToServer(file: File, onProgress?: (pct: number) => void) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return new Promise<{ message: string; file: ServerFile }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}/files/upload`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(JSON.parse(xhr.responseText)); } catch { reject(new Error('Invalid response')); }
+      } else {
+        try { const err = JSON.parse(xhr.responseText); reject(new Error(err.detail || `HTTP ${xhr.status}`)); }
+        catch { reject(new Error(xhr.responseText || `HTTP ${xhr.status}`)); }
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network error'));
+    xhr.send(formData);
+  });
+}
+
+export async function listServerFiles(): Promise<{ files: ServerFile[] }> {
+  const res = await fetch(`${API_BASE}/files`);
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function deleteServerFile(fileId: string) {
+  const res = await fetch(`${API_BASE}/files/${fileId}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function loadServerFile(fileId: string) {
+  const res = await fetch(`${API_BASE}/files/${fileId}/load`, { method: 'POST' });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
 // Module A: Sheet Selection
 export async function loadSheet(datasetId: string, sheetName: string) {
   const res = await fetch(`${API_BASE}/upload/sheet`, {

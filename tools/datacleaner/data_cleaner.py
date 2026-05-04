@@ -295,6 +295,96 @@ def load_sheet():
                    needs_header_config=has_unnamed)
 
 
+# ── Server Files (shared uploads volume) ─────────────────────────────────────
+
+UPLOADS_DIR = pathlib.Path(__file__).resolve().parent / "uploads"
+UPLOADS_DIR.mkdir(exist_ok=True)
+_MANIFEST = UPLOADS_DIR / "_manifest.json"
+
+def _load_manifest():
+    if _MANIFEST.exists():
+        try:
+            return json.loads(_MANIFEST.read_text())
+        except Exception:
+            pass
+    return []
+
+@app.route("/api/files")
+def list_server_files():
+    manifest = _load_manifest()
+    valid = [e for e in manifest if (UPLOADS_DIR / e["stored_name"]).exists()]
+    return jsonify(files=sorted(valid, key=lambda f: f.get("uploaded_at", ""), reverse=True))
+
+@app.route("/api/files/<file_id>/load", methods=["POST"])
+def load_server_file(file_id):
+    manifest = _load_manifest()
+    entry = next((f for f in manifest if f["id"] == file_id), None)
+    if not entry:
+        return jsonify(error="File not found on server"), 404
+    src = UPLOADS_DIR / entry["stored_name"]
+    if not src.exists():
+        return jsonify(error="File missing from disk"), 404
+    import shutil
+    copy_name = f"COPY_{entry['original_name']}"
+    copy_path = COPIES_DIR / copy_name
+    shutil.copy2(str(src), str(copy_path))
+    fname = entry["original_name"].lower()
+    try:
+        if fname.endswith(".csv") or fname.endswith(".tsv"):
+            sep = "\t" if fname.endswith(".tsv") else ","
+            df = pd.read_csv(copy_path, sep=sep, dtype=str, keep_default_na=False, na_values=[''])
+        elif fname.endswith((".xlsx", ".xls")):
+            xls = pd.ExcelFile(copy_path, engine="openpyxl")
+            if len(xls.sheet_names) > 1:
+                return jsonify(ok=True, needs_sheet_selection=True, sheets=xls.sheet_names,
+                               filename=entry["original_name"], copy_path=copy_name)
+            df = pd.read_excel(copy_path, sheet_name=xls.sheet_names[0], engine="openpyxl",
+                               dtype=str, keep_default_na=False, na_values=[''])
+            DATA["sheet_name"] = xls.sheet_names[0]
+        else:
+            return jsonify(error="Unsupported format"), 400
+    except Exception as e:
+        return jsonify(error=f"Parse error: {e}"), 400
+    df.columns = df.columns.astype(str)
+    DATA["df"] = df
+    DATA["original_df"] = df.copy()
+    DATA["filename"] = entry["original_name"]
+    DATA["copy_path"] = str(copy_path)
+    DATA["server_file_id"] = file_id
+    DATA["history"] = []
+    _save_state()
+    return jsonify(ok=True, rows=len(df), cols=len(df.columns),
+                   columns=df.columns.tolist(), filename=entry["original_name"],
+                   copy_path=copy_name, server_file_id=file_id)
+
+
+@app.route("/api/files/<file_id>/save-back", methods=["POST"])
+def save_back_to_server(file_id):
+    """Write the current cleaned DataFrame back to the shared uploads file."""
+    df = DATA.get("df")
+    if df is None:
+        return jsonify(error="No data loaded"), 400
+    manifest = _load_manifest()
+    entry = next((f for f in manifest if f["id"] == file_id), None)
+    if not entry:
+        return jsonify(error="Server file not found"), 404
+    dest = UPLOADS_DIR / entry["stored_name"]
+    fname = entry["original_name"].lower()
+    try:
+        if fname.endswith((".xlsx", ".xls")):
+            df.to_excel(str(dest), index=False, engine="openpyxl")
+        elif fname.endswith(".tsv"):
+            df.to_csv(str(dest), index=False, sep="\t")
+        else:
+            df.to_csv(str(dest), index=False)
+    except Exception as e:
+        return jsonify(error=f"Save failed: {e}"), 500
+    entry["size_bytes"] = dest.stat().st_size
+    entry["size_mb"] = round(entry["size_bytes"] / 1024 / 1024, 2)
+    _MANIFEST.write_text(json.dumps(manifest, indent=2))
+    return jsonify(ok=True, message=f"Saved cleaned data back to '{entry['original_name']}' on server")
+
+
 @app.route("/api/preview_headers")
 def preview_headers():
     """Show raw first N rows to help user identify header structure."""

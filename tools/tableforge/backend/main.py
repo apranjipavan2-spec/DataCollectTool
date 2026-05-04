@@ -26,6 +26,7 @@ from .routers import (
     stats,
     ai,
     fieldgovern,
+    files,
 )
 
 app = FastAPI(title="TableForge", version="2.0")
@@ -52,6 +53,7 @@ app.include_router(compare.router)
 app.include_router(stats.router)
 app.include_router(ai.router)
 app.include_router(fieldgovern.router)
+app.include_router(files.router)
 
 
 # Serve Frontend (production)
