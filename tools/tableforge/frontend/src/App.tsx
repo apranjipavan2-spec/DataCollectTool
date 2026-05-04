@@ -1246,7 +1246,7 @@ export default function App() {
         onCreated={() => { setModal(null); refreshExtraColumns(); }} onClose={() => setModal(null)} />}
       {modal === 'column-creator' && <ColumnCreator datasetId={dataset.dataset_id} columns={allColumns}
         onCreated={() => { refreshExtraColumns(); }} onClose={() => setModal(null)}
-        onOpenLibrary={() => setModal('metric_library')} />}
+        onOpenLibrary={() => setModal('metric_library')} columnDescriptions={columnDescriptions} />}
       {modal === 'export' && <ExportDialog datasetId={dataset.dataset_id} tables={tables} results={results}
         annotationsMap={annotationsMap}
         onClose={() => setModal(null)} />}

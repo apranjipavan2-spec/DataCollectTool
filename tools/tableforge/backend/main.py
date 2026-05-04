@@ -785,13 +785,25 @@ def apply_metrics_and_bins(df: pd.DataFrame, dataset_id: str) -> pd.DataFrame:
                 op_str = op_map.get(str(cond_op), ">")
 
                 if cond_col and cond_col in df.columns:
-                    col_series = pd.to_numeric(df[cond_col], errors="coerce")
-                    if op_str == ">": mask = col_series > cond_val
-                    elif op_str == ">=": mask = col_series >= cond_val
-                    elif op_str == "<": mask = col_series < cond_val
-                    elif op_str == "<=": mask = col_series <= cond_val
-                    elif op_str == "==": mask = col_series == cond_val
-                    else: mask = col_series != cond_val
+                    if cond_op in ("contains", "not_contains", "starts_with", "ends_with", "is_null", "not_null"):
+                        str_series = df[cond_col].astype(str).str.strip()
+                        if cond_op == "contains": mask = str_series.str.contains(str(cond_val), case=False, na=False)
+                        elif cond_op == "not_contains": mask = ~str_series.str.contains(str(cond_val), case=False, na=False)
+                        elif cond_op == "starts_with": mask = str_series.str.startswith(str(cond_val), na=False)
+                        elif cond_op == "ends_with": mask = str_series.str.endswith(str(cond_val), na=False)
+                        elif cond_op == "is_null": mask = df[cond_col].isna() | (str_series == "")
+                        else: mask = df[cond_col].notna() & (str_series != "")
+                    elif cond_op in ("eq", "neq") and isinstance(cond_val, str):
+                        str_series = df[cond_col].astype(str).str.strip()
+                        mask = str_series == str(cond_val).strip() if cond_op == "eq" else str_series != str(cond_val).strip()
+                    else:
+                        col_series = pd.to_numeric(df[cond_col], errors="coerce")
+                        if op_str == ">": mask = col_series > cond_val
+                        elif op_str == ">=": mask = col_series >= cond_val
+                        elif op_str == "<": mask = col_series < cond_val
+                        elif op_str == "<=": mask = col_series <= cond_val
+                        elif op_str == "==": mask = col_series == cond_val
+                        else: mask = col_series != cond_val
 
                     then_type = mdef.get("cond_then_type", "column")
                     else_type = mdef.get("cond_else_type", "value")
@@ -1702,6 +1714,27 @@ async def create_metric(metric: MetricDef):
         # Roll back
         custom_metrics[metric.dataset_id] = [m for m in custom_metrics.get(metric.dataset_id, []) if m["name"] != metric.name]
         raise HTTPException(400, f"Metric error: {str(e)}")
+
+
+@app.post("/api/metrics/preview")
+async def preview_metric(metric: MetricDef):
+    """Preview a metric without persisting it."""
+    if metric.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    df = datasets[metric.dataset_id]["df"].copy()
+    mdef = metric.model_dump()
+    try:
+        df = apply_metrics_and_bins(df, metric.dataset_id)
+        saved = custom_metrics.get(metric.dataset_id, [])
+        custom_metrics[metric.dataset_id] = saved + [mdef]
+        df = apply_metrics_and_bins(df, metric.dataset_id)
+        preview = df[metric.name].dropna().head(8).tolist()
+        preview = sanitize_for_json(preview)
+        custom_metrics[metric.dataset_id] = saved
+        return {"name": metric.name, "preview": preview}
+    except Exception as e:
+        custom_metrics[metric.dataset_id] = [m for m in custom_metrics.get(metric.dataset_id, []) if m["name"] != metric.name]
+        raise HTTPException(400, f"Preview error: {str(e)}")
 
 
 @app.delete("/api/metrics/{dataset_id}/{metric_name}")
@@ -4646,8 +4679,10 @@ async def ai_smart_build(body: AISmartBuildRequest):
 class AIAutoGenerateRequest(BaseModel):
     dataset_id: str
     table_descriptions: str = ""
+    objectives: str = ""
     max_tables: int = 20
     column_descriptions: dict = {}
+    selected_columns: list = []
     template: str = ""
 
 
@@ -4663,8 +4698,11 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
         ds = datasets[body.dataset_id]
         df = ds["df"]
 
+        target_cols = body.selected_columns if body.selected_columns else list(df.columns[:100])
         cols_info = []
-        for col in df.columns[:100]:
+        for col in target_cols:
+            if col not in df.columns:
+                continue
             dtype = str(df[col].dtype)
             uniq = int(df[col].nunique())
             sample = df[col].dropna().head(5).astype(str).tolist()
@@ -4682,8 +4720,17 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
         sample_rows = df.head(10).fillna("").to_dict(orient="records")
 
         guidance = ""
+        if body.objectives.strip():
+            guidance += (
+                f"\n--- RESEARCH OBJECTIVES & QUESTIONS ---\n"
+                f"{body.objectives.strip()}\n"
+                f"--- END ---\n\n"
+                f"Generate tables that directly answer these research objectives and questions. "
+                f"Each table should map to one or more objectives. "
+                f"Include the relevant objective in each table's description.\n\n"
+            )
         if body.table_descriptions.strip():
-            guidance = (
+            guidance += (
                 f"\n--- USER TABLE DESCRIPTIONS ---\n"
                 f"{body.table_descriptions.strip()}\n"
                 f"--- END ---\n\n"
@@ -4780,6 +4827,8 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
 class AICreateColumnRequest(BaseModel):
     dataset_id: str
     description: str
+    column_descriptions: dict = {}
+    selected_columns: list = []
 
 
 @app.post("/api/ai/create-column")
@@ -4794,17 +4843,21 @@ async def ai_create_column(body: AICreateColumnRequest):
         ds = datasets[body.dataset_id]
         df = ds["df"]
 
+        use_cols = [c for c in df.columns if c in body.selected_columns] if body.selected_columns else list(df.columns[:80])
         cols_info = []
-        for col in df.columns[:80]:
+        for col in use_cols:
             dtype = str(df[col].dtype)
             uniq = int(df[col].nunique())
             sample = df[col].dropna().head(5).astype(str).tolist()
-            cols_info.append({
+            entry = {
                 "id": col,
                 "type": "numeric" if "int" in dtype or "float" in dtype else "text",
                 "unique": uniq,
                 "sample": sample,
-            })
+            }
+            if col in body.column_descriptions and body.column_descriptions[col]:
+                entry["description"] = body.column_descriptions[col]
+            cols_info.append(entry)
 
         prompt = (
             f"You are a data engineer. The user wants to create a new computed column.\n"

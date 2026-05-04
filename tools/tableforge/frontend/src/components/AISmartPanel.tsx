@@ -60,6 +60,7 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
 
   // Auto-generate state
   const [tableDescriptions, setTableDescriptions] = useState('');
+  const [objectives, setObjectives] = useState('');
   const [maxTables, setMaxTables] = useState(20);
   const [selectedAutoTables, setSelectedAutoTables] = useState<Set<number>>(new Set());
 
@@ -194,7 +195,14 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
       const res = await fetch(`${API_BASE}/ai/auto-generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataset_id: dataset.dataset_id, table_descriptions: tableDescriptions, max_tables: maxTables, column_descriptions: columnDescriptions }),
+        body: JSON.stringify({
+          dataset_id: dataset.dataset_id,
+          table_descriptions: tableDescriptions,
+          objectives,
+          max_tables: maxTables,
+          column_descriptions: columnDescriptions,
+          selected_columns: selectedCols.length > 0 ? selectedCols : undefined,
+        }),
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
@@ -480,10 +488,17 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
                 {/* GENERATE mode — multiple tables */}
                 {effectiveSubMode === 'generate' && (
                   <>
-                    <p className="ai-desc" style={{ margin: 0 }}>AI analyzes all columns and generates a comprehensive set of tables.</p>
+                    <p className="ai-desc" style={{ margin: 0 }}>
+                      AI generates tables based on your objectives and data.
+                      {selectedCols.length > 0 && <span style={{ color: '#60a5fa' }}> Using {selectedCols.length} selected columns.</span>}
+                      {selectedCols.length === 0 && ' Select columns on the left or leave empty to use all.'}
+                    </p>
+                    <textarea value={objectives} onChange={e => setObjectives(e.target.value)}
+                      placeholder={"Research objectives or questions (optional):\n• What is the demographic profile of beneficiaries?\n• How does income vary across districts?\n• What are the key indicators of program performance?\n• Compare male vs female participation rates"}
+                      className="fdrop-input" style={{ width: '100%', minHeight: 60, resize: 'vertical', fontSize: 12 }} />
                     <textarea value={tableDescriptions} onChange={e => setTableDescriptions(e.target.value)}
-                      placeholder={"Describe the tables you need (optional):\n- Demographics by district\n- Income source by beneficiary type\n- Average landholding by region\n\nLeave empty for AI to decide."}
-                      className="fdrop-input" style={{ width: '100%', minHeight: 70, resize: 'vertical', fontSize: 12 }} />
+                      placeholder={"Specific tables to create (optional):\n- Demographics by district\n- Income source by beneficiary type\n- Average landholding by region"}
+                      className="fdrop-input" style={{ width: '100%', minHeight: 50, resize: 'vertical', fontSize: 12 }} />
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Max tables:</label>
                       <input type="range" min={5} max={100} value={maxTables} onChange={e => setMaxTables(Number(e.target.value))} style={{ flex: 1 }} />

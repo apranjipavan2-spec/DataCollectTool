@@ -254,12 +254,18 @@ export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLi
                   <div className="form-group" style={{ flex: 1 }}>
                     <label>Condition</label>
                     <select value={condOperator} onChange={e => setCondOperator(e.target.value)}>
-                      <option value="gt">&gt;</option>
-                      <option value="gte">≥</option>
-                      <option value="lt">&lt;</option>
-                      <option value="lte">≤</option>
-                      <option value="eq">=</option>
-                      <option value="neq">≠</option>
+                      <option value="eq">= equals</option>
+                      <option value="neq">≠ not equal</option>
+                      <option value="gt">&gt; greater than</option>
+                      <option value="gte">≥ greater or equal</option>
+                      <option value="lt">&lt; less than</option>
+                      <option value="lte">≤ less or equal</option>
+                      <option value="contains">contains text</option>
+                      <option value="not_contains">not contains</option>
+                      <option value="starts_with">starts with</option>
+                      <option value="ends_with">ends with</option>
+                      <option value="is_null">is empty/null</option>
+                      <option value="not_null">is not empty</option>
                     </select>
                   </div>
                   <div className="form-group" style={{ flex: 1 }}>
@@ -303,7 +309,7 @@ export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLi
                 </div>
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8, padding: '6px 8px', background: 'var(--bg-2)', borderRadius: 4 }}>
-                IF {condColumn || '?'} {condOperator} {condValue} → THEN {condThenType === 'column' ? (condThenCol || '?') : condThenVal} ELSE {condElseType === 'column' ? (condElseCol || '?') : condElseVal}
+                IF {condColumn || '?'} {condOperator === 'is_null' ? 'IS EMPTY' : condOperator === 'not_null' ? 'IS NOT EMPTY' : `${condOperator} "${condValue}"`} → THEN {condThenType === 'column' ? (condThenCol || '?') : `"${condThenVal}"`} ELSE {condElseType === 'column' ? (condElseCol || '?') : `"${condElseVal}"`}
               </div>
             </div>
           )}

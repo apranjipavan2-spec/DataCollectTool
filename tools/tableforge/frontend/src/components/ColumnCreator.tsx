@@ -10,6 +10,7 @@ interface Props {
   onCreated: (name: string) => void;
   onClose: () => void;
   onOpenLibrary?: () => void;
+  columnDescriptions?: Record<string, string>;
 }
 
 interface ExistingColumn {
@@ -33,7 +34,7 @@ const typeIcons: Record<string, string> = {
   multi_choice: 'M',
 };
 
-export function ColumnCreator({ datasetId, columns, onCreated, onClose, onOpenLibrary }: Props) {
+export function ColumnCreator({ datasetId, columns, onCreated, onClose, onOpenLibrary, columnDescriptions = {} }: Props) {
   const [tab, setTab] = useState<'ai' | 'metric' | 'bin'>('ai');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -43,6 +44,9 @@ export function ColumnCreator({ datasetId, columns, onCreated, onClose, onOpenLi
   const [existingCols, setExistingCols] = useState<ExistingColumn[]>([]);
   const [colSearch, setColSearch] = useState('');
   const [selectedRefCol, setSelectedRefCol] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<any[] | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [selectedAICols, setSelectedAICols] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     Promise.all([
@@ -64,12 +68,35 @@ export function ColumnCreator({ datasetId, columns, onCreated, onClose, onOpenLi
       const res = await fetch(`${API_BASE}/ai/create-column`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataset_id: datasetId, description }),
+        body: JSON.stringify({
+          dataset_id: datasetId, description,
+          column_descriptions: columnDescriptions,
+          selected_columns: selectedAICols.size > 0 ? Array.from(selectedAICols) : [],
+        }),
       });
       if (!res.ok) throw new Error(await res.text());
       setAiResult(await res.json());
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
+  };
+
+  const handlePreviewAI = async () => {
+    if (!aiResult?.definition) return;
+    setPreviewing(true); setPreviewData(null);
+    try {
+      const def = aiResult.definition;
+      if (aiResult.type === 'metric') {
+        const res = await fetch(`${API_BASE}/metrics/preview`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...def, dataset_id: datasetId }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        setPreviewData(data.preview || []);
+      }
+    } catch (e: any) { setError(`Preview failed: ${e.message}`); }
+    finally { setPreviewing(false); }
   };
 
   const handleApplyAI = async () => {
@@ -109,8 +136,14 @@ export function ColumnCreator({ datasetId, columns, onCreated, onClose, onOpenLi
       width: 220, minWidth: 220, borderRight: '1px solid rgba(255,255,255,0.08)',
       paddingRight: 10, display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>
-        Available Columns ({columns.length})
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>Columns ({selectedAICols.size > 0 ? `${selectedAICols.size}/` : ''}{columns.length})</span>
+        <span style={{ display: 'flex', gap: 4 }}>
+          <button onClick={() => setSelectedAICols(new Set(columns.map(c => c.name)))}
+            style={{ fontSize: 9, background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', padding: 0 }}>All</button>
+          <button onClick={() => setSelectedAICols(new Set())}
+            style={{ fontSize: 9, background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: 0 }}>None</button>
+        </span>
       </div>
       <input
         value={colSearch} onChange={e => setColSearch(e.target.value)}
@@ -129,11 +162,22 @@ export function ColumnCreator({ datasetId, columns, onCreated, onClose, onOpenLi
             style={{
               padding: '4px 6px', fontSize: 11, cursor: 'pointer',
               borderBottom: '1px solid rgba(255,255,255,0.04)',
-              background: selectedRefCol === col.name ? 'rgba(59,130,246,0.15)' : 'transparent',
+              background: selectedRefCol === col.name ? 'rgba(59,130,246,0.15)' : selectedAICols.has(col.name) ? 'rgba(34,197,94,0.08)' : 'transparent',
               borderRadius: 3,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <input type="checkbox" checked={selectedAICols.has(col.name)}
+                onChange={e => {
+                  e.stopPropagation();
+                  setSelectedAICols(prev => {
+                    const next = new Set(prev);
+                    if (next.has(col.name)) next.delete(col.name); else next.add(col.name);
+                    return next;
+                  });
+                }}
+                style={{ width: 12, height: 12, margin: 0, cursor: 'pointer', accentColor: '#22c55e' }}
+              />
               <span style={{
                 fontSize: 9, fontWeight: 700, color: typeColors[col.type] || '#888',
                 background: `${typeColors[col.type] || '#888'}22`,
@@ -176,7 +220,7 @@ export function ColumnCreator({ datasetId, columns, onCreated, onClose, onOpenLi
       </div>
       <div style={{ marginTop: 6, padding: '4px 0', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.3 }}>
-          Click column to see details. Click [+] to insert into description.
+          Check columns to limit AI scope. Click [+] to insert name. Click row for details.
         </div>
       </div>
     </div>
@@ -265,15 +309,33 @@ export function ColumnCreator({ datasetId, columns, onCreated, onClose, onOpenLi
               </div>
             )}
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              {aiResult.type === 'metric' && (
+                <button className="fdrop-btn-action" onClick={handlePreviewAI} disabled={previewing}
+                  style={{ padding: '7px 14px' }}>
+                  {previewing ? 'Loading...' : 'Preview Values'}
+                </button>
+              )}
               <button className="btn-primary" onClick={handleApplyAI} disabled={applying}
                 style={{ padding: '7px 18px' }}>
                 {applying ? 'Creating...' : 'Create Column'}
               </button>
-              <button className="fdrop-btn-action" onClick={() => { setAiResult(null); }}
+              <button className="fdrop-btn-action" onClick={() => { setAiResult(null); setPreviewData(null); }}
                 style={{ padding: '7px 14px' }}>
                 Try Again
               </button>
             </div>
+            {previewData && previewData.length > 0 && (
+              <div style={{ marginTop: 8, padding: '8px 10px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 6 }}>
+                <div style={{ fontSize: 10, color: '#86efac', marginBottom: 4 }}>Preview (first {previewData.length} values):</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {previewData.map((v: any, i: number) => (
+                    <span key={i} style={{ padding: '2px 8px', background: 'rgba(0,0,0,0.2)', borderRadius: 3, fontSize: 12, fontFamily: 'monospace' }}>
+                      {typeof v === 'number' ? v.toFixed(2) : String(v)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
