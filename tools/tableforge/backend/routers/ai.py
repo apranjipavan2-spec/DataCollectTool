@@ -119,6 +119,28 @@ async def _call_llm(cfg: dict, prompt: str) -> str:
         raise HTTPException(502, f"AI provider error ({provider}): {str(e)}")
 
 
+def _match_col(name: str, actual_cols: list) -> str:
+    """Best-effort match an AI-returned column name to an actual column."""
+    if name in actual_cols:
+        return name
+    low = {c.lower().strip(): c for c in actual_cols}
+    if name.lower().strip() in low:
+        return low[name.lower().strip()]
+    for c in actual_cols:
+        if name.lower() in c.lower() or c.lower() in name.lower():
+            return c
+    return name
+
+
+def _validate_table_cols(table: dict, actual_cols: list) -> dict:
+    """Fix AI-returned column names to match actual dataset columns."""
+    for key in ("groupby_field", "secondary_groupby", "value_field"):
+        val = table.get(key, "")
+        if val and val != "*":
+            table[key] = _match_col(val, actual_cols)
+    return table
+
+
 AI_MODELS = {
     "gemini": [
         {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash (fast, recommended)"},
@@ -341,18 +363,18 @@ async def ai_suggest_tables(body: AISuggestRequest):
     df = ds["df"]
 
     cols_info = []
-    for col in df.columns[:60]:
+    for col in df.columns[:80]:
         dtype = str(df[col].dtype)
         uniq = int(df[col].nunique())
-        sample = df[col].dropna().head(5).astype(str).tolist()
-        cols_info.append({"id": col, "type": "numeric" if "int" in dtype or "float" in dtype else "text", "unique": uniq, "sample": sample})
+        sample = df[col].dropna().head(3).astype(str).tolist()
+        cols_info.append({"id": col, "type": "numeric" if "int" in dtype or "float" in dtype else "text", "unique": uniq, "sample": sample[:2]})
 
-    sample_rows = df.head(8).fillna("").to_dict(orient="records")
+    sample_rows = df.head(5).fillna("").to_dict(orient="records")
 
     prompt = (
         f"You are a research data analyst designing tabulations.\n\n"
-        f"Available columns (use ONLY these ids):\n{json.dumps(cols_info, indent=1)}\n\n"
-        f"Sample data rows:\n{json.dumps(sample_rows[:6])}\n\n"
+        f"Available columns (use ONLY these ids):\n{json.dumps(cols_info)}\n\n"
+        f"Sample data rows:\n{json.dumps(sample_rows[:3], default=str)}\n\n"
         f"User request: {body.prompt or 'Suggest the most insightful tabulations for this dataset.'}\n\n"
         f"For each table decide:\n"
         f"  - groupby_field: column id to group rows by (required)\n"
@@ -368,7 +390,11 @@ async def ai_suggest_tables(body: AISuggestRequest):
     match = _re.search(r'\{.*\}', raw, _re.DOTALL)
     if match:
         try:
-            return json.loads(match.group())
+            result = json.loads(match.group())
+            actual_cols = list(df.columns)
+            for t in result.get("tables", []):
+                _validate_table_cols(t, actual_cols)
+            return result
         except Exception:
             pass
     return {"rationale": "Could not parse AI response", "tables": []}
@@ -401,15 +427,15 @@ async def ai_smart_build(body: AISmartBuildRequest):
             raise HTTPException(400, "No valid columns found for analysis")
 
         cols_block = []
-        for col in cols:
+        for col in cols[:60]:
             dtype = str(df[col].dtype)
             try:
-                uniq_vals = [str(v) for v in df[col].dropna().unique()[:12]]
+                uniq_vals = [str(v)[:50] for v in df[col].dropna().unique()[:6]]
             except Exception:
                 uniq_vals = []
-            cols_block.append(f"  - id={col} | type={'numeric' if 'int' in dtype or 'float' in dtype else 'text'} | unique values ({df[col].nunique()}): {uniq_vals}")
+            cols_block.append(f"  - id={col} | type={'numeric' if 'int' in dtype or 'float' in dtype else 'text'} | unique({df[col].nunique()}): {uniq_vals}")
 
-        sample_rows = sanitize_for_json(df[cols].head(6).fillna("").to_dict(orient="records"))
+        sample_rows = sanitize_for_json(df[cols[:30]].head(4).fillna("").to_dict(orient="records"))
 
         task = f'User question: "{body.query.strip()}"\nDesign the best table to answer this.' if body.query.strip() else "Design the most insightful cross-tabulation or aggregation from these columns."
 
@@ -436,6 +462,7 @@ async def ai_smart_build(body: AISmartBuildRequest):
                 result = json.loads(match.group())
                 if isinstance(result.get("column_labels"), dict):
                     result["column_labels"] = {str(k): str(v) for k, v in result["column_labels"].items()}
+                _validate_table_cols(result, list(df.columns))
                 return result
             except json.JSONDecodeError:
                 raise HTTPException(502, "AI returned invalid JSON. Try again.")
@@ -475,7 +502,7 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
                 continue
             dtype = str(df[col].dtype)
             uniq = int(df[col].nunique())
-            sample = df[col].dropna().head(5).astype(str).tolist()
+            sample = [str(v)[:50] for v in df[col].dropna().head(3).tolist()]
             col_entry = {
                 "id": col,
                 "dtype": dtype,
@@ -487,7 +514,7 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
                 col_entry["description"] = body.column_descriptions[col]
             cols_info.append(col_entry)
 
-        sample_rows = df.head(10).fillna("").to_dict(orient="records")
+        sample_rows = df[target_cols[:30]].head(5).fillna("").to_dict(orient="records")
 
         guidance = ""
         if body.objectives.strip():
@@ -528,8 +555,8 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
 
         prompt = (
             f"You are a senior research data analyst designing a comprehensive tabulation plan.\n\n"
-            f"Available columns (use ONLY these exact ids):\n{json.dumps(cols_info, indent=1)}\n\n"
-            f"Sample data rows:\n{json.dumps(sample_rows[:8], ensure_ascii=False, default=str)}\n\n"
+            f"Available columns (use ONLY these exact ids):\n{json.dumps(cols_info, ensure_ascii=False, default=str)}\n\n"
+            f"Sample data rows:\n{json.dumps(sample_rows[:4], ensure_ascii=False, default=str)}\n\n"
             f"{guidance}"
             f"{template_guide}"
             f"Generate {body.max_tables} tables covering all major dimensions of this dataset.\n"
@@ -569,8 +596,10 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
             if match:
                 try:
                     result = json.loads(match.group())
+                    actual_cols = list(df.columns)
                     batch_tables = result.get("tables", [])
                     for t in batch_tables:
+                        _validate_table_cols(t, actual_cols)
                         if t.get("value_field") == "*":
                             t["value_field"] = t.get("groupby_field", "")
                             t["aggregation"] = "count"

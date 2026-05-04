@@ -382,7 +382,7 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
       case 'auto-generate': {
         const effectiveSubMode = mode === 'auto-generate' ? 'generate' : mode === 'suggest' ? 'suggest' : buildSubMode;
         const colSidebarContent = dataset && (
-          <div style={{ width: 210, minWidth: 210, borderRight: '1px solid rgba(255,255,255,0.08)', paddingRight: 10, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ width: 320, minWidth: 280, borderRight: '1px solid rgba(255,255,255,0.08)', paddingRight: 10, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>
               Columns ({dataset.columns.length})
               {selectedCols.length > 0 && <span style={{ color: '#60a5fa' }}> — {selectedCols.length} selected</span>}
@@ -411,7 +411,7 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
                     <span style={{ fontSize: 8, fontWeight: 700, color: tColor, background: `${tColor}22`, padding: '1px 3px', borderRadius: 2, minWidth: 20, textAlign: 'center' }}>
                       {c.type === 'numeric' ? '123' : c.type === 'text' ? 'Aa' : c.type === 'date' ? 'D' : c.type === 'boolean' ? '01' : 'M'}
                     </span>
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                    <span style={{ flex: 1, wordBreak: 'break-word', lineHeight: 1.3 }}>{c.name}</span>
                     {isSelected && <span style={{ color: '#60a5fa', fontSize: 10 }}>✓</span>}
                   </button>
                 );
@@ -701,7 +701,7 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: (mode === 'smart-build' || mode === 'auto-generate' || mode === 'suggest') ? 900 : 600, maxHeight: (mode === 'smart-build' || mode === 'auto-generate' || mode === 'suggest') ? '85vh' : '70vh' }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: (mode === 'smart-build' || mode === 'auto-generate' || mode === 'suggest') ? '95vw' : 600, width: (mode === 'smart-build' || mode === 'auto-generate' || mode === 'suggest') ? '95vw' : undefined, maxHeight: (mode === 'smart-build' || mode === 'auto-generate' || mode === 'suggest') ? '90vh' : '70vh' }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{titles[mode] || 'AI-Smart'}</h2>
           <button className="modal-close" onClick={onClose}>×</button>
