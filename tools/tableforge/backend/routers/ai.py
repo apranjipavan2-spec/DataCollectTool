@@ -483,16 +483,70 @@ class AIAutoGenerateRequest(BaseModel):
     template: str = ""
 
 
-@router.post("/api/ai/auto-generate")
-async def ai_auto_generate(body: AIAutoGenerateRequest):
-    """AI generates tables in column-based phases to handle large datasets.
+# ── Stage 1: AI analyses all columns and creates a study plan ──
 
-    Columns are split into chunks of ~25. Each chunk gets its own LLM call
-    with a proportional share of the requested table count. Results are
-    streamed back via SSE so the frontend can show progress per phase.
+class AIPlanRequest(BaseModel):
+    dataset_id: str
+    objectives: str = ""
+    table_descriptions: str = ""
+    max_tables: int = 20
+    column_descriptions: dict = {}
+    selected_columns: list = []
+
+
+def _detect_multi_choice(series) -> bool:
+    """Check if >30% of non-null values contain commas (multi-choice indicator)."""
+    import pandas as pd
+    non_null = series.dropna().astype(str)
+    if len(non_null) < 5:
+        return False
+    has_comma = non_null.str.contains(',', na=False)
+    return float(has_comma.sum()) / len(non_null) > 0.3
+
+
+def _build_col_metadata(df, target_cols, column_descriptions):
+    """Build compact column metadata for the planning prompt."""
+    import pandas as pd
+    cols_meta = []
+    for col in target_cols:
+        if col not in df.columns:
+            continue
+        dtype = str(df[col].dtype)
+        uniq = int(df[col].nunique())
+        is_numeric = "int" in dtype or "float" in dtype
+        is_date = "datetime" in dtype
+        is_mc = False
+        if not is_numeric and not is_date:
+            is_mc = _detect_multi_choice(df[col])
+
+        sample = [str(v)[:60] for v in df[col].dropna().head(4).tolist()]
+
+        entry = {
+            "id": col,
+            "type": "numeric" if is_numeric else ("date" if is_date else ("multi_choice" if is_mc else "categorical")),
+            "unique": uniq,
+            "sample": sample,
+        }
+        if is_mc:
+            all_vals = []
+            for v in df[col].dropna().astype(str).head(100):
+                all_vals.extend([p.strip() for p in v.split(',') if p.strip()])
+            entry["multi_choice_values"] = list(set(all_vals))[:15]
+        if col in column_descriptions and column_descriptions[col]:
+            entry["description"] = column_descriptions[col]
+        cols_meta.append(entry)
+    return cols_meta
+
+
+@router.post("/api/ai/auto-generate/plan")
+async def ai_auto_generate_plan(body: AIPlanRequest):
+    """Stage 1: AI analyses all columns and creates a structured study plan.
+
+    Returns a plan with:
+    - Column classifications (demographic, indicator, measure, identifier, multi_choice)
+    - Shared grouping columns that appear across phases
+    - Thematic phases with column assignments and table specs
     """
-    from fastapi.responses import StreamingResponse
-
     cfg = _load_ai_cfg()
     if not cfg.get("api_key"):
         raise HTTPException(400, "AI not configured. Go to AI Settings and add your API key.")
@@ -501,83 +555,172 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
     ds = datasets[body.dataset_id]
     df = ds["df"]
 
-    target_cols = body.selected_columns if body.selected_columns else list(df.columns[:150])
+    target_cols = body.selected_columns if body.selected_columns else list(df.columns[:200])
     target_cols = [c for c in target_cols if c in df.columns]
 
-    def _col_info(col):
-        dtype = str(df[col].dtype)
-        uniq = int(df[col].nunique())
-        sample = [str(v)[:50] for v in df[col].dropna().head(3).tolist()]
-        entry = {
-            "id": col,
-            "dtype": dtype,
-            "analysis_type": "numeric" if "int" in dtype or "float" in dtype else ("date" if "datetime" in dtype else "categorical"),
-            "unique": uniq,
-            "sample": sample,
-        }
-        if col in body.column_descriptions and body.column_descriptions[col]:
-            entry["description"] = body.column_descriptions[col]
-        return entry
+    cols_meta = _build_col_metadata(df, target_cols, body.column_descriptions)
+
+    sample_cols = target_cols[:20]
+    sample_rows = sanitize_for_json(df[sample_cols].head(5).fillna("").to_dict(orient="records"))
 
     guidance = ""
     if body.objectives.strip():
-        guidance += (
-            f"\n--- RESEARCH OBJECTIVES & QUESTIONS ---\n"
-            f"{body.objectives.strip()}\n--- END ---\n\n"
-            f"Generate tables that directly answer these research objectives. "
-            f"Include the relevant objective in each table's description.\n\n"
-        )
+        guidance += f"\n--- RESEARCH OBJECTIVES ---\n{body.objectives.strip()}\n--- END ---\n\n"
     if body.table_descriptions.strip():
-        guidance += (
-            f"\n--- USER TABLE DESCRIPTIONS ---\n"
-            f"{body.table_descriptions.strip()}\n--- END ---\n\n"
-            f"Follow the user's table descriptions closely. Create EXACTLY the tables described.\n\n"
-        )
+        guidance += f"\n--- USER TABLE DESCRIPTIONS ---\n{body.table_descriptions.strip()}\n--- END ---\n\n"
 
-    template_guide = (
-        "TEMPLATE FORMATS:\n"
-        "  'frequency': count only | 'count_pct_row': count + row % | 'count_pct_col': count + col %\n"
-        "  'count_pct_grand': count + grand % | 'average_totals': mean + totals\n"
-        "  'sum_pct_row': sum + row % | 'crosstab_full': count + row % + subtotals + grand\n\n"
+    prompt = (
+        f"You are a senior research data analyst designing a comprehensive tabulation study.\n\n"
+        f"DATASET: {len(df)} rows, {len(target_cols)} columns\n\n"
+        f"ALL COLUMNS:\n{json.dumps(cols_meta, ensure_ascii=False, default=str)}\n\n"
+        f"SAMPLE DATA (first 5 rows, first 20 columns):\n{json.dumps(sample_rows, ensure_ascii=False, default=str)}\n\n"
+        f"{guidance}"
+        f"TASK: Create a structured study plan that organizes these columns into thematic phases.\n\n"
+        f"Step 1 — CLASSIFY each column into ONE role:\n"
+        f"  'demographic': grouping/segmentation variables reused across many tables (district, gender, age group, user type)\n"
+        f"  'indicator': main analysis variables for frequency tables and cross-tabs\n"
+        f"  'numeric_measure': quantitative values for sum/mean aggregation (income, area, count)\n"
+        f"  'multi_choice': columns with comma-separated multiple responses\n"
+        f"  'identifier': IDs, names, dates — skip for tabulation\n\n"
+        f"Step 2 — IDENTIFY shared demographic columns that should be used as groupby across multiple phases.\n\n"
+        f"Step 3 — GROUP related indicator/measure columns into thematic phases (e.g., 'Land Details', 'Income & Livelihood', 'Education', 'Demographics').\n"
+        f"Each phase should have 5-15 columns and produce ~10 tables.\n\n"
+        f"Step 4 — For each phase, specify the tables to create. Each table needs:\n"
+        f"  groupby_field, secondary_groupby (''), value_field, aggregation ('count'|'sum'|'mean'),\n"
+        f"  template ('frequency'|'count_pct_row'|'count_pct_col'|'count_pct_grand'|'average_totals'|'sum_pct_row'|'crosstab_full'),\n"
+        f"  title, description\n\n"
+        f"IMPORTANT RULES:\n"
+        f"- Use EXACT column ids from the list above\n"
+        f"- Do NOT use '*' as value_field — use the groupby_field with 'count'\n"
+        f"- Demographic columns should appear as secondary_groupby in cross-tabs across phases\n"
+        f"- multi_choice columns need frequency tables (count each option)\n"
+        f"- Target ~{body.max_tables} tables total across all phases\n\n"
+        f"Respond with ONLY valid JSON:\n"
+        f'{{"column_classifications": {{"col_id": "demographic|indicator|numeric_measure|multi_choice|identifier", ...}}, '
+        f'"shared_demographics": ["col_id", ...], '
+        f'"phases": [{{"theme": "...", "description": "...", "columns": ["col_id", ...], '
+        f'"tables": [{{"groupby_field": "...", "secondary_groupby": "", "value_field": "...", "aggregation": "count", "template": "frequency", "title": "...", "description": "..."}}]}}]}}'
     )
 
-    TABLES_PER_PHASE = 10
-    total_phases = max(1, (body.max_tables + TABLES_PER_PHASE - 1) // TABLES_PER_PHASE)
-    chunk_size = max(5, len(target_cols) // total_phases)
-    chunks = [target_cols[i:i + chunk_size] for i in range(0, len(target_cols), chunk_size)]
+    try:
+        raw = await _call_llm(cfg, prompt)
+        match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+        if not match:
+            raise HTTPException(502, "AI returned empty response. Try again.")
+        plan = json.loads(match.group())
+
+        actual_cols = list(df.columns)
+        for phase in plan.get("phases", []):
+            for t in phase.get("tables", []):
+                _validate_table_cols(t, actual_cols)
+                if t.get("value_field") == "*":
+                    t["value_field"] = t.get("groupby_field", "")
+                    t["aggregation"] = "count"
+                if not t.get("template"):
+                    t["template"] = "frequency" if not t.get("secondary_groupby") else "count_pct_row"
+
+        plan["shared_demographics"] = [
+            _match_col(c, actual_cols) for c in plan.get("shared_demographics", [])
+        ]
+
+        total_tables = sum(len(p.get("tables", [])) for p in plan.get("phases", []))
+        plan["summary"] = {
+            "total_columns": len(target_cols),
+            "total_phases": len(plan.get("phases", [])),
+            "total_tables": total_tables,
+            "shared_demographics": plan.get("shared_demographics", []),
+        }
+
+        return plan
+    except HTTPException:
+        raise
+    except json.JSONDecodeError:
+        raise HTTPException(502, "AI returned invalid JSON. Try again.")
+    except Exception as e:
+        raise HTTPException(500, f"Planning failed: {str(e)}")
+
+
+# ── Stage 3: Execute approved phases with SSE streaming ──
+
+class AIExecutePlanRequest(BaseModel):
+    dataset_id: str
+    plan: dict
+    selected_phases: list = []
+    objectives: str = ""
+    table_descriptions: str = ""
+    column_descriptions: dict = {}
+
+
+@router.post("/api/ai/auto-generate/execute")
+async def ai_auto_generate_execute(body: AIExecutePlanRequest):
+    """Stage 3: Execute approved phases from the plan, streaming results via SSE."""
+    from fastapi.responses import StreamingResponse
+
+    cfg = _load_ai_cfg()
+    if not cfg.get("api_key"):
+        raise HTTPException(400, "AI not configured.")
+    if body.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    ds = datasets[body.dataset_id]
+    df = ds["df"]
+
+    plan = body.plan
+    phases = plan.get("phases", [])
+    shared_demos = plan.get("shared_demographics", [])
     actual_cols = list(df.columns)
+
+    if body.selected_phases:
+        phases = [phases[i] for i in body.selected_phases if i < len(phases)]
+
+    guidance = ""
+    if body.objectives.strip():
+        guidance += f"Research objectives: {body.objectives.strip()}\n\n"
+    if body.table_descriptions.strip():
+        guidance += f"User table descriptions: {body.table_descriptions.strip()}\n\n"
 
     async def stream():
         all_tables = []
-        total_phases = len(chunks)
 
-        yield f"data: {json.dumps({'step': 'start', 'message': f'Analyzing {len(target_cols)} columns in {total_phases} phase(s)…', 'phases': total_phases, 'tables': []})}\n\n"
+        yield f"data: {json.dumps({'step': 'start', 'message': f'Executing {len(phases)} phase(s)…', 'phases': len(phases), 'tables': []})}\n\n"
 
-        for phase_idx, chunk in enumerate(chunks):
-            tables_for_chunk = TABLES_PER_PHASE
-            cols_info = [_col_info(c) for c in chunk]
-            sample_cols = chunk[:15]
-            sample_rows = df[sample_cols].head(4).fillna("").to_dict(orient="records")
+        for phase_idx, phase in enumerate(phases):
+            theme = phase.get("theme", f"Phase {phase_idx + 1}")
+            phase_cols = phase.get("columns", [])
+            phase_tables_spec = phase.get("tables", [])
+
+            all_phase_cols = list(set(shared_demos + phase_cols))
+            all_phase_cols = [c for c in all_phase_cols if c in df.columns]
+
+            cols_meta = _build_col_metadata(df, all_phase_cols, body.column_descriptions)
+            sample_cols = all_phase_cols[:15]
+            sample_rows = sanitize_for_json(
+                df[sample_cols].head(5).fillna("").to_dict(orient="records")
+            )
 
             existing_titles = [t.get("title", "") for t in all_tables]
-            dedup_block = ""
-            if existing_titles:
-                dedup_block = f"\nAlready created (do NOT repeat): {json.dumps(existing_titles[:50])}\n"
 
             prompt = (
-                f"You are a senior research data analyst designing tabulations.\n\n"
-                f"Available columns (use ONLY these exact ids):\n{json.dumps(cols_info, ensure_ascii=False, default=str)}\n\n"
+                f"You are a senior research data analyst.\n\n"
+                f"PHASE: {theme}\n"
+                f"Phase description: {phase.get('description', '')}\n\n"
+                f"Available columns for this phase (use ONLY these):\n{json.dumps(cols_meta, ensure_ascii=False, default=str)}\n\n"
                 f"Sample data:\n{json.dumps(sample_rows, ensure_ascii=False, default=str)}\n\n"
-                f"{guidance}{template_guide}"
-                f"Generate {tables_for_chunk} tables from these columns. Include frequency tables, cross-tabs, and aggregations as appropriate.\n"
-                f"For each table: groupby_field, secondary_groupby ('' if simple), value_field, aggregation ('count'|'sum'|'mean'), template, title, description.\n"
-                f"IMPORTANT: Do NOT use '*' as value_field. Use the groupby_field with 'count' instead.\n"
-                f"{dedup_block}\n"
+                f"{guidance}"
+                f"PLANNED TABLES for this phase (create exactly these, refining if needed):\n"
+                f"{json.dumps(phase_tables_spec, ensure_ascii=False, default=str)}\n\n"
+                f"For each table return: groupby_field, secondary_groupby, value_field, aggregation, template, title, description.\n"
+                f"Do NOT use '*' as value_field. Use groupby_field with 'count'.\n"
+                f"Use EXACT column ids from the available columns list.\n"
+            )
+            if existing_titles:
+                prompt += f"\nAlready created (do NOT repeat): {json.dumps(existing_titles[:50])}\n"
+            prompt += (
+                f"\nTEMPLATES: frequency | count_pct_row | count_pct_col | count_pct_grand | average_totals | sum_pct_row | crosstab_full\n\n"
                 f"Respond ONLY valid JSON:\n"
                 f'{{"tables": [{{"groupby_field":"...","secondary_groupby":"","value_field":"...","aggregation":"count","template":"frequency","title":"...","description":"..."}}]}}'
             )
 
-            yield f"data: {json.dumps({'step': 'phase', 'phase': phase_idx + 1, 'message': f'Phase {phase_idx + 1}/{total_phases}: Analyzing columns {phase_idx * CHUNK_SIZE + 1}–{min((phase_idx + 1) * CHUNK_SIZE, len(target_cols))}…', 'tables': []})}\n\n"
+            yield f"data: {json.dumps({'step': 'phase', 'phase': phase_idx + 1, 'message': f'Phase {phase_idx + 1}/{len(phases)}: {theme}…', 'tables': []})}\n\n"
 
             try:
                 raw = await _call_llm(cfg, prompt)
@@ -592,12 +735,136 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
                             t["aggregation"] = "count"
                         if not t.get("template"):
                             t["template"] = "frequency" if not t.get("secondary_groupby") else "count_pct_row"
+                        t["phase"] = theme
                     all_tables.extend(batch_tables)
-                    yield f"data: {json.dumps({'step': 'phase_done', 'phase': phase_idx + 1, 'message': f'Phase {phase_idx + 1} complete — {len(batch_tables)} tables', 'tables': batch_tables})}\n\n"
+                    yield f"data: {json.dumps({'step': 'phase_done', 'phase': phase_idx + 1, 'message': f'{theme} — {len(batch_tables)} tables', 'tables': batch_tables})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'step': 'phase_error', 'phase': phase_idx + 1, 'message': f'{theme}: AI returned empty response', 'tables': []})}\n\n"
             except Exception as e:
-                yield f"data: {json.dumps({'step': 'phase_error', 'phase': phase_idx + 1, 'message': f'Phase {phase_idx + 1} error: {str(e)}', 'tables': []})}\n\n"
+                yield f"data: {json.dumps({'step': 'phase_error', 'phase': phase_idx + 1, 'message': f'{theme}: {str(e)}', 'tables': []})}\n\n"
 
-        yield f"data: {json.dumps({'step': 'done', 'message': f'Generated {len(all_tables)} tables', 'tables': all_tables})}\n\n"
+        yield f"data: {json.dumps({'step': 'done', 'message': f'Generated {len(all_tables)} tables across {len(phases)} phases', 'tables': all_tables})}\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+# ── Legacy endpoint (redirects to plan+execute for backwards compat) ──
+
+@router.post("/api/ai/auto-generate")
+async def ai_auto_generate(body: AIAutoGenerateRequest):
+    """Backwards-compatible: runs plan + execute in one shot with SSE streaming."""
+    from fastapi.responses import StreamingResponse
+
+    cfg = _load_ai_cfg()
+    if not cfg.get("api_key"):
+        raise HTTPException(400, "AI not configured. Go to AI Settings and add your API key.")
+    if body.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    ds = datasets[body.dataset_id]
+    df = ds["df"]
+
+    target_cols = body.selected_columns if body.selected_columns else list(df.columns[:200])
+    target_cols = [c for c in target_cols if c in df.columns]
+    actual_cols = list(df.columns)
+
+    cols_meta = _build_col_metadata(df, target_cols, body.column_descriptions)
+    sample_rows = sanitize_for_json(df[target_cols[:20]].head(5).fillna("").to_dict(orient="records"))
+
+    guidance = ""
+    if body.objectives.strip():
+        guidance += f"\n--- RESEARCH OBJECTIVES ---\n{body.objectives.strip()}\n--- END ---\n\n"
+    if body.table_descriptions.strip():
+        guidance += f"\n--- USER TABLE DESCRIPTIONS ---\n{body.table_descriptions.strip()}\n--- END ---\n\n"
+
+    async def stream():
+        yield f"data: {json.dumps({'step': 'planning', 'message': f'Analyzing {len(target_cols)} columns and creating study plan…', 'phases': 0, 'tables': []})}\n\n"
+
+        plan_prompt = (
+            f"You are a senior research data analyst designing a comprehensive tabulation study.\n\n"
+            f"DATASET: {len(df)} rows, {len(target_cols)} columns\n\n"
+            f"ALL COLUMNS:\n{json.dumps(cols_meta, ensure_ascii=False, default=str)}\n\n"
+            f"SAMPLE DATA:\n{json.dumps(sample_rows, ensure_ascii=False, default=str)}\n\n"
+            f"{guidance}"
+            f"Create a study plan: group related columns into thematic phases.\n"
+            f"Identify shared demographic columns (district, gender, user type etc.) for cross-tabs.\n"
+            f"Target ~{body.max_tables} tables across all phases, ~10 tables per phase.\n\n"
+            f"For each phase, specify tables with: groupby_field, secondary_groupby (''), value_field, aggregation, template, title, description.\n"
+            f"TEMPLATES: frequency | count_pct_row | count_pct_col | count_pct_grand | average_totals | sum_pct_row | crosstab_full\n"
+            f"Do NOT use '*' as value_field.\n\n"
+            f"Respond ONLY valid JSON:\n"
+            f'{{"shared_demographics": ["col_id"], "phases": [{{"theme": "...", "columns": ["col_id"], "tables": [{{"groupby_field":"...","secondary_groupby":"","value_field":"...","aggregation":"count","template":"frequency","title":"...","description":"..."}}]}}]}}'
+        )
+
+        try:
+            raw = await _call_llm(cfg, plan_prompt)
+            match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+            if not match:
+                yield f"data: {json.dumps({'step': 'error', 'message': 'AI returned empty response', 'tables': []})}\n\n"
+                return
+            plan = json.loads(match.group())
+        except Exception as e:
+            yield f"data: {json.dumps({'step': 'error', 'message': f'Planning failed: {str(e)}', 'tables': []})}\n\n"
+            return
+
+        phases = plan.get("phases", [])
+        shared_demos = [_match_col(c, actual_cols) for c in plan.get("shared_demographics", [])]
+
+        yield f"data: {json.dumps({'step': 'plan_ready', 'message': f'Plan: {len(phases)} phases, executing…', 'phases': len(phases), 'plan': plan, 'tables': []})}\n\n"
+
+        all_tables = []
+        for phase_idx, phase in enumerate(phases):
+            theme = phase.get("theme", f"Phase {phase_idx + 1}")
+            phase_cols = phase.get("columns", [])
+            phase_tables_spec = phase.get("tables", [])
+
+            all_phase_cols = list(set(shared_demos + phase_cols))
+            all_phase_cols = [c for c in all_phase_cols if c in df.columns]
+
+            phase_meta = _build_col_metadata(df, all_phase_cols, body.column_descriptions)
+            phase_sample = sanitize_for_json(
+                df[all_phase_cols[:15]].head(5).fillna("").to_dict(orient="records")
+            )
+
+            existing_titles = [t.get("title", "") for t in all_tables]
+
+            exec_prompt = (
+                f"You are a senior research data analyst.\n\n"
+                f"PHASE: {theme}\n\n"
+                f"Available columns:\n{json.dumps(phase_meta, ensure_ascii=False, default=str)}\n\n"
+                f"Sample data:\n{json.dumps(phase_sample, ensure_ascii=False, default=str)}\n\n"
+                f"Create these planned tables (refine as needed):\n{json.dumps(phase_tables_spec, ensure_ascii=False, default=str)}\n\n"
+                f"Return: groupby_field, secondary_groupby, value_field, aggregation, template, title, description.\n"
+                f"Use EXACT column ids. Do NOT use '*' as value_field.\n"
+                f"TEMPLATES: frequency | count_pct_row | count_pct_col | count_pct_grand | average_totals | sum_pct_row | crosstab_full\n"
+            )
+            if existing_titles:
+                exec_prompt += f"\nDo NOT repeat: {json.dumps(existing_titles[:50])}\n"
+            exec_prompt += f'\nRespond ONLY JSON: {{"tables": [...]}}'
+
+            yield f"data: {json.dumps({'step': 'phase', 'phase': phase_idx + 1, 'message': f'Phase {phase_idx + 1}/{len(phases)}: {theme}…', 'tables': []})}\n\n"
+
+            try:
+                raw = await _call_llm(cfg, exec_prompt)
+                match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+                if match:
+                    result = json.loads(match.group())
+                    batch_tables = result.get("tables", [])
+                    for t in batch_tables:
+                        _validate_table_cols(t, actual_cols)
+                        if t.get("value_field") == "*":
+                            t["value_field"] = t.get("groupby_field", "")
+                            t["aggregation"] = "count"
+                        if not t.get("template"):
+                            t["template"] = "frequency" if not t.get("secondary_groupby") else "count_pct_row"
+                        t["phase"] = theme
+                    all_tables.extend(batch_tables)
+                    yield f"data: {json.dumps({'step': 'phase_done', 'phase': phase_idx + 1, 'message': f'{theme} — {len(batch_tables)} tables', 'tables': batch_tables})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'step': 'phase_error', 'phase': phase_idx + 1, 'message': f'{theme}: empty response', 'tables': []})}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'step': 'phase_error', 'phase': phase_idx + 1, 'message': f'{theme}: {str(e)}', 'tables': []})}\n\n"
+
+        yield f"data: {json.dumps({'step': 'done', 'message': f'Generated {len(all_tables)} tables across {len(phases)} phases', 'tables': all_tables})}\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 

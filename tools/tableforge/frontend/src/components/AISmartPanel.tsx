@@ -64,6 +64,9 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
   const [maxTables, setMaxTables] = useState(20);
   const [selectedAutoTables, setSelectedAutoTables] = useState<Set<number>>(new Set());
   const [phaseProgress, setPhaseProgress] = useState<{ phase: number; total: number; message: string } | null>(null);
+  const [studyPlan, setStudyPlan] = useState<any>(null);
+  const [selectedPhases, setSelectedPhases] = useState<Set<number>>(new Set());
+  const [planLoading, setPlanLoading] = useState(false);
 
   // Unified build sub-mode
   const [buildSubMode, setBuildSubMode] = useState<'ask' | 'generate' | 'suggest'>('ask');
@@ -189,21 +192,45 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
     finally { setLoading(false); }
   };
 
-  const handleAutoGenerate = async () => {
+  const handleCreatePlan = async () => {
     if (!dataset) return;
-    setLoading(true); setError(''); setPhaseProgress(null);
-    const accumulated: any[] = [];
+    setPlanLoading(true); setError(''); setStudyPlan(null);
     try {
-      const res = await fetch(`${API_BASE}/ai/auto-generate`, {
+      const res = await fetch(`${API_BASE}/ai/auto-generate/plan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           dataset_id: dataset.dataset_id,
-          table_descriptions: tableDescriptions,
           objectives,
+          table_descriptions: tableDescriptions,
           max_tables: maxTables,
           column_descriptions: columnDescriptions,
           selected_columns: selectedCols.length > 0 ? selectedCols : undefined,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const plan = await res.json();
+      setStudyPlan(plan);
+      setSelectedPhases(new Set((plan.phases || []).map((_: any, i: number) => i)));
+    } catch (e: any) { setError(e.message); }
+    finally { setPlanLoading(false); }
+  };
+
+  const handleExecutePlan = async () => {
+    if (!dataset || !studyPlan) return;
+    setLoading(true); setError(''); setPhaseProgress(null);
+    const accumulated: any[] = [];
+    try {
+      const res = await fetch(`${API_BASE}/ai/auto-generate/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dataset_id: dataset.dataset_id,
+          plan: studyPlan,
+          selected_phases: Array.from(selectedPhases).sort((a, b) => a - b),
+          objectives,
+          table_descriptions: tableDescriptions,
+          column_descriptions: columnDescriptions,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -249,6 +276,8 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); setPhaseProgress(null); }
   };
+
+  const handleAutoGenerate = handleCreatePlan;
 
   const handleReport = async () => {
     if (!dataset) return;
@@ -523,31 +552,137 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
                   </>
                 )}
 
-                {/* GENERATE mode — multiple tables */}
+                {/* GENERATE mode — 3-stage: plan → review → execute */}
                 {effectiveSubMode === 'generate' && (
                   <>
-                    <p className="ai-desc" style={{ margin: 0 }}>
-                      AI generates tables based on your objectives and data.
-                      {selectedCols.length > 0 && <span style={{ color: '#60a5fa' }}> Using {selectedCols.length} selected columns.</span>}
-                      {selectedCols.length === 0 && ' Select columns on the left or leave empty to use all.'}
-                    </p>
-                    <textarea value={objectives} onChange={e => setObjectives(e.target.value)}
-                      placeholder={"Research objectives or questions (optional):\n• What is the demographic profile of beneficiaries?\n• How does income vary across districts?\n• What are the key indicators of program performance?\n• Compare male vs female participation rates"}
-                      className="fdrop-input" style={{ width: '100%', minHeight: 60, resize: 'vertical', fontSize: 12 }} />
-                    <textarea value={tableDescriptions} onChange={e => setTableDescriptions(e.target.value)}
-                      placeholder={"Specific tables to create (optional):\n- Demographics by district\n- Income source by beneficiary type\n- Average landholding by region"}
-                      className="fdrop-input" style={{ width: '100%', minHeight: 50, resize: 'vertical', fontSize: 12 }} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Max tables:</label>
-                      <input type="range" min={5} max={100} value={maxTables} onChange={e => setMaxTables(Number(e.target.value))} style={{ flex: 1 }} />
-                      <span style={{ fontSize: 12, minWidth: 28 }}>{maxTables}</span>
-                    </div>
-                    {!aiResult && (
-                      <div>
-                        <button className="btn-primary" onClick={handleAutoGenerate} disabled={loading}
-                          style={{ padding: '8px 20px' }}>
-                          {loading ? 'Generating...' : 'Auto-Generate Tables'}
+                    {/* Stage 1: Input — objectives, descriptions, max tables */}
+                    {!studyPlan && !aiResult && (
+                      <>
+                        <p className="ai-desc" style={{ margin: 0 }}>
+                          AI analyses all columns, creates a study plan, then generates tables in phases.
+                          {selectedCols.length > 0 && <span style={{ color: '#60a5fa' }}> Using {selectedCols.length} selected columns.</span>}
+                          {selectedCols.length === 0 && ' Select columns on the left or leave empty to use all.'}
+                        </p>
+                        <textarea value={objectives} onChange={e => setObjectives(e.target.value)}
+                          placeholder={"Research objectives or questions (optional):\n\u2022 What is the demographic profile of beneficiaries?\n\u2022 How does income vary across districts?\n\u2022 What are the key indicators of program performance?\n\u2022 Compare male vs female participation rates"}
+                          className="fdrop-input" style={{ width: '100%', minHeight: 60, resize: 'vertical', fontSize: 12 }} />
+                        <textarea value={tableDescriptions} onChange={e => setTableDescriptions(e.target.value)}
+                          placeholder={"Specific tables to create (optional):\n- Demographics by district\n- Income source by beneficiary type\n- Average landholding by region"}
+                          className="fdrop-input" style={{ width: '100%', minHeight: 50, resize: 'vertical', fontSize: 12 }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Max tables:</label>
+                          <input type="range" min={5} max={100} value={maxTables} onChange={e => setMaxTables(Number(e.target.value))} style={{ flex: 1 }} />
+                          <span style={{ fontSize: 12, minWidth: 28 }}>{maxTables}</span>
+                        </div>
+                        <button className="btn-primary" onClick={handleCreatePlan} disabled={planLoading}
+                          style={{ padding: '8px 20px', alignSelf: 'flex-start' }}>
+                          {planLoading ? 'Analyzing columns...' : 'Create Study Plan'}
                         </button>
+                      </>
+                    )}
+
+                    {/* Stage 2: Plan review — show phases with toggles */}
+                    {studyPlan && !aiResult && (
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>Study Plan</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                              {studyPlan.summary?.total_phases || studyPlan.phases?.length || 0} phases, {studyPlan.summary?.total_tables || '?'} tables planned
+                            </div>
+                          </div>
+                          <button className="fdrop-btn-action" style={{ fontSize: 11 }}
+                            onClick={() => { setStudyPlan(null); setSelectedPhases(new Set()); }}>
+                            Redo Plan
+                          </button>
+                        </div>
+
+                        {/* Shared demographics */}
+                        {studyPlan.shared_demographics?.length > 0 && (
+                          <div style={{ padding: '8px 12px', background: 'rgba(34,197,94,0.08)', borderRadius: 6, marginBottom: 10, border: '1px solid rgba(34,197,94,0.2)' }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: '#4ade80', marginBottom: 4 }}>
+                              Shared Demographics (used across all phases)
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--text-dim)', display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                              {studyPlan.shared_demographics.map((c: string) => (
+                                <span key={c} style={{ padding: '2px 8px', background: 'rgba(34,197,94,0.15)', borderRadius: 3, fontSize: 10 }}>{c}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Phase list */}
+                        <div style={{ maxHeight: 400, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {(studyPlan.phases || []).map((phase: any, idx: number) => {
+                            const isSelected = selectedPhases.has(idx);
+                            const tableCount = phase.tables?.length || 0;
+                            return (
+                              <div key={idx} style={{
+                                padding: '10px 14px', borderRadius: 8,
+                                background: isSelected ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.03)',
+                                border: `1px solid ${isSelected ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                              }}>
+                                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
+                                  <input type="checkbox" checked={isSelected}
+                                    onChange={() => setSelectedPhases(prev => {
+                                      const next = new Set(prev);
+                                      next.has(idx) ? next.delete(idx) : next.add(idx);
+                                      return next;
+                                    })} style={{ marginTop: 3 }} />
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>
+                                        Phase {idx + 1}: {phase.theme}
+                                      </span>
+                                      <span style={{ fontSize: 10, color: '#93c5fd', padding: '2px 8px', background: 'rgba(59,130,246,0.15)', borderRadius: 10 }}>
+                                        {tableCount} tables
+                                      </span>
+                                    </div>
+                                    {phase.description && (
+                                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{phase.description}</div>
+                                    )}
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 6 }}>
+                                      {(phase.columns || []).slice(0, 8).map((c: string) => (
+                                        <span key={c} style={{ fontSize: 9, padding: '1px 6px', background: 'rgba(255,255,255,0.06)', borderRadius: 3, color: 'var(--text-dim)' }}>{c}</span>
+                                      ))}
+                                      {(phase.columns || []).length > 8 && (
+                                        <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>+{phase.columns.length - 8} more</span>
+                                      )}
+                                    </div>
+                                    {/* Show planned tables */}
+                                    {phase.tables?.length > 0 && (
+                                      <div style={{ marginTop: 6, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 6 }}>
+                                        {phase.tables.map((t: any, ti: number) => (
+                                          <div key={ti} style={{ fontSize: 10, color: 'var(--text-dim)', padding: '2px 0', display: 'flex', gap: 4 }}>
+                                            <span style={{ color: '#475569' }}>{ti + 1}.</span>
+                                            <span>{t.title}</span>
+                                            {t.template && <span style={{ color: '#60a5fa', fontSize: 9 }}>({t.template})</span>}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </label>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Execute button */}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center' }}>
+                          <button className="btn-primary" onClick={handleExecutePlan}
+                            disabled={loading || selectedPhases.size === 0}
+                            style={{ padding: '10px 24px' }}>
+                            {loading ? 'Generating...' : `Generate ${selectedPhases.size} Phase${selectedPhases.size !== 1 ? 's' : ''}`}
+                          </button>
+                          <button className="fdrop-btn-action" style={{ fontSize: 11 }} onClick={() => {
+                            selectedPhases.size === (studyPlan.phases || []).length
+                              ? setSelectedPhases(new Set())
+                              : setSelectedPhases(new Set((studyPlan.phases || []).map((_: any, i: number) => i)));
+                          }}>{selectedPhases.size === (studyPlan.phases || []).length ? 'Deselect All' : 'Select All'}</button>
+                        </div>
+
+                        {/* Phase execution progress */}
                         {loading && phaseProgress && (
                           <div style={{ marginTop: 10, padding: '10px 14px', background: 'rgba(59,130,246,0.08)', borderRadius: 8, fontSize: 12 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -561,10 +696,12 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
                         )}
                       </div>
                     )}
+
+                    {/* Stage 3 result: Generated tables — select which to create */}
                     {aiResult?.tables && (
                       <div className="ai-result">
                         <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>{aiResult.tables.length} tables generated — select which to create:</div>
-                        <div style={{ maxHeight: 300, overflow: 'auto' }}>
+                        <div style={{ maxHeight: 350, overflow: 'auto' }}>
                           {aiResult.tables.map((t: any, i: number) => (
                             <label key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '6px 4px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                               <input type="checkbox" checked={selectedAutoTables.has(i)}
@@ -579,6 +716,7 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
                                 <div style={{ fontSize: 10, color: 'var(--text-dim)', opacity: 0.7 }}>
                                   Rows: {t.groupby_field} | Values: {t.value_field} ({t.aggregation}){t.secondary_groupby && ` | Columns: ${t.secondary_groupby}`}
                                   {t.template && <span style={{ marginLeft: 6, padding: '1px 5px', background: 'rgba(59,130,246,0.2)', borderRadius: 3, color: '#93c5fd' }}>{t.template}</span>}
+                                  {t.phase && <span style={{ marginLeft: 6, padding: '1px 5px', background: 'rgba(34,197,94,0.15)', borderRadius: 3, color: '#4ade80', fontSize: 9 }}>{t.phase}</span>}
                                 </div>
                               </div>
                             </label>
@@ -595,6 +733,9 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
                               ? setSelectedAutoTables(new Set())
                               : setSelectedAutoTables(new Set(aiResult.tables.map((_: any, i: number) => i)));
                           }}>{selectedAutoTables.size === aiResult.tables.length ? 'Deselect All' : 'Select All'}</button>
+                          <button className="fdrop-btn-action" style={{ fontSize: 11 }} onClick={() => {
+                            setAiResult(null); setStudyPlan(null); setSelectedPhases(new Set());
+                          }}>Start Over</button>
                         </div>
                       </div>
                     )}
