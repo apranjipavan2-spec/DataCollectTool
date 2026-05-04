@@ -1,6 +1,68 @@
 import React, { useState } from 'react';
-import { TableResult, TableConfig } from '../types';
+import { TableResult, TableConfig, NumberFormat } from '../types';
 import { API_BASE } from '../api';
+
+function formatCell(cell: any): string {
+  if (cell == null) return '';
+  if (typeof cell === 'number') {
+    if (Number.isInteger(cell) && Math.abs(cell) < 1e15) return cell.toLocaleString();
+    return cell.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  }
+  return String(cell);
+}
+
+function applyFormat(val: number, fmt: NumberFormat): string {
+  const { style, decimals, separator, currency_symbol, prefix, suffix } = fmt;
+  const opts: Intl.NumberFormatOptions = {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+    useGrouping: separator,
+  };
+  let formatted = '';
+  if (style === 'percent') {
+    formatted = val.toLocaleString(undefined, opts) + '%';
+  } else if (style === 'currency') {
+    formatted = (currency_symbol || '$') + val.toLocaleString(undefined, opts);
+  } else {
+    formatted = val.toLocaleString(undefined, opts);
+  }
+  return (prefix || '') + formatted + (suffix || '');
+}
+
+function buildFormattedRows(t: TableConfig, res: TableResult): string[][] {
+  const numRowFields = t.rows?.length || 0;
+  const valFormats: NumberFormat[] = (t.values || []).map(v => {
+    const base = v.number_format || {
+      style: 'number' as const, decimals: 2, separator: true, prefix: '', suffix: '', currency_symbol: '$',
+    };
+    if (v.decimals !== undefined && v.decimals !== null) {
+      return { ...base, decimals: v.decimals };
+    }
+    return base;
+  });
+
+  return res.rows.map((row, ri) => {
+    const isGrandTotal = String(row[0]) === 'Grand Total';
+    const serialNum = t.serial_number
+      ? (isGrandTotal ? '' : String(ri + 1))
+      : null;
+
+    const cells: string[] = [];
+    if (t.serial_number) cells.push(serialNum || '');
+
+    for (let ci = 0; ci < row.length; ci++) {
+      const cell = row[ci];
+      if (cell == null) { cells.push(''); continue; }
+      const valIdx = ci - numRowFields;
+      if (typeof cell === 'number' && valIdx >= 0 && valFormats.length > 0) {
+        cells.push(applyFormat(cell, valFormats[valIdx % valFormats.length]));
+      } else {
+        cells.push(formatCell(cell));
+      }
+    }
+    return cells;
+  });
+}
 
 interface Props {
   datasetId: string;
@@ -51,25 +113,45 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
         .filter(t => selectedTables.has(t.id))
         .map(t => {
           const res = results.get(t.id);
+          if (!res) return null;
+          const renames = t.header_renames || {};
+          const displayHeaders = res.headers.map(h => renames[h] || h);
+          const fmtRows = buildFormattedRows(t, res);
           return {
-            name: t.name, headers: res?.headers || [], rows: res?.rows || [],
+            name: t.name,
+            headers: t.serial_number ? ['S.No', ...displayHeaders] : displayHeaders,
+            rows: t.serial_number
+              ? res.rows.map((row, ri) => {
+                  const isGT = String(row[0]) === 'Grand Total';
+                  return [isGT ? '' : ri + 1, ...row];
+                })
+              : res.rows,
+            formatted_rows: fmtRows,
             title: t.title, subtitle: t.subtitle, footnote: t.footnote,
-            header_renames: t.header_renames,
             annotations: annotationsMap[t.id] || [],
-            // Formatting options for export fidelity
-            column_widths: t.column_widths,
-            row_height: t.row_height,
+            num_row_fields: (t.rows?.length || 0) + (t.serial_number ? 1 : 0),
+            cell_align: t.cell_align || 'right',
+            header_align: t.header_align || 'center',
+            row_label_align: t.row_label_align || 'left',
             serial_number: t.serial_number,
-            serial_number_mode: t.serial_number_mode,
-            conditional_formats: t.conditional_formats,
-            header_formats: t.header_formats,
             zebra: t.zebra,
             zebra_color: t.zebra_color,
-            theme: t.theme,
             title_color: t.title_color,
+            header_bg_color: t.header_bg_color,
+            header_text_color: t.header_text_color,
+            total_bg_color: t.total_bg_color,
+            header_formats: t.header_formats,
+            value_formats: (t.values || []).map(v => ({
+              decimals: v.decimals ?? 2,
+              style: v.number_format?.style || 'number',
+              separator: v.number_format?.separator ?? true,
+              prefix: v.number_format?.prefix || '',
+              suffix: v.number_format?.suffix || '',
+              currency_symbol: v.number_format?.currency_symbol || '$',
+            })),
           };
         })
-        .filter(t => t.headers.length > 0);
+        .filter(t => t && t.headers.length > 0);
 
       if (exportData.length === 0) {
         setError('No tables with data to export');
@@ -107,23 +189,45 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
       .filter(t => selectedTables.has(t.id))
       .map(t => {
         const res = results.get(t.id);
+        if (!res) return null;
+        const renames = t.header_renames || {};
+        const displayHeaders = res.headers.map(h => renames[h] || h);
+        const fmtRows = buildFormattedRows(t, res);
         return {
-          name: t.name, headers: res?.headers || [], rows: res?.rows || [],
+          name: t.name,
+          headers: t.serial_number ? ['S.No', ...displayHeaders] : displayHeaders,
+          rows: t.serial_number
+            ? res.rows.map((row, ri) => {
+                const isGT = String(row[0]) === 'Grand Total';
+                return [isGT ? '' : ri + 1, ...row];
+              })
+            : res.rows,
+          formatted_rows: fmtRows,
           title: t.title, subtitle: t.subtitle, footnote: t.footnote,
           annotations: annotationsMap[t.id] || [],
-          column_widths: t.column_widths,
-          row_height: t.row_height,
+          num_row_fields: (t.rows?.length || 0) + (t.serial_number ? 1 : 0),
+          cell_align: t.cell_align || 'right',
+          header_align: t.header_align || 'center',
+          row_label_align: t.row_label_align || 'left',
           serial_number: t.serial_number,
-          serial_number_mode: t.serial_number_mode,
-          conditional_formats: t.conditional_formats,
-          header_formats: t.header_formats,
           zebra: t.zebra,
           zebra_color: t.zebra_color,
-          theme: t.theme,
           title_color: t.title_color,
+          header_bg_color: t.header_bg_color,
+          header_text_color: t.header_text_color,
+          total_bg_color: t.total_bg_color,
+          header_formats: t.header_formats,
+          value_formats: (t.values || []).map(v => ({
+            decimals: v.decimals ?? 2,
+            style: v.number_format?.style || 'number',
+            separator: v.number_format?.separator ?? true,
+            prefix: v.number_format?.prefix || '',
+            suffix: v.number_format?.suffix || '',
+            currency_symbol: v.number_format?.currency_symbol || '$',
+          })),
         };
       })
-      .filter(t => t.headers.length > 0);
+      .filter(t => t && t.headers.length > 0);
 
     if (exportData.length === 0) { setError('No tables with data'); setExporting(false); return; }
 
@@ -159,11 +263,16 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
       const res = results.get(t.id);
       if (!res || res.headers.length === 0) continue;
 
+      const renames = t.header_renames || {};
+      const dispHeaders = res.headers.map(h => renames[h] || h);
+      const fmtRows = buildFormattedRows(t, res);
+      const allHeaders = t.serial_number ? ['S.No', ...dispHeaders] : dispHeaders;
+
       // Plain text version
       const lines = [
         ...(t.title ? [t.title] : []),
-        res.headers.join('\t'),
-        ...res.rows.map(row => row.map(cell => cell != null ? String(cell) : '').join('\t')),
+        allHeaders.join('\t'),
+        ...fmtRows.map(row => row.join('\t')),
       ];
       textParts.push(lines.join('\n'));
 
@@ -171,11 +280,11 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
       let html = '';
       if (t.title) html += `<h3>${t.title}</h3>`;
       html += '<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">';
-      html += '<thead><tr>' + res.headers.map(h => `<th style="background:#1e293b;color:#fff;padding:6px 10px;">${h}</th>`).join('') + '</tr></thead>';
+      html += '<thead><tr>' + allHeaders.map(h => `<th style="background:#1e293b;color:#fff;padding:6px 10px;">${h}</th>`).join('') + '</tr></thead>';
       html += '<tbody>';
-      res.rows.forEach((row, ri) => {
+      fmtRows.forEach((row, ri) => {
         const bg = ri % 2 === 1 ? ' style="background:#f8f9fa;"' : '';
-        html += `<tr${bg}>` + row.map(cell => `<td style="padding:4px 8px;">${cell != null ? String(cell) : ''}</td>`).join('') + '</tr>';
+        html += `<tr${bg}>` + row.map(cell => `<td style="padding:4px 8px;">${cell}</td>`).join('') + '</tr>';
       });
       html += '</tbody></table>';
       htmlParts.push(html);

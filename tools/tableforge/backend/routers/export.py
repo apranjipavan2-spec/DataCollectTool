@@ -47,6 +47,38 @@ async def export_tables(config: ExportConfig):
         raise HTTPException(400, f"Unsupported format: {config.format}")
 
 
+def _is_total_row(row):
+    if not row:
+        return False, False
+    first = str(row[0])
+    is_grand = first == "Grand Total"
+    is_sub = not is_grand and ("Subtotal" in first or (len(row) > 1 and str(row[1]) == "Subtotal"))
+    return is_grand, is_sub
+
+
+def _build_number_format(vfmt):
+    decimals = vfmt.get("decimals", 2)
+    style = vfmt.get("style", "number")
+    separator = vfmt.get("separator", True)
+    prefix = vfmt.get("prefix", "")
+    suffix = vfmt.get("suffix", "")
+    currency = vfmt.get("currency_symbol", "$")
+
+    int_part = "#,##0" if separator else "0"
+    dec_part = "." + "0" * decimals if decimals > 0 else ""
+    nf = int_part + dec_part
+
+    if style == "percent":
+        nf = nf + '"%"'
+    elif style == "currency":
+        nf = f'"{currency}"{nf}'
+    if prefix:
+        nf = f'"{prefix}"{nf}'
+    if suffix:
+        nf = f'{nf}"{suffix}"'
+    return nf
+
+
 async def export_excel(config: ExportConfig):
     """Export with full formatting using openpyxl."""
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -58,11 +90,6 @@ async def export_excel(config: ExportConfig):
     wb = Workbook()
     wb.remove(wb.active)
 
-    header_fill = PatternFill(start_color="1e293b", end_color="1e293b", fill_type="solid")
-    header_font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
-    data_font = Font(name="Segoe UI", size=10)
-    total_fill = PatternFill(start_color="e8f0fe", end_color="e8f0fe", fill_type="solid")
-    total_font = Font(name="Segoe UI", size=10, bold=True)
     thin_border = Border(
         left=Side(style="thin", color="D0D0D0"),
         right=Side(style="thin", color="D0D0D0"),
@@ -77,13 +104,29 @@ async def export_excel(config: ExportConfig):
         rows = t.get("rows", [])
         title = t.get("title", "")
         subtitle = t.get("subtitle", "")
+        num_row_fields = t.get("num_row_fields", 1)
+        cell_align = t.get("cell_align", "right")
+        header_align = t.get("header_align", "center")
+        row_label_align = t.get("row_label_align", "left")
+        value_formats = t.get("value_formats", [])
+        header_bg = (t.get("header_bg_color") or "1e293b").lstrip("#")
+        header_tc = (t.get("header_text_color") or "FFFFFF").lstrip("#")
+        total_bg = (t.get("total_bg_color") or "e8f0fe").lstrip("#")
+        title_color = (t.get("title_color") or "")
+
+        header_fill = PatternFill(start_color=header_bg or "1e293b", end_color=header_bg or "1e293b", fill_type="solid")
+        header_font = Font(name="Segoe UI", size=11, bold=True, color=header_tc or "FFFFFF")
+        data_font = Font(name="Segoe UI", size=10)
+        total_fill = PatternFill(start_color=total_bg or "e8f0fe", end_color=total_bg or "e8f0fe", fill_type="solid")
+        total_font = Font(name="Segoe UI", size=10, bold=True)
+        subtotal_fill = PatternFill(start_color="f0f4f8", end_color="f0f4f8", fill_type="solid")
 
         row_offset = 1
-        # Title
         if title:
             ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=max(len(headers), 1))
             cell = ws.cell(row=1, column=1, value=title)
-            cell.font = Font(name="Segoe UI", size=14, bold=True)
+            tc = title_color.lstrip("#") if title_color else ""
+            cell.font = Font(name="Segoe UI", size=14, bold=True, color=tc if tc else "000000")
             row_offset = 2
         if subtitle:
             ws.merge_cells(start_row=row_offset, start_column=1, end_row=row_offset, end_column=max(len(headers), 1))
@@ -91,39 +134,49 @@ async def export_excel(config: ExportConfig):
             cell.font = Font(name="Segoe UI", size=11, color="666666")
             row_offset += 1
         if title or subtitle:
-            row_offset += 1  # Blank row
+            row_offset += 1
 
-        # Apply header renames if present
-        header_renames = t.get("header_renames") or {}
-        headers = [header_renames.get(h, h) for h in headers]
-
-        # Headers
         for ci, h in enumerate(headers, 1):
             cell = ws.cell(row=row_offset, column=ci, value=h)
             cell.font = header_font
             cell.fill = header_fill
-            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.alignment = Alignment(horizontal=header_align, vertical="center", wrap_text=True)
             cell.border = thin_border
 
-        # Build annotation lookup for this table
         ann_lookup = {}
         for ann in t.get("annotations", []):
             ann_lookup[(ann["rowIdx"], ann["colIdx"])] = ann.get("text", "")
 
-        # Data rows
         for ri, row in enumerate(rows, row_offset + 1):
-            is_total = (len(row) > 0 and str(row[0]) == "Grand Total")
-            data_ri = ri - row_offset - 1  # 0-based index into rows
+            is_grand, is_sub = _is_total_row(row)
+            data_ri = ri - row_offset - 1
             for ci, val in enumerate(row, 1):
                 cell = ws.cell(row=ri, column=ci, value=val)
-                cell.font = total_font if is_total else data_font
                 cell.border = thin_border
-                if is_total:
+
+                if is_grand:
+                    cell.font = total_font
                     cell.fill = total_fill
+                elif is_sub:
+                    cell.font = total_font
+                    cell.fill = subtotal_fill
+                else:
+                    cell.font = data_font
+
+                is_val_col = (ci - 1) >= num_row_fields
                 if isinstance(val, (int, float)):
-                    cell.alignment = Alignment(horizontal="right")
-                    cell.number_format = '#,##0.00' if isinstance(val, float) else '#,##0'
-                # Add cell comment if annotation exists
+                    align = cell_align if is_val_col else row_label_align
+                    cell.alignment = Alignment(horizontal=align)
+                    if is_val_col and value_formats:
+                        vf_idx = (ci - 1 - num_row_fields) % len(value_formats)
+                        cell.number_format = _build_number_format(value_formats[vf_idx])
+                    else:
+                        cell.number_format = '#,##0.00' if isinstance(val, float) else '#,##0'
+                elif is_val_col:
+                    cell.alignment = Alignment(horizontal=cell_align)
+                else:
+                    cell.alignment = Alignment(horizontal=row_label_align)
+
                 ann_text = ann_lookup.get((data_ri, ci - 1))
                 if ann_text:
                     from openpyxl.comments import Comment
@@ -132,7 +185,6 @@ async def export_excel(config: ExportConfig):
                     comment.height = 100
                     cell.comment = comment
 
-        # Auto-fit column widths
         for ci in range(1, len(headers) + 1):
             max_len = max(
                 (len(str(ws.cell(row=r, column=ci).value or "")) for r in range(row_offset, row_offset + len(rows) + 1)),
@@ -170,10 +222,12 @@ async def export_excel(config: ExportConfig):
     if config.options.get("include_raw_data") and config.dataset_id in datasets:
         raw_df = datasets[config.dataset_id]["df"]
         raw_ws = wb.create_sheet(title="Raw Data")
+        raw_hdr_font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
+        raw_hdr_fill = PatternFill(start_color="1e293b", end_color="1e293b", fill_type="solid")
         for ci, col in enumerate(raw_df.columns, 1):
             cell = raw_ws.cell(row=1, column=ci, value=col)
-            cell.font = header_font
-            cell.fill = header_fill
+            cell.font = raw_hdr_font
+            cell.fill = raw_hdr_fill
         for ri, row in enumerate(raw_df.head(10000).values.tolist(), 2):
             for ci, val in enumerate(row, 1):
                 raw_ws.cell(row=ri, column=ci, value=val if not (isinstance(val, float) and (np.isnan(val) or np.isinf(val))) else None)
@@ -257,8 +311,14 @@ async def export_word(config: ExportConfig):
         subtitle = t.get("subtitle", "")
         headers = t.get("headers", [])
         rows = t.get("rows", [])
+        formatted_rows = t.get("formatted_rows") or []
+        num_row_fields = t.get("num_row_fields", 1)
+        cell_align = t.get("cell_align", "right")
+        header_align = t.get("header_align", "center")
+        row_label_align = t.get("row_label_align", "left")
 
-        # Title
+        align_map = {"left": WD_ALIGN_PARAGRAPH.LEFT, "center": WD_ALIGN_PARAGRAPH.CENTER, "right": WD_ALIGN_PARAGRAPH.RIGHT}
+
         p = doc.add_heading(title, level=2)
         if subtitle:
             p = doc.add_paragraph(subtitle)
@@ -268,23 +328,20 @@ async def export_word(config: ExportConfig):
         if not headers:
             continue
 
-        # Table
-        table = doc.add_table(rows=1 + len(rows), cols=len(headers))
+        table = doc.add_table(rows=1 + len(formatted_rows or rows), cols=len(headers))
         table.style = "Table Grid"
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
-        # Header row
         for ci, h in enumerate(headers):
             cell = table.rows[0].cells[ci]
             cell.text = str(h)
             p = cell.paragraphs[0]
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.alignment = align_map.get(header_align, WD_ALIGN_PARAGRAPH.CENTER)
             run = p.runs[0] if p.runs else p.add_run(str(h))
             run.bold = True
             run.font.size = Pt(9)
             run.font.name = "Segoe UI"
 
-        # Build annotation lookup for footnotes
         ann_lookup = {}
         ann_list = []
         for ann in t.get("annotations", []):
@@ -292,33 +349,44 @@ async def export_word(config: ExportConfig):
             ann_lookup[key] = len(ann_list) + 1
             ann_list.append(ann.get("text", ""))
 
-        # Data rows
-        for ri, row in enumerate(rows):
-            for ci, val in enumerate(row):
+        use_formatted = len(formatted_rows) == len(rows)
+        for ri in range(len(rows)):
+            raw_row = rows[ri]
+            fmt_row = formatted_rows[ri] if use_formatted else None
+            is_grand, is_sub = _is_total_row(raw_row)
+
+            for ci in range(len(headers)):
                 cell = table.rows[ri + 1].cells[ci]
-                display = ""
-                if val is not None:
-                    if isinstance(val, float):
+                if fmt_row and ci < len(fmt_row):
+                    display = fmt_row[ci]
+                elif ci < len(raw_row):
+                    val = raw_row[ci]
+                    if val is None:
+                        display = ""
+                    elif isinstance(val, float):
                         display = f"{val:,.2f}"
                     elif isinstance(val, int):
                         display = f"{val:,}"
                     else:
                         display = str(val)
-                # Add footnote marker if annotation
+                else:
+                    display = ""
+
                 ann_num = ann_lookup.get((ri, ci))
                 if ann_num:
                     display = f"{display} [{ann_num}]"
+
                 cell.text = display
                 p = cell.paragraphs[0]
-                if isinstance(val, (int, float)):
-                    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                is_val_col = ci >= num_row_fields
+                p.alignment = align_map.get(cell_align if is_val_col else row_label_align, WD_ALIGN_PARAGRAPH.LEFT)
+
                 run = p.runs[0] if p.runs else p.add_run(display)
                 run.font.size = Pt(9)
                 run.font.name = "Segoe UI"
-                if str(row[0]) == "Grand Total":
+                if is_grand or is_sub:
                     run.bold = True
 
-        # Add annotation footnotes below table
         if ann_list:
             fn_para = doc.add_paragraph()
             fn_run = fn_para.add_run("Annotations:")
@@ -361,6 +429,7 @@ async def export_pdf(config: ExportConfig):
     th { background: #1e293b; color: #fff; padding: 6px 10px; text-align: left; font-size: 10px; }
     td { padding: 5px 10px; border-bottom: 1px solid #ddd; font-size: 10px; }
     tr.grand-total td { background: #e8f0fe; font-weight: bold; }
+    tr.subtotal td { background: #f0f4f8; font-weight: bold; }
     tr:nth-child(even) td { background: #f9f9f9; }
     .cover { text-align: center; padding-top: 80px; page-break-after: always; }
     @media print { .cover { page-break-after: always; } }
@@ -382,26 +451,46 @@ async def export_pdf(config: ExportConfig):
         footnote = t.get("footnote", "")
         headers = t.get("headers", [])
         rows = t.get("rows", [])
+        formatted_rows = t.get("formatted_rows") or []
+        num_row_fields = t.get("num_row_fields", 1)
+        cell_align = t.get("cell_align", "right")
+        header_align = t.get("header_align", "center")
+        row_label_align = t.get("row_label_align", "left")
+        use_formatted = len(formatted_rows) == len(rows)
 
         if title: html_parts.append(f"<h2>{title}</h2>")
         if subtitle: html_parts.append(f'<p class="subtitle">{subtitle}</p>')
         if not headers: continue
 
         html_parts.append("<table><thead><tr>")
-        for h in headers: html_parts.append(f"<th>{h}</th>")
+        for h in headers:
+            html_parts.append(f'<th style="text-align:{header_align}">{h}</th>')
         html_parts.append("</tr></thead><tbody>")
 
-        for row in rows:
-            is_total = len(row) > 0 and str(row[0]) == "Grand Total"
-            cls = ' class="grand-total"' if is_total else ""
+        for ri, row in enumerate(rows):
+            is_grand, is_sub = _is_total_row(row)
+            cls = ' class="grand-total"' if is_grand else (' class="subtotal"' if is_sub else "")
             html_parts.append(f"<tr{cls}>")
-            for cell in row:
-                display = ""
-                if cell is not None:
-                    if isinstance(cell, float): display = f"{cell:,.2f}"
-                    elif isinstance(cell, int): display = f"{cell:,}"
-                    else: display = str(cell)
-                html_parts.append(f"<td>{display}</td>")
+            fmt_row = formatted_rows[ri] if use_formatted and ri < len(formatted_rows) else None
+            for ci in range(len(headers)):
+                if fmt_row and ci < len(fmt_row):
+                    display = fmt_row[ci]
+                elif ci < len(row):
+                    cell = row[ci]
+                    if cell is None:
+                        display = ""
+                    elif isinstance(cell, float):
+                        display = f"{cell:,.2f}"
+                    elif isinstance(cell, int):
+                        display = f"{cell:,}"
+                    else:
+                        display = str(cell)
+                else:
+                    display = ""
+                is_val_col = ci >= num_row_fields
+                align = cell_align if is_val_col else row_label_align
+                bold = "font-weight:bold;" if (is_grand or is_sub) else ""
+                html_parts.append(f'<td style="text-align:{align};{bold}">{display}</td>')
             html_parts.append("</tr>")
 
         html_parts.append("</tbody></table>")
