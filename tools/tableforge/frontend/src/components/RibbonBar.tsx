@@ -1243,9 +1243,7 @@ function AISmartRibbon({ table, dataset, onAction, onUpdate }: { table: TableCon
         <RBtn icon="🔄" label="Refine" onClick={() => onAction('ai-refine')} disabled={!table || !dataset} />
       </RGroup>
       <RGroup label="AI Build">
-        <RBtn icon="🧠" label="Smart Build" onClick={() => onAction('ai-smart-build')} disabled={!dataset} />
-        <RBtn icon="💡" label="Suggest Tables" onClick={() => onAction('ai-suggest')} disabled={!dataset} />
-        <RBtn icon="🚀" label="Auto Generate" onClick={() => onAction('ai-auto-generate')} disabled={!dataset} />
+        <RBtn icon="🧠" label="AI Table Builder" onClick={() => onAction('ai-smart-build')} disabled={!dataset} />
       </RGroup>
       <RGroup label="AI Report">
         <RBtn icon="📄" label="Generate Report" onClick={() => onAction('ai-report')} disabled={!dataset} />

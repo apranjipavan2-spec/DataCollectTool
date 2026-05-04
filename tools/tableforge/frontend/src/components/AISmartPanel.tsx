@@ -63,6 +63,9 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
   const [maxTables, setMaxTables] = useState(20);
   const [selectedAutoTables, setSelectedAutoTables] = useState<Set<number>>(new Set());
 
+  // Unified build sub-mode
+  const [buildSubMode, setBuildSubMode] = useState<'ask' | 'generate' | 'suggest'>('ask');
+
   // Report state
   const [reportStyle, setReportStyle] = useState('field_survey');
   const [customContext, setCustomContext] = useState('');
@@ -367,168 +370,212 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
         );
 
       case 'suggest':
-        return (
-          <div className="ai-panel-body">
-            <p className="ai-desc">AI will analyze your dataset and suggest optimal table configurations.</p>
-            <input type="text" value={query} onChange={e => setQuery(e.target.value)}
-              placeholder="Optional: describe what you want to analyze..." className="fdrop-input" style={{ width: '100%', marginBottom: 10 }} />
-            {!aiResult && <button className="btn-primary" onClick={handleSuggest} disabled={loading}>{loading ? 'Thinking...' : '💡 Suggest Tables'}</button>}
-            {aiResult?.tables && (
-              <div className="ai-result">
-                {aiResult.rationale && <p className="ai-rationale"><em>{aiResult.rationale}</em></p>}
-                <div className="ai-suggestions">
-                  {aiResult.tables.map((t: any, i: number) => (
-                    <div key={i} className="ai-suggestion-card">
-                      <strong>{t.title || `Table ${i + 1}`}</strong>
-                      <p>{t.description}</p>
-                      <div className="ai-suggestion-meta">
-                        Rows: {t.groupby_field} | Values: {t.value_field} ({t.aggregation})
-                        {t.secondary_groupby && ` | Columns: ${t.secondary_groupby}`}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <button className="btn-primary" style={{ marginTop: 12 }} onClick={() => {
-                  onApplySuggestion?.(aiResult.tables);
-                  onClose();
-                }}>Create These Tables</button>
-              </div>
-            )}
+      case 'smart-build':
+      case 'auto-generate': {
+        const effectiveSubMode = mode === 'auto-generate' ? 'generate' : mode === 'suggest' ? 'suggest' : buildSubMode;
+        const colSidebarContent = dataset && (
+          <div style={{ width: 210, minWidth: 210, borderRight: '1px solid rgba(255,255,255,0.08)', paddingRight: 10, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>
+              Columns ({dataset.columns.length})
+              {selectedCols.length > 0 && <span style={{ color: '#60a5fa' }}> — {selectedCols.length} selected</span>}
+            </div>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+              <button onClick={() => setSelectedCols(dataset.columns.map(c => c.name))}
+                style={{ fontSize: 9, padding: '2px 6px', background: 'rgba(59,130,246,0.15)', border: 'none', borderRadius: 3, color: '#93c5fd', cursor: 'pointer' }}>All</button>
+              <button onClick={() => setSelectedCols([])}
+                style={{ fontSize: 9, padding: '2px 6px', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 3, color: 'var(--text-dim)', cursor: 'pointer' }}>None</button>
+            </div>
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              {dataset.columns.map((c, idx) => {
+                const isSelected = selectedCols.includes(c.name);
+                const tColor = c.type === 'numeric' ? '#3b82f6' : c.type === 'text' ? '#22c55e' : c.type === 'date' ? '#f59e0b' : c.type === 'boolean' ? '#a855f7' : '#ec4899';
+                return (
+                  <button key={c.name}
+                    onClick={() => setSelectedCols(prev => prev.includes(c.name) ? prev.filter(x => x !== c.name) : [...prev, c.name])}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 4, width: '100%',
+                      fontSize: 11, padding: '4px 6px', textAlign: 'left', cursor: 'pointer',
+                      background: isSelected ? 'rgba(59,130,246,0.2)' : 'transparent',
+                      border: isSelected ? '1px solid rgba(59,130,246,0.4)' : '1px solid transparent',
+                      borderRadius: 4, marginBottom: 1, color: 'inherit',
+                    }}>
+                    <span style={{ color: 'var(--text-dim)', fontSize: 10, minWidth: 20 }}>{idx + 1}.</span>
+                    <span style={{ fontSize: 8, fontWeight: 700, color: tColor, background: `${tColor}22`, padding: '1px 3px', borderRadius: 2, minWidth: 20, textAlign: 'center' }}>
+                      {c.type === 'numeric' ? '123' : c.type === 'text' ? 'Aa' : c.type === 'date' ? 'D' : c.type === 'boolean' ? '01' : 'M'}
+                    </span>
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                    {isSelected && <span style={{ color: '#60a5fa', fontSize: 10 }}>✓</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         );
 
-      case 'smart-build':
         return (
           <div style={{ display: 'flex', gap: 14, height: '100%', overflow: 'hidden' }}>
-            {/* Left: columns list */}
-            {dataset && (
-              <div style={{ width: 220, minWidth: 220, borderRight: '1px solid rgba(255,255,255,0.08)', paddingRight: 10, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 6 }}>
-                  Columns ({dataset.columns.length})
-                  {selectedCols.length > 0 && <span style={{ color: '#60a5fa' }}> — {selectedCols.length} selected</span>}
-                </div>
-                <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
-                  <button onClick={() => setSelectedCols(dataset.columns.map(c => c.name))}
-                    style={{ fontSize: 9, padding: '2px 6px', background: 'rgba(59,130,246,0.15)', border: 'none', borderRadius: 3, color: '#93c5fd', cursor: 'pointer' }}>All</button>
-                  <button onClick={() => setSelectedCols([])}
-                    style={{ fontSize: 9, padding: '2px 6px', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 3, color: 'var(--text-dim)', cursor: 'pointer' }}>None</button>
-                </div>
-                <div style={{ flex: 1, overflow: 'auto' }}>
-                  {dataset.columns.map((c, idx) => {
-                    const isSelected = selectedCols.includes(c.name);
-                    const tColor = c.type === 'numeric' ? '#3b82f6' : c.type === 'text' ? '#22c55e' : c.type === 'date' ? '#f59e0b' : c.type === 'boolean' ? '#a855f7' : '#ec4899';
-                    return (
-                      <button key={c.name}
-                        onClick={() => setSelectedCols(prev => prev.includes(c.name) ? prev.filter(x => x !== c.name) : [...prev, c.name])}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 4, width: '100%',
-                          fontSize: 11, padding: '4px 6px', textAlign: 'left', cursor: 'pointer',
-                          background: isSelected ? 'rgba(59,130,246,0.2)' : 'transparent',
-                          border: isSelected ? '1px solid rgba(59,130,246,0.4)' : '1px solid transparent',
-                          borderRadius: 4, marginBottom: 1, color: 'inherit',
-                        }}>
-                        <span style={{ color: 'var(--text-dim)', fontSize: 10, minWidth: 20 }}>{idx + 1}.</span>
-                        <span style={{ fontSize: 8, fontWeight: 700, color: tColor, background: `${tColor}22`, padding: '1px 3px', borderRadius: 2, minWidth: 20, textAlign: 'center' }}>
-                          {c.type === 'numeric' ? '123' : c.type === 'text' ? 'Aa' : c.type === 'date' ? 'D' : c.type === 'boolean' ? '01' : 'M'}
-                        </span>
-                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-                        {isSelected && <span style={{ color: '#60a5fa', fontSize: 10 }}>✓</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            {/* Right: prompt + results */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, overflow: 'auto' }}>
-              <p className="ai-desc" style={{ margin: 0 }}>Ask a question or describe the table you want. AI will design the optimal configuration.</p>
-              <input type="text" value={query} onChange={e => setQuery(e.target.value)}
-                placeholder="e.g., Show average income by district and gender..."
-                className="fdrop-input" style={{ width: '100%', padding: '8px 12px', fontSize: 13 }} />
-              {!aiResult && (
-                <button className="btn-primary" onClick={handleSmartBuild} disabled={loading}
-                  style={{ alignSelf: 'flex-start', padding: '8px 20px' }}>
-                  {loading ? 'Building...' : 'Smart Build Table'}
-                </button>
-              )}
-              {aiResult?.groupby_field && (
-                <div className="ai-result" style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{aiResult.title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>{aiResult.description}</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: 12, padding: '10px 12px', background: 'rgba(0,0,0,0.15)', borderRadius: 6 }}>
-                    <div><span style={{ color: 'var(--text-dim)' }}>Row grouping:</span> <strong>{aiResult.groupby_field}</strong></div>
-                    <div><span style={{ color: 'var(--text-dim)' }}>Value field:</span> <strong>{aiResult.value_field}</strong></div>
-                    <div><span style={{ color: 'var(--text-dim)' }}>Aggregation:</span> <strong>{aiResult.aggregation}</strong></div>
-                    {aiResult.secondary_groupby && (
-                      <div><span style={{ color: 'var(--text-dim)' }}>Column grouping:</span> <strong>{aiResult.secondary_groupby}</strong></div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-                    <button className="btn-primary" style={{ padding: '8px 20px' }} onClick={() => {
-                      onApplySmartBuild?.(aiResult);
-                      onClose();
-                    }}>Create This Table</button>
-                    <button className="fdrop-btn-action" onClick={() => setAiResult(null)}>Try Again</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-
-      case 'auto-generate':
-        return (
-          <div className="ai-panel-body">
-            <p className="ai-desc">AI analyzes all columns and generates a comprehensive set of tables. Optionally provide a list of tables you need.</p>
-            <textarea value={tableDescriptions} onChange={e => setTableDescriptions(e.target.value)}
-              placeholder={"Describe the tables you need (optional). Example:\n- Demographics by district\n- Income source by beneficiary type\n- Average landholding by region\n\nLeave empty for AI to decide."}
-              className="fdrop-input" style={{ width: '100%', minHeight: 80, resize: 'vertical', marginBottom: 10, fontSize: 12 }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Max tables:</label>
-              <input type="range" min={5} max={100} value={maxTables} onChange={e => setMaxTables(Number(e.target.value))}
-                style={{ flex: 1 }} />
-              <span style={{ fontSize: 12, minWidth: 24 }}>{maxTables}</span>
-            </div>
-            {!aiResult && <button className="btn-primary" onClick={handleAutoGenerate} disabled={loading}>{loading ? 'Generating...' : '🚀 Auto-Generate Tables'}</button>}
-            {aiResult?.tables && (
-              <div className="ai-result">
-                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>{aiResult.tables.length} tables generated — select which to create:</div>
-                <div style={{ maxHeight: 300, overflow: 'auto' }}>
-                  {aiResult.tables.map((t: any, i: number) => (
-                    <label key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '6px 4px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <input type="checkbox" checked={selectedAutoTables.has(i)}
-                        onChange={() => setSelectedAutoTables(prev => {
-                          const next = new Set(prev);
-                          next.has(i) ? next.delete(i) : next.add(i);
-                          return next;
-                        })} style={{ marginTop: 2 }} />
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 600 }}>{t.title || `Table ${i + 1}`}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{t.description}</div>
-                        <div style={{ fontSize: 10, color: 'var(--text-dim)', opacity: 0.7 }}>
-                          Rows: {t.groupby_field} | Values: {t.value_field} ({t.aggregation}){t.secondary_groupby && ` | Columns: ${t.secondary_groupby}`}
-                          {t.template && <span style={{ marginLeft: 6, padding: '1px 5px', background: 'rgba(59,130,246,0.2)', borderRadius: 3, color: '#93c5fd' }}>{t.template}</span>}
-                        </div>
-                      </div>
-                    </label>
+            {colSidebarContent}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              {/* Sub-mode tabs — only when opened from smart-build */}
+              {mode === 'smart-build' && !aiResult && (
+                <div style={{ display: 'flex', gap: 0, marginBottom: 12, borderBottom: '2px solid rgba(255,255,255,0.08)' }}>
+                  {([
+                    { key: 'ask' as const, label: 'Ask a Question', desc: 'Create one table' },
+                    { key: 'generate' as const, label: 'Auto-Generate', desc: 'Create many tables' },
+                    { key: 'suggest' as const, label: 'Get Suggestions', desc: 'AI recommends' },
+                  ]).map(t => (
+                    <button key={t.key} onClick={() => { setBuildSubMode(t.key); setAiResult(null); setError(''); }}
+                      style={{
+                        padding: '8px 16px', fontSize: 12, fontWeight: buildSubMode === t.key ? 700 : 400,
+                        border: 'none', cursor: 'pointer',
+                        background: buildSubMode === t.key ? 'rgba(59,130,246,0.15)' : 'transparent',
+                        color: buildSubMode === t.key ? '#60a5fa' : 'var(--text-dim)',
+                        borderBottom: buildSubMode === t.key ? '3px solid #3b82f6' : '3px solid transparent',
+                        marginBottom: -2,
+                      }}>
+                      {t.label}
+                    </button>
                   ))}
                 </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                  <button className="btn-primary" onClick={() => {
-                    const selected = aiResult.tables.filter((_: any, i: number) => selectedAutoTables.has(i));
-                    onApplySuggestion?.(selected);
-                    onClose();
-                  }}>Create {selectedAutoTables.size} Tables</button>
-                  <button className="fdrop-btn-action" style={{ fontSize: 11 }} onClick={() => {
-                    selectedAutoTables.size === aiResult.tables.length
-                      ? setSelectedAutoTables(new Set())
-                      : setSelectedAutoTables(new Set(aiResult.tables.map((_: any, i: number) => i)));
-                  }}>{selectedAutoTables.size === aiResult.tables.length ? 'Deselect All' : 'Select All'}</button>
-                </div>
+              )}
+
+              <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {/* ASK mode — single table */}
+                {effectiveSubMode === 'ask' && (
+                  <>
+                    <p className="ai-desc" style={{ margin: 0 }}>Describe the table you want. AI will design the optimal configuration.</p>
+                    <input type="text" value={query} onChange={e => setQuery(e.target.value)}
+                      placeholder="e.g., Show average income by district and gender..."
+                      className="fdrop-input" style={{ width: '100%', padding: '8px 12px', fontSize: 13 }} />
+                    {!aiResult && (
+                      <button className="btn-primary" onClick={handleSmartBuild} disabled={loading}
+                        style={{ alignSelf: 'flex-start', padding: '8px 20px' }}>
+                        {loading ? 'Building...' : 'Build Table'}
+                      </button>
+                    )}
+                    {aiResult?.groupby_field && (
+                      <div className="ai-result">
+                        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{aiResult.title}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>{aiResult.description}</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: 12, padding: '10px 12px', background: 'rgba(0,0,0,0.15)', borderRadius: 6 }}>
+                          <div><span style={{ color: 'var(--text-dim)' }}>Row grouping:</span> <strong>{aiResult.groupby_field}</strong></div>
+                          <div><span style={{ color: 'var(--text-dim)' }}>Value field:</span> <strong>{aiResult.value_field}</strong></div>
+                          <div><span style={{ color: 'var(--text-dim)' }}>Aggregation:</span> <strong>{aiResult.aggregation}</strong></div>
+                          {aiResult.secondary_groupby && (
+                            <div><span style={{ color: 'var(--text-dim)' }}>Column grouping:</span> <strong>{aiResult.secondary_groupby}</strong></div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                          <button className="btn-primary" style={{ padding: '8px 20px' }} onClick={() => {
+                            onApplySmartBuild?.(aiResult);
+                            onClose();
+                          }}>Create This Table</button>
+                          <button className="fdrop-btn-action" onClick={() => setAiResult(null)}>Try Again</button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* GENERATE mode — multiple tables */}
+                {effectiveSubMode === 'generate' && (
+                  <>
+                    <p className="ai-desc" style={{ margin: 0 }}>AI analyzes all columns and generates a comprehensive set of tables.</p>
+                    <textarea value={tableDescriptions} onChange={e => setTableDescriptions(e.target.value)}
+                      placeholder={"Describe the tables you need (optional):\n- Demographics by district\n- Income source by beneficiary type\n- Average landholding by region\n\nLeave empty for AI to decide."}
+                      className="fdrop-input" style={{ width: '100%', minHeight: 70, resize: 'vertical', fontSize: 12 }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Max tables:</label>
+                      <input type="range" min={5} max={100} value={maxTables} onChange={e => setMaxTables(Number(e.target.value))} style={{ flex: 1 }} />
+                      <span style={{ fontSize: 12, minWidth: 28 }}>{maxTables}</span>
+                    </div>
+                    {!aiResult && (
+                      <button className="btn-primary" onClick={handleAutoGenerate} disabled={loading}
+                        style={{ alignSelf: 'flex-start', padding: '8px 20px' }}>
+                        {loading ? 'Generating...' : 'Auto-Generate Tables'}
+                      </button>
+                    )}
+                    {aiResult?.tables && (
+                      <div className="ai-result">
+                        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>{aiResult.tables.length} tables generated — select which to create:</div>
+                        <div style={{ maxHeight: 300, overflow: 'auto' }}>
+                          {aiResult.tables.map((t: any, i: number) => (
+                            <label key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '6px 4px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <input type="checkbox" checked={selectedAutoTables.has(i)}
+                                onChange={() => setSelectedAutoTables(prev => {
+                                  const next = new Set(prev);
+                                  next.has(i) ? next.delete(i) : next.add(i);
+                                  return next;
+                                })} style={{ marginTop: 2 }} />
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 600 }}>{t.title || `Table ${i + 1}`}</div>
+                                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{t.description}</div>
+                                <div style={{ fontSize: 10, color: 'var(--text-dim)', opacity: 0.7 }}>
+                                  Rows: {t.groupby_field} | Values: {t.value_field} ({t.aggregation}){t.secondary_groupby && ` | Columns: ${t.secondary_groupby}`}
+                                  {t.template && <span style={{ marginLeft: 6, padding: '1px 5px', background: 'rgba(59,130,246,0.2)', borderRadius: 3, color: '#93c5fd' }}>{t.template}</span>}
+                                </div>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                          <button className="btn-primary" onClick={() => {
+                            const selected = aiResult.tables.filter((_: any, i: number) => selectedAutoTables.has(i));
+                            onApplySuggestion?.(selected);
+                            onClose();
+                          }}>Create {selectedAutoTables.size} Tables</button>
+                          <button className="fdrop-btn-action" style={{ fontSize: 11 }} onClick={() => {
+                            selectedAutoTables.size === aiResult.tables.length
+                              ? setSelectedAutoTables(new Set())
+                              : setSelectedAutoTables(new Set(aiResult.tables.map((_: any, i: number) => i)));
+                          }}>{selectedAutoTables.size === aiResult.tables.length ? 'Deselect All' : 'Select All'}</button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* SUGGEST mode — AI recommendations */}
+                {effectiveSubMode === 'suggest' && (
+                  <>
+                    <p className="ai-desc" style={{ margin: 0 }}>AI will analyze your dataset and suggest optimal table configurations.</p>
+                    <input type="text" value={query} onChange={e => setQuery(e.target.value)}
+                      placeholder="Optional: describe what you want to analyze..."
+                      className="fdrop-input" style={{ width: '100%', padding: '8px 12px', fontSize: 13 }} />
+                    {!aiResult && (
+                      <button className="btn-primary" onClick={handleSuggest} disabled={loading}
+                        style={{ alignSelf: 'flex-start', padding: '8px 20px' }}>
+                        {loading ? 'Thinking...' : 'Get Suggestions'}
+                      </button>
+                    )}
+                    {aiResult?.tables && (
+                      <div className="ai-result">
+                        {aiResult.rationale && <p className="ai-rationale"><em>{aiResult.rationale}</em></p>}
+                        <div className="ai-suggestions">
+                          {aiResult.tables.map((t: any, i: number) => (
+                            <div key={i} className="ai-suggestion-card">
+                              <strong>{t.title || `Table ${i + 1}`}</strong>
+                              <p>{t.description}</p>
+                              <div className="ai-suggestion-meta">
+                                Rows: {t.groupby_field} | Values: {t.value_field} ({t.aggregation})
+                                {t.secondary_groupby && ` | Columns: ${t.secondary_groupby}`}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <button className="btn-primary" style={{ marginTop: 12 }} onClick={() => {
+                          onApplySuggestion?.(aiResult.tables);
+                          onClose();
+                        }}>Create These Tables</button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-            )}
+            </div>
           </div>
         );
+      }
 
       case 'report':
         return (
@@ -619,9 +666,9 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
     'polish': '✨ AI Polish — Title & Headers',
     'interpret': '📝 AI Interpret Table',
     'refine': '🔄 AI Refine Interpretation',
-    'suggest': '💡 AI Table Suggestions',
-    'smart-build': '🧠 AI Smart Build',
-    'auto-generate': '🚀 AI Auto-Generate Tables',
+    'suggest': '🧠 AI Table Builder',
+    'smart-build': '🧠 AI Table Builder',
+    'auto-generate': '🧠 AI Table Builder',
     'report': '📄 AI Report Writer',
     'config': '⚙ AI Configuration',
   };
@@ -639,7 +686,7 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: mode === 'smart-build' ? 850 : mode === 'auto-generate' ? 700 : 600, maxHeight: (mode === 'auto-generate' || mode === 'smart-build') ? '85vh' : '70vh' }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: (mode === 'smart-build' || mode === 'auto-generate' || mode === 'suggest') ? 900 : 600, maxHeight: (mode === 'smart-build' || mode === 'auto-generate' || mode === 'suggest') ? '85vh' : '70vh' }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{titles[mode] || 'AI-Smart'}</h2>
           <button className="modal-close" onClick={onClose}>×</button>
