@@ -268,10 +268,13 @@ export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLi
                       <option value="not_null">is not empty</option>
                     </select>
                   </div>
-                  <div className="form-group" style={{ flex: 1 }}>
-                    <label>Value</label>
-                    <input type="text" value={condValue} onChange={e => setCondValue(e.target.value)} placeholder="0" />
-                  </div>
+                  {condOperator !== 'is_null' && condOperator !== 'not_null' && (
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label>Value</label>
+                      <input type="text" value={condValue} onChange={e => setCondValue(e.target.value)}
+                        placeholder={['contains', 'not_contains', 'starts_with', 'ends_with'].includes(condOperator) ? 'text...' : '0'} />
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="form-row" style={{ gap: 8 }}>
