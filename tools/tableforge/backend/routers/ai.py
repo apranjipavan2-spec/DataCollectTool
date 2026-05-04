@@ -541,8 +541,10 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
         "  'sum_pct_row': sum + row % | 'crosstab_full': count + row % + subtotals + grand\n\n"
     )
 
-    CHUNK_SIZE = 25
-    chunks = [target_cols[i:i + CHUNK_SIZE] for i in range(0, len(target_cols), CHUNK_SIZE)]
+    TABLES_PER_PHASE = 10
+    total_phases = max(1, (body.max_tables + TABLES_PER_PHASE - 1) // TABLES_PER_PHASE)
+    chunk_size = max(5, len(target_cols) // total_phases)
+    chunks = [target_cols[i:i + chunk_size] for i in range(0, len(target_cols), chunk_size)]
     actual_cols = list(df.columns)
 
     async def stream():
@@ -552,7 +554,7 @@ async def ai_auto_generate(body: AIAutoGenerateRequest):
         yield f"data: {json.dumps({'step': 'start', 'message': f'Analyzing {len(target_cols)} columns in {total_phases} phase(s)…', 'phases': total_phases, 'tables': []})}\n\n"
 
         for phase_idx, chunk in enumerate(chunks):
-            tables_for_chunk = max(3, body.max_tables // total_phases + (1 if phase_idx < body.max_tables % total_phases else 0))
+            tables_for_chunk = TABLES_PER_PHASE
             cols_info = [_col_info(c) for c in chunk]
             sample_cols = chunk[:15]
             sample_rows = df[sample_cols].head(4).fillna("").to_dict(orient="records")
