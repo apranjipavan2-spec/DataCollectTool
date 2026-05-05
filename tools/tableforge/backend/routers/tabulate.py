@@ -708,17 +708,17 @@ async def tabulate(config: TableConfig):
                                 for dc in data_cols:
                                     if str(dc).startswith(prefix + " |") or str(dc) == prefix:
                                         col_to_subtotal[dc] = sc
+                            # Save raw subtotal values before any conversion
+                            raw_subtotals = {sc: pivot_df[sc].copy() for sc in subtotal_cols}
                             for c in numeric_cols:
                                 if _is_gt_col(c):
-                                    row_sums = pivot_df[data_cols].sum(axis=1) if data_cols else pivot_df[numeric_cols].sum(axis=1)
+                                    # GT = sum of all subtotals' percentages (each is 100), not meaningful — show raw/row
+                                    row_sums = sum(raw_subtotals[sc] for sc in subtotal_cols)
                                     pivot_df[c] = (pivot_df[c] / row_sums.replace(0, np.nan) * 100).round(decimal_places)
                                 elif _is_subtotal_col(c):
-                                    prefix = str(c).split(" | Subtotal")[0].strip()
-                                    group_cols = [dc for dc in data_cols if str(dc).startswith(prefix + " |") or str(dc) == prefix]
-                                    group_sum = pivot_df[group_cols].sum(axis=1) if group_cols else pivot_df[c]
-                                    pivot_df[c] = (pivot_df[c] / group_sum.replace(0, np.nan) * 100).round(decimal_places)
+                                    pivot_df[c] = 100.0
                                 elif c in col_to_subtotal:
-                                    group_sum = pivot_df[col_to_subtotal[c]]
+                                    group_sum = raw_subtotals[col_to_subtotal[c]]
                                     pivot_df[c] = (pivot_df[c] / group_sum.replace(0, np.nan) * 100).round(decimal_places)
                                 else:
                                     row_sums = pivot_df[data_cols].sum(axis=1)
