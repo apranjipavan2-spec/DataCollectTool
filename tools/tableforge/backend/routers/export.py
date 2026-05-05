@@ -30,8 +30,9 @@ class ExportConfig(BaseModel):
 
 @router.post("/api/export")
 async def export_tables(config: ExportConfig):
-    if config.dataset_id not in datasets:
-        raise HTTPException(404, "Dataset not found")
+    dataset_required = config.format == "python" or config.options.get("include_raw_data") or config.options.get("formula_export")
+    if dataset_required and config.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found — reload data to use raw data/formula export")
 
     if config.format == "xlsx":
         return await export_excel(config)
