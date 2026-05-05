@@ -385,11 +385,15 @@ async def export_word(config: ExportConfig):
                     run.font.size = Pt(9)
                     run.font.name = "Segoe UI"
 
-            # Row 1: bottom-level labels for multi-span groups
+            # Row 1: bottom-level labels (skip cells already vertically merged)
+            merged_cols = set()
+            for grp in top_groups:
+                if grp["colspan"] == 1:
+                    merged_cols.add(grp["colstart"] + num_row_fields)
             for bi, blabel in enumerate(bottom_labels):
                 ci = bi + num_row_fields
-                if ci >= len(headers):
-                    break
+                if ci >= len(headers) or ci in merged_cols:
+                    continue
                 cell = table.rows[1].cells[ci]
                 cell.text = str(blabel)
                 p = cell.paragraphs[0]
