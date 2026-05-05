@@ -147,7 +147,11 @@ export default function App() {
         setActiveTableIdx(0);
         setResults(new Map());
         setShowDataPreview(false);
-        setTimeout(() => data.tables.forEach((t: TableConfig) => { if (t.values.length > 0) runTabulation(t); }), 100);
+        // Trigger batch tabulation after state settles
+        setTimeout(() => {
+          const toRun = data.tables.filter((t: TableConfig) => t.values.length > 0);
+          toRun.forEach((t: TableConfig) => runTabulation(t));
+        }, 50);
       }
     }
   }, [pendingProjectData, dataset, allColumns]);
@@ -321,52 +325,53 @@ export default function App() {
     } finally { setLoading(false); }
   }, []);
 
-  const runTabulation = useCallback(async (config: TableConfig) => {
-    if (!dataset) return;
-    if (config.values.length === 0) {
-      setResults(prev => { const next = new Map(prev); next.delete(config.id); return next; });
+  const runTabulationCore = useCallback(async (config: TableConfig) => {
+    if (!dataset || config.values.length === 0) {
+      if (config.values.length === 0) setResults(prev => { const next = new Map(prev); next.delete(config.id); return next; });
       return;
     }
+    const res = await tabulate({
+      dataset_id: dataset.dataset_id,
+      rows: config.rows, columns: config.columns, values: config.values,
+      filters: mergeProjectFilters(projectFiltersRef.current, config.filters), grand_total: config.grand_total,
+      grand_total_rows: config.grand_total_rows, grand_total_columns: config.grand_total_columns,
+      subtotals: config.subtotals, subtotal_pct_base: config.subtotal_pct_base,
+      missing_data: config.missing_data,
+      sort_by: config.sort_by, sort_order: config.sort_order,
+      multi_sort: config.multi_sort,
+      date_groupings: config.date_groupings,
+      blank_suppress: config.blank_suppress,
+    });
+    setResults(prev => {
+      const next = new Map(prev);
+      next.set(config.id, res);
+      const tableAnns = annotationsMap[config.id];
+      if (tableAnns && tableAnns.length > 0) {
+        const orphaned = tableAnns.filter(
+          a => a.rowIdx >= res.rows.length || a.colIdx >= res.headers.length
+        );
+        if (orphaned.length > 0) {
+          const tableName = tables.find(t => t.id === config.id)?.name || config.id;
+          setOrphanedAnnotations(orphaned.map(ann => ({
+            tableId: config.id,
+            tableName,
+            annotation: ann as any,
+            action: 'keep' as const,
+          })));
+        }
+      }
+      return next;
+    });
+  }, [dataset, annotationsMap, tables]);
+
+  const runTabulation = useCallback(async (config: TableConfig) => {
     setLoading(true); setLoadingMsg('Generating table…'); setError(null);
     try {
-      const res = await tabulate({
-        dataset_id: dataset.dataset_id,
-        rows: config.rows, columns: config.columns, values: config.values,
-        filters: mergeProjectFilters(projectFiltersRef.current, config.filters), grand_total: config.grand_total,
-        grand_total_rows: config.grand_total_rows, grand_total_columns: config.grand_total_columns,
-        subtotals: config.subtotals, subtotal_pct_base: config.subtotal_pct_base,
-        missing_data: config.missing_data,
-        sort_by: config.sort_by, sort_order: config.sort_order,
-        multi_sort: config.multi_sort,
-        date_groupings: config.date_groupings,
-        blank_suppress: config.blank_suppress,
-      });
-      setLoadingMsg('');
-      setResults(prev => {
-        const next = new Map(prev);
-        next.set(config.id, res);
-        // Check for orphaned annotations after new result
-        const tableAnns = annotationsMap[config.id];
-        if (tableAnns && tableAnns.length > 0) {
-          const orphaned = tableAnns.filter(
-            a => a.rowIdx >= res.rows.length || a.colIdx >= res.headers.length
-          );
-          if (orphaned.length > 0) {
-            const tableName = tables.find(t => t.id === config.id)?.name || config.id;
-            setOrphanedAnnotations(orphaned.map(ann => ({
-              tableId: config.id,
-              tableName,
-              annotation: ann as any,
-              action: 'keep' as const,
-            })));
-          }
-        }
-        return next;
-      });
+      await runTabulationCore(config);
     } catch (e: any) {
       setError(e.message || 'Tabulation failed');
     } finally { setLoading(false); setLoadingMsg(''); }
-  }, [dataset, annotationsMap, tables]);
+  }, [runTabulationCore]);
 
   const updateTable = useCallback((update: Partial<TableConfig>) => {
     pushUndo();
@@ -609,12 +614,17 @@ export default function App() {
         setTables(data.tables);
         setActiveTableIdx(0);
         setResults(new Map());
-        setTimeout(() => data.tables.forEach((t: TableConfig) => { if (t.values.length > 0) runTabulation(t); }), 100);
+        const toRun = data.tables.filter((t: TableConfig) => t.values.length > 0);
+        const BATCH = 5;
+        for (let i = 0; i < toRun.length; i += BATCH) {
+          setLoadingMsg(`Generating tables ${i + 1}–${Math.min(i + BATCH, toRun.length)} of ${toRun.length}…`);
+          await Promise.all(toRun.slice(i, i + BATCH).map((t: TableConfig) => runTabulationCore(t).catch(() => {})));
+        }
       }
     } catch (e: any) {
       setError(e.message || 'Failed to load project');
     } finally { setLoading(false); setLoadingMsg(''); }
-  }, [allColumns, pushUndo, runTabulation]);
+  }, [allColumns, pushUndo, runTabulationCore]);
 
   const handleReorderTables = useCallback((fromIdx: number, toIdx: number) => {
     if (fromIdx === toIdx) return;
@@ -738,13 +748,22 @@ export default function App() {
         setResults(new Map());
         setShowDataPreview(false);
         setLastProjectHint(null);
-        // Re-run all tabulations
-        setTimeout(() => data.tables.forEach((t: TableConfig) => { if (t.values.length > 0) runTabulation(t); }), 100);
+        // Run tabulations in batches to avoid flooding backend
+        const toRun = data.tables.filter((t: TableConfig) => t.values.length > 0);
+        if (toRun.length > 0) {
+          setLoading(true);
+          const BATCH = 5;
+          for (let i = 0; i < toRun.length; i += BATCH) {
+            setLoadingMsg(`Generating tables ${i + 1}–${Math.min(i + BATCH, toRun.length)} of ${toRun.length}…`);
+            await Promise.all(toRun.slice(i, i + BATCH).map((t: TableConfig) => runTabulationCore(t).catch(() => {})));
+          }
+          setLoading(false); setLoadingMsg('');
+        }
       }
     } catch (e: any) {
       setError(e.message || 'Failed to apply project');
     }
-  }, [allColumns, pushUndo, runTabulation]);
+  }, [allColumns, pushUndo, runTabulationCore]);
 
   const handleDataRefresh = useCallback(async () => {
     if (!dataset) return;
