@@ -175,9 +175,8 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
       const data = await res.json();
       setResultMsg(data.message);
 
-      // Trigger browser download
       if (data.download_filename) {
-        triggerDownload(`${API_BASE}/export/download/${data.download_filename}`, data.download_filename);
+        await triggerDownload(`${API_BASE}/export/download/${data.download_filename}`, data.download_filename);
       }
     } catch (e: any) {
       setError(e.message || 'Export failed');
@@ -248,12 +247,10 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
       const xlsxData = xlsxRes.ok ? await xlsxRes.json() : null;
       const docxData = docxRes.ok ? await docxRes.json() : null;
       if (xlsxData?.download_filename) {
-        triggerDownload(`${API_BASE}/export/download/${xlsxData.download_filename}`, xlsxData.download_filename);
+        await triggerDownload(`${API_BASE}/export/download/${xlsxData.download_filename}`, xlsxData.download_filename);
       }
       if (docxData?.download_filename) {
-        // Small delay to ensure first download starts before triggering second
-        await new Promise(r => setTimeout(r, 100));
-        triggerDownload(`${API_BASE}/export/download/${docxData.download_filename}`, docxData.download_filename);
+        await triggerDownload(`${API_BASE}/export/download/${docxData.download_filename}`, docxData.download_filename);
       }
       setResultMsg('Batch export complete: Excel + Word downloaded');
     } catch (e: any) {
@@ -470,11 +467,20 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
   );
 }
 
-function triggerDownload(url: string, filename: string) {
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+async function triggerDownload(url: string, filename: string) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+  } catch {
+    window.open(url, '_blank');
+  }
 }

@@ -328,19 +328,85 @@ async def export_word(config: ExportConfig):
         if not headers:
             continue
 
-        table = doc.add_table(rows=1 + len(formatted_rows or rows), cols=len(headers))
+        column_groups = t.get("column_groups")
+        has_multi_header = column_groups and column_groups.get("has_multi_level")
+        header_rows_count = 2 if has_multi_header else 1
+
+        table = doc.add_table(rows=header_rows_count + len(formatted_rows or rows), cols=len(headers))
         table.style = "Table Grid"
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
-        for ci, h in enumerate(headers):
-            cell = table.rows[0].cells[ci]
-            cell.text = str(h)
-            p = cell.paragraphs[0]
-            p.alignment = align_map.get(header_align, WD_ALIGN_PARAGRAPH.CENTER)
-            run = p.runs[0] if p.runs else p.add_run(str(h))
-            run.bold = True
-            run.font.size = Pt(9)
-            run.font.name = "Segoe UI"
+        if has_multi_header:
+            top_groups = column_groups["top"]
+            bottom_labels = column_groups["bottom"]
+            # Row 0: top-level merged headers
+            # Row-dimension columns get vertical merge (span both rows)
+            for ci in range(num_row_fields):
+                top_cell = table.rows[0].cells[ci]
+                bot_cell = table.rows[1].cells[ci]
+                top_cell.merge(bot_cell)
+                top_cell.text = str(headers[ci])
+                p = top_cell.paragraphs[0]
+                p.alignment = align_map.get(header_align, WD_ALIGN_PARAGRAPH.CENTER)
+                run = p.runs[0] if p.runs else p.add_run(str(headers[ci]))
+                run.bold = True
+                run.font.size = Pt(9)
+                run.font.name = "Segoe UI"
+
+            # Column groups: merge horizontally in row 0
+            for grp in top_groups:
+                col_start = grp["colstart"] + num_row_fields
+                colspan = grp["colspan"]
+                if col_start >= len(headers):
+                    continue
+                if colspan == 1:
+                    # Single column group: vertical merge
+                    top_cell = table.rows[0].cells[col_start]
+                    bot_cell = table.rows[1].cells[col_start]
+                    top_cell.merge(bot_cell)
+                    top_cell.text = str(grp["label"])
+                    p = top_cell.paragraphs[0]
+                    p.alignment = align_map.get(header_align, WD_ALIGN_PARAGRAPH.CENTER)
+                    run = p.runs[0] if p.runs else p.add_run(str(grp["label"]))
+                    run.bold = True
+                    run.font.size = Pt(9)
+                    run.font.name = "Segoe UI"
+                else:
+                    # Multi-column group: horizontal merge in row 0
+                    end_col = min(col_start + colspan - 1, len(headers) - 1)
+                    top_cell = table.rows[0].cells[col_start]
+                    top_cell.merge(table.rows[0].cells[end_col])
+                    top_cell.text = str(grp["label"])
+                    p = top_cell.paragraphs[0]
+                    p.alignment = align_map.get(header_align, WD_ALIGN_PARAGRAPH.CENTER)
+                    run = p.runs[0] if p.runs else p.add_run(str(grp["label"]))
+                    run.bold = True
+                    run.font.size = Pt(9)
+                    run.font.name = "Segoe UI"
+
+            # Row 1: bottom-level labels for multi-span groups
+            for bi, blabel in enumerate(bottom_labels):
+                ci = bi + num_row_fields
+                if ci >= len(headers):
+                    break
+                cell = table.rows[1].cells[ci]
+                cell.text = str(blabel)
+                p = cell.paragraphs[0]
+                p.alignment = align_map.get(header_align, WD_ALIGN_PARAGRAPH.CENTER)
+                run = p.runs[0] if p.runs else p.add_run(str(blabel))
+                run.bold = True
+                run.font.size = Pt(9)
+                run.font.name = "Segoe UI"
+        else:
+            for ci, h in enumerate(headers):
+                cell = table.rows[0].cells[ci]
+                cell.text = str(h)
+                p = cell.paragraphs[0]
+                p.alignment = align_map.get(header_align, WD_ALIGN_PARAGRAPH.CENTER)
+                run = p.runs[0] if p.runs else p.add_run(str(h))
+                run.bold = True
+                run.font.size = Pt(9)
+                run.font.name = "Segoe UI"
 
         ann_lookup = {}
         ann_list = []
@@ -356,7 +422,7 @@ async def export_word(config: ExportConfig):
             is_grand, is_sub = _is_total_row(raw_row)
 
             for ci in range(len(headers)):
-                cell = table.rows[ri + 1].cells[ci]
+                cell = table.rows[ri + header_rows_count].cells[ci]
                 if fmt_row and ci < len(fmt_row):
                     display = fmt_row[ci]
                 elif ci < len(raw_row):
