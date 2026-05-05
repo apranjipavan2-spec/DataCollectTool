@@ -760,6 +760,39 @@ async def tabulate(config: TableConfig):
                     if grand != 0:
                         for c in numeric_cols:
                             pivot_df[c] = (pivot_df[c] / grand * 100).round(decimal_places)
+                elif sa == "pct_parent_row":
+                    # Each cell as % of its column-group subtotal (row-wise)
+                    subtotal_cols = [c for c in numeric_cols if _is_subtotal_col(c)]
+                    if subtotal_cols:
+                        col_to_subtotal = {}
+                        for sc in subtotal_cols:
+                            prefix = str(sc).split(" | Subtotal")[0].strip()
+                            for dc in data_cols:
+                                if str(dc).startswith(prefix + " |") or str(dc) == prefix:
+                                    col_to_subtotal[dc] = sc
+                        for c in data_cols:
+                            if c in col_to_subtotal:
+                                pivot_df[c] = (pivot_df[c] / pivot_df[col_to_subtotal[c]].replace(0, np.nan) * 100).round(decimal_places)
+                        for sc in subtotal_cols:
+                            pivot_df[sc] = 100.0
+                    else:
+                        # Fallback: same as pct_row
+                        row_sums = pivot_df[data_cols].sum(axis=1) if data_cols else pivot_df[numeric_cols].sum(axis=1)
+                        for c in numeric_cols:
+                            pivot_df[c] = (pivot_df[c] / row_sums.replace(0, np.nan) * 100).round(decimal_places)
+                elif sa == "pct_parent_col":
+                    # Each cell as % of its row-group parent total (column-wise)
+                    if len(rows) > 1 and rows[0] in pivot_df.columns:
+                        parent_col = rows[0]
+                        for c in data_cols:
+                            parent_sums = pivot_df.groupby(parent_col)[c].transform("sum")
+                            pivot_df[c] = (pivot_df[c] / parent_sums.replace(0, np.nan) * 100).round(decimal_places)
+                    else:
+                        # Fallback: same as pct_col
+                        for c in data_cols:
+                            col_sum = pivot_df[c].sum()
+                            if col_sum != 0:
+                                pivot_df[c] = (pivot_df[c] / col_sum * 100).round(decimal_places)
                 return pivot_df
 
             if combo_show_as and combo_show_as != "normal":

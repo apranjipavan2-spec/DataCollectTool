@@ -58,6 +58,7 @@ export async function tabulate(config: {
   grand_total_rows?: boolean;
   grand_total_columns?: boolean;
   subtotals: boolean;
+  subtotal_pct_base?: string;
   missing_data: string;
   sort_by?: string;
   sort_order?: string;
