@@ -55,26 +55,19 @@ app.include_router(ai.router)
 app.include_router(fieldgovern.router)
 app.include_router(files.router)
 
-<<<<<<< HEAD
-
-# Serve Frontend (production)
-=======
 # Serve frontend static files (production)
->>>>>>> b2b3041 (feat: multi-row Word export headers, percentage base option, fix missing route files)
 STATIC_DIR = BASE_DIR / "static"
 if STATIC_DIR.exists() and (STATIC_DIR / "assets").exists():
     app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")
 
-<<<<<<< HEAD
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         file_path = STATIC_DIR / full_path
         if file_path.is_file():
             return FileResponse(file_path)
         return FileResponse(STATIC_DIR / "index.html")
-=======
+
 # Health check endpoint
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
->>>>>>> b2b3041 (feat: multi-row Word export headers, percentage base option, fix missing route files)
