@@ -1269,6 +1269,7 @@ export default function App() {
         onOpenLibrary={() => setModal('metric_library')} columnDescriptions={columnDescriptions} />}
       {modal === 'export' && <ExportDialog datasetId={dataset.dataset_id} tables={tables} results={results}
         annotationsMap={annotationsMap}
+        interpretationsMap={tableInterpretations}
         onClose={() => setModal(null)} />}
       {modal === 'quality' && <DataQualityPanel datasetId={dataset.dataset_id} onClose={() => setModal(null)}
         onDataChanged={() => {

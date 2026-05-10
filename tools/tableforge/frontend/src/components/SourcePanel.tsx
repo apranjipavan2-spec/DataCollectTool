@@ -112,15 +112,24 @@ export function SourcePanel({
   const [tableDragIdx, setTableDragIdx] = useState<number | null>(null);
   const [tableDragOverIdx, setTableDragOverIdx] = useState<number | null>(null);
 
+  const [colNumSearch, setColNumSearch] = useState('');
+
+  // Map column name → 1-based index (original import order)
+  const colNumMap = new Map<string, number>();
+  columns.forEach((c, i) => { colNumMap.set(c.name, i + 1); });
+
   const usedSet = new Set([
     ...(usedColumns?.rows || []),
     ...(usedColumns?.columns || []),
     ...(usedColumns?.values || []),
   ]);
 
-  const filtered = columns.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = columns.filter(c => {
+    const num = colNumMap.get(c.name) || 0;
+    const matchesName = !search || c.name.toLowerCase().includes(search.toLowerCase());
+    const matchesNum = !colNumSearch || String(num) === colNumSearch.trim() || String(num).startsWith(colNumSearch.trim());
+    return matchesName && matchesNum;
+  });
 
   // Separate used vs available columns
   const usedCols = filtered.filter(c => usedSet.has(c.name));
@@ -176,6 +185,9 @@ export function SourcePanel({
         onMouseLeave={() => setHoveredCol(null)}
       >
         <span className="col-type-indicator" style={{ background: typeColors[col.type] }} />
+        <span className="col-num" style={{ fontSize: 9, opacity: 0.5, minWidth: 20, marginRight: 2, fontVariantNumeric: 'tabular-nums' }}>
+          {colNumMap.get(col.name)}
+        </span>
         <span className="col-name">
           <HighlightText text={col.name} search={search} />
         </span>
@@ -401,13 +413,25 @@ export function SourcePanel({
     <>
       <div className="panel-header">
         <h3>Source Columns</h3>
-        <input
-          type="text"
-          placeholder="Search columns..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="search-input"
-        />
+        <div style={{ display: 'flex', gap: 4 }}>
+          <input
+            type="text"
+            placeholder="Search columns..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="search-input"
+            style={{ flex: 1 }}
+          />
+          <input
+            type="text"
+            placeholder="Col #"
+            value={colNumSearch}
+            onChange={e => setColNumSearch(e.target.value.replace(/[^0-9]/g, ''))}
+            className="search-input"
+            style={{ width: 48, textAlign: 'center', fontSize: 11 }}
+            title="Search by column number"
+          />
+        </div>
       </div>
       <div className="panel-hint">Drag to zones · Ctrl+Click to multi-select</div>
 

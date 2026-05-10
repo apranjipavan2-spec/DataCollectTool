@@ -122,6 +122,25 @@ async def export_excel(config: ExportConfig):
         total_font = Font(name="Segoe UI", size=10, bold=True)
         subtotal_fill = PatternFill(start_color="f0f4f8", end_color="f0f4f8", fill_type="solid")
 
+        # Per-column header format overrides
+        hdr_formats_list = t.get("header_formats") or []
+        hdr_fmt_map = {hf.get("field", ""): hf for hf in hdr_formats_list}
+
+        def _get_header_font_fill(col_name):
+            """Return (font, fill) for a header cell, applying per-column overrides."""
+            fmt = hdr_fmt_map.get(col_name)
+            if not fmt:
+                return header_font, header_fill
+            f_name = fmt.get("font") or "Segoe UI"
+            f_size = fmt.get("size") or 11
+            f_bold = fmt.get("bold") if fmt.get("bold") is not None else True
+            f_italic = fmt.get("italic") or False
+            f_color = (fmt.get("color") or header_tc or "FFFFFF").lstrip("#")
+            f_bg = (fmt.get("backgroundColor") or header_bg or "1e293b").lstrip("#")
+            font = Font(name=f_name, size=f_size, bold=f_bold, italic=f_italic, color=f_color)
+            fill = PatternFill(start_color=f_bg, end_color=f_bg, fill_type="solid")
+            return font, fill
+
         row_offset = 1
         if title:
             ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=max(len(headers), 1))
@@ -137,12 +156,53 @@ async def export_excel(config: ExportConfig):
         if title or subtitle:
             row_offset += 1
 
-        for ci, h in enumerate(headers, 1):
-            cell = ws.cell(row=row_offset, column=ci, value=h)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = Alignment(horizontal=header_align, vertical="center", wrap_text=True)
-            cell.border = thin_border
+        column_groups = t.get("column_groups")
+        has_multi_level = column_groups and column_groups.get("has_multi_level")
+
+        if has_multi_level:
+            top_groups = column_groups["top"]
+            bottom_labels = column_groups.get("bottom", [])
+            # Row-dimension columns: merge across 2 rows
+            for ci in range(1, num_row_fields + 1):
+                ws.merge_cells(start_row=row_offset, start_column=ci, end_row=row_offset + 1, end_column=ci)
+                col_name = headers[ci - 1]
+                hf, hfl = _get_header_font_fill(col_name)
+                cell = ws.cell(row=row_offset, column=ci, value=col_name)
+                cell.font = hf
+                cell.fill = hfl
+                cell.alignment = Alignment(horizontal=header_align, vertical="center", wrap_text=True)
+                cell.border = thin_border
+            # Top-level group headers
+            col_cursor = num_row_fields + 1
+            for g in top_groups:
+                colspan = g.get("colspan", 1)
+                if colspan > 1:
+                    ws.merge_cells(start_row=row_offset, start_column=col_cursor, end_row=row_offset, end_column=col_cursor + colspan - 1)
+                cell = ws.cell(row=row_offset, column=col_cursor, value=g.get("label", ""))
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                cell.border = thin_border
+                col_cursor += colspan
+            # Bottom-level sub-headers
+            for bi, label in enumerate(bottom_labels):
+                ci = num_row_fields + 1 + bi
+                col_name = headers[num_row_fields + bi] if (num_row_fields + bi) < len(headers) else label
+                hf, hfl = _get_header_font_fill(col_name)
+                cell = ws.cell(row=row_offset + 1, column=ci, value=label)
+                cell.font = hf
+                cell.fill = hfl
+                cell.alignment = Alignment(horizontal=header_align, vertical="center", wrap_text=True)
+                cell.border = thin_border
+            row_offset += 1  # extra header row
+        else:
+            for ci, h in enumerate(headers, 1):
+                hf, hfl = _get_header_font_fill(h)
+                cell = ws.cell(row=row_offset, column=ci, value=h)
+                cell.font = hf
+                cell.fill = hfl
+                cell.alignment = Alignment(horizontal=header_align, vertical="center", wrap_text=True)
+                cell.border = thin_border
 
         ann_lookup = {}
         for ann in t.get("annotations", []):
@@ -320,6 +380,10 @@ async def export_word(config: ExportConfig):
 
         align_map = {"left": WD_ALIGN_PARAGRAPH.LEFT, "center": WD_ALIGN_PARAGRAPH.CENTER, "right": WD_ALIGN_PARAGRAPH.RIGHT}
 
+        # Per-column header format overrides for Word
+        hdr_formats_list = t.get("header_formats") or []
+        hdr_fmt_map = {hf.get("field", ""): hf for hf in hdr_formats_list}
+
         p = doc.add_heading(title, level=2)
         if subtitle:
             p = doc.add_paragraph(subtitle)
@@ -330,88 +394,55 @@ async def export_word(config: ExportConfig):
             continue
 
         column_groups = t.get("column_groups")
-        has_multi_header = column_groups and column_groups.get("has_multi_level")
-        header_rows_count = 2 if has_multi_header else 1
+        has_multi_level = column_groups and column_groups.get("has_multi_level")
+        header_row_count = 2 if has_multi_level else 1
 
-        table = doc.add_table(rows=header_rows_count + len(formatted_rows or rows), cols=len(headers))
+        table = doc.add_table(rows=header_row_count + len(formatted_rows or rows), cols=len(headers))
         table.style = "Table Grid"
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
-        if has_multi_header:
+        def _style_header_cell(cell, text, align=header_align, col_name=None):
+            cell.text = str(text)
+            p = cell.paragraphs[0]
+            p.alignment = align_map.get(align, WD_ALIGN_PARAGRAPH.CENTER)
+            run = p.runs[0] if p.runs else p.add_run(str(text))
+            fmt = hdr_fmt_map.get(col_name) if col_name else None
+            if fmt:
+                run.bold = fmt.get("bold", True)
+                run.italic = fmt.get("italic", False)
+                run.font.size = Pt(fmt.get("size", 9))
+                run.font.name = fmt.get("font", "Segoe UI")
+                if fmt.get("color"):
+                    c = fmt["color"].lstrip("#")
+                    run.font.color.rgb = RGBColor(int(c[:2], 16), int(c[2:4], 16), int(c[4:6], 16))
+            else:
+                run.bold = True
+                run.font.size = Pt(9)
+                run.font.name = "Segoe UI"
+
+        if has_multi_level:
             top_groups = column_groups["top"]
-            bottom_labels = column_groups["bottom"]
-            # Row 0: top-level merged headers
-            # Row-dimension columns get vertical merge (span both rows)
+            bottom_labels = column_groups.get("bottom", [])
             for ci in range(num_row_fields):
-                top_cell = table.rows[0].cells[ci]
-                bot_cell = table.rows[1].cells[ci]
-                top_cell.merge(bot_cell)
-                top_cell.text = str(headers[ci])
-                p = top_cell.paragraphs[0]
-                p.alignment = align_map.get(header_align, WD_ALIGN_PARAGRAPH.CENTER)
-                run = p.runs[0] if p.runs else p.add_run(str(headers[ci]))
-                run.bold = True
-                run.font.size = Pt(9)
-                run.font.name = "Segoe UI"
+                table.rows[0].cells[ci].merge(table.rows[1].cells[ci])
+                _style_header_cell(table.rows[0].cells[ci], headers[ci], col_name=headers[ci])
 
-            # Column groups: merge horizontally in row 0
-            for grp in top_groups:
-                col_start = grp["colstart"] + num_row_fields
-                colspan = grp["colspan"]
-                if col_start >= len(headers):
-                    continue
-                if colspan == 1:
-                    # Single column group: vertical merge
-                    top_cell = table.rows[0].cells[col_start]
-                    bot_cell = table.rows[1].cells[col_start]
-                    top_cell.merge(bot_cell)
-                    top_cell.text = str(grp["label"])
-                    p = top_cell.paragraphs[0]
-                    p.alignment = align_map.get(header_align, WD_ALIGN_PARAGRAPH.CENTER)
-                    run = p.runs[0] if p.runs else p.add_run(str(grp["label"]))
-                    run.bold = True
-                    run.font.size = Pt(9)
-                    run.font.name = "Segoe UI"
-                else:
-                    # Multi-column group: horizontal merge in row 0
-                    end_col = min(col_start + colspan - 1, len(headers) - 1)
-                    top_cell = table.rows[0].cells[col_start]
-                    top_cell.merge(table.rows[0].cells[end_col])
-                    top_cell.text = str(grp["label"])
-                    p = top_cell.paragraphs[0]
-                    p.alignment = align_map.get(header_align, WD_ALIGN_PARAGRAPH.CENTER)
-                    run = p.runs[0] if p.runs else p.add_run(str(grp["label"]))
-                    run.bold = True
-                    run.font.size = Pt(9)
-                    run.font.name = "Segoe UI"
+            col_cursor = num_row_fields
+            for g in top_groups:
+                colspan = g.get("colspan", 1)
+                if colspan > 1:
+                    table.rows[0].cells[col_cursor].merge(table.rows[0].cells[col_cursor + colspan - 1])
+                _style_header_cell(table.rows[0].cells[col_cursor], g.get("label", ""), "center")
+                col_cursor += colspan
 
-            # Row 1: bottom-level labels (skip cells already vertically merged)
-            merged_cols = set()
-            for grp in top_groups:
-                if grp["colspan"] == 1:
-                    merged_cols.add(grp["colstart"] + num_row_fields)
-            for bi, blabel in enumerate(bottom_labels):
-                ci = bi + num_row_fields
-                if ci >= len(headers) or ci in merged_cols:
-                    continue
-                cell = table.rows[1].cells[ci]
-                cell.text = str(blabel)
-                p = cell.paragraphs[0]
-                p.alignment = align_map.get(header_align, WD_ALIGN_PARAGRAPH.CENTER)
-                run = p.runs[0] if p.runs else p.add_run(str(blabel))
-                run.bold = True
-                run.font.size = Pt(9)
-                run.font.name = "Segoe UI"
+            for bi, label in enumerate(bottom_labels):
+                ci = num_row_fields + bi
+                if ci < len(headers):
+                    col_name = headers[ci] if ci < len(headers) else label
+                    _style_header_cell(table.rows[1].cells[ci], label, col_name=col_name)
         else:
             for ci, h in enumerate(headers):
-                cell = table.rows[0].cells[ci]
-                cell.text = str(h)
-                p = cell.paragraphs[0]
-                p.alignment = align_map.get(header_align, WD_ALIGN_PARAGRAPH.CENTER)
-                run = p.runs[0] if p.runs else p.add_run(str(h))
-                run.bold = True
-                run.font.size = Pt(9)
-                run.font.name = "Segoe UI"
+                _style_header_cell(table.rows[0].cells[ci], h, col_name=h)
 
         ann_lookup = {}
         ann_list = []
@@ -427,7 +458,7 @@ async def export_word(config: ExportConfig):
             is_grand, is_sub = _is_total_row(raw_row)
 
             for ci in range(len(headers)):
-                cell = table.rows[ri + header_rows_count].cells[ci]
+                cell = table.rows[ri + header_row_count].cells[ci]
                 if fmt_row and ci < len(fmt_row):
                     display = fmt_row[ci]
                 elif ci < len(raw_row):
@@ -468,6 +499,21 @@ async def export_word(config: ExportConfig):
                 fp.runs[0].font.size = Pt(8)
                 fp.runs[0].font.color.rgb = RGBColor(0x66, 0x66, 0x66)
 
+        interpretation = t.get("interpretation", "")
+        if interpretation:
+            doc.add_paragraph()
+            ip_heading = doc.add_paragraph()
+            ip_run = ip_heading.add_run("Interpretation")
+            ip_run.bold = True
+            ip_run.font.size = Pt(11)
+            ip_run.font.name = "Segoe UI"
+            ip_run.font.color.rgb = RGBColor(0x33, 0x33, 0x33)
+            ip = doc.add_paragraph(interpretation)
+            for run in ip.runs:
+                run.font.size = Pt(10)
+                run.font.name = "Georgia"
+                run.font.color.rgb = RGBColor(0x44, 0x44, 0x44)
+
     doc.save(output_path)
     fname = output_path.name
     return {"path": str(output_path), "message": f"Exported to {fname}", "download_filename": fname}
@@ -477,8 +523,30 @@ async def export_csv(config: ExportConfig):
     if config.tables:
         t = config.tables[0]
         output_path = EXPORTS_DIR / f"{config.filename}.csv"
-        df = pd.DataFrame(t.get("rows", []), columns=t.get("headers", []))
-        df.to_csv(output_path, index=False)
+        headers = t.get("headers", [])
+        rows = t.get("rows", [])
+        column_groups = t.get("column_groups")
+        has_multi_level = column_groups and column_groups.get("has_multi_level")
+        num_row_fields = t.get("num_row_fields", 1)
+
+        with open(output_path, "w", encoding="utf-8", newline="") as f:
+            import csv
+            writer = csv.writer(f)
+            if has_multi_level:
+                top_groups = column_groups["top"]
+                bottom_labels = column_groups.get("bottom", [])
+                top_row = list(headers[:num_row_fields])
+                for g in top_groups:
+                    top_row.append(g.get("label", ""))
+                    top_row.extend([""] * (g.get("colspan", 1) - 1))
+                writer.writerow(top_row)
+                bot_row = [""] * num_row_fields + bottom_labels
+                writer.writerow(bot_row)
+            else:
+                writer.writerow(headers)
+            for row in rows:
+                writer.writerow(row)
+
         fname = output_path.name
         return {"path": str(output_path), "message": f"Exported to {fname}", "download_filename": fname}
     raise HTTPException(400, "No tables to export")
@@ -533,10 +601,49 @@ async def export_pdf(config: ExportConfig):
         if subtitle: html_parts.append(f'<p class="subtitle">{subtitle}</p>')
         if not headers: continue
 
-        html_parts.append("<table><thead><tr>")
-        for h in headers:
-            html_parts.append(f'<th style="text-align:{header_align}">{h}</th>')
-        html_parts.append("</tr></thead><tbody>")
+        column_groups = t.get("column_groups")
+        has_multi_level = column_groups and column_groups.get("has_multi_level")
+
+        # Per-column header format overrides for PDF
+        hdr_formats_list = t.get("header_formats") or []
+        hdr_fmt_map = {hf.get("field", ""): hf for hf in hdr_formats_list}
+
+        def _th_style(col_name, align=header_align):
+            fmt = hdr_fmt_map.get(col_name)
+            parts = [f"text-align:{align}"]
+            if fmt:
+                if fmt.get("font"): parts.append(f"font-family:{fmt['font']}")
+                if fmt.get("size"): parts.append(f"font-size:{fmt['size']}px")
+                if fmt.get("bold") is False: parts.append("font-weight:normal")
+                if fmt.get("italic"): parts.append("font-style:italic")
+                if fmt.get("color"): parts.append(f"color:{fmt['color']}")
+                if fmt.get("backgroundColor"): parts.append(f"background:{fmt['backgroundColor']}")
+            return ";".join(parts)
+
+        html_parts.append("<table><thead>")
+        if has_multi_level:
+            top_groups = column_groups["top"]
+            bottom_labels = column_groups.get("bottom", [])
+            html_parts.append("<tr>")
+            for ci in range(num_row_fields):
+                style = _th_style(headers[ci], header_align)
+                html_parts.append(f'<th rowspan="2" style="{style}">{headers[ci]}</th>')
+            for g in top_groups:
+                colspan = g.get("colspan", 1)
+                html_parts.append(f'<th colspan="{colspan}" style="text-align:center">{g.get("label", "")}</th>')
+            html_parts.append("</tr><tr>")
+            for bi, label in enumerate(bottom_labels):
+                col_name = headers[num_row_fields + bi] if (num_row_fields + bi) < len(headers) else label
+                style = _th_style(col_name, header_align)
+                html_parts.append(f'<th style="{style}">{label}</th>')
+            html_parts.append("</tr>")
+        else:
+            html_parts.append("<tr>")
+            for h in headers:
+                style = _th_style(h, header_align)
+                html_parts.append(f'<th style="{style}">{h}</th>')
+            html_parts.append("</tr>")
+        html_parts.append("</thead><tbody>")
 
         for ri, row in enumerate(rows):
             is_grand, is_sub = _is_total_row(row)
@@ -566,6 +673,10 @@ async def export_pdf(config: ExportConfig):
 
         html_parts.append("</tbody></table>")
         if footnote: html_parts.append(f'<p class="footnote">{footnote}</p>')
+        interpretation = t.get("interpretation", "")
+        if interpretation:
+            html_parts.append(f'<p style="margin-top:12px;"><strong>Interpretation</strong></p>')
+            html_parts.append(f'<p style="font-family:Georgia,serif;font-size:11px;color:#444;line-height:1.6;">{interpretation}</p>')
 
     if opts.get("footer_text"):
         html_parts.append(f'<div style="text-align:center;color:#999;margin-top:20px;font-size:10px">{opts["footer_text"]}</div>')

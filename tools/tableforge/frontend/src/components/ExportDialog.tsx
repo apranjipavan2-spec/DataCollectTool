@@ -69,6 +69,7 @@ interface Props {
   tables: TableConfig[];
   results: Map<string, TableResult>;
   annotationsMap?: Record<string, { rowIdx: number; colIdx: number; text: string; color: string }[]>;
+  interpretationsMap?: Record<string, string>;
   onClose: () => void;
 }
 
@@ -84,8 +85,8 @@ interface ExportOptions {
   formula_export: boolean;
 }
 
-export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, onClose }: Props) {
-  const [format, setFormat] = useState('xlsx');
+export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, interpretationsMap = {}, onClose }: Props) {
+  const [format, setFormat] = useState('docx');
   const [filename, setFilename] = useState('TableForge_Export');
   const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set(tables.map(t => t.id)));
   const [exporting, setExporting] = useState(false);
@@ -117,6 +118,19 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
           const renames = t.header_renames || {};
           const displayHeaders = res.headers.map(h => renames[h] || h);
           const fmtRows = buildFormattedRows(t, res);
+          const nRowCols = (t.rows?.length || 0) + (t.serial_number ? 1 : 0);
+          const cg = res.column_groups;
+          const columnGroups = cg?.has_multi_level ? {
+            top: cg.top.map(g => ({
+              label: g.label,
+              colspan: g.colspan,
+            })),
+            bottom: cg.bottom.map((b, i) => {
+              const origH = res.headers[i + (t.rows?.length || 0)];
+              return origH ? (renames[origH] || b) : b;
+            }),
+            has_multi_level: true,
+          } : undefined;
           return {
             name: t.name,
             headers: t.serial_number ? ['S.No', ...displayHeaders] : displayHeaders,
@@ -129,8 +143,9 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
             formatted_rows: fmtRows,
             title: t.title, subtitle: t.subtitle, footnote: t.footnote,
             annotations: annotationsMap[t.id] || [],
-            column_groups: res?.column_groups || null,
-            num_row_fields: (t.rows?.length || 0) + (t.serial_number ? 1 : 0),
+            interpretation: interpretationsMap[t.id] || '',
+            num_row_fields: nRowCols,
+            column_groups: columnGroups,
             cell_align: t.cell_align || 'right',
             header_align: t.header_align || 'center',
             row_label_align: t.row_label_align || 'left',
@@ -195,6 +210,16 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
         const renames = t.header_renames || {};
         const displayHeaders = res.headers.map(h => renames[h] || h);
         const fmtRows = buildFormattedRows(t, res);
+        const nRowCols = (t.rows?.length || 0) + (t.serial_number ? 1 : 0);
+        const cg = res.column_groups;
+        const columnGroups = cg?.has_multi_level ? {
+          top: cg.top.map(g => ({ label: g.label, colspan: g.colspan })),
+          bottom: cg.bottom.map((b, i) => {
+            const origH = res.headers[i + (t.rows?.length || 0)];
+            return origH ? (renames[origH] || b) : b;
+          }),
+          has_multi_level: true,
+        } : undefined;
         return {
           name: t.name,
           headers: t.serial_number ? ['S.No', ...displayHeaders] : displayHeaders,
@@ -208,8 +233,9 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
           title: t.title, subtitle: t.subtitle, footnote: t.footnote,
           header_renames: t.header_renames,
           annotations: annotationsMap[t.id] || [],
-          column_groups: res?.column_groups || null,
-          num_row_fields: (t.rows?.length || 0) + (t.serial_number ? 1 : 0),
+          interpretation: interpretationsMap[t.id] || '',
+          num_row_fields: nRowCols,
+          column_groups: columnGroups,
           cell_align: t.cell_align || 'right',
           header_align: t.header_align || 'center',
           row_label_align: t.row_label_align || 'left',
@@ -271,24 +297,91 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
       const dispHeaders = res.headers.map(h => renames[h] || h);
       const fmtRows = buildFormattedRows(t, res);
       const allHeaders = t.serial_number ? ['S.No', ...dispHeaders] : dispHeaders;
+      const nRowCols = (t.rows?.length || 0) + (t.serial_number ? 1 : 0);
+      const cg = res.column_groups;
+      const hasMultiLevel = cg?.has_multi_level;
 
       // Plain text version
-      const lines = [
-        ...(t.title ? [t.title] : []),
-        allHeaders.join('\t'),
-        ...fmtRows.map(row => row.join('\t')),
-      ];
+      const lines: string[] = [];
+      if (t.title) lines.push(t.title);
+      if (t.subtitle) lines.push(t.subtitle);
+      if (hasMultiLevel) {
+        const topRow: string[] = [];
+        for (let i = 0; i < nRowCols; i++) topRow.push(allHeaders[i]);
+        for (const g of cg!.top) {
+          topRow.push(g.label);
+          for (let s = 1; s < g.colspan; s++) topRow.push('');
+        }
+        lines.push(topRow.join('\t'));
+        const botRow: string[] = [];
+        for (let i = 0; i < nRowCols; i++) botRow.push('');
+        const bottomLabels = cg!.bottom.map((b: string, i: number) => {
+          const origH = res.headers[i + (t.rows?.length || 0)];
+          return origH ? (renames[origH] || b) : b;
+        });
+        botRow.push(...bottomLabels);
+        lines.push(botRow.join('\t'));
+      } else {
+        lines.push(allHeaders.join('\t'));
+      }
+      lines.push(...fmtRows.map(row => row.join('\t')));
       textParts.push(lines.join('\n'));
 
       // HTML version for rich paste into Word/Excel
+      const headerFormats = t.header_formats || [];
+      const hdrFmtMap: Record<string, any> = {};
+      for (const hf of headerFormats) { if (hf.field) hdrFmtMap[hf.field] = hf; }
+      const headerBg = t.header_bg_color || '#1e293b';
+      const headerColor = t.header_text_color || '#fff';
+      const hdrAlign = t.header_align || 'center';
+      const cellAlign = t.cell_align || 'right';
+      const rowLabelAlign = t.row_label_align || 'left';
+
+      function thStyle(colName: string, align = hdrAlign) {
+        const fmt = hdrFmtMap[colName];
+        let s = `background:${fmt?.backgroundColor || headerBg};color:${fmt?.color || headerColor};padding:6px 10px;text-align:${align};`;
+        if (fmt?.font) s += `font-family:${fmt.font};`;
+        if (fmt?.size) s += `font-size:${fmt.size}px;`;
+        if (fmt?.bold === false) s += 'font-weight:normal;';
+        if (fmt?.italic) s += 'font-style:italic;';
+        return s;
+      }
+
       let html = '';
       if (t.title) html += `<h3>${t.title}</h3>`;
+      if (t.subtitle) html += `<p style="color:#666;font-size:11px;">${t.subtitle}</p>`;
       html += '<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">';
-      html += '<thead><tr>' + allHeaders.map(h => `<th style="background:#1e293b;color:#fff;padding:6px 10px;">${h}</th>`).join('') + '</tr></thead>';
+      html += '<thead>';
+      if (hasMultiLevel) {
+        html += '<tr>';
+        for (let i = 0; i < nRowCols; i++) {
+          html += `<th rowspan="2" style="${thStyle(allHeaders[i], hdrAlign)};vertical-align:middle;">${allHeaders[i]}</th>`;
+        }
+        for (const g of cg!.top) {
+          html += `<th colspan="${g.colspan}" style="background:${headerBg};color:${headerColor};padding:6px 10px;text-align:center;">${g.label}</th>`;
+        }
+        html += '</tr><tr>';
+        const bottomLabels = cg!.bottom.map((b: string, i: number) => {
+          const origH = res.headers[i + (t.rows?.length || 0)];
+          return origH ? (renames[origH] || b) : b;
+        });
+        for (let i = 0; i < bottomLabels.length; i++) {
+          const colName = dispHeaders[(t.rows?.length || 0) + i] || bottomLabels[i];
+          html += `<th style="${thStyle(colName, hdrAlign)}">${bottomLabels[i]}</th>`;
+        }
+        html += '</tr>';
+      } else {
+        html += '<tr>' + allHeaders.map(h => `<th style="${thStyle(h, hdrAlign)}">${h}</th>`).join('') + '</tr>';
+      }
+      html += '</thead>';
       html += '<tbody>';
       fmtRows.forEach((row, ri) => {
-        const bg = ri % 2 === 1 ? ' style="background:#f8f9fa;"' : '';
-        html += `<tr${bg}>` + row.map(cell => `<td style="padding:4px 8px;">${cell}</td>`).join('') + '</tr>';
+        const bg = ri % 2 === 1 ? 'background:#f8f9fa;' : '';
+        html += `<tr>` + row.map((cell, ci) => {
+          const isValCol = ci >= nRowCols;
+          const align = isValCol ? cellAlign : rowLabelAlign;
+          return `<td style="padding:4px 8px;text-align:${align};${bg}">${cell}</td>`;
+        }).join('') + '</tr>';
       });
       html += '</tbody></table>';
       htmlParts.push(html);
@@ -313,8 +406,8 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
   };
 
   const formats = [
-    { value: 'xlsx', label: 'Excel (.xlsx)', icon: '📊' },
     { value: 'docx', label: 'Word (.docx)', icon: '📄' },
+    { value: 'xlsx', label: 'Excel (.xlsx)', icon: '📊' },
     { value: 'csv', label: 'CSV (.csv)', icon: '📋' },
     { value: 'pdf', label: 'PDF (.pdf)', icon: '📕' },
     { value: 'python', label: 'Python Script', icon: '🐍' },
