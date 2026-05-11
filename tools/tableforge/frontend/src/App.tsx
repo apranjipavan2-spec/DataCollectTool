@@ -90,6 +90,7 @@ export default function App() {
   const [metricNames, setMetricNames] = useState<string[]>([]);
   const [binNames, setBinNames] = useState<string[]>([]);
   const [columnDescriptions, setColumnDescriptions] = useState<Record<string, string>>({});
+  const [columnTypeOverrides, setColumnTypeOverrides] = useState<Record<string, string>>({});
   const [comparisonState, setComparisonState] = useState<any>(null);
   const [orphanedAnnotations, setOrphanedAnnotations] = useState<ReconcileAnnotation[] | null>(null);
   // tabContextMenu removed — tables now listed in SourcePanel sidebar
@@ -139,6 +140,17 @@ export default function App() {
       }
       if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
       if (data.comparisonState) setComparisonState(data.comparisonState);
+      if (data.columnTypeOverrides && dataset) {
+        const overrides = data.columnTypeOverrides as Record<string, string>;
+        setColumnTypeOverrides(overrides);
+        setDataset(prev => prev ? ({
+          ...prev,
+          columns: prev.columns.map(c => overrides[c.name] ? { ...c, type: overrides[c.name] as any } : c),
+        }) : prev);
+        Object.entries(overrides).forEach(([col, newType]) => {
+          changeColumnType(dataset.dataset_id, col, newType).catch(() => {});
+        });
+      }
       if (mismatches.length > 0) {
         setShowDataPreview(false);
         setReconcileState({ pendingTables: data.tables, mismatches, mapping: Object.fromEntries(mismatches.map(m => [m.field, m.suggestion])) });
@@ -170,7 +182,7 @@ export default function App() {
     if (autoSaveRef.current) clearInterval(autoSaveRef.current);
     autoSaveRef.current = setInterval(() => {
       if (tables.some(t => t.values.length > 0)) {
-        saveProject('__autosave__', { tables, annotationsMap, comparisonState, projectFilters, dataset_id: dataset?.dataset_id, source_file: dataset ? { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length } : undefined }).then(() => {
+        saveProject('__autosave__', { tables, annotationsMap, comparisonState, projectFilters, columnTypeOverrides, dataset_id: dataset?.dataset_id, source_file: dataset ? { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length } : undefined }).then(() => {
           // Update last save state and clear dirty flag
           lastSaveStateRef.current = JSON.stringify({ tables, annotationsMap, comparisonState });
           setIsDirty(false);
@@ -733,6 +745,17 @@ export default function App() {
 
       if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
       if (data.comparisonState) setComparisonState(data.comparisonState);
+      if (data.columnTypeOverrides && dataset) {
+        const overrides = data.columnTypeOverrides as Record<string, string>;
+        setColumnTypeOverrides(overrides);
+        setDataset(prev => prev ? ({
+          ...prev,
+          columns: prev.columns.map(c => overrides[c.name] ? { ...c, type: overrides[c.name] as any } : c),
+        }) : prev);
+        Object.entries(overrides).forEach(([col, newType]) => {
+          changeColumnType(dataset.dataset_id, col, newType).catch(() => {});
+        });
+      }
 
       if (mismatches.length > 0) {
         setShowDataPreview(false);
@@ -804,12 +827,11 @@ export default function App() {
     if (!dataset) return;
     try {
       await changeColumnType(dataset.dataset_id, column, newType);
-      // Update the column type in local dataset state so the UI reflects it immediately
       setDataset(prev => prev ? ({
         ...prev,
         columns: prev.columns.map(c => c.name === column ? { ...c, type: newType as any } : c),
       }) : prev);
-      // Re-run tabulation so the new type takes effect in the result
+      setColumnTypeOverrides(prev => ({ ...prev, [column]: newType }));
       const activeT = tables[activeTableIdx];
       if (activeT && activeT.values.length > 0) runTabulation(activeT);
     } catch (e: any) {
@@ -1321,7 +1343,7 @@ export default function App() {
           onApplyPolish={(title, subtitle, renames) => {
             const t = tables[activeTableIdx];
             if (t) {
-              const updated = { ...t, title, subtitle, header_renames: { ...(t.header_renames || {}), ...renames }, _autoTitle: false };
+              const updated = { ...t, title, subtitle, name: title || t.name, header_renames: { ...(t.header_renames || {}), ...renames }, _autoTitle: false };
               setTables(prev => prev.map(x => x.id === t.id ? updated : x));
             }
           }}
@@ -1329,7 +1351,7 @@ export default function App() {
             setTables(prev => prev.map(t => {
               const u = updates.find(u => u.tableId === t.id);
               if (!u) return t;
-              return { ...t, title: u.title, subtitle: u.subtitle, header_renames: { ...(t.header_renames || {}), ...u.renames }, _autoTitle: false };
+              return { ...t, title: u.title, subtitle: u.subtitle, name: u.title || t.name, header_renames: { ...(t.header_renames || {}), ...u.renames }, _autoTitle: false };
             }));
           }}
           onApplyInterpretation={(text) => {
@@ -1398,13 +1420,26 @@ export default function App() {
         />
       )}
       {modal === 'projects' && <ProjectManager currentTables={tables}
-        currentAnnotationsMap={annotationsMap} currentComparisonState={comparisonState} currentProjectFilters={projectFilters} currentFilename={dataset?.filename}
+        currentAnnotationsMap={annotationsMap} currentComparisonState={comparisonState} currentProjectFilters={projectFilters} currentColumnTypeOverrides={columnTypeOverrides} currentFilename={dataset?.filename}
         currentDatasetId={dataset?.dataset_id} currentRowCount={dataset?.row_count} currentColCount={dataset?.columns?.length}
         onLoad={(loadedTables, loadedAnnotations, loadedExtra) => {
           if (loadedAnnotations) setAnnotationsMap(loadedAnnotations);
           if (loadedExtra?.reportTemplate) setReportTemplate(loadedExtra.reportTemplate);
           if (loadedExtra?.comparisonState) setComparisonState(loadedExtra.comparisonState);
           if (loadedExtra?.projectFilters) setProjectFilters(loadedExtra.projectFilters);
+          if (loadedExtra?.columnTypeOverrides) {
+            const overrides = loadedExtra.columnTypeOverrides as Record<string, string>;
+            setColumnTypeOverrides(overrides);
+            if (dataset) {
+              setDataset(prev => prev ? ({
+                ...prev,
+                columns: prev.columns.map(c => overrides[c.name] ? { ...c, type: overrides[c.name] as any } : c),
+              }) : prev);
+              Object.entries(overrides).forEach(([col, newType]) => {
+                changeColumnType(dataset.dataset_id, col, newType).catch(() => {});
+              });
+            }
+          }
           // Migrate legacy global comparisonState into per-table comparisonConfig
           if (loadedExtra?.comparisonState && loadedTables.length > 0) {
             const legacy = loadedExtra.comparisonState;
@@ -1421,6 +1456,13 @@ export default function App() {
                 body: JSON.stringify(loadedExtra.source_file),
               }).then(r => r.ok ? r.json() : null).then(meta => {
                 if (meta) {
+                  const overrides = loadedExtra?.columnTypeOverrides as Record<string, string> | undefined;
+                  if (overrides && Object.keys(overrides).length > 0) {
+                    meta.columns = meta.columns.map((c: any) => overrides[c.name] ? { ...c, type: overrides[c.name] } : c);
+                    Object.entries(overrides).forEach(([col, newType]) => {
+                      changeColumnType(meta.dataset_id, col, newType).catch(() => {});
+                    });
+                  }
                   setDataset(meta);
                   pushUndo();
                   setTables(loadedTables);

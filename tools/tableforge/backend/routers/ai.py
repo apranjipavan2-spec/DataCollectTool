@@ -211,6 +211,18 @@ async def ai_polish_table(body: AIPolishRequest):
     is_cross_tab = len(body.columns) > 0
     sub_keys = body.columns
 
+    # Build full dataset column context for better title generation
+    all_dataset_columns = []
+    if body.dataset_id in datasets:
+        ds = datasets[body.dataset_id]
+        df = ds.get("df")
+        if df is not None:
+            for col in list(df.columns)[:100]:
+                dtype = str(df[col].dtype)
+                col_type = "numeric" if ("int" in dtype or "float" in dtype) else "text"
+                sample = df[col].dropna().head(3).astype(str).tolist()
+                all_dataset_columns.append(f"{col} ({col_type}): {sample}")
+
     rows_preview = []
     for r in body.sample_rows[:20]:
         if isinstance(r, list):
@@ -221,15 +233,26 @@ async def ai_polish_table(body: AIPolishRequest):
     all_col_keys = list(dict.fromkeys([groupby] + ([value_field] if value_field != "*" else []) + sub_keys + body.headers))
     col_keys_json = json.dumps({k: f"clean label for {k}" for k in all_col_keys[:15]})
 
+    dataset_context = ""
+    if all_dataset_columns:
+        dataset_context = (
+            f"\nFull dataset columns (use these to understand the domain and create contextual titles):\n"
+            + "\n".join(f"  - {c}" for c in all_dataset_columns[:60])
+            + "\n"
+        )
+
     prompt = (
         f"You are a research data analyst. A data tabulation has raw machine-generated names. Clean them up.\n\n"
-        f"Raw table info:\n"
-        f"- Title: {body.table_title or 'Untitled'}\n"
+        f"{dataset_context}\n"
+        f"This table uses these fields from the dataset:\n"
         f"- Row variable (groupby): {groupby}\n"
         f"- Value/column variable: {value_field}\n"
         f"- Aggregation: {aggregation}\n"
         f"- Is cross-tabulation: {is_cross_tab}\n"
-        f"- Column headers: {body.headers[:15]}\n"
+        f"- All row fields: {body.rows}\n"
+        f"- All column fields: {body.columns}\n"
+        f"- All value fields: {json.dumps(body.values[:10])}\n"
+        f"- Column headers in result: {body.headers[:15]}\n"
         f"- Sample data ({len(rows_preview)} rows):\n" +
         "\n".join(rows_preview) + "\n\n"
         f"Return ONLY valid JSON (no markdown, no explanation):\n"
@@ -239,7 +262,8 @@ async def ai_polish_table(body: AIPolishRequest):
         f'  "column_labels": {col_keys_json}\n'
         f'}}\n\n'
         f"Rules:\n"
-        f"- Title: concise and specific, not generic\n"
+        f"- Title: create a sensible, domain-appropriate title based on the full dataset context and what this table actually analyses\n"
+        f"- Title should NOT just be the column names rephrased — understand what the data represents and name it meaningfully\n"
         f"- subtitle: describes the insight or finding angle\n"
         f"- column_labels: map raw field names to clean human-readable labels\n"
         f"- For '*' use 'Count' or 'Number of Records'\n"

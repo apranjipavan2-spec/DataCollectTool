@@ -23,6 +23,7 @@ interface Props {
   currentAnnotationsMap?: Record<string, any[]>;
   currentComparisonState?: any;
   currentProjectFilters?: Record<string, string[]>;
+  currentColumnTypeOverrides?: Record<string, string>;
   onLoad: (tables: TableConfig[], annotationsMap?: Record<string, any[]>, extra?: Record<string, any>) => void;
   onClose: () => void;
   currentFilename?: string;
@@ -32,7 +33,7 @@ interface Props {
   fgContext?: FgContext | null;
 }
 
-export function ProjectManager({ currentTables, currentAnnotationsMap = {}, currentComparisonState, currentProjectFilters, onLoad, onClose, currentFilename, currentDatasetId, currentRowCount, currentColCount, fgContext }: Props) {
+export function ProjectManager({ currentTables, currentAnnotationsMap = {}, currentComparisonState, currentProjectFilters, currentColumnTypeOverrides = {}, onLoad, onClose, currentFilename, currentDatasetId, currentRowCount, currentColCount, fgContext }: Props) {
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saveName, setSaveName] = useState('');
@@ -98,6 +99,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
           tables: currentTables,
           annotationsMap: currentAnnotationsMap,
           comparisonState: currentComparisonState || null,
+          columnTypeOverrides: currentColumnTypeOverrides,
           source_file: sourceFileInfo,
         };
         const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
@@ -113,14 +115,14 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
         await fgSaveProject(
           fgContext.fgUrl, fgContext.token, saveName.trim(),
           fgContext.programId || null,
-          { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null },
+          { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, columnTypeOverrides: currentColumnTypeOverrides },
         );
         setSuccess(`Project "${saveName}" saved to FieldGovern! Access it from any device via your account.`);
       } else {
         const res = await fetch(`${API_BASE}/project/save`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getUserHeaders() },
-          body: JSON.stringify({ name: saveName.trim(), config: { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, dataset_id: currentDatasetId, source_file: sourceFileInfo }, password: projectPassword || undefined }),
+          body: JSON.stringify({ name: saveName.trim(), config: { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, columnTypeOverrides: currentColumnTypeOverrides, dataset_id: currentDatasetId, source_file: sourceFileInfo }, password: projectPassword || undefined }),
         });
         if (!res.ok) throw new Error(await res.text());
         const saveResult = await res.json();
@@ -130,7 +132,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
             await fgSaveProject(
               fgContext.fgUrl, fgContext.token, saveName.trim(),
               fgContext.programId || null,
-              { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null },
+              { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, columnTypeOverrides: currentColumnTypeOverrides },
             );
           } catch { /* non-fatal */ }
         }
@@ -159,6 +161,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
         if (data.reportTemplate) extra.reportTemplate = data.reportTemplate;
         if (data.comparisonState) extra.comparisonState = data.comparisonState;
         if (data.projectFilters) extra.projectFilters = data.projectFilters;
+        if (data.columnTypeOverrides) extra.columnTypeOverrides = data.columnTypeOverrides;
         const sourceFile = data.meta?.source_file || data.source_file;
         if (sourceFile) extra.source_file = sourceFile;
         onLoad(data.tables, data.annotationsMap, extra);
