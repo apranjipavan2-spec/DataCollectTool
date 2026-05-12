@@ -137,7 +137,8 @@ function buildExportHtml(t: TableConfig, res: TableResult, fmtRows: string[][]):
     html += '<tr>' + row.map((cell, ci) => {
       const isValCol = ci >= nRowCols;
       const align = isValCol ? cellAlign : rowLabelAlign;
-      return `<td style="padding:4px 8px;text-align:${align};font-size:12pt;font-family:${TF},Georgia,serif;${grandStyle}${zebraStyle}">${cell}</td>`;
+      const cellHtml = cell.includes('\n') ? cell.replace(/\n/g, '<br>') : cell;
+      return `<td style="padding:4px 8px;text-align:${align};font-size:12pt;font-family:${TF},Georgia,serif;${grandStyle}${zebraStyle}">${cellHtml}</td>`;
     }).join('') + '</tr>';
   });
   html += '</tbody></table>';

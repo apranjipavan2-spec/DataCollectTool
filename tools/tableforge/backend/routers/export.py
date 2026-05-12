@@ -556,11 +556,28 @@ async def export_word(config: ExportConfig):
             if len(doc.tables) > tables_before:
                 tbl = doc.tables[-1]
                 tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+                tbl.autofit = False
+                tbl_el = tbl._tbl
+                tblPr = tbl_el.tblPr if tbl_el.tblPr is not None else OxmlElement('w:tblPr')
+                tblW = OxmlElement('w:tblW')
+                tblW.set(qn('w:type'), 'auto')
+                tblW.set(qn('w:w'), '0')
+                for old in tblPr.findall(qn('w:tblW')):
+                    tblPr.remove(old)
+                tblPr.append(tblW)
+                layout = OxmlElement('w:tblLayout')
+                layout.set(qn('w:type'), 'fixed')
+                for old in tblPr.findall(qn('w:tblLayout')):
+                    tblPr.remove(old)
+                tblPr.append(layout)
                 page_width_emu = section.page_width - section.left_margin - section.right_margin
                 col_px = _col_pixel_widths(t)
                 total_px = sum(col_px) or 1
-                for ci in range(min(len(tbl.columns), len(col_px))):
-                    tbl.columns[ci].width = int(page_width_emu * col_px[ci] / total_px)
+                col_emus = [int(page_width_emu * px / total_px) for px in col_px]
+                for ci in range(min(len(tbl.columns), len(col_emus))):
+                    tbl.columns[ci].width = col_emus[ci]
+                    for row in tbl.rows:
+                        row.cells[ci].width = col_emus[ci]
 
             footnote_text = t.get("footnote", "")
             footnotes_list = t.get("footnotes") or []
