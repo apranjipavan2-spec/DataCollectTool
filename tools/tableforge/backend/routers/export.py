@@ -442,7 +442,7 @@ async def export_word(config: ExportConfig):
                 run._r.append(instrText)
                 run._r.append(fldChar2)
 
-    BODY_FONT = "Calibri"
+    BODY_FONT = "Times New Roman"
     BODY_SIZE = 12
     HEADER_SIZE = 12
     CELL_MARGIN = 40
@@ -527,7 +527,8 @@ async def export_word(config: ExportConfig):
             pf.space_after = Pt(4)
             run = p.add_run(title)
             run.font.name = BODY_FONT
-            run.font.size = Pt(t.get("title_size") or 14)
+            title_size_px = t.get("title_size") or 18
+            run.font.size = Pt(round(title_size_px * 0.75))
             run.bold = t.get("title_bold", True)
             run.italic = t.get("title_italic", False)
             if title_color:

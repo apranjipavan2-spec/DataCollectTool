@@ -86,10 +86,19 @@ function buildExportHtml(t: TableConfig, res: TableResult, fmtRows: string[][]):
   const cellAlign = t.cell_align || 'right';
   const rowLabelAlign = t.row_label_align || 'left';
   const totalBg = t.total_bg_color || '#e8f0fe';
+  const colWidths: Record<string, number> = {};
+  if (t.column_widths) {
+    for (const [key, val] of Object.entries(t.column_widths)) {
+      colWidths[renames[key] || key] = val as number;
+    }
+  }
+  const TF = "Times New Roman";
 
   function thStyle(colName: string, align = hdrAlign): string {
     const fmt = hdrFmtMap[colName];
-    let s = `background:${fmt?.backgroundColor || headerBg};color:${fmt?.color || headerColor};padding:6px 10px;text-align:${align};font-size:12pt;font-family:Calibri,sans-serif;`;
+    const w = colWidths[colName];
+    let s = `background:${fmt?.backgroundColor || headerBg};color:${fmt?.color || headerColor};padding:6px 10px;text-align:${align};font-size:12pt;font-family:${TF},Georgia,serif;`;
+    if (w) s += `width:${w}px;`;
     if (fmt?.font) s += `font-family:${fmt.font};`;
     if (fmt?.size) s += `font-size:${Math.round(fmt.size * 0.75)}pt;`;
     if (fmt?.bold === false) s += 'font-weight:normal;';
@@ -97,7 +106,7 @@ function buildExportHtml(t: TableConfig, res: TableResult, fmtRows: string[][]):
     return s;
   }
 
-  let html = '<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-family:Calibri,sans-serif;font-size:12pt;width:100%;">';
+  let html = `<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-family:${TF},Georgia,serif;font-size:12pt;width:100%;">`;
   html += '<thead>';
 
   if (hasMultiLevel) {
@@ -106,7 +115,7 @@ function buildExportHtml(t: TableConfig, res: TableResult, fmtRows: string[][]):
       html += `<th rowspan="2" style="${thStyle(allHeaders[i])};vertical-align:middle;">${allHeaders[i]}</th>`;
     }
     for (const g of cg!.top) {
-      html += `<th colspan="${g.colspan}" style="background:${headerBg};color:${headerColor};padding:6px 10px;text-align:center;font-size:12pt;font-family:Calibri,sans-serif;">${g.label}</th>`;
+      html += `<th colspan="${g.colspan}" style="background:${headerBg};color:${headerColor};padding:6px 10px;text-align:center;font-size:12pt;font-family:${TF},Georgia,serif;">${g.label}</th>`;
     }
     html += '</tr><tr>';
     const bottomLabels = cg!.bottom.map((b: string) => String(b));
@@ -128,7 +137,7 @@ function buildExportHtml(t: TableConfig, res: TableResult, fmtRows: string[][]):
     html += '<tr>' + row.map((cell, ci) => {
       const isValCol = ci >= nRowCols;
       const align = isValCol ? cellAlign : rowLabelAlign;
-      return `<td style="padding:4px 8px;text-align:${align};font-size:12pt;font-family:Calibri,sans-serif;${grandStyle}${zebraStyle}">${cell}</td>`;
+      return `<td style="padding:4px 8px;text-align:${align};font-size:12pt;font-family:${TF},Georgia,serif;${grandStyle}${zebraStyle}">${cell}</td>`;
     }).join('') + '</tr>';
   });
   html += '</tbody></table>';
