@@ -139,6 +139,59 @@ async def list_projects(x_user_id: Optional[str] = Header(None), x_user_role: Op
     return {"projects": sorted(projects, key=lambda p: p.get("created", ""), reverse=True), "projects_dir": str(PROJECTS_DIR)}
 
 
+class ProjectRenameRequest(BaseModel):
+    path: str
+    new_name: str
+
+
+@router.post("/api/project/rename")
+async def rename_project(req: ProjectRenameRequest, x_user_id: Optional[str] = Header(None), x_user_role: Optional[str] = Header(None)):
+    p = Path(req.path)
+    if not p.exists():
+        raise HTTPException(404, "Project not found")
+    if x_user_id and not is_super_admin(x_user_role):
+        user_dir = get_user_projects_dir(x_user_id)
+        if not str(p.resolve()).startswith(str(user_dir.resolve())):
+            raise HTTPException(403, "Access denied")
+
+    safe_name = "".join(c for c in req.new_name if c.isalnum() or c in " _-").strip()
+    if not safe_name:
+        raise HTTPException(400, "Invalid name")
+
+    data = json.loads(p.read_text())
+    if data.get("encrypted"):
+        raise HTTPException(400, "Cannot rename encrypted projects")
+
+    data.setdefault("meta", {})["name"] = req.new_name
+    new_path = p.parent / f"{safe_name}.tableforge"
+    new_path.write_text(json.dumps(data, indent=2))
+    if new_path != p:
+        p.unlink()
+
+    add_audit_log("", "project_rename", f"Renamed project to: {req.new_name}")
+    return {"status": "ok", "new_path": str(new_path), "name": req.new_name}
+
+
+class ProjectDeleteRequest(BaseModel):
+    path: str
+
+
+@router.post("/api/project/delete")
+async def delete_project(req: ProjectDeleteRequest, x_user_id: Optional[str] = Header(None), x_user_role: Optional[str] = Header(None)):
+    p = Path(req.path)
+    if not p.exists():
+        raise HTTPException(404, "Project not found")
+    if x_user_id and not is_super_admin(x_user_role):
+        user_dir = get_user_projects_dir(x_user_id)
+        if not str(p.resolve()).startswith(str(user_dir.resolve())):
+            raise HTTPException(403, "Access denied")
+
+    name = p.stem
+    p.unlink()
+    add_audit_log("", "project_delete", f"Deleted project: {name}")
+    return {"status": "ok"}
+
+
 @router.get("/api/project/versions")
 async def get_project_versions(path: str):
     p = Path(path)

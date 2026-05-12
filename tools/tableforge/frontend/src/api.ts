@@ -183,6 +183,35 @@ export async function listProjects() {
   return res.json();
 }
 
+export async function renameProject(path: string, newName: string) {
+  const res = await fetch(`${API_BASE}/project/rename`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getUserHeaders() },
+    body: JSON.stringify({ path, new_name: newName }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function deleteProject(path: string) {
+  const res = await fetch(`${API_BASE}/project/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getUserHeaders() },
+    body: JSON.stringify({ path }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export function getUserRole(): string {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('user_role') || localStorage.getItem('tf_user_role') || '';
+}
+
+export function isSuperAdmin(): boolean {
+  return getUserRole() === 'master_admin';
+}
+
 export async function rollbackProject(path: string, versionIndex: number) {
   const res = await fetch(`${API_BASE}/project/rollback`, {
     method: 'POST',

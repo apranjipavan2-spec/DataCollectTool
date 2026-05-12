@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { fgListPrograms, fgListQuestionnaires, importFromFg, fgListUserProjects, listProjects, FgProgressEvent, listServerFiles, uploadToServer, loadServerFile, deleteServerFile, ServerFile } from '../api';
+import { fgListPrograms, fgListQuestionnaires, importFromFg, fgListUserProjects, listProjects, FgProgressEvent, listServerFiles, uploadToServer, loadServerFile, deleteServerFile, renameProject, deleteProject, isSuperAdmin, ServerFile } from '../api';
 
 interface FgContext { fgUrl: string; token: string; programId?: string }
 
@@ -105,18 +105,43 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
   const [sfLoading, setSfLoading]           = useState('');
   const [sfUploading, setSfUploading]       = useState(false);
   const serverFileRef = useRef<HTMLInputElement>(null);
+  const isAdmin = isSuperAdmin();
 
-  useEffect(() => {
+  const refreshProjects = () => {
     listProjects()
-      .then((res: any) => {
-        const projs = (res.projects || []).slice(0, 5);
-        setLocalProjects(projs);
-      })
+      .then((res: any) => setLocalProjects((res.projects || []).slice(0, 20)))
       .catch(() => {});
+  };
+
+  const refreshFiles = () => {
     listServerFiles()
       .then(res => setServerFiles(res.files || []))
       .catch(() => {});
+  };
+
+  useEffect(() => {
+    refreshProjects();
+    refreshFiles();
   }, []);
+
+  const analyzerProjects = localProjects.filter(p => p.name !== '__autosave__');
+
+  const handleRenameProject = async (proj: LocalProject) => {
+    const newName = prompt('Rename project:', proj.name);
+    if (!newName || !newName.trim() || newName.trim() === proj.name) return;
+    try {
+      await renameProject(proj.path, newName.trim());
+      refreshProjects();
+    } catch {}
+  };
+
+  const handleDeleteProject = async (proj: LocalProject) => {
+    if (!confirm(`Delete project "${proj.name}"? This cannot be undone.`)) return;
+    try {
+      await deleteProject(proj.path);
+      refreshProjects();
+    } catch {}
+  };
 
   const handleServerUpload = async (file: File) => {
     setSfUploading(true);
@@ -360,67 +385,100 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
               )}
             </div>
 
-            {/* Right column: Saved projects & Server files */}
+            {/* Right column: Files & Projects */}
             <div style={s.colRight}>
-              {/* Saved projects */}
-              {localProjects.length > 0 && (
-                <>
-                  <div style={s.sectionTitle}>Saved Projects</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-                    {localProjects.map(proj => (
-                      <button key={proj.path} style={{ ...s.linkBtn, justifyContent: 'space-between' }}
-                        onClick={() => onLoadLocalProject?.(proj.path)}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 14 }}>📋</span>
-                          <span style={{ fontSize: 13, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proj.name}</span>
-                        </span>
-                        <span style={{ fontSize: 11, color: '#475569', whiteSpace: 'nowrap' }}>{proj.created ? formatRelative(proj.created) : ''}</span>
-                      </button>
-                    ))}
-                  </div>
-                </>
+              {/* Upload button — super admin only */}
+              {isAdmin && !loading && !fgLoading && (
+                <div style={{ marginBottom: 16 }}>
+                  <button
+                    style={{ ...s.btnPrimary, background: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: sfUploading ? 0.5 : 1 }}
+                    disabled={sfUploading}
+                    onClick={() => serverFileRef.current?.click()}
+                  >
+                    {sfUploading ? 'Uploading…' : '\u2b06 Upload File to Server'}
+                  </button>
+                  <div style={{ fontSize: 10, color: '#475569', textAlign: 'center', marginTop: 4 }}>Available in /analyzer and /cleaner</div>
+                </div>
               )}
 
-              {/* Server files */}
-              {!loading && !fgLoading && (
-                <>
-                  <div style={{ ...s.sectionTitle, marginTop: localProjects.length > 0 ? 8 : 0 }}>Server Files</div>
-                  {serverFiles.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {/* Scrollable file/project list */}
+              <div style={{ maxHeight: 380, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 0, paddingRight: 4 }}>
+                {/* Server files section */}
+                {!loading && !fgLoading && serverFiles.length > 0 && (
+                  <>
+                    <div style={s.sectionTitle}>Server Files</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 14 }}>
                       {serverFiles.map(f => (
-                        <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           <button
-                            style={{ ...s.linkBtn, flex: 1, opacity: sfLoading === f.id ? 0.5 : 1 }}
+                            style={{ ...s.linkBtn, flex: 1, opacity: sfLoading === f.id ? 0.5 : 1, padding: '8px 10px' }}
                             disabled={!!sfLoading}
                             onClick={() => handleServerLoad(f)}
                           >
                             <span style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-                              <span style={{ fontSize: 14 }}>{f.ext === 'csv' || f.ext === 'tsv' ? '\ud83d\udcc4' : '\ud83d\udcca'}</span>
-                              <span style={{ fontSize: 13, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.original_name}</span>
+                              <span style={{ fontSize: 13 }}>{f.ext === 'csv' || f.ext === 'tsv' ? '\ud83d\udcc4' : '\ud83d\udcca'}</span>
+                              <span style={{ fontSize: 12, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.original_name}</span>
                             </span>
-                            <span style={{ fontSize: 11, color: '#475569', whiteSpace: 'nowrap' }}>
-                              {f.size_mb > 0 ? `${f.size_mb} MB` : `${Math.round(f.size_bytes / 1024)} KB`} · {formatRelative(f.uploaded_at)}
+                            <span style={{ fontSize: 10, color: '#475569', whiteSpace: 'nowrap' }}>
+                              {f.size_mb > 0 ? `${f.size_mb} MB` : `${Math.round(f.size_bytes / 1024)} KB`}
                             </span>
                           </button>
-                          <button
-                            onClick={() => handleServerDelete(f)}
-                            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px 6px', fontSize: 14 }}
-                            title="Delete from server"
-                          >&times;</button>
+                          <button onClick={() => handleServerDelete(f)}
+                            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px 4px', fontSize: 13 }}
+                            title="Delete from server">&times;</button>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <div style={{ fontSize: 12, color: '#475569', textAlign: 'center', padding: '12px 0' }}>No files saved on server yet</div>
-                  )}
-                  <button
-                    style={{ ...s.linkBtn, justifyContent: 'center', marginTop: 8, opacity: sfUploading ? 0.5 : 1 }}
-                    disabled={sfUploading}
-                    onClick={() => serverFileRef.current?.click()}
-                  >
-                    {sfUploading ? 'Uploading…' : '\u2b06 Save file to server'}
-                  </button>
-                </>
+                  </>
+                )}
+
+                {/* Analyzer Projects folder */}
+                {analyzerProjects.length > 0 && (
+                  <>
+                    <div style={{ ...s.sectionTitle, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 13 }}>📂</span> Analyzer Projects
+                      <span style={{ fontSize: 10, fontWeight: 400, color: '#475569' }}>({analyzerProjects.length})</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 14 }}>
+                      {analyzerProjects.map(proj => (
+                        <div key={proj.path} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <button style={{ ...s.linkBtn, flex: 1, padding: '8px 10px' }}
+                            onClick={() => onLoadLocalProject?.(proj.path)}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                              <span style={{ fontSize: 13 }}>📋</span>
+                              <span style={{ fontSize: 12, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proj.name}</span>
+                            </span>
+                            <span style={{ fontSize: 10, color: '#475569', whiteSpace: 'nowrap' }}>{proj.created ? formatRelative(proj.created) : ''}</span>
+                          </button>
+                          <button onClick={() => handleRenameProject(proj)}
+                            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px 4px', fontSize: 11 }}
+                            title="Rename">✏</button>
+                          <button onClick={() => handleDeleteProject(proj)}
+                            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px 4px', fontSize: 13 }}
+                            title="Delete">&times;</button>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* No content message */}
+                {!loading && !fgLoading && serverFiles.length === 0 && analyzerProjects.length === 0 && (
+                  <div style={{ fontSize: 12, color: '#475569', textAlign: 'center', padding: '24px 0' }}>
+                    No files or projects saved yet
+                  </div>
+                )}
+              </div>
+
+              {/* Non-admin upload */}
+              {!isAdmin && !loading && !fgLoading && (
+                <button
+                  style={{ ...s.linkBtn, justifyContent: 'center', marginTop: 8, opacity: sfUploading ? 0.5 : 1 }}
+                  disabled={sfUploading}
+                  onClick={() => serverFileRef.current?.click()}
+                >
+                  {sfUploading ? 'Uploading…' : '\u2b06 Save file to server'}
+                </button>
               )}
             </div>
           </div>
@@ -469,7 +527,7 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
 
             {!loading && serverFilesSection}
 
-            {localProjects.length > 0 && !loading && (
+            {analyzerProjects.length > 0 && !loading && (
               <>
                 <div style={s.divider}>
                   <div style={s.dividerLine} />
@@ -477,15 +535,23 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
                   <div style={s.dividerLine} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {localProjects.map(proj => (
-                    <button key={proj.path} style={{ ...s.linkBtn, justifyContent: 'space-between' }}
-                      onClick={() => onLoadLocalProject?.(proj.path)}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 14 }}>📊</span>
-                        <span style={{ fontSize: 13, color: '#e2e8f0' }}>{proj.name}</span>
-                      </span>
-                      <span style={{ fontSize: 11, color: '#475569' }}>{proj.created ? formatRelative(proj.created) : ''}</span>
-                    </button>
+                  {analyzerProjects.map(proj => (
+                    <div key={proj.path} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <button style={{ ...s.linkBtn, flex: 1, justifyContent: 'space-between' }}
+                        onClick={() => onLoadLocalProject?.(proj.path)}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 14 }}>📋</span>
+                          <span style={{ fontSize: 13, color: '#e2e8f0' }}>{proj.name}</span>
+                        </span>
+                        <span style={{ fontSize: 11, color: '#475569' }}>{proj.created ? formatRelative(proj.created) : ''}</span>
+                      </button>
+                      <button onClick={() => handleRenameProject(proj)}
+                        style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px 4px', fontSize: 11 }}
+                        title="Rename">✏</button>
+                      <button onClick={() => handleDeleteProject(proj)}
+                        style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px 4px', fontSize: 13 }}
+                        title="Delete">&times;</button>
+                    </div>
                   ))}
                 </div>
               </>
