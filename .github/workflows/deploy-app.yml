@@ -121,8 +121,8 @@ jobs:
             echo "Nginx ID=$NGINX_ID  Network=$NGINX_NET"
 
             # ── 5. Start tools on nginx's network ────────────────────────────────
-            docker ps -aq -f "name=analyzer" | xargs docker rm -f 2>/dev/null || true
-            docker ps -aq -f "name=cleaner"  | xargs docker rm -f 2>/dev/null || true
+            docker rm -f analyzer 2>/dev/null || true
+            docker rm -f cleaner  2>/dev/null || true
             docker run -d --name analyzer --network "$NGINX_NET" --restart unless-stopped \
               -v fg_tableforge_data:/app/projects \
               -v fg_tableforge_exports:/app/exports \
