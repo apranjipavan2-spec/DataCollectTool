@@ -342,10 +342,7 @@ export default function LoginPage() {
             {/* Heading */}
             <div className="mb-7 pb-6 text-center" style={{ borderBottom: '1px solid #e2e8f0' }}>
               <div className="flex flex-col items-center gap-3 mb-2">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
-                     style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.1))', border: '1px solid rgba(99,102,241,0.2)' }}>
-                  <Logo size={36} />
-                </div>
+                <img src="/logo-wide.png" alt="FieldGovern" className="h-9 w-auto object-contain" />
                 <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#1e293b' }}>Welcome back</h1>
               </div>
               <p className="text-sm" style={{ color: '#64748b' }}>Sign in to continue to FieldGovern</p>
