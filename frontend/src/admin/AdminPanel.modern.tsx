@@ -236,31 +236,81 @@ export default function AdminPanel() {
         <div className="flex-1 p-4 md:p-6 space-y-5">
           {error && <Alert type="error" message={error} onClose={() => setError('')} />}
 
+          {/* Welcome Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-catalan-text">
+                {new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'}, {user.name?.split(' ')[0] || 'Admin'}
+              </h2>
+              <p className="text-sm text-catalan-textMuted mt-0.5">
+                Platform Administration · {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
+            </div>
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
+                 style={{ background: 'rgba(137,180,250,0.1)', border: '1px solid rgba(137,180,250,0.2)', color: '#89b4fa' }}>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse" />
+              {tenants.length} tenant{tenants.length !== 1 ? 's' : ''} active
+            </div>
+          </div>
+
           {/* Platform stat cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="border-l-4 border-l-catalan-primary">
-              <div className="text-xs text-catalan-textMuted mb-1">Tenants</div>
-              <div className="text-3xl font-bold text-catalan-primary">{tenants.length}</div>
-            </Card>
-            <Card className="border-l-4 border-l-catalan-info">
-              <div className="text-xs text-catalan-textMuted mb-1">Total Users</div>
-              <div className="text-3xl font-bold text-catalan-info">{totals.users}</div>
-            </Card>
-            <Card className="border-l-4 border-l-catalan-success">
-              <div className="text-xs text-catalan-textMuted mb-1">Total Submissions</div>
-              <div className="text-3xl font-bold text-catalan-success">{totals.submissions}</div>
-            </Card>
-            <Card className="border-l-4 border-l-catalan-warning">
-              <div className="text-xs text-catalan-textMuted mb-1">Total Forms</div>
-              <div className="text-3xl font-bold text-catalan-warning">{totals.forms}</div>
-            </Card>
+            {[
+              {
+                label: 'Tenants', sub: 'Active organizations', value: tenants.length,
+                gradient: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(99,102,241,0.05))',
+                border: 'rgba(99,102,241,0.25)', color: '#818cf8',
+                icon: <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />,
+              },
+              {
+                label: 'Total Users', sub: 'Across all tenants', value: totals.users,
+                gradient: 'linear-gradient(135deg, rgba(96,165,250,0.15), rgba(96,165,250,0.05))',
+                border: 'rgba(96,165,250,0.25)', color: '#60a5fa',
+                icon: <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />,
+              },
+              {
+                label: 'Total Submissions', sub: 'All collected data', value: totals.submissions,
+                gradient: 'linear-gradient(135deg, rgba(52,211,153,0.15), rgba(52,211,153,0.05))',
+                border: 'rgba(52,211,153,0.25)', color: '#34d399',
+                icon: <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />,
+              },
+              {
+                label: 'Total Forms', sub: 'Published questionnaires', value: totals.forms,
+                gradient: 'linear-gradient(135deg, rgba(251,191,36,0.15), rgba(251,191,36,0.05))',
+                border: 'rgba(251,191,36,0.25)', color: '#fbbf24',
+                icon: <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
+              },
+            ].map(card => (
+              <div key={card.label}
+                className="rounded-xl p-5 transition-all duration-200 hover:scale-[1.02] cursor-default"
+                style={{ background: card.gradient, border: `1px solid ${card.border}` }}>
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <div className="text-sm font-medium text-catalan-textMuted">{card.label}</div>
+                    <div className="text-xs text-catalan-textMuted/70 mt-0.5">{card.sub}</div>
+                  </div>
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                       style={{ background: `${card.color}18` }}>
+                    <svg className="w-5 h-5" style={{ color: card.color }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      {card.icon}
+                    </svg>
+                  </div>
+                </div>
+                <div className="text-3xl font-bold" style={{ color: card.color }}>{typeof card.value === 'number' ? card.value.toLocaleString() : card.value}</div>
+              </div>
+            ))}
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 bg-catalan-surface rounded-lg p-1 w-fit">
+          <div className="flex gap-1 rounded-xl p-1 w-fit flex-wrap"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             {(['overview', 'tenants', 'progress', 'files'] as const).map(t => (
               <button key={t} onClick={() => { setTab(t); setSelectedTenant(null) }}
-                className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all capitalize ${tab === t ? 'bg-catalan-primary text-white shadow-sm' : 'text-catalan-textMuted hover:text-catalan-text hover:bg-catalan-hover'}`}>
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${tab === t ? 'text-white shadow-sm' : 'text-catalan-textMuted hover:text-catalan-text hover:bg-catalan-hover'}`}
+                style={tab === t ? {
+                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+                } : undefined}>
                 {t === 'overview' ? 'Overview' : t === 'tenants' ? 'Tenants' : t === 'progress' ? 'Team Progress' : 'Files'}
               </button>
             ))}
@@ -285,7 +335,7 @@ export default function AdminPanel() {
                     </thead>
                     <tbody>
                       {overview.map(row => (
-                        <tr key={row.tenant_id} className="border-b border-catalan-border hover:bg-catalan-hover">
+                        <tr key={row.tenant_id} className="border-b border-catalan-border hover:bg-catalan-hover transition-colors duration-150">
                           <td className="px-3 py-2 font-medium text-catalan-text">{row.tenant_name}</td>
                           <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded capitalize ${PLAN_STYLE[row.plan_tier] ?? ''}`}>{row.plan_tier}</span></td>
                           <td className="px-3 py-2 text-catalan-textMuted">{row.user_count}</td>
@@ -331,7 +381,7 @@ export default function AdminPanel() {
                       </thead>
                       <tbody>
                         {tenants.map(t => (
-                          <tr key={t.id} className="border-b border-catalan-border hover:bg-catalan-hover">
+                          <tr key={t.id} className="border-b border-catalan-border hover:bg-catalan-hover transition-colors duration-150">
                             <td className="px-3 py-2 font-medium text-catalan-text">{t.name}</td>
                             <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded capitalize ${PLAN_STYLE[t.plan_tier] ?? ''}`}>{t.plan_tier}</span></td>
                             <td className="px-3 py-2 text-catalan-textMuted">{t.users_count}</td>
@@ -364,10 +414,15 @@ export default function AdminPanel() {
               </div>
 
               {/* Drill tabs */}
-              <div className="flex gap-1 bg-catalan-surface rounded-lg p-1 w-fit">
+              <div className="flex gap-1 rounded-xl p-1 w-fit"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 {([['progress', 'Team Progress'], ['subs', 'Submissions'], ['users', 'Users']] as const).map(([t, label]) => (
                   <button key={t} onClick={() => setDrillTab(t)}
-                    className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${drillTab === t ? 'bg-catalan-primary text-white shadow-sm' : 'text-catalan-textMuted hover:text-catalan-text hover:bg-catalan-hover'}`}>
+                    className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${drillTab === t ? 'text-white shadow-sm' : 'text-catalan-textMuted hover:text-catalan-text hover:bg-catalan-hover'}`}
+                    style={drillTab === t ? {
+                      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                      boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+                    } : undefined}>
                     {label}
                   </button>
                 ))}
@@ -471,20 +526,26 @@ export default function AdminPanel() {
               <p className="text-sm text-catalan-textMuted">Click <strong>View →</strong> on any tenant in the Tenants tab to see their detailed team progress.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {tenants.map(t => (
-                  <Card key={t.id} className="cursor-pointer hover:border-catalan-primary/50 transition-colors" onClick={() => openDrillDown(t)}>
+                  <div key={t.id}
+                    className="rounded-xl p-5 cursor-pointer transition-all duration-200 hover:scale-[1.02]"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.03))',
+                      border: '1px solid rgba(99,102,241,0.15)',
+                    }}
+                    onClick={() => openDrillDown(t)}>
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <p className="font-semibold text-catalan-text">{t.name}</p>
                         <span className={`text-xs px-2 py-0.5 rounded capitalize ${PLAN_STYLE[t.plan_tier] ?? ''}`}>{t.plan_tier}</span>
                       </div>
-                      <span className="text-catalan-primary text-xs font-medium">View →</span>
+                      <span className="text-xs font-medium" style={{ color: '#818cf8' }}>View →</span>
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-center">
-                      <div><div className="text-lg font-bold text-catalan-text">{t.users_count}</div><div className="text-xs text-catalan-textMuted">Users</div></div>
-                      <div><div className="text-lg font-bold text-catalan-text">{t.submissions_count}</div><div className="text-xs text-catalan-textMuted">Submissions</div></div>
-                      <div><div className="text-lg font-bold text-catalan-text">{t.forms_count}</div><div className="text-xs text-catalan-textMuted">Forms</div></div>
+                      <div><div className="text-lg font-bold" style={{ color: '#60a5fa' }}>{t.users_count}</div><div className="text-xs text-catalan-textMuted">Users</div></div>
+                      <div><div className="text-lg font-bold" style={{ color: '#34d399' }}>{t.submissions_count}</div><div className="text-xs text-catalan-textMuted">Submissions</div></div>
+                      <div><div className="text-lg font-bold" style={{ color: '#fbbf24' }}>{t.forms_count}</div><div className="text-xs text-catalan-textMuted">Forms</div></div>
                     </div>
-                  </Card>
+                  </div>
                 ))}
               </div>
             </div>

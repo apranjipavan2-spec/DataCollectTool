@@ -304,6 +304,7 @@ async def export_word(config: ExportConfig):
     from docx.shared import Inches, Pt, Cm, Emu, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.enum.table import WD_TABLE_ALIGNMENT
+    from docx.enum.section import WD_ORIENT
     from docx.oxml.ns import qn, nsdecls
     from docx.oxml import OxmlElement, parse_xml
 
@@ -325,7 +326,6 @@ async def export_word(config: ExportConfig):
         cell._tc.get_or_add_tcPr().append(shading)
 
     def _set_cell_borders(cell, **kwargs):
-        """Set individual cell borders. kwargs: top, bottom, left, right with dicts of sz, val, color."""
         tc = cell._tc
         tcPr = tc.get_or_add_tcPr()
         tcBorders = OxmlElement('w:tcBorders')
@@ -346,8 +346,7 @@ async def export_word(config: ExportConfig):
         trHeight.set(qn('w:hRule'), 'atLeast')
         trPr.append(trHeight)
 
-    def _set_cell_margin(cell, top=0, bottom=0, left=28, right=28):
-        """Set cell internal margins (in twips). 28 twips ~ 0.5mm."""
+    def _set_cell_margin(cell, top=0, bottom=0, left=40, right=40):
         tc = cell._tc
         tcPr = tc.get_or_add_tcPr()
         tcMar = OxmlElement('w:tcMar')
@@ -359,7 +358,6 @@ async def export_word(config: ExportConfig):
         tcPr.append(tcMar)
 
     def _estimate_table_width_cm(t_data):
-        """Estimate table width in cm based on column content. Uses ~0.2cm per char at Arial Narrow 9pt."""
         headers = t_data.get("headers", [])
         rows = t_data.get("rows", [])
         formatted_rows = t_data.get("formatted_rows") or []
@@ -369,91 +367,107 @@ async def export_word(config: ExportConfig):
         for ci, h in enumerate(headers):
             cfg_w = col_widths_cfg.get(h)
             if cfg_w:
-                total_cm += cfg_w * 0.0264  # px to cm
+                total_cm += cfg_w * 0.026
                 continue
             max_len = len(str(h))
             sample = rows[:50] if not use_fmt else formatted_rows[:50]
             for row in sample:
                 if ci < len(row):
                     max_len = max(max_len, len(str(row[ci] or "")))
-            total_cm += max(max_len * 0.18, 1.5)
+            total_cm += max(max_len * 0.25, 2.5)
         return total_cm
 
-    COMPACT_FONT_NAME = "Arial Narrow"
-    COMPACT_FONT_SIZE = 9
-    COMPACT_HEADER_SIZE = 9
-    CELL_MARGIN_TWIPS = 28  # ~0.5mm per side
+    def _setup_section(section, landscape=False):
+        section.top_margin = Cm(1.27)
+        section.bottom_margin = Cm(1.27)
+        section.left_margin = Cm(1.27)
+        section.right_margin = Cm(1.27)
+        if landscape:
+            section.orientation = WD_ORIENT.LANDSCAPE
+            if section.page_width < section.page_height:
+                section.page_width, section.page_height = section.page_height, section.page_width
+        else:
+            section.orientation = WD_ORIENT.PORTRAIT
+            if section.page_width > section.page_height:
+                section.page_width, section.page_height = section.page_height, section.page_width
 
-    # Page setup — start with tight portrait, flip to landscape if needed
-    from docx.enum.section import WD_ORIENT
+    def _setup_header_footer(section):
+        if opts.get("header_text"):
+            header = section.header
+            header.is_linked_to_previous = False
+            hp = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+            hp.text = ""
+            run = hp.add_run(opts["header_text"])
+            run.font.size = Pt(8)
+            run.font.name = BODY_FONT
+            run.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
+        if opts.get("footer_text") or opts.get("page_numbers"):
+            footer = section.footer
+            footer.is_linked_to_previous = False
+            fp = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+            fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            txt = opts.get("footer_text", "")
+            if opts.get("page_numbers"):
+                txt = (txt + "  " if txt else "") + "Page "
+            if txt:
+                run = fp.add_run(txt)
+                run.font.size = Pt(8)
+                run.font.name = BODY_FONT
+            if opts.get("page_numbers"):
+                fldChar = OxmlElement('w:fldChar')
+                fldChar.set(qn('w:fldCharType'), 'begin')
+                instrText = OxmlElement('w:instrText')
+                instrText.text = "PAGE"
+                fldChar2 = OxmlElement('w:fldChar')
+                fldChar2.set(qn('w:fldCharType'), 'end')
+                run = fp.add_run()
+                run.font.size = Pt(8)
+                run._r.append(fldChar)
+                run._r.append(instrText)
+                run._r.append(fldChar2)
+
+    BODY_FONT = "Calibri"
+    BODY_SIZE = 12
+    HEADER_SIZE = 12
+    CELL_MARGIN = 40
+
+    portrait_usable_cm = 21.0 - 2.54
+    landscape_usable_cm = 29.7 - 2.54
     user_wants_landscape = opts.get("landscape", False)
 
-    # First pass: estimate widths to decide orientation
-    portrait_usable_cm = 21.0 - 3.0  # A4 width minus 1.5cm margins each side
-    landscape_usable_cm = 29.7 - 3.0
-
-    needs_landscape = user_wants_landscape
-    if not needs_landscape:
-        for t_data in config.tables:
-            est = _estimate_table_width_cm(t_data)
-            if est > portrait_usable_cm:
-                needs_landscape = True
-                break
-
-    for section in doc.sections:
-        section.top_margin = Cm(1.5)
-        section.bottom_margin = Cm(1.5)
-        section.left_margin = Cm(1.5)
-        section.right_margin = Cm(1.5)
-        if needs_landscape:
-            section.orientation = WD_ORIENT.LANDSCAPE
-            section.page_width, section.page_height = section.page_height, section.page_width
-
-    # Cover page
+    # Cover page — use first section for it
     if opts.get("cover_page"):
+        _setup_section(doc.sections[0], landscape=False)
         cover_p = doc.add_paragraph()
         cover_p.add_run("\n\n\n\n")
         cover_h = doc.add_heading(opts.get("cover_title") or config.filename, level=1)
         cover_h.runs[0].font.size = Pt(28)
+        cover_h.runs[0].font.name = BODY_FONT
         if opts.get("cover_subtitle"):
             cs = doc.add_paragraph(opts["cover_subtitle"])
             cs.runs[0].font.size = Pt(14)
+            cs.runs[0].font.name = BODY_FONT
             cs.runs[0].font.color.rgb = RGBColor(80, 80, 80)
         doc.add_paragraph(f"\nGenerated: {datetime.now().strftime('%B %d, %Y')}")
-        doc.add_page_break()
-
-    # Header / footer
-    if opts.get("header_text") or opts.get("footer_text") or opts.get("page_numbers"):
-        for section in doc.sections:
-            if opts.get("header_text"):
-                header = section.header
-                hp = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
-                hp.text = opts["header_text"]
-                hp.runs[0].font.size = Pt(9) if hp.runs else None
-            if opts.get("footer_text") or opts.get("page_numbers"):
-                footer = section.footer
-                fp = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
-                fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                txt = opts.get("footer_text", "")
-                if opts.get("page_numbers"):
-                    txt = (txt + "  " if txt else "") + "Page "
-                if txt:
-                    fp.add_run(txt)
-                if opts.get("page_numbers"):
-                    fldChar = OxmlElement('w:fldChar')
-                    fldChar.set(qn('w:fldCharType'), 'begin')
-                    instrText = OxmlElement('w:instrText')
-                    instrText.text = "PAGE"
-                    fldChar2 = OxmlElement('w:fldChar')
-                    fldChar2.set(qn('w:fldCharType'), 'end')
-                    run = fp.add_run()
-                    run._r.append(fldChar)
-                    run._r.append(instrText)
-                    run._r.append(fldChar2)
+        _setup_header_footer(doc.sections[0])
+        first_table_idx = 0
+    else:
+        first_table_idx = 0
 
     for t_idx, t in enumerate(config.tables):
-        if t_idx > 0:
-            doc.add_page_break()
+        # Each table gets its own section with appropriate orientation
+        est_width = _estimate_table_width_cm(t)
+        table_landscape = user_wants_landscape or est_width > portrait_usable_cm
+
+        if t_idx == 0 and not opts.get("cover_page"):
+            section = doc.sections[0]
+            _setup_section(section, table_landscape)
+            _setup_header_footer(section)
+        else:
+            doc.add_section()
+            section = doc.sections[-1]
+            _setup_section(section, table_landscape)
+            _setup_header_footer(section)
 
         title = t.get("title", t.get("name", f"Table {t_idx + 1}"))
         subtitle = t.get("subtitle", "")
@@ -477,11 +491,9 @@ async def export_word(config: ExportConfig):
 
         align_map = {"left": WD_ALIGN_PARAGRAPH.LEFT, "center": WD_ALIGN_PARAGRAPH.CENTER, "right": WD_ALIGN_PARAGRAPH.RIGHT}
 
-        # Per-column header format overrides for Word
         hdr_formats_list = t.get("header_formats") or []
         hdr_fmt_map = {hf.get("field", ""): hf for hf in hdr_formats_list}
 
-        # Column group boundaries (for thicker borders)
         column_groups = t.get("column_groups")
         has_multi_level = column_groups and column_groups.get("has_multi_level")
         group_start_cols = set()
@@ -492,12 +504,15 @@ async def export_word(config: ExportConfig):
                     group_start_cols.add(offset)
                 offset += g.get("colspan", 1)
 
-        # Title
+        # Title — matching preview font and size
         if title:
             p = doc.add_paragraph()
+            pf = p.paragraph_format
+            pf.space_before = Pt(0)
+            pf.space_after = Pt(4)
             run = p.add_run(title)
-            run.font.name = COMPACT_FONT_NAME
-            run.font.size = Pt(t.get("title_size") or 12)
+            run.font.name = BODY_FONT
+            run.font.size = Pt(t.get("title_size") or 14)
             run.bold = t.get("title_bold", True)
             run.italic = t.get("title_italic", False)
             if title_color:
@@ -505,9 +520,12 @@ async def export_word(config: ExportConfig):
             p.alignment = align_map.get(t.get("title_align", "left"), WD_ALIGN_PARAGRAPH.LEFT)
         if subtitle:
             p = doc.add_paragraph()
+            pf = p.paragraph_format
+            pf.space_before = Pt(0)
+            pf.space_after = Pt(6)
             run = p.add_run(subtitle)
-            run.font.size = Pt(COMPACT_FONT_SIZE)
-            run.font.name = COMPACT_FONT_NAME
+            run.font.size = Pt(BODY_SIZE)
+            run.font.name = BODY_FONT
             run.font.color.rgb = RGBColor(100, 100, 100)
 
         if not headers:
@@ -518,47 +536,60 @@ async def export_word(config: ExportConfig):
         table = doc.add_table(rows=header_row_count + len(formatted_rows or rows), cols=len(headers))
         table.style = "Table Grid"
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
-        table.autofit = True
+        table.autofit = False
 
-        # Set column widths from config
-        page_width_emu = doc.sections[0].page_width - doc.sections[0].left_margin - doc.sections[0].right_margin
-        if column_widths_cfg:
-            for ci, h in enumerate(headers):
-                w = column_widths_cfg.get(h)
-                if w and ci < len(table.columns):
-                    table.columns[ci].width = Emu(int(w * 9144))
-        else:
-            if len(headers) > 0:
-                col_w = page_width_emu // len(headers)
-                for ci in range(len(headers)):
-                    if ci < len(table.columns):
-                        table.columns[ci].width = col_w
+        # Column widths: use preview pixel widths as proportional weights
+        page_width_emu = section.page_width - section.left_margin - section.right_margin
+
+        col_weights = []
+        use_fmt = len(formatted_rows) == len(rows)
+        has_cfg_widths = any(column_widths_cfg.get(h) for h in headers)
+        for ci, h in enumerate(headers):
+            cfg_w = column_widths_cfg.get(h)
+            if cfg_w and cfg_w > 0:
+                col_weights.append(float(cfg_w))
+            else:
+                max_len = len(str(h))
+                sample = formatted_rows[:100] if use_fmt else rows[:100]
+                for row in sample:
+                    if ci < len(row):
+                        max_len = max(max_len, len(str(row[ci] or "")))
+                is_label = ci < num_row_fields
+                col_weights.append(max(max_len * (1.2 if is_label else 1.0), 4))
+
+        total_weight = sum(col_weights) or 1
+        for ci in range(len(headers)):
+            if ci < len(table.columns):
+                ratio = col_weights[ci] / total_weight
+                table.columns[ci].width = int(page_width_emu * ratio)
 
         def _style_header_cell(cell, text, align=header_align, col_name=None):
             cell.text = ""
             p = cell.paragraphs[0]
             p.alignment = align_map.get(align, WD_ALIGN_PARAGRAPH.CENTER)
             pf = p.paragraph_format
-            pf.space_before = Pt(0)
-            pf.space_after = Pt(0)
+            pf.space_before = Pt(1)
+            pf.space_after = Pt(1)
+            pf.line_spacing = Pt(HEADER_SIZE + 2)
             run = p.add_run(str(text))
             fmt = hdr_fmt_map.get(col_name) if col_name else None
             if fmt:
                 run.bold = fmt.get("bold", True)
                 run.italic = fmt.get("italic", False)
-                run.font.size = Pt(min(fmt.get("size", COMPACT_HEADER_SIZE), COMPACT_HEADER_SIZE))
-                run.font.name = fmt.get("font") or COMPACT_FONT_NAME
+                run.font.size = Pt(fmt.get("size", HEADER_SIZE))
+                run.font.name = fmt.get("font") or BODY_FONT
                 fc = (fmt.get("color") or header_tc).lstrip("#")
                 run.font.color.rgb = _hex_to_rgb(fc) or RGBColor(0xFF, 0xFF, 0xFF)
                 bg = (fmt.get("backgroundColor") or header_bg).lstrip("#")
                 _set_cell_shading(cell, bg)
             else:
                 run.bold = True
-                run.font.size = Pt(COMPACT_HEADER_SIZE)
-                run.font.name = COMPACT_FONT_NAME
+                run.font.size = Pt(HEADER_SIZE)
+                run.font.name = BODY_FONT
                 run.font.color.rgb = _hex_to_rgb(header_tc) or RGBColor(0xFF, 0xFF, 0xFF)
                 _set_cell_shading(cell, header_bg)
-            _set_cell_margin(cell, top=14, bottom=14, left=CELL_MARGIN_TWIPS, right=CELL_MARGIN_TWIPS)
+            _set_cell_margin(cell, top=20, bottom=20, left=CELL_MARGIN, right=CELL_MARGIN)
+            cell.vertical_alignment = 1  # CENTER
 
         if has_multi_level:
             top_groups = column_groups["top"]
@@ -589,9 +620,8 @@ async def export_word(config: ExportConfig):
             for ci, h in enumerate(headers):
                 _style_header_cell(table.rows[0].cells[ci], h, col_name=h)
 
-        # Set header row height
         for hr_idx in range(header_row_count):
-            _set_row_height(table.rows[hr_idx], 14)
+            _set_row_height(table.rows[hr_idx], HEADER_SIZE + 6)
 
         ann_lookup = {}
         ann_list = []
@@ -634,17 +664,17 @@ async def export_word(config: ExportConfig):
                 cell.text = ""
                 p = cell.paragraphs[0]
                 pf = p.paragraph_format
-                pf.space_before = Pt(0)
-                pf.space_after = Pt(0)
+                pf.space_before = Pt(1)
+                pf.space_after = Pt(1)
+                pf.line_spacing = Pt(BODY_SIZE + 2)
                 is_val_col = ci >= num_row_fields
                 p.alignment = align_map.get(cell_align if is_val_col else row_label_align, WD_ALIGN_PARAGRAPH.LEFT)
 
                 run = p.add_run(str(display))
-                run.font.size = Pt(COMPACT_FONT_SIZE)
-                run.font.name = COMPACT_FONT_NAME
-                _set_cell_margin(cell, top=14, bottom=14, left=CELL_MARGIN_TWIPS, right=CELL_MARGIN_TWIPS)
+                run.font.size = Pt(BODY_SIZE)
+                run.font.name = BODY_FONT
+                _set_cell_margin(cell, top=20, bottom=20, left=CELL_MARGIN, right=CELL_MARGIN)
 
-                # Cell background: grand total > subtotal > zebra > row label bg > table bg
                 if is_grand:
                     run.bold = True
                     _set_cell_shading(cell, total_bg)
@@ -658,7 +688,6 @@ async def export_word(config: ExportConfig):
                 elif is_val_col and table_bg:
                     _set_cell_shading(cell, table_bg)
 
-                # Group separator border
                 if ci in group_start_cols:
                     _set_cell_borders(cell, left={'sz': 12, 'val': 'single', 'color': '475569'})
 
@@ -667,14 +696,17 @@ async def export_word(config: ExportConfig):
         footnotes_list = t.get("footnotes") or []
         if footnote_text:
             fp = doc.add_paragraph()
+            fp.paragraph_format.space_before = Pt(4)
             fr = fp.add_run(footnote_text)
             fr.font.size = Pt(8)
+            fr.font.name = BODY_FONT
             fr.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
             fr.italic = True
         for fn in footnotes_list:
             fp = doc.add_paragraph()
             fr = fp.add_run(f"{fn.get('marker', '*')} {fn.get('text', '')}")
             fr.font.size = Pt(8)
+            fr.font.name = BODY_FONT
             fr.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
 
         if ann_list:
@@ -682,9 +714,11 @@ async def export_word(config: ExportConfig):
             fn_run = fn_para.add_run("Annotations:")
             fn_run.bold = True
             fn_run.font.size = Pt(8)
+            fn_run.font.name = BODY_FONT
             for i, ann_text in enumerate(ann_list, 1):
                 fp = doc.add_paragraph(f"[{i}] {ann_text}")
                 fp.runs[0].font.size = Pt(8)
+                fp.runs[0].font.name = BODY_FONT
                 fp.runs[0].font.color.rgb = RGBColor(0x66, 0x66, 0x66)
 
         interpretation = t.get("interpretation", "")
@@ -694,12 +728,12 @@ async def export_word(config: ExportConfig):
             ip_run = ip_heading.add_run("Interpretation")
             ip_run.bold = True
             ip_run.font.size = Pt(11)
-            ip_run.font.name = "Segoe UI"
+            ip_run.font.name = BODY_FONT
             ip_run.font.color.rgb = RGBColor(0x33, 0x33, 0x33)
             ip = doc.add_paragraph(interpretation)
             for run in ip.runs:
                 run.font.size = Pt(10)
-                run.font.name = "Georgia"
+                run.font.name = BODY_FONT
                 run.font.color.rgb = RGBColor(0x44, 0x44, 0x44)
 
     doc.save(output_path)
