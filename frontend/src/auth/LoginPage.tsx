@@ -212,39 +212,39 @@ export default function LoginPage() {
     <div className="min-h-screen flex" style={{ background: '#f8fafc' }}>
       <style>{LOGIN_STYLES}</style>
 
-      {/* ── Left branding panel ── */}
+      {/* ── Left branding panel (LIGHT) ── */}
       <div className="hidden lg:flex lg:w-[520px] xl:w-[560px] flex-shrink-0 flex-col relative overflow-hidden"
-           style={{ background: 'linear-gradient(135deg, #1e293b 0%, #312e81 40%, #1e293b 100%)' }}>
+           style={{ background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 40%, #f0f4ff 100%)' }}>
 
-        {/* Animated mesh background */}
+        {/* Soft background orbs */}
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute w-[600px] h-[600px] rounded-full opacity-20"
-               style={{ top: '-10%', right: '-20%', background: 'radial-gradient(circle, #6366f1, transparent 70%)', animation: 'float-orb 8s ease-in-out infinite' }} />
-          <div className="absolute w-[400px] h-[400px] rounded-full opacity-15"
-               style={{ bottom: '-5%', left: '-10%', background: 'radial-gradient(circle, #06b6d4, transparent 70%)', animation: 'float-orb-2 10s ease-in-out infinite' }} />
-          <div className="absolute w-[300px] h-[300px] rounded-full opacity-10"
-               style={{ top: '40%', left: '30%', background: 'radial-gradient(circle, #8b5cf6, transparent 70%)', animation: 'float-orb 12s ease-in-out infinite 2s' }} />
-          <div className="absolute inset-0 opacity-[0.03]"
-               style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
+          <div className="absolute w-[600px] h-[600px] rounded-full opacity-30"
+               style={{ top: '-10%', right: '-20%', background: 'radial-gradient(circle, #c7d2fe, transparent 70%)', animation: 'float-orb 8s ease-in-out infinite' }} />
+          <div className="absolute w-[400px] h-[400px] rounded-full opacity-25"
+               style={{ bottom: '-5%', left: '-10%', background: 'radial-gradient(circle, #a5f3fc, transparent 70%)', animation: 'float-orb-2 10s ease-in-out infinite' }} />
+          <div className="absolute w-[300px] h-[300px] rounded-full opacity-20"
+               style={{ top: '40%', left: '30%', background: 'radial-gradient(circle, #ddd6fe, transparent 70%)', animation: 'float-orb 12s ease-in-out infinite 2s' }} />
+          <div className="absolute inset-0 opacity-[0.04]"
+               style={{ backgroundImage: 'linear-gradient(rgba(99,102,241,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.15) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
         </div>
 
         <div className="relative z-10 flex flex-col h-full p-10 xl:p-12">
           <div className="flex items-center login-slide-up">
-            <img src="/logo-wide.png" alt="FieldGovern" className="h-10 w-auto object-contain" style={{ filter: 'brightness(1.1)' }} />
+            <img src="/logo-wide.png" alt="FieldGovern" className="h-10 w-auto object-contain" />
           </div>
 
           <div className="mt-10 mb-auto login-slide-up" style={{ animationDelay: '0.1s' }}>
             <div className="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-full text-xs font-semibold"
-                 style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc' }}>
-              <span className="w-2 h-2 rounded-full inline-block animate-pulse" style={{ background: '#34d399' }} />
+                 style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: '#4f46e5' }}>
+              <span className="w-2 h-2 rounded-full inline-block animate-pulse" style={{ background: '#10b981' }} />
               Trusted by research teams across India
             </div>
-            <h2 className="text-[2.6rem] font-extrabold leading-[1.1] mb-5" style={{ color: '#f1f5f9' }}>
+            <h2 className="text-[2.6rem] font-extrabold leading-[1.1] mb-5" style={{ color: '#1e293b' }}>
               Collect, Analyze
               <br />& Report
               <br />
               <span style={{
-                background: 'linear-gradient(135deg, #06b6d4, #6366f1, #a855f7)',
+                background: 'linear-gradient(135deg, #0891b2, #4f46e5, #7c3aed)',
                 backgroundSize: '200% 200%',
                 animation: 'gradient-shift 4s ease infinite',
                 WebkitBackgroundClip: 'text',
@@ -253,9 +253,9 @@ export default function LoginPage() {
                 From the Field.
               </span>
             </h2>
-            <p className="text-base leading-relaxed max-w-sm" style={{ color: '#94a3b8' }}>
+            <p className="text-base leading-relaxed max-w-sm" style={{ color: '#475569' }}>
               India's most affordable offline-first field data platform.
-              Collect with <strong style={{ color: '#cbd5e1' }}>zero internet</strong>, auto-sync, and unlock <strong style={{ color: '#cbd5e1' }}>real-time analysis</strong>.
+              Collect with <strong style={{ color: '#1e293b' }}>zero internet</strong>, auto-sync, and unlock <strong style={{ color: '#1e293b' }}>real-time analysis</strong>.
             </p>
 
             <div className="mt-8 flex gap-6 login-slide-up" style={{ animationDelay: '0.3s' }}>
@@ -265,7 +265,7 @@ export default function LoginPage() {
                 { val: '50K+', label: 'Submissions' },
               ].map(s => (
                 <div key={s.label}>
-                  <div className="text-xl font-bold" style={{ color: '#e2e8f0', animation: 'counter-up 0.6s ease-out both', animationDelay: '0.5s' }}>{s.val}</div>
+                  <div className="text-xl font-bold" style={{ color: '#1e293b', animation: 'counter-up 0.6s ease-out both', animationDelay: '0.5s' }}>{s.val}</div>
                   <div className="text-xs mt-0.5" style={{ color: '#64748b' }}>{s.label}</div>
                 </div>
               ))}
@@ -279,11 +279,11 @@ export default function LoginPage() {
                   style={{
                     animationDelay: `${0.2 + i * 0.08}s`,
                     background: i === activeFeature
-                      ? 'rgba(99,102,241,0.12)'
-                      : 'rgba(255,255,255,0.03)',
+                      ? 'rgba(99,102,241,0.08)'
+                      : 'rgba(255,255,255,0.5)',
                     border: i === activeFeature
-                      ? '1px solid rgba(99,102,241,0.3)'
-                      : '1px solid rgba(255,255,255,0.06)',
+                      ? '1px solid rgba(99,102,241,0.25)'
+                      : '1px solid rgba(255,255,255,0.7)',
                     transform: i === activeFeature ? 'translateX(4px)' : 'translateX(0)',
                   }}
                 >
@@ -292,8 +292,8 @@ export default function LoginPage() {
                     <FeatureIcon name={f.icon} className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <div className="text-sm font-semibold" style={{ color: i === activeFeature ? '#e2e8f0' : '#94a3b8', transition: 'color 0.5s' }}>{f.label}</div>
-                    <div className="text-xs mt-0.5" style={{ color: i === activeFeature ? '#94a3b8' : '#475569', transition: 'color 0.5s' }}>{f.sub}</div>
+                    <div className="text-sm font-semibold" style={{ color: i === activeFeature ? '#1e293b' : '#64748b', transition: 'color 0.5s' }}>{f.label}</div>
+                    <div className="text-xs mt-0.5" style={{ color: i === activeFeature ? '#475569' : '#94a3b8', transition: 'color 0.5s' }}>{f.sub}</div>
                   </div>
                 </div>
               ))}
@@ -301,13 +301,13 @@ export default function LoginPage() {
           </div>
 
           <div className="relative z-10 mt-8 flex items-center justify-between login-fade-in" style={{ animationDelay: '0.5s' }}>
-            <p className="text-xs" style={{ color: '#475569' }}>2026 FieldGovern</p>
+            <p className="text-xs" style={{ color: '#94a3b8' }}>2026 FieldGovern</p>
             <button
               onClick={() => navigate('/pricing')}
               className="text-xs font-medium transition-colors"
-              style={{ color: '#6366f1' }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#818cf8')}
-              onMouseLeave={e => (e.currentTarget.style.color = '#6366f1')}
+              style={{ color: '#4f46e5' }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#6366f1')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#4f46e5')}
             >
               View plans
             </button>
