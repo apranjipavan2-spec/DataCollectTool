@@ -272,9 +272,8 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
       <div style={fgContext ? s.cardWide : s.card}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <img src={import.meta.env.BASE_URL + 'logo-icon.png'} alt="FieldGovern" style={{ width: 40, height: 40, display: 'block', margin: '0 auto 8px' }} />
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.02em' }}>Analyzer</div>
-          <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>FieldGovern Data Analyzer</div>
+          <img src={import.meta.env.BASE_URL + 'logo-wide.png'} alt="FieldGovern" style={{ height: 44, width: 'auto', display: 'block', margin: '0 auto 8px' }} />
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#94a3b8', letterSpacing: '0.04em', marginTop: 2 }}>Data Analyzer</div>
         </div>
 
         {/* Loading indicator — full width above columns */}
