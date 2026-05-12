@@ -357,10 +357,12 @@ async def export_word(config: ExportConfig):
             tcMar.append(el)
         tcPr.append(tcMar)
 
-    PX_PER_CHAR = 7.5
+    PX_PER_CHAR = 7.0
 
     def _col_pixel_widths(t_data):
-        """Return list of pixel-scale weights for each column."""
+        """Return list of pixel-scale weights for each column.
+        Headers wrap in the preview, so cap their contribution.
+        Content length is the primary width driver."""
         headers = t_data.get("headers", [])
         rows = t_data.get("rows", [])
         formatted_rows = t_data.get("formatted_rows") or []
@@ -373,14 +375,18 @@ async def export_word(config: ExportConfig):
             if cfg_w and cfg_w > 0:
                 px_list.append(float(cfg_w))
             else:
-                max_len = len(str(h))
+                content_max = 0
                 sample = formatted_rows[:100] if use_fmt else rows[:100]
                 for row in sample:
                     if ci < len(row):
-                        max_len = max(max_len, len(str(row[ci] or "")))
-                est_px = max(max_len * PX_PER_CHAR + 24, 50)
+                        val = str(row[ci] or "")
+                        line_max = max((len(line) for line in val.split('\n')), default=0)
+                        content_max = max(content_max, line_max)
+                hdr_len = min(len(str(h)), 15)
+                effective_len = max(content_max, hdr_len)
+                est_px = max(effective_len * PX_PER_CHAR + 16, 45)
                 if ci < num_row_fields:
-                    est_px *= 1.15
+                    est_px *= 1.1
                 px_list.append(est_px)
         return px_list
 
