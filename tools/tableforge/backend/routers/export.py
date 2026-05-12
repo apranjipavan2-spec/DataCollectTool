@@ -299,15 +299,52 @@ async def export_excel(config: ExportConfig):
 
 
 async def export_word(config: ExportConfig):
-    """Export tables to a Word document with formatting."""
+    """Export tables to a Word document with formatting matching preview."""
     from docx import Document as DocxDocument
-    from docx.shared import Inches, Pt, Cm, RGBColor
+    from docx.shared import Inches, Pt, Cm, Emu, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.enum.table import WD_TABLE_ALIGNMENT
+    from docx.oxml.ns import qn, nsdecls
+    from docx.oxml import OxmlElement, parse_xml
 
     output_path = EXPORTS_DIR / f"{config.filename}.docx"
     doc = DocxDocument()
     opts = config.options or {}
+
+    def _hex_to_rgb(hex_str):
+        h = (hex_str or "").lstrip("#")
+        if len(h) == 6:
+            return RGBColor(int(h[:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+        return None
+
+    def _set_cell_shading(cell, hex_color):
+        c = (hex_color or "").lstrip("#")
+        if not c or len(c) != 6:
+            return
+        shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{c}" w:val="clear"/>')
+        cell._tc.get_or_add_tcPr().append(shading)
+
+    def _set_cell_borders(cell, **kwargs):
+        """Set individual cell borders. kwargs: top, bottom, left, right with dicts of sz, val, color."""
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        tcBorders = OxmlElement('w:tcBorders')
+        for edge, attrs in kwargs.items():
+            el = OxmlElement(f'w:{edge}')
+            el.set(qn('w:val'), attrs.get('val', 'single'))
+            el.set(qn('w:sz'), str(attrs.get('sz', 4)))
+            el.set(qn('w:color'), attrs.get('color', '000000'))
+            el.set(qn('w:space'), '0')
+            tcBorders.append(el)
+        tcPr.append(tcBorders)
+
+    def _set_row_height(row, height_pt):
+        tr = row._tr
+        trPr = tr.get_or_add_trPr()
+        trHeight = OxmlElement('w:trHeight')
+        trHeight.set(qn('w:val'), str(int(height_pt * 20)))
+        trHeight.set(qn('w:hRule'), 'atLeast')
+        trPr.append(trHeight)
 
     # Page setup
     from docx.enum.section import WD_ORIENT
@@ -335,7 +372,6 @@ async def export_word(config: ExportConfig):
 
     # Header / footer
     if opts.get("header_text") or opts.get("footer_text") or opts.get("page_numbers"):
-        from docx.oxml.ns import qn
         for section in doc.sections:
             if opts.get("header_text"):
                 header = section.header
@@ -352,7 +388,6 @@ async def export_word(config: ExportConfig):
                 if txt:
                     fp.add_run(txt)
                 if opts.get("page_numbers"):
-                    from docx.oxml import OxmlElement
                     fldChar = OxmlElement('w:fldChar')
                     fldChar.set(qn('w:fldCharType'), 'begin')
                     instrText = OxmlElement('w:instrText')
@@ -377,6 +412,16 @@ async def export_word(config: ExportConfig):
         cell_align = t.get("cell_align", "right")
         header_align = t.get("header_align", "center")
         row_label_align = t.get("row_label_align", "left")
+        column_widths_cfg = t.get("column_widths") or {}
+        row_height_cfg = t.get("row_height") or 0
+        zebra = t.get("zebra", False)
+        zebra_color = (t.get("zebra_color") or "#f8f9fa").lstrip("#")
+        header_bg = (t.get("header_bg_color") or "1e293b").lstrip("#")
+        header_tc = (t.get("header_text_color") or "FFFFFF").lstrip("#")
+        total_bg = (t.get("total_bg_color") or "e8f0fe").lstrip("#")
+        row_bg = (t.get("row_bg_color") or "").lstrip("#")
+        table_bg = (t.get("bg_color") or "").lstrip("#")
+        title_color = (t.get("title_color") or "").lstrip("#")
 
         align_map = {"left": WD_ALIGN_PARAGRAPH.LEFT, "center": WD_ALIGN_PARAGRAPH.CENTER, "right": WD_ALIGN_PARAGRAPH.RIGHT}
 
@@ -384,41 +429,80 @@ async def export_word(config: ExportConfig):
         hdr_formats_list = t.get("header_formats") or []
         hdr_fmt_map = {hf.get("field", ""): hf for hf in hdr_formats_list}
 
-        p = doc.add_heading(title, level=2)
+        # Column group boundaries (for thicker borders)
+        column_groups = t.get("column_groups")
+        has_multi_level = column_groups and column_groups.get("has_multi_level")
+        group_start_cols = set()
+        if has_multi_level:
+            offset = num_row_fields
+            for g in column_groups["top"]:
+                if offset > num_row_fields:
+                    group_start_cols.add(offset)
+                offset += g.get("colspan", 1)
+
+        # Title
+        if title:
+            p = doc.add_paragraph()
+            run = p.add_run(title)
+            run.font.name = "Segoe UI"
+            run.font.size = Pt(t.get("title_size") or 14)
+            run.bold = t.get("title_bold", True)
+            run.italic = t.get("title_italic", False)
+            if title_color:
+                run.font.color.rgb = _hex_to_rgb(title_color) or RGBColor(0, 0, 0)
+            p.alignment = align_map.get(t.get("title_align", "left"), WD_ALIGN_PARAGRAPH.LEFT)
         if subtitle:
-            p = doc.add_paragraph(subtitle)
-            p.style.font.size = Pt(10)
-            p.style.font.color.rgb = RGBColor(100, 100, 100)
+            p = doc.add_paragraph()
+            run = p.add_run(subtitle)
+            run.font.size = Pt(10)
+            run.font.name = "Segoe UI"
+            run.font.color.rgb = RGBColor(100, 100, 100)
 
         if not headers:
             continue
 
-        column_groups = t.get("column_groups")
-        has_multi_level = column_groups and column_groups.get("has_multi_level")
         header_row_count = 2 if has_multi_level else 1
 
         table = doc.add_table(rows=header_row_count + len(formatted_rows or rows), cols=len(headers))
         table.style = "Table Grid"
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        table.autofit = True
+
+        # Set column widths from config
+        page_width_emu = doc.sections[0].page_width - doc.sections[0].left_margin - doc.sections[0].right_margin
+        if column_widths_cfg:
+            for ci, h in enumerate(headers):
+                w = column_widths_cfg.get(h)
+                if w and ci < len(table.columns):
+                    table.columns[ci].width = Emu(int(w * 9144))
+        else:
+            if len(headers) > 0:
+                col_w = page_width_emu // len(headers)
+                for ci in range(len(headers)):
+                    if ci < len(table.columns):
+                        table.columns[ci].width = col_w
 
         def _style_header_cell(cell, text, align=header_align, col_name=None):
-            cell.text = str(text)
+            cell.text = ""
             p = cell.paragraphs[0]
             p.alignment = align_map.get(align, WD_ALIGN_PARAGRAPH.CENTER)
-            run = p.runs[0] if p.runs else p.add_run(str(text))
+            run = p.add_run(str(text))
             fmt = hdr_fmt_map.get(col_name) if col_name else None
             if fmt:
                 run.bold = fmt.get("bold", True)
                 run.italic = fmt.get("italic", False)
                 run.font.size = Pt(fmt.get("size", 9))
                 run.font.name = fmt.get("font", "Segoe UI")
-                if fmt.get("color"):
-                    c = fmt["color"].lstrip("#")
-                    run.font.color.rgb = RGBColor(int(c[:2], 16), int(c[2:4], 16), int(c[4:6], 16))
+                fc = (fmt.get("color") or header_tc).lstrip("#")
+                run.font.color.rgb = _hex_to_rgb(fc) or RGBColor(0xFF, 0xFF, 0xFF)
+                bg = (fmt.get("backgroundColor") or header_bg).lstrip("#")
+                _set_cell_shading(cell, bg)
             else:
                 run.bold = True
                 run.font.size = Pt(9)
                 run.font.name = "Segoe UI"
+                run.font.color.rgb = _hex_to_rgb(header_tc) or RGBColor(0xFF, 0xFF, 0xFF)
+                _set_cell_shading(cell, header_bg)
 
         if has_multi_level:
             top_groups = column_groups["top"]
@@ -428,11 +512,14 @@ async def export_word(config: ExportConfig):
                 _style_header_cell(table.rows[0].cells[ci], headers[ci], col_name=headers[ci])
 
             col_cursor = num_row_fields
-            for g in top_groups:
+            for gi, g in enumerate(top_groups):
                 colspan = g.get("colspan", 1)
                 if colspan > 1:
                     table.rows[0].cells[col_cursor].merge(table.rows[0].cells[col_cursor + colspan - 1])
-                _style_header_cell(table.rows[0].cells[col_cursor], g.get("label", ""), "center")
+                cell = table.rows[0].cells[col_cursor]
+                _style_header_cell(cell, g.get("label", ""), "center")
+                if gi > 0:
+                    _set_cell_borders(cell, left={'sz': 12, 'val': 'single', 'color': '475569'})
                 col_cursor += colspan
 
             for bi, label in enumerate(bottom_labels):
@@ -440,9 +527,15 @@ async def export_word(config: ExportConfig):
                 if ci < len(headers):
                     col_name = headers[ci] if ci < len(headers) else label
                     _style_header_cell(table.rows[1].cells[ci], label, col_name=col_name)
+                    if ci in group_start_cols:
+                        _set_cell_borders(table.rows[1].cells[ci], left={'sz': 12, 'val': 'single', 'color': '475569'})
         else:
             for ci, h in enumerate(headers):
                 _style_header_cell(table.rows[0].cells[ci], h, col_name=h)
+
+        # Set header row height
+        for hr_idx in range(header_row_count):
+            _set_row_height(table.rows[hr_idx], 14)
 
         ann_lookup = {}
         ann_list = []
@@ -456,9 +549,13 @@ async def export_word(config: ExportConfig):
             raw_row = rows[ri]
             fmt_row = formatted_rows[ri] if use_formatted else None
             is_grand, is_sub = _is_total_row(raw_row)
+            tbl_row = table.rows[ri + header_row_count]
+
+            if row_height_cfg and row_height_cfg > 0:
+                _set_row_height(tbl_row, row_height_cfg * 0.75)
 
             for ci in range(len(headers)):
-                cell = table.rows[ri + header_row_count].cells[ci]
+                cell = tbl_row.cells[ci]
                 if fmt_row and ci < len(fmt_row):
                     display = fmt_row[ci]
                 elif ci < len(raw_row):
@@ -478,16 +575,47 @@ async def export_word(config: ExportConfig):
                 if ann_num:
                     display = f"{display} [{ann_num}]"
 
-                cell.text = display
+                cell.text = ""
                 p = cell.paragraphs[0]
                 is_val_col = ci >= num_row_fields
                 p.alignment = align_map.get(cell_align if is_val_col else row_label_align, WD_ALIGN_PARAGRAPH.LEFT)
 
-                run = p.runs[0] if p.runs else p.add_run(display)
+                run = p.add_run(str(display))
                 run.font.size = Pt(9)
                 run.font.name = "Segoe UI"
-                if is_grand or is_sub:
+
+                # Cell background: grand total > subtotal > zebra > row label bg > table bg
+                if is_grand:
                     run.bold = True
+                    _set_cell_shading(cell, total_bg)
+                elif is_sub:
+                    run.bold = True
+                    _set_cell_shading(cell, "f0f4f8")
+                elif zebra and ri % 2 == 1:
+                    _set_cell_shading(cell, zebra_color)
+                elif not is_val_col and row_bg:
+                    _set_cell_shading(cell, row_bg)
+                elif is_val_col and table_bg:
+                    _set_cell_shading(cell, table_bg)
+
+                # Group separator border
+                if ci in group_start_cols:
+                    _set_cell_borders(cell, left={'sz': 12, 'val': 'single', 'color': '475569'})
+
+        # Footnotes
+        footnote_text = t.get("footnote", "")
+        footnotes_list = t.get("footnotes") or []
+        if footnote_text:
+            fp = doc.add_paragraph()
+            fr = fp.add_run(footnote_text)
+            fr.font.size = Pt(8)
+            fr.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+            fr.italic = True
+        for fn in footnotes_list:
+            fp = doc.add_paragraph()
+            fr = fp.add_run(f"{fn.get('marker', '*')} {fn.get('text', '')}")
+            fr.font.size = Pt(8)
+            fr.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
 
         if ann_list:
             fn_para = doc.add_paragraph()
