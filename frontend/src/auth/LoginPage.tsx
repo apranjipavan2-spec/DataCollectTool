@@ -6,9 +6,9 @@ import { subscribeToPush } from '@/lib/pushNotifications'
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
 
 const DEMO_ACCOUNTS = [
-  { role: 'Admin',       phone: '+919999990001', password: 'test@123', color: '#6366f1', bg: 'rgba(99,102,241,0.1)' },
-  { role: 'Supervisor',  phone: '+919999990002', password: 'test@123', color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)' },
-  { role: 'Enumerator',  phone: '+919999990003', password: 'test@123', color: '#06b6d4', bg: 'rgba(6,182,212,0.1)' },
+  { role: 'Admin',       phone: '+919999990001', password: 'test@123', color: '#6366f1', bg: 'rgba(99,102,241,0.08)' },
+  { role: 'Supervisor',  phone: '+919999990002', password: 'test@123', color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)' },
+  { role: 'Enumerator',  phone: '+919999990003', password: 'test@123', color: '#06b6d4', bg: 'rgba(6,182,212,0.08)' },
 ]
 
 const FEATURES = [
@@ -74,10 +74,6 @@ const LOGIN_STYLES = `
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
-  }
-  @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
   }
   @keyframes demo-ping {
     0%   { opacity: 0.3; transform: scale(1); }
@@ -213,12 +209,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex" style={{ background: '#0a0a1a' }}>
+    <div className="min-h-screen flex" style={{ background: '#f8fafc' }}>
       <style>{LOGIN_STYLES}</style>
 
       {/* ── Left branding panel ── */}
       <div className="hidden lg:flex lg:w-[520px] xl:w-[560px] flex-shrink-0 flex-col relative overflow-hidden"
-           style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #0f172a 100%)' }}>
+           style={{ background: 'linear-gradient(135deg, #1e293b 0%, #312e81 40%, #1e293b 100%)' }}>
 
         {/* Animated mesh background */}
         <div className="absolute inset-0 overflow-hidden">
@@ -228,18 +224,15 @@ export default function LoginPage() {
                style={{ bottom: '-5%', left: '-10%', background: 'radial-gradient(circle, #06b6d4, transparent 70%)', animation: 'float-orb-2 10s ease-in-out infinite' }} />
           <div className="absolute w-[300px] h-[300px] rounded-full opacity-10"
                style={{ top: '40%', left: '30%', background: 'radial-gradient(circle, #8b5cf6, transparent 70%)', animation: 'float-orb 12s ease-in-out infinite 2s' }} />
-          {/* Grid pattern */}
           <div className="absolute inset-0 opacity-[0.03]"
                style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
         </div>
 
         <div className="relative z-10 flex flex-col h-full p-10 xl:p-12">
-          {/* Logo */}
           <div className="flex items-center login-slide-up">
             <img src="/logo-wide.png" alt="FieldGovern" className="h-10 w-auto object-contain" style={{ filter: 'brightness(1.1)' }} />
           </div>
 
-          {/* Headline */}
           <div className="mt-10 mb-auto login-slide-up" style={{ animationDelay: '0.1s' }}>
             <div className="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-full text-xs font-semibold"
                  style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc' }}>
@@ -265,7 +258,6 @@ export default function LoginPage() {
               Collect with <strong style={{ color: '#cbd5e1' }}>zero internet</strong>, auto-sync, and unlock <strong style={{ color: '#cbd5e1' }}>real-time analysis</strong>.
             </p>
 
-            {/* Live stats bar */}
             <div className="mt-8 flex gap-6 login-slide-up" style={{ animationDelay: '0.3s' }}>
               {[
                 { val: '30+', label: 'Brokers' },
@@ -279,7 +271,6 @@ export default function LoginPage() {
               ))}
             </div>
 
-            {/* Feature cards — animated carousel */}
             <div className="mt-10 space-y-2.5">
               {FEATURES.map((f, i) => (
                 <div
@@ -324,49 +315,46 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* ── Right form panel ── */}
+      {/* ── Right form panel (LIGHT) ── */}
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative overflow-hidden"
-           style={{ background: 'linear-gradient(160deg, #0f172a 0%, #1a1a2e 50%, #16132d 100%)' }}>
+           style={{ background: 'linear-gradient(160deg, #f8fafc 0%, #f1f5f9 50%, #eef2ff 100%)' }}>
 
-        {/* Subtle background glow */}
-        <div className="absolute w-[500px] h-[500px] rounded-full opacity-10"
-             style={{ top: '-15%', right: '-15%', background: 'radial-gradient(circle, #6366f1, transparent 70%)' }} />
-        <div className="absolute w-[300px] h-[300px] rounded-full opacity-10"
-             style={{ bottom: '-10%', left: '-10%', background: 'radial-gradient(circle, #06b6d4, transparent 70%)' }} />
+        <div className="absolute w-[500px] h-[500px] rounded-full opacity-[0.15]"
+             style={{ top: '-15%', right: '-15%', background: 'radial-gradient(circle, #c7d2fe, transparent 70%)' }} />
+        <div className="absolute w-[300px] h-[300px] rounded-full opacity-[0.12]"
+             style={{ bottom: '-10%', left: '-10%', background: 'radial-gradient(circle, #a5f3fc, transparent 70%)' }} />
 
         <div className="w-full max-w-[420px] relative z-10">
 
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center justify-center mb-8">
-            <img src="/logo-wide.png" alt="FieldGovern" className="h-10 w-auto object-contain" style={{ filter: 'brightness(1.1)' }} />
+            <img src="/logo-wide.png" alt="FieldGovern" className="h-10 w-auto object-contain" />
           </div>
 
-          {/* Card — glassmorphism */}
+          {/* Card */}
           <div className="rounded-3xl p-8 login-slide-up"
                style={{
-                 background: 'rgba(255,255,255,0.05)',
-                 backdropFilter: 'blur(20px)',
-                 WebkitBackdropFilter: 'blur(20px)',
-                 border: '1px solid rgba(255,255,255,0.1)',
-                 boxShadow: '0 20px 60px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.05) inset',
+                 background: '#ffffff',
+                 border: '1px solid #e2e8f0',
+                 boxShadow: '0 20px 60px rgba(0,0,0,0.06), 0 4px 20px rgba(0,0,0,0.04)',
                }}>
 
             {/* Heading */}
-            <div className="mb-7 pb-6 text-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="mb-7 pb-6 text-center" style={{ borderBottom: '1px solid #e2e8f0' }}>
               <div className="flex flex-col items-center gap-3 mb-2">
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
-                     style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2))', border: '1px solid rgba(99,102,241,0.3)' }}>
+                     style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.1))', border: '1px solid rgba(99,102,241,0.2)' }}>
                   <Logo size={36} />
                 </div>
-                <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#f1f5f9' }}>Welcome back</h1>
+                <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#1e293b' }}>Welcome back</h1>
               </div>
-              <p className="text-sm" style={{ color: '#94a3b8' }}>Sign in to continue to FieldGovern</p>
+              <p className="text-sm" style={{ color: '#64748b' }}>Sign in to continue to FieldGovern</p>
               <button
                 onClick={() => navigate('/pricing')}
                 className="mt-2 text-xs font-medium transition-colors"
-                style={{ color: '#818cf8' }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#a5b4fc')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#818cf8')}
+                style={{ color: '#6366f1' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#4f46e5')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#6366f1')}
               >
                 New here? View pricing plans
               </button>
@@ -375,7 +363,7 @@ export default function LoginPage() {
             {/* Error */}
             {error && (
               <div className="flex items-start gap-3 mb-5 px-4 py-3 rounded-xl text-sm"
-                   style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#fca5a5' }}>
+                   style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' }}>
                 <span className="mt-0.5 flex-shrink-0">!</span>
                 <span className="flex-1">{error}</span>
                 <button onClick={() => setError('')} className="flex-shrink-0 ml-1 opacity-60 hover:opacity-100 transition-opacity">x</button>
@@ -387,16 +375,16 @@ export default function LoginPage() {
               <div className="space-y-5">
                 <div className="text-center py-2">
                   <div className="w-16 h-16 mx-auto mb-3 rounded-2xl flex items-center justify-center"
-                       style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2))', border: '1px solid rgba(99,102,241,0.3)' }}>
-                    <FeatureIcon name="shield" className="w-8 h-8" style={{ color: '#a5b4fc' }} />
+                       style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.1))', border: '1px solid rgba(99,102,241,0.2)' }}>
+                    <FeatureIcon name="shield" className="w-8 h-8" style={{ color: '#6366f1' }} />
                   </div>
-                  <p className="text-sm" style={{ color: '#cbd5e1' }}>
-                    We sent a 6-digit code to <strong style={{ color: '#f1f5f9' }}>{maskedContact}</strong>
+                  <p className="text-sm" style={{ color: '#475569' }}>
+                    We sent a 6-digit code to <strong style={{ color: '#1e293b' }}>{maskedContact}</strong>
                   </p>
-                  <p className="text-xs mt-1" style={{ color: '#64748b' }}>Check your email inbox · expires in 10 min</p>
+                  <p className="text-xs mt-1" style={{ color: '#94a3b8' }}>Check your email inbox · expires in 10 min</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#94a3b8' }}>Verification Code</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#64748b' }}>Verification Code</label>
                   <input
                     type="text"
                     inputMode="numeric"
@@ -408,30 +396,29 @@ export default function LoginPage() {
                     onKeyDown={e => e.key === 'Enter' && handleVerifyOtp()}
                     className="w-full rounded-xl px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] focus:outline-none transition-all"
                     style={{
-                      background: 'rgba(255,255,255,0.06)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      color: '#f1f5f9',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      color: '#1e293b',
                     }}
-                    onFocus={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.15)' }}
-                    onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)' }}
+                    onFocus={e => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.1)' }}
+                    onBlur={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
                   />
                 </div>
                 <button
                   onClick={handleVerifyOtp}
                   disabled={loading || otp.length < 6}
                   className="w-full py-3.5 rounded-xl font-bold text-sm text-white transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', boxShadow: '0 4px 20px rgba(99,102,241,0.4)' }}
+                  style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}
                 >
                   {loading ? (
                     <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Verifying...</span></>
                   ) : 'Verify Code'}
                 </button>
-                <div className="flex items-center justify-between text-xs" style={{ color: '#64748b' }}>
-                  <button onClick={() => { setStep('login'); setOtp(''); setError('') }} className="hover:text-white transition-colors">
+                <div className="flex items-center justify-between text-xs" style={{ color: '#94a3b8' }}>
+                  <button onClick={() => { setStep('login'); setOtp(''); setError('') }} className="hover:text-slate-700 transition-colors">
                     Back to login
                   </button>
-                  <button onClick={handleResendOtp} className="font-semibold transition-colors" style={{ color: '#818cf8' }}>
+                  <button onClick={handleResendOtp} className="font-semibold transition-colors" style={{ color: '#6366f1' }}>
                     Resend code
                   </button>
                 </div>
@@ -444,11 +431,11 @@ export default function LoginPage() {
 
               {/* Phone */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#94a3b8' }}>
+                <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#64748b' }}>
                   Mobile Number
                 </label>
                 <div className="relative">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: '#64748b' }}>
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: '#94a3b8' }}>
                     <FeatureIcon name="phone" className="w-4 h-4" />
                   </div>
                   <input
@@ -461,25 +448,24 @@ export default function LoginPage() {
                     onKeyDown={e => e.key === 'Enter' && document.getElementById('pwd')?.focus()}
                     className="w-full rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none transition-all duration-200"
                     style={{
-                      background: 'rgba(255,255,255,0.06)',
-                      border: phoneErr ? '1px solid rgba(239,68,68,0.5)' : '1px solid rgba(255,255,255,0.1)',
-                      color: '#f1f5f9',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                      background: '#f8fafc',
+                      border: phoneErr ? '1px solid #fca5a5' : '1px solid #e2e8f0',
+                      color: '#1e293b',
                     }}
-                    onFocus={e => { if (!phoneErr) { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.15)' } }}
-                    onBlur={e => { if (!phoneErr) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)' } }}
+                    onFocus={e => { if (!phoneErr) { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.1)' } }}
+                    onBlur={e => { if (!phoneErr) { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' } }}
                   />
                 </div>
-                {phoneErr && <p className="text-xs mt-1.5 flex items-center gap-1" style={{ color: '#fca5a5' }}>{phoneErr}</p>}
+                {phoneErr && <p className="text-xs mt-1.5 flex items-center gap-1" style={{ color: '#dc2626' }}>{phoneErr}</p>}
               </div>
 
               {/* Password */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#94a3b8' }}>
+                <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#64748b' }}>
                   Password
                 </label>
                 <div className="relative">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: '#64748b' }}>
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: '#94a3b8' }}>
                     <FeatureIcon name="lock" className="w-4 h-4" />
                   </div>
                   <input
@@ -491,25 +477,24 @@ export default function LoginPage() {
                     onKeyDown={e => e.key === 'Enter' && handleLogin()}
                     className="w-full rounded-xl pl-10 pr-16 py-3 text-sm focus:outline-none transition-all duration-200"
                     style={{
-                      background: 'rgba(255,255,255,0.06)',
-                      border: pwdErr ? '1px solid rgba(239,68,68,0.5)' : '1px solid rgba(255,255,255,0.1)',
-                      color: '#f1f5f9',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                      background: '#f8fafc',
+                      border: pwdErr ? '1px solid #fca5a5' : '1px solid #e2e8f0',
+                      color: '#1e293b',
                     }}
-                    onFocus={e => { if (!pwdErr) { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.15)' } }}
-                    onBlur={e => { if (!pwdErr) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)' } }}
+                    onFocus={e => { if (!pwdErr) { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.1)' } }}
+                    onBlur={e => { if (!pwdErr) { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' } }}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPwd(v => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold transition-colors px-1.5 py-0.5 rounded"
-                    style={{ color: '#818cf8' }}
+                    style={{ color: '#6366f1' }}
                     tabIndex={-1}
                   >
                     {showPwd ? 'Hide' : 'Show'}
                   </button>
                 </div>
-                {pwdErr && <p className="text-xs mt-1.5 flex items-center gap-1" style={{ color: '#fca5a5' }}>{pwdErr}</p>}
+                {pwdErr && <p className="text-xs mt-1.5 flex items-center gap-1" style={{ color: '#dc2626' }}>{pwdErr}</p>}
               </div>
             </div>
 
@@ -518,9 +503,9 @@ export default function LoginPage() {
               <button
                 onClick={() => navigate('/forgot-password')}
                 className="text-xs font-semibold transition-colors"
-                style={{ color: '#818cf8' }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#a5b4fc')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#818cf8')}
+                style={{ color: '#6366f1' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#4f46e5')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#6366f1')}
               >
                 Forgot password?
               </button>
@@ -533,10 +518,10 @@ export default function LoginPage() {
               className="w-full py-3.5 rounded-xl font-bold text-sm text-white transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
               style={{
                 background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                boxShadow: '0 4px 20px rgba(99,102,241,0.4), 0 0 0 1px rgba(99,102,241,0.2) inset',
+                boxShadow: '0 4px 14px rgba(99,102,241,0.3)',
               }}
-              onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 6px 28px rgba(99,102,241,0.5), 0 0 0 1px rgba(99,102,241,0.3) inset')}
-              onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 4px 20px rgba(99,102,241,0.4), 0 0 0 1px rgba(99,102,241,0.2) inset')}
+              onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 6px 24px rgba(99,102,241,0.4)')}
+              onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 4px 14px rgba(99,102,241,0.3)')}
             >
               {loading ? (
                 <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Signing in...</span></>
@@ -548,34 +533,34 @@ export default function LoginPage() {
             {GOOGLE_CLIENT_ID && (
               <div className="mt-5">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
-                  <span className="text-xs font-medium" style={{ color: '#64748b' }}>or</span>
-                  <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+                  <div className="flex-1 h-px" style={{ background: '#e2e8f0' }} />
+                  <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>or</span>
+                  <div className="flex-1 h-px" style={{ background: '#e2e8f0' }} />
                 </div>
                 <div ref={googleBtnRef} className="flex justify-center" />
               </div>
             )}
 
-            <div className="mt-5 pt-5" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="mt-5 pt-5" style={{ borderTop: '1px solid #e2e8f0' }}>
               {/* Demo accounts toggle */}
               <div className="relative">
                 {!showDemo && (
                   <span className="absolute inset-0 rounded-xl opacity-0 animate-[demo-ping_2s_ease-out_infinite]"
-                        style={{ background: 'rgba(99,102,241,0.3)' }} />
+                        style={{ background: 'rgba(99,102,241,0.15)' }} />
                 )}
                 <button
                   type="button"
                   onClick={() => setShowDemo(v => !v)}
                   className="relative w-full flex items-center justify-center gap-2 text-sm font-bold transition-all duration-200 py-2.5 px-4 rounded-xl"
                   style={showDemo ? {
-                    background: 'rgba(99,102,241,0.1)',
-                    border: '1px solid rgba(99,102,241,0.3)',
-                    color: '#a5b4fc',
+                    background: 'rgba(99,102,241,0.06)',
+                    border: '1px solid rgba(99,102,241,0.2)',
+                    color: '#6366f1',
                   } : {
-                    background: 'linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.1))',
-                    border: '1px solid rgba(99,102,241,0.3)',
-                    color: '#a5b4fc',
-                    boxShadow: '0 0 0 3px rgba(99,102,241,0.1), 0 2px 12px rgba(99,102,241,0.15)',
+                    background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(139,92,246,0.06))',
+                    border: '1px solid rgba(99,102,241,0.2)',
+                    color: '#6366f1',
+                    boxShadow: '0 0 0 3px rgba(99,102,241,0.06), 0 2px 8px rgba(99,102,241,0.08)',
                   }}
                 >
                   <FeatureIcon name="key" className={`w-4 h-4 transition-transform duration-300 ${!showDemo ? 'animate-bounce' : ''}`} />
@@ -599,37 +584,37 @@ export default function LoginPage() {
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left group"
                       style={{
-                        background: 'rgba(255,255,255,0.03)',
-                        border: '1px solid rgba(255,255,255,0.08)',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
                       }}
                       onMouseEnter={e => { e.currentTarget.style.background = acc.bg; e.currentTarget.style.borderColor = `${acc.color}40` }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#e2e8f0' }}
                     >
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                           style={{ background: acc.bg, border: `1px solid ${acc.color}30` }}>
+                           style={{ background: acc.bg, border: `1px solid ${acc.color}25` }}>
                         <FeatureIcon name="shield" className="w-4 h-4" style={{ color: acc.color }} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold transition-colors" style={{ color: '#e2e8f0' }}>{acc.role}</div>
-                        <div className="text-xs font-mono truncate" style={{ color: '#64748b' }}>{acc.phone}</div>
+                        <div className="text-sm font-semibold" style={{ color: '#1e293b' }}>{acc.role}</div>
+                        <div className="text-xs font-mono truncate" style={{ color: '#94a3b8' }}>{acc.phone}</div>
                       </div>
                       <span className="text-xs flex-shrink-0 font-medium" style={{ color: acc.color }}>Use</span>
                     </button>
                   ))}
-                  <p className="text-center pt-1" style={{ fontSize: '11px', color: '#475569' }}>
+                  <p className="text-center pt-1" style={{ fontSize: '11px', color: '#94a3b8' }}>
                     These are read-only demo accounts — data is shared.
                   </p>
                 </div>
               )}
 
               {filledRole && !showDemo && (
-                <p className="text-xs text-center mt-2 font-medium" style={{ color: '#34d399' }}>
+                <p className="text-xs text-center mt-2 font-medium" style={{ color: '#059669' }}>
                   Filled as {filledRole} — press Sign In
                 </p>
               )}
 
               {!showDemo && !filledRole && (
-                <p className="text-xs text-center mt-2" style={{ color: '#475569' }}>
+                <p className="text-xs text-center mt-2" style={{ color: '#94a3b8' }}>
                   Having trouble? Contact your supervisor or administrator.
                 </p>
               )}
