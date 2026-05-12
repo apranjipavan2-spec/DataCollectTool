@@ -1486,42 +1486,89 @@ export default function Dashboard() {
           {/* ── Loading skeleton ── */}
           {loading && <DashboardSkeleton />}
 
+          {/* Welcome Header */}
+          {!loading && (
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-catalan-text">
+                  {new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'}, {user.name?.split(' ')[0] || 'there'}
+                </h2>
+                <p className="text-sm text-catalan-textMuted mt-0.5">
+                  {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+              </div>
+              {summary && (
+                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
+                     style={{ background: 'rgba(137,180,250,0.1)', border: '1px solid rgba(137,180,250,0.2)', color: '#89b4fa' }}>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse" />
+                  Live · Last synced {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Stat Cards */}
           {!loading && <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <Card className="border-l-4 border-l-catalan-primary">
-              <div className="text-sm font-medium text-catalan-textMuted mb-1">Total Submissions</div>
-              <div className="text-xs text-catalan-textMuted/70 mb-3">All synced field data</div>
-              <div className="text-4xl font-bold text-catalan-primary">{stats.totalSubs}</div>
-            </Card>
-            <Card className="border-l-4 border-l-catalan-success">
-              <div className="text-sm font-medium text-catalan-textMuted mb-1">Active Forms</div>
-              <div className="text-xs text-catalan-textMuted/70 mb-3">Published and collecting</div>
-              <div className="text-4xl font-bold text-catalan-success">{stats.totalForms}</div>
-            </Card>
-            <Card className="border-l-4 border-l-catalan-info">
-              <div className="text-sm font-medium text-catalan-textMuted mb-1">Team Members</div>
-              <div className="text-xs text-catalan-textMuted/70 mb-3">Enumerators & supervisors</div>
-              <div className="text-4xl font-bold text-catalan-info">{stats.teamSize}</div>
-            </Card>
-            <Card className="border-l-4 border-l-catalan-warning">
-              <div className="text-sm font-medium text-catalan-textMuted mb-1">Flagged</div>
-              <div className="text-xs text-catalan-textMuted/70 mb-3">Requiring manual review</div>
-              <div className="text-4xl font-bold text-catalan-warning">{stats.flagged}</div>
-            </Card>
-            <Card className={`border-l-4 ${syncQueue.outbox + syncQueue.media > 0 ? 'border-l-orange-400' : 'border-l-catalan-border'}`}>
-              <div className="text-sm font-medium text-catalan-textMuted mb-1">Pending Upload</div>
-              <div className="text-xs text-catalan-textMuted/70 mb-3">
-                {syncQueue.outbox > 0 ? `${syncQueue.outbox} form${syncQueue.outbox !== 1 ? 's' : ''}` : 'All synced'}
-                {syncQueue.media > 0 ? ` · ${syncQueue.media} photo${syncQueue.media !== 1 ? 's' : ''}` : ''}
+            {[
+              {
+                label: 'Total Submissions', sub: 'All synced field data', value: stats.totalSubs,
+                gradient: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(99,102,241,0.05))',
+                border: 'rgba(99,102,241,0.25)', color: '#818cf8',
+                icon: <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />,
+              },
+              {
+                label: 'Active Forms', sub: 'Published and collecting', value: stats.totalForms,
+                gradient: 'linear-gradient(135deg, rgba(52,211,153,0.15), rgba(52,211,153,0.05))',
+                border: 'rgba(52,211,153,0.25)', color: '#34d399',
+                icon: <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
+              },
+              {
+                label: 'Team Members', sub: 'Enumerators & supervisors', value: stats.teamSize,
+                gradient: 'linear-gradient(135deg, rgba(96,165,250,0.15), rgba(96,165,250,0.05))',
+                border: 'rgba(96,165,250,0.25)', color: '#60a5fa',
+                icon: <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />,
+              },
+              {
+                label: 'Flagged', sub: 'Requiring manual review', value: stats.flagged,
+                gradient: 'linear-gradient(135deg, rgba(251,191,36,0.15), rgba(251,191,36,0.05))',
+                border: 'rgba(251,191,36,0.25)', color: '#fbbf24',
+                icon: <path d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2z" />,
+              },
+              {
+                label: 'Pending Upload',
+                sub: syncQueue.outbox > 0 ? `${syncQueue.outbox} form${syncQueue.outbox !== 1 ? 's' : ''}${syncQueue.media > 0 ? ` · ${syncQueue.media} photo${syncQueue.media !== 1 ? 's' : ''}` : ''}` : 'All synced',
+                value: syncQueue.outbox + syncQueue.media,
+                gradient: syncQueue.outbox + syncQueue.media > 0
+                  ? 'linear-gradient(135deg, rgba(251,146,60,0.15), rgba(251,146,60,0.05))'
+                  : 'linear-gradient(135deg, rgba(100,116,139,0.1), rgba(100,116,139,0.03))',
+                border: syncQueue.outbox + syncQueue.media > 0 ? 'rgba(251,146,60,0.25)' : 'rgba(100,116,139,0.15)',
+                color: syncQueue.outbox + syncQueue.media > 0 ? '#fb923c' : '#64748b',
+                icon: <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />,
+              },
+            ].map(card => (
+              <div key={card.label}
+                className="rounded-xl p-5 transition-all duration-200 hover:scale-[1.02] cursor-default"
+                style={{ background: card.gradient, border: `1px solid ${card.border}` }}>
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <div className="text-sm font-medium text-catalan-textMuted">{card.label}</div>
+                    <div className="text-xs text-catalan-textMuted/70 mt-0.5">{card.sub}</div>
+                  </div>
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                       style={{ background: `${card.color}18` }}>
+                    <svg className="w-5 h-5" style={{ color: card.color }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      {card.icon}
+                    </svg>
+                  </div>
+                </div>
+                <div className="text-3xl font-bold" style={{ color: card.color }}>{typeof card.value === 'number' ? card.value.toLocaleString() : card.value}</div>
               </div>
-              <div className={`text-4xl font-bold ${syncQueue.outbox + syncQueue.media > 0 ? 'text-orange-500' : 'text-catalan-textMuted'}`}>
-                {syncQueue.outbox + syncQueue.media}
-              </div>
-            </Card>
+            ))}
           </div>}
 
           {/* Tabs + Content (hidden while loading) */}
-          {!loading && <><div className="hidden sm:flex gap-1 bg-catalan-surface rounded-lg p-1 w-fit flex-wrap">
+          {!loading && <><div className="hidden sm:flex gap-1 rounded-xl p-1 w-fit flex-wrap"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             {(isEnumerator
               ? (['overview', 'submissions', 'forms'] as const)
               : (['overview', 'submissions', 'analytics', 'scorecard', 'forms', 'team', 'roster'] as const)
@@ -1531,14 +1578,16 @@ export default function Dashboard() {
                 onClick={() => {
                   setTab(t)
                   if (t === 'team') loadSchedules()
-
-
                 }}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
                   tab === t
-                    ? 'bg-catalan-primary text-catalan-bg shadow-sm'
+                    ? 'text-white shadow-sm'
                     : 'text-catalan-textMuted hover:text-catalan-text hover:bg-catalan-hover'
                 }`}
+                style={tab === t ? {
+                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+                } : undefined}
               >
                 {t === 'roster' ? 'Roster' : t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
@@ -1578,12 +1627,18 @@ export default function Dashboard() {
                         <div
                           key={sub.id}
                           onClick={() => openDetail(sub.id)}
-                          className="flex justify-between items-start p-3 bg-catalan-hover rounded border border-catalan-border cursor-pointer hover:border-catalan-primary/50 transition-colors"
+                          className="flex justify-between items-start p-3.5 rounded-xl cursor-pointer transition-all duration-200 hover:scale-[1.01]"
+                          style={{
+                            background: 'rgba(255,255,255,0.02)',
+                            border: '1px solid rgba(255,255,255,0.06)',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.06)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.2)' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)' }}
                         >
                           <div>
                             <p className="text-sm font-medium text-catalan-text">{sub.enumerator_name}</p>
                             <p className="text-xs text-catalan-textMuted mt-0.5">
-                              {new Date(sub.server_received_at).toLocaleDateString()}
+                              {new Date(sub.server_received_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                             </p>
                           </div>
                           <StatusBadge status={sub.status} />
@@ -1613,7 +1668,8 @@ export default function Dashboard() {
                   ) : (
                     <div className="space-y-2">
                       {forms.slice(0, 5).map(form => (
-                        <div key={form.id} className="flex justify-between items-center p-3 bg-catalan-hover rounded border border-catalan-border">
+                        <div key={form.id} className="flex justify-between items-center p-3.5 rounded-xl transition-all duration-200"
+                          style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                           <div>
                             <p className="text-sm font-medium text-catalan-text">{form.title}</p>
                             <p className="text-xs text-catalan-textMuted mt-0.5">v{form.version}</p>

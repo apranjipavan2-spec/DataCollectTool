@@ -81,7 +81,8 @@
   }
 
   .card {
-    @apply bg-catalan-surface border border-catalan-border rounded-lg p-6;
+    @apply bg-catalan-surface border border-catalan-border rounded-xl p-6;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   }
 
   .input-field {

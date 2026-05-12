@@ -275,7 +275,7 @@ const TopNav: React.FC<TopNavProps> = ({ title, titleNode, breadcrumbs, rightCon
   }, [])
 
   return (
-    <div className="bg-catalan-surface border-b border-catalan-border sticky top-0 z-30">
+    <div className="bg-catalan-surface border-b border-catalan-border sticky top-0 z-30" style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', background: 'var(--color-catalan-surface, rgba(30,30,46,0.85))' }}>
       <div className="flex items-center justify-between h-16 px-6 pl-14 md:pl-6">
 
         {/* Left: Title/Breadcrumbs */}
