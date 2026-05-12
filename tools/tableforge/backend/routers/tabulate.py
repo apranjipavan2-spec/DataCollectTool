@@ -868,9 +868,33 @@ async def tabulate(config: TableConfig):
                 if subtotal_cols:
                     pivot = pivot.drop(columns=subtotal_cols)
                     if column_groups:
-                        # Rebuild column groups without subtotal columns
-                        remaining = [str(c) for c in pivot.columns if c not in config.rows]
-                        column_groups = None
+                        # Rebuild column_groups from remaining non-row columns
+                        non_row_headers = [str(c) for c in pivot.columns if c not in config.rows]
+                        # Parse "TopGroup | SubLabel" back into top/bottom
+                        top_labels = []
+                        bot_labels = []
+                        for h in non_row_headers:
+                            if " | " in h:
+                                parts = h.split(" | ", 1)
+                                top_labels.append(parts[0])
+                                bot_labels.append(parts[1])
+                            else:
+                                top_labels.append(h)
+                                bot_labels.append(h)
+                        groups = []
+                        i = 0
+                        while i < len(top_labels):
+                            label = top_labels[i]
+                            span = 1
+                            while i + span < len(top_labels) and top_labels[i + span] == label:
+                                span += 1
+                            groups.append({"label": label, "colspan": span, "colstart": i})
+                            i += span
+                        column_groups = {
+                            "top": groups,
+                            "bottom": bot_labels,
+                            "has_multi_level": len(set(top_labels)) > 1,
+                        }
 
             headers = [str(c) for c in pivot.columns]
             rows = sanitize_for_json(pivot.fillna(config.missing_data).values.tolist())

@@ -344,6 +344,18 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
   const borderPreset = tableConfig?.border_preset || 'full';
   const frozenCol = tableConfig?.frozen_first_col ?? false;
   const headerWrap = tableConfig?.header_word_wrap ?? false;
+
+  // Column-group separator: track which absolute column indices start a new group
+  const groupStartCols = new Set<number>();
+  if (result?.column_groups?.has_multi_level) {
+    const nRowCols = tableConfig?.rows?.length || 0;
+    let offset = nRowCols;
+    for (const g of result.column_groups.top) {
+      if (offset > nRowCols) groupStartCols.add(offset);
+      offset += g.colspan;
+    }
+  }
+  const groupBorderStyle = '2px solid var(--border-strong, #475569)';
   const zoomLevel = tableConfig?.zoom_level || 100;
   const zoomClass = zoomLevel !== 100 ? `zoom-${zoomLevel}` : '';
   const footnotes = tableConfig?.footnotes || [];
@@ -392,7 +404,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                   ))}
                   {/* Top-level merged headers */}
                   {groups.map((g, gi) => (
-                    <th key={gi} colSpan={g.colspan} style={{ textAlign: 'center', borderColor: tv.borderColor, background: tv.headerBg, color: tv.headerColor }}>
+                    <th key={gi} colSpan={g.colspan} style={{ textAlign: 'center', borderColor: tv.borderColor, background: tv.headerBg, color: tv.headerColor, ...(gi > 0 ? { borderLeft: groupBorderStyle } : {}) }}>
                       {g.label}
                     </th>
                   ))}
@@ -420,7 +432,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                         setEditHeaderVal(displayH);
                       }
                     }}
-                    style={{ cursor: 'pointer', borderColor: tv.borderColor, textAlign: headerAlign as any, ...(isSubtotalCol ? { fontWeight: 600, background: 'rgba(59,130,246,0.08)' } : {}), ...getHeaderStyle(h, tv) }}>
+                    style={{ cursor: 'pointer', borderColor: tv.borderColor, textAlign: headerAlign as any, ...(isSubtotalCol ? { fontWeight: 600, background: 'rgba(59,130,246,0.08)' } : {}), ...(groupStartCols.has(i) ? { borderLeft: groupBorderStyle } : {}), ...getHeaderStyle(h, tv) }}>
                     {editingHeader === i ? (
                       <input
                         autoFocus
@@ -503,6 +515,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                           ...(ci < numRowFields && rowLabelBg && !isGrandTotal ? { backgroundColor: rowLabelBg } : {}),
                           ...(ci >= numRowFields && tableBgColor && !isGrandTotal ? { backgroundColor: tableBgColor } : {}),
                           ...(isSubtotalCol && !isGrandTotal ? { fontWeight: 600, backgroundColor: 'rgba(59,130,246,0.04)' } : {}),
+                          ...(groupStartCols.has(ci) ? { borderLeft: groupBorderStyle } : {}),
                           ...cfStyle, ...annStyle, ...(colW ? { minWidth: colW } : {}),
                         }}
                         onClick={() => { setKbCell({ r: ri, c: ci }); handleCellClick(ri, ci); }}
