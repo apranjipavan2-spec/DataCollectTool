@@ -32,6 +32,7 @@ class TableConfig(BaseModel):
     missing_data: str = ""
     date_groupings: dict = {}       # {col_name: "year"|"quarter"|"month"|"week"|"day"}
     blank_suppress: bool = False    # hide rows where all value cols are 0/blank
+    hide_subgroup: bool = False     # hide detail rows, show only subtotals/grand totals
 
 
 AGG_MAP = {
@@ -41,7 +42,7 @@ AGG_MAP = {
     "count_distinct": "nunique", "first": "first", "last": "last",
 }
 
-PERCENT_AGGS = {"pct_grand", "pct_row", "pct_col", "pct_parent_row", "pct_parent_col"}
+PERCENT_AGGS = {"pct_grand", "pct_row", "pct_col", "pct_parent_row", "pct_parent_col", "pct_subgroup"}
 SPECIAL_AGGS = {"running_total", "cumulative_sum", "rank_asc", "rank_desc", "index"}
 # Aggregations that require numeric values — auto-downgrade to 'count' for text/multi-choice columns
 NUMERIC_ONLY_AGGS = {"sum", "average", "mean", "min", "max", "median", "std", "var"}
@@ -250,6 +251,15 @@ async def tabulate(config: TableConfig):
                         if parent_col in result_df.columns:
                             parent_sums = result_df.groupby(parent_col)[series.name].transform("sum")
                             return (series / parent_sums.replace(0, np.nan) * 100).round(dec_places)
+                    elif show_as == "pct_subgroup" and len(rows) > 1:
+                        parent_col = rows[0]
+                        if parent_col in result_df.columns:
+                            parent_sums = result_df.groupby(parent_col)[series.name].transform("sum")
+                            return (series / parent_sums.replace(0, np.nan) * 100).round(dec_places)
+                    elif show_as == "pct_subgroup" and len(rows) == 1:
+                        total = series.sum()
+                        if total != 0:
+                            return (series / total * 100).round(dec_places)
                     elif show_as == "pct_row":
                         return series  # handled later in pivot path
                     elif show_as == "pct_col":
@@ -517,6 +527,17 @@ async def tabulate(config: TableConfig):
                 keep = (numeric_mask != 0).any(axis=1)
                 grand_total_mask = result[config.rows[0]].astype(str) == "Grand Total" if config.rows else pd.Series(True, index=result.index)
                 result = result[keep | grand_total_mask].reset_index(drop=True)
+
+            # Hide subgroup detail rows — keep only subtotal and grand total rows
+            if config.hide_subgroup and config.subtotals and len(config.rows) >= 1:
+                def _is_summary_row(row):
+                    for rc in config.rows:
+                        val = str(row.get(rc, ""))
+                        if "Subtotal" in val or "Grand Total" in val:
+                            return True
+                    return False
+                mask = result.apply(_is_summary_row, axis=1)
+                result = result[mask].reset_index(drop=True)
 
             # Remove internal __note__ column, preserve it for response
             note = None
@@ -793,6 +814,19 @@ async def tabulate(config: TableConfig):
                             col_sum = pivot_df[c].sum()
                             if col_sum != 0:
                                 pivot_df[c] = (pivot_df[c] / col_sum * 100).round(decimal_places)
+                elif sa == "pct_subgroup":
+                    # Each cell as % of its row-group (subgroup) total
+                    if len(config.rows) > 1 and config.rows[0] in pivot_df.columns:
+                        parent_col = config.rows[0]
+                        for c in data_cols:
+                            parent_sums = pivot_df.groupby(parent_col)[c].transform("sum")
+                            pivot_df[c] = (pivot_df[c] / parent_sums.replace(0, np.nan) * 100).round(decimal_places)
+                    else:
+                        # Single row: same as pct_grand
+                        grand = pivot_df[data_cols].values.sum() if data_cols else pivot_df[numeric_cols].values.sum()
+                        if grand != 0:
+                            for c in numeric_cols:
+                                pivot_df[c] = (pivot_df[c] / grand * 100).round(decimal_places)
                 return pivot_df
 
             if combo_show_as and combo_show_as != "normal":
@@ -817,6 +851,18 @@ async def tabulate(config: TableConfig):
             if dec is not None:
                 for c in pivot.select_dtypes(include=[np.number]).columns:
                     pivot[c] = pivot[c].round(int(dec))
+
+            # Hide subgroup detail rows in pivot — keep only subtotal and grand total rows
+            if config.hide_subgroup and config.subtotals and len(config.rows) >= 1:
+                def _is_summary_pivot(row):
+                    for rc in config.rows:
+                        if rc in row.index:
+                            val = str(row[rc])
+                            if "Subtotal" in val or "Grand Total" in val:
+                                return True
+                    return False
+                mask = pivot.apply(_is_summary_pivot, axis=1)
+                pivot = pivot[mask].reset_index(drop=True)
 
             headers = [str(c) for c in pivot.columns]
             rows = sanitize_for_json(pivot.fillna(config.missing_data).values.tolist())

@@ -36,6 +36,7 @@ const SHOW_AS_OPTIONS = [
   { value: 'pct_col', label: '% of Column Total', group: 'Percentage' },
   { value: 'pct_parent_row', label: '% of Parent Row', group: 'Percentage' },
   { value: 'pct_parent_col', label: '% of Parent Col', group: 'Percentage' },
+  { value: 'pct_subgroup', label: '% of Each Subgroup', group: 'Percentage' },
   { value: 'running_total', label: 'Running Total', group: 'Sequential' },
   { value: 'rank_asc', label: 'Rank (Smallest to Largest)', group: 'Sequential' },
   { value: 'rank_desc', label: 'Rank (Largest to Smallest)', group: 'Sequential' },
@@ -277,6 +278,7 @@ export function DropZones({ table, columns, draggedField, onDrop, onRemove, onAg
                               <option value="pct_col">Value (% of Column)</option>
                               <option value="pct_parent_row">Value (% of Parent Row)</option>
                               <option value="pct_parent_col">Value (% of Parent Col)</option>
+                              <option value="pct_subgroup">Value (% of Subgroup)</option>
                             </select>
                           </div>
 
@@ -363,7 +365,7 @@ export function DropZones({ table, columns, draggedField, onDrop, onRemove, onAg
               ))}
               <div className="ctx-divider" />
               <div className="ctx-section">Show Values As...</div>
-              {['normal', 'pct_grand', 'pct_row', 'pct_col'].map(sa => (
+              {['normal', 'pct_grand', 'pct_row', 'pct_col', 'pct_subgroup'].map(sa => (
                 <button key={sa} className="ctx-item" onClick={() => {
                   onValueFieldUpdate(contextMenu.field, { show_as: sa });
                   setContextMenu(null);

@@ -353,6 +353,7 @@ export default function App() {
       multi_sort: config.multi_sort,
       date_groupings: config.date_groupings,
       blank_suppress: config.blank_suppress,
+      hide_subgroup: config.hide_subgroup,
     });
     setResults(prev => {
       const next = new Map(prev);

@@ -391,8 +391,23 @@ function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0
   onAction: (action: string) => void; onUpdate: (update: Partial<TableConfig>) => void;
   projectFilterCount?: number;
 }) {
+  const [openDrop, setOpenDrop] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const t = table;
+  const dis = !t;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpenDrop(null);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const tog = (name: string) => setOpenDrop(o => o === name ? null : name);
+
   return (
-    <>
+    <div ref={containerRef} style={{ display: 'contents' }}>
       <RGroup label="File">
         <ImportDropdownBtn onAction={onAction} />
         <RBtn icon="💾" label="Save"    onClick={() => onAction('save')}   disabled={!dataset} />
@@ -406,15 +421,98 @@ function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0
       </RGroup>
       <RGroup label="Table">
         <TemplateDropdown table={table} onAction={onAction} disabled={!dataset} />
-        <RBtn icon="Σ" label="Totals"    onClick={() => table && onUpdate({ grand_total: !table.grand_total, grand_total_rows: !table.grand_total, grand_total_columns: !table.grand_total })} disabled={!dataset} active={table?.grand_total} />
-        <RBtn icon="⊞" label="Subtotals" onClick={() => table && onUpdate({ subtotals: !table.subtotals })}    disabled={!dataset} active={table?.subtotals} />
         <RBtn icon="⇄" label="Transpose" onClick={() => onAction('transpose')} disabled={!dataset} />
+      </RGroup>
+      <RGroup label="Totals & Subtotals" style={{ position: 'relative' }}>
+        <button className={`ribbon-btn fdrop-btn ${openDrop === 'totals' ? 'active' : ''}`}
+          onClick={() => tog('totals')} disabled={dis}>
+          <span className="ribbon-btn-icon">Σ</span>
+          <span className="ribbon-btn-label">Totals ▾</span>
+        </button>
+        {openDrop === 'totals' && t && (
+          <FDrop width={270}>
+            <FTitle>Totals & Subtotals</FTitle>
+            <div className="fdrop-toggle-stack">
+              <FToggle label="Grand Totals (All)"       checked={t.grand_total}    onChange={v => onUpdate({ grand_total: v, grand_total_rows: v, grand_total_columns: v })} />
+              <FToggle label="Row Total (bottom row)"    checked={t.grand_total_rows ?? t.grand_total}  onChange={v => onUpdate({ grand_total_rows: v, grand_total: v && (t.grand_total_columns ?? t.grand_total) })} />
+              <FToggle label="Column Total (last column)" checked={t.grand_total_columns ?? t.grand_total} onChange={v => onUpdate({ grand_total_columns: v, grand_total: v && (t.grand_total_rows ?? t.grand_total) })} />
+              <FToggle label="Subtotals (hierarchical)" checked={t.subtotals}      onChange={v => onUpdate({ subtotals: v })} />
+            </div>
+            {t.subtotals && (
+              <>
+              <FField label="Subtotal Position" style={{ marginTop: 8 }}>
+                <select value={t.subtotals_position || 'bottom'} className="fdrop-select"
+                  onChange={e => onUpdate({ subtotals_position: e.target.value as any })}>
+                  <option value="bottom">Bottom of Group</option>
+                  <option value="top">Top of Group</option>
+                </select>
+              </FField>
+              <FField label="Percentage Base" style={{ marginTop: 8 }}>
+                <select value={t.subtotal_pct_base || 'grand_total'} className="fdrop-select"
+                  onChange={e => onUpdate({ subtotal_pct_base: e.target.value as any })}>
+                  <option value="grand_total">100% = Grand Total (full row)</option>
+                  <option value="subtotal">100% = Each Subtotal Group</option>
+                </select>
+              </FField>
+              <FToggle label="Hide subgroup rows (show only totals)" checked={t.hide_subgroup ?? false}
+                onChange={v => onUpdate({ hide_subgroup: v })} />
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4, padding: '4px 2px' }}>
+                {(t.subtotal_pct_base || 'grand_total') === 'subtotal'
+                  ? 'Each subtotal group sums to 100%. Use when comparing within groups.'
+                  : 'Full row sums to 100%. Subtotals show their share of the grand total.'}
+              </div>
+              </>
+            )}
+            <FDivider />
+            <FField label="Missing Data Display">
+              <select value={t.missing_data || ''} className="fdrop-select"
+                onChange={e => onUpdate({ missing_data: e.target.value })}>
+                <option value="">Leave Blank</option>
+                <option value="0">0</option>
+                <option value="N/A">N/A</option>
+                <option value="–">– (dash)</option>
+                <option value="n/a">n/a</option>
+                <option value=".">.</option>
+              </select>
+            </FField>
+            <FDivider />
+            <FTitle>Multi-Column Sort</FTitle>
+            {(t.multi_sort || []).map((sk, i) => (
+              <div key={i} className="fdrop-sort-row">
+                <select value={sk.field} className="fdrop-select" style={{ flex: 2 }}
+                  onChange={e => {
+                    const arr = [...(t.multi_sort || [])];
+                    arr[i] = { ...arr[i], field: e.target.value };
+                    onUpdate({ multi_sort: arr });
+                  }}>
+                  <option value="">-- field --</option>
+                  {t.values.map(v => <option key={v.field} value={v.label || v.field}>{v.label || v.field}</option>)}
+                  {t.rows.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <select value={sk.order} className="fdrop-select" style={{ flex: 1 }}
+                  onChange={e => {
+                    const arr = [...(t.multi_sort || [])];
+                    arr[i] = { ...arr[i], order: e.target.value as any };
+                    onUpdate({ multi_sort: arr });
+                  }}>
+                  <option value="asc">Asc ▲</option>
+                  <option value="desc">Desc ▼</option>
+                </select>
+                <button className="fdrop-reset-btn"
+                  onClick={() => onUpdate({ multi_sort: (t.multi_sort || []).filter((_, j) => j !== i) })}>✕</button>
+              </div>
+            ))}
+            <button className="fdrop-ghost-btn" style={{ marginTop: 4 }}
+              onClick={() => onUpdate({ multi_sort: [...(t.multi_sort || []), { field: '', order: 'asc' as const }] })}>
+              + Add Sort Key
+            </button>
+          </FDrop>
+        )}
       </RGroup>
       <RGroup label="Sort & Filter">
         <RBtn icon="↕" label="Sort A-Z" onClick={() => table && onUpdate({ sort_order: 'asc' })}  disabled={!dataset} />
         <RBtn icon="↕" label="Sort Z-A" onClick={() => table && onUpdate({ sort_order: 'desc' })} disabled={!dataset} />
         <RBtn icon="🔍" label="Filters" onClick={() => onAction('filter_panel')} disabled={!dataset} />
-        {/* Project-level filter — distinct from per-table filter */}
         <div style={{ position: 'relative', display: 'inline-flex' }}>
           <button
             className={`ribbon-btn ${projectFilterCount > 0 ? 'active' : ''}`}
@@ -462,7 +560,7 @@ function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0
           <option value=".">.</option>
         </select>
       </RGroup>
-    </>
+    </div>
   );
 }
 
@@ -953,93 +1051,7 @@ function FormatRibbon({ table, onUpdate, columns = [], onColumnTypeChange }: {
         )}
       </RGroup>
 
-      {/* ── 7. TOTALS / DATA ─────────────────────────── */}
-      <RGroup label="Totals" style={{ position: 'relative' }}>
-        <button className={`ribbon-btn fdrop-btn ${openDrop === 'totals' ? 'active' : ''}`}
-          onClick={() => tog('totals')} disabled={dis}>
-          <span className="ribbon-btn-icon">Σ</span>
-          <span className="ribbon-btn-label">Totals ▾</span>
-        </button>
-        {openDrop === 'totals' && t && (
-          <FDrop width={270}>
-            <FTitle>Totals & Subtotals</FTitle>
-            <div className="fdrop-toggle-stack">
-              <FToggle label="Grand Totals (All)"       checked={t.grand_total}    onChange={v => onUpdate({ grand_total: v, grand_total_rows: v, grand_total_columns: v })} />
-              <FToggle label="Row Total (bottom row)"    checked={t.grand_total_rows ?? t.grand_total}  onChange={v => onUpdate({ grand_total_rows: v, grand_total: v && (t.grand_total_columns ?? t.grand_total) })} />
-              <FToggle label="Column Total (last column)" checked={t.grand_total_columns ?? t.grand_total} onChange={v => onUpdate({ grand_total_columns: v, grand_total: v && (t.grand_total_rows ?? t.grand_total) })} />
-              <FToggle label="Subtotals (hierarchical)" checked={t.subtotals}      onChange={v => onUpdate({ subtotals: v })} />
-            </div>
-            {t.subtotals && (
-              <>
-              <FField label="Subtotal Position" style={{ marginTop: 8 }}>
-                <select value={t.subtotals_position || 'bottom'} className="fdrop-select"
-                  onChange={e => onUpdate({ subtotals_position: e.target.value as any })}>
-                  <option value="bottom">Bottom of Group</option>
-                  <option value="top">Top of Group</option>
-                </select>
-              </FField>
-              <FField label="Percentage Base" style={{ marginTop: 8 }}>
-                <select value={t.subtotal_pct_base || 'grand_total'} className="fdrop-select"
-                  onChange={e => onUpdate({ subtotal_pct_base: e.target.value as any })}>
-                  <option value="grand_total">100% = Grand Total (full row)</option>
-                  <option value="subtotal">100% = Each Subtotal Group</option>
-                </select>
-              </FField>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4, padding: '4px 2px' }}>
-                {(t.subtotal_pct_base || 'grand_total') === 'subtotal'
-                  ? 'Each subtotal group sums to 100%. Use when comparing within groups (e.g. user types).'
-                  : 'Full row sums to 100%. Subtotals show their share of the grand total.'}
-              </div>
-              </>
-            )}
-            <FDivider />
-            <FField label="Missing Data Display">
-              <select value={t.missing_data || ''} className="fdrop-select"
-                onChange={e => onUpdate({ missing_data: e.target.value })}>
-                <option value="">Leave Blank</option>
-                <option value="0">0</option>
-                <option value="N/A">N/A</option>
-                <option value="–">– (dash)</option>
-                <option value="n/a">n/a</option>
-                <option value=".">.</option>
-              </select>
-            </FField>
-            <FDivider />
-            <FTitle>Multi-Column Sort</FTitle>
-            {(t.multi_sort || []).map((sk, i) => (
-              <div key={i} className="fdrop-sort-row">
-                <select value={sk.field} className="fdrop-select" style={{ flex: 2 }}
-                  onChange={e => {
-                    const arr = [...(t.multi_sort || [])];
-                    arr[i] = { ...arr[i], field: e.target.value };
-                    onUpdate({ multi_sort: arr });
-                  }}>
-                  <option value="">-- field --</option>
-                  {t.values.map(v => <option key={v.field} value={v.label || v.field}>{v.label || v.field}</option>)}
-                  {t.rows.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-                <select value={sk.order} className="fdrop-select" style={{ flex: 1 }}
-                  onChange={e => {
-                    const arr = [...(t.multi_sort || [])];
-                    arr[i] = { ...arr[i], order: e.target.value as any };
-                    onUpdate({ multi_sort: arr });
-                  }}>
-                  <option value="asc">Asc ▲</option>
-                  <option value="desc">Desc ▼</option>
-                </select>
-                <button className="fdrop-reset-btn"
-                  onClick={() => onUpdate({ multi_sort: (t.multi_sort || []).filter((_, j) => j !== i) })}>✕</button>
-              </div>
-            ))}
-            <button className="fdrop-ghost-btn" style={{ marginTop: 4 }}
-              onClick={() => onUpdate({ multi_sort: [...(t.multi_sort || []), { field: '', order: 'asc' as const }] })}>
-              + Add Sort Key
-            </button>
-          </FDrop>
-        )}
-      </RGroup>
-
-      {/* ── 8. LABELS / HEADERS ──────────────────────── */}
+      {/* ── 7. LABELS / HEADERS ──────────────────────── */}
       <RGroup label="Labels" style={{ position: 'relative' }}>
         <button className={`ribbon-btn fdrop-btn ${openDrop === 'labels' ? 'active' : ''}`}
           onClick={() => tog('labels')} disabled={dis}>

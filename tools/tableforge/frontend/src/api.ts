@@ -65,6 +65,7 @@ export async function tabulate(config: {
   multi_sort?: { field: string; order: 'asc' | 'desc' }[];
   date_groupings?: Record<string, string>;
   blank_suppress?: boolean;
+  hide_subgroup?: boolean;
 }) {
   const res = await fetch(`${API_BASE}/tabulate`, {
     method: 'POST',
