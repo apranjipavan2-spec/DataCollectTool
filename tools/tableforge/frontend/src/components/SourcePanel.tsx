@@ -242,7 +242,7 @@ export function SourcePanel({
   };
 
   const filteredTables = tables.filter(t =>
-    t.name.toLowerCase().includes(tableSearch.toLowerCase())
+    (t.title || t.name).toLowerCase().includes(tableSearch.toLowerCase())
   );
 
   const toggleTableSelect = (id: string, e: React.MouseEvent) => {
@@ -392,7 +392,7 @@ export function SourcePanel({
               <span className="table-nav-drag-grip" title="Drag to reorder">⠿</span>
               <span className="table-nav-num">{realIdx + 1}</span>
               <span className="table-nav-name">
-                <HighlightText text={t.name} search={tableSearch} />
+                <HighlightText text={t.title || t.name} search={tableSearch} />
               </span>
               <span className="table-nav-meta">
                 {hasError && <span className="table-nav-badge error-badge">!</span>}

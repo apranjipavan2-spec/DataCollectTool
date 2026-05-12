@@ -1150,7 +1150,7 @@ export default function App() {
           <div className="table-title-bar">
             <input className="table-title-input" type="text"
               value={activeTable.title} placeholder="Click to add table title..."
-              onChange={e => updateTable({ title: e.target.value, _autoTitle: false } as any)}
+              onChange={e => updateTable({ title: e.target.value, name: e.target.value || activeTable.name, _autoTitle: false } as any)}
               onBlur={e => { if (dataset && e.target.value) logAuditEvent(dataset.dataset_id, 'table_title_change', `Title set to: "${e.target.value}" on table "${activeTable.name}"`); }} />
             <input className="table-subtitle-input" type="text"
               value={activeTable.subtitle} placeholder="Subtitle (optional)"

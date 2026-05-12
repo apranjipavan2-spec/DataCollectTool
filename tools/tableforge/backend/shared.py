@@ -73,6 +73,12 @@ def sanitize_for_json(obj):
         return str(obj)
     if isinstance(obj, np.ndarray):
         return sanitize_for_json(obj.tolist())
+    if isinstance(obj, str):
+        if obj.strip().lower() in ('nan', 'inf', '-inf'):
+            return None
+        obj = obj.replace('(nan%)', '(0%)').replace('(nan)', '(0)')
+        obj = obj.replace('(inf%)', '(0%)').replace('(-inf%)', '(0%)')
+        return obj
     if pd.isna(obj) if not isinstance(obj, (str, list, dict)) else False:
         return None
     return obj

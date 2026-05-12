@@ -289,24 +289,24 @@ async def tabulate(config: TableConfig):
                 if is_combo:
                     # Compute the percentage values
                     pct_values = apply_show_as(result[label].copy(), actual_agg, config.rows, result, dec)
-                    # Format as "value (pct%)" — handle NaN gracefully
+                    # Format as "value (pct%)" — handle NaN/Inf gracefully
                     missing_fill = config.missing_data if config.missing_data else ""
                     combo_col = []
                     for ov, pv in zip(orig_values, pct_values):
                         try:
-                            ov_is_na = pd.isna(ov) if not isinstance(ov, str) else False
-                            pv_is_na = pd.isna(pv) if not isinstance(pv, str) else False
+                            ov_is_na = (isinstance(ov, float) and (pd.isna(ov) or np.isinf(ov))) if not isinstance(ov, str) else False
+                            pv_is_na = (isinstance(pv, float) and (pd.isna(pv) or np.isinf(pv))) if not isinstance(pv, str) else ("nan" in str(pv).lower())
                             if ov_is_na:
                                 combo_col.append(missing_fill)
                             elif pv_is_na:
                                 ov_str = f"{ov:,.{dec}f}" if isinstance(ov, (int, float)) else str(ov)
-                                combo_col.append(ov_str)
+                                combo_col.append(f"{ov_str}\n({missing_fill or '0'}%)")
                             else:
                                 ov_str = f"{ov:,.{dec}f}" if isinstance(ov, (int, float)) else str(ov)
                                 pv_str = f"{pv:.{dec}f}%" if isinstance(pv, (int, float)) else str(pv)
                                 combo_col.append(f"{ov_str}\n({pv_str})")
                         except (ValueError, TypeError):
-                            combo_col.append(missing_fill if pd.isna(ov) else str(ov))
+                            combo_col.append(missing_fill if ov_is_na else str(ov))
                     result[label] = combo_col
                 else:
                     result[label] = apply_show_as(result[label], actual_agg, config.rows, result, dec)
@@ -833,16 +833,25 @@ async def tabulate(config: TableConfig):
                 # Store original values, compute %, then combine
                 orig_pivot = pivot.copy()
                 apply_pivot_show_as(pivot, combo_show_as, dec)
+                missing_fill = config.missing_data if config.missing_data else ""
                 numeric_cols = orig_pivot.select_dtypes(include=[np.number]).columns
                 for c in numeric_cols:
                     combined = []
                     for ov, pv in zip(orig_pivot[c], pivot[c]):
                         try:
-                            ov_s = f"{ov:,.{dec}f}" if isinstance(ov, (int, float)) and not pd.isna(ov) else str(ov)
-                            pv_s = f"{pv:.{dec}f}%" if isinstance(pv, (int, float)) and not pd.isna(pv) else str(pv)
-                            combined.append(f"{ov_s}\n({pv_s})")
+                            ov_na = (isinstance(ov, float) and (pd.isna(ov) or np.isinf(ov))) if not isinstance(ov, str) else False
+                            pv_na = (isinstance(pv, float) and (pd.isna(pv) or np.isinf(pv))) if not isinstance(pv, str) else ("nan" in str(pv).lower())
+                            if ov_na:
+                                combined.append(missing_fill)
+                            elif pv_na:
+                                ov_s = f"{ov:,.{dec}f}" if isinstance(ov, (int, float)) else str(ov)
+                                combined.append(f"{ov_s}\n({missing_fill or '0'}%)")
+                            else:
+                                ov_s = f"{ov:,.{dec}f}" if isinstance(ov, (int, float)) else str(ov)
+                                pv_s = f"{pv:.{dec}f}%" if isinstance(pv, (int, float)) else str(pv)
+                                combined.append(f"{ov_s}\n({pv_s})")
                         except (ValueError, TypeError):
-                            combined.append(str(ov))
+                            combined.append(missing_fill if ov_na else str(ov))
                     pivot[c] = combined
             elif show_as and show_as != "normal":
                 apply_pivot_show_as(pivot, show_as, dec)
