@@ -546,6 +546,68 @@ async def export_word(config: ExportConfig):
         if not headers:
             continue
 
+        styled_html = t.get("styled_html", "")
+        if styled_html:
+            from htmldocx import HtmlToDocx
+            parser = HtmlToDocx()
+            tables_before = len(doc.tables)
+            parser.add_html_to_document(styled_html, doc)
+            if len(doc.tables) > tables_before:
+                tbl = doc.tables[-1]
+                tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+                page_width_emu = section.page_width - section.left_margin - section.right_margin
+                col_px = _col_pixel_widths(t)
+                total_px = sum(col_px) or 1
+                for ci in range(min(len(tbl.columns), len(col_px))):
+                    tbl.columns[ci].width = int(page_width_emu * col_px[ci] / total_px)
+
+            footnote_text = t.get("footnote", "")
+            footnotes_list = t.get("footnotes") or []
+            if footnote_text:
+                fp = doc.add_paragraph()
+                fp.paragraph_format.space_before = Pt(4)
+                fr = fp.add_run(footnote_text)
+                fr.font.size = Pt(8)
+                fr.font.name = BODY_FONT
+                fr.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+                fr.italic = True
+            for fn in footnotes_list:
+                fp = doc.add_paragraph()
+                fr = fp.add_run(f"{fn.get('marker', '*')} {fn.get('text', '')}")
+                fr.font.size = Pt(8)
+                fr.font.name = BODY_FONT
+                fr.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+
+            ann_list = [ann.get("text", "") for ann in t.get("annotations", [])]
+            if ann_list:
+                fn_para = doc.add_paragraph()
+                fn_run = fn_para.add_run("Annotations:")
+                fn_run.bold = True
+                fn_run.font.size = Pt(8)
+                fn_run.font.name = BODY_FONT
+                for i, ann_text in enumerate(ann_list, 1):
+                    fp = doc.add_paragraph(f"[{i}] {ann_text}")
+                    fp.runs[0].font.size = Pt(8)
+                    fp.runs[0].font.name = BODY_FONT
+                    fp.runs[0].font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+
+            interpretation = t.get("interpretation", "")
+            if interpretation:
+                doc.add_paragraph()
+                ip_heading = doc.add_paragraph()
+                ip_run = ip_heading.add_run("Interpretation")
+                ip_run.bold = True
+                ip_run.font.size = Pt(11)
+                ip_run.font.name = BODY_FONT
+                ip_run.font.color.rgb = RGBColor(0x33, 0x33, 0x33)
+                ip = doc.add_paragraph(interpretation)
+                for run in ip.runs:
+                    run.font.size = Pt(10)
+                    run.font.name = BODY_FONT
+                    run.font.color.rgb = RGBColor(0x44, 0x44, 0x44)
+
+            continue
+
         header_row_count = 2 if has_multi_level else 1
 
         table = doc.add_table(rows=header_row_count + len(formatted_rows or rows), cols=len(headers))

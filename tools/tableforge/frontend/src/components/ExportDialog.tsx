@@ -64,6 +64,78 @@ function buildFormattedRows(t: TableConfig, res: TableResult): string[][] {
   });
 }
 
+function buildExportHtml(t: TableConfig, res: TableResult, fmtRows: string[][]): string {
+  const renames = t.header_renames || {};
+  const dispHeaders = res.headers.map(h => renames[h] || h);
+  const allHeaders = t.serial_number ? ['#', ...dispHeaders] : dispHeaders;
+  const nRowCols = (t.rows?.length || 0) + (t.serial_number ? 1 : 0);
+  const cg = res.column_groups;
+  const hasMultiLevel = cg?.has_multi_level;
+
+  const hdrFmtMap: Record<string, any> = {};
+  for (const hf of (t.header_formats || [])) {
+    if (hf.field) {
+      const displayName = renames[hf.field] || hf.field;
+      hdrFmtMap[displayName] = hf;
+    }
+  }
+
+  const headerBg = t.header_bg_color || '#1e293b';
+  const headerColor = t.header_text_color || '#fff';
+  const hdrAlign = t.header_align || 'center';
+  const cellAlign = t.cell_align || 'right';
+  const rowLabelAlign = t.row_label_align || 'left';
+  const totalBg = t.total_bg_color || '#e8f0fe';
+
+  function thStyle(colName: string, align = hdrAlign): string {
+    const fmt = hdrFmtMap[colName];
+    let s = `background:${fmt?.backgroundColor || headerBg};color:${fmt?.color || headerColor};padding:6px 10px;text-align:${align};font-size:12pt;font-family:Calibri,sans-serif;`;
+    if (fmt?.font) s += `font-family:${fmt.font};`;
+    if (fmt?.size) s += `font-size:${Math.round(fmt.size * 0.75)}pt;`;
+    if (fmt?.bold === false) s += 'font-weight:normal;';
+    if (fmt?.italic) s += 'font-style:italic;';
+    return s;
+  }
+
+  let html = '<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-family:Calibri,sans-serif;font-size:12pt;width:100%;">';
+  html += '<thead>';
+
+  if (hasMultiLevel) {
+    html += '<tr>';
+    for (let i = 0; i < nRowCols; i++) {
+      html += `<th rowspan="2" style="${thStyle(allHeaders[i])};vertical-align:middle;">${allHeaders[i]}</th>`;
+    }
+    for (const g of cg!.top) {
+      html += `<th colspan="${g.colspan}" style="background:${headerBg};color:${headerColor};padding:6px 10px;text-align:center;font-size:12pt;font-family:Calibri,sans-serif;">${g.label}</th>`;
+    }
+    html += '</tr><tr>';
+    const bottomLabels = cg!.bottom.map((b: string) => String(b));
+    for (let i = 0; i < bottomLabels.length; i++) {
+      const colIdx = (t.rows?.length || 0) + i;
+      const colName = dispHeaders[colIdx] || bottomLabels[i];
+      html += `<th style="${thStyle(colName)}">${bottomLabels[i]}</th>`;
+    }
+    html += '</tr>';
+  } else {
+    html += '<tr>' + allHeaders.map(h => `<th style="${thStyle(h)}">${h}</th>`).join('') + '</tr>';
+  }
+
+  html += '</thead><tbody>';
+  fmtRows.forEach((row, ri) => {
+    const isGrand = row[0] === 'Grand Total';
+    const zebraStyle = !isGrand && t.zebra && ri % 2 === 1 ? `background:${t.zebra_color || '#f8f9fa'};` : '';
+    const grandStyle = isGrand ? `background:${totalBg};font-weight:bold;` : '';
+    html += '<tr>' + row.map((cell, ci) => {
+      const isValCol = ci >= nRowCols;
+      const align = isValCol ? cellAlign : rowLabelAlign;
+      return `<td style="padding:4px 8px;text-align:${align};font-size:12pt;font-family:Calibri,sans-serif;${grandStyle}${zebraStyle}">${cell}</td>`;
+    }).join('') + '</tr>';
+  });
+  html += '</tbody></table>';
+
+  return html;
+}
+
 interface Props {
   datasetId: string;
   tables: TableConfig[];
@@ -148,6 +220,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
                 })
               : res.rows,
             formatted_rows: fmtRows,
+            styled_html: buildExportHtml(t, res, fmtRows),
             title: t.title, subtitle: t.subtitle, footnote: t.footnote,
             annotations: annotationsMap[t.id] || [],
             interpretation: interpretationsMap[t.id] || '',
@@ -251,6 +324,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
               })
             : res.rows,
           formatted_rows: fmtRows,
+          styled_html: buildExportHtml(t, res, fmtRows),
           title: t.title, subtitle: t.subtitle, footnote: t.footnote,
           header_renames: t.header_renames,
           annotations: annotationsMap[t.id] || [],
