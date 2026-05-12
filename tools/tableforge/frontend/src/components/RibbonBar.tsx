@@ -454,7 +454,7 @@ function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0
                   <option value="subtotal">100% = Each Subtotal Group</option>
                 </select>
               </FField>
-              <FToggle label="Hide subgroup rows (show only totals)" checked={t.hide_subgroup ?? false}
+              <FToggle label="Hide subtotal rows/columns" checked={t.hide_subgroup ?? false}
                 onChange={v => onUpdate({ hide_subgroup: v })} />
               <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4, padding: '4px 2px' }}>
                 {(t.subtotal_pct_base || 'grand_total') === 'subtotal'

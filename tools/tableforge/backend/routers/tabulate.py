@@ -528,16 +528,16 @@ async def tabulate(config: TableConfig):
                 grand_total_mask = result[config.rows[0]].astype(str) == "Grand Total" if config.rows else pd.Series(True, index=result.index)
                 result = result[keep | grand_total_mask].reset_index(drop=True)
 
-            # Hide subgroup detail rows — keep only subtotal and grand total rows
+            # Hide subtotal rows — remove rows labelled "Subtotal" but keep detail and grand total rows
             if config.hide_subgroup and config.subtotals and len(config.rows) >= 1:
-                def _is_summary_row(row):
+                def _is_subtotal_row(row):
                     for rc in config.rows:
                         val = str(row.get(rc, ""))
-                        if "Subtotal" in val or "Grand Total" in val:
+                        if "Subtotal" in val and "Grand Total" not in val:
                             return True
                     return False
-                mask = result.apply(_is_summary_row, axis=1)
-                result = result[mask].reset_index(drop=True)
+                mask = result.apply(_is_subtotal_row, axis=1)
+                result = result[~mask].reset_index(drop=True)
 
             # Remove internal __note__ column, preserve it for response
             note = None
@@ -852,17 +852,25 @@ async def tabulate(config: TableConfig):
                 for c in pivot.select_dtypes(include=[np.number]).columns:
                     pivot[c] = pivot[c].round(int(dec))
 
-            # Hide subgroup detail rows in pivot — keep only subtotal and grand total rows
+            # Hide subtotal rows in pivot — remove "Subtotal" rows but keep detail and grand total
             if config.hide_subgroup and config.subtotals and len(config.rows) >= 1:
-                def _is_summary_pivot(row):
+                def _is_subtotal_pivot(row):
                     for rc in config.rows:
                         if rc in row.index:
                             val = str(row[rc])
-                            if "Subtotal" in val or "Grand Total" in val:
+                            if "Subtotal" in val and "Grand Total" not in val:
                                 return True
                     return False
-                mask = pivot.apply(_is_summary_pivot, axis=1)
-                pivot = pivot[mask].reset_index(drop=True)
+                mask = pivot.apply(_is_subtotal_pivot, axis=1)
+                pivot = pivot[~mask].reset_index(drop=True)
+                # Also remove "| Subtotal" columns if present
+                subtotal_cols = [c for c in pivot.columns if "| Subtotal" in str(c)]
+                if subtotal_cols:
+                    pivot = pivot.drop(columns=subtotal_cols)
+                    if column_groups:
+                        # Rebuild column groups without subtotal columns
+                        remaining = [str(c) for c in pivot.columns if c not in config.rows]
+                        column_groups = None
 
             headers = [str(c) for c in pivot.columns]
             rows = sanitize_for_json(pivot.fillna(config.missing_data).values.tolist())
