@@ -346,14 +346,66 @@ async def export_word(config: ExportConfig):
         trHeight.set(qn('w:hRule'), 'atLeast')
         trPr.append(trHeight)
 
-    # Page setup
+    def _set_cell_margin(cell, top=0, bottom=0, left=28, right=28):
+        """Set cell internal margins (in twips). 28 twips ~ 0.5mm."""
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        tcMar = OxmlElement('w:tcMar')
+        for edge, val in [('top', top), ('bottom', bottom), ('start', left), ('end', right)]:
+            el = OxmlElement(f'w:{edge}')
+            el.set(qn('w:w'), str(val))
+            el.set(qn('w:type'), 'dxa')
+            tcMar.append(el)
+        tcPr.append(tcMar)
+
+    def _estimate_table_width_cm(t_data):
+        """Estimate table width in cm based on column content. Uses ~0.2cm per char at Arial Narrow 9pt."""
+        headers = t_data.get("headers", [])
+        rows = t_data.get("rows", [])
+        formatted_rows = t_data.get("formatted_rows") or []
+        use_fmt = len(formatted_rows) == len(rows)
+        col_widths_cfg = t_data.get("column_widths") or {}
+        total_cm = 0.0
+        for ci, h in enumerate(headers):
+            cfg_w = col_widths_cfg.get(h)
+            if cfg_w:
+                total_cm += cfg_w * 0.0264  # px to cm
+                continue
+            max_len = len(str(h))
+            sample = rows[:50] if not use_fmt else formatted_rows[:50]
+            for row in sample:
+                if ci < len(row):
+                    max_len = max(max_len, len(str(row[ci] or "")))
+            total_cm += max(max_len * 0.18, 1.5)
+        return total_cm
+
+    COMPACT_FONT_NAME = "Arial Narrow"
+    COMPACT_FONT_SIZE = 9
+    COMPACT_HEADER_SIZE = 9
+    CELL_MARGIN_TWIPS = 28  # ~0.5mm per side
+
+    # Page setup — start with tight portrait, flip to landscape if needed
     from docx.enum.section import WD_ORIENT
+    user_wants_landscape = opts.get("landscape", False)
+
+    # First pass: estimate widths to decide orientation
+    portrait_usable_cm = 21.0 - 3.0  # A4 width minus 1.5cm margins each side
+    landscape_usable_cm = 29.7 - 3.0
+
+    needs_landscape = user_wants_landscape
+    if not needs_landscape:
+        for t_data in config.tables:
+            est = _estimate_table_width_cm(t_data)
+            if est > portrait_usable_cm:
+                needs_landscape = True
+                break
+
     for section in doc.sections:
-        section.top_margin = Cm(2)
-        section.bottom_margin = Cm(2)
-        section.left_margin = Cm(2)
-        section.right_margin = Cm(2)
-        if opts.get("landscape"):
+        section.top_margin = Cm(1.5)
+        section.bottom_margin = Cm(1.5)
+        section.left_margin = Cm(1.5)
+        section.right_margin = Cm(1.5)
+        if needs_landscape:
             section.orientation = WD_ORIENT.LANDSCAPE
             section.page_width, section.page_height = section.page_height, section.page_width
 
@@ -444,8 +496,8 @@ async def export_word(config: ExportConfig):
         if title:
             p = doc.add_paragraph()
             run = p.add_run(title)
-            run.font.name = "Segoe UI"
-            run.font.size = Pt(t.get("title_size") or 14)
+            run.font.name = COMPACT_FONT_NAME
+            run.font.size = Pt(t.get("title_size") or 12)
             run.bold = t.get("title_bold", True)
             run.italic = t.get("title_italic", False)
             if title_color:
@@ -454,8 +506,8 @@ async def export_word(config: ExportConfig):
         if subtitle:
             p = doc.add_paragraph()
             run = p.add_run(subtitle)
-            run.font.size = Pt(10)
-            run.font.name = "Segoe UI"
+            run.font.size = Pt(COMPACT_FONT_SIZE)
+            run.font.name = COMPACT_FONT_NAME
             run.font.color.rgb = RGBColor(100, 100, 100)
 
         if not headers:
@@ -486,23 +538,27 @@ async def export_word(config: ExportConfig):
             cell.text = ""
             p = cell.paragraphs[0]
             p.alignment = align_map.get(align, WD_ALIGN_PARAGRAPH.CENTER)
+            pf = p.paragraph_format
+            pf.space_before = Pt(0)
+            pf.space_after = Pt(0)
             run = p.add_run(str(text))
             fmt = hdr_fmt_map.get(col_name) if col_name else None
             if fmt:
                 run.bold = fmt.get("bold", True)
                 run.italic = fmt.get("italic", False)
-                run.font.size = Pt(fmt.get("size", 9))
-                run.font.name = fmt.get("font", "Segoe UI")
+                run.font.size = Pt(min(fmt.get("size", COMPACT_HEADER_SIZE), COMPACT_HEADER_SIZE))
+                run.font.name = fmt.get("font") or COMPACT_FONT_NAME
                 fc = (fmt.get("color") or header_tc).lstrip("#")
                 run.font.color.rgb = _hex_to_rgb(fc) or RGBColor(0xFF, 0xFF, 0xFF)
                 bg = (fmt.get("backgroundColor") or header_bg).lstrip("#")
                 _set_cell_shading(cell, bg)
             else:
                 run.bold = True
-                run.font.size = Pt(9)
-                run.font.name = "Segoe UI"
+                run.font.size = Pt(COMPACT_HEADER_SIZE)
+                run.font.name = COMPACT_FONT_NAME
                 run.font.color.rgb = _hex_to_rgb(header_tc) or RGBColor(0xFF, 0xFF, 0xFF)
                 _set_cell_shading(cell, header_bg)
+            _set_cell_margin(cell, top=14, bottom=14, left=CELL_MARGIN_TWIPS, right=CELL_MARGIN_TWIPS)
 
         if has_multi_level:
             top_groups = column_groups["top"]
@@ -577,12 +633,16 @@ async def export_word(config: ExportConfig):
 
                 cell.text = ""
                 p = cell.paragraphs[0]
+                pf = p.paragraph_format
+                pf.space_before = Pt(0)
+                pf.space_after = Pt(0)
                 is_val_col = ci >= num_row_fields
                 p.alignment = align_map.get(cell_align if is_val_col else row_label_align, WD_ALIGN_PARAGRAPH.LEFT)
 
                 run = p.add_run(str(display))
-                run.font.size = Pt(9)
-                run.font.name = "Segoe UI"
+                run.font.size = Pt(COMPACT_FONT_SIZE)
+                run.font.name = COMPACT_FONT_NAME
+                _set_cell_margin(cell, top=14, bottom=14, left=CELL_MARGIN_TWIPS, right=CELL_MARGIN_TWIPS)
 
                 # Cell background: grand total > subtotal > zebra > row label bg > table bg
                 if is_grand:
