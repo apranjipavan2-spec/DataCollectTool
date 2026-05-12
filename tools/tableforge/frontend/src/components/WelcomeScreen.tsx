@@ -32,6 +32,25 @@ const s = {
     borderRadius: 16, padding: 36, width: '100%', maxWidth: 480,
     display: 'flex', flexDirection: 'column' as const, gap: 0,
   },
+  cardWide: {
+    background: 'var(--surface, #1e293b)', border: '1px solid var(--border, #334155)',
+    borderRadius: 16, padding: 36, width: '100%', maxWidth: 820,
+    display: 'flex', flexDirection: 'column' as const, gap: 0,
+  },
+  twoCol: {
+    display: 'flex', gap: 28, alignItems: 'flex-start',
+  },
+  colLeft: {
+    flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' as const, gap: 0,
+  },
+  colRight: {
+    flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' as const, gap: 0,
+    borderLeft: '1px solid #334155', paddingLeft: 28,
+  },
+  sectionTitle: {
+    fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.06em',
+    textTransform: 'uppercase' as const, marginBottom: 12,
+  },
   label: { fontSize: 11, fontWeight: 700, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 6 },
   select: {
     width: '100%', padding: '11px 14px', borderRadius: 8, fontSize: 14,
@@ -225,7 +244,7 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
 
   return (
     <div style={s.wrap}>
-      <div style={s.card}>
+      <div style={fgContext ? s.cardWide : s.card}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <img src={import.meta.env.BASE_URL + 'logo-icon.png'} alt="FieldGovern" style={{ width: 40, height: 40, display: 'block', margin: '0 auto 8px' }} />
@@ -233,132 +252,178 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
           <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>FieldGovern Data Analyzer</div>
         </div>
 
-        {/* FG program picker */}
-        {fgContext ? (
-          <>
-            {(loading || fgLoading) && (
-              <div style={{ textAlign: 'center', padding: '20px 0', marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 10 }}>
-                  <div style={{ width: 18, height: 18, border: '2.5px solid rgba(59,130,246,0.2)', borderTop: '2.5px solid #3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                  <span style={{ fontSize: 14, color: '#94a3b8' }}>
-                    {fgProgress?.message || (fgLoading ? 'Connecting…' : (loadingMsg || 'Importing data from FieldGovern…'))}
-                  </span>
-                </div>
-                {fgProgress && fgProgress.percent > 0 && (
-                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>{fgProgress.percent}%</div>
-                )}
-                <div style={{ width: '100%', height: 4, background: 'rgba(100,116,139,0.15)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{
-                    width: fgProgress && fgProgress.percent > 0 ? `${fgProgress.percent}%` : '100%',
-                    height: '100%', background: '#3b82f6', borderRadius: 3,
-                    transition: fgProgress ? 'width 0.3s ease' : 'none',
-                    ...(fgProgress && fgProgress.percent > 0 ? {} : { animation: 'indeterminate 1.5s ease-in-out infinite' }),
-                  }} />
-                </div>
-                {fgProgress && (
-                  <div style={{ marginTop: 8, fontSize: 11, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {fgProgress.step === 'connecting' && '● Connecting to server'}
-                    {fgProgress.step === 'downloading' && '● Downloading data'}
-                    {fgProgress.step === 'saving' && '● Saving file'}
-                    {fgProgress.step === 'parsing' && '● Parsing Excel'}
-                    {fgProgress.step === 'extracting' && '● Extracting columns'}
-                    {fgProgress.step === 'finalizing' && '● Building dataset'}
-                    {fgProgress.step === 'done' && '● Complete'}
-                  </div>
-                )}
-                <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes indeterminate { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }`}</style>
+        {/* Loading indicator — full width above columns */}
+        {fgContext && (loading || fgLoading) && (
+          <div style={{ textAlign: 'center', padding: '20px 0', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 10 }}>
+              <div style={{ width: 18, height: 18, border: '2.5px solid rgba(59,130,246,0.2)', borderTop: '2.5px solid #3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              <span style={{ fontSize: 14, color: '#94a3b8' }}>
+                {fgProgress?.message || (fgLoading ? 'Connecting…' : (loadingMsg || 'Importing data from FieldGovern…'))}
+              </span>
+            </div>
+            {fgProgress && fgProgress.percent > 0 && (
+              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>{fgProgress.percent}%</div>
+            )}
+            <div style={{ width: '100%', height: 4, background: 'rgba(100,116,139,0.15)', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{
+                width: fgProgress && fgProgress.percent > 0 ? `${fgProgress.percent}%` : '100%',
+                height: '100%', background: '#3b82f6', borderRadius: 3,
+                transition: fgProgress ? 'width 0.3s ease' : 'none',
+                ...(fgProgress && fgProgress.percent > 0 ? {} : { animation: 'indeterminate 1.5s ease-in-out infinite' }),
+              }} />
+            </div>
+            {fgProgress && (
+              <div style={{ marginTop: 8, fontSize: 11, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {fgProgress.step === 'connecting' && '● Connecting to server'}
+                {fgProgress.step === 'downloading' && '● Downloading data'}
+                {fgProgress.step === 'saving' && '● Saving file'}
+                {fgProgress.step === 'parsing' && '● Parsing Excel'}
+                {fgProgress.step === 'extracting' && '● Extracting columns'}
+                {fgProgress.step === 'finalizing' && '● Building dataset'}
+                {fgProgress.step === 'done' && '● Complete'}
               </div>
             )}
-            <div style={{ marginBottom: 16 }}>
-              <div style={s.label}>Program</div>
-              <select style={s.select} value={selProgram} onChange={e => setSelProgram(e.target.value)}>
-                <option value="">Select a program…</option>
-                {programs.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}{p.scheme_name ? ` — ${p.scheme_name}` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes indeterminate { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }`}</style>
+          </div>
+        )}
 
-            {selProgram && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={s.label}>
-                  Questionnaire / Form{' '}
-                  <span style={{ color: '#475569', textTransform: 'none', fontWeight: 400 }}>(optional)</span>
-                </div>
-                <select style={s.select} value={selQ} onChange={e => setSelQ(e.target.value)}>
-                  <option value="">All questionnaires</option>
-                  {questionnaires.map(q => (
-                    <option key={q.questionnaire_id} value={q.questionnaire_id}>
-                      {q.name}{q.form_title ? ` (${q.form_title})` : ''}
+        {/* FG program picker — two-column layout */}
+        {fgContext ? (
+          <div style={s.twoCol}>
+            {/* Left column: Program & Questionnaire selection */}
+            <div style={s.colLeft}>
+              <div style={s.sectionTitle}>Load Data</div>
+
+              <div style={{ marginBottom: 16 }}>
+                <div style={s.label}>Program</div>
+                <select style={s.select} value={selProgram} onChange={e => setSelProgram(e.target.value)}>
+                  <option value="">Select a program…</option>
+                  {programs.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}{p.scheme_name ? ` — ${p.scheme_name}` : ''}
                     </option>
                   ))}
                 </select>
               </div>
-            )}
 
-            <button
-              style={{ ...s.btnPrimary, opacity: selProgram && !fgLoading ? 1 : 0.4 }}
-              disabled={!selProgram || fgLoading}
-              onClick={handleFgLoad}
-            >
-              {fgLoading ? 'Loading data…' : `Load${selectedProgName ? ` "${selectedProgName}"` : ''} →`}
-            </button>
-
-            {fgError && <div style={s.errorMsg}>{fgError}</div>}
-
-            {/* Recent FG projects */}
-            {recentProjects.length > 0 && (
-              <>
-                <div style={s.divider}>
-                  <div style={s.dividerLine} />
-                  <span style={s.dividerText}>recent sessions</span>
-                  <div style={s.dividerLine} />
+              {selProgram && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={s.label}>
+                    Questionnaire / Form{' '}
+                    <span style={{ color: '#475569', textTransform: 'none', fontWeight: 400 }}>(optional)</span>
+                  </div>
+                  <select style={s.select} value={selQ} onChange={e => setSelQ(e.target.value)}>
+                    <option value="">All questionnaires</option>
+                    {questionnaires.map(q => (
+                      <option key={q.questionnaire_id} value={q.questionnaire_id}>
+                        {q.name}{q.form_title ? ` (${q.form_title})` : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {recentProjects.map(proj => (
-                    <button key={proj.id} style={{ ...s.linkBtn, justifyContent: 'space-between' }}
-                      onClick={() => {
-                        if (proj.program_id) setSelProgram(proj.program_id);
-                        if ((proj as any).data && onLoadFgProject) onLoadFgProject(proj);
-                      }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span>📊</span>
-                        <span style={{ fontSize: 13, color: '#e2e8f0' }}>{proj.name}</span>
-                      </span>
-                      <span style={{ fontSize: 11, color: '#475569' }}>{formatRelative(proj.updated_at)}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+              )}
 
-            {/* Recent local projects */}
-            {localProjects.length > 0 && (
-              <>
-                <div style={s.divider}>
-                  <div style={s.dividerLine} />
-                  <span style={s.dividerText}>saved projects</span>
-                  <div style={s.dividerLine} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {localProjects.map(proj => (
-                    <button key={proj.path} style={{ ...s.linkBtn, justifyContent: 'space-between' }}
-                      onClick={() => onLoadLocalProject?.(proj.path)}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 14 }}>📋</span>
-                        <span style={{ fontSize: 13, color: '#e2e8f0' }}>{proj.name}</span>
-                      </span>
-                      <span style={{ fontSize: 11, color: '#475569' }}>{proj.created ? formatRelative(proj.created) : ''}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+              <button
+                style={{ ...s.btnPrimary, opacity: selProgram && !fgLoading ? 1 : 0.4 }}
+                disabled={!selProgram || fgLoading}
+                onClick={handleFgLoad}
+              >
+                {fgLoading ? 'Loading data…' : `Load${selectedProgName ? ` "${selectedProgName}"` : ''} →`}
+              </button>
 
-            {!loading && !fgLoading && serverFilesSection}
-          </>
+              {fgError && <div style={s.errorMsg}>{fgError}</div>}
+
+              {/* Recent FG sessions */}
+              {recentProjects.length > 0 && (
+                <>
+                  <div style={s.divider}>
+                    <div style={s.dividerLine} />
+                    <span style={s.dividerText}>recent sessions</span>
+                    <div style={s.dividerLine} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {recentProjects.map(proj => (
+                      <button key={proj.id} style={{ ...s.linkBtn, justifyContent: 'space-between' }}
+                        onClick={() => {
+                          if (proj.program_id) setSelProgram(proj.program_id);
+                          if ((proj as any).data && onLoadFgProject) onLoadFgProject(proj);
+                        }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span>📊</span>
+                          <span style={{ fontSize: 13, color: '#e2e8f0' }}>{proj.name}</span>
+                        </span>
+                        <span style={{ fontSize: 11, color: '#475569' }}>{formatRelative(proj.updated_at)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Right column: Saved projects & Server files */}
+            <div style={s.colRight}>
+              {/* Saved projects */}
+              {localProjects.length > 0 && (
+                <>
+                  <div style={s.sectionTitle}>Saved Projects</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+                    {localProjects.map(proj => (
+                      <button key={proj.path} style={{ ...s.linkBtn, justifyContent: 'space-between' }}
+                        onClick={() => onLoadLocalProject?.(proj.path)}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 14 }}>📋</span>
+                          <span style={{ fontSize: 13, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proj.name}</span>
+                        </span>
+                        <span style={{ fontSize: 11, color: '#475569', whiteSpace: 'nowrap' }}>{proj.created ? formatRelative(proj.created) : ''}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Server files */}
+              {!loading && !fgLoading && (
+                <>
+                  <div style={{ ...s.sectionTitle, marginTop: localProjects.length > 0 ? 8 : 0 }}>Server Files</div>
+                  {serverFiles.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {serverFiles.map(f => (
+                        <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <button
+                            style={{ ...s.linkBtn, flex: 1, opacity: sfLoading === f.id ? 0.5 : 1 }}
+                            disabled={!!sfLoading}
+                            onClick={() => handleServerLoad(f)}
+                          >
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                              <span style={{ fontSize: 14 }}>{f.ext === 'csv' || f.ext === 'tsv' ? '\ud83d\udcc4' : '\ud83d\udcca'}</span>
+                              <span style={{ fontSize: 13, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.original_name}</span>
+                            </span>
+                            <span style={{ fontSize: 11, color: '#475569', whiteSpace: 'nowrap' }}>
+                              {f.size_mb > 0 ? `${f.size_mb} MB` : `${Math.round(f.size_bytes / 1024)} KB`} · {formatRelative(f.uploaded_at)}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => handleServerDelete(f)}
+                            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px 6px', fontSize: 14 }}
+                            title="Delete from server"
+                          >&times;</button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: '#475569', textAlign: 'center', padding: '12px 0' }}>No files saved on server yet</div>
+                  )}
+                  <button
+                    style={{ ...s.linkBtn, justifyContent: 'center', marginTop: 8, opacity: sfUploading ? 0.5 : 1 }}
+                    disabled={sfUploading}
+                    onClick={() => serverFileRef.current?.click()}
+                  >
+                    {sfUploading ? 'Uploading…' : '\u2b06 Save file to server'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         ) : (
           /* No FG context — plain file upload */
           <div
