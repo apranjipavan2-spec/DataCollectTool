@@ -131,6 +131,16 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
             }),
             has_multi_level: true,
           } : undefined;
+          const remappedWidths: Record<string, number> = {};
+          if (t.column_widths) {
+            for (const [key, val] of Object.entries(t.column_widths)) {
+              remappedWidths[renames[key] || key] = val as number;
+            }
+          }
+          const remappedHdrFmts = (t.header_formats || []).map(hf => ({
+            ...hf,
+            field: hf.field ? (renames[hf.field] || hf.field) : hf.field,
+          }));
           return {
             name: t.name,
             headers: t.serial_number ? ['S.No', ...displayHeaders] : displayHeaders,
@@ -149,7 +159,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
             cell_align: t.cell_align || 'right',
             header_align: t.header_align || 'center',
             row_label_align: t.row_label_align || 'left',
-            column_widths: t.column_widths,
+            column_widths: remappedWidths,
             row_height: t.row_height,
             serial_number: t.serial_number,
             zebra: t.zebra,
@@ -164,7 +174,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
             total_bg_color: t.total_bg_color,
             bg_color: t.bg_color,
             row_bg_color: t.row_bg_color,
-            header_formats: t.header_formats,
+            header_formats: remappedHdrFmts,
             footnotes: t.footnotes,
             value_formats: (t.values || []).map(v => ({
               decimals: v.decimals ?? 2,
@@ -227,6 +237,16 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
           }),
           has_multi_level: true,
         } : undefined;
+        const batchRemappedWidths: Record<string, number> = {};
+        if (t.column_widths) {
+          for (const [key, val] of Object.entries(t.column_widths)) {
+            batchRemappedWidths[renames[key] || key] = val as number;
+          }
+        }
+        const batchRemappedHdrFmts = (t.header_formats || []).map(hf => ({
+          ...hf,
+          field: hf.field ? (renames[hf.field] || hf.field) : hf.field,
+        }));
         return {
           name: t.name,
           headers: t.serial_number ? ['S.No', ...displayHeaders] : displayHeaders,
@@ -246,7 +266,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
           cell_align: t.cell_align || 'right',
           header_align: t.header_align || 'center',
           row_label_align: t.row_label_align || 'left',
-          column_widths: t.column_widths,
+          column_widths: batchRemappedWidths,
           row_height: t.row_height,
           serial_number: t.serial_number,
           zebra: t.zebra,
@@ -261,7 +281,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
           total_bg_color: t.total_bg_color,
           bg_color: t.bg_color,
           row_bg_color: t.row_bg_color,
-          header_formats: t.header_formats,
+          header_formats: batchRemappedHdrFmts,
           footnotes: t.footnotes,
           value_formats: (t.values || []).map(v => ({
             decimals: v.decimals ?? 2,
