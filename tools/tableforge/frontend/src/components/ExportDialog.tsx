@@ -454,7 +454,19 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
           </div>
 
           <div className="form-group">
-            <label>Tables to Export</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label>Tables to Export</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn-secondary" style={{ padding: '2px 10px', fontSize: 11 }}
+                  onClick={() => setSelectedTables(new Set(tables.filter(t => results.get(t.id)?.rows?.length).map(t => t.id)))}>
+                  Select All
+                </button>
+                <button className="btn-secondary" style={{ padding: '2px 10px', fontSize: 11 }}
+                  onClick={() => setSelectedTables(new Set())}>
+                  Deselect All
+                </button>
+              </div>
+            </div>
             <div className="table-select-list">
               {tables.map(t => {
                 const res = results.get(t.id);
