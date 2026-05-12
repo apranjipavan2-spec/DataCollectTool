@@ -110,14 +110,18 @@ function buildExportHtml(t: TableConfig, res: TableResult, fmtRows: string[][]):
   html += '<thead>';
 
   if (hasMultiLevel) {
+    const totalCols = allHeaders.length;
+    const topStyle = `background:${headerBg};color:${headerColor};padding:6px 10px;text-align:center;font-size:12pt;font-family:${TF},Georgia,serif;`;
     html += '<tr>';
     for (let i = 0; i < nRowCols; i++) {
-      html += `<th rowspan="2" style="${thStyle(allHeaders[i])};vertical-align:middle;">${allHeaders[i]}</th>`;
+      html += `<th style="${thStyle(allHeaders[i])};vertical-align:middle;">${allHeaders[i]}</th>`;
     }
     for (const g of cg!.top) {
-      html += `<th colspan="${g.colspan}" style="background:${headerBg};color:${headerColor};padding:6px 10px;text-align:center;font-size:12pt;font-family:${TF},Georgia,serif;">${g.label}</th>`;
+      html += `<th style="${topStyle}">${g.label}</th>`;
+      for (let s = 1; s < g.colspan; s++) html += `<th style="${topStyle}"></th>`;
     }
     html += '</tr><tr>';
+    for (let i = 0; i < nRowCols; i++) html += `<th style="${thStyle(allHeaders[i])}"></th>`;
     const bottomLabels = cg!.bottom.map((b: string) => String(b));
     for (let i = 0; i < bottomLabels.length; i++) {
       const colIdx = (t.rows?.length || 0) + i;

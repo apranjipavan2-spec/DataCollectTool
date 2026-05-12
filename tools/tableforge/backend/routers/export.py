@@ -579,6 +579,16 @@ async def export_word(config: ExportConfig):
                     for row in tbl.rows:
                         row.cells[ci].width = col_emus[ci]
 
+                if has_multi_level and len(tbl.rows) >= 2:
+                    for ci in range(num_row_fields):
+                        tbl.rows[0].cells[ci].merge(tbl.rows[1].cells[ci])
+                    col_cursor = num_row_fields
+                    for g in column_groups["top"]:
+                        colspan = g.get("colspan", 1)
+                        if colspan > 1:
+                            tbl.rows[0].cells[col_cursor].merge(tbl.rows[0].cells[col_cursor + colspan - 1])
+                        col_cursor += colspan
+
             footnote_text = t.get("footnote", "")
             footnotes_list = t.get("footnotes") or []
             if footnote_text:
