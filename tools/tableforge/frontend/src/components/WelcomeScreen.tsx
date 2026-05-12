@@ -357,6 +357,17 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
 
               {fgError && <div style={s.errorMsg}>{fgError}</div>}
 
+              <div style={s.divider}>
+                <div style={s.dividerLine} />
+                <span style={s.dividerText}>or</span>
+                <div style={s.dividerLine} />
+              </div>
+              <button style={{ ...s.linkBtn, justifyContent: 'center', gap: 8 }}
+                onClick={() => fileRef.current?.click()}>
+                <span>📂</span>
+                <span style={{ fontSize: 13, color: '#e2e8f0' }}>Import Excel / CSV File</span>
+              </button>
+
               {/* Recent FG sessions */}
               {recentProjects.length > 0 && (
                 <>
