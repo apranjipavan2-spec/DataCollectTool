@@ -125,10 +125,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
               label: g.label,
               colspan: g.colspan,
             })),
-            bottom: cg.bottom.map((b, i) => {
-              const origH = res.headers[i + (t.rows?.length || 0)];
-              return origH ? (renames[origH] || b) : b;
-            }),
+            bottom: cg.bottom.map(b => String(b)),
             has_multi_level: true,
           } : undefined;
           const remappedWidths: Record<string, number> = {};
@@ -143,7 +140,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
           }));
           return {
             name: t.name,
-            headers: t.serial_number ? ['S.No', ...displayHeaders] : displayHeaders,
+            headers: t.serial_number ? ['#', ...displayHeaders] : displayHeaders,
             rows: t.serial_number
               ? res.rows.map((row, ri) => {
                   const isGT = String(row[0]) === 'Grand Total';
@@ -231,10 +228,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
         const cg = res.column_groups;
         const columnGroups = cg?.has_multi_level ? {
           top: cg.top.map(g => ({ label: g.label, colspan: g.colspan })),
-          bottom: cg.bottom.map((b, i) => {
-            const origH = res.headers[i + (t.rows?.length || 0)];
-            return origH ? (renames[origH] || b) : b;
-          }),
+          bottom: cg.bottom.map(b => String(b)),
           has_multi_level: true,
         } : undefined;
         const batchRemappedWidths: Record<string, number> = {};
@@ -249,7 +243,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
         }));
         return {
           name: t.name,
-          headers: t.serial_number ? ['S.No', ...displayHeaders] : displayHeaders,
+          headers: t.serial_number ? ['#', ...displayHeaders] : displayHeaders,
           rows: t.serial_number
             ? res.rows.map((row, ri) => {
                 const isGT = String(row[0]) === 'Grand Total';
@@ -330,7 +324,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
       const renames = t.header_renames || {};
       const dispHeaders = res.headers.map(h => renames[h] || h);
       const fmtRows = buildFormattedRows(t, res);
-      const allHeaders = t.serial_number ? ['S.No', ...dispHeaders] : dispHeaders;
+      const allHeaders = t.serial_number ? ['#', ...dispHeaders] : dispHeaders;
       const nRowCols = (t.rows?.length || 0) + (t.serial_number ? 1 : 0);
       const cg = res.column_groups;
       const hasMultiLevel = cg?.has_multi_level;
