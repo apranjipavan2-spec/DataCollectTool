@@ -589,6 +589,21 @@ async def export_word(config: ExportConfig):
                             tbl.rows[0].cells[col_cursor].merge(tbl.rows[0].cells[col_cursor + colspan - 1])
                         col_cursor += colspan
 
+                header_row_count = 2 if has_multi_level else 1
+                for ri, row in enumerate(tbl.rows):
+                    is_header = ri < header_row_count
+                    for ci, cell in enumerate(row.cells):
+                        is_val_col = ci >= num_row_fields
+                        if is_header:
+                            h_align = align_map.get(header_align, WD_ALIGN_PARAGRAPH.CENTER)
+                        elif is_val_col:
+                            h_align = align_map.get(cell_align, WD_ALIGN_PARAGRAPH.RIGHT)
+                        else:
+                            h_align = align_map.get(row_label_align, WD_ALIGN_PARAGRAPH.LEFT)
+                        for p in cell.paragraphs:
+                            p.alignment = h_align
+                        cell.vertical_alignment = 1  # WD_CELL_VERTICAL_ALIGNMENT.CENTER
+
             footnote_text = t.get("footnote", "")
             footnotes_list = t.get("footnotes") or []
             if footnote_text:
