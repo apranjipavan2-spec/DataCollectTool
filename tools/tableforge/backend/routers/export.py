@@ -357,25 +357,35 @@ async def export_word(config: ExportConfig):
             tcMar.append(el)
         tcPr.append(tcMar)
 
-    def _estimate_table_width_cm(t_data):
+    PX_PER_CHAR = 7.5
+
+    def _col_pixel_widths(t_data):
+        """Return list of pixel-scale weights for each column."""
         headers = t_data.get("headers", [])
         rows = t_data.get("rows", [])
         formatted_rows = t_data.get("formatted_rows") or []
         use_fmt = len(formatted_rows) == len(rows)
         col_widths_cfg = t_data.get("column_widths") or {}
-        total_cm = 0.0
+        num_row_fields = t_data.get("num_row_fields", 1)
+        px_list = []
         for ci, h in enumerate(headers):
             cfg_w = col_widths_cfg.get(h)
-            if cfg_w:
-                total_cm += cfg_w * 0.026
-                continue
-            max_len = len(str(h))
-            sample = rows[:50] if not use_fmt else formatted_rows[:50]
-            for row in sample:
-                if ci < len(row):
-                    max_len = max(max_len, len(str(row[ci] or "")))
-            total_cm += max(max_len * 0.25, 2.5)
-        return total_cm
+            if cfg_w and cfg_w > 0:
+                px_list.append(float(cfg_w))
+            else:
+                max_len = len(str(h))
+                sample = formatted_rows[:100] if use_fmt else rows[:100]
+                for row in sample:
+                    if ci < len(row):
+                        max_len = max(max_len, len(str(row[ci] or "")))
+                est_px = max(max_len * PX_PER_CHAR + 24, 50)
+                if ci < num_row_fields:
+                    est_px *= 1.15
+                px_list.append(est_px)
+        return px_list
+
+    def _estimate_table_width_cm(t_data):
+        return sum(_col_pixel_widths(t_data)) * 0.0264
 
     def _setup_section(section, landscape=False):
         section.top_margin = Cm(1.27)
@@ -433,7 +443,6 @@ async def export_word(config: ExportConfig):
 
     portrait_usable_cm = 21.0 - 2.54
     landscape_usable_cm = 29.7 - 2.54
-    user_wants_landscape = opts.get("landscape", False)
 
     # Cover page — use first section for it
     if opts.get("cover_page"):
@@ -455,9 +464,9 @@ async def export_word(config: ExportConfig):
         first_table_idx = 0
 
     for t_idx, t in enumerate(config.tables):
-        # Each table gets its own section with appropriate orientation
+        # Each table decides orientation based on its own content width
         est_width = _estimate_table_width_cm(t)
-        table_landscape = user_wants_landscape or est_width > portrait_usable_cm
+        table_landscape = est_width > portrait_usable_cm
 
         if t_idx == 0 and not opts.get("cover_page"):
             section = doc.sections[0]
@@ -538,30 +547,14 @@ async def export_word(config: ExportConfig):
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
         table.autofit = False
 
-        # Column widths: use preview pixel widths as proportional weights
+        # Column widths: use pixel-scale weights (same scale as preview)
         page_width_emu = section.page_width - section.left_margin - section.right_margin
+        col_px = _col_pixel_widths(t)
 
-        col_weights = []
-        use_fmt = len(formatted_rows) == len(rows)
-        has_cfg_widths = any(column_widths_cfg.get(h) for h in headers)
-        for ci, h in enumerate(headers):
-            cfg_w = column_widths_cfg.get(h)
-            if cfg_w and cfg_w > 0:
-                col_weights.append(float(cfg_w))
-            else:
-                max_len = len(str(h))
-                sample = formatted_rows[:100] if use_fmt else rows[:100]
-                for row in sample:
-                    if ci < len(row):
-                        max_len = max(max_len, len(str(row[ci] or "")))
-                is_label = ci < num_row_fields
-                col_weights.append(max(max_len * (1.2 if is_label else 1.0), 4))
-
-        total_weight = sum(col_weights) or 1
+        total_px = sum(col_px) or 1
         for ci in range(len(headers)):
-            if ci < len(table.columns):
-                ratio = col_weights[ci] / total_weight
-                table.columns[ci].width = int(page_width_emu * ratio)
+            if ci < len(table.columns) and ci < len(col_px):
+                table.columns[ci].width = int(page_width_emu * col_px[ci] / total_px)
 
         def _style_header_cell(cell, text, align=header_align, col_name=None):
             cell.text = ""
@@ -576,7 +569,8 @@ async def export_word(config: ExportConfig):
             if fmt:
                 run.bold = fmt.get("bold", True)
                 run.italic = fmt.get("italic", False)
-                run.font.size = Pt(fmt.get("size", HEADER_SIZE))
+                fmt_size_px = fmt.get("size")
+                run.font.size = Pt(round(fmt_size_px * 0.75)) if fmt_size_px else Pt(HEADER_SIZE)
                 run.font.name = fmt.get("font") or BODY_FONT
                 fc = (fmt.get("color") or header_tc).lstrip("#")
                 run.font.color.rgb = _hex_to_rgb(fc) or RGBColor(0xFF, 0xFF, 0xFF)
