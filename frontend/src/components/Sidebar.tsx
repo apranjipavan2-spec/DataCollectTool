@@ -71,7 +71,10 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
   const dark = resolvedTheme === 'dark'
   const ts = themeStyles(dark)
 
-  const isActive = (path: string) => location.pathname === path
+  const isActive = (path: string) => {
+    if (path === '/') return location.pathname === '/'
+    return location.pathname === path || location.pathname.startsWith(path + '/')
+  }
 
   const navButton = (item: SidebarItem, onClick?: () => void) => {
     const active = isActive(item.path)
@@ -160,7 +163,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
               style={{ background: isPanelOpen ? 'rgba(255,255,255,0.2)' : ts.helpBg }}>
               ?
             </span>
-            <span className="text-xs hidden lg:inline font-medium">Help & Guide</span>
+            <span className="text-xs hidden lg:inline font-medium">Help</span>
           </button>
         </div>
 
@@ -255,7 +258,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
             } : ts.mobileBtnInactive}
           >
             <span className="font-bold">?</span>
-            <span>Help & Guide</span>
+            <span>Help</span>
           </button>
           {role && (
             <div className="p-3 rounded-xl text-xs" style={ts.roleBadge}>
