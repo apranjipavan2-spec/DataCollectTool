@@ -1452,6 +1452,22 @@ function CsvTab() {
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<any | null>(null)
 
+  // Auto-load shared file from URL param
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const sharedFileId = params.get('shared_file')
+    if (!sharedFileId) return
+    api.get(`/shared-files/${sharedFileId}/csv-data`).then(({ data }) => {
+      if (data.headers && data.rows) {
+        setHeaders(data.headers)
+        setRows(data.rows)
+        setFileName(data.filename || 'Shared file')
+        setGroupby(data.headers[0] || '')
+        setResult(null)
+      }
+    }).catch(() => { toast.error('Failed to load shared file') })
+  }, [])
+
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) return

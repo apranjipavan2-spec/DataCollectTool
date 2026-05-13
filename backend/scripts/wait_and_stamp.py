@@ -102,8 +102,10 @@ def detect_and_stamp():
             stamp = "0028"
         elif not col_exists(cur, "forms", "allow_enumerator_edit"):
             stamp = "0030"
+        elif not col_exists(cur, "shared_files", "folder"):
+            stamp = "0035"
         else:
-            stamp = "0031"
+            stamp = "0036"
 
         print(f"Stamping alembic_version to {stamp}")
         if not has_alembic:

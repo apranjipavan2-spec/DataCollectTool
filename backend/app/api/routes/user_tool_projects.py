@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from pydantic import BaseModel
-from typing import Optional
-from app.core.deps import require_supervisor, get_db
+from typing import Optional, List
+from app.core.deps import require_supervisor, get_current_user, get_db
 from app.models.user_tool_project import UserToolProject
 
 router = APIRouter()
@@ -15,27 +16,35 @@ class ProjectIn(BaseModel):
     data: dict = {}
 
 
+def _serialize(r: UserToolProject) -> dict:
+    return {
+        "id": str(r.id),
+        "tool": r.tool,
+        "name": r.name,
+        "program_id": str(r.program_id) if r.program_id else None,
+        "data": r.data,
+        "shared_with": [str(t) for t in (r.shared_with_tenants or [])],
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+        "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+    }
+
+
 @router.get("/tool-projects/")
 def list_projects(tool: str = "", user=Depends(require_supervisor), db: Session = Depends(get_db)):
-    q = db.query(UserToolProject).filter(
-        UserToolProject.user_id == user["sub"],
-        UserToolProject.tenant_id == user["tenant_id"],
-    )
+    if user.get("role") == "master_admin":
+        q = db.query(UserToolProject)
+    else:
+        tenant_id = user["tenant_id"]
+        q = db.query(UserToolProject).filter(
+            or_(
+                (UserToolProject.user_id == user["sub"]) & (UserToolProject.tenant_id == tenant_id),
+                UserToolProject.shared_with_tenants.any(tenant_id),
+            )
+        )
     if tool:
         q = q.filter(UserToolProject.tool == tool)
     rows = q.order_by(UserToolProject.updated_at.desc()).all()
-    return [
-        {
-            "id": str(r.id),
-            "tool": r.tool,
-            "name": r.name,
-            "program_id": str(r.program_id) if r.program_id else None,
-            "data": r.data,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-            "updated_at": r.updated_at.isoformat() if r.updated_at else None,
-        }
-        for r in rows
-    ]
+    return [_serialize(r) for r in rows]
 
 
 @router.post("/tool-projects/")
@@ -66,6 +75,27 @@ def upsert_project(body: ProjectIn, user=Depends(require_supervisor), db: Sessio
     db.commit()
     db.refresh(proj)
     return {"id": str(proj.id), "created": True}
+
+
+class ShareProjectRequest(BaseModel):
+    tenant_ids: List[str]
+
+
+@router.patch("/tool-projects/{project_id}/share")
+def share_project(project_id: str, body: ShareProjectRequest, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Share a tool-project with other tenants (master_admin or project owner)."""
+    proj = db.query(UserToolProject).filter(UserToolProject.id == project_id).first()
+    if not proj:
+        raise HTTPException(404, "Project not found")
+    if user.get("role") == "master_admin":
+        pass
+    elif str(proj.user_id) == user["sub"]:
+        pass
+    else:
+        raise HTTPException(403, "Only project owner or master admin can share")
+    proj.shared_with_tenants = body.tenant_ids
+    db.commit()
+    return {"id": str(proj.id), "shared_with": body.tenant_ids}
 
 
 @router.delete("/tool-projects/{project_id}")

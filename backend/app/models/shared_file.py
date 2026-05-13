@@ -18,5 +18,7 @@ class SharedFile(Base):
     disk_path = Column(String, nullable=False)
     shared_with_tenants = Column(ARRAY(UUID(as_uuid=True)), default=[])
     is_global = Column(Boolean, default=False)
+    folder = Column(String, default="", server_default="")
+    display_name = Column(String, default="")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

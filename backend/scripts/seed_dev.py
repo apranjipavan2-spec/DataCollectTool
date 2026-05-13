@@ -118,6 +118,10 @@ _PATCHES = [
         created_at TIMESTAMPTZ DEFAULT now(),
         updated_at TIMESTAMPTZ DEFAULT now()
     )""",
+    # 0036
+    "ALTER TABLE shared_files ADD COLUMN IF NOT EXISTS folder VARCHAR DEFAULT ''",
+    "ALTER TABLE shared_files ADD COLUMN IF NOT EXISTS display_name VARCHAR DEFAULT ''",
+    "ALTER TABLE user_tool_projects ADD COLUMN IF NOT EXISTS shared_with_tenants UUID[] DEFAULT '{}'",
 ]
 
 from sqlalchemy import text as _text
