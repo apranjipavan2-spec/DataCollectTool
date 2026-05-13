@@ -433,7 +433,7 @@ def admin_confirm(
         raise HTTPException(400, "Cannot confirm — no UTR has been submitted yet.")
 
     req.status       = "confirmed"
-    req.confirmed_by = user["user_id"]
+    req.confirmed_by = user["sub"]
     req.confirmed_at = datetime.now(timezone.utc)
     if body.notes:
         req.notes    = body.notes
@@ -464,7 +464,7 @@ def admin_reject(
         raise HTTPException(400, f"Request is already {req.status}")
 
     req.status           = "rejected"
-    req.confirmed_by     = user["user_id"]
+    req.confirmed_by     = user["sub"]
     req.confirmed_at     = datetime.now(timezone.utc)
     req.rejection_reason = body.reason
     db.commit()

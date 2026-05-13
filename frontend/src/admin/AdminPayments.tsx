@@ -172,9 +172,9 @@ export default function AdminPayments() {
   const confirm = async (id: string) => {
     setActing(id)
     try {
-      await api.patch(`/billing/admin/requests/${id}/confirm`)
+      await api.patch(`/billing/admin/requests/${id}/confirm`, {})
       toast.success('Payment confirmed — subscription activated')
-      load()
+      setFilter('confirmed')
     } catch (e: any) {
       toast.error(e.response?.data?.detail || 'Failed to confirm')
     } finally { setActing(null) }
@@ -187,7 +187,7 @@ export default function AdminPayments() {
       await api.patch(`/billing/admin/requests/${rejectId}/reject`, { reason: rejectReason })
       toast.success('Request rejected')
       setRejectId(null); setRejectReason('')
-      load()
+      setFilter('rejected')
     } catch (e: any) {
       toast.error(e.response?.data?.detail || 'Failed to reject')
     } finally { setActing(null) }
@@ -291,14 +291,27 @@ export default function AdminPayments() {
                       </div>
 
                       {r.status === 'pending' && (
-                        <div className="flex gap-2 shrink-0">
-                          <button onClick={() => confirm(r.id)} disabled={acting === r.id || !r.utr_number} className={btnPr} title={!r.utr_number ? 'UTR not submitted yet' : ''}>
-                            {acting === r.id ? 'Confirming…' : '✓ Confirm & Activate'}
-                          </button>
-                          <button onClick={() => { setRejectId(r.id); setRejectReason('') }} disabled={acting === r.id} className={btnDa}>
-                            ✕ Reject
-                          </button>
+                        <div className="flex flex-col gap-2 shrink-0 items-end">
+                          {!r.utr_number && (
+                            <span className="text-xs text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-1.5">
+                              Awaiting UTR from organisation
+                            </span>
+                          )}
+                          <div className="flex gap-2">
+                            <button onClick={() => confirm(r.id)} disabled={acting === r.id || !r.utr_number} className={btnPr}>
+                              {acting === r.id ? 'Confirming…' : '✓ Confirm & Activate'}
+                            </button>
+                            <button onClick={() => { setRejectId(r.id); setRejectReason('') }} disabled={acting === r.id} className={btnDa}>
+                              ✕ Reject
+                            </button>
+                          </div>
                         </div>
+                      )}
+                      {r.status === 'confirmed' && (
+                        <span className="text-xs text-green-500 font-medium shrink-0">Subscription Active</span>
+                      )}
+                      {r.status === 'rejected' && (
+                        <span className="text-xs text-catalan-error font-medium shrink-0">Rejected</span>
                       )}
                     </div>
                   </div>
