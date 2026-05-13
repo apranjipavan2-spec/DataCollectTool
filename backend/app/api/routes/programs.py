@@ -161,7 +161,10 @@ def list_programs(
     status: Optional[str] = None,
     user=Depends(require_enumerator), db: Session = Depends(get_db)
 ):
-    q = db.query(Program).filter(Program.tenant_id == user["tenant_id"])
+    if user.get("role") == "master_admin":
+        q = db.query(Program)
+    else:
+        q = db.query(Program).filter(Program.tenant_id == user["tenant_id"])
     if scheme: q = q.filter(Program.scheme_name.ilike(f"%{scheme}%"))
     if status: q = q.filter(Program.status == status)
     programs = q.order_by(Program.created_at.desc()).all()

@@ -945,11 +945,13 @@ def _get_or_create_manual_analysis(program_id: str, tenant_id, user_id, db: Sess
 
 @router.get("/programs/{program_id}/analysis")
 def get_analysis(program_id: str, user: dict = Depends(require_supervisor), db: Session = Depends(get_db)):
-    rec = db.query(ProgramAnalysis).filter(
+    q = db.query(ProgramAnalysis).filter(
         ProgramAnalysis.program_id == program_id,
-        ProgramAnalysis.tenant_id == user["tenant_id"],
         ProgramAnalysis.source == "manual",
-    ).order_by(ProgramAnalysis.updated_at.desc()).first()
+    )
+    if user.get("role") != "master_admin":
+        q = q.filter(ProgramAnalysis.tenant_id == user["tenant_id"])
+    rec = q.order_by(ProgramAnalysis.updated_at.desc()).first()
     if not rec:
         return {"analysis_id": None, "table_configs": [], "status": "empty", "updated_at": None}
     return {
@@ -958,6 +960,72 @@ def get_analysis(program_id: str, user: dict = Depends(require_supervisor), db: 
         "status": rec.status,
         "updated_at": rec.updated_at.isoformat() if rec.updated_at else None,
     }
+
+
+@router.get("/programs/{program_id}/writer-tables")
+def get_writer_tables(program_id: str, user: dict = Depends(require_supervisor), db: Session = Depends(get_db)):
+    """Get tabulations for Writer — tries ProgramAnalysis first, falls back to tool-projects."""
+    # Try ProgramAnalysis
+    q = db.query(ProgramAnalysis).filter(
+        ProgramAnalysis.program_id == program_id,
+        ProgramAnalysis.source == "manual",
+    )
+    if user.get("role") != "master_admin":
+        q = q.filter(ProgramAnalysis.tenant_id == user["tenant_id"])
+    rec = q.order_by(ProgramAnalysis.updated_at.desc()).first()
+
+    if rec and rec.table_configs:
+        return {"source": "analysis", "table_configs": rec.table_configs}
+
+    # Fallback: tool-projects with tool='analyzer' for this program
+    from app.models.user_tool_project import UserToolProject
+    projs = db.query(UserToolProject).filter(
+        UserToolProject.program_id == program_id,
+        UserToolProject.tool == "analyzer",
+    )
+    if user.get("role") != "master_admin":
+        projs = projs.filter(
+            UserToolProject.user_id == user["sub"],
+            UserToolProject.tenant_id == user["tenant_id"],
+        )
+    projs = projs.order_by(UserToolProject.updated_at.desc()).all()
+
+    if not projs:
+        return {"source": "none", "table_configs": []}
+
+    # Convert tool-projects to tabulation format
+    tabs = []
+    for p in projs:
+        data = p.data or {}
+        csv_content = data.get("csv_content", "")
+        rows = []
+        if csv_content:
+            lines = csv_content.strip().split("\n")
+            if len(lines) > 1:
+                for line in lines[1:]:
+                    parts = line.split(",")
+                    if len(parts) >= 2:
+                        group = parts[0].strip().strip('"')
+                        try:
+                            value = float(parts[1].strip())
+                        except (ValueError, IndexError):
+                            value = 0
+                        rows.append({"group": group, "value": value})
+
+        tabs.append({
+            "id": str(p.id),
+            "title": data.get("title", p.name),
+            "description": f"From saved project: {p.name}",
+            "groupby_field": "",
+            "value_field": "",
+            "aggregation": "count",
+            "chart_type": "bar",
+            "rows": rows,
+            "total": sum(r["value"] for r in rows),
+            "created_at": p.created_at.isoformat() if p.created_at else "",
+        })
+
+    return {"source": "tool_projects", "table_configs": tabs}
 
 
 @router.get("/programs/{program_id}/analysis/status")

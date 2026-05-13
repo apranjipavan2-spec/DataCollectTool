@@ -27,7 +27,12 @@ const STATUS_CLS: Record<string, string> = {
   pending:  'bg-gray-100 text-gray-500',
 }
 
-type Section = 'recent' | 'analyzer' | 'cleaner' | 'writer' | 'submissions'
+type Section = 'recent' | 'analyzer' | 'cleaner' | 'writer' | 'submissions' | 'uploads'
+
+interface SharedFile {
+  id: string; filename: string; mime_type: string; size: number
+  description: string; shared_with: string[]; created_at: string
+}
 
 function fmtDateTime(iso: string | null | undefined) {
   if (!iso) return '—'
@@ -53,6 +58,11 @@ export default function FileManagerPage() {
   const [subPage, setSubPage] = useState(1)
   const [subTotal, setSubTotal] = useState(0)
   const PAGE_SIZE = 50
+
+  // Shared files / uploads
+  const [sharedFiles, setSharedFiles] = useState<SharedFile[]>([])
+  const [uploading, setUploading] = useState(false)
+  const canUpload = user?.role === 'master_admin' || user?.role === 'org_admin'
 
   // Selection state
   const [selectedSubs, setSelectedSubs] = useState<Set<string>>(new Set())
@@ -104,6 +114,12 @@ export default function FileManagerPage() {
       setSubTotal(data?.total ?? data?.count ?? 0)
     }).catch(() => {})
   }, [loadProjects])
+
+  useEffect(() => {
+    if (canUpload || user?.role === 'supervisor') {
+      api.get('/shared-files/').then(r => setSharedFiles(Array.isArray(r.data) ? r.data : [])).catch(() => {})
+    }
+  }, [])
 
   useEffect(() => {
     if (section === 'submissions') loadSubmissions()
@@ -182,6 +198,27 @@ export default function FileManagerPage() {
 
   // ── Selection helpers ────────────────────────────────────────────────────
 
+  // ── Upload handler ────────────────────────────────────────────────────────
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('description', '')
+      formData.append('shared_with_tenants', '')
+      await api.post('/shared-files/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      const r = await api.get('/shared-files/')
+      setSharedFiles(Array.isArray(r.data) ? r.data : [])
+      toast.success('File uploaded')
+    } catch { toast.error('Upload failed') }
+    finally { setUploading(false); e.target.value = '' }
+  }
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const byTool = (tool: string) => projects.filter(p => p.tool === tool)
@@ -191,6 +228,7 @@ export default function FileManagerPage() {
   const visibleProjects =
     section === 'recent'      ? recentProjects :
     section === 'submissions' ? [] :
+    section === 'uploads'     ? [] :
     byTool(section)
 
   const allSubsSelected = submissions.length > 0 && submissions.every(s => selectedSubs.has(s.id))
@@ -232,6 +270,7 @@ export default function FileManagerPage() {
     { key: 'analyzer' as Section,    label: 'Analyzer',  icon: '📊', count: byTool('analyzer').length },
     { key: 'cleaner' as Section,     label: 'Cleaner',   icon: '🧹', count: byTool('cleaner').length },
     { key: 'writer' as Section,      label: 'Writer',    icon: '✍️', count: byTool('writer').length },
+    ...(canUpload ? [{ key: 'uploads' as Section, label: 'Uploads', icon: '📤', count: sharedFiles.length }] : []),
   ]
 
   const isLoading = section === 'submissions' ? loadingSub : loadingProj
@@ -398,7 +437,7 @@ export default function FileManagerPage() {
             )}
 
             {/* ── Tool projects section ── */}
-            {section !== 'submissions' && (
+            {section !== 'submissions' && section !== 'uploads' && (
               <>
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-sm text-catalan-textMuted">
@@ -496,6 +535,66 @@ export default function FileManagerPage() {
                             </tr>
                           )
                         })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── Uploads section ── */}
+            {section === 'uploads' && (
+              <>
+                {/* Upload area - admin only */}
+                {canUpload && (
+                  <div className="mb-6 border-2 border-dashed border-catalan-border rounded-xl p-8 text-center hover:border-catalan-primary/40 transition-colors">
+                    <div className="text-4xl mb-3">📤</div>
+                    <p className="text-sm font-medium text-catalan-text mb-1">Upload a file</p>
+                    <p className="text-xs text-catalan-textMuted mb-4">Share files with your team. PDF, CSV, Excel, images supported.</p>
+                    <label className="px-4 py-2 bg-catalan-primary text-catalan-bg rounded-lg text-sm font-medium hover:opacity-90 transition-opacity cursor-pointer inline-block">
+                      {uploading ? 'Uploading\u2026' : 'Choose File'}
+                      <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
+                    </label>
+                  </div>
+                )}
+
+                {/* Shared files list */}
+                {sharedFiles.length === 0 ? (
+                  <div className="py-16 text-center text-catalan-textMuted text-sm">
+                    <div className="text-5xl mb-3">📂</div>
+                    <div className="font-medium text-catalan-text mb-1">No uploaded files</div>
+                    <div className="text-xs">Upload files to share with your team.</div>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-catalan-border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-catalan-border bg-catalan-surface">
+                          {['File', 'Size', 'Uploaded'].map(h => (
+                            <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-catalan-textMuted uppercase tracking-wider">{h}</th>
+                          ))}
+                          <th className="px-4 py-3 text-xs font-semibold text-catalan-textMuted uppercase tracking-wider text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sharedFiles.map(f => (
+                          <tr key={f.id} className="border-b border-catalan-border hover:bg-catalan-hover transition-colors">
+                            <td className="px-4 py-3 font-medium text-catalan-text">{f.filename}</td>
+                            <td className="px-4 py-3 text-catalan-textMuted text-xs">{f.size > 1024*1024 ? `${(f.size/1024/1024).toFixed(1)} MB` : `${Math.round(f.size/1024)} KB`}</td>
+                            <td className="px-4 py-3 text-catalan-textMuted text-xs whitespace-nowrap">{fmtDateTime(f.created_at)}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex gap-3 justify-end">
+                                <a href={`/api/v1/shared-files/${f.id}/download`} target="_blank" rel="noopener" className="text-xs text-catalan-primary hover:underline">Download</a>
+                                {canUpload && (
+                                  <button onClick={async () => {
+                                    if (!confirm(`Delete "${f.filename}"?`)) return
+                                    try { await api.delete(`/shared-files/${f.id}`); setSharedFiles(prev => prev.filter(x => x.id !== f.id)); toast.success('Deleted') } catch { toast.error('Failed') }
+                                  }} className="text-xs text-red-500 hover:underline">Delete</button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>

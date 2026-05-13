@@ -7,7 +7,7 @@ import { useToast } from '@/lib/ToastContext'
 import { useAiJob } from '@/lib/useAiJob'
 import AiProgressBar from '@/components/AiProgressBar'
 import {
-  loadTabulations, loadTabulationsCache, loadReports, saveReport, deleteReport,
+  loadTabulations, loadTabulationsCache, loadWriterTables, loadReports, saveReport, deleteReport,
   getLastProgram, setLastProgram,
   type SavedTabulation, type SavedReport,
 } from '@/lib/fgStorage'
@@ -360,7 +360,7 @@ export default function FgWriter() {
     if (!programId) return
     const cached = loadTabulationsCache(programId)
     applyTabulations(cached)
-    loadTabulations(programId).then(applyTabulations).catch(() => {})
+    loadWriterTables(programId).then(applyTabulations).catch(() => {})
     setVersions(loadReports(programId))
   }, [programId])
 
@@ -380,7 +380,7 @@ export default function FgWriter() {
     if (id) {
       const cached = loadTabulationsCache(id)
       applyTabulations(cached)
-      loadTabulations(id).then(applyTabulations).catch(() => {})
+      loadWriterTables(id).then(applyTabulations).catch(() => {})
       setVersions(loadReports(id))
     }
     if (p?.start_date || p?.end_date) {

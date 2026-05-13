@@ -42,6 +42,15 @@ export async function loadTabulations(programId: string): Promise<SavedTabulatio
   }
 }
 
+export async function loadWriterTables(programId: string): Promise<SavedTabulation[]> {
+  try {
+    const res = await api.get(`/fg/programs/${programId}/writer-tables`)
+    return res.data.table_configs ?? []
+  } catch {
+    return loadTabulationsCache(programId)
+  }
+}
+
 export function loadTabulationsCache(programId: string): SavedTabulation[] {
   try { return JSON.parse(localStorage.getItem(`fg_tabs_${programId}`) || '[]') } catch { return [] }
 }

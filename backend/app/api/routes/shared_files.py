@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List
+from sqlalchemy import or_
 from app.core.deps import get_current_user, require_master_admin, get_db
 from app.models.shared_file import SharedFile
 
@@ -19,10 +20,12 @@ async def upload_shared_file(
     file: UploadFile = File(...),
     description: str = Form(""),
     shared_with_tenants: str = Form(""),
-    user=Depends(require_master_admin),
+    user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Upload a file (master_admin only). Optionally share with tenant IDs (comma-separated)."""
+    """Upload a file (master_admin or org_admin). Optionally share with tenant IDs (comma-separated)."""
+    if user.get("role") not in ("master_admin", "org_admin"):
+        raise HTTPException(403, "Only admins can upload files")
     file_id = str(uuid.uuid4())
     ext = Path(file.filename or "file").suffix
     disk_filename = f"{file_id}{ext}"
@@ -65,8 +68,12 @@ def list_shared_files(user=Depends(get_current_user), db: Session = Depends(get_
         rows = db.query(SharedFile).order_by(SharedFile.created_at.desc()).all()
     else:
         tenant_id = user["tenant_id"]
+        user_id = user["sub"]
         rows = db.query(SharedFile).filter(
-            SharedFile.shared_with_tenants.any(tenant_id)
+            or_(
+                SharedFile.shared_with_tenants.any(tenant_id),
+                SharedFile.uploaded_by == user_id,
+            )
         ).order_by(SharedFile.created_at.desc()).all()
 
     return [
@@ -118,11 +125,17 @@ def update_sharing(
 
 
 @router.delete("/{file_id}")
-def delete_shared_file(file_id: str, user=Depends(require_master_admin), db: Session = Depends(get_db)):
-    """Delete a shared file (master_admin only)."""
+def delete_shared_file(file_id: str, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Delete a shared file (master_admin or org_admin for own uploads)."""
     record = db.query(SharedFile).filter(SharedFile.id == file_id).first()
     if not record:
         raise HTTPException(404, "File not found")
+    if user.get("role") == "master_admin":
+        pass  # can delete anything
+    elif user.get("role") == "org_admin" and str(record.uploaded_by) == user["sub"]:
+        pass  # can delete own uploads
+    else:
+        raise HTTPException(403, "Only admins can delete files")
     if os.path.exists(record.disk_path):
         os.remove(record.disk_path)
     db.delete(record)
