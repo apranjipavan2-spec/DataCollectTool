@@ -436,6 +436,7 @@ function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0
               <FToggle label="Grand Totals (All)"       checked={t.grand_total}    onChange={v => onUpdate({ grand_total: v, grand_total_rows: v, grand_total_columns: v })} />
               <FToggle label="Row Total (bottom row)"    checked={t.grand_total_rows ?? t.grand_total}  onChange={v => onUpdate({ grand_total_rows: v, grand_total: v && (t.grand_total_columns ?? t.grand_total) })} />
               <FToggle label="Column Total (last column)" checked={t.grand_total_columns ?? t.grand_total} onChange={v => onUpdate({ grand_total_columns: v, grand_total: v && (t.grand_total_rows ?? t.grand_total) })} />
+              <FToggle label="Combined Grand Total" checked={!!t.grand_total_combined} onChange={v => onUpdate({ grand_total_combined: v })} />
               <FToggle label="Subtotals (hierarchical)" checked={t.subtotals}      onChange={v => onUpdate({ subtotals: v })} />
             </div>
             {t.subtotals && (

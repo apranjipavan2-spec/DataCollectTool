@@ -25,6 +25,7 @@ class TableConfig(BaseModel):
     grand_total: bool = True
     grand_total_rows: Optional[bool] = None    # None = follow grand_total
     grand_total_columns: Optional[bool] = None # None = follow grand_total
+    grand_total_combined: bool = False         # Club all values into single Grand Total column
     sort_by: Optional[str] = None
     sort_order: str = "asc"
     multi_sort: list[dict] = []     # [{field, order}] for multi-key sorting
@@ -667,6 +668,17 @@ async def tabulate(config: TableConfig):
                             _col_tuples.append(_nk)
                 pivot = pd.DataFrame(_data, index=_ref.index)
                 pivot.columns = pd.MultiIndex.from_tuples(_col_tuples)
+
+                # Combined Grand Total: replace per-value GT sub-columns with single summed column
+                if config.grand_total_combined and want_col_total_pivot:
+                    gt_cols = [c for c in pivot.columns if str(c[0]) == "Grand Total"]
+                    if gt_cols:
+                        pivot[("Grand Total", "Total")] = pivot[gt_cols].sum(axis=1)
+                        pivot = pivot.drop(columns=gt_cols)
+                        # Re-sort columns: non-GT first, then the combined GT at the end
+                        non_gt = [c for c in pivot.columns if str(c[0]) != "Grand Total"]
+                        gt_new = [c for c in pivot.columns if str(c[0]) == "Grand Total"]
+                        pivot = pivot[non_gt + gt_new]
 
             column_groups = None
             if isinstance(pivot.columns, pd.MultiIndex):

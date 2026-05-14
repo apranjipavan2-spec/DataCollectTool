@@ -346,7 +346,7 @@ export default function App() {
       dataset_id: dataset.dataset_id,
       rows: config.rows, columns: config.columns, values: config.values,
       filters: mergeProjectFilters(projectFiltersRef.current, config.filters), grand_total: config.grand_total,
-      grand_total_rows: config.grand_total_rows, grand_total_columns: config.grand_total_columns,
+      grand_total_rows: config.grand_total_rows, grand_total_columns: config.grand_total_columns, grand_total_combined: config.grand_total_combined,
       subtotals: config.subtotals, subtotal_pct_base: config.subtotal_pct_base,
       missing_data: config.missing_data,
       sort_by: config.sort_by, sort_order: config.sort_order,
@@ -452,14 +452,16 @@ export default function App() {
     updateTable(patch);
   }, [tables, activeTableIdx, updateTable]);
 
+  // Prompt state for numeric fields dropped into Columns zone
+  const [numericPrompt, setNumericPrompt] = useState<{ field: string; zone: DropZoneType; fromZone?: DropZoneType } | null>(null);
+
   const handleDrop = useCallback((zone: DropZoneType, fieldName: string) => {
     const table = tables[activeTableIdx];
-    // Auto-redirect numeric fields dropped into Columns zone to Values zone
+    // Prompt for numeric fields dropped into Columns zone
     if (zone === 'columns') {
       const col = allColumns.find(c => c.name === fieldName);
       if (col?.type === 'numeric') {
-        if (table.values.find(v => v.field === fieldName)) return;
-        updateTable({ values: [...table.values, createValueField(table, fieldName)] });
+        setNumericPrompt({ field: fieldName, zone });
         return;
       }
     }
@@ -514,21 +516,15 @@ export default function App() {
       }
       else if (fromZone === 'filters') { const f = { ...t.filters }; delete f[fieldName]; t.filters = f; }
       else t[fromZone] = t[fromZone].filter((f: string) => f !== fieldName);
-      // Auto-redirect numeric fields targeting Columns zone to Values zone
-      let effectiveToZone = toZone;
-      if (toZone === 'columns') {
-        const col = allColumns.find(c => c.name === fieldName);
-        if (col?.type === 'numeric') effectiveToZone = 'values';
-      }
       // Add to target
-      if (effectiveToZone === 'values') {
+      if (toZone === 'values') {
         if (!t.values.find(v => v.field === fieldName)) {
           t.values = [...t.values, createValueField(t, fieldName)];
         }
-      } else if (effectiveToZone === 'filters') {
+      } else if (toZone === 'filters') {
         if (!(fieldName in t.filters)) t.filters = { ...t.filters, [fieldName]: [] };
       } else {
-        if (!t[effectiveToZone].includes(fieldName)) t[effectiveToZone] = [...t[effectiveToZone], fieldName];
+        if (!t[toZone].includes(fieldName)) t[toZone] = [...t[toZone], fieldName];
       }
       next[activeTableIdx] = t;
       runTabulation(t);
@@ -1051,18 +1047,8 @@ export default function App() {
               updateTable({ rows: newRows });
             } else if (zone === 'columns') {
               const newCols = [...table.columns];
-              const newVals = [...table.values];
-              fields.forEach(f => {
-                const col = allColumns.find(c => c.name === f);
-                if (col?.type === 'numeric') {
-                  if (!newVals.find(v => v.field === f)) {
-                    newVals.push(createValueField({ ...table, values: newVals }, f));
-                  }
-                } else {
-                  if (!newCols.includes(f)) newCols.push(f);
-                }
-              });
-              updateTable({ columns: newCols, values: newVals });
+              fields.forEach(f => { if (!newCols.includes(f)) newCols.push(f); });
+              updateTable({ columns: newCols });
             }
           }}
           tables={tables}
@@ -1298,6 +1284,40 @@ export default function App() {
                 onClick={() => setDateGroupModal(null)}>
                 No grouping (use raw values)
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {numericPrompt && (
+        <div className="modal-overlay" onClick={() => setNumericPrompt(null)}>
+          <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Numeric Field</h2>
+              <button className="modal-close" onClick={() => setNumericPrompt(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>This field contains numbers. How should it be used?</p>
+              <div className="date-group-grid">
+                <button className="date-group-btn" onClick={() => {
+                  const table = tables[activeTableIdx];
+                  if (table && !table.columns.includes(numericPrompt.field))
+                    updateTable({ columns: [...table.columns, numericPrompt.field] });
+                  setNumericPrompt(null);
+                }}>As Column (categorical)</button>
+                {['sum', 'average', 'count', 'min', 'max'].map(agg => (
+                  <button key={agg} className="date-group-btn" onClick={() => {
+                    const table = tables[activeTableIdx];
+                    if (table && !table.values.find(v => v.field === numericPrompt.field)) {
+                      const vf = createValueField(table, numericPrompt.field);
+                      vf.agg = agg;
+                      vf.label = `${agg.charAt(0).toUpperCase() + agg.slice(1)} of ${numericPrompt.field}`;
+                      updateTable({ values: [...table.values, vf] });
+                    }
+                    setNumericPrompt(null);
+                  }}>Value → {agg.charAt(0).toUpperCase() + agg.slice(1)}</button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
