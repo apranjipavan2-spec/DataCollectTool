@@ -566,23 +566,6 @@ async def tabulate(config: TableConfig):
 
         # Pivot table case
         elif config.rows and config.columns:
-            val_field = config.values[0]["field"]
-            _raw_agg = config.values[0].get("agg", "sum")
-            # Handle '*' (row count) — use first row field as proxy with count agg
-            if val_field == "*":
-                val_field = config.rows[0]
-                _raw_agg = "count"
-            # Auto-downgrade numeric agg to 'count' for text/multi-choice value columns
-            if _raw_agg in NUMERIC_ONLY_AGGS and _col_is_text(df, val_field):
-                _raw_agg = "count"
-            agg_func = AGG_MAP.get(_raw_agg, "sum")
-
-            # Pandas pivot_table fails if val_field is in rows or columns
-            temp_val_field = val_field
-            if val_field in config.rows or val_field in config.columns:
-                temp_val_field = f"__temp_{val_field}__"
-                df[temp_val_field] = df[val_field]
-
             # Handle same field in both rows and columns — create temp copy for columns
             temp_cols = list(config.columns)
             temp_col_renames = {}
@@ -604,43 +587,91 @@ async def tabulate(config: TableConfig):
                     if _nat_mask.any():
                         df.loc[_nat_mask, _pc] = "(blank)"
 
-            pivot = pd.pivot_table(
-                df,
-                values=temp_val_field,
-                index=config.rows,
-                columns=temp_cols,
-                aggfunc=agg_func,
-                fill_value=0 if config.missing_data == "0" else None,
-                margins=need_margins,
-                margins_name="Grand Total",
-                dropna=False,
-            )
+            # Build per-value pivots (supports multiple value fields with independent aggs)
+            _pv_pivots = []
+            _pv_cfgs = []
+            _pv_temp_cleanup = []
 
-            # Selectively remove row or column grand totals
-            if need_margins:
-                if not want_row_total_pivot:
-                    # Remove the Grand Total row (last row added by margins)
-                    if "Grand Total" in pivot.index.get_level_values(-1).astype(str).tolist():
-                        pivot = pivot.drop("Grand Total", axis=0, errors="ignore")
-                if not want_col_total_pivot:
-                    # Remove the Grand Total column
-                    if isinstance(pivot.columns, pd.MultiIndex):
-                        cols_to_drop = [c for c in pivot.columns if "Grand Total" in [str(x) for x in c]]
-                        if cols_to_drop:
-                            pivot = pivot.drop(columns=cols_to_drop, errors="ignore")
-                    else:
-                        if "Grand Total" in pivot.columns.astype(str).tolist():
-                            pivot = pivot.drop(columns=["Grand Total"], errors="ignore")
+            for _vi, _v in enumerate(config.values):
+                _vf = _v["field"]
+                _va = _v.get("agg", "sum")
+                if _vf == "*":
+                    _vf = config.rows[0]
+                    _va = "count"
+                if _va in NUMERIC_ONLY_AGGS and _col_is_text(df, _vf):
+                    _va = "count"
+                _af = AGG_MAP.get(_va, "sum")
+                _vl = _v.get("label", f"{_va.title()} of {_vf}")
 
-            if temp_val_field != val_field:
-                df.drop(columns=[temp_val_field], inplace=True, errors="ignore")
+                _tvf = _vf
+                if _vf in config.rows or _vf in config.columns:
+                    _tvf = f"__temp_{_vf}_{_vi}__"
+                    df[_tvf] = df[_vf]
+                    _pv_temp_cleanup.append(_tvf)
+
+                _p = pd.pivot_table(
+                    df, values=_tvf, index=config.rows, columns=temp_cols,
+                    aggfunc=_af,
+                    fill_value=0 if config.missing_data == "0" else None,
+                    margins=need_margins, margins_name="Grand Total", dropna=False,
+                )
+
+                # Selectively remove row or column grand totals
+                if need_margins:
+                    if not want_row_total_pivot:
+                        if "Grand Total" in _p.index.get_level_values(-1).astype(str).tolist():
+                            _p = _p.drop("Grand Total", axis=0, errors="ignore")
+                    if not want_col_total_pivot:
+                        if isinstance(_p.columns, pd.MultiIndex):
+                            _cd = [c for c in _p.columns if "Grand Total" in [str(x) for x in c]]
+                            if _cd:
+                                _p = _p.drop(columns=_cd, errors="ignore")
+                        else:
+                            if "Grand Total" in _p.columns.astype(str).tolist():
+                                _p = _p.drop(columns=["Grand Total"], errors="ignore")
+
+                _pv_pivots.append(_p)
+                _pv_cfgs.append({
+                    "label": _vl, "show_as": _v.get("show_as", "normal"),
+                    "combo_show_as": _v.get("combo_show_as", "normal"),
+                    "decimals": _v.get("decimals", 2), "agg": _va,
+                })
+
+            for _tf in _pv_temp_cleanup:
+                df.drop(columns=[_tf], inplace=True, errors="ignore")
             for temp_name in temp_col_renames:
                 df.drop(columns=[temp_name], inplace=True, errors="ignore")
 
+            # Merge per-value pivots into combined pivot
+            _is_multi_val = len(_pv_pivots) > 1
+            if not _is_multi_val:
+                pivot = _pv_pivots[0]
+            else:
+                _ref = _pv_pivots[0]
+                _ref_cols = _ref.columns
+                _data = {}
+                _col_tuples = []
+                if isinstance(_ref_cols, pd.MultiIndex):
+                    for _ct in _ref_cols:
+                        for _p, _vc in zip(_pv_pivots, _pv_cfgs):
+                            _nk = tuple(str(c) for c in _ct) + (_vc["label"],)
+                            _fk = " | ".join(_nk)
+                            _data[_fk] = _p[_ct].values if _ct in _p.columns else np.zeros(len(_ref))
+                            _col_tuples.append(_nk)
+                else:
+                    for _cv in _ref_cols:
+                        for _p, _vc in zip(_pv_pivots, _pv_cfgs):
+                            _nk = (str(_cv), _vc["label"])
+                            _fk = f"{_cv} | {_vc['label']}"
+                            _data[_fk] = _p[_cv].values if _cv in _p.columns else np.zeros(len(_ref))
+                            _col_tuples.append(_nk)
+                pivot = pd.DataFrame(_data, index=_ref.index)
+                pivot.columns = pd.MultiIndex.from_tuples(_col_tuples)
+
             column_groups = None
             if isinstance(pivot.columns, pd.MultiIndex):
-                # Insert column-group subtotals before flattening
-                if config.subtotals:
+                # Insert column-group subtotals before flattening (skip for multi-value — summing across measures is meaningless)
+                if config.subtotals and not _is_multi_val:
                     from collections import OrderedDict
                     top_level_values = list(OrderedDict.fromkeys(
                         str(col[0]) for col in pivot.columns if str(col[0]) != "Grand Total"
@@ -716,8 +747,10 @@ async def tabulate(config: TableConfig):
             if v0.get("agg", "sum") in PERCENT_AGGS:
                 show_as = v0["agg"]
 
-            def apply_pivot_show_as(pivot_df, sa, decimal_places):
+            def apply_pivot_show_as(pivot_df, sa, decimal_places, col_filter=None):
                 numeric_cols = pivot_df.select_dtypes(include=[np.number]).columns
+                if col_filter:
+                    numeric_cols = pd.Index([c for c in numeric_cols if any(str(c).endswith(lbl) for lbl in col_filter)])
                 # Exclude Grand Total and Subtotal columns from percentage calculations
                 data_cols = [c for c in numeric_cols if not str(c).startswith("Grand Total") and "| Subtotal" not in str(c)]
                 has_margin_col = any(str(c).startswith("Grand Total") for c in numeric_cols)
@@ -838,37 +871,61 @@ async def tabulate(config: TableConfig):
                                 pivot_df[c] = (pivot_df[c] / grand * 100).round(decimal_places)
                 return pivot_df
 
-            if combo_show_as and combo_show_as != "normal":
-                # Store original values, compute %, then combine
-                orig_pivot = pivot.copy()
-                apply_pivot_show_as(pivot, combo_show_as, dec)
+            def _apply_combo(target_df, orig_df, sa, decimal_places, col_filter=None):
+                apply_pivot_show_as(target_df, sa, decimal_places, col_filter=col_filter)
                 missing_fill = config.missing_data if config.missing_data else ""
-                numeric_cols = orig_pivot.select_dtypes(include=[np.number]).columns
-                for c in numeric_cols:
+                ncols = orig_df.select_dtypes(include=[np.number]).columns
+                if col_filter:
+                    ncols = pd.Index([c for c in ncols if any(str(c).endswith(lbl) for lbl in col_filter)])
+                for c in ncols:
                     combined = []
-                    for ov, pv in zip(orig_pivot[c], pivot[c]):
+                    for ov, pv in zip(orig_df[c], target_df[c]):
                         try:
                             ov_na = (isinstance(ov, float) and (pd.isna(ov) or np.isinf(ov))) if not isinstance(ov, str) else False
                             pv_na = (isinstance(pv, float) and (pd.isna(pv) or np.isinf(pv))) if not isinstance(pv, str) else ("nan" in str(pv).lower())
                             if ov_na:
                                 combined.append(missing_fill)
                             elif pv_na:
-                                ov_s = f"{ov:,.{dec}f}" if isinstance(ov, (int, float)) else str(ov)
+                                ov_s = f"{ov:,.{decimal_places}f}" if isinstance(ov, (int, float)) else str(ov)
                                 combined.append(f"{ov_s}\n({missing_fill or '0'}%)")
                             else:
-                                ov_s = f"{ov:,.{dec}f}" if isinstance(ov, (int, float)) else str(ov)
-                                pv_s = f"{pv:.{dec}f}%" if isinstance(pv, (int, float)) else str(pv)
+                                ov_s = f"{ov:,.{decimal_places}f}" if isinstance(ov, (int, float)) else str(ov)
+                                pv_s = f"{pv:.{decimal_places}f}%" if isinstance(pv, (int, float)) else str(pv)
                                 combined.append(f"{ov_s}\n({pv_s})")
                         except (ValueError, TypeError):
                             combined.append(missing_fill if ov_na else str(ov))
-                    pivot[c] = combined
-            elif show_as and show_as != "normal":
-                apply_pivot_show_as(pivot, show_as, dec)
+                    target_df[c] = combined
 
-            # Apply decimal rounding to all numeric columns
-            if dec is not None:
-                for c in pivot.select_dtypes(include=[np.number]).columns:
-                    pivot[c] = pivot[c].round(int(dec))
+            if _is_multi_val:
+                # Per-value show_as / combo / rounding
+                for _vc in _pv_cfgs:
+                    _sa = _vc.get("show_as", "normal")
+                    _csa = _vc.get("combo_show_as", "normal")
+                    _dec = _vc.get("decimals", 2)
+                    _lbl = _vc["label"]
+                    # Legacy compat
+                    if _vc.get("agg", "sum") in PERCENT_AGGS:
+                        _sa = _vc["agg"]
+                    _cf = [_lbl]
+                    if _csa and _csa != "normal":
+                        orig_pivot = pivot.copy()
+                        _apply_combo(pivot, orig_pivot, _csa, _dec, col_filter=_cf)
+                    elif _sa and _sa != "normal":
+                        apply_pivot_show_as(pivot, _sa, _dec, col_filter=_cf)
+                    if _dec is not None:
+                        val_cols = [c for c in pivot.select_dtypes(include=[np.number]).columns if str(c).endswith(_lbl)]
+                        for c in val_cols:
+                            pivot[c] = pivot[c].round(int(_dec))
+            else:
+                if combo_show_as and combo_show_as != "normal":
+                    orig_pivot = pivot.copy()
+                    _apply_combo(pivot, orig_pivot, combo_show_as, dec)
+                elif show_as and show_as != "normal":
+                    apply_pivot_show_as(pivot, show_as, dec)
+                # Apply decimal rounding to all numeric columns
+                if dec is not None:
+                    for c in pivot.select_dtypes(include=[np.number]).columns:
+                        pivot[c] = pivot[c].round(int(dec))
 
             # Hide subtotal rows in pivot — remove "Subtotal" rows but keep detail and grand total
             if config.hide_subgroup and config.subtotals and len(config.rows) >= 1:
