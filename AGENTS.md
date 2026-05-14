@@ -47,22 +47,281 @@
 | To query by topic | `sigmap --query "<topic>"` |
 
 Always run `sigmap ask` or `sigmap --query` before searching for files relevant to a task.
+## deps
+```
+backend\app\api\routes\billing.py ← fastapi, pydantic, sqlalchemy, app
+backend\app\api\routes\field_govern.py ← fastapi, pydantic, sqlalchemy, app, pandas
+backend\app\api\routes\programs.py ← fastapi, pydantic, sqlalchemy, app
+backend\app\api\routes\shared_files.py ← fastapi, pydantic, sqlalchemy, app
+backend\app\api\routes\user_tool_projects.py ← fastapi, sqlalchemy, pydantic, app
+backend\app\models\shared_file.py ← sqlalchemy, app
+backend\app\models\user_tool_project.py ← sqlalchemy, app
+```
+
+## backend
+
+### backend\app\api\routes\billing.py
+```
+class RequestPaymentIn(BaseModel) {plan_id*, billing_cycle?}
+class SubmitUTRIn(BaseModel) {order_ref*, utr_number*}
+class PaymentConfigIn(BaseModel) {upi_id?, upi_name?, bank_account?, bank_ifsc?, bank_name?, admin_whatsapp?}
+class ConfirmIn(BaseModel) {notes?}
+class RejectIn(BaseModel) {reason*}
+class ManualAssignIn(BaseModel) {plan_id*, billing_cycle?, notes?}
+def get_org_plan(tenant_id, db: Session) → Plan  # Return the current plan for an org (falls back to free plan)
+def get_org_usage(tenant_id, db: Session) → UsageRecord  # Return or create current month's usage record
+def check_submission_limit(tenant_id, db: Session)  # Raise 402 if org has hit submission limit
+def check_feature(tenant_id, feature: str, db: Session)  # Raise 403 if the org's plan doesn't include the feature
+GET /plans  →  list_plans()
+POST /request  →  request_payment()
+POST /utr  →  submit_utr()
+GET /my-subscription  →  my_subscription()
+GET /payment-config  →  get_payment_config()
+GET /admin/payment-config  →  admin_get_payment_config()
+PATCH /admin/payment-config  →  admin_update_payment_config()
+GET /admin/requests  →  admin_list_requests()
+PATCH /admin/requests/{request_id}/confirm  →  admin_confirm()
+PATCH /admin/requests/{request_id}/reject  →  admin_reject()
+GET /admin/subscriptions  →  admin_list_subscriptions()
+POST /admin/subscriptions/{tenant_id}/assign  →  admin_assign_plan()
+DELETE /admin/subscriptions/{tenant_id}  →  admin_cancel_subscription()
+```
+
+### backend\app\api\routes\field_govern.py
+```
+class WaveIn(BaseModel) {questionnaire_id*, wave_number*, wave_label*, panel_key?}
+class TabulateRequest(BaseModel) {column_headers*, sample_rows?, user_prompt?, research_type?}
+class TabulateExecuteRequest(BaseModel) {groupby_field*, value_field*, aggregation?, form_ids?, chart_type?, title?}
+class TabulateCsvRequest(BaseModel) {rows*, groupby_field*, value_field?, aggregation?, chart_type?, title?}
+class WriterRequest(BaseModel) {style?, date_range?, custom_context?, tabulation_data?}
+class RestoreRequest(BaseModel) {analysis_id*}
+class FeedbackRequest(BaseModel) {vote?}
+class SmartBuildRequest(BaseModel) {column_ids?, column_headers?, query?}
+class PolishRequest(BaseModel) {title*, groupby_field*, value_field?, aggregation?, rows?, is_cross_tab?}
+class InterpretRequest(BaseModel) {title*, subtitle?, groupby_field*, value_field?, aggregation?, rows?}
+class SaveTabulationRequest(BaseModel) {tabulation*}
+class AutoGenerateRequest(BaseModel) {objectives?}
+GET /programs/{program_id}/waves  →  get_waves()
+PATCH /programs/{program_id}/panel-study  →  toggle_panel_study()
+PUT /programs/{program_id}/waves  →  set_wave()
+DELETE /programs/{program_id}/waves/{questionnaire_id}  →  clear_wave()
+GET /programs/{program_id}/attrition  →  attrition_report()
+GET /programs/{program_id}/analyzer-data  →  get_analyzer_data()
+GET /programs/{program_id}/summary  →  get_program_summary()
+POST /programs/{program_id}/tabulate/suggest  →  suggest_tabulation()
+POST /programs/{program_id}/tabulate/smart-build  →  smart_build_tabulation()
+POST /programs/{program_id}/tabulate/polish  →  polish_tabulation()
+POST /programs/{program_id}/tabulate/interpret  →  interpret_tabulation()
+POST /programs/{program_id}/tabulate/execute  →  execute_tabulation()
+POST /tabulate-csv  →  tabulate_csv()
+GET /programs/{program_id}/analysis  →  get_analysis()
+GET /programs/{program_id}/writer-tables  →  get_writer_tables()
+GET /programs/{program_id}/analysis/status  →  get_analysis_status()
+GET /programs/{program_id}/analysis/history  →  get_analysis_history()
+POST /programs/{program_id}/analysis/restore  →  restore_analysis()
+```
+
+### backend\app\api\routes\programs.py
+```
+class LocationIn(BaseModel) {state?, district*, block?, village?, gps_lat?, gps_lng?}
+class ProgramIn(BaseModel) {name*, scheme_name?, description?, start_date?, end_date?, status?}
+class BulkProgEditSettingRequest(BaseModel) {allow_enumerator_edit?}
+class ParticipantTypeIn(BaseModel) {name*, description?, sort_order?}
+class QuestionnaireIn(BaseModel) {participant_type_id?, form_id?, name*, total_target?, start_date?, end_date?}
+class LocationTargetIn(BaseModel) {location_id*, target_count*, deadline?}
+GET /locations  →  list_locations()
+POST /locations  →  create_location()
+PATCH /locations/{loc_id}  →  update_location()
+DELETE /locations/{loc_id}  →  delete_location()
+GET /overview  →  progress_overview()
+GET /  →  list_programs()
+POST /  →  create_program()
+GET /{prog_id}  →  get_program()
+PATCH /{prog_id}  →  update_program()
+PATCH /bulk-edit-setting  →  bulk_update_program_edit_setting()
+DELETE /{prog_id}  →  delete_program()
+POST /{prog_id}/participant-types  →  create_participant_type()
+PATCH /{prog_id}/participant-types/{pt_id}  →  update_participant_type()
+DELETE /{prog_id}/participant-types/{pt_id}  →  delete_participant_type()
+GET /{prog_id}/questionnaires  →  list_questionnaires()
+POST /{prog_id}/questionnaires  →  create_questionnaire()
+PATCH /{prog_id}/questionnaires/{q_id}  →  update_questionnaire()
+DELETE /{prog_id}/questionnaires/{q_id}  →  delete_questionnaire()
+POST /{prog_id}/questionnaires/{q_id}/targets  →  create_location_target()
+PATCH /{prog_id}/questionnaires/{q_id}/targets/{t_id}  →  update_location_target()
+DELETE /{prog_id}/questionnaires/{q_id}/targets/{t_id}  →  delete_location_target()
+GET /{prog_id}/progress  →  get_progress()
+GET /{prog_id}/progress/xlsx  →  export_progress_xlsx()
+GET /{prog_id}/progress/pdf  →  export_progress_pdf()
+```
+
+### backend\app\api\routes\shared_files.py
+```
+class CreateFolderRequest(BaseModel) {name*}
+class RenameRequest(BaseModel) {new_name*}
+POST /  →  upload_shared_file()
+GET /folders  →  list_folders()
+POST /folders  →  create_folder()
+GET /  →  list_shared_files()
+GET /{file_id}/download  →  download_shared_file()
+PATCH /{file_id}/rename  →  rename_shared_file()
+GET /{file_id}/csv-data  →  get_csv_data()
+PATCH /{file_id}/share  →  update_sharing()
+DELETE /{file_id}  →  delete_shared_file()
+```
+
+### backend\app\api\routes\user_tool_projects.py
+```
+class ProjectIn(BaseModel) {tool*, name*, program_id?, data?}
+class ShareProjectRequest(BaseModel) {tenant_ids*}
+GET /tool-projects/  →  list_projects()
+POST /tool-projects/  →  upsert_project()
+PATCH /tool-projects/{project_id}/share  →  share_project()
+DELETE /tool-projects/{project_id}  →  delete_project()
+```
+
+### backend\app\models\shared_file.py
+```
+class SharedFile(Base)
+```
+
+### backend\app\models\user_tool_project.py
+```
+class UserToolProject(Base)
+```
+
 ## frontend
 
-### frontend\src\auth\LoginPage.tsx
+### frontend\src\admin\AdminPanel.modern.tsx
 ```
-component FeatureIcon
-component Logo
-component LoginPage
-hook useNavigate
+component PlanBadge
+component StatusBadge
+component RoleBadge
+component GlassCard
+component StatCard
+component TableHeader
+component EmptyState
+component AdminPanel
 hook useState
-hook useRef
+hook useMemo
 hook useEffect
+handler onChange
+handler onClick
+```
+
+### frontend\src\admin\AdminPayments.tsx
+```
+component AdminPayments
+hook useToast
+hook useState
+hook useCallback
+hook useEffect
+handler onClick
+handler onChange
+```
+
+### frontend\src\components\Sidebar.tsx
+```
+props SidebarProps
+hook useState
+hook useNavigate
+hook useLocation
+hook useHelp
+hook useLanguage
+hook useTheme
+export Sidebar
 handler onMouseEnter
 handler onMouseLeave
 handler onChange
-handler onKeyDown
-handler onFocus
-handler onBlur
 handler onClick
+```
+
+### frontend\src\components\TopNav.tsx
+```
+component NotifRow
+component NotificationBell
+component UsageBar
+props TopNavProps
+hook useState
+hook useRef
+hook useNavigate
+hook useTheme
+hook useCallback
+hook useEffect
+hook useSubscription
+export TopNav
+handler onClick
+```
+
+### frontend\src\fg\FileManagerPage.tsx
+```
+component FileManagerPage
+hook useToast
+hook useRef
+hook useState
+hook useEffect
+hook useCallback
+handler onClick
+handler onChange
+handler onKeyDown
+```
+
+### frontend\src\lib\fgStorage.ts
+```
+export interface SavedTabulation
+  id: string title: string description: s
+export interface SavedReport
+export async function loadTabulations(programId) → Promise<SavedTabulation[]>
+export async function loadWriterTables(programId) → Promise<SavedTabulation[]>
+export function loadTabulationsCache(programId) → SavedTabulation[]
+export async function saveTabulation(programId, tab) → Promise<void>
+export async function deleteTabulation(programId, tabId) → Promise<void>
+export function loadReports(programId) → SavedReport[]
+export function saveReport(programId, report)
+export function deleteReport(programId, reportId)
+export async function saveAnalyzerToolProject(programId, programName, tab) → Promise<void>
+export function getLastProgram() → string
+export function setLastProgram(id)
+```
+
+### frontend\src\programs\FgAnalyzer.tsx
+```
+component StatCard
+component OverviewTab
+component TabulationCard
+component TabulatorTab
+component PanelStudyTab
+component CsvTab
+component ProgramPicker
+component FgAnalyzer
+hook useToast
+hook useState
+hook useCallback
+hook useEffect
+hook useRef
+handler onClick
+handler onChange
+handler onDelete
+handler onUpdate
+```
+
+### frontend\src\reports\FgWriter.tsx
+```
+component ProgramPicker
+component TabPreview
+component MarkdownPreview
+component ReportVersionCard
+component ScheduleModal
+component FgWriter
+hook useState
+hook useEffect
+hook useToast
+hook useAiJob
+hook useCallback
+handler onChange
+handler onClick
+handler onProgramChange
+handler onData
+handler onNum
+handler onRestore
 ```
