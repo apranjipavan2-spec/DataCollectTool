@@ -454,6 +454,15 @@ export default function App() {
 
   const handleDrop = useCallback((zone: DropZoneType, fieldName: string) => {
     const table = tables[activeTableIdx];
+    // Auto-redirect numeric fields dropped into Columns zone to Values zone
+    if (zone === 'columns') {
+      const col = allColumns.find(c => c.name === fieldName);
+      if (col?.type === 'numeric') {
+        if (table.values.find(v => v.field === fieldName)) return;
+        updateTable({ values: [...table.values, createValueField(table, fieldName)] });
+        return;
+      }
+    }
     if (zone === 'values') {
       if (table.values.find(v => v.field === fieldName)) return;
       updateTable({ values: [...table.values, createValueField(table, fieldName)] });
@@ -505,15 +514,21 @@ export default function App() {
       }
       else if (fromZone === 'filters') { const f = { ...t.filters }; delete f[fieldName]; t.filters = f; }
       else t[fromZone] = t[fromZone].filter((f: string) => f !== fieldName);
+      // Auto-redirect numeric fields targeting Columns zone to Values zone
+      let effectiveToZone = toZone;
+      if (toZone === 'columns') {
+        const col = allColumns.find(c => c.name === fieldName);
+        if (col?.type === 'numeric') effectiveToZone = 'values';
+      }
       // Add to target
-      if (toZone === 'values') {
+      if (effectiveToZone === 'values') {
         if (!t.values.find(v => v.field === fieldName)) {
           t.values = [...t.values, createValueField(t, fieldName)];
         }
-      } else if (toZone === 'filters') {
+      } else if (effectiveToZone === 'filters') {
         if (!(fieldName in t.filters)) t.filters = { ...t.filters, [fieldName]: [] };
       } else {
-        if (!t[toZone].includes(fieldName)) t[toZone] = [...t[toZone], fieldName];
+        if (!t[effectiveToZone].includes(fieldName)) t[effectiveToZone] = [...t[effectiveToZone], fieldName];
       }
       next[activeTableIdx] = t;
       runTabulation(t);
@@ -1036,8 +1051,18 @@ export default function App() {
               updateTable({ rows: newRows });
             } else if (zone === 'columns') {
               const newCols = [...table.columns];
-              fields.forEach(f => { if (!newCols.includes(f)) newCols.push(f); });
-              updateTable({ columns: newCols });
+              const newVals = [...table.values];
+              fields.forEach(f => {
+                const col = allColumns.find(c => c.name === f);
+                if (col?.type === 'numeric') {
+                  if (!newVals.find(v => v.field === f)) {
+                    newVals.push(createValueField({ ...table, values: newVals }, f));
+                  }
+                } else {
+                  if (!newCols.includes(f)) newCols.push(f);
+                }
+              });
+              updateTable({ columns: newCols, values: newVals });
             }
           }}
           tables={tables}

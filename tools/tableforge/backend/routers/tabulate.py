@@ -520,6 +520,15 @@ async def tabulate(config: TableConfig):
                     total_row["__note__"] = f"* Multiple responses: {', '.join(multi_choice_cols)}. Total responses may exceed {original_row_count} respondents."
                 result = pd.concat([result, pd.DataFrame([total_row])], ignore_index=True)
 
+            # Column total (last column) — sum across all value columns per row
+            want_col_total = config.grand_total_columns if config.grand_total_columns is not None else config.grand_total
+            if want_col_total and len(config.values) > 1:
+                value_cols = [v.get("label", f"{v.get('agg','sum').title()} of {v['field']}") for v in config.values]
+                existing_vcols = [c for c in value_cols if c in result.columns]
+                if existing_vcols:
+                    numeric_part = result[existing_vcols].apply(pd.to_numeric, errors="coerce").fillna(0)
+                    result["Grand Total"] = numeric_part.sum(axis=1)
+
             # Blank suppression
             if config.blank_suppress:
                 value_cols = [v.get("label", f"{v.get('agg','sum').title()} of {v['field']}") for v in config.values]
