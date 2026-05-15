@@ -156,22 +156,6 @@ async def generate_styled_report(cfg: dict, style: str, form_title: str, date_ra
 
 ## frontend
 
-### frontend\src\components\Sidebar.tsx
-```
-props SidebarProps
-hook useState
-hook useNavigate
-hook useLocation
-hook useHelp
-hook useLanguage
-hook useTheme
-export Sidebar
-handler onMouseEnter
-handler onMouseLeave
-handler onChange
-handler onClick
-```
-
 ### frontend\src\fg\FileManagerPage.tsx
 ```
 component FileManagerPage

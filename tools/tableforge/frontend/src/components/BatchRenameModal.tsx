@@ -25,7 +25,8 @@ const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 export function BatchRenameModal({ tables, allResults, dataset, projectFilters, onClose, onApplyAll, onRollback }: Props) {
   const [rowStates, setRowStates] = useState<RowState[]>(tables.map(t => ({ id: t.id, name: t.name || t.title, status: 'pending' })))
   const [currentIdx, setCurrentIdx] = useState(0)
-  const [phase, setPhase] = useState<'idle' | 'running' | 'cancelled' | 'done'>('idle')
+  const [phase, setPhase] = useState<'idle' | 'running' | 'cancelled' | 'done' | 'error'>('idle')
+  const [configError, setConfigError] = useState('')
   const cancelRef = useRef(false)
   const [skipRenamed, setSkipRenamed] = useState(true)
   const [delayMs, setDelayMs] = useState(1200)
@@ -38,7 +39,25 @@ export function BatchRenameModal({ tables, allResults, dataset, projectFilters, 
 
   const runBatch = async () => {
     if (!dataset) return
+
+    // Check API config first
+    try {
+      const configRes = await fetch(`${API_BASE}/ai/config`)
+      if (!configRes.ok) throw new Error('Failed to check AI configuration')
+      const config = await configRes.json()
+      if (!config.has_key) {
+        setConfigError('AI API key not configured. Please contact your administrator to configure the API key.')
+        setPhase('error')
+        return
+      }
+    } catch (e: any) {
+      setConfigError('Unable to verify API configuration. Please try again.')
+      setPhase('error')
+      return
+    }
+
     cancelRef.current = false
+    setConfigError('')
     const updates: { tableId: string; title: string; subtitle: string; renames: Record<string, string> }[] = []
     let doneCount = 0, skippedCount = 0, errorCount = 0
 
@@ -125,20 +144,35 @@ export function BatchRenameModal({ tables, allResults, dataset, projectFilters, 
 
   return (
     <div className="ai-result" style={{ marginTop: 16 }}>
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8 }}>
-          {phase === 'idle' ? `Ready to rename ${rowStates.length} tables` : `Renaming ${currentIdx + 1} of ${rowStates.length}`}
+      {configError && phase === 'error' && (
+        <div style={{
+          padding: 12,
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          borderRadius: 4,
+          fontSize: 12,
+          color: 'var(--danger)',
+          marginBottom: 12,
+          border: '1px solid rgba(239, 68, 68, 0.2)',
+        }}>
+          ⚠ {configError}
         </div>
-        <div style={{ width: '100%', height: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
-          <div style={{
-            height: '100%',
-            backgroundColor: 'var(--primary)',
-            width: `${progressPct}%`,
-            transition: 'width 0.3s ease',
-          }} />
+      )}
+      {phase !== 'error' && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8 }}>
+            {phase === 'idle' ? `Ready to rename ${rowStates.length} tables` : `Renaming ${currentIdx + 1} of ${rowStates.length}`}
+          </div>
+          <div style={{ width: '100%', height: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%',
+              backgroundColor: 'var(--primary)',
+              width: `${progressPct}%`,
+              transition: 'width 0.3s ease',
+            }} />
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>{progressPct}%</div>
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>{progressPct}%</div>
-      </div>
+      )}
 
       {phase === 'running' && currentIdx < rowStates.length && (
         <div style={{
@@ -237,6 +271,16 @@ export function BatchRenameModal({ tables, allResults, dataset, projectFilters, 
           <button onClick={runBatch} className="btn-primary" style={{ flex: 1 }}>
             Start Rename
           </button>
+        )}
+        {phase === 'error' && (
+          <>
+            <button onClick={() => { setPhase('idle'); setConfigError('') }} className="btn-primary" style={{ flex: 1 }}>
+              Try Again
+            </button>
+            <button onClick={onClose} className="btn-primary" style={{ flex: 1, backgroundColor: 'transparent', color: 'var(--text-dim)', border: '1px solid var(--border)' }}>
+              Close
+            </button>
+          </>
         )}
         {phase === 'running' && (
           <button onClick={handleCancel} className="btn-primary" style={{ flex: 1, backgroundColor: 'var(--danger)' }}>
