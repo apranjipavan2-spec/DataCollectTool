@@ -1384,6 +1384,7 @@ export default function App() {
           dataset={dataset}
           result={results.get(tables[activeTableIdx]?.id) || null}
           interpretation={tableInterpretations[tables[activeTableIdx]?.id] || ''}
+          projectFilters={projectFilters}
           columnDescriptions={columnDescriptions}
           onClose={() => setModal(null)}
           onApplyPolish={(title, subtitle, renames) => {

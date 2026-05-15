@@ -56,6 +56,8 @@ backend\app\api\routes\shared_files.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\api\routes\user_tool_projects.py ← fastapi, sqlalchemy, pydantic, app
 backend\app\models\shared_file.py ← sqlalchemy, app
 backend\app\models\user_tool_project.py ← sqlalchemy, app
+frontend\src\programs\BatchRenameModal.tsx ← lib/api, lib/ToastContext
+frontend\src\programs\FgAnalyzer.tsx ← BatchRenameModal
 ```
 
 ## backend
@@ -101,6 +103,7 @@ class PolishRequest(BaseModel) {title*, groupby_field*, value_field?, aggregatio
 class InterpretRequest(BaseModel) {title*, subtitle?, groupby_field*, value_field?, aggregation?, rows?}
 class SaveTabulationRequest(BaseModel) {tabulation*}
 class AutoGenerateRequest(BaseModel) {objectives?}
+class BatchUpdateRequest(BaseModel) {tabulations?}
 GET /programs/{program_id}/waves  →  get_waves()
 PATCH /programs/{program_id}/panel-study  →  toggle_panel_study()
 PUT /programs/{program_id}/waves  →  set_wave()
@@ -118,7 +121,6 @@ GET /programs/{program_id}/analysis  →  get_analysis()
 GET /programs/{program_id}/writer-tables  →  get_writer_tables()
 GET /programs/{program_id}/analysis/status  →  get_analysis_status()
 GET /programs/{program_id}/analysis/history  →  get_analysis_history()
-POST /programs/{program_id}/analysis/restore  →  restore_analysis()
 ```
 
 ### backend\app\api\routes\programs.py
@@ -190,24 +192,14 @@ class SharedFile(Base)
 class UserToolProject(Base)
 ```
 
-## frontend
+### backend\app\services\ai_service.py
+```
+async def generate_report(cfg: dict, form_title: str, field_labels: list, submissions: list) → str
+async def suggest_skip_logic(cfg: dict, question_text: str, form_fields: list, user_description: str) → list  # Return 1-3 SkipLogic suggestions in frontend-compatible form
+async def generate_styled_report(cfg: dict, style: str, form_title: str, date_range: str, sample_size: int, table_data: str, chart_descriptions: str, custom_context: str) → str
+```
 
-### frontend\src\admin\AdminPanel.modern.tsx
-```
-component PlanBadge
-component StatusBadge
-component RoleBadge
-component GlassCard
-component StatCard
-component TableHeader
-component EmptyState
-component AdminPanel
-hook useState
-hook useMemo
-hook useEffect
-handler onChange
-handler onClick
-```
+## frontend
 
 ### frontend\src\admin\AdminPayments.tsx
 ```
@@ -284,6 +276,19 @@ export function getLastProgram() → string
 export function setLastProgram(id)
 ```
 
+### frontend\src\programs\BatchRenameModal.tsx
+```
+component BatchRenameModal
+props Props
+hook useToast
+hook useState
+hook useRef
+export SavedTabulation
+export BatchRenameModal
+handler onClick
+handler onChange
+```
+
 ### frontend\src\programs\FgAnalyzer.tsx
 ```
 component StatCard
@@ -303,6 +308,7 @@ handler onClick
 handler onChange
 handler onDelete
 handler onUpdate
+handler onComplete
 ```
 
 ### frontend\src\reports\FgWriter.tsx

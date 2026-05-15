@@ -199,6 +199,8 @@ class AIPolishRequest(BaseModel):
     values: list = []
     headers: list = []
     sample_rows: list = []
+    table_filters: dict = {}
+    project_filters: dict = {}
 
 
 @router.post("/api/ai/polish")
@@ -241,9 +243,22 @@ async def ai_polish_table(body: AIPolishRequest):
             + "\n"
         )
 
+    filter_context = ""
+    merged = {**body.project_filters, **body.table_filters}
+    if merged:
+        parts = []
+        for field, values in list(merged.items())[:10]:
+            val_list = ", ".join(str(v) for v in values[:5])
+            parts.append(f"{field}: {val_list}")
+        filter_context = (
+            f"\nActive filters applied to this table:\n"
+            + "\n".join(f"  - {p}" for p in parts)
+            + "\n(Incorporate these filter values into the title for specificity.)\n"
+        )
+
     prompt = (
         f"You are a research data analyst. A data tabulation has raw machine-generated names. Clean them up.\n\n"
-        f"{dataset_context}\n"
+        f"{dataset_context}{filter_context}"
         f"This table uses these fields from the dataset:\n"
         f"- Row variable (groupby): {groupby}\n"
         f"- Value/column variable: {value_field}\n"
