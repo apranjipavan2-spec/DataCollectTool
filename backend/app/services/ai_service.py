@@ -267,6 +267,8 @@ async def polish_tabulation(
     rows: list,
     is_cross_tab: bool,
     sub_keys: list,
+    program_context: str = "",
+    field_labels: dict = {},
 ) -> dict:
     rows_preview = []
     for r in rows[:20]:
@@ -291,6 +293,9 @@ async def polish_tabulation(
         f"- Aggregation: {aggregation}\n"
         f"- Is cross-tabulation: {is_cross_tab}\n"
         f"- Cross-tab column keys: {sub_keys[:10]}\n"
+        f"- Program/scheme context: {program_context}\n"
+        f"- Known field display labels: {json.dumps(field_labels)}\n"
+        f"  (use these to map raw field IDs to human-readable names in labels and title)\n"
         f"- Sample data ({len(rows_preview)} rows):\n" +
         "\n".join(rows_preview) + "\n\n"
         f"Return ONLY valid JSON (no markdown, no explanation):\n"

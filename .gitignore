@@ -95,3 +95,4 @@ _archive/
 _archive.zip
 deploy/monitor-config.json
 process_deployment.md
+.gstack/

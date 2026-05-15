@@ -112,6 +112,8 @@ class PolishRequest(BaseModel):
     rows: list = []
     is_cross_tab: bool = False
     sub_keys: list = []
+    program_context: str = ""
+    field_labels: dict = {}
 
 
 class InterpretRequest(BaseModel):
@@ -654,10 +656,12 @@ async def polish_tabulation(
     if not cfg.get("api_key"):
         raise HTTPException(400, "AI not configured. Contact your platform administrator.")
     try:
+        program_context = body.program_context or f"{prog.name}{' (' + prog.scheme_name + ')' if prog.scheme_name else ''}"
         result = await ai_service.polish_tabulation(
             cfg=cfg, title=body.title, groupby_field=body.groupby_field,
             value_field=body.value_field, aggregation=body.aggregation,
             rows=body.rows[:30], is_cross_tab=body.is_cross_tab, sub_keys=body.sub_keys,
+            program_context=program_context, field_labels=body.field_labels,
         )
         return result
     except ValueError as e:
@@ -1188,6 +1192,32 @@ def save_tabulation(
     else:
         configs.append(tab)
     rec.table_configs = configs
+    rec.updated_at = func.now()
+    db.commit()
+    return {"analysis_id": str(rec.id), "table_configs": rec.table_configs}
+
+
+class BatchUpdateRequest(BaseModel):
+    tabulations: list = []
+
+@router.post("/programs/{program_id}/analysis/tabulations/batch-update")
+def batch_update_tabulations(
+    program_id: str,
+    body: BatchUpdateRequest,
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    rec = db.query(ProgramAnalysis).filter(
+        ProgramAnalysis.program_id == program_id,
+        ProgramAnalysis.tenant_id == user["tenant_id"],
+        ProgramAnalysis.source == "manual",
+    ).order_by(ProgramAnalysis.updated_at.desc()).first()
+    if not rec:
+        rec = _get_or_create_manual_analysis(program_id, user["tenant_id"], user["sub"], db)
+
+    update_map = {t.get("id"): t for t in body.tabulations if t.get("id")}
+    new_configs = [update_map.get(c.get("id"), c) for c in (rec.table_configs or [])]
+    rec.table_configs = new_configs
     rec.updated_at = func.now()
     db.commit()
     return {"analysis_id": str(rec.id), "table_configs": rec.table_configs}

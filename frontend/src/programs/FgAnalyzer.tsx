@@ -10,6 +10,7 @@ import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
 import LineChart from '@/components/charts/LineChart'
 import BarChart from '@/components/charts/BarChart'
+import { BatchRenameModal } from './BatchRenameModal'
 import {
   loadTabulations, loadTabulationsCache, saveTabulation, deleteTabulation,
   saveAnalyzerToolProject, getLastProgram, setLastProgram, type SavedTabulation,
@@ -572,6 +573,10 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
   const [manualTitle, setManualTitle] = useState('')
   const [manualRunning, setManualRunning] = useState(false)
 
+  // Batch rename state
+  const [showBatchRename, setShowBatchRename] = useState(false)
+  const [hasBatchSnapshot, setHasBatchSnapshot] = useState(!!localStorage.getItem(`fg_batch_rename_${programId}`))
+
   const reload = useCallback(async () => {
     setSaved(loadTabulationsCache(programId))
     const fresh = await loadTabulations(programId)
@@ -649,6 +654,25 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
 
   const toggleSmartCol = (id: string) =>
     setSmartColIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+
+  const handleUndoBatch = async () => {
+    const raw = localStorage.getItem(`fg_batch_rename_${programId}`)
+    if (!raw) {
+      toast.error('No snapshot found')
+      return
+    }
+    try {
+      const { tables } = JSON.parse(raw)
+      await api.post(`/fg/programs/${programId}/analysis/tabulations/batch-update`, { tabulations: tables })
+      setSaved(tables)
+      localStorage.removeItem(`fg_batch_rename_${programId}`)
+      setHasBatchSnapshot(false)
+      toast.success('Batch rename undone')
+    } catch (e: any) {
+      toast.error('Undo failed')
+    }
+  }
+
   useEffect(() => { reload() }, [reload])
   useEffect(() => { if (cols.length && !groupby) setGroupby(cols[0].id) }, [cols])
 
@@ -1161,11 +1185,29 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className={`${sh} mb-0`}>Saved Tables & Charts ({saved.length})</div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               {lastRefreshedAt && (
                 <span className="text-xs text-catalan-textMuted">
                   Data as of {lastRefreshedAt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} — auto-refreshes every 30 min
                 </span>
+              )}
+              {saved.length > 1 && (
+                <button
+                  onClick={() => setShowBatchRename(true)}
+                  className={btnSe}
+                  title="Rename all tables with AI"
+                >
+                  ✨ Batch Rename ({saved.length})
+                </button>
+              )}
+              {hasBatchSnapshot && (
+                <button
+                  onClick={handleUndoBatch}
+                  className="text-xs text-catalan-error hover:underline"
+                  title="Undo the last batch rename"
+                >
+                  Undo Batch Rename
+                </button>
               )}
               <button
                 onClick={refreshTableData}
@@ -1308,6 +1350,22 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
         />
         {autoError && <p className="text-xs text-catalan-error mt-2">{autoError}</p>}
       </Modal>
+
+      {/* Batch Rename Modal */}
+      {showBatchRename && (
+        <BatchRenameModal
+          saved={saved}
+          programId={programId}
+          programName={programName}
+          cols={cols}
+          onClose={() => setShowBatchRename(false)}
+          onComplete={(updated) => {
+            setSaved(updated)
+            setShowBatchRename(false)
+            setHasBatchSnapshot(true)
+          }}
+        />
+      )}
     </div>
   )
 }
