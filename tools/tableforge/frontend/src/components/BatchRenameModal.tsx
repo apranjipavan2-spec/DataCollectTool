@@ -17,7 +17,7 @@ interface Props {
   projectFilters: Record<string, string[]>
   onClose: () => void
   onApplyAll: (updates: { tableId: string; title: string; subtitle: string; renames: Record<string, string> }[]) => void
-  onRollback: (original: TableConfig[]) => void
+  onRollback: () => void
 }
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
@@ -118,255 +118,146 @@ export function BatchRenameModal({ tables, allResults, dataset, projectFilters, 
   }
 
   const handleUndo = () => {
-    onRollback(originalTablesRef.current)
+    onRollback()
   }
 
   const progressPct = rowStates.length > 0 ? Math.round((currentIdx + 1) / rowStates.length * 100) : 0
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 50,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: 'rgba(0,0,0,0.4)',
-    }}>
-      <div style={{
-        backgroundColor: 'var(--bg-primary)',
-        borderRadius: '8px',
-        boxShadow: '0 20px 25px rgba(0,0,0,0.15)',
-        maxWidth: '600px',
-        width: '100%',
-        maxHeight: '480px',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px',
-          borderBottom: '1px solid var(--border)',
-        }}>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>✨ Batch AI Rename</h2>
-          <button onClick={onClose} style={{
-            background: 'none',
-            border: 'none',
-            fontSize: '20px',
-            cursor: 'pointer',
-            color: 'var(--text-dim)',
-          }}>✕</button>
+    <div className="ai-result" style={{ marginTop: 16 }}>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8 }}>
+          {phase === 'idle' ? `Ready to rename ${rowStates.length} tables` : `Renaming ${currentIdx + 1} of ${rowStates.length}`}
         </div>
+        <div style={{ width: '100%', height: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+          <div style={{
+            height: '100%',
+            backgroundColor: 'var(--primary)',
+            width: `${progressPct}%`,
+            transition: 'width 0.3s ease',
+          }} />
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>{progressPct}%</div>
+      </div>
 
-        {/* Content */}
+      {phase === 'running' && currentIdx < rowStates.length && (
         <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
+          fontSize: 12,
+          padding: 8,
+          backgroundColor: 'rgba(255,255,255,0.05)',
+          borderRadius: 4,
+          marginBottom: 10,
         }}>
-          {phase !== 'done' && (
-            <>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
-                  {phase === 'idle' ? `Ready to rename ${rowStates.length} tables` : `Renaming ${currentIdx + 1} of ${rowStates.length}`}
-                </div>
-                <div style={{
-                  width: '100%',
-                  height: '8px',
-                  backgroundColor: '#e5e7eb',
-                  borderRadius: '4px',
-                  overflow: 'hidden',
-                }}>
-                  <div style={{
-                    height: '100%',
-                    backgroundColor: 'var(--primary)',
-                    width: `${progressPct}%`,
-                    transition: 'width 0.3s ease',
-                  }} />
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '4px' }}>{progressPct}%</div>
-              </div>
-
-              {phase === 'running' && currentIdx < rowStates.length && (
-                <div style={{
-                  fontSize: '13px',
-                  padding: '8px',
-                  backgroundColor: 'var(--bg-secondary)',
-                  borderRadius: '4px',
-                }}>
-                  <div style={{ fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rowStates[currentIdx].name}</div>
-                  {rowStates[currentIdx].newTitle && (
-                    <div style={{ fontSize: '12px', color: 'var(--text-success)', marginTop: '4px' }}>
-                      ✓ → {rowStates[currentIdx].newTitle}
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Status list */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {rowStates.slice(0, 15).map((rs, i) => (
-              <div key={rs.id} style={{
-                fontSize: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px',
-                backgroundColor: 'var(--bg-secondary)',
-                borderRadius: '4px',
-              }}>
-                {rs.status === 'done' && <span style={{ color: 'var(--success)' }}>✓</span>}
-                {rs.status === 'running' && <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>}
-                {rs.status === 'pending' && <span style={{ color: 'var(--text-dim)' }}>○</span>}
-                {rs.status === 'error' && <span style={{ color: 'var(--error)' }}>⚠</span>}
-                {rs.status === 'skipped' && <span style={{ color: 'var(--text-dim)' }}>–</span>}
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{rs.name}</span>
-                <span style={{ color: 'var(--text-dim)' }}>{rs.status}</span>
-                {rs.error && <span style={{ color: 'var(--error)', fontSize: '11px' }}>{rs.error}</span>}
-              </div>
-            ))}
-            {rowStates.length > 15 && (
-              <div style={{ fontSize: '12px', color: 'var(--text-dim)', padding: '8px' }}>
-                ... and {rowStates.length - 15} more
-              </div>
-            )}
-          </div>
-
-          {phase === 'done' && (
-            <div style={{
-              padding: '12px',
-              backgroundColor: 'rgba(34, 197, 94, 0.1)',
-              borderRadius: '4px',
-              fontSize: '13px',
-              color: 'var(--success)',
-            }}>
-              ✓ Batch complete: {summary.done} renamed, {summary.skipped} skipped, {summary.error} errors
+          <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis' }}>{rowStates[currentIdx].name}</div>
+          {rowStates[currentIdx].newTitle && (
+            <div style={{ fontSize: 11, color: 'var(--success)', marginTop: 4 }}>
+              ✓ → {rowStates[currentIdx].newTitle}
             </div>
           )}
         </div>
+      )}
 
-        {/* Footer */}
+      {/* Status list */}
+      <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 12 }}>
+        {rowStates.slice(0, 15).map((rs) => (
+          <div key={rs.id} style={{
+            fontSize: 11,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: 6,
+            backgroundColor: 'rgba(255,255,255,0.05)',
+            borderRadius: 3,
+          }}>
+            {rs.status === 'done' && <span style={{ color: 'var(--success)' }}>✓</span>}
+            {rs.status === 'running' && <span style={{ display: 'inline-block', animation: 'spin 0.8s linear infinite' }}>⟳</span>}
+            {rs.status === 'pending' && <span style={{ color: 'var(--text-dim)' }}>○</span>}
+            {rs.status === 'error' && <span style={{ color: 'var(--danger)' }}>⚠</span>}
+            {rs.status === 'skipped' && <span style={{ color: 'var(--text-dim)' }}>–</span>}
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{rs.name}</span>
+            {rs.error && <span style={{ color: 'var(--danger)', fontSize: 10, whiteSpace: 'nowrap' }}>error</span>}
+          </div>
+        ))}
+        {rowStates.length > 15 && (
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: 6 }}>
+            ... and {rowStates.length - 15} more
+          </div>
+        )}
+      </div>
+
+      {phase === 'done' && (
         <div style={{
-          borderTop: '1px solid var(--border)',
-          padding: '12px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '12px',
+          padding: 10,
+          backgroundColor: 'rgba(34, 197, 94, 0.1)',
+          borderRadius: 4,
+          fontSize: 12,
+          color: 'var(--success)',
+          marginBottom: 12,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={skipRenamed}
-                onChange={e => setSkipRenamed(e.target.checked)}
-                disabled={phase === 'running'}
-              />
-              <span>Skip already-renamed</span>
-            </label>
-            {phase === 'idle' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ color: 'var(--text-dim)' }}>Delay:</span>
-                <input
-                  type="number"
-                  value={delayMs}
-                  onChange={e => setDelayMs(Math.max(100, Math.min(5000, parseInt(e.target.value) || 1200)))}
-                  min="100"
-                  max="5000"
-                  step="100"
-                  style={{
-                    width: '60px',
-                    padding: '4px',
-                    fontSize: '12px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                  }}
-                />
-                <span style={{ color: 'var(--text-dim)' }}>ms</span>
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {phase === 'idle' && (
-              <button onClick={runBatch} style={{
-                padding: '8px 16px',
-                backgroundColor: 'var(--primary)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontWeight: '500',
-                cursor: 'pointer',
-              }}>
-                Start Rename
-              </button>
-            )}
-            {phase === 'running' && (
-              <button onClick={handleCancel} style={{
-                padding: '8px 16px',
-                backgroundColor: 'var(--error)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontWeight: '500',
-                cursor: 'pointer',
-              }}>
-                Cancel
-              </button>
-            )}
-            {phase === 'done' && (
-              <>
-                <button onClick={handleUndo} style={{
-                  padding: '8px 16px',
-                  backgroundColor: 'transparent',
-                  color: 'var(--error)',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                }}>
-                  Undo Batch Rename
-                </button>
-                <button onClick={onClose} style={{
-                  padding: '8px 16px',
-                  backgroundColor: 'var(--primary)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                }}>
-                  Done
-                </button>
-              </>
-            )}
-            {phase === 'cancelled' && (
-              <button onClick={onClose} style={{
-                padding: '8px 16px',
-                backgroundColor: 'var(--bg-secondary)',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontWeight: '500',
-                cursor: 'pointer',
-              }}>
-                Close
-              </button>
-            )}
-          </div>
+          ✓ Batch complete: {summary.done} renamed, {summary.skipped} skipped, {summary.error} errors
         </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={skipRenamed}
+            onChange={e => setSkipRenamed(e.target.checked)}
+          />
+          <span>Skip already-renamed</span>
+        </label>
+        {phase === 'idle' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: 'var(--text-dim)' }}>Delay:</span>
+            <input
+              type="number"
+              value={delayMs}
+              onChange={e => setDelayMs(Math.max(100, Math.min(5000, parseInt(e.target.value) || 1200)))}
+              min="100"
+              max="5000"
+              step="100"
+              style={{
+                width: 50,
+                padding: 4,
+                fontSize: 11,
+                border: '1px solid var(--border)',
+                borderRadius: 3,
+                background: 'var(--bg)',
+                color: 'var(--text)',
+              }}
+            />
+            <span style={{ color: 'var(--text-dim)' }}>ms</span>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        {phase === 'idle' && (
+          <button onClick={runBatch} className="btn-primary" style={{ flex: 1 }}>
+            Start Rename
+          </button>
+        )}
+        {phase === 'running' && (
+          <button onClick={handleCancel} className="btn-primary" style={{ flex: 1, backgroundColor: 'var(--danger)' }}>
+            Cancel
+          </button>
+        )}
+        {phase === 'done' && (
+          <>
+            <button onClick={handleUndo} className="btn-primary" style={{ flex: 1, backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)' }}>
+              Undo
+            </button>
+            <button onClick={onClose} className="btn-primary" style={{ flex: 1 }}>
+              Done
+            </button>
+          </>
+        )}
+        {phase === 'cancelled' && (
+          <button onClick={onClose} className="btn-primary" style={{ flex: 1 }}>
+            Close
+          </button>
+        )}
       </div>
 
       <style>{`

@@ -32,7 +32,6 @@ Current DB: 0035. Repo: https://github.com/apranjipavan2-spec/DataCollectTool
 
 ## deps
 ```
-backend\app\api\routes\billing.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\api\routes\field_govern.py ← fastapi, pydantic, sqlalchemy, app, pandas
 backend\app\api\routes\programs.py ← fastapi, pydantic, sqlalchemy, app
 backend\app\api\routes\shared_files.py ← fastapi, pydantic, sqlalchemy, app
@@ -44,33 +43,6 @@ frontend\src\programs\FgAnalyzer.tsx ← BatchRenameModal
 ```
 
 ## backend
-
-### backend\app\api\routes\billing.py
-```
-class RequestPaymentIn(BaseModel) {plan_id*, billing_cycle?}
-class SubmitUTRIn(BaseModel) {order_ref*, utr_number*}
-class PaymentConfigIn(BaseModel) {upi_id?, upi_name?, bank_account?, bank_ifsc?, bank_name?, admin_whatsapp?}
-class ConfirmIn(BaseModel) {notes?}
-class RejectIn(BaseModel) {reason*}
-class ManualAssignIn(BaseModel) {plan_id*, billing_cycle?, notes?}
-def get_org_plan(tenant_id, db: Session) → Plan  # Return the current plan for an org (falls back to free plan)
-def get_org_usage(tenant_id, db: Session) → UsageRecord  # Return or create current month's usage record
-def check_submission_limit(tenant_id, db: Session)  # Raise 402 if org has hit submission limit
-def check_feature(tenant_id, feature: str, db: Session)  # Raise 403 if the org's plan doesn't include the feature
-GET /plans  →  list_plans()
-POST /request  →  request_payment()
-POST /utr  →  submit_utr()
-GET /my-subscription  →  my_subscription()
-GET /payment-config  →  get_payment_config()
-GET /admin/payment-config  →  admin_get_payment_config()
-PATCH /admin/payment-config  →  admin_update_payment_config()
-GET /admin/requests  →  admin_list_requests()
-PATCH /admin/requests/{request_id}/confirm  →  admin_confirm()
-PATCH /admin/requests/{request_id}/reject  →  admin_reject()
-GET /admin/subscriptions  →  admin_list_subscriptions()
-POST /admin/subscriptions/{tenant_id}/assign  →  admin_assign_plan()
-DELETE /admin/subscriptions/{tenant_id}  →  admin_cancel_subscription()
-```
 
 ### backend\app\api\routes\field_govern.py
 ```
@@ -184,17 +156,6 @@ async def generate_styled_report(cfg: dict, style: str, form_title: str, date_ra
 
 ## frontend
 
-### frontend\src\admin\AdminPayments.tsx
-```
-component AdminPayments
-hook useToast
-hook useState
-hook useCallback
-hook useEffect
-handler onClick
-handler onChange
-```
-
 ### frontend\src\components\Sidebar.tsx
 ```
 props SidebarProps
@@ -208,23 +169,6 @@ export Sidebar
 handler onMouseEnter
 handler onMouseLeave
 handler onChange
-handler onClick
-```
-
-### frontend\src\components\TopNav.tsx
-```
-component NotifRow
-component NotificationBell
-component UsageBar
-props TopNavProps
-hook useState
-hook useRef
-hook useNavigate
-hook useTheme
-hook useCallback
-hook useEffect
-hook useSubscription
-export TopNav
 handler onClick
 ```
 

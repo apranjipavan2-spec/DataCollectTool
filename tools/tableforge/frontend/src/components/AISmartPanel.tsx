@@ -319,49 +319,61 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
       case 'polish':
         return (
           <div className="ai-panel-body">
-            <p className="ai-desc">AI will analyze your table and suggest a clean title, subtitle, and column labels.</p>
-            {tables.length > 1 && !aiResult && (
-              <button className="btn-primary" onClick={() => setShowBatchRename(true)} style={{ marginBottom: 12, width: '100%' }}>
-                ✨ Batch Rename All {tables.length} Tables
-              </button>
-            )}
-            {!aiResult && <button className="btn-primary" onClick={handlePolish} disabled={loading}>{loading ? 'Generating...' : '✨ Polish Title & Headers'}</button>}
-            {aiResult && (
-              <div className="ai-result">
-                <div className="ai-result-field"><label>Title:</label><strong>{aiResult.title}</strong></div>
-                <div className="ai-result-field"><label>Subtitle:</label><em>{aiResult.subtitle}</em></div>
-                {aiResult.column_labels && Object.keys(aiResult.column_labels).length > 0 && (
-                  <div className="ai-result-field">
-                    <label>Column Labels:</label>
-                    <div className="ai-labels-grid">
-                      {Object.entries(aiResult.column_labels).map(([k, v]) => (
-                        <div key={k} className="ai-label-row"><span className="ai-label-key">{k}</span><span>→</span><span className="ai-label-val">{v as string}</span></div>
-                      ))}
-                    </div>
+            {!showBatchRename ? (
+              <>
+                <p className="ai-desc">AI will analyze your table and suggest a clean title, subtitle, and column labels.</p>
+                {tables.length > 1 && !aiResult && (
+                  <button className="btn-primary" onClick={() => setShowBatchRename(true)} style={{ marginBottom: 12, width: '100%' }}>
+                    ✨ Batch Rename All {tables.length} Tables
+                  </button>
+                )}
+                {!aiResult && <button className="btn-primary" onClick={handlePolish} disabled={loading}>{loading ? 'Generating...' : '✨ Polish Title & Headers'}</button>}
+                {aiResult && (
+                  <div className="ai-result">
+                    <div className="ai-result-field"><label>Title:</label><strong>{aiResult.title}</strong></div>
+                    <div className="ai-result-field"><label>Subtitle:</label><em>{aiResult.subtitle}</em></div>
+                    {aiResult.column_labels && Object.keys(aiResult.column_labels).length > 0 && (
+                      <div className="ai-result-field">
+                        <label>Column Labels:</label>
+                        <div className="ai-labels-grid">
+                          {Object.entries(aiResult.column_labels).map(([k, v]) => (
+                            <div key={k} className="ai-label-row"><span className="ai-label-key">{k}</span><span>→</span><span className="ai-label-val">{v as string}</span></div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <button className="btn-primary" style={{ marginTop: 12 }} onClick={() => {
+                      onApplyPolish?.(aiResult.title, aiResult.subtitle, aiResult.column_labels || {});
+                      onClose();
+                    }}>Apply Changes</button>
                   </div>
                 )}
-                <button className="btn-primary" style={{ marginTop: 12 }} onClick={() => {
-                  onApplyPolish?.(aiResult.title, aiResult.subtitle, aiResult.column_labels || {});
-                  onClose();
-                }}>Apply Changes</button>
-              </div>
-            )}
-            {showBatchRename && (
-              <BatchRenameModal
-                tables={tables}
-                allResults={allResults}
-                dataset={dataset}
-                projectFilters={projectFilters}
-                onClose={() => setShowBatchRename(false)}
-                onApplyAll={(updates) => {
-                  onApplyPolishAll?.(updates);
-                  setShowBatchRename(false);
-                }}
-                onRollback={() => {
-                  // Rollback just closes the modal; state wasn't persisted
-                  setShowBatchRename(false);
-                }}
-              />
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>✨ Batch AI Rename</div>
+                  <button onClick={() => setShowBatchRename(false)} style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: 18,
+                    cursor: 'pointer',
+                    color: 'var(--text-dim)',
+                  }}>✕</button>
+                </div>
+                <BatchRenameModal
+                  tables={tables}
+                  allResults={allResults}
+                  dataset={dataset}
+                  projectFilters={projectFilters}
+                  onClose={() => setShowBatchRename(false)}
+                  onApplyAll={(updates) => {
+                    onApplyPolishAll?.(updates);
+                    setShowBatchRename(false);
+                  }}
+                  onRollback={() => setShowBatchRename(false)}
+                />
+              </>
             )}
           </div>
         );
