@@ -39,6 +39,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
   // Inline header editing
   const [editingHeader, setEditingHeader] = useState<number | null>(null);
   const [editHeaderVal, setEditHeaderVal] = useState('');
+  const editCommittedRef = React.useRef(false);
   // Keyboard navigation
   const [kbCell, setKbCell] = useState<{ r: number; c: number } | null>(null);
   const tableRef = React.useRef<HTMLTableElement>(null);
@@ -419,15 +420,32 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
               {result.headers.map((h, i) => {
                 // Skip row-dimension headers if they already have rowSpan=2 above
                 if (result.column_groups?.has_multi_level && i < (tableConfig?.rows?.length || 0)) return null;
-                const displayH = result.column_groups?.has_multi_level
-                  ? (result.column_groups.bottom[i - (tableConfig?.rows?.length || 0)] || displayHeaders[i])
+                const bottomLeaf = result.column_groups?.has_multi_level
+                  ? result.column_groups.bottom[i - (tableConfig?.rows?.length || 0)]
+                  : undefined;
+                // For multi-level, prefer rename on the leaf label, then on result.headers[i], then fall back to leaf or displayHeaders
+                const displayH = bottomLeaf
+                  ? (headerRenames[bottomLeaf] || headerRenames[h] || bottomLeaf || displayHeaders[i])
                   : displayHeaders[i];
+                // The key under which the rename is stored — leaf name for multi-level, full header otherwise
+                const renameKey = bottomLeaf || h;
                 const isSubtotalCol = displayH === 'Subtotal';
+                const commitRename = (rawVal: string) => {
+                  if (editCommittedRef.current) return;
+                  editCommittedRef.current = true;
+                  const next = rawVal.trim();
+                  // Commit even when blank — that signals "clear rename and revert to original"
+                  if (next !== displayH) {
+                    onHeaderRename?.(renameKey, next);
+                  }
+                  setEditingHeader(null);
+                };
                 return (
                   <th key={i} onClick={() => handleHeaderClick(i)}
                     onDoubleClick={(e) => {
                       if (onHeaderRename) {
                         e.stopPropagation();
+                        editCommittedRef.current = false;
                         setEditingHeader(i);
                         setEditHeaderVal(displayH);
                       }
@@ -438,23 +456,20 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                         autoFocus
                         value={editHeaderVal}
                         onChange={e => setEditHeaderVal(e.target.value)}
-                        onBlur={() => {
-                          if (editHeaderVal.trim() && editHeaderVal !== displayH) {
-                            onHeaderRename?.(h, editHeaderVal.trim());
-                          }
-                          setEditingHeader(null);
-                        }}
+                        onBlur={() => commitRename(editHeaderVal)}
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
-                            if (editHeaderVal.trim() && editHeaderVal !== displayH) {
-                              onHeaderRename?.(h, editHeaderVal.trim());
-                            }
-                            setEditingHeader(null);
+                            e.preventDefault();
+                            commitRename(editHeaderVal);
                           } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            editCommittedRef.current = true;
                             setEditingHeader(null);
                           }
                         }}
                         onClick={e => e.stopPropagation()}
+                        onDoubleClick={e => e.stopPropagation()}
+                        onMouseDown={e => e.stopPropagation()}
                         style={{
                           background: 'rgba(0,0,0,0.3)', color: 'inherit', border: '1px solid var(--primary)',
                           borderRadius: 3, padding: '2px 6px', fontSize: 'inherit', fontWeight: 'inherit',

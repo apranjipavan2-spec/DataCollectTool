@@ -1199,9 +1199,11 @@ export default function App() {
             tableMode={theme}
             onHeaderRename={(original, newName) => {
               const renames = { ...(activeTable.header_renames || {}) };
-              if (newName && newName !== original) {
-                renames[original] = newName;
-                if (dataset) logAuditEvent(dataset.dataset_id, 'column_rename', `Column "${original}" renamed to "${newName}" in table "${activeTable.name}"`);
+              const trimmed = (newName || '').trim();
+              // Empty value or value matching the original field name = clear the rename
+              if (trimmed && trimmed !== original) {
+                renames[original] = trimmed;
+                if (dataset) logAuditEvent(dataset.dataset_id, 'column_rename', `Column "${original}" renamed to "${trimmed}" in table "${activeTable.name}"`);
               } else {
                 delete renames[original];
               }
