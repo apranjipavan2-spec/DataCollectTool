@@ -20,6 +20,7 @@ Deploy: Node 20 build → Python 3.13. wait_and_stamp.py → alembic upgrade →
 8. Idempotent migrations: `ADD COLUMN IF NOT EXISTS` via `op.get_bind().execute(sa.text(...))`
 9. Vite manualChunks: vendor only. App code → TDZ crash. Use `React.lazy()`
 10. Leaflet: npm only, no CDN. Tiles need `*.tile.openstreetmap.org` in CSP img-src
+11. Marketing site: edit `website/` ONLY. CI (`.github/workflows/deploy-website.yml`) auto-syncs `website/ → docs/` on push. Never edit `docs/` directly — it gets overwritten. `website/status.html` is excluded from sync.
 
 ## Paths
 `backend/app/api/routes/`, `frontend/src/programs/` (FgAnalyzer, FgCleaner, FieldGovern), `frontend/src/dashboard/`, `tasks/` (todo.md, lessons.md)
@@ -33,11 +34,6 @@ Current DB: 0035. Repo: https://github.com/apranjipavan2-spec/DataCollectTool
 ## deps
 ```
 backend\app\api\routes\field_govern.py ← fastapi, pydantic, sqlalchemy, app, pandas
-backend\app\api\routes\programs.py ← fastapi, pydantic, sqlalchemy, app
-backend\app\api\routes\shared_files.py ← fastapi, pydantic, sqlalchemy, app
-backend\app\api\routes\user_tool_projects.py ← fastapi, sqlalchemy, pydantic, app
-backend\app\models\shared_file.py ← sqlalchemy, app
-backend\app\models\user_tool_project.py ← sqlalchemy, app
 frontend\src\programs\BatchRenameModal.tsx ← lib/api, lib/ToastContext
 frontend\src\programs\FgAnalyzer.tsx ← BatchRenameModal
 ```
@@ -78,75 +74,6 @@ GET /programs/{program_id}/analysis/status  →  get_analysis_status()
 GET /programs/{program_id}/analysis/history  →  get_analysis_history()
 ```
 
-### backend\app\api\routes\programs.py
-```
-class LocationIn(BaseModel) {state?, district*, block?, village?, gps_lat?, gps_lng?}
-class ProgramIn(BaseModel) {name*, scheme_name?, description?, start_date?, end_date?, status?}
-class BulkProgEditSettingRequest(BaseModel) {allow_enumerator_edit?}
-class ParticipantTypeIn(BaseModel) {name*, description?, sort_order?}
-class QuestionnaireIn(BaseModel) {participant_type_id?, form_id?, name*, total_target?, start_date?, end_date?}
-class LocationTargetIn(BaseModel) {location_id*, target_count*, deadline?}
-GET /locations  →  list_locations()
-POST /locations  →  create_location()
-PATCH /locations/{loc_id}  →  update_location()
-DELETE /locations/{loc_id}  →  delete_location()
-GET /overview  →  progress_overview()
-GET /  →  list_programs()
-POST /  →  create_program()
-GET /{prog_id}  →  get_program()
-PATCH /{prog_id}  →  update_program()
-PATCH /bulk-edit-setting  →  bulk_update_program_edit_setting()
-DELETE /{prog_id}  →  delete_program()
-POST /{prog_id}/participant-types  →  create_participant_type()
-PATCH /{prog_id}/participant-types/{pt_id}  →  update_participant_type()
-DELETE /{prog_id}/participant-types/{pt_id}  →  delete_participant_type()
-GET /{prog_id}/questionnaires  →  list_questionnaires()
-POST /{prog_id}/questionnaires  →  create_questionnaire()
-PATCH /{prog_id}/questionnaires/{q_id}  →  update_questionnaire()
-DELETE /{prog_id}/questionnaires/{q_id}  →  delete_questionnaire()
-POST /{prog_id}/questionnaires/{q_id}/targets  →  create_location_target()
-PATCH /{prog_id}/questionnaires/{q_id}/targets/{t_id}  →  update_location_target()
-DELETE /{prog_id}/questionnaires/{q_id}/targets/{t_id}  →  delete_location_target()
-GET /{prog_id}/progress  →  get_progress()
-GET /{prog_id}/progress/xlsx  →  export_progress_xlsx()
-GET /{prog_id}/progress/pdf  →  export_progress_pdf()
-```
-
-### backend\app\api\routes\shared_files.py
-```
-class CreateFolderRequest(BaseModel) {name*}
-class RenameRequest(BaseModel) {new_name*}
-POST /  →  upload_shared_file()
-GET /folders  →  list_folders()
-POST /folders  →  create_folder()
-GET /  →  list_shared_files()
-GET /{file_id}/download  →  download_shared_file()
-PATCH /{file_id}/rename  →  rename_shared_file()
-GET /{file_id}/csv-data  →  get_csv_data()
-PATCH /{file_id}/share  →  update_sharing()
-DELETE /{file_id}  →  delete_shared_file()
-```
-
-### backend\app\api\routes\user_tool_projects.py
-```
-class ProjectIn(BaseModel) {tool*, name*, program_id?, data?}
-class ShareProjectRequest(BaseModel) {tenant_ids*}
-GET /tool-projects/  →  list_projects()
-POST /tool-projects/  →  upsert_project()
-PATCH /tool-projects/{project_id}/share  →  share_project()
-DELETE /tool-projects/{project_id}  →  delete_project()
-```
-
-### backend\app\models\shared_file.py
-```
-class SharedFile(Base)
-```
-
-### backend\app\models\user_tool_project.py
-```
-class UserToolProject(Base)
-```
-
 ### backend\app\services\ai_service.py
 ```
 async def generate_report(cfg: dict, form_title: str, field_labels: list, submissions: list) → str
@@ -155,37 +82,6 @@ async def generate_styled_report(cfg: dict, style: str, form_title: str, date_ra
 ```
 
 ## frontend
-
-### frontend\src\fg\FileManagerPage.tsx
-```
-component FileManagerPage
-hook useToast
-hook useRef
-hook useState
-hook useEffect
-hook useCallback
-handler onClick
-handler onChange
-handler onKeyDown
-```
-
-### frontend\src\lib\fgStorage.ts
-```
-export interface SavedTabulation
-  id: string title: string description: s
-export interface SavedReport
-export async function loadTabulations(programId) → Promise<SavedTabulation[]>
-export async function loadWriterTables(programId) → Promise<SavedTabulation[]>
-export function loadTabulationsCache(programId) → SavedTabulation[]
-export async function saveTabulation(programId, tab) → Promise<void>
-export async function deleteTabulation(programId, tabId) → Promise<void>
-export function loadReports(programId) → SavedReport[]
-export function saveReport(programId, report)
-export function deleteReport(programId, reportId)
-export async function saveAnalyzerToolProject(programId, programName, tab) → Promise<void>
-export function getLastProgram() → string
-export function setLastProgram(id)
-```
 
 ### frontend\src\programs\BatchRenameModal.tsx
 ```
@@ -220,25 +116,4 @@ handler onChange
 handler onDelete
 handler onUpdate
 handler onComplete
-```
-
-### frontend\src\reports\FgWriter.tsx
-```
-component ProgramPicker
-component TabPreview
-component MarkdownPreview
-component ReportVersionCard
-component ScheduleModal
-component FgWriter
-hook useState
-hook useEffect
-hook useToast
-hook useAiJob
-hook useCallback
-handler onChange
-handler onClick
-handler onProgramChange
-handler onData
-handler onNum
-handler onRestore
 ```
