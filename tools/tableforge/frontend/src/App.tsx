@@ -388,6 +388,19 @@ export default function App() {
 
   const updateTable = useCallback((update: Partial<TableConfig>) => {
     pushUndo();
+    // Fields that affect what the backend computes; display-only fields (header_renames, title,
+    // theme, formats, etc.) don't need a re-tabulation, which makes typing in those inputs snappy.
+    const TABULATION_KEYS = new Set([
+      'rows', 'columns', 'values', 'filters',
+      'grand_total', 'grand_total_rows', 'grand_total_columns', 'grand_total_combined',
+      'subtotals', 'subtotal_pct_base',
+      'missing_data',
+      'sort_by', 'sort_order', 'multi_sort',
+      'date_groupings',
+      'blank_suppress',
+      'hide_subgroup',
+    ]);
+    const needsTabulation = Object.keys(update).some(k => TABULATION_KEYS.has(k));
     setTables(prev => {
       const next = [...prev];
       const merged = { ...next[activeTableIdx], ...update };
@@ -409,7 +422,7 @@ export default function App() {
         merged._lastValueConfig = { agg: v.agg, show_as: v.show_as, combo_show_as: v.combo_show_as, decimals: v.decimals };
       }
       next[activeTableIdx] = merged;
-      runTabulation(next[activeTableIdx]);
+      if (needsTabulation) runTabulation(next[activeTableIdx]);
       return next;
     });
   }, [activeTableIdx, runTabulation, pushUndo]);
@@ -1392,11 +1405,13 @@ export default function App() {
           onApplyPolish={(title, subtitle, renames) => {
             const t = tables[activeTableIdx];
             if (t) {
+              pushUndo();
               const updated = { ...t, title, subtitle, name: title || t.name, header_renames: { ...(t.header_renames || {}), ...renames }, _autoTitle: false };
               setTables(prev => prev.map(x => x.id === t.id ? updated : x));
             }
           }}
           onApplyPolishAll={(updates) => {
+            pushUndo();
             setTables(prev => prev.map(t => {
               const u = updates.find(u => u.tableId === t.id);
               if (!u) return t;
