@@ -68,6 +68,27 @@
 - [ ] DHIS2 push integration
 - [ ] ODK Central compatibility layer (import ODK XLS form, export ODK-compatible submissions)
 
+## 🌐 SEO / Marketing site (zero-budget plan)
+
+See `tasks/seo_user_actions.md` for the full FREE-only action plan and `tasks/seo_submissions.md` for pre-written submission copy. Highest-ROI tasks (do this week):
+
+- [ ] GSC verification + sitemap submission + URL inspection for 21 URLs (30 min)
+- [ ] GA4 setup + share Measurement ID for wiring (15 min)
+- [ ] Bing Webmaster Tools — import from GSC (10 min)
+- [ ] Product Hunt scheduled launch — Tuesday/Wednesday (30 min)
+- [ ] AlternativeTo submissions across all 8 competitors (15 min)
+- [ ] HARO / Qwoted / Featured signup — 60 min/week ongoing
+- [ ] G2 + Capterra free vendor profiles (40 min)
+- [ ] LinkedIn Company Page + first post (15 min)
+
+Programmatic SEO already shipped (no action needed):
+- ✅ 8 competitor comparison pages
+- ✅ 5 long-tail topical landing pages
+- ✅ Pricing Product+Offer JSON-LD schema
+- ✅ Custom 404 + sitemap with 21 URLs
+- ✅ Title CTR optimisation on home / features / pricing
+- ✅ Lazy-loading on footer images
+
 ## Review Notes
 
 - FG Analyzer/Cleaner/Writer are program-picker-based (not URL-param), with program selection synced via localStorage across tools
