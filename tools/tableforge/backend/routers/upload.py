@@ -256,15 +256,44 @@ class ColumnTypeReq(BaseModel):
     dataset_id: str
     column: str
     new_type: str  # "text", "numeric", "multi_choice", "date"
+    dry_run: bool | None = False
 
 @router.post("/api/dataset/column_type")
 async def set_column_type(req: ColumnTypeReq):
-    """Override the detected data type for a specific column."""
+    """Override the detected data type for a specific column.
+    When dry_run=true, runs the parse but does NOT mutate state; returns counts.
+    """
     if req.dataset_id not in datasets:
         raise HTTPException(404, "Dataset not found")
     df = datasets[req.dataset_id]["df"]
     if req.column not in df.columns:
         raise HTTPException(404, f"Column '{req.column}' not found")
+
+    # Dry-run path: don't mutate state, just compute parse-failure counts
+    if req.dry_run:
+        src = df[req.column]
+        total = int(src.shape[0])
+        non_null = int(src.notna().sum())
+        if req.new_type == "numeric":
+            parsed = pd.to_numeric(src, errors="coerce")
+            fail_count = int(parsed.isna().sum() - src.isna().sum())
+            # Sample first 5 failing raw values
+            fail_mask = parsed.isna() & src.notna()
+            samples = [str(v) for v in src[fail_mask].head(5).tolist()]
+            return {"dry_run": True, "column": req.column, "new_type": req.new_type,
+                    "total": total, "non_null": non_null,
+                    "fail_count": max(fail_count, 0), "samples": samples}
+        elif req.new_type == "date":
+            parsed = pd.to_datetime(src, errors="coerce")
+            fail_count = int(parsed.isna().sum() - src.isna().sum())
+            fail_mask = parsed.isna() & src.notna()
+            samples = [str(v) for v in src[fail_mask].head(5).tolist()]
+            return {"dry_run": True, "column": req.column, "new_type": req.new_type,
+                    "total": total, "non_null": non_null,
+                    "fail_count": max(fail_count, 0), "samples": samples}
+        else:
+            return {"dry_run": True, "column": req.column, "new_type": req.new_type,
+                    "total": total, "non_null": non_null, "fail_count": 0, "samples": []}
 
     if req.dataset_id not in column_type_overrides:
         column_type_overrides[req.dataset_id] = {}
@@ -310,33 +339,178 @@ async def set_column_type(req: ColumnTypeReq):
     return {"status": "ok", "column": req.column, "new_type": req.new_type}
 
 
+@router.get("/api/dataset/{dataset_id}/anomalies")
+async def detect_anomalies(dataset_id: str, method: str = "zscore", threshold: float = 3.0):
+    """Detect outlier cells per numeric column using z-score or MAD.
+    Returns {column: {indices: [...], values: [...], count, total}} for each numeric column.
+    method: 'zscore' or 'mad'. threshold: z >= threshold (or MAD-equivalent).
+    """
+    if dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    df = datasets[dataset_id]["df"]
+    per_col = {}
+    for col in df.columns:
+        s = df[col]
+        # Only numeric
+        if not pd.api.types.is_numeric_dtype(s):
+            continue
+        non_null = s.dropna()
+        if len(non_null) < 5:
+            continue
+        if method == "mad":
+            med = float(non_null.median())
+            mad = float((non_null - med).abs().median()) or 1e-9
+            scores = (s - med).abs() / (1.4826 * mad)
+        else:
+            mean = float(non_null.mean())
+            std = float(non_null.std()) or 1e-9
+            scores = (s - mean).abs() / std
+        outlier_mask = scores >= threshold
+        outlier_idx = [int(i) for i in s.index[outlier_mask.fillna(False)].tolist()]
+        outlier_vals = [float(v) if pd.notna(v) else None for v in s[outlier_mask.fillna(False)].tolist()]
+        outlier_scores = [round(float(z), 2) if pd.notna(z) else None for z in scores[outlier_mask.fillna(False)].tolist()]
+        if outlier_idx:
+            per_col[col] = {
+                "indices": outlier_idx[:500],  # cap response size
+                "values": outlier_vals[:500],
+                "scores": outlier_scores[:500],
+                "count": len(outlier_idx),
+                "total": int(len(non_null)),
+                "method": method,
+                "threshold": threshold,
+            }
+    return {"columns": per_col, "method": method, "threshold": threshold}
+
+
+@router.get("/api/dataset/{dataset_id}/type_hints")
+async def column_type_hints(dataset_id: str):
+    """Detect text columns whose values are mostly numeric or date — suggest a one-click convert.
+    Returns hints with suggested_type, parse_success_rate, and sample failing rows.
+    """
+    if dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    df = datasets[dataset_id]["df"]
+    overrides = column_type_overrides.get(dataset_id, {})
+    hints = []
+    for col in df.columns:
+        if overrides.get(col):  # user already chose a type; respect it
+            continue
+        src = df[col]
+        if not (src.dtype == object or str(src.dtype).startswith("string")):
+            continue
+        non_null = src.dropna()
+        if len(non_null) == 0 or len(non_null) < 5:
+            continue
+        # Try numeric
+        as_num = pd.to_numeric(non_null, errors="coerce")
+        num_rate = (as_num.notna().sum() / len(non_null)) if len(non_null) else 0
+        # Try date
+        try:
+            as_date = pd.to_datetime(non_null, errors="coerce")
+            date_rate = (as_date.notna().sum() / len(non_null)) if len(non_null) else 0
+        except Exception:
+            date_rate = 0
+        # Pick highest plausible suggestion
+        if num_rate >= 0.85 and num_rate > date_rate:
+            fail_mask = as_num.isna()
+            samples = [str(v) for v in non_null[fail_mask].head(5).tolist()]
+            hints.append({"column": col, "suggested_type": "numeric",
+                          "success_rate": round(float(num_rate), 3),
+                          "fail_count": int(fail_mask.sum()),
+                          "samples": samples})
+        elif date_rate >= 0.85 and date_rate > num_rate:
+            fail_mask = as_date.isna()
+            samples = [str(v) for v in non_null[fail_mask].head(5).tolist()]
+            hints.append({"column": col, "suggested_type": "date",
+                          "success_rate": round(float(date_rate), 3),
+                          "fail_count": int(fail_mask.sum()),
+                          "samples": samples})
+    return {"hints": hints}
+
+
 # ─── Multi-Sheet Union ───
 
 class UnionConfig(BaseModel):
     dataset_id: str
     sheet_names: list[str]
+    mode: str | None = "concat"  # "concat" | "join_inner" | "join_outer"
+    join_on: list[str] | None = None  # if None and mode is join_*, auto-detect common columns
 
 @router.post("/api/upload/union")
 async def union_sheets(config: UnionConfig):
-    """Combine multiple sheets into one dataset."""
+    """Combine multiple sheets into one dataset.
+    Modes:
+      - concat (default): stack rows; missing columns become NaN
+      - join_inner: inner-merge on join_on (auto-detected common cols if None)
+      - join_outer: outer-merge on join_on
+    """
     if config.dataset_id not in datasets:
         raise HTTPException(404, "Dataset not found")
     ext = datasets[config.dataset_id]["filename"].rsplit(".", 1)[-1].lower()
     tmp_path = CACHE_DIR / f"{config.dataset_id}.{ext}"
     frames = []
+    used_sheets = []
     for sheet in config.sheet_names:
         try:
             frames.append(pd.read_excel(tmp_path, sheet_name=sheet))
+            used_sheets.append(sheet)
         except Exception:
             pass
     if not frames:
         raise HTTPException(400, "No valid sheets to union")
-    df = pd.concat(frames, ignore_index=True)
+
+    mode = (config.mode or "concat").lower()
+    if mode in ("join_inner", "join_outer") and len(frames) >= 2:
+        # Auto-detect common columns if not provided
+        common = set(frames[0].columns)
+        for f in frames[1:]:
+            common &= set(f.columns)
+        keys = config.join_on or sorted(common)
+        if not keys:
+            raise HTTPException(400, "No common columns found for join; use concat or specify join_on")
+        how = "inner" if mode == "join_inner" else "outer"
+        df = frames[0]
+        for f in frames[1:]:
+            df = df.merge(f, on=keys, how=how, suffixes=("", "_dup"))
+        join_desc = f"{mode} on [{', '.join(keys)}]"
+    else:
+        df = pd.concat(frames, ignore_index=True)
+        join_desc = "concat"
     datasets[config.dataset_id]["df"] = df
-    add_audit_log(config.dataset_id, "sheet_union", f"Combined sheets: {', '.join(config.sheet_names)}")
+    add_audit_log(config.dataset_id, "sheet_union",
+                  f"Combined {len(used_sheets)} sheet(s) via {join_desc}: {', '.join(used_sheets)}")
     columns = _detect_columns(df)
     return {"row_count": len(df), "columns": columns,
             "preview": sanitize_for_json(df.head(50).fillna("").to_dict(orient="records"))}
+
+
+class SheetsInfoRequest(BaseModel):
+    dataset_id: str
+    sheet_names: list[str]
+
+@router.post("/api/upload/sheets_info")
+async def sheets_info(req: SheetsInfoRequest):
+    """Return per-sheet column lists + auto-detected common (join-eligible) columns.
+    Used by frontend to suggest auto-join keys before calling /api/upload/union.
+    """
+    if req.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    ext = datasets[req.dataset_id]["filename"].rsplit(".", 1)[-1].lower()
+    tmp_path = CACHE_DIR / f"{req.dataset_id}.{ext}"
+    per_sheet = {}
+    col_sets = []
+    for sheet in req.sheet_names:
+        try:
+            df_head = pd.read_excel(tmp_path, sheet_name=sheet, nrows=5)
+            cols = list(df_head.columns)
+            per_sheet[sheet] = cols
+            col_sets.append(set(cols))
+        except Exception:
+            per_sheet[sheet] = []
+    common = set()
+    if col_sets:
+        common = set.intersection(*col_sets) if len(col_sets) > 1 else col_sets[0]
+    return {"per_sheet": per_sheet, "common_columns": sorted(common)}
 
 
 # ─── Data Refresh ───

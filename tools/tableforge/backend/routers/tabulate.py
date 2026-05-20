@@ -34,6 +34,9 @@ class TableConfig(BaseModel):
     date_groupings: dict = {}       # {col_name: "year"|"quarter"|"month"|"week"|"day"}
     blank_suppress: bool = False    # hide rows where all value cols are 0/blank
     hide_subgroup: bool = False     # hide detail rows, show only subtotals/grand totals
+    # Table chains: optional upstream table whose tabulated result feeds this table
+    source_table_id: Optional[str] = None
+    upstream_chain: Optional[list[dict]] = None  # [{rows, columns, values, filters, ...}] of the source table
 
 
 AGG_MAP = {

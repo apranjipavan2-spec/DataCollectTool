@@ -570,14 +570,16 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
               </div>
             </div>
             <div className="table-select-list">
-              {tables.map(t => {
+              {tables.map((t, i) => {
                 const res = results.get(t.id);
                 const hasData = res && res.rows.length > 0;
                 return (
                   <label key={t.id} className={`table-select-item ${!hasData ? 'disabled' : ''}`}>
                     <input type="checkbox" checked={selectedTables.has(t.id)}
                       onChange={() => toggleTable(t.id)} disabled={!hasData} />
-                    <span>{t.name}</span>
+                    <span className="exp-table-num">#{i + 1}</span>
+                    {t.pinned && <span title="Pinned" style={{ color: '#f59e0b', marginRight: 4 }}>★</span>}
+                    <span>{t.title || t.name}</span>
                     <span className="table-info">{hasData ? `${res!.row_count} rows` : 'No data'}</span>
                   </label>
                 );

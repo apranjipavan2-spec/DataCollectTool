@@ -603,6 +603,7 @@ function DataRibbon({ dataset, onAction }: { dataset: boolean; onAction: (action
       </RGroup>
       <RGroup label="Quality & Clean">
         <RBtn icon="🔍" label="Quality & Clean" onClick={() => onAction('quality')} disabled={!dataset} />
+        <RBtn icon="🚨" label="Anomalies" onClick={() => onAction('anomalies')} disabled={!dataset} />
         <RBtn icon="📝" label="Audit"   onClick={() => onAction('audit')}   disabled={!dataset} />
       </RGroup>
       <RGroup label="Text Clean">

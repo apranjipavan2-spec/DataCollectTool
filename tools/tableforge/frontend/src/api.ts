@@ -106,6 +106,39 @@ export async function changeColumnType(datasetId: string, column: string, newTyp
   return res.json();
 }
 
+export async function dryRunColumnType(datasetId: string, column: string, newType: string):
+  Promise<{ dry_run: true; column: string; new_type: string; total: number; non_null: number; fail_count: number; samples: string[] }> {
+  const res = await fetch(`${API_BASE}/dataset/column_type`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, column, new_type: newType, dry_run: true }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function detectAnomalies(
+  datasetId: string,
+  method: 'zscore' | 'mad' = 'zscore',
+  threshold: number = 3.0,
+): Promise<{
+  columns: Record<string, { indices: number[]; values: (number | null)[]; scores: (number | null)[]; count: number; total: number; method: string; threshold: number }>;
+  method: string;
+  threshold: number;
+}> {
+  const url = `${API_BASE}/dataset/${datasetId}/anomalies?method=${method}&threshold=${threshold}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function getColumnTypeHints(datasetId: string):
+  Promise<{ hints: { column: string; suggested_type: 'numeric' | 'date'; success_rate: number; fail_count: number; samples: string[] }[] }> {
+  const res = await fetch(`${API_BASE}/dataset/${datasetId}/type_hints`);
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
 export async function listMetrics(datasetId: string) {
   const res = await fetch(`${API_BASE}/metrics/${datasetId}`);
   if (!res.ok) throw new Error(await parseError(res));
@@ -220,6 +253,29 @@ export async function rollbackProject(path: string, versionIndex: number) {
     headers: { 'Content-Type': 'application/json', ...getUserHeaders() },
     body: JSON.stringify({ path, version_index: versionIndex }),
   });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function getProjectVersions(path: string):
+  Promise<{ versions: { saved_at: string; tables: any[]; annotationsMap?: any }[] }> {
+  const url = `${API_BASE}/project/versions?path=${encodeURIComponent(path)}`;
+  const res = await fetch(url, { headers: getUserHeaders() });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function diffProjectVersions(path: string, left: number, right: number):
+  Promise<{
+    left: { index: number; saved_at: string };
+    right: { index: number; saved_at: string };
+    added: { id: string; name: string }[];
+    removed: { id: string; name: string }[];
+    changed: { id: string; name: string; changes: { field: string; before: any; after: any }[] }[];
+    summary: { added: number; removed: number; changed: number; total_left: number; total_right: number };
+  }> {
+  const url = `${API_BASE}/project/diff?path=${encodeURIComponent(path)}&left=${left}&right=${right}`;
+  const res = await fetch(url, { headers: getUserHeaders() });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 }
@@ -396,9 +452,26 @@ export async function modifyDataset(config: {
   return res.json();
 }
 
-// Module A: Multi-Sheet Union
-export async function unionSheets(datasetId: string, sheetNames: string[]) {
+// Module A: Multi-Sheet Union (concat / join_inner / join_outer)
+export async function unionSheets(
+  datasetId: string,
+  sheetNames: string[],
+  mode: 'concat' | 'join_inner' | 'join_outer' = 'concat',
+  joinOn?: string[],
+) {
   const res = await fetch(`${API_BASE}/upload/union`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, sheet_names: sheetNames, mode, join_on: joinOn }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+// Module A: Per-sheet columns + auto-detected common columns
+export async function sheetsInfo(datasetId: string, sheetNames: string[]):
+  Promise<{ per_sheet: Record<string, string[]>; common_columns: string[] }> {
+  const res = await fetch(`${API_BASE}/upload/sheets_info`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ dataset_id: datasetId, sheet_names: sheetNames }),

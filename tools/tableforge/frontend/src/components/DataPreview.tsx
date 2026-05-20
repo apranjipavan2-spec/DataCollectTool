@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DatasetMeta, ColumnInfo } from '../types';
-import { loadSheet, modifyDataset, unionSheets } from '../api';
+import { loadSheet, modifyDataset, unionSheets, sheetsInfo } from '../api';
 
 interface Props {
   dataset: DatasetMeta;
@@ -19,6 +19,9 @@ export function DataPreview({ dataset, onProceed, onDatasetUpdate }: Props) {
   const [renameValue, setRenameValue] = useState('');
   const [unionSheetNames, setUnionSheetNames] = useState<Set<string>>(new Set());
   const [showUnion, setShowUnion] = useState(false);
+  const [unionMode, setUnionMode] = useState<'concat' | 'join_inner' | 'join_outer'>('concat');
+  const [commonCols, setCommonCols] = useState<string[]>([]);
+  const [selectedJoinCols, setSelectedJoinCols] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   const typeColors: Record<string, string> = {
@@ -74,14 +77,35 @@ export function DataPreview({ dataset, onProceed, onDatasetUpdate }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await unionSheets(dataset.dataset_id, Array.from(unionSheetNames));
+      const joinOn = unionMode !== 'concat' && selectedJoinCols.size > 0
+        ? Array.from(selectedJoinCols)
+        : undefined;
+      const res = await unionSheets(
+        dataset.dataset_id, Array.from(unionSheetNames), unionMode, joinOn
+      );
       onDatasetUpdate(res);
       setShowUnion(false);
       setUnionSheetNames(new Set());
+      setSelectedJoinCols(new Set());
+      setCommonCols([]);
+      setUnionMode('concat');
     } catch (e: any) {
       setError(e.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Auto-detect common columns whenever the sheet selection changes (debounced lightly via effect)
+  const detectCommonColumns = async (sheets: string[]) => {
+    if (sheets.length < 2) { setCommonCols([]); return; }
+    try {
+      const info = await sheetsInfo(dataset.dataset_id, sheets);
+      setCommonCols(info.common_columns);
+      // Pre-select all common columns as the default join keys
+      setSelectedJoinCols(new Set(info.common_columns));
+    } catch (e) {
+      setCommonCols([]);
     }
   };
 
@@ -159,18 +183,56 @@ export function DataPreview({ dataset, onProceed, onDatasetUpdate }: Props) {
                 <label key={s} className="union-checkbox">
                   <input type="checkbox" checked={unionSheetNames.has(s)}
                     onChange={() => {
-                      setUnionSheetNames(prev => {
-                        const next = new Set(prev);
-                        if (next.has(s)) next.delete(s); else next.add(s);
-                        return next;
-                      });
+                      const next = new Set(unionSheetNames);
+                      if (next.has(s)) next.delete(s); else next.add(s);
+                      setUnionSheetNames(next);
+                      detectCommonColumns(Array.from(next));
                     }} />
                   {s}
                 </label>
               ))}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
+                <label style={{ fontSize: 11 }}>Mode:</label>
+                <select value={unionMode}
+                  onChange={e => setUnionMode(e.target.value as any)}
+                  style={{ fontSize: 11, padding: '2px 6px' }}>
+                  <option value="concat">Concat (stack rows)</option>
+                  <option value="join_inner">Auto-join inner (only matched rows)</option>
+                  <option value="join_outer">Auto-join outer (all rows)</option>
+                </select>
+              </div>
+              {unionMode !== 'concat' && unionSheetNames.size >= 2 && (
+                <div style={{ marginTop: 6 }}>
+                  {commonCols.length === 0 ? (
+                    <div style={{ fontSize: 11, color: '#ef4444' }}>
+                      ⚠ No common columns found — fall back to concat or choose different sheets.
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 4 }}>
+                        Join on (detected {commonCols.length} common column{commonCols.length !== 1 ? 's' : ''}):
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {commonCols.map(c => (
+                          <label key={c} className="union-checkbox" style={{ fontSize: 11 }}>
+                            <input type="checkbox" checked={selectedJoinCols.has(c)}
+                              onChange={() => {
+                                const next = new Set(selectedJoinCols);
+                                if (next.has(c)) next.delete(c); else next.add(c);
+                                setSelectedJoinCols(next);
+                              }} />
+                            {c}
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               <button className="btn-small btn-primary" onClick={handleUnionSheets}
-                disabled={unionSheetNames.size < 2}>
-                Combine ({unionSheetNames.size} sheets)
+                disabled={unionSheetNames.size < 2 ||
+                  (unionMode !== 'concat' && selectedJoinCols.size === 0)}>
+                Combine ({unionSheetNames.size} sheets · {unionMode})
               </button>
             </div>
           )}

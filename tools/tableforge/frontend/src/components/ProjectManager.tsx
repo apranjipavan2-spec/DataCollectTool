@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TableConfig } from '../types';
-import { rollbackProject, fgSaveProject, fgListUserProjects, API_BASE, getUserHeaders } from '../api';
+import { rollbackProject, diffProjectVersions, fgSaveProject, fgListUserProjects, API_BASE, getUserHeaders } from '../api';
 
 interface ProjectEntry {
   name: string;
@@ -42,6 +42,14 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
   const [success, setSuccess] = useState('');
   const [activeTab, setActiveTab] = useState<'recent' | 'save' | 'gallery' | 'batch'>('recent');
   const [expandedVersions, setExpandedVersions] = useState<Record<string, any[]>>({});
+  const [diffState, setDiffState] = useState<{
+    path: string;
+    leftIdx: number;
+    rightIdx: number;
+    result: any | null;
+    loading: boolean;
+    error: string;
+  } | null>(null);
   const [batchProjectPath, setBatchProjectPath] = useState('');
   const [batchFiles, setBatchFiles] = useState<string[]>([]);
   const [batchFormat, setBatchFormat] = useState('xlsx');
@@ -295,6 +303,22 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
                       {expandedVersions[p.path] && (
                         <div className="version-history">
                           <div className="version-history-label">Version History (oldest first):</div>
+                          {expandedVersions[p.path].length >= 1 && (
+                            <div style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <span style={{ fontSize: 11, opacity: 0.7 }}>Compare two versions:</span>
+                              <button className="btn-secondary" style={{ padding: '2px 8px', fontSize: 11 }}
+                                onClick={() => setDiffState({
+                                  path: p.path,
+                                  leftIdx: 0,
+                                  rightIdx: -1,
+                                  result: null,
+                                  loading: false,
+                                  error: '',
+                                })}>
+                                🔀 Open Diff View
+                              </button>
+                            </div>
+                          )}
                           {expandedVersions[p.path].map((v: any, i: number) => (
                             <div key={i} className="version-row">
                               <span className="version-date">{v.saved_at ? new Date(v.saved_at).toLocaleString() : `Version ${i + 1}`}</span>
@@ -405,8 +429,12 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
               <div className="project-current-info">
                 <span className="project-meta">{currentTables.length} table(s) in current session</span>
                 <ul className="project-table-list">
-                  {currentTables.map(t => (
-                    <li key={t.id}>{t.name} — {t.values.length} metrics, {t.rows.length + t.columns.length} dimensions</li>
+                  {currentTables.map((t, i) => (
+                    <li key={t.id}>
+                      <span className="pm-table-num">#{i + 1}</span>
+                      {t.pinned && <span title="Pinned" style={{ color: '#f59e0b', marginRight: 4 }}>★</span>}
+                      {t.title || t.name} — {t.values.length} metrics, {t.rows.length + t.columns.length} dimensions
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -510,6 +538,144 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Close</button>
+        </div>
+      </div>
+      {diffState && (
+        <DiffModal
+          state={diffState}
+          versions={expandedVersions[diffState.path] || []}
+          onChange={setDiffState}
+          onClose={() => setDiffState(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function DiffModal({
+  state, versions, onChange, onClose,
+}: {
+  state: { path: string; leftIdx: number; rightIdx: number; result: any | null; loading: boolean; error: string };
+  versions: any[];
+  onChange: (s: typeof state) => void;
+  onClose: () => void;
+}) {
+  const versionLabel = (idx: number) => {
+    if (idx === -1) return 'Current (working version)';
+    const v = versions[idx];
+    if (!v) return `Version ${idx + 1}`;
+    return v.saved_at ? new Date(v.saved_at).toLocaleString() : `Version ${idx + 1}`;
+  };
+
+  const runDiff = async () => {
+    onChange({ ...state, loading: true, error: '', result: null });
+    try {
+      const r = await diffProjectVersions(state.path, state.leftIdx, state.rightIdx);
+      onChange({ ...state, loading: false, result: r });
+    } catch (e: any) {
+      onChange({ ...state, loading: false, error: e.message || 'Diff failed' });
+    }
+  };
+
+  useEffect(() => { runDiff(); }, [state.leftIdx, state.rightIdx]); // eslint-disable-line
+
+  const fmtVal = (v: any): string => {
+    if (v === null || v === undefined) return '—';
+    if (Array.isArray(v)) return v.length === 0 ? '[]' : `[${v.length}] ${v.slice(0, 3).join(', ')}${v.length > 3 ? '…' : ''}`;
+    if (typeof v === 'object') return JSON.stringify(v).slice(0, 80);
+    return String(v);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 200 }}>
+      <div className="modal-content" style={{ maxWidth: 900, maxHeight: '85vh' }} onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>🔀 Diff: Compare Project Versions</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div style={{ display: 'flex', gap: 12, padding: 12, borderBottom: '1px solid var(--border)', flexWrap: 'wrap', alignItems: 'center' }}>
+          <label>Base:
+            <select value={state.leftIdx} onChange={e => onChange({ ...state, leftIdx: parseInt(e.target.value) })} style={{ marginLeft: 6 }}>
+              {versions.map((_, i) => (
+                <option key={i} value={i}>{versionLabel(i)}</option>
+              ))}
+              <option value={-1}>{versionLabel(-1)}</option>
+            </select>
+          </label>
+          <span style={{ opacity: 0.6 }}>→</span>
+          <label>Compare:
+            <select value={state.rightIdx} onChange={e => onChange({ ...state, rightIdx: parseInt(e.target.value) })} style={{ marginLeft: 6 }}>
+              {versions.map((_, i) => (
+                <option key={i} value={i}>{versionLabel(i)}</option>
+              ))}
+              <option value={-1}>{versionLabel(-1)}</option>
+            </select>
+          </label>
+        </div>
+        <div className="modal-body" style={{ overflow: 'auto', padding: 12, maxHeight: '60vh' }}>
+          {state.loading && <div>Loading diff…</div>}
+          {state.error && <div className="preview-error">{state.error}</div>}
+          {state.result && (
+            <>
+              <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 12 }}>
+                <span>📊 <strong>{state.result.summary.total_left}</strong> tables (base)</span>
+                <span>→</span>
+                <span>📊 <strong>{state.result.summary.total_right}</strong> tables (compare)</span>
+                <span style={{ color: '#22c55e' }}>+ {state.result.summary.added} added</span>
+                <span style={{ color: '#ef4444' }}>− {state.result.summary.removed} removed</span>
+                <span style={{ color: '#f59e0b' }}>~ {state.result.summary.changed} changed</span>
+              </div>
+              {state.result.added.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <h4 style={{ color: '#22c55e' }}>Added tables</h4>
+                  {state.result.added.map((t: any) => (
+                    <div key={t.id} style={{ padding: '4px 8px', fontSize: 12 }}>+ {t.name}</div>
+                  ))}
+                </div>
+              )}
+              {state.result.removed.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <h4 style={{ color: '#ef4444' }}>Removed tables</h4>
+                  {state.result.removed.map((t: any) => (
+                    <div key={t.id} style={{ padding: '4px 8px', fontSize: 12 }}>− {t.name}</div>
+                  ))}
+                </div>
+              )}
+              {state.result.changed.length > 0 && (
+                <div>
+                  <h4 style={{ color: '#f59e0b' }}>Changed tables</h4>
+                  {state.result.changed.map((t: any) => (
+                    <details key={t.id} style={{ marginBottom: 8, border: '1px solid var(--border)', borderRadius: 4 }}>
+                      <summary style={{ padding: '6px 8px', cursor: 'pointer', fontWeight: 600 }}>
+                        {t.name} <span style={{ fontWeight: 400, opacity: 0.6, fontSize: 11 }}>({t.changes.length} change{t.changes.length !== 1 ? 's' : ''})</span>
+                      </summary>
+                      <table style={{ width: '100%', fontSize: 11, borderTop: '1px solid var(--border)' }}>
+                        <thead>
+                          <tr style={{ background: 'var(--bg-elev)' }}>
+                            <th style={{ textAlign: 'left', padding: '4px 8px' }}>Field</th>
+                            <th style={{ textAlign: 'left', padding: '4px 8px' }}>Before</th>
+                            <th style={{ textAlign: 'left', padding: '4px 8px' }}>After</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {t.changes.map((c: any, i: number) => (
+                            <tr key={i} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '4px 8px', fontFamily: 'monospace' }}>{c.field}</td>
+                              <td style={{ padding: '4px 8px', color: '#ef4444' }}>{fmtVal(c.before)}</td>
+                              <td style={{ padding: '4px 8px', color: '#22c55e' }}>{fmtVal(c.after)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </details>
+                  ))}
+                </div>
+              )}
+              {state.result.added.length === 0 && state.result.removed.length === 0 && state.result.changed.length === 0 && (
+                <div style={{ opacity: 0.6, padding: 12 }}>No differences between these versions.</div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

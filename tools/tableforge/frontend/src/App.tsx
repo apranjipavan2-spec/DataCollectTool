@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType } from './types';
-import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, logAuditEvent, importFromFg } from './api';
+import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg } from './api';
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
 import { LivePreview } from './components/LivePreview';
@@ -52,12 +52,93 @@ function generateAutoTitle(t: TableConfig): { title: string; subtitle: string; n
   return { title, subtitle, name: nameShort };
 }
 
-type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config';
+type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config' | 'anomalies' | 'diff';
 
 interface ReconcileState {
   pendingTables: TableConfig[];
   mismatches: { field: string; zone: string; suggestion: string }[];
   mapping: Record<string, string>;
+}
+
+function AnomalyModal({ datasetId, onClose }: { datasetId: string; onClose: () => void }) {
+  const [method, setMethod] = useState<'zscore' | 'mad'>('zscore');
+  const [threshold, setThreshold] = useState(3.0);
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<Record<string, any> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    detectAnomalies(datasetId, method, threshold)
+      .then(r => setData(r.columns))
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [datasetId, method, threshold]);
+
+  useEffect(() => { run(); }, [run]);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" style={{ maxWidth: 800, maxHeight: '85vh' }} onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>🚨 Auto-Flag Anomalies</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12, borderBottom: '1px solid var(--border)' }}>
+          <label>Method:
+            <select value={method} onChange={e => setMethod(e.target.value as any)} style={{ marginLeft: 6 }}>
+              <option value="zscore">Z-score</option>
+              <option value="mad">MAD (robust)</option>
+            </select>
+          </label>
+          <label>Threshold:
+            <input type="number" min={1} max={10} step={0.5} value={threshold}
+              onChange={e => setThreshold(parseFloat(e.target.value) || 3.0)}
+              style={{ marginLeft: 6, width: 70 }} />
+          </label>
+          <button className="btn-small btn-primary" onClick={run} disabled={loading}>
+            {loading ? 'Detecting…' : 'Re-run'}
+          </button>
+        </div>
+        <div className="modal-body" style={{ overflow: 'auto', padding: 12 }}>
+          {error && <div className="preview-error">{error}</div>}
+          {loading && <div style={{ padding: 12 }}>Analyzing numeric columns…</div>}
+          {!loading && data && Object.keys(data).length === 0 && (
+            <div style={{ padding: 12, opacity: 0.6 }}>No anomalies found at this threshold.</div>
+          )}
+          {!loading && data && Object.keys(data).length > 0 && (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  <th style={{ textAlign: 'left', padding: '6px 8px' }}>Column</th>
+                  <th style={{ textAlign: 'right', padding: '6px 8px' }}>Outliers</th>
+                  <th style={{ textAlign: 'right', padding: '6px 8px' }}>% of values</th>
+                  <th style={{ textAlign: 'left', padding: '6px 8px' }}>Example outliers (value · score)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(data).map(([col, info]: [string, any]) => (
+                  <tr key={col} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '6px 8px', fontWeight: 600 }}>{col}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right', color: '#ef4444' }}>{info.count}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right', opacity: 0.7 }}>
+                      {((info.count / info.total) * 100).toFixed(1)}%
+                    </td>
+                    <td style={{ padding: '6px 8px', fontSize: 11, opacity: 0.85 }}>
+                      {info.values.slice(0, 5).map((v: any, i: number) =>
+                        `${v} (${info.scores[i]})`).join(', ')}
+                      {info.count > 5 && ` … +${info.count - 5} more`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
@@ -91,6 +172,8 @@ export default function App() {
   const [binNames, setBinNames] = useState<string[]>([]);
   const [columnDescriptions, setColumnDescriptions] = useState<Record<string, string>>({});
   const [columnTypeOverrides, setColumnTypeOverrides] = useState<Record<string, string>>({});
+  const [typeHints, setTypeHints] = useState<Array<{ column: string; suggested_type: 'numeric' | 'date'; success_rate: number; fail_count: number; samples: string[] }>>([]);
+  const [dismissedHints, setDismissedHints] = useState<Set<string>>(new Set());
   const [comparisonState, setComparisonState] = useState<any>(null);
   const [orphanedAnnotations, setOrphanedAnnotations] = useState<ReconcileAnnotation[] | null>(null);
   // tabContextMenu removed — tables now listed in SourcePanel sidebar
@@ -221,6 +304,16 @@ export default function App() {
 
   // Keep projectFiltersRef in sync so runTabulation can read the latest value
   useEffect(() => { projectFiltersRef.current = projectFilters; }, [projectFilters]);
+
+  // Fetch column-type hints whenever the dataset (or override set) changes
+  useEffect(() => {
+    if (!dataset) { setTypeHints([]); return; }
+    let cancelled = false;
+    getColumnTypeHints(dataset.dataset_id)
+      .then(r => { if (!cancelled) setTypeHints(r.hints || []); })
+      .catch(() => { if (!cancelled) setTypeHints([]); });
+    return () => { cancelled = true; };
+  }, [dataset?.dataset_id, columnTypeOverrides]);
 
   // Re-run all active tables whenever project filters change
   useEffect(() => {
@@ -712,6 +805,11 @@ export default function App() {
     updateTable({ rows: table.columns, columns: table.rows });
   }, [tables, activeTableIdx, updateTable]);
 
+  const togglePinTable = useCallback((idx: number) => {
+    pushUndo();
+    setTables(prev => prev.map((tb, ti) => ti === idx ? { ...tb, pinned: !tb.pinned } : tb));
+  }, [pushUndo]);
+
   const refreshExtraColumns = useCallback(async () => {
     if (!dataset) return;
     try {
@@ -1105,6 +1203,7 @@ export default function App() {
             setActiveTableIdx(0);
           }}
           onReorderTables={handleReorderTables}
+          onTogglePin={togglePinTable}
         />
         <div className="center-area">
           {activeTable && (
@@ -1173,6 +1272,53 @@ export default function App() {
               onClose={() => setShowProjectFilterPanel(false)}
             />
           )}
+          {/* Column type-override hints */}
+          {typeHints.filter(h => !dismissedHints.has(h.column)).length > 0 && (
+            <div className="type-hint-banner">
+              {typeHints.filter(h => !dismissedHints.has(h.column)).slice(0, 4).map(h => (
+                <div key={h.column} className="type-hint-row">
+                  <span className="type-hint-icon">{h.suggested_type === 'date' ? '📅' : '🔢'}</span>
+                  <span className="type-hint-text">
+                    <strong>{h.column}</strong> looks {h.suggested_type} (
+                    {Math.round(h.success_rate * 100)}% parse OK
+                    {h.fail_count > 0 ? `, ${h.fail_count} cells won't parse` : ''})
+                  </span>
+                  <button className="type-hint-preview" title="See what will fail to parse"
+                    onClick={async () => {
+                      if (!dataset) return;
+                      try {
+                        const r = await dryRunColumnType(dataset.dataset_id, h.column, h.suggested_type);
+                        const sampleStr = r.samples.length > 0
+                          ? `\n\nExamples of cells that will NOT parse:\n${r.samples.map(s => `  • ${s}`).join('\n')}`
+                          : '';
+                        const ok = window.confirm(
+                          `Dry-run for "${h.column}" → ${h.suggested_type}:\n` +
+                          `  Total: ${r.total}\n` +
+                          `  Non-null: ${r.non_null}\n` +
+                          `  Will fail: ${r.fail_count}` +
+                          sampleStr +
+                          `\n\nProceed with conversion?`
+                        );
+                        if (ok) handleColumnTypeChange(h.column, h.suggested_type);
+                      } catch (e: any) {
+                        setError(e.message || 'Dry-run failed');
+                      }
+                    }}>Preview & convert</button>
+                  <button className="type-hint-apply" title="Convert without preview"
+                    onClick={() => handleColumnTypeChange(h.column, h.suggested_type)}>
+                    Convert
+                  </button>
+                  <button className="type-hint-dismiss" title="Dismiss this hint"
+                    onClick={() => setDismissedHints(prev => new Set(prev).add(h.column))}>×</button>
+                </div>
+              ))}
+              {typeHints.filter(h => !dismissedHints.has(h.column)).length > 4 && (
+                <div style={{ fontSize: 10, opacity: 0.6, padding: '2px 8px' }}>
+                  + {typeHints.filter(h => !dismissedHints.has(h.column)).length - 4} more hint(s)
+                </div>
+              )}
+            </div>
+          )}
           {/* Editable Table Title */}
           <div className="table-title-bar">
             <input className="table-title-input" type="text"
@@ -1182,6 +1328,20 @@ export default function App() {
             <input className="table-subtitle-input" type="text"
               value={activeTable.subtitle} placeholder="Subtitle (optional)"
               onChange={e => updateTable({ subtitle: e.target.value, _autoTitle: false } as any)} />
+            <select
+              className="source-table-select"
+              value={activeTable.source_table_id || ''}
+              onChange={e => updateTable({ source_table_id: e.target.value || undefined } as any)}
+              title="Optional: mark this table as derived from another table (metadata for the pipeline view)"
+              style={{ fontSize: 11, padding: '4px 8px' }}
+            >
+              <option value="">No source (raw data)</option>
+              {tables.filter((_, i) => i !== activeTableIdx).map((t, i) => (
+                <option key={t.id} value={t.id}>
+                  Source: #{tables.indexOf(t) + 1} {t.title || t.name}
+                </option>
+              ))}
+            </select>
             <button className="title-dup-btn" onClick={duplicateTable}
               title="Duplicate this table (same structure, new copy)">
               <span className="title-dup-icon">⧉</span>
@@ -1202,6 +1362,36 @@ export default function App() {
               <span className="title-del-label">Delete</span>
             </button>
           </div>
+          {Object.entries(projectFilters).some(([, v]) => v && v.length > 0) && (
+            <div className="project-filter-chips" title="Project-wide filters apply to all tables">
+              <span className="pf-chips-label">🌐 Project filters:</span>
+              {Object.entries(projectFilters).map(([field, values]) => {
+                if (!values || values.length === 0) return null;
+                const display = values.length <= 2 ? values.join(', ') : `${values[0]} +${values.length - 1}`;
+                return (
+                  <span key={field} className="pf-chip" title={`${field}: ${values.join(', ')}`}>
+                    <span className="pf-chip-field">{field}</span>
+                    <span className="pf-chip-sep">=</span>
+                    <span className="pf-chip-values">{display}</span>
+                    <button
+                      className="pf-chip-x"
+                      onClick={() => {
+                        const next = { ...projectFilters };
+                        delete next[field];
+                        setProjectFilters(next);
+                      }}
+                      title="Remove this project filter"
+                    >×</button>
+                  </span>
+                );
+              })}
+              <button
+                className="pf-chips-clear"
+                onClick={() => setProjectFilters({})}
+                title="Clear all project filters"
+              >Clear all</button>
+            </div>
+          )}
           </>
           )}
           {activeTableIdx === -1 ? (
@@ -1393,6 +1583,7 @@ export default function App() {
         />
       )}
       {modal === 'audit' && <AuditTrail datasetId={dataset.dataset_id} onClose={() => setModal(null)} />}
+      {modal === 'anomalies' && <AnomalyModal datasetId={dataset.dataset_id} onClose={() => setModal(null)} />}
       {(modal === 'ai-polish' || modal === 'ai-interpret' || modal === 'ai-refine' || modal === 'ai-suggest' || modal === 'ai-smart-build' || modal === 'ai-auto-generate' || modal === 'ai-report' || modal === 'ai-config') && (
         <AISmartPanel
           mode={modal.replace('ai-', '') as any}

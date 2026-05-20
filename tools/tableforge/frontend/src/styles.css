@@ -600,6 +600,49 @@ body {
   font-size: 10px; font-weight: 700; opacity: 0.5; min-width: 16px;
   text-align: center; flex-shrink: 0;
 }
+.table-nav-pin {
+  font-size: 12px; cursor: pointer; flex-shrink: 0;
+  color: var(--text-dim); opacity: 0.45; transition: all 0.12s;
+  user-select: none;
+}
+.table-nav-pin:hover { opacity: 1; color: #f59e0b; transform: scale(1.15); }
+.table-nav-pin.pinned { color: #f59e0b; opacity: 1; }
+
+/* Column type override hint banner */
+.type-hint-banner {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 6px 8px; margin: 4px 0;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 6px;
+  font-size: 11px;
+}
+.type-hint-row {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+}
+.type-hint-icon { font-size: 14px; }
+.type-hint-text { flex: 1; min-width: 200px; }
+.type-hint-preview, .type-hint-apply {
+  font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg-elev);
+}
+.type-hint-preview:hover { background: rgba(59,130,246,0.15); border-color: var(--accent); }
+.type-hint-apply:hover { background: rgba(34,197,94,0.15); border-color: #22c55e; }
+.type-hint-dismiss {
+  border: none; background: transparent; cursor: pointer;
+  color: var(--text-dim); font-size: 14px; line-height: 1;
+  padding: 0 6px;
+}
+.type-hint-dismiss:hover { color: #ef4444; }
+
+/* Table number badges in dialogs (save popup, export list) */
+.pm-table-num, .exp-table-num {
+  display: inline-block;
+  font-size: 10px; font-weight: 700;
+  background: var(--bg-elev); color: var(--text-dim);
+  padding: 1px 6px; margin-right: 6px;
+  border-radius: 10px; min-width: 24px; text-align: center;
+}
 .table-nav-name {
   flex: 1; overflow: hidden;
   line-height: 1.3;
@@ -612,6 +655,7 @@ body {
   display: flex; align-items: center; justify-content: center;
   border-radius: 50%;
 }
+.table-nav-badge.chain-badge { color: #a855f7; background: rgba(168,85,247,0.15); }
 .table-nav-badge.error-badge { color: #ef4444; background: rgba(239,68,68,0.15); }
 .table-nav-badge.ok-badge { color: #22c55e; background: rgba(34,197,94,0.15); }
 .table-nav-badge.empty-badge { color: var(--text-dim); background: rgba(255,255,255,0.05); }
@@ -828,6 +872,46 @@ body {
 .table-title-bar {
   display: flex; gap: 8px; align-items: center; padding: 4px 0; flex-shrink: 0;
 }
+
+/* ─── Project filter chips ─── */
+.project-filter-chips {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  padding: 6px 8px; margin: 4px 0;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 6px;
+  font-size: 11px;
+}
+.pf-chips-label {
+  font-weight: 600; color: var(--text-dim); margin-right: 2px; flex-shrink: 0;
+}
+.pf-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 4px 2px 8px;
+  background: rgba(59, 130, 246, 0.18);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  border-radius: 12px;
+  font-size: 11px; line-height: 1.4;
+  max-width: 280px;
+}
+.pf-chip-field { font-weight: 600; }
+.pf-chip-sep { opacity: 0.5; margin: 0 2px; }
+.pf-chip-values {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;
+}
+.pf-chip-x {
+  border: none; background: transparent; cursor: pointer;
+  color: var(--text-dim); font-size: 14px; line-height: 1;
+  padding: 0 4px; margin-left: 2px;
+  border-radius: 50%;
+}
+.pf-chip-x:hover { background: rgba(239, 68, 68, 0.25); color: #ef4444; }
+.pf-chips-clear {
+  border: none; background: transparent; cursor: pointer;
+  color: var(--text-dim); font-size: 10px; padding: 2px 6px;
+  text-decoration: underline;
+}
+.pf-chips-clear:hover { color: #ef4444; }
 .title-dup-btn {
   display: flex; align-items: center; gap: 6px; padding: 5px 12px;
   background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3);

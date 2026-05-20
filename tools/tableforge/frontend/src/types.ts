@@ -182,6 +182,10 @@ export interface TableConfig {
   header_align?: 'left' | 'center' | 'right';       // Header row alignment
   row_label_align?: 'left' | 'center' | 'right';    // Row labels alignment
   hide_subgroup?: boolean;
+  // Pin/star: surface frequently used tables at top of strip
+  pinned?: boolean;
+  // Table chains: this table's input is the result of another table
+  source_table_id?: string;
 }
 
 export interface ColumnGroup {

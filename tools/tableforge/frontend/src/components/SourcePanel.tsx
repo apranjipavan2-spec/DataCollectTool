@@ -24,6 +24,7 @@ interface Props {
   onDeleteTable?: (idx: number) => void;
   onDeleteTables?: (indices: number[]) => void;
   onReorderTables?: (fromIdx: number, toIdx: number) => void;
+  onTogglePin?: (idx: number) => void;
 }
 
 const typeIcons: Record<string, string> = {
@@ -66,7 +67,7 @@ export function SourcePanel({
   usedColumns, columnDescriptions = {}, onColumnDescriptionChange,
   tables = [], activeTableIdx = 0, results, error,
   onTableSelect, onAddTable, onDuplicateTable, onDuplicateTables, onRenameTable, onDeleteTable, onDeleteTables,
-  onReorderTables,
+  onReorderTables, onTogglePin,
 }: Props) {
   const [search, setSearch] = useState('');
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
@@ -241,9 +242,11 @@ export function SourcePanel({
     );
   };
 
-  const filteredTables = tables.filter(t =>
-    (t.title || t.name).toLowerCase().includes(tableSearch.toLowerCase())
-  );
+  const filteredTables = tables
+    .filter(t => (t.title || t.name).toLowerCase().includes(tableSearch.toLowerCase()))
+    // Pinned tables float to the top (stable: preserves underlying order within each group)
+    .slice()
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
   const toggleTableSelect = (id: string, e: React.MouseEvent) => {
     if (e.ctrlKey || e.metaKey) {
@@ -391,10 +394,18 @@ export function SourcePanel({
               )}
               <span className="table-nav-drag-grip" title="Drag to reorder">⠿</span>
               <span className="table-nav-num">{realIdx + 1}</span>
+              <span
+                className={`table-nav-pin ${t.pinned ? 'pinned' : ''}`}
+                title={t.pinned ? 'Unpin table' : 'Pin to top'}
+                onClick={e => { e.stopPropagation(); onTogglePin?.(realIdx); }}
+              >
+                {t.pinned ? '★' : '☆'}
+              </span>
               <span className="table-nav-name">
                 <HighlightText text={t.title || t.name} search={tableSearch} />
               </span>
               <span className="table-nav-meta">
+                {t.source_table_id && <span className="table-nav-badge chain-badge" title="Derived from another table">⛓</span>}
                 {hasError && <span className="table-nav-badge error-badge">!</span>}
                 {hasData && !hasError && hasResult && <span className="table-nav-badge ok-badge">✓</span>}
                 {isEmpty && <span className="table-nav-badge empty-badge">-</span>}

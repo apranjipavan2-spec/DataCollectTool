@@ -201,6 +201,69 @@ async def get_project_versions(path: str):
     return {"versions": data.get("versions", [])}
 
 
+def _snapshot_for_index(data: dict, idx: int) -> dict:
+    """idx == -1 means current; otherwise an index into versions[]."""
+    if idx == -1:
+        return {"tables": data.get("tables", []), "saved_at": data.get("meta", {}).get("created", "")}
+    versions = data.get("versions", [])
+    if idx < 0 or idx >= len(versions):
+        raise HTTPException(400, f"Invalid version index: {idx}")
+    v = versions[idx]
+    return {"tables": v.get("tables", []), "saved_at": v.get("saved_at", "")}
+
+
+def _diff_tables(left: list, right: list) -> dict:
+    """Return added/removed/changed tables between two snapshots (left=base, right=compare)."""
+    by_id_l = {t.get("id"): t for t in left}
+    by_id_r = {t.get("id"): t for t in right}
+    added = [{"id": tid, "name": by_id_r[tid].get("title") or by_id_r[tid].get("name", tid)}
+             for tid in by_id_r.keys() - by_id_l.keys()]
+    removed = [{"id": tid, "name": by_id_l[tid].get("title") or by_id_l[tid].get("name", tid)}
+               for tid in by_id_l.keys() - by_id_r.keys()]
+    changed = []
+    for tid in by_id_l.keys() & by_id_r.keys():
+        l = by_id_l[tid]
+        r = by_id_r[tid]
+        field_changes = []
+        for key in ("title", "subtitle", "name", "rows", "columns", "values", "filters", "header_renames",
+                    "subtotals", "grand_total", "sort_by", "sort_order", "blank_suppress",
+                    "conditional_formats", "pinned"):
+            lv = l.get(key)
+            rv = r.get(key)
+            if lv != rv:
+                field_changes.append({"field": key, "before": lv, "after": rv})
+        if field_changes:
+            changed.append({
+                "id": tid,
+                "name": r.get("title") or r.get("name", tid),
+                "changes": field_changes,
+            })
+    return {"added": added, "removed": removed, "changed": changed,
+            "summary": {"added": len(added), "removed": len(removed), "changed": len(changed),
+                        "total_left": len(left), "total_right": len(right)}}
+
+
+@router.get("/api/project/diff")
+async def diff_project_versions(path: str, left: int = -1, right: int = -1):
+    """Compare two versions of the same project.
+    Indices into versions[]; use -1 for 'current'.
+    """
+    p = Path(path)
+    if not p.exists():
+        raise HTTPException(404, "Project not found")
+    data = json.loads(p.read_text())
+    if data.get("encrypted"):
+        raise HTTPException(400, "Diff not supported on encrypted projects")
+    snap_l = _snapshot_for_index(data, left)
+    snap_r = _snapshot_for_index(data, right)
+    diff = _diff_tables(snap_l["tables"], snap_r["tables"])
+    return {
+        "left": {"index": left, "saved_at": snap_l["saved_at"]},
+        "right": {"index": right, "saved_at": snap_r["saved_at"]},
+        **diff,
+    }
+
+
 class RollbackRequest(BaseModel):
     path: str
     version_index: int
