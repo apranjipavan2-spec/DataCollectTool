@@ -182,7 +182,10 @@ export default function App() {
     if (autoSaveRef.current) clearInterval(autoSaveRef.current);
     autoSaveRef.current = setInterval(() => {
       if (tables.some(t => t.values.length > 0)) {
-        saveProject('__autosave__', { tables, annotationsMap, comparisonState, projectFilters, columnTypeOverrides, dataset_id: dataset?.dataset_id, source_file: dataset ? { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length } : undefined }).then(() => {
+        // Use the ref for projectFilters so we always autosave the latest value
+        // (the interval closure captures other state at effect-setup time, but
+        // projectFilters can change without the deps array refreshing).
+        saveProject('__autosave__', { tables, annotationsMap, comparisonState, projectFilters: projectFiltersRef.current, columnTypeOverrides, dataset_id: dataset?.dataset_id, source_file: dataset ? { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length } : undefined }).then(() => {
           // Update last save state and clear dirty flag
           lastSaveStateRef.current = JSON.stringify({ tables, annotationsMap, comparisonState });
           setIsDirty(false);
@@ -190,7 +193,7 @@ export default function App() {
       }
     }, 5 * 60 * 1000);
     return () => { if (autoSaveRef.current) clearInterval(autoSaveRef.current); };
-  }, [dataset, tables, annotationsMap, comparisonState]);
+  }, [dataset, tables, annotationsMap, comparisonState, columnTypeOverrides]);
 
   // Warn about unsaved changes
   useEffect(() => {

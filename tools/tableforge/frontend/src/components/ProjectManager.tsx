@@ -93,12 +93,13 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
       if (saveMode === 'download') {
         const projectData = {
           meta: {
-            name: saveName.trim(), version: '2.1', created: new Date().toISOString(),
+            name: saveName.trim(), version: '2.2', created: new Date().toISOString(),
             source_file: sourceFileInfo,
           },
           tables: currentTables,
           annotationsMap: currentAnnotationsMap,
           comparisonState: currentComparisonState || null,
+          projectFilters: currentProjectFilters || {},
           columnTypeOverrides: currentColumnTypeOverrides,
           source_file: sourceFileInfo,
         };
@@ -115,7 +116,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
         await fgSaveProject(
           fgContext.fgUrl, fgContext.token, saveName.trim(),
           fgContext.programId || null,
-          { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, columnTypeOverrides: currentColumnTypeOverrides },
+          { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, columnTypeOverrides: currentColumnTypeOverrides },
         );
         setSuccess(`Project "${saveName}" saved to FieldGovern! Access it from any device via your account.`);
       } else {
@@ -132,7 +133,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
             await fgSaveProject(
               fgContext.fgUrl, fgContext.token, saveName.trim(),
               fgContext.programId || null,
-              { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, columnTypeOverrides: currentColumnTypeOverrides },
+              { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, columnTypeOverrides: currentColumnTypeOverrides },
             );
           } catch { /* non-fatal */ }
         }
@@ -173,7 +174,14 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
 
   const handleExportProject = async () => {
     const name = saveName || 'TableForge_Project';
-    const blob = new Blob([JSON.stringify({ meta: { name, version: '2.0', created: new Date().toISOString() }, tables: currentTables, annotationsMap: currentAnnotationsMap }, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({
+      meta: { name, version: '2.2', created: new Date().toISOString() },
+      tables: currentTables,
+      annotationsMap: currentAnnotationsMap,
+      comparisonState: currentComparisonState || null,
+      projectFilters: currentProjectFilters || {},
+      columnTypeOverrides: currentColumnTypeOverrides,
+    }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = `${name}.tableforge`;
@@ -189,7 +197,15 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
     reader.onload = (ev) => {
       try {
         const data = JSON.parse(ev.target?.result as string);
-        if (data.tables) onLoad(data.tables, data.annotationsMap);
+        if (data.tables) {
+          const extra: Record<string, any> = {};
+          if (data.comparisonState) extra.comparisonState = data.comparisonState;
+          if (data.projectFilters) extra.projectFilters = data.projectFilters;
+          if (data.columnTypeOverrides) extra.columnTypeOverrides = data.columnTypeOverrides;
+          const sourceFile = data.meta?.source_file || data.source_file;
+          if (sourceFile) extra.source_file = sourceFile;
+          onLoad(data.tables, data.annotationsMap, extra);
+        }
       } catch { setError('Invalid project file'); }
     };
     reader.readAsText(file);
@@ -321,7 +337,11 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
                           <button className="btn-primary" style={{ padding: '4px 12px', fontSize: 12 }}
                             onClick={() => {
                               if (p.data?.tables) {
-                                onLoad(p.data.tables, p.data.annotationsMap, { comparisonState: p.data.comparisonState });
+                                const extra: Record<string, any> = {};
+                                if (p.data.comparisonState) extra.comparisonState = p.data.comparisonState;
+                                if (p.data.projectFilters) extra.projectFilters = p.data.projectFilters;
+                                if (p.data.columnTypeOverrides) extra.columnTypeOverrides = p.data.columnTypeOverrides;
+                                onLoad(p.data.tables, p.data.annotationsMap, extra);
                               }
                             }}>Load</button>
                         </div>
