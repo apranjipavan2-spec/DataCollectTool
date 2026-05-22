@@ -122,6 +122,9 @@ export function StatGuide({ initialSection, onClose, onContinue }: Props) {
               {selected.useWhen}
             </div>
 
+            {selected.criteria && selected.criteria.length > 0 && (
+              <Section label="Criteria (when this test fits)" items={selected.criteria} />
+            )}
             <Section label="Required data" items={selected.requires} />
             <Section label="Step-by-step" items={selected.steps} />
             <Section label="What you get" items={selected.outputs} />
