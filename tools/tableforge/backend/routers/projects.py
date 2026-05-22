@@ -10,6 +10,7 @@ from pydantic import BaseModel
 import pandas as pd
 
 from ..shared import (datasets, custom_metrics, audit_logs, annotations,
+                      column_roles, study_designs,
                       PROJECTS_DIR, CACHE_DIR, EXPORTS_DIR,
                       sanitize_for_json, add_audit_log, get_user_projects_dir, is_super_admin)
 
@@ -80,6 +81,17 @@ async def save_project(project: ProjectData, x_user_id: Optional[str] = Header(N
         else:
             source_file = fe_sf
 
+    # Survey-analysis metadata: pull from in-memory state if not already in config
+    metadata_block = project.config.get("metadata") or {}
+    if dataset_id:
+        if "column_roles" not in metadata_block and dataset_id in column_roles:
+            metadata_block["column_roles"] = column_roles[dataset_id]
+        if "study_design" not in metadata_block and dataset_id in study_designs:
+            metadata_block["study_design"] = study_designs[dataset_id]
+    config_to_save = {**project.config}
+    if metadata_block:
+        config_to_save["metadata"] = metadata_block
+
     data = {
         "meta": {
             "name": project.name,
@@ -90,7 +102,7 @@ async def save_project(project: ProjectData, x_user_id: Optional[str] = Header(N
             "source_file": source_file,
         },
         "versions": existing_versions,
-        **project.config,
+        **config_to_save,
     }
 
     if project.password:

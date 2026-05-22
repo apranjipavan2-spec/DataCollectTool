@@ -623,6 +623,16 @@ function DataRibbon({ dataset, onAction }: { dataset: boolean; onAction: (action
 function StatisticsRibbon({ dataset, onAction }: { dataset: boolean; onAction: (action: string) => void }) {
   return (
     <>
+      <RGroup label="Survey Design">
+        <RBtn icon="🏷️" label="Variables"     onClick={() => onAction('variable_metadata')} disabled={!dataset} />
+        <RBtn icon="🧭" label="Study Design"  onClick={() => onAction('study_design')}      disabled={!dataset} />
+      </RGroup>
+      <RGroup label="Survey Analyses">
+        <RBtn icon="⚡" label="Run Full"   onClick={() => onAction('auto_analyze')}   disabled={!dataset} />
+        <RBtn icon="📊" label="Likert"    onClick={() => onAction('likert')}         disabled={!dataset} />
+        <RBtn icon="☑️" label="Multi-Resp" onClick={() => onAction('multi_response')} disabled={!dataset} />
+        <RBtn icon="👁️" label="Observer"  onClick={() => onAction('observer')}       disabled={!dataset} />
+      </RGroup>
       <RGroup label="Descriptive">
         <RBtn icon="📋" label="Summary"   onClick={() => onAction('stat_descriptive')} disabled={!dataset} />
         <RBtn icon="📊" label="Frequency" onClick={() => onAction('stat_frequency')}   disabled={!dataset} />
@@ -635,6 +645,23 @@ function StatisticsRibbon({ dataset, onAction }: { dataset: boolean; onAction: (
         <RBtn icon="𝑡"  label="t-Test"   onClick={() => onAction('stat_ttest')}   disabled={!dataset} />
         <RBtn icon="F"  label="ANOVA"    onClick={() => onAction('stat_anova')}   disabled={!dataset} />
         <RBtn icon="χ²" label="Cross-tab" onClick={() => onAction('stat_crosstab')} disabled={!dataset} />
+      </RGroup>
+      <RGroup label="Paired / Pre-Post">
+        <RBtn icon="↔" label="Paired t"  onClick={() => onAction('stat_paired_ttest')} disabled={!dataset} />
+        <RBtn icon="W" label="Wilcoxon" onClick={() => onAction('stat_wilcoxon')}    disabled={!dataset} />
+        <RBtn icon="±" label="McNemar"  onClick={() => onAction('stat_mcnemar')}     disabled={!dataset} />
+      </RGroup>
+      <RGroup label="Non-parametric">
+        <RBtn icon="K"  label="Kruskal"  onClick={() => onAction('stat_kruskal')}  disabled={!dataset} />
+        <RBtn icon="Fr" label="Friedman" onClick={() => onAction('stat_friedman')} disabled={!dataset} />
+        <RBtn icon="ρ"  label="Spearman" onClick={() => onAction('stat_spearman')} disabled={!dataset} />
+        <RBtn icon="τ"  label="Kendall"  onClick={() => onAction('stat_kendall')}  disabled={!dataset} />
+      </RGroup>
+      <RGroup label="Models">
+        <RBtn icon="📐" label="Multi-Reg"   onClick={() => onAction('stat_multiple_regression')} disabled={!dataset} />
+        <RBtn icon="OR" label="Logistic"    onClick={() => onAction('stat_logistic_regression')} disabled={!dataset} />
+        <RBtn icon="⇄"  label="Post-hoc"    onClick={() => onAction('stat_posthoc')}              disabled={!dataset} />
+        <RBtn icon="α"  label="Reliability" onClick={() => onAction('stat_reliability')}          disabled={!dataset} />
       </RGroup>
       <RGroup label="Distribution">
         <RBtn icon="📉" label="Normality" onClick={() => onAction('stat_normality')} disabled={!dataset} />

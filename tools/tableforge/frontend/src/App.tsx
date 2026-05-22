@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType } from './types';
-import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg } from './api';
+import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg, getColumnRoles, bulkSetColumnRoles, saveStudyDesign } from './api';
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
 import { LivePreview } from './components/LivePreview';
@@ -28,6 +28,12 @@ import { AnnotationReconcileDialog, detectOrphanedAnnotations, ReconcileAnnotati
 import { ChartBuilder } from './components/ChartBuilder';
 import { RibbonBar, TABLE_TEMPLATES } from './components/RibbonBar';
 import { StatisticalTables } from './components/StatisticalTables';
+import { VariableMetadataPanel } from './components/VariableMetadataPanel';
+import { StudyDesignWizard } from './components/StudyDesignWizard';
+import { LikertPanel } from './components/LikertPanel';
+import { MultiResponsePanel } from './components/MultiResponsePanel';
+import { ObserverPanel } from './components/ObserverPanel';
+import { AutoAnalyzePanel } from './components/AutoAnalyzePanel';
 
 function createEmptyTable(id: string, name: string): TableConfig {
   return {
@@ -52,7 +58,7 @@ function generateAutoTitle(t: TableConfig): { title: string; subtitle: string; n
   return { title, subtitle, name: nameShort };
 }
 
-type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config' | 'anomalies' | 'diff';
+type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'stat_paired_ttest' | 'stat_wilcoxon' | 'stat_mcnemar' | 'stat_kruskal' | 'stat_friedman' | 'stat_spearman' | 'stat_kendall' | 'stat_logistic_regression' | 'stat_multiple_regression' | 'stat_posthoc' | 'stat_reliability' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config' | 'anomalies' | 'diff' | 'variable_metadata' | 'study_design' | 'likert' | 'multi_response' | 'observer' | 'auto_analyze';
 
 interface ReconcileState {
   pendingTables: TableConfig[];
@@ -172,6 +178,8 @@ export default function App() {
   const [binNames, setBinNames] = useState<string[]>([]);
   const [columnDescriptions, setColumnDescriptions] = useState<Record<string, string>>({});
   const [columnTypeOverrides, setColumnTypeOverrides] = useState<Record<string, string>>({});
+  const [columnRolesMap, setColumnRolesMap] = useState<Record<string, import('./types').ColumnRole>>({});
+  const [pendingMetadataRestore, setPendingMetadataRestore] = useState<{ column_roles?: Record<string, any>; study_design?: any } | null>(null);
   const [typeHints, setTypeHints] = useState<Array<{ column: string; suggested_type: 'numeric' | 'date'; success_rate: number; fail_count: number; samples: string[] }>>([]);
   const [dismissedHints, setDismissedHints] = useState<Set<string>>(new Set());
   const [comparisonState, setComparisonState] = useState<any>(null);
@@ -314,6 +322,34 @@ export default function App() {
       .catch(() => { if (!cancelled) setTypeHints([]); });
     return () => { cancelled = true; };
   }, [dataset?.dataset_id, columnTypeOverrides]);
+
+  // Fetch column-role metadata (Phase 0: Survey Analysis Studio) on dataset load
+  useEffect(() => {
+    if (!dataset) { setColumnRolesMap({}); return; }
+    let cancelled = false;
+    getColumnRoles(dataset.dataset_id)
+      .then(r => { if (!cancelled) setColumnRolesMap(r.roles || {}); })
+      .catch(() => { if (!cancelled) setColumnRolesMap({}); });
+    return () => { cancelled = true; };
+  }, [dataset?.dataset_id]);
+
+  // Push restored metadata back to the new dataset once it's available.
+  useEffect(() => {
+    if (!dataset || !pendingMetadataRestore) return;
+    const { column_roles: cr, study_design: sd } = pendingMetadataRestore;
+    setPendingMetadataRestore(null);
+    (async () => {
+      try {
+        if (cr && Object.keys(cr).length) {
+          await bulkSetColumnRoles(dataset.dataset_id, cr);
+          setColumnRolesMap(cr);
+        }
+        if (sd && Object.keys(sd).length) {
+          await saveStudyDesign(dataset.dataset_id, sd);
+        }
+      } catch {}
+    })();
+  }, [dataset?.dataset_id, pendingMetadataRestore]);
 
   // Re-run all active tables whenever project filters change
   useEffect(() => {
@@ -1142,6 +1178,7 @@ export default function App() {
           metricNames={metricNames} binNames={binNames}
           columnDescriptions={columnDescriptions}
           onColumnDescriptionChange={(col, desc) => setColumnDescriptions(prev => ({ ...prev, [col]: desc }))}
+          columnRoles={columnRolesMap}
           usedColumns={activeTable ? { rows: activeTable.rows, columns: activeTable.columns, values: activeTable.values.map(v => v.field) } : undefined}
           onMultiDrop={(zone, fields) => {
             if (activeTableIdx < 0) return;
@@ -1574,7 +1611,7 @@ export default function App() {
           setTables(prev => prev.map(t => t.id === tableId ? { ...t, chartConfig } : t));
         }}
         onClose={() => setModal(null)} />}
-      {(modal === 'stat_correlation' || modal === 'stat_descriptive' || modal === 'stat_crosstab' || modal === 'stat_ttest' || modal === 'stat_anova' || modal === 'stat_regression' || modal === 'stat_normality' || modal === 'stat_outlier' || modal === 'stat_frequency') && (
+      {(modal === 'stat_correlation' || modal === 'stat_descriptive' || modal === 'stat_crosstab' || modal === 'stat_ttest' || modal === 'stat_anova' || modal === 'stat_regression' || modal === 'stat_normality' || modal === 'stat_outlier' || modal === 'stat_frequency' || modal === 'stat_paired_ttest' || modal === 'stat_wilcoxon' || modal === 'stat_mcnemar' || modal === 'stat_kruskal' || modal === 'stat_friedman' || modal === 'stat_spearman' || modal === 'stat_kendall' || modal === 'stat_logistic_regression' || modal === 'stat_multiple_regression' || modal === 'stat_posthoc' || modal === 'stat_reliability') && (
         <StatisticalTables
           type={modal.replace('stat_', '') as any}
           datasetId={dataset.dataset_id}
@@ -1584,6 +1621,67 @@ export default function App() {
       )}
       {modal === 'audit' && <AuditTrail datasetId={dataset.dataset_id} onClose={() => setModal(null)} />}
       {modal === 'anomalies' && <AnomalyModal datasetId={dataset.dataset_id} onClose={() => setModal(null)} />}
+      {modal === 'variable_metadata' && (
+        <VariableMetadataPanel
+          datasetId={dataset.dataset_id}
+          columns={allColumns}
+          onClose={() => setModal(null)}
+          onSaved={r => setColumnRolesMap(r)}
+        />
+      )}
+      {modal === 'study_design' && (
+        <StudyDesignWizard
+          datasetId={dataset.dataset_id}
+          columns={allColumns}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === 'likert' && (
+        <LikertPanel
+          datasetId={dataset.dataset_id}
+          columns={allColumns}
+          columnRoles={columnRolesMap}
+          onClose={() => setModal(null)}
+          onCompositeCreated={handleDataRefresh}
+        />
+      )}
+      {modal === 'multi_response' && (
+        <MultiResponsePanel
+          datasetId={dataset.dataset_id}
+          columns={allColumns}
+          columnRoles={columnRolesMap}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === 'observer' && (
+        <ObserverPanel
+          datasetId={dataset.dataset_id}
+          columns={allColumns}
+          columnRoles={columnRolesMap}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === 'auto_analyze' && (
+        <AutoAnalyzePanel
+          datasetId={dataset.dataset_id}
+          columns={allColumns}
+          columnRoles={columnRolesMap}
+          onClose={() => setModal(null)}
+          onPromote={(label, headers, rows, interpretation) => {
+            const id = String(Date.now() + Math.floor(Math.random() * 1000));
+            pushUndo();
+            const empty = createEmptyTable(id, label.slice(0, 30));
+            empty.title = label;
+            empty.subtitle = interpretation;
+            setTables(prev => [...prev, empty]);
+            setResults(prev => {
+              const next = new Map(prev);
+              next.set(id, { headers, rows, row_count: rows.length, col_count: headers.length });
+              return next;
+            });
+          }}
+        />
+      )}
       {(modal === 'ai-polish' || modal === 'ai-interpret' || modal === 'ai-refine' || modal === 'ai-suggest' || modal === 'ai-smart-build' || modal === 'ai-auto-generate' || modal === 'ai-report' || modal === 'ai-config') && (
         <AISmartPanel
           mode={modal.replace('ai-', '') as any}
@@ -1685,6 +1783,7 @@ export default function App() {
           if (loadedExtra?.reportTemplate) setReportTemplate(loadedExtra.reportTemplate);
           if (loadedExtra?.comparisonState) setComparisonState(loadedExtra.comparisonState);
           if (loadedExtra?.projectFilters) setProjectFilters(loadedExtra.projectFilters);
+          if (loadedExtra?.metadata) setPendingMetadataRestore(loadedExtra.metadata);
           if (loadedExtra?.columnTypeOverrides) {
             const overrides = loadedExtra.columnTypeOverrides as Record<string, string>;
             setColumnTypeOverrides(overrides);

@@ -487,6 +487,162 @@ export async function refreshDataset(datasetId: string) {
   return res.json();
 }
 
+// ── Survey Analysis Studio: metadata layer (Phase 0) ────────────────────────
+import type { ColumnRole, StudyDesign, AutoDetectResult } from './types';
+
+export async function getColumnRoles(datasetId: string): Promise<{ roles: Record<string, ColumnRole> }> {
+  const res = await fetch(`${API_BASE}/metadata/column/${datasetId}`);
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function setColumnRole(datasetId: string, column: string, role: ColumnRole) {
+  const res = await fetch(`${API_BASE}/metadata/column/set`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, column, role }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function bulkSetColumnRoles(datasetId: string, roles: Record<string, ColumnRole>) {
+  const res = await fetch(`${API_BASE}/metadata/column/bulk_set`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, roles }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function deleteColumnRole(datasetId: string, column: string) {
+  const res = await fetch(`${API_BASE}/metadata/column/${datasetId}/${encodeURIComponent(column)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function saveStudyDesign(datasetId: string, design: StudyDesign) {
+  const res = await fetch(`${API_BASE}/metadata/study_design/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, design }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function getStudyDesign(datasetId: string): Promise<{ design: StudyDesign }> {
+  const res = await fetch(`${API_BASE}/metadata/study_design/${datasetId}`);
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function autoDetectRoles(datasetId: string): Promise<AutoDetectResult> {
+  const res = await fetch(`${API_BASE}/metadata/auto_detect_roles`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+// ── Phase 2 — Likert / Multi-Response / Observer ─────────────────────────────
+
+async function postStat<T = any>(path: string, body: any): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export const likertApi = {
+  summary: (b: any) => postStat('/likert/summary', b),
+  composite: (b: any) => postStat('/likert/composite', b),
+  compare: (b: any) => postStat('/likert/compare', b),
+  factor: (b: any) => postStat('/likert/factor', b),
+};
+
+export const mrApi = {
+  frequencies: (b: any) => postStat('/mr/frequencies', b),
+  cooccurrence: (b: any) => postStat('/mr/cooccurrence', b),
+  byGroup: (b: any) => postStat('/mr/by_group', b),
+  exclusive: (b: any) => postStat('/mr/exclusive', b),
+};
+
+export const observerApi = {
+  concordance: (b: any) => postStat('/observer/concordance', b),
+  discrepancies: (b: any) => postStat('/observer/discrepancies', b),
+};
+
+// ── Phase 3 — Auto-Analyze battery ───────────────────────────────────────────
+
+export interface AutoAnalyzeConfig {
+  dataset_id: string;
+  outcome_cols: string[];
+  predictor_cols?: string[];
+  correction?: 'fdr_bh' | 'bonferroni' | 'holm' | 'none';
+  use_design?: boolean;
+  filters?: Record<string, string[]>;
+}
+
+export async function planBattery(config: AutoAnalyzeConfig) {
+  return postStat('/analyze/plan', config);
+}
+
+export interface BatteryProgress {
+  step: 'start' | 'progress' | 'done';
+  idx?: number;
+  total?: number;
+  label?: string;
+  kind?: string;
+  p_raw?: number | null;
+  error?: string;
+  skipped?: boolean;
+  results?: any[];
+  correction?: string;
+  design_used?: boolean;
+}
+
+/** SSE-streamed auto-battery executor. `onEvent` fires for every event. */
+export async function runAutoBattery(
+  config: AutoAnalyzeConfig,
+  onEvent: (e: BatteryProgress) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/analyze/auto-battery`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+    signal,
+  });
+  if (!res.ok || !res.body) throw new Error(await parseError(res));
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split('\n\n');
+    buf = lines.pop() || '';
+    for (const block of lines) {
+      const line = block.trim();
+      if (!line.startsWith('data:')) continue;
+      try {
+        const event = JSON.parse(line.slice(5).trim());
+        onEvent(event);
+      } catch { /* ignore parse error on partial frame */ }
+    }
+  }
+}
+
 // Export download (binary)
 export async function downloadExport(config: {
   dataset_id: string;

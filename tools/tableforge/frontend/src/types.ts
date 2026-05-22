@@ -267,3 +267,52 @@ export interface QualityReport {
   duplicate_rows: number;
   total_rows: number;
 }
+
+// ── Survey Analysis Studio: metadata layer (Phase 0) ─────────────────────────
+
+export type ColumnRoleKind =
+  | 'treatment' | 'outcome' | 'demographic' | 'mediator' | 'moderator'
+  | 'geographic' | 'panel_wave' | 'observer_rated' | 'qualitative' | 'weight'
+  | 'id' | 'other';
+
+export type ColumnScale =
+  | 'nominal' | 'ordinal' | 'interval' | 'ratio'
+  | 'likert' | 'binary' | 'count' | 'multi_response';
+
+export type StudyDesignType =
+  | 'cross_sectional' | 'pre_post' | 'quasi_experimental' | 'panel' | 'rcs';
+
+export interface ColumnRole {
+  role?: ColumnRoleKind | string | null;
+  scale?: ColumnScale | string | null;
+  value_labels?: Record<string, string>;
+  units?: string | null;
+  paired_with?: string | null;
+  mr_set_id?: string | null;
+  benchmark_link?: string | null;
+  notes?: string | null;
+}
+
+export interface PrePostPair {
+  pre: string;
+  post: string;
+}
+
+export interface StudyDesign {
+  design_type?: StudyDesignType | string | null;
+  treatment_col?: string | null;
+  treatment_value?: string | null;
+  weight_col?: string | null;
+  cluster_col?: string | null;
+  panel_id_col?: string | null;
+  panel_wave_col?: string | null;
+  pre_post_pairs?: PrePostPair[];
+  strata?: string[];
+  notes?: string | null;
+}
+
+export interface AutoDetectResult {
+  suggested_roles: Record<string, ColumnRole>;
+  suggested_design: StudyDesign;
+  column_count: number;
+}

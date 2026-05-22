@@ -2,7 +2,27 @@ import React, { useState } from 'react';
 import { ColumnInfo } from '../types';
 import { API_BASE } from '../api';
 
-type StatType = 'correlation' | 'descriptive' | 'crosstab' | 'ttest' | 'anova' | 'regression' | 'normality' | 'outlier' | 'frequency';
+type StatType =
+  | 'correlation'
+  | 'descriptive'
+  | 'crosstab'
+  | 'ttest'
+  | 'anova'
+  | 'regression'
+  | 'normality'
+  | 'outlier'
+  | 'frequency'
+  | 'paired_ttest'
+  | 'wilcoxon'
+  | 'mcnemar'
+  | 'kruskal'
+  | 'friedman'
+  | 'spearman'
+  | 'kendall'
+  | 'logistic_regression'
+  | 'multiple_regression'
+  | 'posthoc'
+  | 'reliability';
 
 interface Props {
   type: StatType;
@@ -21,27 +41,49 @@ export function StatisticalTables({ type, datasetId, columns, onClose }: Props) 
   const allCols = columns;
 
   const titles: Record<StatType, string> = {
-    correlation: 'Correlation Matrix',
+    correlation: 'Correlation Matrix (Pearson)',
     descriptive: 'Descriptive Statistics (Table 1)',
-    crosstab: 'Cross-Tabulation with Chi-Square Test',
-    ttest: 't-Test / Mann-Whitney U Test',
-    anova: 'One-Way ANOVA',
-    regression: 'Linear Regression',
+    crosstab: 'Cross-Tabulation + Cramér\u2019s V',
+    ttest: 't-Test (Welch) + Cohen\u2019s d',
+    anova: 'One-Way ANOVA + \u03b7\u00b2/\u03c9\u00b2',
+    regression: 'OLS Regression',
     normality: 'Normality Tests',
     outlier: 'Outlier Detection',
     frequency: 'Frequency Distribution',
+    paired_ttest: 'Paired t-Test (Pre vs Post)',
+    wilcoxon: 'Wilcoxon Signed-Rank (paired, non-parametric)',
+    mcnemar: 'McNemar\u2019s Test (paired binary)',
+    kruskal: 'Kruskal-Wallis (non-parametric ANOVA)',
+    friedman: 'Friedman Test (repeated measures)',
+    spearman: 'Spearman Rank Correlation',
+    kendall: 'Kendall\u2019s \u03c4 Correlation',
+    logistic_regression: 'Logistic Regression (binary outcome)',
+    multiple_regression: 'Multiple Regression (with categorical encoding + VIF)',
+    posthoc: 'Post-Hoc Pairwise Comparisons',
+    reliability: 'Cronbach\u2019s \u03b1 (scale reliability)',
   };
 
   const descriptions: Record<StatType, string> = {
     correlation: 'Select numeric columns to compute pairwise Pearson correlations.',
     descriptive: 'Select numeric columns for summary statistics (N, Mean, SD, quartiles).',
-    crosstab: 'Select 2 categorical columns for cross-tabulation with chi-square test.',
-    ttest: 'Select a group column and a numeric column for comparison.',
-    anova: 'Select a group column and a numeric column for one-way ANOVA.',
+    crosstab: 'Select 2 categorical columns. Returns chi-square, Cram\u00e9r\u2019s V, Fisher\u2019s exact (2\u00d72).',
+    ttest: 'Select a group column and a numeric column. Welch\u2019s t-test by default; falls back to Mann-Whitney if non-normal.',
+    anova: 'Select a group column and a numeric column. Returns F, \u03b7\u00b2, \u03c9\u00b2, and Welch\u2019s F when variances differ.',
     regression: 'Select columns: first = dependent (Y), rest = independent (X). Fits OLS regression.',
     normality: 'Select numeric columns to test for normality (Shapiro-Wilk, Kolmogorov-Smirnov).',
     outlier: 'Select numeric columns to detect outliers using IQR and Z-score methods.',
     frequency: 'Select columns to generate frequency distribution tables.',
+    paired_ttest: 'Select PRE column then POST column. Tests within-respondent change with Cohen\u2019s d_z.',
+    wilcoxon: 'Select PRE then POST column. Paired non-parametric test, robust to non-normal change scores.',
+    mcnemar: 'Select PRE then POST binary column (e.g., No/Yes). Detects net shift in paired binary outcomes.',
+    kruskal: 'Select a group column and a numeric column. Non-parametric alternative to one-way ANOVA.',
+    friedman: 'Select 3+ repeated-measure columns (same respondents, different timepoints/measures).',
+    spearman: 'Select numeric/ordinal columns for rank-based correlation (robust to outliers).',
+    kendall: 'Select numeric/ordinal columns for Kendall\u2019s \u03c4 (conservative, handles ties).',
+    logistic_regression: 'First column = binary outcome. Rest = predictors. Returns odds ratios + 95% CI + pseudo-R\u00b2.',
+    multiple_regression: 'First column = numeric outcome. Rest = predictors (categoricals auto-encoded). Includes VIF.',
+    posthoc: 'Select group column then numeric column. Pairwise comparisons after ANOVA (Tukey HSD default).',
+    reliability: 'Select \u22652 Likert item columns to compute Cronbach\u2019s \u03b1 and item-rest correlations.',
   };
 
   const toggleCol = (col: string) => {
@@ -80,21 +122,35 @@ export function StatisticalTables({ type, datasetId, columns, onClose }: Props) 
   };
 
   const getAvailableCols = () => {
-    if (['correlation', 'descriptive', 'normality', 'outlier', 'regression'].includes(type)) return numericCols;
+    const numericOnly = ['correlation', 'descriptive', 'normality', 'outlier', 'regression',
+      'spearman', 'kendall', 'paired_ttest', 'wilcoxon', 'friedman', 'reliability',
+      'multiple_regression'];
+    if (numericOnly.includes(type)) return numericCols;
     return allCols;
   };
 
   const getMinMax = (): [number, number | undefined] => {
     switch (type) {
       case 'correlation': return [2, undefined];
+      case 'spearman': return [2, undefined];
+      case 'kendall': return [2, undefined];
       case 'descriptive': return [1, undefined];
       case 'crosstab': return [2, 2];
       case 'ttest': return [2, 2];
       case 'anova': return [2, 2];
+      case 'kruskal': return [2, 2];
       case 'regression': return [2, undefined];
+      case 'logistic_regression': return [2, undefined];
+      case 'multiple_regression': return [2, undefined];
       case 'normality': return [1, undefined];
       case 'outlier': return [1, undefined];
       case 'frequency': return [1, undefined];
+      case 'paired_ttest': return [2, 2];
+      case 'wilcoxon': return [2, 2];
+      case 'mcnemar': return [2, 2];
+      case 'friedman': return [3, undefined];
+      case 'posthoc': return [2, 2];
+      case 'reliability': return [2, undefined];
       default: return [1, undefined];
     }
   };
@@ -102,18 +158,42 @@ export function StatisticalTables({ type, datasetId, columns, onClose }: Props) 
   const [minCols, maxCols] = getMinMax();
 
   const getSelectionHint = () => {
-    if (type === 'ttest' || type === 'anova') {
-      return selectedCols.length > 0 ? (
+    const groupValue = ['ttest', 'anova', 'kruskal', 'posthoc'];
+    const prePost = ['paired_ttest', 'wilcoxon', 'mcnemar'];
+    const yX = ['regression', 'logistic_regression', 'multiple_regression'];
+    if (groupValue.includes(type) && selectedCols.length > 0) {
+      return (
         <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
           Group: <strong>{selectedCols[0] || '?'}</strong> | Value: <strong>{selectedCols[1] || '?'}</strong>
         </div>
-      ) : null;
+      );
     }
-    if (type === 'regression' && selectedCols.length > 0) {
+    if (prePost.includes(type) && selectedCols.length > 0) {
       return (
         <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
-          Dependent (Y): <strong>{selectedCols[0] || '?'}</strong> |
-          Independent (X): <strong>{selectedCols.slice(1).join(', ') || '?'}</strong>
+          PRE: <strong>{selectedCols[0] || '?'}</strong> | POST: <strong>{selectedCols[1] || '?'}</strong>
+        </div>
+      );
+    }
+    if (yX.includes(type) && selectedCols.length > 0) {
+      const yLabel = type === 'logistic_regression' ? 'Outcome (binary)' : 'Dependent (Y)';
+      return (
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+          {yLabel}: <strong>{selectedCols[0] || '?'}</strong> | Predictors: <strong>{selectedCols.slice(1).join(', ') || '?'}</strong>
+        </div>
+      );
+    }
+    if (type === 'friedman' && selectedCols.length > 0) {
+      return (
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+          Measures (in order): <strong>{selectedCols.join(' → ')}</strong>
+        </div>
+      );
+    }
+    if (type === 'reliability' && selectedCols.length > 0) {
+      return (
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+          Scale items: <strong>{selectedCols.join(', ')}</strong>
         </div>
       );
     }
@@ -194,12 +274,31 @@ export function StatisticalTables({ type, datasetId, columns, onClose }: Props) 
             <div style={{ overflow: 'auto' }}>
               {result.chi2 !== undefined && (
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
-                  Chi-Square = {result.chi2}, p = {result.p_value}, df = {result.dof}
+                  χ² = {result.chi2}, p = {result.p_value}{result.dof !== undefined ? `, df = ${result.dof}` : ''}
+                  {result.cramers_v !== undefined && result.cramers_v !== null ? `, Cramér's V = ${result.cramers_v}` : ''}
+                  {result.fisher_p ? `, Fisher's p = ${result.fisher_p}` : ''}
                 </div>
               )}
               {result.f_stat !== undefined && (
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
                   F = {result.f_stat}, p = {result.p_value}
+                  {result.eta_squared !== undefined && result.eta_squared !== null ? `, η² = ${result.eta_squared}` : ''}
+                  {result.omega_squared !== undefined && result.omega_squared !== null ? `, ω² = ${result.omega_squared}` : ''}
+                </div>
+              )}
+              {result.H !== undefined && (
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+                  Kruskal H = {result.H}, p = {result.p_value}{result.eta_squared !== undefined ? `, η²_H = ${result.eta_squared}` : ''}
+                </div>
+              )}
+              {result.kendalls_w !== undefined && (
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+                  Friedman χ² = {result.chi2}, p = {result.p_value}, Kendall's W = {result.kendalls_w}
+                </div>
+              )}
+              {result.alpha !== undefined && (
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+                  Cronbach's α = {result.alpha}
                 </div>
               )}
               <table className="result-table" style={{ fontSize: 12 }}>

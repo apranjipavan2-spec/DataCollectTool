@@ -171,6 +171,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
         if (data.comparisonState) extra.comparisonState = data.comparisonState;
         if (data.projectFilters) extra.projectFilters = data.projectFilters;
         if (data.columnTypeOverrides) extra.columnTypeOverrides = data.columnTypeOverrides;
+        if (data.metadata || data.config?.metadata) extra.metadata = data.metadata || data.config?.metadata;
         const sourceFile = data.meta?.source_file || data.source_file;
         if (sourceFile) extra.source_file = sourceFile;
         onLoad(data.tables, data.annotationsMap, extra);

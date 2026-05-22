@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ColumnInfo, TableConfig, TableResult } from '../types';
+import { ColumnInfo, ColumnRole, TableConfig, TableResult } from '../types';
 
 interface Props {
   columns: ColumnInfo[];
@@ -11,6 +11,7 @@ interface Props {
   usedColumns?: { rows: string[]; columns: string[]; values: string[] };
   columnDescriptions?: Record<string, string>;
   onColumnDescriptionChange?: (column: string, description: string) => void;
+  columnRoles?: Record<string, ColumnRole>;
   // Table list props
   tables?: TableConfig[];
   activeTableIdx?: number;
@@ -62,9 +63,20 @@ function HighlightText({ text, search }: { text: string; search: string }) {
   );
 }
 
+const ROLE_BADGE_STYLES: Record<string, { label: string; color: string }> = {
+  outcome:        { label: 'O',   color: '#ef4444' },
+  treatment:      { label: 'T',   color: '#a855f7' },
+  demographic:    { label: 'D',   color: '#22c55e' },
+  geographic:     { label: 'Geo', color: '#0ea5e9' },
+  observer_rated: { label: 'Obs', color: '#f59e0b' },
+  qualitative:    { label: 'Q',   color: '#ec4899' },
+  weight:         { label: 'Wt',  color: '#94a3b8' },
+  id:             { label: 'ID',  color: '#64748b' },
+};
+
 export function SourcePanel({
   columns, onDragStart, onDragEnd, onMultiDrop, metricNames = [], binNames = [],
-  usedColumns, columnDescriptions = {}, onColumnDescriptionChange,
+  usedColumns, columnDescriptions = {}, onColumnDescriptionChange, columnRoles = {},
   tables = [], activeTableIdx = 0, results, error,
   onTableSelect, onAddTable, onDuplicateTable, onDuplicateTables, onRenameTable, onDeleteTable, onDeleteTables,
   onReorderTables, onTogglePin,
@@ -199,6 +211,19 @@ export function SourcePanel({
         )}
         {metricNames.includes(col.name) && <span className="col-badge col-metric-badge" title="Has metric">f</span>}
         {binNames.includes(col.name) && <span className="col-badge col-bin-badge" title="Has bin">+</span>}
+        {(() => {
+          const role = columnRoles[col.name]?.role;
+          const badge = role ? ROLE_BADGE_STYLES[role] : null;
+          if (!badge) return null;
+          return (
+            <span title={`Role: ${role}`} style={{
+              display: 'inline-block', minWidth: 16, padding: '0 4px',
+              marginLeft: 3, fontSize: 9, lineHeight: '14px',
+              borderRadius: 3, background: badge.color, color: '#fff',
+              textAlign: 'center', fontWeight: 600,
+            }}>{badge.label}</span>
+          );
+        })()}
         {selected.has(col.name) && <span className="col-selected-check">✓</span>}
         {hoveredCol === col.name && !selected.has(col.name) && editingDesc !== col.name && (
           <div className="col-tooltip">

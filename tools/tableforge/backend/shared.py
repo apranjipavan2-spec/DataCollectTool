@@ -18,6 +18,9 @@ audit_logs: dict = {}      # dataset_id -> [log_entries]
 annotations: dict = {}     # dataset_id -> {table_id -> [{row, col, text, color}]}
 upload_progress: dict = {}  # dataset_id -> {percent, rows_read, total_estimated, status}
 column_type_overrides: dict = {}  # dataset_id -> {col_name: "text"|"numeric"|"multi_choice"|"date"}
+# Survey-analysis metadata layer (Phase 0)
+column_roles: dict = {}    # dataset_id -> {col_name: ColumnRole dict}
+study_designs: dict = {}   # dataset_id -> StudyDesign dict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECTS_DIR = BASE_DIR / "projects"
