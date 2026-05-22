@@ -34,6 +34,7 @@ import { LikertPanel } from './components/LikertPanel';
 import { MultiResponsePanel } from './components/MultiResponsePanel';
 import { ObserverPanel } from './components/ObserverPanel';
 import { AutoAnalyzePanel } from './components/AutoAnalyzePanel';
+import { StatGuide, isGuideSkipped } from './components/StatGuide';
 
 function createEmptyTable(id: string, name: string): TableConfig {
   return {
@@ -59,6 +60,15 @@ function generateAutoTitle(t: TableConfig): { title: string; subtitle: string; n
 }
 
 type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'stat_paired_ttest' | 'stat_wilcoxon' | 'stat_mcnemar' | 'stat_kruskal' | 'stat_friedman' | 'stat_spearman' | 'stat_kendall' | 'stat_logistic_regression' | 'stat_multiple_regression' | 'stat_posthoc' | 'stat_reliability' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config' | 'anomalies' | 'diff' | 'variable_metadata' | 'study_design' | 'likert' | 'multi_response' | 'observer' | 'auto_analyze';
+
+const STAT_GUIDE_ACTIONS = new Set<string>([
+  'stat_correlation', 'stat_descriptive', 'stat_crosstab', 'stat_ttest', 'stat_anova',
+  'stat_regression', 'stat_normality', 'stat_outlier', 'stat_frequency',
+  'stat_paired_ttest', 'stat_wilcoxon', 'stat_mcnemar', 'stat_kruskal', 'stat_friedman',
+  'stat_spearman', 'stat_kendall', 'stat_logistic_regression', 'stat_multiple_regression',
+  'stat_posthoc', 'stat_reliability',
+  'variable_metadata', 'study_design', 'likert', 'multi_response', 'observer', 'auto_analyze',
+]);
 
 interface ReconcileState {
   pendingTables: TableConfig[];
@@ -159,6 +169,8 @@ export default function App() {
   const [showDataPreview, setShowDataPreview] = useState(false);
   const [draggedField, setDraggedField] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalType>(null);
+  const [guideSection, setGuideSection] = useState<string | null>(null);
+  const [guidePendingModal, setGuidePendingModal] = useState<ModalType>(null);
   const [extraColumns, setExtraColumns] = useState<ColumnInfo[]>([]);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [ribbonTab, setRibbonTab] = useState('home');
@@ -1150,6 +1162,11 @@ export default function App() {
           else if (a === 'project_filter') setShowProjectFilterPanel(s => !s);
           else if (a.startsWith('apply_template:')) handleApplyTemplate(a.slice('apply_template:'.length));
           else if (a.startsWith('load_project:')) handleLoadProjectByPath(a.slice('load_project:'.length));
+          else if (a === 'stat_guide') { setGuidePendingModal(null); setGuideSection('overview'); }
+          else if (STAT_GUIDE_ACTIONS.has(a)) {
+            if (isGuideSkipped(a)) setModal(a as ModalType);
+            else { setGuidePendingModal(a as ModalType); setGuideSection(a); }
+          }
           else setModal(a as ModalType);
         }}
         onUpdate={update => updateTable(update)}
@@ -1680,6 +1697,17 @@ export default function App() {
               return next;
             });
           }}
+        />
+      )}
+      {guideSection && (
+        <StatGuide
+          initialSection={guideSection}
+          onClose={() => setGuideSection(null)}
+          onContinue={guidePendingModal ? () => {
+            const next = guidePendingModal;
+            setGuidePendingModal(null);
+            setModal(next);
+          } : undefined}
         />
       )}
       {(modal === 'ai-polish' || modal === 'ai-interpret' || modal === 'ai-refine' || modal === 'ai-suggest' || modal === 'ai-smart-build' || modal === 'ai-auto-generate' || modal === 'ai-report' || modal === 'ai-config') && (

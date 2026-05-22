@@ -623,6 +623,9 @@ function DataRibbon({ dataset, onAction }: { dataset: boolean; onAction: (action
 function StatisticsRibbon({ dataset, onAction }: { dataset: boolean; onAction: (action: string) => void }) {
   return (
     <>
+      <RGroup label="Help">
+        <RBtn icon="📖" label="Guide" onClick={() => onAction('stat_guide')} />
+      </RGroup>
       <RGroup label="Survey Design">
         <RBtn icon="🏷️" label="Variables"     onClick={() => onAction('variable_metadata')} disabled={!dataset} />
         <RBtn icon="🧭" label="Study Design"  onClick={() => onAction('study_design')}      disabled={!dataset} />
