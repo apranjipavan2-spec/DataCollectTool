@@ -41,7 +41,9 @@
       "Bash(npx tsc *)",
       "Bash(npx vite *)",
       "PowerShell(gh *)",
-      "PowerShell(Copy-Item *)"
+      "PowerShell(Copy-Item *)",
+      "Bash(PYTHONIOENCODING=utf-8 python -c \"from backend.main import app; print\\(f'Routes: {len\\(app.routes\\)}'\\)\")",
+      "Bash(PYTHONIOENCODING=utf-8 python -c \"from backend.main import app; print\\(f'Routes: {len\\(app.routes\\)}'\\); auto_routes = [r.path for r in app.routes if 'analyze' in r.path]; print\\('auto routes:', auto_routes\\)\")"
     ]
   },
   "mcpServers": {

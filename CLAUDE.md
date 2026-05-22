@@ -31,89 +31,133 @@ Current DB: 0035. Repo: https://github.com/apranjipavan2-spec/DataCollectTool
 <!-- Updated by gen-context.js -->
 # Code signatures
 
-## deps
+## website
+
+### website\404.html
 ```
-backend\app\api\routes\field_govern.py ← fastapi, pydantic, sqlalchemy, app, pandas
-frontend\src\programs\BatchRenameModal.tsx ← lib/api, lib/ToastContext
-frontend\src\programs\FgAnalyzer.tsx ← BatchRenameModal
+title: Page Not Found (404) — FieldGovern
 ```
 
-## backend
-
-### backend\app\api\routes\field_govern.py
+### website\best-survey-app-india.html
 ```
-class WaveIn(BaseModel) {questionnaire_id*, wave_number*, wave_label*, panel_key?}
-class TabulateRequest(BaseModel) {column_headers*, sample_rows?, user_prompt?, research_type?}
-class TabulateExecuteRequest(BaseModel) {groupby_field*, value_field*, aggregation?, form_ids?, chart_type?, title?}
-class TabulateCsvRequest(BaseModel) {rows*, groupby_field*, value_field?, aggregation?, chart_type?, title?}
-class WriterRequest(BaseModel) {style?, date_range?, custom_context?, tabulation_data?}
-class RestoreRequest(BaseModel) {analysis_id*}
-class FeedbackRequest(BaseModel) {vote?}
-class SmartBuildRequest(BaseModel) {column_ids?, column_headers?, query?}
-class PolishRequest(BaseModel) {title*, groupby_field*, value_field?, aggregation?, rows?, is_cross_tab?}
-class InterpretRequest(BaseModel) {title*, subtitle?, groupby_field*, value_field?, aggregation?, rows?}
-class SaveTabulationRequest(BaseModel) {tabulation*}
-class AutoGenerateRequest(BaseModel) {objectives?}
-class BatchUpdateRequest(BaseModel) {tabulations?}
-GET /programs/{program_id}/waves  →  get_waves()
-PATCH /programs/{program_id}/panel-study  →  toggle_panel_study()
-PUT /programs/{program_id}/waves  →  set_wave()
-DELETE /programs/{program_id}/waves/{questionnaire_id}  →  clear_wave()
-GET /programs/{program_id}/attrition  →  attrition_report()
-GET /programs/{program_id}/analyzer-data  →  get_analyzer_data()
-GET /programs/{program_id}/summary  →  get_program_summary()
-POST /programs/{program_id}/tabulate/suggest  →  suggest_tabulation()
-POST /programs/{program_id}/tabulate/smart-build  →  smart_build_tabulation()
-POST /programs/{program_id}/tabulate/polish  →  polish_tabulation()
-POST /programs/{program_id}/tabulate/interpret  →  interpret_tabulation()
-POST /programs/{program_id}/tabulate/execute  →  execute_tabulation()
-POST /tabulate-csv  →  tabulate_csv()
-GET /programs/{program_id}/analysis  →  get_analysis()
-GET /programs/{program_id}/writer-tables  →  get_writer_tables()
-GET /programs/{program_id}/analysis/status  →  get_analysis_status()
-GET /programs/{program_id}/analysis/history  →  get_analysis_history()
+title: Best Survey App in India (2026) — Honest Buyer's Guide | FieldGovern
 ```
 
-### backend\app\services\ai_service.py
+### website\capi-software-india.html
 ```
-async def generate_report(cfg: dict, form_title: str, field_labels: list, submissions: list) → str
-async def suggest_skip_logic(cfg: dict, question_text: str, form_fields: list, user_description: str) → list  # Return 1-3 SkipLogic suggestions in frontend-compatible form
-async def generate_styled_report(cfg: dict, style: str, form_title: str, date_range: str, sample_size: int, table_data: str, chart_descriptions: str, custom_context: str) → str
+title: Best CAPI Software for India (2026) — FieldGovern
 ```
 
-## frontend
-
-### frontend\src\programs\BatchRenameModal.tsx
+### website\dpdp-compliant-survey-software.html
 ```
-component BatchRenameModal
-props Props
-hook useToast
-hook useState
-hook useRef
-export SavedTabulation
-export BatchRenameModal
-handler onClick
-handler onChange
+title: DPDP-Compliant Survey Software in India (2026) — FieldGovern
 ```
 
-### frontend\src\programs\FgAnalyzer.tsx
+### website\features.html
 ```
-component StatCard
-component OverviewTab
-component TabulationCard
-component TabulatorTab
-component PanelStudyTab
-component CsvTab
-component ProgramPicker
-component FgAnalyzer
-hook useToast
-hook useState
-hook useCallback
-hook useEffect
-hook useRef
-handler onClick
-handler onChange
-handler onDelete
-handler onUpdate
-handler onComplete
+title: Features (2026) — FieldGovern | Offline PWA, AI Form Builder, Back-Check, DPDP
+nav#navbar
+button#hamburgerBtn
+div#mobileMenu
+div#pgProgress
+span#uploadPct
+span#sheetCount
+div#langQ
+div#langHint
+div#lo1
+div#lo2
+div#lo3
+div#lo4
+```
+
+### website\googleforms-alternative.html
+```
+title: The Best Google Forms Alternative for Field Research in India (2026) — FieldGovern
+```
+
+### website\index.html
+```
+title: FieldGovern (2026) — India's Offline-First Survey App + AI Analysis | From ₹6,499/mo
+nav#navbar
+button#hamburgerBtn
+div#mobileMenu
+canvas#particleCanvas
+div#mockBars
+span#syncPct
+div#syncBar
+section#features
+section#compare
+div#scoreGrid
+div#aiMsg
+div#aiCards
+section#pipeline
+section#analytics
+section#about
+```
+
+### website\integrations.html
+```
+title: Integrations — FieldGovern
+nav#navbar
+button#hamburgerBtn
+div#mobileMenu
+```
+
+### website\magpi-alternative.html
+```
+title: The Best Magpi Alternative for India (2026) — FieldGovern
+```
+
+### website\offline-survey-app-india.html
+```
+title: Best Offline Survey App for India (2026) — FieldGovern
+```
+
+### website\pricing.html
+```
+title: Pricing (2026) — FieldGovern | From ₹6,499/mo · UPI Billing
+nav#navbar
+button#hamburgerBtn
+div#mobileMenu
+```
+
+### website\qualtrics-alternative.html
+```
+title: The Best Qualtrics Alternative for India (2026) — FieldGovern
+```
+
+### website\security.html
+```
+title: Security — FieldGovern
+nav#navbar
+button#hamburgerBtn
+div#mobileMenu
+```
+
+### website\sitemap.xml
+```
+root urlset
+```
+
+### website\survey-tool-for-ngos-india.html
+```
+title: Best Survey Tool for NGOs in India (2026) — FieldGovern
+```
+
+### website\surveycto-alternative.html
+```
+title: The Best SurveyCTO Alternative for India (2026) — FieldGovern
+```
+
+### website\surveymonkey-alternative.html
+```
+title: The Best SurveyMonkey Alternative for India (2026) — FieldGovern
+```
+
+### website\use-cases.html
+```
+title: Use Cases — FieldGovern
+nav#navbar
+button#hamburgerBtn
+div#mobileMenu
 ```

@@ -1,61 +1,37 @@
 # Lessons — Mistakes & Patterns to Avoid
 
-## L001 — Always patch seed_dev.py when adding migrations
-**Pattern:** Each new alembic migration (0019+) MUST have a matching `ALTER TABLE … ADD COLUMN IF NOT EXISTS` patch in `seed_dev.py` AND a detection line in `wait_and_stamp.py`.  
-**Why:** Production DBs may have been set up without alembic tracking; belt-and-suspenders patches ensure columns exist even if alembic silently fails.  
-**How to apply:** When writing a migration, immediately add the patch to `_PATCHES` list and a `col_exists` / `table_exists` check in `wait_and_stamp.py`.
+Most of these are also enforced as numbered rules in `CLAUDE.md`. Keep this file for the "why" — the context that explains the rule.
 
-## L002 — Register new routers in router.py
-**Pattern:** A new `routes/foo.py` file does nothing until imported and `include_router`'d in `app/api/router.py`.  
-**Why:** `field_govern.py` was created but not registered — all its endpoints returned 404.  
-**How to apply:** After creating any new route file, immediately add it to router.py.
+## L001 — Patch `seed_dev.py` when adding migrations
+Every new alembic migration must have a matching `ADD COLUMN IF NOT EXISTS` patch in `seed_dev.py._PATCHES` AND a detection line in `wait_and_stamp.py`. Production DBs may have been set up without alembic tracking; belt-and-suspenders patches ensure columns exist even if alembic silently fails.
 
-## L003 — field_govern.py: `require_supervisor` uses `user["tenant_id"]` not `user.tenant_id`
-**Pattern:** The user dependency returns a dict (`{"user_id": ..., "tenant_id": ..., "role": ...}`), not an ORM model. Always use `user["tenant_id"]`, `user["role"]`.  
-**Why:** Mixing dict access with attribute access causes `KeyError` at runtime.
+## L002 — Register new routers in `router.py`
+A new `routes/foo.py` does nothing until imported + `include_router`'d in `app/api/router.py`. `field_govern.py` once shipped with all endpoints returning 404 because of this.
 
-## L004 — localStorage keys must be namespaced by programId
-**Pattern:** `fg_tabs_{programId}`, `fg_reports_{programId}` — always include entity ID in the key.  
-**Why:** Without namespacing, data from one program bleeds into another for the same user.
+## L003 — User dependency is a dict, not an ORM model
+`get_current_user` returns `{"sub": user_id, "tenant_id": ..., "role": ...}`. Use `user["sub"]` (not `user["id"]` — doesn't exist), `user["tenant_id"]`, `user["role"]`.
 
-## L005 — Navigation items require both navigation.ts AND App.tsx route
-**Pattern:** Adding a nav item to `getNavItems()` without a matching `<Route>` in App.tsx causes a blank page.  
-**How to apply:** Always add the route in App.tsx immediately after adding to navigation.ts.
+## L004 — localStorage keys need both `programId` AND `userId` for per-user caches
+Pattern: `fg_tabs_{programId}`, `fg_last_form_cache_{userId}`. Without namespacing, data bleeds across programs or across users on shared devices.
 
-## L006 — TopNav breadcrumbs use `path` not `href`
-**Pattern:** The `TopNav` component accepts `{ label: string; path?: string }` — NOT `href`.  
-**Why:** Used `href` initially which caused dead breadcrumb links (silently ignored).
+## L005 — Nav items need both `navigation.ts` AND `<Route>` in `App.tsx`
+Adding to `getNavItems()` without a route → blank page. Role-restricted nav also needs a role-guard wrapping the route — otherwise users can navigate by typing the URL directly.
 
-## L008 — SQLAlchemy JSONB mutations need flag_modified
-**Pattern:** When updating a JSONB column in-place (`row.value["key"] = val`), SQLAlchemy does NOT detect the change. Must call `flag_modified(row, "value")` before `db.commit()`.  
-**Why:** SQLAlchemy tracks object identity, not deep dict content. Silent no-op otherwise.  
-**How to apply:** After any in-place JSONB dict mutation, always call `from sqlalchemy.orm.attributes import flag_modified; flag_modified(row, "column_name")`.
+## L006 — `TopNav` breadcrumbs use `path`, not `href`
+Component signature is `{ label: string; path?: string }`. `href` is silently ignored → dead links.
 
-## L009 — _ensure_table() for ad-hoc tables avoids migration overhead
-**Pattern:** For new feature tables (comments, inbox), use `_ensure_table(db)` with raw `CREATE TABLE IF NOT EXISTS` SQL called at the start of each endpoint.  
-**Why:** Avoids creating a migration for every small feature table; safe for idempotent re-runs; production-compatible.  
-**Tradeoff:** No alembic tracking — fine for feature tables, not for tables with FK constraints to core models.
+## L007 — `seed_dev.py` fast-path skips patches on warm restart — intentional
+The seed exits early if `Demo Org` exists, but schema patches run BEFORE that check, so they always apply. Don't "fix" the early-exit ordering.
 
-## L010 — Leaflet loaded from CDN, not npm, for optional map features
-**Pattern:** Dynamically inject `<link>` and `<script>` for Leaflet CSS/JS in a `useEffect` only when the map page loads.  
-**Why:** Avoids adding ~150KB to the main bundle for a feature only supervisors use. CDN load is cached after first visit.  
-**How to apply:** Check `window.L` before injecting; use `script.onload = initMap` callback; guard with `if (!document.getElementById('leaflet-js'))` to prevent double-inject.
+## L008 — SQLAlchemy JSONB mutations need `flag_modified`
+In-place mutation (`row.value["key"] = val`) is a silent no-op — SQLAlchemy tracks object identity, not deep dict content. Always:
+```python
+from sqlalchemy.orm.attributes import flag_modified
+flag_modified(row, "column_name")
+```
 
-## L011 — JWT payload user ID is under `sub`, not `id`
-**Pattern:** The `get_current_user` dependency returns a dict where the user's UUID is at `user["sub"]`, not `user["id"]`.  
-**Why:** JWTs use the standard `sub` (subject) claim. `user["id"]` does not exist and silently causes `KeyError` or `None` in FK fields.  
-**How to apply:** Always use `user["sub"]` for the user's ID, `user["tenant_id"]` for tenant, `user["role"]` for role.
+## L009 — Use `_ensure_table(db)` for ad-hoc feature tables
+For small feature tables (comments, inbox), `CREATE TABLE IF NOT EXISTS` at the start of each endpoint avoids per-feature migrations. Idempotent, production-safe. Don't use this for tables with FK constraints to core models — those need alembic.
 
-## L012 — IndexedDB / localStorage keys must include user ID to prevent cross-user cache bleed
-**Pattern:** Use `fg_last_form_cache_{userId}` not `fg_last_form_cache` when caching per-user data in IndexedDB/localStorage.  
-**Why:** On shared devices, the previous user's cached form/program selection persists for the next login — causes wrong data displayed.  
-**How to apply:** Any localStorage key that caches user-specific state must include the user's ID in the key.
-
-## L013 — master_admin nav items require both navigation.ts AND route guard
-**Pattern:** Adding a nav item for master_admin in `navigation.ts` without a matching role guard in App.tsx allows other roles to navigate directly via URL.  
-**Why:** Nav visibility and route access are independent. A supervisor can type `/admin/...` directly if the route has no role check.  
-**How to apply:** Every nav item that's role-restricted must have a matching `<Route>` wrapped in a role-guard component in App.tsx.
-
-## L007 — seed_dev.py fast-path skips patches on warm restart
-**Pattern:** The seed exits early if `Demo Org` tenant exists. Schema patches run BEFORE that check, so they always apply.  
-**Why:** This is intentional — patches must always run to handle incremental column additions on existing DBs.
+## L010 — Leaflet via CDN, not npm
+Inject `<link>`/`<script>` in a `useEffect` only on the map page. Avoids ~150KB in the main bundle for a supervisor-only feature. Guard with `if (!document.getElementById('leaflet-js'))` to prevent double-inject; use `script.onload = initMap`. *(Note: CLAUDE.md rule 10 says npm-only — that rule was added after this lesson and supersedes it for new map features.)*
