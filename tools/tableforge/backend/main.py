@@ -33,6 +33,7 @@ from .routers import (
     multi_response,
     observer,
     auto_analyze,
+    survey_suggest,
 )
 
 app = FastAPI(title="TableForge", version="2.0")
@@ -66,6 +67,7 @@ app.include_router(likert.router)
 app.include_router(multi_response.router)
 app.include_router(observer.router)
 app.include_router(auto_analyze.router)
+app.include_router(survey_suggest.router)
 
 # Serve frontend static files (production)
 STATIC_DIR = BASE_DIR / "static"

@@ -12,6 +12,7 @@ interface Props {
   columns?: ColumnInfo[];
   onColumnTypeChange?: (column: string, newType: string) => void;
   projectFilterCount?: number;   // number of active project-level filters
+  onAskAI?: (query: string) => void;  // #15 Talk-to-your-data: NL query → smart-build modal
 }
 
 type TabKey = 'home' | 'insert' | 'data' | 'statistics' | 'format' | 'view' | 'ai-smart';
@@ -192,13 +193,13 @@ function TemplateDropdown({ table, onAction, disabled }: { table: TableConfig | 
 }
 
 // ── Root component ─────────────────────────────────────────
-export function RibbonBar({ table, dataset, onAction, onUpdate, theme, activeTab: externalTab, columns, onColumnTypeChange, projectFilterCount = 0 }: Props) {
+export function RibbonBar({ table, dataset, onAction, onUpdate, theme, activeTab: externalTab, columns, onColumnTypeChange, projectFilterCount = 0, onAskAI }: Props) {
   const [internalTab, setInternalTab] = useState<TabKey>('home');
   const activeTab = (externalTab as TabKey) || internalTab;
 
   return (
     <div className="ribbon-content">
-      {activeTab === 'home'       && <HomeRibbon      table={table} dataset={dataset} onAction={onAction} onUpdate={onUpdate} projectFilterCount={projectFilterCount} />}
+      {activeTab === 'home'       && <HomeRibbon      table={table} dataset={dataset} onAction={onAction} onUpdate={onUpdate} projectFilterCount={projectFilterCount} onAskAI={onAskAI} />}
       {activeTab === 'insert'     && <InsertRibbon    dataset={dataset} onAction={onAction} />}
       {activeTab === 'data'       && <DataRibbon      dataset={dataset} onAction={onAction} />}
       {activeTab === 'statistics' && <StatisticsRibbon dataset={dataset} onAction={onAction} />}
@@ -386,15 +387,24 @@ function ImportDropdownBtn({ onAction }: { onAction: (action: string) => void })
 }
 
 // ── HOME ───────────────────────────────────────────────────
-function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0 }: {
+function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0, onAskAI }: {
   table: TableConfig | null; dataset: boolean;
   onAction: (action: string) => void; onUpdate: (update: Partial<TableConfig>) => void;
   projectFilterCount?: number;
+  onAskAI?: (query: string) => void;
 }) {
   const [openDrop, setOpenDrop] = useState<string | null>(null);
+  const [askQuery, setAskQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const t = table;
   const dis = !t;
+
+  const submitAsk = () => {
+    const q = askQuery.trim();
+    if (!q || !onAskAI) return;
+    onAskAI(q);
+    setAskQuery('');
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -408,6 +418,29 @@ function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0
 
   return (
     <div ref={containerRef} style={{ display: 'contents' }}>
+      <RGroup label="Ask AI">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <input
+            type="text"
+            value={askQuery}
+            onChange={e => setAskQuery(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') submitAsk(); }}
+            placeholder="Ask: e.g., avg income by district…"
+            disabled={!dataset}
+            className="ribbon-ask-input"
+            style={{
+              fontSize: 12, padding: '6px 10px', minWidth: 220, height: 30,
+              background: 'rgba(15,23,42,0.6)', color: 'inherit',
+              border: '1px solid rgba(168,85,247,0.45)', borderRadius: 4,
+            }}
+            title="Talk to your data — AI designs a table from your question"
+          />
+          <button className="ribbon-btn" onClick={submitAsk} disabled={!dataset || !askQuery.trim()} title="Build table from question">
+            <span className="ribbon-btn-icon">💬</span>
+            <span className="ribbon-btn-label">Ask</span>
+          </button>
+        </div>
+      </RGroup>
       <RGroup label="File">
         <ImportDropdownBtn onAction={onAction} />
         <RBtn icon="💾" label="Save"    onClick={() => onAction('save')}   disabled={!dataset} />
@@ -629,6 +662,7 @@ function StatisticsRibbon({ dataset, onAction }: { dataset: boolean; onAction: (
       <RGroup label="Survey Design">
         <RBtn icon="🏷️" label="Variables"     onClick={() => onAction('variable_metadata')} disabled={!dataset} />
         <RBtn icon="🧭" label="Study Design"  onClick={() => onAction('study_design')}      disabled={!dataset} />
+        <RBtn icon="💡" label="Suggest Crosstabs" onClick={() => onAction('survey_insights')} disabled={!dataset} />
       </RGroup>
       <RGroup label="Survey Analyses">
         <RBtn icon="⚡" label="Run Full"   onClick={() => onAction('auto_analyze')}   disabled={!dataset} />

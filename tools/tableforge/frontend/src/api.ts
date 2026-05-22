@@ -658,3 +658,27 @@ export async function downloadExport(config: {
   if (!res.ok) throw new Error(await parseError(res));
   return res;
 }
+
+// #14 Survey-aware mode — crosstab suggestions driven by auto-detected column roles.
+export interface SurveySuggestion {
+  title: string;
+  description: string;
+  rationale: string;
+  kind: string;
+  rows: string[];
+  columns: string[];
+  value_field: string;
+  aggregation: string;
+  show_as: string | null;
+}
+
+export async function suggestSurveyCrosstabs(datasetId: string, maxSuggestions = 20):
+  Promise<{ suggestions: SurveySuggestion[]; detected: Record<string, any>; roles_count: number }> {
+  const res = await fetch(`${API_BASE}/survey/suggest_crosstabs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, max_suggestions: maxSuggestions }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}

@@ -34,6 +34,7 @@ import { LikertPanel } from './components/LikertPanel';
 import { MultiResponsePanel } from './components/MultiResponsePanel';
 import { ObserverPanel } from './components/ObserverPanel';
 import { AutoAnalyzePanel } from './components/AutoAnalyzePanel';
+import { SurveyInsightsPanel } from './components/SurveyInsightsPanel';
 import { StatGuide, isGuideSkipped } from './components/StatGuide';
 
 function createEmptyTable(id: string, name: string): TableConfig {
@@ -59,7 +60,7 @@ function generateAutoTitle(t: TableConfig): { title: string; subtitle: string; n
   return { title, subtitle, name: nameShort };
 }
 
-type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'stat_paired_ttest' | 'stat_wilcoxon' | 'stat_mcnemar' | 'stat_kruskal' | 'stat_friedman' | 'stat_spearman' | 'stat_kendall' | 'stat_logistic_regression' | 'stat_multiple_regression' | 'stat_posthoc' | 'stat_reliability' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config' | 'anomalies' | 'diff' | 'variable_metadata' | 'study_design' | 'likert' | 'multi_response' | 'observer' | 'auto_analyze';
+type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'stat_paired_ttest' | 'stat_wilcoxon' | 'stat_mcnemar' | 'stat_kruskal' | 'stat_friedman' | 'stat_spearman' | 'stat_kendall' | 'stat_logistic_regression' | 'stat_multiple_regression' | 'stat_posthoc' | 'stat_reliability' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config' | 'anomalies' | 'diff' | 'variable_metadata' | 'study_design' | 'likert' | 'multi_response' | 'observer' | 'auto_analyze' | 'survey_insights';
 
 const STAT_GUIDE_ACTIONS = new Set<string>([
   'stat_correlation', 'stat_descriptive', 'stat_crosstab', 'stat_ttest', 'stat_anova',
@@ -191,6 +192,16 @@ export default function App() {
   const [columnDescriptions, setColumnDescriptions] = useState<Record<string, string>>({});
   const [columnTypeOverrides, setColumnTypeOverrides] = useState<Record<string, string>>({});
   const [columnRolesMap, setColumnRolesMap] = useState<Record<string, import('./types').ColumnRole>>({});
+  // Captures the pre-AI-Polish snapshot so user can revert with one click even after closing the AI panel.
+  // Snapshots cover only the touched table(s): scope='single' = active table; scope='all' = every table updated by batch polish.
+  const [aiPolishUndo, setAiPolishUndo] = useState<{ snapshots: TableConfig[]; scope: 'single' | 'all'; appliedAt: number } | null>(null);
+  // #15 Talk-to-your-data: when user submits NL query from ribbon Ask AI, prefill smart-build modal + auto-submit.
+  const [smartBuildPrefill, setSmartBuildPrefill] = useState<{ query: string; autoSubmit: boolean } | null>(null);
+  useEffect(() => {
+    if (!aiPolishUndo) return;
+    const t = setTimeout(() => setAiPolishUndo(curr => curr && curr.appliedAt === aiPolishUndo.appliedAt ? null : curr), 60000);
+    return () => clearTimeout(t);
+  }, [aiPolishUndo]);
   const [pendingMetadataRestore, setPendingMetadataRestore] = useState<{ column_roles?: Record<string, any>; study_design?: any } | null>(null);
   const [typeHints, setTypeHints] = useState<Array<{ column: string; suggested_type: 'numeric' | 'date'; success_rate: number; fail_count: number; samples: string[] }>>([]);
   const [dismissedHints, setDismissedHints] = useState<Set<string>>(new Set());
@@ -401,7 +412,22 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const pushUndo = useCallback(() => {
+  const lastUndoPushRef = useRef<{ time: number; key: string | null }>({ time: 0, key: null });
+  const pushUndo = useCallback((opts?: { coalesceKey?: string }) => {
+    // Coalesce rapid edits (e.g. typing in title input) into a single undo entry.
+    // When the same coalesceKey is pushed again within 600ms, the existing snapshot
+    // is still the correct "before" state — skip the push.
+    if (opts?.coalesceKey) {
+      const now = Date.now();
+      const last = lastUndoPushRef.current;
+      if (last.key === opts.coalesceKey && now - last.time < 600) {
+        lastUndoPushRef.current = { time: now, key: opts.coalesceKey };
+        return;
+      }
+      lastUndoPushRef.current = { time: now, key: opts.coalesceKey };
+    } else {
+      lastUndoPushRef.current = { time: 0, key: null };
+    }
     setUndoStack(prev => [...prev.slice(-20), tables.map(t => ({ ...t, values: [...t.values], rows: [...t.rows], columns: [...t.columns], filters: { ...t.filters } }))]);
     setRedoStack([]);
   }, [tables]);
@@ -531,7 +557,6 @@ export default function App() {
   }, [runTabulationCore]);
 
   const updateTable = useCallback((update: Partial<TableConfig>) => {
-    pushUndo();
     // Fields that affect what the backend computes; display-only fields (header_renames, title,
     // theme, formats, etc.) don't need a re-tabulation, which makes typing in those inputs snappy.
     const TABULATION_KEYS = new Set([
@@ -544,7 +569,12 @@ export default function App() {
       'blank_suppress',
       'hide_subgroup',
     ]);
-    const needsTabulation = Object.keys(update).some(k => TABULATION_KEYS.has(k));
+    // Text-edit fields where rapid keystrokes should collapse into a single undo entry.
+    const TEXT_EDIT_KEYS = new Set(['title', 'subtitle', 'name', 'header_renames', 'footnote', 'table_number', 'table_number_prefix']);
+    const keys = Object.keys(update);
+    const needsTabulation = keys.some(k => TABULATION_KEYS.has(k));
+    const isTextEditOnly = keys.length > 0 && keys.every(k => TEXT_EDIT_KEYS.has(k) || k === '_autoTitle');
+    pushUndo(isTextEditOnly ? { coalesceKey: 'text-edit' } : undefined);
     setTables(prev => {
       const next = [...prev];
       const merged = { ...next[activeTableIdx], ...update };
@@ -1173,7 +1203,24 @@ export default function App() {
         theme={theme}
         columns={allColumns}
         onColumnTypeChange={handleColumnTypeChange}
+        onAskAI={q => { setSmartBuildPrefill({ query: q, autoSubmit: true }); setModal('ai-smart-build'); }}
       />
+      {aiPolishUndo && (Date.now() - aiPolishUndo.appliedAt < 60000) && (
+        <div style={{ margin: '0 12px', padding: '8px 14px', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.35)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, flexShrink: 0 }}>
+          <span>✨ AI Polish applied to {aiPolishUndo.scope === 'all' ? `${aiPolishUndo.snapshots.length} table${aiPolishUndo.snapshots.length === 1 ? '' : 's'}` : 'this table'}.</span>
+          <button className="btn-secondary" style={{ fontSize: 11, padding: '4px 12px' }}
+            onClick={() => {
+              const byId = new Map(aiPolishUndo.snapshots.map(s => [s.id, s]));
+              setTables(prev => prev.map(t => byId.get(t.id) || t));
+              setAiPolishUndo(null);
+            }}>
+            Undo AI Polish
+          </button>
+          <span style={{ opacity: 0.55, fontSize: 10 }}>or press Ctrl+Z</span>
+          <button style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 14, marginLeft: 'auto' }}
+            onClick={() => setAiPolishUndo(null)}>×</button>
+        </div>
+      )}
       {lastProjectHint && (
         <div style={{ margin: '0 12px', padding: '8px 14px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, flexShrink: 0 }}>
           <span>Previous project: <strong>{lastProjectHint}</strong></span>
@@ -1699,6 +1746,18 @@ export default function App() {
           }}
         />
       )}
+      {modal === 'survey_insights' && (
+        <SurveyInsightsPanel
+          datasetId={dataset.dataset_id}
+          onClose={() => setModal(null)}
+          onAdoptTables={(configs) => {
+            if (!configs.length) return;
+            pushUndo();
+            setTables(prev => [...prev, ...configs]);
+            setActiveTableIdx(tables.length);
+          }}
+        />
+      )}
       {guideSection && (
         <StatGuide
           initialSection={guideSection}
@@ -1721,17 +1780,25 @@ export default function App() {
           interpretation={tableInterpretations[tables[activeTableIdx]?.id] || ''}
           projectFilters={projectFilters}
           columnDescriptions={columnDescriptions}
-          onClose={() => setModal(null)}
+          prefillQuery={smartBuildPrefill || undefined}
+          onClose={() => { setModal(null); setSmartBuildPrefill(null); }}
           onApplyPolish={(title, subtitle, renames) => {
             const t = tables[activeTableIdx];
             if (t) {
               pushUndo();
+              setAiPolishUndo({ snapshots: [{ ...t, values: [...t.values], rows: [...t.rows], columns: [...t.columns], filters: { ...t.filters } }], scope: 'single', appliedAt: Date.now() });
               const updated = { ...t, title, subtitle, name: title || t.name, header_renames: { ...(t.header_renames || {}), ...renames }, _autoTitle: false };
               setTables(prev => prev.map(x => x.id === t.id ? updated : x));
             }
           }}
           onApplyPolishAll={(updates) => {
             pushUndo();
+            const touchedIds = new Set(updates.map(u => u.tableId));
+            setAiPolishUndo({
+              snapshots: tables.filter(t => touchedIds.has(t.id)).map(t => ({ ...t, values: [...t.values], rows: [...t.rows], columns: [...t.columns], filters: { ...t.filters } })),
+              scope: 'all',
+              appliedAt: Date.now(),
+            });
             setTables(prev => prev.map(t => {
               const u = updates.find(u => u.tableId === t.id);
               if (!u) return t;

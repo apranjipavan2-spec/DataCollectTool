@@ -20,6 +20,7 @@ interface Props {
   onApplySuggestion?: (tables: any[]) => void;
   onApplySmartBuild?: (config: any) => void;
   columnDescriptions?: Record<string, string>;
+  prefillQuery?: { query: string; autoSubmit?: boolean };
 }
 
 const FOCUS_TEMPLATES = [
@@ -42,7 +43,7 @@ const REPORT_STYLES = [
   { key: 'executive', label: 'Executive Summary' },
 ];
 
-export function AISmartPanel({ mode, table, tables, allResults, dataset, result, interpretation, projectFilters = {}, onClose, onApplyPolish, onApplyPolishAll, onApplyInterpretation, onApplyInterpretationAll, onApplySuggestion, onApplySmartBuild, columnDescriptions = {} }: Props) {
+export function AISmartPanel({ mode, table, tables, allResults, dataset, result, interpretation, projectFilters = {}, onClose, onApplyPolish, onApplyPolishAll, onApplyInterpretation, onApplyInterpretationAll, onApplySuggestion, onApplySmartBuild, columnDescriptions = {}, prefillQuery }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [aiResult, setAiResult] = useState<any>(null);
@@ -95,6 +96,21 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
       }).catch(() => {});
     }
   }, [mode]);
+
+  // #15 Talk-to-your-data: prefill query + sub-mode when opened from ribbon Ask AI bar.
+  const prefillFiredRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (mode !== 'smart-build' || !prefillQuery) return;
+    const sig = `${prefillQuery.query}|${prefillQuery.autoSubmit ? '1' : '0'}`;
+    if (prefillFiredRef.current === sig) return;
+    prefillFiredRef.current = sig;
+    setQuery(prefillQuery.query);
+    setBuildSubMode('ask');
+    if (prefillQuery.autoSubmit) {
+      setTimeout(() => { handleSmartBuild(); }, 0);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, prefillQuery]);
 
   const handlePolish = async () => {
     if (!dataset || !table) return;
