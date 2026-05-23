@@ -351,15 +351,26 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
   const headerWrap = tableConfig?.header_word_wrap ?? false;
 
   // Column-group separator: track which absolute column indices start a new group
+  // and build a per-column → parent-top-label map (used to strip duplicate parent
+  // prefix from AI/user renames on the leaf row in multi-level headers).
   const groupStartCols = new Set<number>();
+  const topLabelByCol = new Map<number, string>();
   if (result?.column_groups?.has_multi_level) {
     const nRowCols = tableConfig?.rows?.length || 0;
     let offset = nRowCols;
     for (const g of result.column_groups.top) {
       if (offset > nRowCols) groupStartCols.add(offset);
+      for (let k = 0; k < g.colspan; k++) topLabelByCol.set(offset + k, String(g.label));
       offset += g.colspan;
     }
   }
+  const stripParentPrefix = (s: string, parent: string): string => {
+    if (!s || !parent) return s;
+    const esc = parent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp('^' + esc + '\\s*[-|:]?\\s*', 'i');
+    const stripped = s.replace(re, '').trim();
+    return stripped.length > 0 ? stripped : s;
+  };
   const groupBorderStyle = '2px solid var(--border-strong, #475569)';
   const zoomLevel = tableConfig?.zoom_level || 100;
   const zoomClass = zoomLevel !== 100 ? `zoom-${zoomLevel}` : '';
@@ -436,9 +447,18 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                 const bottomLeaf = result.column_groups?.has_multi_level
                   ? result.column_groups.bottom[i - (tableConfig?.rows?.length || 0)]
                   : undefined;
-                // For multi-level, prefer rename on the leaf label, then on result.headers[i], then fall back to leaf or displayHeaders
+                // For multi-level: prefer leaf-specific rename, then strip the parent
+                // prefix from any joined-header rename (e.g. AI Polish wrote
+                // "Beneficiary - Degree/Diploma" against the flat "Beneficiary | Degree/Diploma";
+                // since the parent label already shows on the top row, we drop the prefix).
+                const parentLabel = topLabelByCol.get(i);
+                const leafRename = bottomLeaf ? headerRenames[bottomLeaf] : undefined;
+                const joinedRenameRaw = headerRenames[h];
+                const joinedRenameClean = parentLabel && joinedRenameRaw
+                  ? stripParentPrefix(joinedRenameRaw, parentLabel)
+                  : joinedRenameRaw;
                 const displayH = bottomLeaf
-                  ? (headerRenames[bottomLeaf] || headerRenames[h] || bottomLeaf || displayHeaders[i])
+                  ? (leafRename || joinedRenameClean || bottomLeaf || displayHeaders[i])
                   : displayHeaders[i];
                 // The key under which the rename is stored — leaf name for multi-level, full header otherwise
                 const renameKey = bottomLeaf || h;

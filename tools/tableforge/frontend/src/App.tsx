@@ -299,9 +299,12 @@ export default function App() {
         setResults(new Map());
         setShowDataPreview(false);
         // Trigger batch tabulation after state settles
-        setTimeout(() => {
+        setTimeout(async () => {
           const toRun = data.tables.filter((t: TableConfig) => t.values.length > 0);
-          toRun.forEach((t: TableConfig) => runTabulation(t));
+          if (toRun.length === 0) return;
+          setLoading(true);
+          try { await runTabulationsBatch(toRun); }
+          finally { setLoading(false); setLoadingMsg(''); }
         }, 50);
       }
     }
@@ -600,6 +603,29 @@ export default function App() {
     } finally { setLoading(false); setLoadingMsg(''); }
   }, [runTabulationCore]);
 
+  // Worker-pool batch runner with per-table progress.
+  // Why: `Promise.all` on a fixed batch waits for the slowest table before advancing,
+  // making progress look "stuck" on the same range for long stretches. A pool keeps
+  // fresh work flowing as each tabulation completes and emits incremental progress.
+  const runTabulationsBatch = useCallback(async (toRun: TableConfig[], concurrency = 4) => {
+    const total = toRun.length;
+    if (total === 0) return;
+    let done = 0;
+    let cursor = 0;
+    const update = () => setLoadingMsg(`Generating tables… ${done}/${total}${done < total ? ' (working)' : ' done'}`);
+    update();
+    const worker = async () => {
+      while (true) {
+        const idx = cursor++;
+        if (idx >= total) return;
+        try { await runTabulationCore(toRun[idx]); } catch {}
+        done++;
+        update();
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(concurrency, total) }, () => worker()));
+  }, [runTabulationCore]);
+
   const updateTable = useCallback((update: Partial<TableConfig>) => {
     // Fields that affect what the backend computes; display-only fields (header_renames, title,
     // theme, formats, etc.) don't need a re-tabulation, which makes typing in those inputs snappy.
@@ -881,16 +907,12 @@ export default function App() {
         setActiveTableIdx(0);
         setResults(new Map());
         const toRun = data.tables.filter((t: TableConfig) => t.values.length > 0);
-        const BATCH = 5;
-        for (let i = 0; i < toRun.length; i += BATCH) {
-          setLoadingMsg(`Generating tables ${i + 1}–${Math.min(i + BATCH, toRun.length)} of ${toRun.length}…`);
-          await Promise.all(toRun.slice(i, i + BATCH).map((t: TableConfig) => runTabulationCore(t).catch(() => {})));
-        }
+        await runTabulationsBatch(toRun);
       }
     } catch (e: any) {
       setError(e.message || 'Failed to load project');
     } finally { setLoading(false); setLoadingMsg(''); }
-  }, [allColumns, pushUndo, runTabulationCore]);
+  }, [allColumns, pushUndo, runTabulationsBatch]);
 
   const handleReorderTables = useCallback((fromIdx: number, toIdx: number) => {
     if (fromIdx === toIdx) return;
@@ -1094,33 +1116,29 @@ export default function App() {
         setResults(new Map());
         setShowDataPreview(false);
         setLastProjectHint(null);
-        // Run tabulations in batches to avoid flooding backend
         const toRun = data.tables.filter((t: TableConfig) => t.values.length > 0);
         if (toRun.length > 0) {
           setLoading(true);
-          const BATCH = 5;
-          for (let i = 0; i < toRun.length; i += BATCH) {
-            setLoadingMsg(`Generating tables ${i + 1}–${Math.min(i + BATCH, toRun.length)} of ${toRun.length}…`);
-            await Promise.all(toRun.slice(i, i + BATCH).map((t: TableConfig) => runTabulationCore(t).catch(() => {})));
-          }
-          setLoading(false); setLoadingMsg('');
+          try { await runTabulationsBatch(toRun); }
+          finally { setLoading(false); setLoadingMsg(''); }
         }
       }
     } catch (e: any) {
       setError(e.message || 'Failed to apply project');
     }
-  }, [allColumns, pushUndo, runTabulationCore]);
+  }, [allColumns, pushUndo, runTabulationsBatch]);
 
   const handleDataRefresh = useCallback(async () => {
     if (!dataset) return;
     try {
       setLoading(true); setLoadingMsg('Refreshing data…');
       await refreshDataset(dataset.dataset_id);
-      tables.forEach(t => { if (t.values.length > 0) runTabulation(t); });
+      const toRun = tables.filter(t => t.values.length > 0);
+      await runTabulationsBatch(toRun);
     } catch (e: any) {
       setError('Refresh failed: ' + (e.message || ''));
     } finally { setLoading(false); setLoadingMsg(''); }
-  }, [dataset, tables, runTabulation]);
+  }, [dataset, tables, runTabulationsBatch]);
 
   // Cleaner handoff: open datacleaner in a new tab with a token, refresh dataset when it saves back.
   const cleanerWindowRef = useRef<Window | null>(null);
@@ -1137,11 +1155,14 @@ export default function App() {
     } : prev);
     setColumnTypeOverrides({});
     setLoadingMsg('Regenerating tables from cleaned data…');
-    setTimeout(() => {
-      tables.forEach(t => { if (t.values.length > 0) runTabulation(t); });
-      setLoadingMsg('');
+    setTimeout(async () => {
+      const toRun = tables.filter(t => t.values.length > 0);
+      if (toRun.length === 0) { setLoadingMsg(''); return; }
+      setLoading(true);
+      try { await runTabulationsBatch(toRun); }
+      finally { setLoading(false); setLoadingMsg(''); }
     }, 50);
-  }, [dataset, tables, runTabulation]);
+  }, [dataset, tables, runTabulationsBatch]);
 
   const handleOpenInCleaner = useCallback(async (focusCol?: string) => {
     if (!dataset) return;

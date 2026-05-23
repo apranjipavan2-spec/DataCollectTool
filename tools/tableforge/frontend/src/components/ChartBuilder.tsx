@@ -210,10 +210,40 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
             </select>
           </div>
           <div className="form-group">
-            <label>
-              Y Axis / Values {effectiveY.length > 1 && `(${effectiveY.length})`}
-              {numCols.length === 0 && <span style={{ color: '#fbbf24', fontWeight: 400, fontSize: 10, marginLeft: 4 }}>(no numeric cols detected)</span>}
-            </label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <label style={{ margin: 0 }}>
+                Y Axis / Values {effectiveY.length > 1 && `(${effectiveY.length})`}
+                {numCols.length === 0 && <span style={{ color: '#fbbf24', fontWeight: 400, fontSize: 10, marginLeft: 4 }}>(no numeric cols detected)</span>}
+              </label>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button
+                  type="button"
+                  title="Select all numeric columns (multi-series grouped bars)"
+                  onClick={() => {
+                    const pool = numCols.length ? numCols : headers.slice(1);
+                    const nonTotal = pool.filter(c => !/\btotal\b/i.test(c) && !/grand\s*total/i.test(c));
+                    setYFields(nonTotal.length > 0 ? nonTotal : pool);
+                  }}
+                  style={{
+                    fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                    background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.4)',
+                    color: '#93c5fd', cursor: 'pointer',
+                  }}
+                >Select all (multi-series)</button>
+                {effectiveY.length > 1 && (
+                  <button
+                    type="button"
+                    title="Clear Y selection"
+                    onClick={() => setYFields([])}
+                    style={{
+                      fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                      background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)',
+                      color: 'var(--text-dim)', cursor: 'pointer',
+                    }}
+                  >Clear</button>
+                )}
+              </div>
+            </div>
             <div style={{ maxHeight: 120, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 4, padding: 4 }}>
               {(numCols.length ? numCols : headers.slice(1)).map(h => (
                 <label key={h} className="checkbox-label" style={{ fontSize: 11, padding: '2px 4px' }}>
@@ -221,6 +251,9 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
                   {h.length > 25 ? h.slice(0, 25) + '...' : h}
                 </label>
               ))}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
+              Tip: tick multiple columns (e.g. Beneficiary <em>and</em> Non-Beneficiary) to render side-by-side grouped bars with a legend.
             </div>
           </div>
         </>

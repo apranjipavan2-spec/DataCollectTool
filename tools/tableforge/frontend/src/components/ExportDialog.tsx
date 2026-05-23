@@ -125,10 +125,29 @@ function buildExportHtml(t: TableConfig, res: TableResult, fmtRows: string[][]):
     html += '</tr><tr>';
     for (let i = 0; i < nRowCols; i++) html += `<th style="${thStyle(allHeaders[i])}"></th>`;
     const bottomLabels = cg!.bottom.map((b: string) => String(b));
+    // Build per-leaf parent label so we can strip any duplicated parent prefix from
+    // joined-header renames (e.g. AI Polish wrote "Beneficiary - Degree/Diploma";
+    // the top row already shows "Beneficiary" merged, so leaf row should drop the prefix).
+    const parentByLeafIdx: string[] = [];
+    for (const g of cg!.top) {
+      for (let k = 0; k < g.colspan; k++) parentByLeafIdx.push(String(g.label));
+    }
+    const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     for (let i = 0; i < bottomLabels.length; i++) {
+      const leaf = bottomLabels[i];
       const colIdx = (t.rows?.length || 0) + i;
-      const colName = dispHeaders[colIdx] || bottomLabels[i];
-      html += `<th style="${thStyle(colName)}">${bottomLabels[i]}</th>`;
+      const fullHeader = res.headers[colIdx];
+      const leafRename = renames[leaf];
+      const joinedRename = renames[fullHeader];
+      const parent = parentByLeafIdx[i];
+      let cleanedJoined = joinedRename;
+      if (joinedRename && parent) {
+        const re = new RegExp('^' + escapeRe(parent) + '\\s*[-|:]?\\s*', 'i');
+        const stripped = joinedRename.replace(re, '').trim();
+        if (stripped.length > 0) cleanedJoined = stripped;
+      }
+      const labelOut = leafRename || cleanedJoined || leaf;
+      html += `<th style="${thStyle(labelOut)}">${labelOut}</th>`;
     }
     html += '</tr>';
   } else {
@@ -202,7 +221,8 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
     if (!cc.yFields || cc.yFields.length === 0) return {};
     const svg = chartRefs.current[t.id];
     if (!svg) return {};
-    const title = ((cc.chartTitle as string) || '').trim() || figTitleFromTable(t);
+    const savedTitle = ((cc.chartTitle as string) || '').trim();
+    const title = savedTitle || figTitleFromTable(t) || `Fig: ${t.title || t.name || 'Chart'}`;
     const width = (typeof cc.chartWidth === 'number' && cc.chartWidth > 0) ? cc.chartWidth : W_DEFAULT;
     const height = (typeof cc.chartHeight === 'number' && cc.chartHeight > 0) ? cc.chartHeight : H_DEFAULT;
     const titleFs = (typeof cc.titleFontSize === 'number' && cc.titleFontSize > 0) ? cc.titleFontSize : 14;
@@ -640,19 +660,69 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
               {tables.map((t, i) => {
                 const res = results.get(t.id);
                 const hasData = res && res.rows.length > 0;
+                const cc = t.chartConfig;
+                const hasChart = !!(cc && cc.xField && cc.yFields && cc.yFields.length > 0);
+                const isSelected = selectedTables.has(t.id);
+                const showThumb = hasChart && hasData && isSelected && format === 'docx';
+                const thumbTitle = hasChart
+                  ? (((cc!.chartTitle as string) || '').trim() || figTitleFromTable(t) || `Fig: ${t.title || t.name || 'Chart'}`)
+                  : '';
                 return (
-                  <label key={t.id} className={`table-select-item ${!hasData ? 'disabled' : ''}`}>
-                    <input type="checkbox" checked={selectedTables.has(t.id)}
-                      onChange={() => toggleTable(t.id)} disabled={!hasData} />
-                    <span className="exp-table-num">#{i + 1}</span>
-                    {t.pinned && <span title="Pinned" style={{ color: '#f59e0b', marginRight: 4 }}>★</span>}
-                    {t.chartConfig && t.chartConfig.xField && (
-                      <span title={`Chart attached${format === 'docx' ? ' — will be embedded in Word' : ' — only embedded in Word (.docx) exports'}`}
-                        style={{ color: '#60a5fa', marginRight: 4, fontSize: 12 }}>📊</span>
+                  <div key={t.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                    <label className={`table-select-item ${!hasData ? 'disabled' : ''}`}>
+                      <input type="checkbox" checked={isSelected}
+                        onChange={() => toggleTable(t.id)} disabled={!hasData} />
+                      <span className="exp-table-num">#{i + 1}</span>
+                      {t.pinned && <span title="Pinned" style={{ color: '#f59e0b', marginRight: 4 }}>★</span>}
+                      {hasChart && (
+                        <span title={`Chart attached${format === 'docx' ? ' — will be embedded in Word with title' : ' — only embedded in Word (.docx) exports'}`}
+                          style={{ color: '#60a5fa', marginRight: 4, fontSize: 12 }}>📊</span>
+                      )}
+                      <span>{t.title || t.name}</span>
+                      <span className="table-info">{hasData ? `${res!.row_count} rows` : 'No data'}</span>
+                    </label>
+                    {showThumb && (
+                      <div style={{
+                        margin: '4px 0 8px 28px',
+                        padding: 8,
+                        background: 'rgba(59,130,246,0.06)',
+                        border: '1px solid rgba(59,130,246,0.2)',
+                        borderRadius: 6,
+                      }}>
+                        <div style={{
+                          fontSize: 11, color: 'var(--text-dim)', marginBottom: 4,
+                          textAlign: 'center', fontWeight: 600,
+                        }}>
+                          Will embed in Word: <span style={{ color: '#60a5fa' }}>{thumbTitle}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
+                          <ChartCanvas
+                            result={res!}
+                            config={{
+                              type: (cc!.type as ChartType) || 'bar',
+                              xField: cc!.xField as string,
+                              yFields: (cc!.yFields as string[]) || [],
+                              paletteName: cc!.palette as string | undefined,
+                              showGrid: cc!.showGrid as boolean | undefined,
+                              showLabels: cc!.showLabels as boolean | undefined,
+                              showLegend: (cc!.showLegend as LegendPos | undefined),
+                              xAxisLabel: cc!.xAxisLabel as string | undefined,
+                              yAxisLabel: cc!.yAxisLabel as string | undefined,
+                              labelFontSize: (cc!.labelFontSize as number | undefined) || 9,
+                              barOpacity: cc!.barOpacity as number | undefined,
+                              xLabelRotation: cc!.xLabelRotation as number | 'auto' | undefined,
+                              yLabelRotation: cc!.yLabelRotation as number | undefined,
+                              valueLabelSplit: cc!.valueLabelSplit as boolean | undefined,
+                            }}
+                            width={420}
+                            height={180}
+                            interactive={false}
+                            style={{ maxWidth: '100%' }}
+                          />
+                        </div>
+                      </div>
                     )}
-                    <span>{t.title || t.name}</span>
-                    <span className="table-info">{hasData ? `${res!.row_count} rows` : 'No data'}</span>
-                  </label>
+                  </div>
                 );
               })}
             </div>
