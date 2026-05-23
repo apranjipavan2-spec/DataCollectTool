@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { TableResult, TableConfig } from '../types';
 import { ChartCanvas, ChartCanvasConfig } from './ChartCanvas';
-import { CHART_TYPES, PALETTES, ChartType, LegendPos, classifyColumns, W_DEFAULT, H_DEFAULT, figTitleFromTable } from './chartUtils';
+import { CHART_TYPES, PALETTES, ChartType, LegendPos, classifyColumns, W_DEFAULT, H_DEFAULT, figTitleFromTable, buildChartExportSvg, svgXmlToPngDataUrl } from './chartUtils';
 
 interface Props {
   tables: TableConfig[];
@@ -142,31 +142,31 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
     onClose();
   };
 
-  const handleDownload = (format: 'svg' | 'png') => {
+  const handleDownload = async (format: 'svg' | 'png') => {
     if (!svgRef.current) return;
-    const xml = new XMLSerializer().serializeToString(svgRef.current);
+    // Wrap the chart SVG with the title so it appears in both SVG and PNG downloads.
+    // (The title is rendered as an HTML input outside the SVG in the builder, so
+    // the raw SVG serialization would lose it.)
+    const { xml, totalHeight } = buildChartExportSvg({
+      svgElement: svgRef.current,
+      title: effectiveTitle,
+      titleFontSize,
+      width: chartWidth,
+      height: effectiveHeight,
+    });
+    const fileBase = `chart_${table?.name || 'export'}`;
     if (format === 'svg') {
       const blob = new Blob([xml], { type: 'image/svg+xml' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = `chart_${table?.name || 'export'}.svg`; a.click();
+      const a = document.createElement('a'); a.href = url; a.download = `${fileBase}.svg`; a.click();
       URL.revokeObjectURL(url);
     } else {
-      const canvas = document.createElement('canvas');
-      canvas.width = chartWidth * 2; canvas.height = chartHeight * 2;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      const img = new Image();
-      img.onload = () => {
-        ctx.fillStyle = '#1a1d27'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(blob => {
-          if (!blob) return;
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a'); a.href = url; a.download = `chart_${table?.name || 'export'}.png`; a.click();
-          URL.revokeObjectURL(url);
-        });
-      };
-      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
+      try {
+        const dataUrl = await svgXmlToPngDataUrl(xml, chartWidth, totalHeight, 2);
+        const a = document.createElement('a'); a.href = dataUrl; a.download = `${fileBase}.png`; a.click();
+      } catch (err) {
+        console.error('PNG export failed', err);
+      }
     }
   };
 

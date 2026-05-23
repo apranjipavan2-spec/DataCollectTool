@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { TableResult, TableConfig, NumberFormat } from '../types';
 import { API_BASE } from '../api';
+import { ChartCanvas } from './ChartCanvas';
+import { buildChartExportSvg, svgXmlToPngDataUrl, figTitleFromTable, ChartType, LegendPos, W_DEFAULT, H_DEFAULT } from './chartUtils';
 
 function formatCell(cell: any): string {
   if (cell == null) return '';
@@ -185,6 +187,42 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
     include_raw_data: false, landscape: false, formula_export: false,
   });
 
+  // Off-screen ChartCanvas refs so we can serialize SVGs to PNG for Word/PPTX export.
+  // One ref per table id; populated when the hidden <ChartCanvas> below mounts.
+  const chartRefs = useRef<Record<string, SVGSVGElement | null>>({});
+
+  // For each selected table that has a chartConfig + result, render the chart
+  // to a PNG (base64) and return { chart_image, chart_title } for the payload.
+  // Title is sent SEPARATELY so the Word doc can place it as an editable paragraph
+  // above the image (per user request: image = chart, title = editable text).
+  async function renderChartFor(t: TableConfig): Promise<{ chart_image?: string; chart_title?: string }> {
+    const cc = t.chartConfig;
+    const res = results.get(t.id);
+    if (!cc || !cc.xField || !res) return {};
+    if (!cc.yFields || cc.yFields.length === 0) return {};
+    const svg = chartRefs.current[t.id];
+    if (!svg) return {};
+    const title = ((cc.chartTitle as string) || '').trim() || figTitleFromTable(t);
+    const width = (typeof cc.chartWidth === 'number' && cc.chartWidth > 0) ? cc.chartWidth : W_DEFAULT;
+    const height = (typeof cc.chartHeight === 'number' && cc.chartHeight > 0) ? cc.chartHeight : H_DEFAULT;
+    const titleFs = (typeof cc.titleFontSize === 'number' && cc.titleFontSize > 0) ? cc.titleFontSize : 14;
+    const { xml, totalHeight } = buildChartExportSvg({
+      svgElement: svg,
+      title: '',  // image carries chart only; title is sent separately for Word editability
+      titleFontSize: titleFs,
+      width,
+      height,
+    });
+    try {
+      const dataUrl = await svgXmlToPngDataUrl(xml, width, totalHeight, 2);
+      const base64 = dataUrl.split(',')[1] || '';
+      return { chart_image: base64, chart_title: title };
+    } catch (err) {
+      console.error('Chart PNG render failed for table', t.id, err);
+      return {};
+    }
+  }
+
   const toggleTable = (id: string) => {
     const next = new Set(selectedTables);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -196,8 +234,21 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
     setError('');
     setResultMsg(null);
     try {
-      const exportData = tables
-        .filter(t => selectedTables.has(t.id))
+      const selectedT = tables.filter(t => selectedTables.has(t.id));
+      // Pre-render charts only for formats that embed them (Word currently).
+      // Sequential rendering — keeps memory bounded for large packs.
+      const chartFieldsByTable: Record<string, { chart_image?: string; chart_title?: string }> = {};
+      const formatEmbedsCharts = format === 'docx';
+      const tablesWithCharts = formatEmbedsCharts
+        ? selectedT.filter(t => t.chartConfig && t.chartConfig.xField)
+        : [];
+      if (tablesWithCharts.length > 0) setResultMsg(`Rendering ${tablesWithCharts.length} chart${tablesWithCharts.length !== 1 ? 's' : ''}…`);
+      for (const t of tablesWithCharts) {
+        chartFieldsByTable[t.id] = await renderChartFor(t);
+      }
+      if (tablesWithCharts.length > 0) setResultMsg(null);
+
+      const exportData = selectedT
         .map(t => {
           const res = results.get(t.id);
           if (!res) return null;
@@ -268,6 +319,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
               suffix: v.number_format?.suffix || '',
               currency_symbol: v.number_format?.currency_symbol || '$',
             })),
+            ...(chartFieldsByTable[t.id] || {}),
           };
         })
         .filter(t => t && t.headers.length > 0);
@@ -303,8 +355,15 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
 
   const handleBatchExport = async () => {
     setExporting(true); setError(''); setResultMsg(null);
-    const exportData = tables
-      .filter(t => selectedTables.has(t.id))
+    const selectedT = tables.filter(t => selectedTables.has(t.id));
+    const chartFieldsByTable: Record<string, { chart_image?: string; chart_title?: string }> = {};
+    const tablesWithCharts = selectedT.filter(t => t.chartConfig && t.chartConfig.xField);
+    if (tablesWithCharts.length > 0) setResultMsg(`Rendering ${tablesWithCharts.length} chart${tablesWithCharts.length !== 1 ? 's' : ''}…`);
+    for (const t of tablesWithCharts) {
+      chartFieldsByTable[t.id] = await renderChartFor(t);
+    }
+    if (tablesWithCharts.length > 0) setResultMsg(null);
+    const exportData = selectedT
       .map(t => {
         const res = results.get(t.id);
         if (!res) return null;
@@ -373,6 +432,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
             suffix: v.number_format?.suffix || '',
             currency_symbol: v.number_format?.currency_symbol || '$',
           })),
+          ...(chartFieldsByTable[t.id] || {}),
         };
       })
       .filter(t => t && t.headers.length > 0);
@@ -686,6 +746,49 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
             {exporting ? 'Exporting...' : `↓ Export ${selectedTables.size} Table(s)`}
           </button>
         </div>
+      </div>
+
+      {/* Off-screen ChartCanvas instances for tables with a configured chart.
+          We serialize these SVGs to PNG when the user hits Export. They are
+          positioned off-screen but still in the layout tree so refs populate. */}
+      <div aria-hidden="true" style={{
+        position: 'fixed', left: -100000, top: -100000,
+        pointerEvents: 'none', visibility: 'hidden',
+      }}>
+        {tables.filter(t => selectedTables.has(t.id) && t.chartConfig && t.chartConfig.xField).map(t => {
+          const cc = t.chartConfig!;
+          const res = results.get(t.id);
+          if (!res) return null;
+          const width = (typeof cc.chartWidth === 'number' && cc.chartWidth > 0) ? cc.chartWidth : W_DEFAULT;
+          const height = (typeof cc.chartHeight === 'number' && cc.chartHeight > 0) ? cc.chartHeight : H_DEFAULT;
+          const canvasConfig = {
+            type: (cc.type as ChartType) || 'bar',
+            xField: cc.xField as string,
+            yFields: (cc.yFields as string[]) || [],
+            paletteName: cc.palette as string | undefined,
+            showGrid: cc.showGrid as boolean | undefined,
+            showLabels: cc.showLabels as boolean | undefined,
+            showLegend: (cc.showLegend as LegendPos | undefined),
+            xAxisLabel: cc.xAxisLabel as string | undefined,
+            yAxisLabel: cc.yAxisLabel as string | undefined,
+            labelFontSize: cc.labelFontSize as number | undefined,
+            barOpacity: cc.barOpacity as number | undefined,
+            xLabelRotation: cc.xLabelRotation as number | 'auto' | undefined,
+            yLabelRotation: cc.yLabelRotation as number | undefined,
+            valueLabelSplit: cc.valueLabelSplit as boolean | undefined,
+          };
+          return (
+            <ChartCanvas
+              key={t.id}
+              ref={el => { chartRefs.current[t.id] = el; }}
+              result={res}
+              config={canvasConfig}
+              width={width}
+              height={height}
+              interactive={false}
+            />
+          );
+        })}
       </div>
     </div>
   );

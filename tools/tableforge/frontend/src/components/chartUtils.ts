@@ -139,3 +139,56 @@ export function figTitleFromTable(t: { title?: string; name?: string; table_numb
   }
   return `Fig: ${base}`;
 }
+
+// ─── Chart export helpers ────────────────────────────────────────────────
+// The ChartCanvas SVG does NOT include the chart title (rendered as an HTML
+// input in the builder), so on export we wrap it in a new SVG that prepends
+// the title as a <text> element. This keeps title visible in standalone
+// PNG/SVG downloads. For Word export we pass title="" since the title goes
+// into the document as a separate editable paragraph.
+function escapeXml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+export interface ChartExportSvgOpts {
+  svgElement: SVGSVGElement;
+  title: string;           // empty string → no title prepended
+  titleFontSize: number;
+  width: number;
+  height: number;
+  bgColor?: string;
+}
+
+export function buildChartExportSvg(opts: ChartExportSvgOpts): { xml: string; totalHeight: number } {
+  const { svgElement, title, titleFontSize, width, height, bgColor = '#1a1d27' } = opts;
+  const innerXml = new XMLSerializer().serializeToString(svgElement);
+  const titleH = title ? Math.round(titleFontSize * 1.7 + 16) : 0;
+  const totalH = height + titleH;
+  const titleY = Math.round(titleFontSize * 1.2 + 8);
+  const xml = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${totalH}" viewBox="0 0 ${width} ${totalH}">`
+    + `<rect width="${width}" height="${totalH}" fill="${bgColor}"/>`
+    + (title ? `<text x="${width / 2}" y="${titleY}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${titleFontSize}" font-weight="700" fill="#e5e7eb">${escapeXml(title)}</text>` : '')
+    + `<g transform="translate(0, ${titleH})">${innerXml}</g>`
+    + `</svg>`;
+  return { xml, totalHeight: totalH };
+}
+
+// Rasterize SVG XML → PNG dataURL (e.g. "data:image/png;base64,..."). Scale=2 for crisp output.
+export function svgXmlToPngDataUrl(svgXml: string, width: number, totalHeight: number, scale = 2): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(totalHeight * scale));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) { reject(new Error('No 2D context')); return; }
+    const img = new Image();
+    img.onload = () => {
+      ctx.fillStyle = '#1a1d27';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = (e) => reject(e instanceof Event ? new Error('SVG image load failed') : new Error(String(e)));
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgXml)));
+  });
+}

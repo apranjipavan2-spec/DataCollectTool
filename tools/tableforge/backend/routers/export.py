@@ -550,6 +550,47 @@ async def export_word(config: ExportConfig):
     portrait_usable_cm = 21.0 - 2.54
     landscape_usable_cm = 29.7 - 2.54
 
+    def _embed_chart_if_present(t_data, is_landscape):
+        """If the table carries a chart_image (base64 PNG), embed it after the table.
+        The chart_title is rendered as a separate, editable Word paragraph above
+        the image so the user can tweak the caption directly in Word."""
+        chart_b64 = t_data.get("chart_image")
+        if not chart_b64:
+            return
+        chart_title = t_data.get("chart_title") or ""
+        try:
+            import base64 as _b64
+            img_bytes = _b64.b64decode(chart_b64)
+        except Exception as decode_err:
+            warn = doc.add_paragraph()
+            wr = warn.add_run(f"[Chart image could not be decoded: {decode_err}]")
+            wr.font.size = Pt(8); wr.italic = True
+            wr.font.color.rgb = RGBColor(0xAA, 0x33, 0x33)
+            return
+        if chart_title:
+            cp = doc.add_paragraph()
+            cp.paragraph_format.space_before = Pt(8)
+            cp.paragraph_format.space_after = Pt(3)
+            cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            cr = cp.add_run(chart_title)
+            cr.bold = True
+            cr.font.size = Pt(11)
+            cr.font.name = BODY_FONT
+            cr.font.color.rgb = RGBColor(0x22, 0x22, 0x22)
+        max_cm = (landscape_usable_cm if is_landscape else portrait_usable_cm) * 0.9
+        target_cm = min(max_cm, 16.0)
+        try:
+            pic_p = doc.add_paragraph()
+            pic_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            pic_p.paragraph_format.space_after = Pt(6)
+            run = pic_p.add_run()
+            run.add_picture(io.BytesIO(img_bytes), width=Cm(target_cm))
+        except Exception as embed_err:
+            warn = doc.add_paragraph()
+            wr = warn.add_run(f"[Chart could not be embedded: {embed_err}]")
+            wr.font.size = Pt(8); wr.italic = True
+            wr.font.color.rgb = RGBColor(0xAA, 0x33, 0x33)
+
     # Cover page — use first section for it
     if opts.get("cover_page"):
         _setup_section(doc.sections[0], landscape=False)
@@ -749,6 +790,7 @@ async def export_word(config: ExportConfig):
                     run.font.name = BODY_FONT
                     run.font.color.rgb = RGBColor(0x44, 0x44, 0x44)
 
+            _embed_chart_if_present(t, table_landscape)
             continue
 
         header_row_count = 2 if has_multi_level else 1
@@ -940,6 +982,8 @@ async def export_word(config: ExportConfig):
                 run.font.size = Pt(10)
                 run.font.name = BODY_FONT
                 run.font.color.rgb = RGBColor(0x44, 0x44, 0x44)
+
+        _embed_chart_if_present(t, table_landscape)
 
     doc.save(output_path)
     fname = output_path.name
