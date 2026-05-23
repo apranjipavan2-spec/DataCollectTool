@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { DatasetMeta, ColumnInfo } from '../types';
 import { loadSheet, modifyDataset, unionSheets, sheetsInfo } from '../api';
 
@@ -6,9 +6,11 @@ interface Props {
   dataset: DatasetMeta;
   onProceed: () => void;
   onDatasetUpdate: (updates: { row_count: number; columns: ColumnInfo[]; preview: Record<string, any>[] }) => void;
+  focusRow?: number | null;
+  focusColumn?: string | null;
 }
 
-export function DataPreview({ dataset, onProceed, onDatasetUpdate }: Props) {
+export function DataPreview({ dataset, onProceed, onDatasetUpdate, focusRow, focusColumn }: Props) {
   const [activeSheet, setActiveSheet] = useState(dataset.sheets[0] || '');
   const [loading, setLoading] = useState(false);
   const [renames, setRenames] = useState<Record<string, string>>({});
@@ -141,6 +143,21 @@ export function DataPreview({ dataset, onProceed, onDatasetUpdate }: Props) {
 
   const hasModifications = Object.keys(renames).length > 0 || excludedCols.size > 0 || excludedRows.size > 0 || headerRow !== null;
 
+  const focusRowRef = useRef<HTMLTableRowElement | null>(null);
+  const [focusFlash, setFocusFlash] = useState(false);
+  useEffect(() => {
+    if (focusRow == null) return;
+    const t = setTimeout(() => {
+      focusRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setFocusFlash(true);
+      const off = setTimeout(() => setFocusFlash(false), 2200);
+      return () => clearTimeout(off);
+    }, 60);
+    return () => clearTimeout(t);
+  }, [focusRow, dataset.dataset_id]);
+  const previewLen = dataset.preview.length;
+  const focusBeyondPreview = focusRow != null && focusRow >= Math.min(50, previewLen);
+
   return (
     <div className="data-preview-screen">
       {loading && <div className="progress-overlay"><div className="progress-spinner" /><span>Processing...</span></div>}
@@ -163,6 +180,16 @@ export function DataPreview({ dataset, onProceed, onDatasetUpdate }: Props) {
       </div>
 
       {error && <div className="preview-error">{error}</div>}
+
+      {focusRow != null && (
+        <div style={{ margin: '0 16px 8px', padding: '8px 12px', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.4)', borderRadius: 6, fontSize: 12, color: 'var(--text)' }}>
+          {focusBeyondPreview ? (
+            <>Row <strong>{focusRow + 1}</strong>{focusColumn ? <> (column <strong>{focusColumn}</strong>)</> : null} is beyond the first 50 preview rows. Showing the preview window — full data was used in dry-run.</>
+          ) : (
+            <>Jumped to row <strong>{focusRow + 1}</strong>{focusColumn ? <> (column <strong>{focusColumn}</strong>)</> : null} from Convert column.</>
+          )}
+        </div>
+      )}
 
       {/* Sheet Selector + Union */}
       {dataset.sheets.length > 1 && (
@@ -291,18 +318,34 @@ export function DataPreview({ dataset, onProceed, onDatasetUpdate }: Props) {
             </tr>
           </thead>
           <tbody>
-            {dataset.preview.slice(0, 50).map((row, i) => (
-              <tr key={i} className={excludedRows.has(i) ? 'row-excluded' : ''}>
-                <td className="row-num">{i + 1}</td>
-                <td className="row-exclude-cell">
-                  <input type="checkbox" checked={!excludedRows.has(i)}
-                    onChange={() => toggleExcludeRow(i)} title="Include/exclude this row" />
-                </td>
-                {dataset.columns.filter(c => !excludedCols.has(c.name)).map(c => (
-                  <td key={c.name}>{row[c.name] != null ? String(row[c.name]) : ''}</td>
-                ))}
-              </tr>
-            ))}
+            {dataset.preview.slice(0, 50).map((row, i) => {
+              const isFocus = focusRow === i;
+              return (
+                <tr key={i}
+                  ref={isFocus ? focusRowRef : undefined}
+                  className={excludedRows.has(i) ? 'row-excluded' : ''}
+                  style={isFocus && focusFlash
+                    ? { background: 'rgba(250,204,21,0.22)', outline: '2px solid #facc15', transition: 'background 0.5s' }
+                    : undefined}>
+                  <td className="row-num">{i + 1}</td>
+                  <td className="row-exclude-cell">
+                    <input type="checkbox" checked={!excludedRows.has(i)}
+                      onChange={() => toggleExcludeRow(i)} title="Include/exclude this row" />
+                  </td>
+                  {dataset.columns.filter(c => !excludedCols.has(c.name)).map(c => {
+                    const isFocusCell = isFocus && focusColumn === c.name;
+                    return (
+                      <td key={c.name}
+                        style={isFocusCell && focusFlash
+                          ? { background: 'rgba(239,68,68,0.28)', fontWeight: 700 }
+                          : undefined}>
+                        {row[c.name] != null ? String(row[c.name]) : ''}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

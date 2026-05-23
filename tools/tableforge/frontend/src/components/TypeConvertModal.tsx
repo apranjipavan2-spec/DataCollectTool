@@ -8,6 +8,7 @@ interface Props {
   onCancel: () => void;
   onApply: () => void;
   onOpenInCleaner?: () => void;
+  onViewRow?: (rowIdx: number) => void;
 }
 
 interface DryRun {
@@ -15,7 +16,8 @@ interface DryRun {
   non_null: number;
   fail_count: number;
   samples: string[];
-  failing_cells?: { row: number; value: string }[];
+  failing_cells?: { row: number; value: string; context?: Record<string, string> }[];
+  context_columns?: string[];
 }
 
 function splitColumnName(name: string): string[] {
@@ -24,7 +26,7 @@ function splitColumnName(name: string): string[] {
   return parts.length > 1 ? parts : [name];
 }
 
-export function TypeConvertModal({ datasetId, column, newType, onCancel, onApply, onOpenInCleaner }: Props) {
+export function TypeConvertModal({ datasetId, column, newType, onCancel, onApply, onOpenInCleaner, onViewRow }: Props) {
   const [data, setData] = useState<DryRun | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -55,7 +57,7 @@ export function TypeConvertModal({ datasetId, column, newType, onCancel, onApply
 
   return (
     <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal modal-lg" style={{ width: '720px', maxWidth: '92vw' }} onClick={e => e.stopPropagation()}>
+      <div className="modal modal-lg" style={{ width: '960px', maxWidth: '95vw' }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div>
             <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>
@@ -115,16 +117,37 @@ export function TypeConvertModal({ datasetId, column, newType, onCancel, onApply
                       These become blanks after conversion
                     </div>
                   </div>
+                  {data.context_columns && data.context_columns.length > 0 && (
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4, fontStyle: 'italic' }}>
+                      Showing context columns: {data.context_columns.map(c => {
+                        // Truncate long grouped headers for readability
+                        const parts = c.split(/\s+>\s+/);
+                        return parts[parts.length - 1];
+                      }).join(' · ')}
+                    </div>
+                  )}
                   <div style={{
-                    maxHeight: 240, overflow: 'auto',
+                    maxHeight: 280, overflow: 'auto',
                     border: '1px solid var(--border)', borderRadius: 6,
                     background: 'rgba(0,0,0,0.18)',
                   }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                       <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-card)', zIndex: 1 }}>
                         <tr>
-                          <th style={{ textAlign: 'left', padding: '6px 10px', borderBottom: '1px solid var(--border)', width: 80, color: 'var(--text-dim)', fontWeight: 600 }}>Row</th>
-                          <th style={{ textAlign: 'left', padding: '6px 10px', borderBottom: '1px solid var(--border)', color: 'var(--text-dim)', fontWeight: 600 }}>Value</th>
+                          <th style={{ textAlign: 'left', padding: '6px 10px', borderBottom: '1px solid var(--border)', width: 60, color: 'var(--text-dim)', fontWeight: 600 }}>Row</th>
+                          <th style={{ textAlign: 'left', padding: '6px 10px', borderBottom: '1px solid var(--border)', width: 110, color: 'var(--text-dim)', fontWeight: 600 }}>Bad value</th>
+                          {data.context_columns && data.context_columns.map(cc => {
+                            const short = cc.split(/\s+>\s+/).pop() || cc;
+                            return (
+                              <th key={cc} title={cc}
+                                style={{ textAlign: 'left', padding: '6px 10px', borderBottom: '1px solid var(--border)', color: 'var(--text-dim)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                {short}
+                              </th>
+                            );
+                          })}
+                          {onViewRow && (
+                            <th style={{ textAlign: 'left', padding: '6px 10px', borderBottom: '1px solid var(--border)', width: 90, color: 'var(--text-dim)', fontWeight: 600 }}></th>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
@@ -132,6 +155,22 @@ export function TypeConvertModal({ datasetId, column, newType, onCancel, onApply
                           <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                             <td style={{ padding: '5px 10px', fontFamily: 'monospace', color: 'var(--text-dim)' }}>{c.row + 1}</td>
                             <td style={{ padding: '5px 10px', fontFamily: 'monospace', color: '#fca5a5', wordBreak: 'break-all' }}>{c.value || <em style={{ color: 'var(--text-dim)' }}>(empty)</em>}</td>
+                            {data.context_columns && data.context_columns.map(cc => (
+                              <td key={cc} style={{ padding: '5px 10px', fontFamily: 'monospace', color: 'var(--text)', whiteSpace: 'nowrap', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                title={c.context?.[cc] || ''}>
+                                {c.context?.[cc] || <em style={{ color: 'var(--text-dim)' }}>—</em>}
+                              </td>
+                            ))}
+                            {onViewRow && (
+                              <td style={{ padding: '5px 10px', whiteSpace: 'nowrap' }}>
+                                <button
+                                  onClick={() => onViewRow(c.row)}
+                                  title="Open Data Preview and jump to this row"
+                                  style={{ background: 'none', border: 'none', color: '#93c5fd', fontSize: 11, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                                  View row →
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>

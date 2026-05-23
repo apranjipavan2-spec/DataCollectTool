@@ -189,8 +189,23 @@ export interface TableConfig {
   source_table_id?: string;
   // NET rows (Q/SPSS convention): aggregated rows summing member categories
   net_rows?: NetRow[];
-  // Sub-group slicers: columns surfaced as click-to-filter chip rows above the table
-  slicers?: string[];
+  // Section assignment for nav grouping
+  section_id?: string;
+}
+
+export interface TableSection {
+  id: string;
+  name: string;
+  color?: string;
+  collapsed?: boolean;
+  order: number;
+}
+
+export interface NumberingConfig {
+  style: 'arabic' | 'decimal' | 'alpha' | 'roman';
+  scope: 'continuous' | 'per_section';
+  prefix?: string;
+  suffix?: string;
 }
 
 export interface NetRow {

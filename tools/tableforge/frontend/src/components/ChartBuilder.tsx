@@ -113,7 +113,7 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
       if (!ctx) return;
       const img = new Image();
       img.onload = () => {
-        ctx.fillStyle = '#0f1117'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#1a1d27'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         canvas.toBlob(blob => {
           if (!blob) return;

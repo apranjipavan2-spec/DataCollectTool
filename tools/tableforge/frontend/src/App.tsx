@@ -1,10 +1,9 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType } from './types';
+import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType, TableSection, NumberingConfig } from './types';
 import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg, getColumnRoles, bulkSetColumnRoles, saveStudyDesign, cleanerApi, buildCleanerUrl } from './api';
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
 import { LivePreview } from './components/LivePreview';
-import { SubgroupSlicer } from './components/SubgroupSlicer';
 import { TopBar } from './components/TopBar';
 import { StatusBar } from './components/StatusBar';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -173,11 +172,15 @@ export default function App() {
   const [fgContext, setFgContext] = useState<{ fgUrl: string; token: string; programId?: string } | null>(null);
   const [tables, setTables] = useState<TableConfig[]>([createEmptyTable('1', 'Table 1')]);
   const [activeTableIdx, setActiveTableIdx] = useState(0);
+  const [previewTab, setPreviewTab] = useState<'table' | 'chart'>('table');
+  const [sections, setSections] = useState<TableSection[]>([]);
+  const [numberingConfig, setNumberingConfig] = useState<NumberingConfig>({ style: 'arabic', scope: 'continuous', prefix: 'Table ', suffix: ': ' });
   const [results, setResults] = useState<Map<string, TableResult>>(new Map());
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [showDataPreview, setShowDataPreview] = useState(false);
+  const [previewFocus, setPreviewFocus] = useState<{ row: number; column?: string } | null>(null);
   const [draggedField, setDraggedField] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalType>(null);
   const [guideSection, setGuideSection] = useState<string | null>(null);
@@ -310,7 +313,7 @@ export default function App() {
         // Use the ref for projectFilters so we always autosave the latest value
         // (the interval closure captures other state at effect-setup time, but
         // projectFilters can change without the deps array refreshing).
-        saveProject('__autosave__', { tables, annotationsMap, comparisonState, projectFilters: projectFiltersRef.current, columnTypeOverrides, dataset_id: dataset?.dataset_id, source_file: dataset ? { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length } : undefined }).then(() => {
+        saveProject('__autosave__', { tables, annotationsMap, comparisonState, projectFilters: projectFiltersRef.current, columnTypeOverrides, sections, numberingConfig, dataset_id: dataset?.dataset_id, source_file: dataset ? { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length } : undefined }).then(() => {
           // Update last save state and clear dirty flag
           lastSaveStateRef.current = JSON.stringify({ tables, annotationsMap, comparisonState });
           setIsDirty(false);
@@ -470,6 +473,8 @@ export default function App() {
     if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
     if (data.comparisonState) setComparisonState(data.comparisonState);
     if (data.projectFilters) setProjectFilters(data.projectFilters);
+    if (Array.isArray(data.sections)) setSections(data.sections);
+    if (data.numberingConfig) setNumberingConfig(data.numberingConfig);
     if (data.source_file) {
       setDataset({ dataset_id: data.source_file.dataset_id, filename: data.source_file.filename, row_count: data.source_file.row_count, columns: [], sheets: [], preview: [] });
     }
@@ -911,6 +916,70 @@ export default function App() {
     setTables(prev => prev.map((tb, ti) => ti === idx ? { ...tb, pinned: !tb.pinned } : tb));
   }, [pushUndo]);
 
+  const handleAssignSection = useCallback((tableIdx: number, sectionId: string | undefined) => {
+    pushUndo();
+    setTables(prev => prev.map((tb, ti) => ti === tableIdx ? { ...tb, section_id: sectionId } : tb));
+  }, [pushUndo]);
+
+  const formatTableNumber = useCallback((n: number, style: NumberingConfig['style'], sectionIdx?: number): string => {
+    const toRoman = (num: number): string => {
+      const map: [number, string][] = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
+        [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+      let out = '', remaining = num;
+      for (const [val, sym] of map) { while (remaining >= val) { out += sym; remaining -= val; } }
+      return out;
+    };
+    const toAlpha = (num: number): string => {
+      let out = '', n2 = num;
+      while (n2 > 0) { const r = (n2 - 1) % 26; out = String.fromCharCode(65 + r) + out; n2 = Math.floor((n2 - 1) / 26); }
+      return out;
+    };
+    if (style === 'roman') return toRoman(Math.max(1, n));
+    if (style === 'alpha') return toAlpha(Math.max(1, n));
+    if (style === 'decimal' && sectionIdx !== undefined) return `${sectionIdx + 1}.${n}`;
+    return String(n);
+  }, []);
+
+  const handleApplyNumbering = useCallback(() => {
+    pushUndo();
+    const prefix = numberingConfig.prefix || '';
+    const suffix = numberingConfig.suffix || '';
+    setTables(prev => {
+      // Build ordered list of tables, grouped by section
+      const sortedSections = [...sections].sort((a, b) => a.order - b.order);
+      const grouped: Array<{ secIdx: number | undefined; tables: number[] }> = [];
+      // Unsectioned first
+      const unsectioned = prev.map((t, i) => (!t.section_id ? i : -1)).filter(i => i >= 0);
+      if (unsectioned.length) grouped.push({ secIdx: undefined, tables: unsectioned });
+      // Then by section order
+      sortedSections.forEach((sec, si) => {
+        const inSec = prev.map((t, i) => (t.section_id === sec.id ? i : -1)).filter(i => i >= 0);
+        if (inSec.length) grouped.push({ secIdx: si, tables: inSec });
+      });
+
+      const numberByIdx: Record<number, string> = {};
+      if (numberingConfig.scope === 'continuous') {
+        let counter = 1;
+        grouped.forEach(g => g.tables.forEach(idx => {
+          numberByIdx[idx] = `${prefix}${formatTableNumber(counter, numberingConfig.style)}${suffix}`;
+          counter++;
+        }));
+      } else {
+        // per_section
+        grouped.forEach(g => {
+          let counter = 1;
+          g.tables.forEach(idx => {
+            numberByIdx[idx] = `${prefix}${formatTableNumber(counter, numberingConfig.style, g.secIdx)}${suffix}`;
+            counter++;
+          });
+        });
+      }
+      return prev.map((tb, ti) => numberByIdx[ti] !== undefined
+        ? { ...tb, table_number: numberByIdx[ti], table_number_prefix: '' }
+        : tb);
+    });
+  }, [pushUndo, sections, numberingConfig, formatTableNumber]);
+
   const refreshExtraColumns = useCallback(async () => {
     if (!dataset) return;
     try {
@@ -1072,7 +1141,14 @@ export default function App() {
         } catch { /* network blip — keep polling */ }
       }, 3000);
     } catch (e: any) {
-      setError('Could not open Cleaner: ' + (e.message || ''));
+      // 502 here means the TF backend is reachable from the browser but somehow the handoff endpoint failed.
+      // 502 inside the cleaner is a separate issue (cleaner backend can't reach TF over network).
+      const raw = String(e?.message || '');
+      const looksLikeHtml = /<html|<head|<body|nginx/i.test(raw);
+      const cleaned = looksLikeHtml
+        ? 'Cleaner service is unreachable (502 Bad Gateway from upstream). Check that the cleaner backend can reach TableForge at /api/cleaner/fetch/<handoff_id>.'
+        : raw;
+      setError('Could not open Cleaner: ' + cleaned);
     }
   }, [dataset, applyCleanerResult]);
 
@@ -1218,7 +1294,10 @@ export default function App() {
             else setModal(a as ModalType);
           }}
           onUpdate={() => {}} theme={theme} />
-        <DataPreview dataset={dataset} onProceed={() => setShowDataPreview(false)}
+        <DataPreview dataset={dataset}
+          focusRow={previewFocus?.row ?? null}
+          focusColumn={previewFocus?.column ?? null}
+          onProceed={() => { setShowDataPreview(false); setPreviewFocus(null); }}
           onDatasetUpdate={(updates) => setDataset(prev => prev ? { ...prev, ...updates } : prev)} />
         {lastProjectHint && (
           <div style={{ margin: '0 16px 8px', padding: '10px 16px', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.35)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 }}>
@@ -1403,6 +1482,12 @@ export default function App() {
           onReorderTables={handleReorderTables}
           onTogglePin={togglePinTable}
           onOpenChartFor={(idx) => { setActiveTableIdx(idx); setModal('charts'); }}
+          sections={sections}
+          onSectionsChange={setSections}
+          onAssignSection={handleAssignSection}
+          numberingConfig={numberingConfig}
+          onNumberingConfigChange={setNumberingConfig}
+          onApplyNumbering={handleApplyNumbering}
         />
         <div className="center-area">
           {activeTable && (
@@ -1593,42 +1678,68 @@ export default function App() {
             <SummaryDashboard tables={tables} results={results}
               onTableSelect={i => { setActiveTableIdx(i); if (tables[i].values.length > 0) runTabulation(tables[i]); }} />
           ) : (<>
-            <SubgroupSlicer
-              datasetId={dataset.dataset_id}
-              table={activeTable}
-              allColumns={allColumns.map(c => c.name)}
-              onUpdate={updateTable}
-            />
-          {!activeTable.chartConfig?.chart_only && (
-            <LivePreview result={currentResult} loading={loading} error={error}
-              title={activeTable.title} subtitle={activeTable.subtitle}
-              datasetId={dataset.dataset_id} tableConfig={activeTable}
-              annotations={annotationsMap[activeTable?.id] || []}
-              onAnnotationsChange={anns => setAnnotationsMap(prev => ({ ...prev, [activeTable.id]: anns }))}
-              tableMode={theme}
-              onHeaderRename={(original, newName) => {
-                const renames = { ...(activeTable.header_renames || {}) };
-                const trimmed = (newName || '').trim();
-                // Empty value or value matching the original field name = clear the rename
-                if (trimmed && trimmed !== original) {
-                  renames[original] = trimmed;
-                  if (dataset) logAuditEvent(dataset.dataset_id, 'column_rename', `Column "${original}" renamed to "${trimmed}" in table "${activeTable.name}"`);
-                } else {
-                  delete renames[original];
-                }
-                updateTable({ header_renames: renames });
-              }}
-            />
-          )}
-          {activeTable.chartConfig && (
-            <InlineChartPreview
-              table={activeTable}
-              result={currentResult}
-              onEdit={() => setModal('charts')}
-              onRemove={() => updateTable({ chartConfig: undefined } as any)}
-              onToggleChartOnly={() => updateTable({ chartConfig: { ...activeTable.chartConfig, chart_only: !activeTable.chartConfig?.chart_only } } as any)}
-            />
-          )}
+          {(() => {
+            const hasChart = !!activeTable.chartConfig;
+            const chartOnly = !!activeTable.chartConfig?.chart_only;
+            const effectiveTab: 'table' | 'chart' = chartOnly ? 'chart' : (hasChart ? previewTab : 'table');
+            return (
+              <>
+                {hasChart && !chartOnly && (
+                  <div style={{ display: 'flex', gap: 0, padding: '8px 12px 0', borderBottom: '1px solid var(--border)' }}>
+                    <button
+                      onClick={() => setPreviewTab('table')}
+                      style={{
+                        padding: '6px 16px', fontSize: 12, fontWeight: 600,
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: effectiveTab === 'table' ? 'var(--primary, #3b82f6)' : 'var(--text-dim)',
+                        borderBottom: effectiveTab === 'table' ? '2px solid var(--primary, #3b82f6)' : '2px solid transparent',
+                        marginBottom: -1,
+                      }}
+                    >📋 Table</button>
+                    <button
+                      onClick={() => setPreviewTab('chart')}
+                      style={{
+                        padding: '6px 16px', fontSize: 12, fontWeight: 600,
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: effectiveTab === 'chart' ? 'var(--primary, #3b82f6)' : 'var(--text-dim)',
+                        borderBottom: effectiveTab === 'chart' ? '2px solid var(--primary, #3b82f6)' : '2px solid transparent',
+                        marginBottom: -1,
+                      }}
+                    >📊 Chart{activeTable.chartConfig?.chartTitle ? ` · ${activeTable.chartConfig.chartTitle}` : ''}</button>
+                  </div>
+                )}
+                {effectiveTab === 'table' && (
+                  <LivePreview result={currentResult} loading={loading} error={error}
+                    title={activeTable.title} subtitle={activeTable.subtitle}
+                    datasetId={dataset.dataset_id} tableConfig={activeTable}
+                    annotations={annotationsMap[activeTable?.id] || []}
+                    onAnnotationsChange={anns => setAnnotationsMap(prev => ({ ...prev, [activeTable.id]: anns }))}
+                    tableMode={theme}
+                    onHeaderRename={(original, newName) => {
+                      const renames = { ...(activeTable.header_renames || {}) };
+                      const trimmed = (newName || '').trim();
+                      if (trimmed && trimmed !== original) {
+                        renames[original] = trimmed;
+                        if (dataset) logAuditEvent(dataset.dataset_id, 'column_rename', `Column "${original}" renamed to "${trimmed}" in table "${activeTable.name}"`);
+                      } else {
+                        delete renames[original];
+                      }
+                      updateTable({ header_renames: renames });
+                    }}
+                  />
+                )}
+                {effectiveTab === 'chart' && hasChart && (
+                  <InlineChartPreview
+                    table={activeTable}
+                    result={currentResult}
+                    onEdit={() => setModal('charts')}
+                    onRemove={() => updateTable({ chartConfig: undefined } as any)}
+                    onToggleChartOnly={() => updateTable({ chartConfig: { ...activeTable.chartConfig, chart_only: !activeTable.chartConfig?.chart_only } } as any)}
+                  />
+                )}
+              </>
+            );
+          })()}
           </>)}
           {tableInterpretations[activeTable?.id] && (
             <div style={{ margin: '8px 12px', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 8, overflow: 'hidden' }}>
@@ -1787,6 +1898,7 @@ export default function App() {
         activeTableIdx={activeTableIdx}
         onChartChange={(tableId, chartConfig) => {
           setTables(prev => prev.map(t => t.id === tableId ? { ...t, chartConfig } : t));
+          setPreviewTab('chart');
         }}
         onClose={() => setModal(null)} />}
       {(modal === 'stat_correlation' || modal === 'stat_descriptive' || modal === 'stat_crosstab' || modal === 'stat_ttest' || modal === 'stat_anova' || modal === 'stat_regression' || modal === 'stat_normality' || modal === 'stat_outlier' || modal === 'stat_frequency' || modal === 'stat_paired_ttest' || modal === 'stat_wilcoxon' || modal === 'stat_mcnemar' || modal === 'stat_kruskal' || modal === 'stat_friedman' || modal === 'stat_spearman' || modal === 'stat_kendall' || modal === 'stat_logistic_regression' || modal === 'stat_multiple_regression' || modal === 'stat_posthoc' || modal === 'stat_reliability') && (
@@ -1946,6 +2058,12 @@ export default function App() {
             setTypeConvertModal(null);
             handleOpenInCleaner(col);
           }}
+          onViewRow={(rowIdx) => {
+            const col = typeConvertModal.column;
+            setTypeConvertModal(null);
+            setPreviewFocus({ row: rowIdx, column: col });
+            setShowDataPreview(true);
+          }}
         />
       )}
       {(modal === 'ai-polish' || modal === 'ai-interpret' || modal === 'ai-refine' || modal === 'ai-suggest' || modal === 'ai-smart-build' || modal === 'ai-auto-generate' || modal === 'ai-report' || modal === 'ai-config') && (
@@ -2052,12 +2170,15 @@ export default function App() {
       {modal === 'projects' && <ProjectManager currentTables={tables}
         currentAnnotationsMap={annotationsMap} currentComparisonState={comparisonState} currentProjectFilters={projectFilters} currentColumnTypeOverrides={columnTypeOverrides} currentFilename={dataset?.filename}
         currentDatasetId={dataset?.dataset_id} currentRowCount={dataset?.row_count} currentColCount={dataset?.columns?.length}
+        currentSections={sections} currentNumberingConfig={numberingConfig}
         onLoad={(loadedTables, loadedAnnotations, loadedExtra) => {
           if (loadedAnnotations) setAnnotationsMap(loadedAnnotations);
           if (loadedExtra?.reportTemplate) setReportTemplate(loadedExtra.reportTemplate);
           if (loadedExtra?.comparisonState) setComparisonState(loadedExtra.comparisonState);
           if (loadedExtra?.projectFilters) setProjectFilters(loadedExtra.projectFilters);
           if (loadedExtra?.metadata) setPendingMetadataRestore(loadedExtra.metadata);
+          if (Array.isArray(loadedExtra?.sections)) setSections(loadedExtra.sections);
+          if (loadedExtra?.numberingConfig) setNumberingConfig(loadedExtra.numberingConfig);
           if (loadedExtra?.columnTypeOverrides) {
             const overrides = loadedExtra.columnTypeOverrides as Record<string, string>;
             setColumnTypeOverrides(overrides);

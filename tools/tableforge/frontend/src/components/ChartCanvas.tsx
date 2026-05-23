@@ -307,7 +307,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                 <polyline points={pts} fill="none" stroke={colors[si % colors.length]} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
                 {multiData.map((d, i) => (
                   <circle key={i} cx={xToSvg(i, multiData.length)} cy={yToSvg(d.values[si])} r={3.5}
-                    fill={colors[si % colors.length]} stroke="#0f1117" strokeWidth={1.5}
+                    fill={colors[si % colors.length]} stroke="var(--bg-card)" strokeWidth={1.5}
                     onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${fmt(d.values[si])}`)}
                     onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
                 ))}
@@ -347,7 +347,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                 <polyline points={pts} fill="none" stroke={colors[si % colors.length]} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
                 {multiData.map((d, i) => (
                   <circle key={i} cx={xToSvg(i, multiData.length)} cy={yToSvg(d.values[si])} r={3.5}
-                    fill={colors[si % colors.length]} stroke="#0f1117" strokeWidth={1.5}
+                    fill={colors[si % colors.length]} stroke="var(--bg-card)" strokeWidth={1.5}
                     onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${fmt(d.values[si])}`)}
                     onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
                 ))}
@@ -378,7 +378,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             angle += slice;
             return (
               <g key={i}>
-                <path d={path} fill={colors[i % colors.length]} opacity={barOpacity} stroke="#0f1117" strokeWidth={1.5}
+                <path d={path} fill={colors[i % colors.length]} opacity={barOpacity} stroke="var(--bg-card)" strokeWidth={1.5}
                   onMouseEnter={e => showTip(e, `${d.label}\n${fmt(d.values[0])} (${pct}%)`)}
                   onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
                 {slice > 0.25 && showLabels && (
@@ -389,7 +389,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
           })}
           {chartType === 'donut' && (
             <>
-              <circle cx={cx} cy={cy} r={inner - 2} fill="#0f1117" />
+              <circle cx={cx} cy={cy} r={inner - 2} fill="var(--bg-card)" />
               <text x={cx} y={cy - 8} textAnchor="middle" fontSize={11} fill="#9ca3af">Total</text>
               <text x={cx} y={cy + 10} textAnchor="middle" fontSize={14} fill="#e4e4e7" fontWeight={700}>{fmt(total)}</text>
             </>
@@ -430,7 +430,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
           <text x={14} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill={labelColor}
             transform={`rotate(-90,14,${MT + PH / 2})`}>{yAxisLabel || headers[syIdx]}</text>
           {sData.map((d, i) => (
-            <circle key={i} cx={sx(d.x)} cy={sy(d.y)} r={5} fill={colors[i % colors.length]} opacity={0.8} stroke="#0f1117" strokeWidth={1}
+            <circle key={i} cx={sx(d.x)} cy={sy(d.y)} r={5} fill={colors[i % colors.length]} opacity={0.8} stroke="var(--bg-card)" strokeWidth={1}
               onMouseEnter={e => showTip(e, `${d.label}\n${headers[sxIdx]}: ${fmt(d.x)}\n${headers[syIdx]}: ${fmt(d.y)}`)}
               onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
           ))}
@@ -534,7 +534,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             rowVals.map((v, ci) => (
               <g key={`c${ri}-${ci}`}>
                 <rect x={ML + ci * cellW} y={MT + ri * cellH} width={cellW - 1} height={cellH - 1}
-                  fill={valToColor(v)} stroke="#0f1117" strokeWidth={1}
+                  fill={valToColor(v)} stroke="var(--bg-card)" strokeWidth={1}
                   onMouseEnter={e => showTip(e, `${colHeaders[ci]} × ${rows[ri][0]}\nValue: ${Number.isFinite(v) ? v.toFixed(2) : 'n/a'}`)}
                   onMouseLeave={hideTip} />
                 {showLabels && Number.isFinite(v) && (
@@ -573,7 +573,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   return (
     <div className={className} style={{ position: 'relative', ...style }}>
       <svg ref={svgRef} width={W} height={H} viewBox={`0 0 ${W} ${H}`}
-        style={{ background: '#0f1117', borderRadius: 8, display: 'block', maxWidth: '100%' }}>
+        style={{ background: 'transparent', borderRadius: 8, display: 'block', maxWidth: '100%' }}>
         {renderChart()}
       </svg>
       {tooltip && interactive && (

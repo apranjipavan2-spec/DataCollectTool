@@ -79,8 +79,12 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
   const serialMode = tableConfig?.serial_number_mode || 'continuous';
   const footnote = tableConfig?.footnote;
   const headerRenames = tableConfig?.header_renames || {};
-  const tableNumberLabel = tableConfig?.auto_number && tableConfig.table_number
-    ? `${tableConfig.table_number_prefix || 'Table'} ${tableConfig.table_number}: `
+  // If table_number is set and the prefix is empty (Apply-Numbering path bakes prefix/suffix in),
+  // use table_number as-is. Otherwise compose `${prefix} ${number}: ` (legacy auto_number path).
+  const tableNumberLabel = tableConfig?.table_number
+    ? (tableConfig.table_number_prefix
+        ? `${tableConfig.table_number_prefix} ${tableConfig.table_number}: `
+        : tableConfig.table_number)
     : '';
   const titleBold = tableConfig?.title_bold ?? true;
   const titleItalic = tableConfig?.title_italic ?? false;

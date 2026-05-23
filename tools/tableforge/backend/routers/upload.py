@@ -275,20 +275,42 @@ async def set_column_type(req: ColumnTypeReq):
         total = int(src.shape[0])
         non_null = int(src.notna().sum())
 
+        # Pick "context columns" so the user can identify which row each failure belongs to.
+        # Prefer columns whose name suggests an identifier; fall back to the first 3 non-target columns.
+        id_keywords = ("id", "name", "respondent", "sl", "serial", "code", "uid", "uuid", "phone", "mobile", "district", "village", "block", "tehsil", "state", "ward", "house")
+        cols_lower = [(c, str(c).lower()) for c in df.columns if c != req.column]
+        id_cols = [c for c, lc in cols_lower if any(kw in lc for kw in id_keywords)]
+        # Cap to first 4 id-like columns; if none found, take the first 3 columns of the dataset (excluding target)
+        if id_cols:
+            context_cols = id_cols[:4]
+        else:
+            context_cols = [c for c in df.columns if c != req.column][:3]
+
         def _build_response(parsed):
             fail_mask = parsed.isna() & src.notna()
             fail_count = int(fail_mask.sum())
             samples = [str(v) for v in src[fail_mask].head(5).tolist()]
-            # Per-cell failures: row index (0-based) + raw value, capped at 200
+            # Per-cell failures: row index (0-based) + raw value + context columns from the same row, capped at 200
             failing_subset = src[fail_mask].head(200)
-            failing_cells = [
-                {"row": int(idx), "value": str(val)}
-                for idx, val in failing_subset.items()
-            ]
+            failing_cells = []
+            for idx, val in failing_subset.items():
+                context = {}
+                for cc in context_cols:
+                    try:
+                        cv = df.at[idx, cc]
+                        # Stringify, treat NaN as empty
+                        if pd.isna(cv):
+                            context[str(cc)] = ""
+                        else:
+                            context[str(cc)] = str(cv)
+                    except Exception:
+                        context[str(cc)] = ""
+                failing_cells.append({"row": int(idx), "value": str(val), "context": context})
             return {"dry_run": True, "column": req.column, "new_type": req.new_type,
                     "total": total, "non_null": non_null,
                     "fail_count": fail_count, "samples": samples,
-                    "failing_cells": failing_cells}
+                    "failing_cells": failing_cells,
+                    "context_columns": [str(c) for c in context_cols]}
 
         if req.new_type == "numeric":
             parsed = pd.to_numeric(src, errors="coerce")

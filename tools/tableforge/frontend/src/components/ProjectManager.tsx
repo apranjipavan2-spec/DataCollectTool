@@ -24,6 +24,8 @@ interface Props {
   currentComparisonState?: any;
   currentProjectFilters?: Record<string, string[]>;
   currentColumnTypeOverrides?: Record<string, string>;
+  currentSections?: any[];
+  currentNumberingConfig?: any;
   onLoad: (tables: TableConfig[], annotationsMap?: Record<string, any[]>, extra?: Record<string, any>) => void;
   onClose: () => void;
   currentFilename?: string;
@@ -33,7 +35,7 @@ interface Props {
   fgContext?: FgContext | null;
 }
 
-export function ProjectManager({ currentTables, currentAnnotationsMap = {}, currentComparisonState, currentProjectFilters, currentColumnTypeOverrides = {}, onLoad, onClose, currentFilename, currentDatasetId, currentRowCount, currentColCount, fgContext }: Props) {
+export function ProjectManager({ currentTables, currentAnnotationsMap = {}, currentComparisonState, currentProjectFilters, currentColumnTypeOverrides = {}, currentSections = [], currentNumberingConfig, onLoad, onClose, currentFilename, currentDatasetId, currentRowCount, currentColCount, fgContext }: Props) {
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saveName, setSaveName] = useState('');
@@ -109,6 +111,8 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
           comparisonState: currentComparisonState || null,
           projectFilters: currentProjectFilters || {},
           columnTypeOverrides: currentColumnTypeOverrides,
+          sections: currentSections,
+          numberingConfig: currentNumberingConfig,
           source_file: sourceFileInfo,
         };
         const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
@@ -131,7 +135,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
         const res = await fetch(`${API_BASE}/project/save`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getUserHeaders() },
-          body: JSON.stringify({ name: saveName.trim(), config: { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, columnTypeOverrides: currentColumnTypeOverrides, dataset_id: currentDatasetId, source_file: sourceFileInfo }, password: projectPassword || undefined }),
+          body: JSON.stringify({ name: saveName.trim(), config: { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, columnTypeOverrides: currentColumnTypeOverrides, sections: currentSections, numberingConfig: currentNumberingConfig, dataset_id: currentDatasetId, source_file: sourceFileInfo }, password: projectPassword || undefined }),
         });
         if (!res.ok) throw new Error(await res.text());
         const saveResult = await res.json();
@@ -172,6 +176,8 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
         if (data.projectFilters) extra.projectFilters = data.projectFilters;
         if (data.columnTypeOverrides) extra.columnTypeOverrides = data.columnTypeOverrides;
         if (data.metadata || data.config?.metadata) extra.metadata = data.metadata || data.config?.metadata;
+        if (Array.isArray(data.sections)) extra.sections = data.sections;
+        if (data.numberingConfig) extra.numberingConfig = data.numberingConfig;
         const sourceFile = data.meta?.source_file || data.source_file;
         if (sourceFile) extra.source_file = sourceFile;
         onLoad(data.tables, data.annotationsMap, extra);
@@ -190,6 +196,8 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
       comparisonState: currentComparisonState || null,
       projectFilters: currentProjectFilters || {},
       columnTypeOverrides: currentColumnTypeOverrides,
+      sections: currentSections,
+      numberingConfig: currentNumberingConfig,
     }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -211,6 +219,8 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
           if (data.comparisonState) extra.comparisonState = data.comparisonState;
           if (data.projectFilters) extra.projectFilters = data.projectFilters;
           if (data.columnTypeOverrides) extra.columnTypeOverrides = data.columnTypeOverrides;
+          if (Array.isArray(data.sections)) extra.sections = data.sections;
+          if (data.numberingConfig) extra.numberingConfig = data.numberingConfig;
           const sourceFile = data.meta?.source_file || data.source_file;
           if (sourceFile) extra.source_file = sourceFile;
           onLoad(data.tables, data.annotationsMap, extra);

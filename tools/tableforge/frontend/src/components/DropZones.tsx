@@ -90,6 +90,11 @@ export function DropZones({ table, columns, draggedField, onDrop, onRemove, onAg
     return table[zone];
   };
 
+  const getColNumber = (field: string): number => {
+    const i = columns.findIndex(c => c.name === field);
+    return i >= 0 ? i + 1 : -1;
+  };
+
   const handleContextMenu = (e: React.MouseEvent, zone: DropZoneType, field: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -207,7 +212,22 @@ export function DropZones({ table, columns, draggedField, onDrop, onRemove, onAg
                       onContextMenu={e => handleContextMenu(e, key, field)}
                     >
                       <span className="chip-drag-handle" title="Drag to reorder">⠿</span>
-                      <span className="chip-name">{field}</span>
+                      {getColNumber(field) > 0 && (
+                        <span
+                          title={`Column #${getColNumber(field)}`}
+                          style={{
+                            background: 'rgba(255,255,255,0.08)',
+                            color: 'var(--text-dim)',
+                            fontSize: 10,
+                            fontWeight: 600,
+                            padding: '1px 5px',
+                            borderRadius: 3,
+                            marginRight: 4,
+                            fontFamily: 'monospace',
+                          }}
+                        >{getColNumber(field)}</span>
+                      )}
+                      <span className="chip-name" title={field}>{field}</span>
                       {valConfig && (
                         <>
                           <select className="agg-select" value={valConfig.agg}
