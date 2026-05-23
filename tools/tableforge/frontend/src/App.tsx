@@ -1556,41 +1556,57 @@ export default function App() {
               onClose={() => setShowProjectFilterPanel(false)}
             />
           )}
-          {/* Column type-override hints */}
-          {typeHints.filter(h => !dismissedHints.has(h.column)).length > 0 && (
-            <div className="type-hint-banner">
-              {typeHints.filter(h => !dismissedHints.has(h.column)).slice(0, 4).map(h => (
-                <div key={h.column} className="type-hint-row">
-                  <span className="type-hint-icon">{h.suggested_type === 'date' ? '📅' : '🔢'}</span>
-                  <span className="type-hint-text">
-                    <strong>{h.column}</strong> looks {h.suggested_type} (
-                    {Math.round(h.success_rate * 100)}% parse OK
-                    {h.fail_count > 0 ? `, ${h.fail_count} cells won't parse` : ''})
-                  </span>
-                  <button className="type-hint-btn type-hint-btn-primary" title="See what will fail to parse"
-                    onClick={() => {
-                      if (!dataset) return;
-                      setTypeConvertModal({ column: h.column, newType: h.suggested_type });
-                    }}>Preview &amp; convert</button>
-                  <button className="type-hint-btn" title="Convert without preview"
-                    onClick={() => handleColumnTypeChange(h.column, h.suggested_type)}>
-                    Convert
-                  </button>
-                  <button className="type-hint-btn" title="Open this column in the Cleaner to inspect every cell, fix the failing ones, and return."
-                    onClick={() => handleOpenInCleaner(h.column)}>
-                    Fix in Cleaner
-                  </button>
-                  <button className="type-hint-dismiss" title="Dismiss this hint"
-                    onClick={() => setDismissedHints(prev => new Set(prev).add(h.column))}>×</button>
-                </div>
-              ))}
-              {typeHints.filter(h => !dismissedHints.has(h.column)).length > 4 && (
-                <div style={{ fontSize: 10, opacity: 0.6, padding: '2px 8px' }}>
-                  + {typeHints.filter(h => !dismissedHints.has(h.column)).length - 4} more hint(s)
-                </div>
-              )}
-            </div>
-          )}
+          {/* Column type-override hints — scoped to columns the active table actually uses */}
+          {(() => {
+            const inTable = new Set<string>([
+              ...(activeTable.rows || []),
+              ...(activeTable.columns || []),
+              ...(activeTable.values || []).map(v => v.field),
+              ...Object.keys(activeTable.filters || {}),
+            ]);
+            const relevant = typeHints.filter(h => !dismissedHints.has(h.column) && inTable.has(h.column));
+            const irrelevantCount = typeHints.filter(h => !dismissedHints.has(h.column) && !inTable.has(h.column)).length;
+            if (relevant.length === 0 && irrelevantCount === 0) return null;
+            return (
+              <div className="type-hint-banner">
+                {relevant.slice(0, 4).map(h => (
+                  <div key={h.column} className="type-hint-row">
+                    <span className="type-hint-icon">{h.suggested_type === 'date' ? '📅' : '🔢'}</span>
+                    <span className="type-hint-text">
+                      <strong>{h.column}</strong> looks {h.suggested_type} (
+                      {Math.round(h.success_rate * 100)}% parse OK
+                      {h.fail_count > 0 ? `, ${h.fail_count} cells won't parse` : ''})
+                    </span>
+                    <button className="type-hint-btn type-hint-btn-primary" title="See what will fail to parse"
+                      onClick={() => {
+                        if (!dataset) return;
+                        setTypeConvertModal({ column: h.column, newType: h.suggested_type });
+                      }}>Preview &amp; convert</button>
+                    <button className="type-hint-btn" title="Convert without preview"
+                      onClick={() => handleColumnTypeChange(h.column, h.suggested_type)}>
+                      Convert
+                    </button>
+                    <button className="type-hint-btn" title="Open this column in the Cleaner to inspect every cell, fix the failing ones, and return."
+                      onClick={() => handleOpenInCleaner(h.column)}>
+                      Fix in Cleaner
+                    </button>
+                    <button className="type-hint-dismiss" title="Dismiss this hint"
+                      onClick={() => setDismissedHints(prev => new Set(prev).add(h.column))}>×</button>
+                  </div>
+                ))}
+                {relevant.length > 4 && (
+                  <div style={{ fontSize: 10, opacity: 0.6, padding: '2px 8px' }}>
+                    + {relevant.length - 4} more hint(s) for columns in this table
+                  </div>
+                )}
+                {irrelevantCount > 0 && (
+                  <div style={{ fontSize: 10, opacity: 0.55, padding: '4px 8px', borderTop: relevant.length > 0 ? '1px dashed var(--border)' : 'none' }}>
+                    {irrelevantCount} hint(s) for other columns hidden — they’ll appear when you use those columns in a table.
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           {/* Editable Table Title */}
           <div className="table-title-bar">
             <input className="table-title-input" type="text"
