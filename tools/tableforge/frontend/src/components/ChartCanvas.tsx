@@ -146,13 +146,14 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   const xIsRotated = effectiveXRot !== 0;
   const xRotMag = Math.abs(effectiveXRot);
   // How far down rotated labels visually sweep from the tick line.
-  const labelSweep = xIsRotated ? (xRotMag >= 60 ? 90 : 70) : 18;
+  // Extra padding (+14) ensures the X-axis caption sits clearly below the rotated tick text.
+  const labelSweep = xIsRotated ? (xRotMag >= 60 ? 104 : 86) : 22;
   const hasXCaption = !!xAxisLabel && chartType !== 'bar_h';
-  const captionGap = hasXCaption ? 22 : 0;
+  const captionGap = hasXCaption ? 28 : 0;
   MB = 14 + labelSweep + captionGap;
   PH = H - MT - MB;
   // Where the x-axis caption sits (below the rotated label sweep).
-  const xLabelExtraOffset = labelSweep + 8;
+  const xLabelExtraOffset = labelSweep + 14;
 
   const allValues = multiData.flatMap(d => d.values);
   const maxVal = allValues.length ? Math.max(...allValues) : 1;
@@ -276,8 +277,8 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
           </text>
         )}
         {(yAxisLabel || yFieldsResolved[0]) && (
-          <text x={14} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill="#e4e4e7" fontWeight={500}
-            transform={`rotate(-90,14,${MT + PH / 2})`}>
+          <text x={12} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill="#e4e4e7" fontWeight={500}
+            transform={`rotate(-90,12,${MT + PH / 2})`}>
             {yAxisLabel || yFieldsResolved[0]}
           </text>
         )}

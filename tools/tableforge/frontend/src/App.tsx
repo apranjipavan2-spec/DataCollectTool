@@ -1685,37 +1685,6 @@ export default function App() {
               <span className="title-del-label">Delete</span>
             </button>
           </div>
-          {Object.entries(projectFilters).some(([, v]) => v && v.length > 0) &&
-           (!activeTable.chartConfig || (!activeTable.chartConfig.chart_only && previewTab !== 'chart')) && (
-            <div className="project-filter-chips" title="Project-wide filters apply to all tables">
-              <span className="pf-chips-label">🌐 Project filters:</span>
-              {Object.entries(projectFilters).map(([field, values]) => {
-                if (!values || values.length === 0) return null;
-                const display = values.length <= 2 ? values.join(', ') : `${values[0]} +${values.length - 1}`;
-                return (
-                  <span key={field} className="pf-chip" title={`${field}: ${values.join(', ')}`}>
-                    <span className="pf-chip-field">{field}</span>
-                    <span className="pf-chip-sep">=</span>
-                    <span className="pf-chip-values">{display}</span>
-                    <button
-                      className="pf-chip-x"
-                      onClick={() => {
-                        const next = { ...projectFilters };
-                        delete next[field];
-                        setProjectFilters(next);
-                      }}
-                      title="Remove this project filter"
-                    >×</button>
-                  </span>
-                );
-              })}
-              <button
-                className="pf-chips-clear"
-                onClick={() => setProjectFilters({})}
-                title="Clear all project filters"
-              >Clear all</button>
-            </div>
-          )}
           </>
           )}
           {activeTableIdx === -1 ? (
