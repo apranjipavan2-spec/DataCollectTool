@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType } from './types';
-import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg, getColumnRoles, bulkSetColumnRoles, saveStudyDesign } from './api';
+import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg, getColumnRoles, bulkSetColumnRoles, saveStudyDesign, cleanerApi, buildCleanerUrl } from './api';
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
 import { LivePreview } from './components/LivePreview';
@@ -41,6 +41,7 @@ import { ClusterPanel } from './components/ClusterPanel';
 import { VerbatimPanel } from './components/VerbatimPanel';
 import { AutoAnalyzePanel } from './components/AutoAnalyzePanel';
 import { SurveyInsightsPanel } from './components/SurveyInsightsPanel';
+import { TypeConvertModal } from './components/TypeConvertModal';
 import { SurveyQualityPanel } from './components/SurveyQualityPanel';
 import { StatGuide, isGuideSkipped } from './components/StatGuide';
 
@@ -213,6 +214,7 @@ export default function App() {
   const [pendingMetadataRestore, setPendingMetadataRestore] = useState<{ column_roles?: Record<string, any>; study_design?: any } | null>(null);
   const [typeHints, setTypeHints] = useState<Array<{ column: string; suggested_type: 'numeric' | 'date'; success_rate: number; fail_count: number; samples: string[] }>>([]);
   const [dismissedHints, setDismissedHints] = useState<Set<string>>(new Set());
+  const [typeConvertModal, setTypeConvertModal] = useState<{ column: string; newType: 'numeric' | 'date' | 'text' | 'multi_choice' } | null>(null);
   const [comparisonState, setComparisonState] = useState<any>(null);
   const [orphanedAnnotations, setOrphanedAnnotations] = useState<ReconcileAnnotation[] | null>(null);
   // tabContextMenu removed — tables now listed in SourcePanel sidebar
@@ -783,6 +785,17 @@ export default function App() {
       if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
       if (data.comparisonState) setComparisonState(data.comparisonState);
       if (data.projectFilters) setProjectFilters(data.projectFilters);
+      if (data.columnTypeOverrides && dataset) {
+        const overrides = data.columnTypeOverrides as Record<string, string>;
+        setColumnTypeOverrides(overrides);
+        setDataset(prev => prev ? ({
+          ...prev,
+          columns: prev.columns.map(c => overrides[c.name] ? { ...c, type: overrides[c.name] as any } : c),
+        }) : prev);
+        Object.entries(overrides).forEach(([col, newType]) => {
+          changeColumnType(dataset.dataset_id, col, newType).catch(() => {});
+        });
+      }
 
       // If no dataset loaded yet, reload the source file first then defer reconciliation
       if (allColumns.length === 0 && data.meta?.source_file) {
@@ -1012,6 +1025,78 @@ export default function App() {
     } finally { setLoading(false); setLoadingMsg(''); }
   }, [dataset, tables, runTabulation]);
 
+  // Cleaner handoff: open datacleaner in a new tab with a token, refresh dataset when it saves back.
+  const cleanerWindowRef = useRef<Window | null>(null);
+  const cleanerHandoffRef = useRef<string | null>(null);
+  const cleanerPollRef = useRef<number | null>(null);
+
+  const applyCleanerResult = useCallback((result: any) => {
+    if (!result || !dataset) return;
+    setDataset(prev => prev ? {
+      ...prev,
+      row_count: result.row_count ?? prev.row_count,
+      columns: result.columns || prev.columns,
+      preview: result.preview || prev.preview,
+    } : prev);
+    setColumnTypeOverrides({});
+    setLoadingMsg('Regenerating tables from cleaned data…');
+    setTimeout(() => {
+      tables.forEach(t => { if (t.values.length > 0) runTabulation(t); });
+      setLoadingMsg('');
+    }, 50);
+  }, [dataset, tables, runTabulation]);
+
+  const handleOpenInCleaner = useCallback(async (focusCol?: string) => {
+    if (!dataset) return;
+    try {
+      const { handoff_id } = await cleanerApi.handoff(dataset.dataset_id, focusCol);
+      cleanerHandoffRef.current = handoff_id;
+      const url = buildCleanerUrl(handoff_id, focusCol);
+      const win = window.open(url, 'tf-cleaner', 'noopener=no');
+      cleanerWindowRef.current = win;
+      // Fallback: poll every 3s in case postMessage is blocked (e.g. cross-origin).
+      if (cleanerPollRef.current) window.clearInterval(cleanerPollRef.current);
+      cleanerPollRef.current = window.setInterval(async () => {
+        if (!cleanerHandoffRef.current) return;
+        try {
+          const s = await cleanerApi.status(cleanerHandoffRef.current);
+          if (s.completed && s.result) {
+            applyCleanerResult(s.result);
+            if (cleanerPollRef.current) window.clearInterval(cleanerPollRef.current);
+            cleanerPollRef.current = null;
+            const hid = cleanerHandoffRef.current;
+            cleanerHandoffRef.current = null;
+            if (hid) cleanerApi.revoke(hid);
+          }
+        } catch { /* network blip — keep polling */ }
+      }, 3000);
+    } catch (e: any) {
+      setError('Could not open Cleaner: ' + (e.message || ''));
+    }
+  }, [dataset, applyCleanerResult]);
+
+  // Listen for postMessage from the cleaner window the moment it saves.
+  useEffect(() => {
+    const onMessage = async (ev: MessageEvent) => {
+      const data = ev.data;
+      if (!data || data.type !== 'tf-cleaner-saved') return;
+      if (!cleanerHandoffRef.current || data.handoff_id !== cleanerHandoffRef.current) return;
+      try {
+        const s = await cleanerApi.status(cleanerHandoffRef.current);
+        if (s.result) applyCleanerResult(s.result);
+      } catch { /* polling fallback will pick it up */ }
+      if (cleanerPollRef.current) { window.clearInterval(cleanerPollRef.current); cleanerPollRef.current = null; }
+      const hid = cleanerHandoffRef.current;
+      cleanerHandoffRef.current = null;
+      if (hid) cleanerApi.revoke(hid);
+    };
+    window.addEventListener('message', onMessage);
+    return () => {
+      window.removeEventListener('message', onMessage);
+      if (cleanerPollRef.current) window.clearInterval(cleanerPollRef.current);
+    };
+  }, [applyCleanerResult]);
+
   const handleTextClean = useCallback(async (action: string, caseType?: string) => {
     if (!dataset) return;
     setLoading(true); setLoadingMsg('Cleaning text data…'); setError(null);
@@ -1168,6 +1253,7 @@ export default function App() {
           else if (a === 'tour') setShowTour(true);
           else if (a === 'dashboard') setActiveTableIdx(-1);
           else if (a === 'import_file') ribbonFileRef.current?.click();
+          else if (a === 'clean_open') handleOpenInCleaner();
           else if (a.startsWith('apply_template:')) handleApplyTemplate(a.slice('apply_template:'.length));
           else if (a.startsWith('load_project:')) handleLoadProjectByPath(a.slice('load_project:'.length));
           else setModal(a as ModalType);
@@ -1188,6 +1274,7 @@ export default function App() {
           else if (a === 'redo') handleRedo();
           else if (a === 'refresh') handleDataRefresh();
           else if (a === 'reload_data') { reloadFileRef.current?.click(); }
+          else if (a === 'clean_open') handleOpenInCleaner();
           else if (a === 'transpose') handleTransposeTable();
           else if (a === 'tour') setShowTour(true);
           else if (a === 'dashboard') setActiveTableIdx(-1);
@@ -1395,29 +1482,18 @@ export default function App() {
                     {h.fail_count > 0 ? `, ${h.fail_count} cells won't parse` : ''})
                   </span>
                   <button className="type-hint-preview" title="See what will fail to parse"
-                    onClick={async () => {
+                    onClick={() => {
                       if (!dataset) return;
-                      try {
-                        const r = await dryRunColumnType(dataset.dataset_id, h.column, h.suggested_type);
-                        const sampleStr = r.samples.length > 0
-                          ? `\n\nExamples of cells that will NOT parse:\n${r.samples.map(s => `  • ${s}`).join('\n')}`
-                          : '';
-                        const ok = window.confirm(
-                          `Dry-run for "${h.column}" → ${h.suggested_type}:\n` +
-                          `  Total: ${r.total}\n` +
-                          `  Non-null: ${r.non_null}\n` +
-                          `  Will fail: ${r.fail_count}` +
-                          sampleStr +
-                          `\n\nProceed with conversion?`
-                        );
-                        if (ok) handleColumnTypeChange(h.column, h.suggested_type);
-                      } catch (e: any) {
-                        setError(e.message || 'Dry-run failed');
-                      }
+                      setTypeConvertModal({ column: h.column, newType: h.suggested_type });
                     }}>Preview & convert</button>
                   <button className="type-hint-apply" title="Convert without preview"
                     onClick={() => handleColumnTypeChange(h.column, h.suggested_type)}>
                     Convert
+                  </button>
+                  <button className="type-hint-apply" title="Open this column in the Cleaner to inspect every cell, fix the failing ones, and return."
+                    style={{ background: 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff' }}
+                    onClick={() => handleOpenInCleaner(h.column)}>
+                    🧹 Fix in Cleaner
                   </button>
                   <button className="type-hint-dismiss" title="Dismiss this hint"
                     onClick={() => setDismissedHints(prev => new Set(prev).add(h.column))}>×</button>
@@ -1443,15 +1519,22 @@ export default function App() {
               className="source-table-select"
               value={activeTable.source_table_id || ''}
               onChange={e => updateTable({ source_table_id: e.target.value || undefined } as any)}
-              title="Optional: mark this table as derived from another table (metadata for the pipeline view)"
-              style={{ fontSize: 11, padding: '4px 8px' }}
+              title={
+                activeTable.source_table_id
+                  ? `Source: #${tables.findIndex(t => t.id === activeTable.source_table_id) + 1} — ${tables.find(t => t.id === activeTable.source_table_id)?.title || tables.find(t => t.id === activeTable.source_table_id)?.name || ''}`
+                  : 'Optional: mark this table as derived from another table (metadata for the pipeline view)'
+              }
             >
-              <option value="">No source (raw data)</option>
-              {tables.filter((_, i) => i !== activeTableIdx).map((t, i) => (
-                <option key={t.id} value={t.id}>
-                  Source: #{tables.indexOf(t) + 1} {t.title || t.name}
-                </option>
-              ))}
+              <option value="">No source</option>
+              {tables.filter((_, i) => i !== activeTableIdx).map(t => {
+                const idx = tables.indexOf(t) + 1;
+                const label = t.title || t.name || '';
+                return (
+                  <option key={t.id} value={t.id} title={label}>
+                    #{idx}{label ? ` — ${label.slice(0, 24)}${label.length > 24 ? '…' : ''}` : ''}
+                  </option>
+                );
+              })}
             </select>
             <button className="title-dup-btn" onClick={duplicateTable}
               title="Duplicate this table (same structure, new copy)">
@@ -1833,6 +1916,24 @@ export default function App() {
             setGuidePendingModal(null);
             setModal(next);
           } : undefined}
+        />
+      )}
+      {typeConvertModal && dataset && (
+        <TypeConvertModal
+          datasetId={dataset.dataset_id}
+          column={typeConvertModal.column}
+          newType={typeConvertModal.newType}
+          onCancel={() => setTypeConvertModal(null)}
+          onApply={() => {
+            const { column, newType } = typeConvertModal;
+            setTypeConvertModal(null);
+            handleColumnTypeChange(column, newType);
+          }}
+          onOpenInCleaner={() => {
+            const col = typeConvertModal.column;
+            setTypeConvertModal(null);
+            handleOpenInCleaner(col);
+          }}
         />
       )}
       {(modal === 'ai-polish' || modal === 'ai-interpret' || modal === 'ai-refine' || modal === 'ai-suggest' || modal === 'ai-smart-build' || modal === 'ai-auto-generate' || modal === 'ai-report' || modal === 'ai-config') && (

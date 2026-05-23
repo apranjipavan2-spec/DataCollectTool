@@ -274,26 +274,32 @@ async def set_column_type(req: ColumnTypeReq):
         src = df[req.column]
         total = int(src.shape[0])
         non_null = int(src.notna().sum())
+
+        def _build_response(parsed):
+            fail_mask = parsed.isna() & src.notna()
+            fail_count = int(fail_mask.sum())
+            samples = [str(v) for v in src[fail_mask].head(5).tolist()]
+            # Per-cell failures: row index (0-based) + raw value, capped at 200
+            failing_subset = src[fail_mask].head(200)
+            failing_cells = [
+                {"row": int(idx), "value": str(val)}
+                for idx, val in failing_subset.items()
+            ]
+            return {"dry_run": True, "column": req.column, "new_type": req.new_type,
+                    "total": total, "non_null": non_null,
+                    "fail_count": fail_count, "samples": samples,
+                    "failing_cells": failing_cells}
+
         if req.new_type == "numeric":
             parsed = pd.to_numeric(src, errors="coerce")
-            fail_count = int(parsed.isna().sum() - src.isna().sum())
-            # Sample first 5 failing raw values
-            fail_mask = parsed.isna() & src.notna()
-            samples = [str(v) for v in src[fail_mask].head(5).tolist()]
-            return {"dry_run": True, "column": req.column, "new_type": req.new_type,
-                    "total": total, "non_null": non_null,
-                    "fail_count": max(fail_count, 0), "samples": samples}
+            return _build_response(parsed)
         elif req.new_type == "date":
             parsed = pd.to_datetime(src, errors="coerce")
-            fail_count = int(parsed.isna().sum() - src.isna().sum())
-            fail_mask = parsed.isna() & src.notna()
-            samples = [str(v) for v in src[fail_mask].head(5).tolist()]
-            return {"dry_run": True, "column": req.column, "new_type": req.new_type,
-                    "total": total, "non_null": non_null,
-                    "fail_count": max(fail_count, 0), "samples": samples}
+            return _build_response(parsed)
         else:
             return {"dry_run": True, "column": req.column, "new_type": req.new_type,
-                    "total": total, "non_null": non_null, "fail_count": 0, "samples": []}
+                    "total": total, "non_null": non_null, "fail_count": 0,
+                    "samples": [], "failing_cells": []}
 
     if req.dataset_id not in column_type_overrides:
         column_type_overrides[req.dataset_id] = {}

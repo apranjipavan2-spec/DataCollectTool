@@ -108,7 +108,7 @@ export async function changeColumnType(datasetId: string, column: string, newTyp
 }
 
 export async function dryRunColumnType(datasetId: string, column: string, newType: string):
-  Promise<{ dry_run: true; column: string; new_type: string; total: number; non_null: number; fail_count: number; samples: string[] }> {
+  Promise<{ dry_run: true; column: string; new_type: string; total: number; non_null: number; fail_count: number; samples: string[]; failing_cells?: { row: number; value: string }[] }> {
   const res = await fetch(`${API_BASE}/dataset/column_type`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -620,6 +620,58 @@ export const verbatimApi = {
   savePalette: (b: any) => postStat('/verbatim/palette/save', b),
   kappa: (b: any) => postStat('/verbatim/kappa', b),
 };
+
+// ── Cleaner handoff (TableForge ↔ datacleaner) ───────────────────────────────
+
+export const cleanerApi = {
+  /** Create a one-shot handoff token so the cleaner can pull + push this dataset. */
+  handoff: async (datasetId: string, focusCol?: string): Promise<{ handoff_id: string; focus_col: string | null; ttl_seconds: number }> => {
+    const res = await fetch(`${API_BASE}/cleaner/handoff`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dataset_id: datasetId, focus_col: focusCol || null }),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json();
+  },
+  /** Polled fallback in case the cleaner's postMessage doesn't reach us (e.g. cross-origin restrictions). */
+  status: async (handoffId: string) => {
+    const res = await fetch(`${API_BASE}/cleaner/handoff/${handoffId}`);
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<{
+      completed: boolean;
+      completed_at: number | null;
+      dataset_id: string;
+      result: { row_count: number; columns: any[]; preview: any[] } | null;
+    }>;
+  },
+  revoke: async (handoffId: string) => {
+    await fetch(`${API_BASE}/cleaner/handoff/${handoffId}`, { method: 'DELETE' }).catch(() => {});
+  },
+};
+
+/** Resolve the cleaner's base URL. Override via VITE_CLEANER_URL.
+ * In production we assume the cleaner is co-deployed at /cleaner/ on the same origin.
+ * In dev (Vite at :5173) we point at the cleaner's standalone port :5050.
+ */
+export function getCleanerBaseUrl(): string {
+  const envUrl = (import.meta as any).env?.VITE_CLEANER_URL as string | undefined;
+  if (envUrl) return envUrl.replace(/\/$/, '');
+  if (typeof window !== 'undefined') {
+    if (window.location.port === '5173') return 'http://localhost:5050';
+    return `${window.location.origin}/cleaner`;
+  }
+  return '';
+}
+
+/** Build the cleaner URL with TF handoff params + optional column focus. */
+export function buildCleanerUrl(handoffId: string, focusCol?: string): string {
+  const base = getCleanerBaseUrl();
+  const tfBase = API_BASE.replace(/\/api$/, '');
+  const tfUrl = (typeof window !== 'undefined' ? window.location.origin : '') + tfBase;
+  const params = new URLSearchParams({ tf_url: tfUrl, handoff_id: handoffId });
+  if (focusCol) params.set('focus_col', focusCol);
+  return `${base}/?${params.toString()}`;
+}
 
 // ── Phase 3 — Auto-Analyze battery ───────────────────────────────────────────
 

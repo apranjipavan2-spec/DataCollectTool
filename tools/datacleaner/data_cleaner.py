@@ -1575,6 +1575,80 @@ def proxy_save_fg_project():
         return jsonify(error=str(e)), 502
 
 
+@app.route("/api/load-from-tableforge", methods=["POST"])
+def load_from_tableforge():
+    """Pull a dataset from TableForge via its handoff token. Body: {tf_base_url, handoff_id}."""
+    body = request.json or {}
+    tf_base_url = body.get("tf_base_url", "").rstrip("/")
+    handoff_id = body.get("handoff_id", "")
+    if not tf_base_url or not handoff_id:
+        return jsonify(error="tf_base_url and handoff_id required"), 400
+    url = f"{tf_base_url}/api/cleaner/fetch/{handoff_id}"
+    try:
+        resp = _requests.get(url, timeout=120)
+        if resp.status_code != 200:
+            return jsonify(error=f"TableForge returned {resp.status_code}: {resp.text[:200]}"), 502
+    except _requests.RequestException as e:
+        return jsonify(error=f"Could not reach TableForge: {e}"), 502
+
+    filename = resp.headers.get("X-TF-Filename") or f"tf_dataset_{handoff_id[:8]}.csv"
+    focus_col = resp.headers.get("X-TF-Focus-Col") or ""
+    copy_path = COPIES_DIR / f"TF_{handoff_id}_{filename}"
+    try:
+        copy_path.write_text(resp.text, encoding="utf-8")
+    except Exception:
+        copy_path.write_bytes(resp.content)
+
+    try:
+        df = pd.read_csv(io.StringIO(resp.text), dtype=str, keep_default_na=False, na_values=[""])
+    except Exception as e:
+        return jsonify(error=f"Parse error: {e}"), 400
+
+    df.columns = df.columns.astype(str)
+    DATA["df"] = df
+    DATA["original_df"] = df.copy()
+    DATA["filename"] = filename
+    DATA["copy_path"] = str(copy_path)
+    DATA["sheet_name"] = None
+    DATA["history"] = []
+    DATA["redo_stack"] = []
+    DATA["column_types"] = {}
+    DATA["active_filters"] = {}
+    _save_state()
+    mark_state_dirty()
+
+    return jsonify(ok=True, filename=filename, rows=len(df), cols=len(df.columns),
+                   columns=df.columns.tolist(), focus_col=focus_col)
+
+
+@app.route("/api/save-to-tableforge", methods=["POST"])
+def save_to_tableforge():
+    """Push cleaned data back to TableForge. Body: {tf_base_url, handoff_id}."""
+    body = request.json or {}
+    tf_base_url = body.get("tf_base_url", "").rstrip("/")
+    handoff_id = body.get("handoff_id", "")
+    if not tf_base_url or not handoff_id:
+        return jsonify(error="tf_base_url and handoff_id required"), 400
+    df = _df()
+    if df is None:
+        return jsonify(error="No data loaded"), 400
+    buf = io.StringIO()
+    df.to_csv(buf, index=False)
+    csv_str = buf.getvalue()
+    try:
+        resp = _requests.post(
+            f"{tf_base_url}/api/cleaner/save-back/{handoff_id}",
+            data=csv_str.encode("utf-8"),
+            headers={"Content-Type": "text/csv"},
+            timeout=60,
+        )
+        if resp.status_code != 200:
+            return jsonify(error=f"TableForge rejected save: {resp.text[:200]}"), 502
+        return jsonify(ok=True, rows=len(df), cols=len(df.columns))
+    except _requests.RequestException as e:
+        return jsonify(error=f"Could not reach TableForge: {e}"), 502
+
+
 @app.route("/api/load-from-fg", methods=["POST"])
 def load_from_fg():
     """Fetch program submissions from FieldGovern; supports optional questionnaire_id filter."""

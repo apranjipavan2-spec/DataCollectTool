@@ -40,6 +40,7 @@ from .routers import (
     driver,
     cluster,
     verbatim,
+    clean,
 )
 
 app = FastAPI(title="TableForge", version="2.0")
@@ -80,6 +81,7 @@ app.include_router(geo.router)
 app.include_router(driver.router)
 app.include_router(cluster.router)
 app.include_router(verbatim.router)
+app.include_router(clean.router)
 
 # Serve frontend static files (production)
 STATIC_DIR = BASE_DIR / "static"
