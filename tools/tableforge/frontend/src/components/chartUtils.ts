@@ -161,7 +161,16 @@ export interface ChartExportSvgOpts {
 
 export function buildChartExportSvg(opts: ChartExportSvgOpts): { xml: string; totalHeight: number } {
   const { svgElement, title, titleFontSize, width, height, bgColor = 'transparent' } = opts;
-  const innerXml = new XMLSerializer().serializeToString(svgElement);
+  // Resolve CSS variables that won't apply when the SVG renders standalone.
+  // ChartCanvas uses var(--bg-card) for bar/pie/scatter separator strokes and
+  // the donut centre hole. Outside the app's CSS context the variable becomes
+  // invalid and the browser falls back to black — producing the "black donut
+  // hole / black bar outlines" the user sees in the exported image. Map those
+  // references to the export background so separators disappear and the donut
+  // hole matches the surrounding page.
+  const fallbackBg = (bgColor === 'transparent' || bgColor === 'none') ? 'transparent' : bgColor;
+  const innerXml = new XMLSerializer().serializeToString(svgElement)
+    .replace(/var\(--bg-card\)/g, fallbackBg);
   const titleH = title ? Math.round(titleFontSize * 1.7 + 16) : 0;
   const totalH = height + titleH;
   const titleY = Math.round(titleFontSize * 1.2 + 8);
