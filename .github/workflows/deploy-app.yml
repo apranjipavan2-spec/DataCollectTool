@@ -73,6 +73,24 @@ jobs:
       - name: Checkout (for deploy files)
         uses: actions/checkout@v4
 
+      - name: Wipe stale tool sources on VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            # scp-action copies but does not delete removed files. Wipe the
+            # source trees on the VPS so a deleted file in git is also deleted here.
+            for d in \
+              /opt/fieldgovern/tools/tableforge/frontend/src \
+              /opt/fieldgovern/tools/tableforge/backend \
+              /opt/fieldgovern/tools/datacleaner/frontend/src \
+              /opt/fieldgovern/tools/datacleaner/backend; do
+              if [ -d "$d" ]; then rm -rf "$d"; fi
+            done
+
       - name: Sync tools and compose file to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
