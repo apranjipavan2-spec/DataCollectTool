@@ -8,11 +8,12 @@ interface Props {
   columnRoles?: Record<string, ColumnRole>;
   onClose: () => void;
   onPromote?: (label: string, headers: string[], rows: any[][], interpretation: string) => void;
+  onPackReady?: (pack: any[]) => void;
 }
 
 type Correction = 'fdr_bh' | 'bonferroni' | 'holm' | 'none';
 
-export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, onClose, onPromote }: Props) {
+export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, onClose, onPromote, onPackReady }: Props) {
   const [outcomes, setOutcomes] = useState<string[]>([]);
   const [predictors, setPredictors] = useState<string[]>([]);
   const [correction, setCorrection] = useState<Correction>('fdr_bh');
@@ -82,7 +83,9 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, onClose
           } else if (e.step === 'progress') {
             setProgress({ idx: e.idx || 0, total: e.total || 0, label: e.label || '' });
           } else if (e.step === 'done') {
-            setResults(e.results || []);
+            const pack = e.results || [];
+            setResults(pack);
+            if (onPackReady) onPackReady(pack);
           }
         },
       );

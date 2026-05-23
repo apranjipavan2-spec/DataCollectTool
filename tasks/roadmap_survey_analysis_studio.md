@@ -62,14 +62,12 @@ Augment existing: Cramér's V on crosstab, Cohen's d + Hedges' g + CI on ttest, 
 **Frontend:** `AutoAnalyzePanel.tsx` + `AnalysisPackView.tsx`. Progress modal mirrors `ai.py` auto-generate. "Promote to project" pushes pack tables into main `tables[]`.
 
 ### Phase 4 — Triangulation & benchmarks
-**Backend:** `routers/triangulate.py` + `benchmarks/india_2024.json` (seed: Census 2011, NFHS-5, NSSO 77, CGWB, PLFS, NITI Aayog).
+**Backend (shipped):** `routers/triangulate.py` + `benchmarks/india_2024.json` (seed: Census 2011, NFHS-5, NSSO 77, CGWB, PLFS, NITI Aayog).
 
-**Frontend:** `TriangulationPanel.tsx` (per-row benchmark attach + bulk pack triangulation).
+**Frontend:** _Skipped — TriangulationPanel.tsx deferred._
 
 ### Phase 5 — Qualitative coding
-**Backend:** `routers/qualitative.py` — codes tree, tag, AI theme extraction, quote tables linkable to quantitative tables.
-
-**Frontend:** `QualitativePanel.tsx`, `CodeTree.tsx`, `QuoteEditor.tsx`.
+_Skipped per maintainer call — open-ended row-level coding already lives in `verbatim.py`/`VerbatimPanel.tsx`. The richer hierarchical-codes workbench (`QualitativePanel.tsx`, `CodeTree.tsx`, `QuoteEditor.tsx`) is not on the build list._
 
 ### Phase 6 — Platform polish
 DiD, propensity score matching, survey-weighted SEs, power & sample-size planner, codebook PDF export, mixed-effects (village random effects), household roster handling, AI-narrated executive summary.

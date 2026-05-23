@@ -715,6 +715,14 @@ function StatisticsRibbon({ dataset, onAction }: { dataset: boolean; onAction: (
         <RBtn icon="📉" label="Normality" onClick={() => onAction('stat_normality')} disabled={!dataset} />
         <RBtn icon="⚠"  label="Outliers"  onClick={() => onAction('stat_outlier')}   disabled={!dataset} />
       </RGroup>
+      <RGroup label="Advanced Analysis">
+        <RBtn icon="📐" label="DiD"          onClick={() => onAction('causal_did')}      disabled={!dataset} />
+        <RBtn icon="≈"  label="PSM"          onClick={() => onAction('causal_psm')}      disabled={!dataset} />
+        <RBtn icon="🏘" label="Mixed LM"     onClick={() => onAction('causal_mixed_lm')} disabled={!dataset} />
+        <RBtn icon="⚡" label="Power"        onClick={() => onAction('power_planner')}   disabled={false} />
+        <RBtn icon="📖" label="Codebook"     onClick={() => onAction('export_codebook')} disabled={!dataset} />
+        <RBtn icon="✨" label="AI Summary"   onClick={() => onAction('exec_summary')}    disabled={!dataset} />
+      </RGroup>
     </>
   );
 }

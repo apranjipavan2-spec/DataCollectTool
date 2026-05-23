@@ -58,6 +58,7 @@ export interface ProgramListItem {
   status: string
   participant_type_count?: number
   questionnaire_count?: number
+  allow_enumerator_edit?: boolean | null
 }
 
 export interface ProgramEditOverride {

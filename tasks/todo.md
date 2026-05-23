@@ -1,6 +1,25 @@
 # FieldGovern — Task Board
 
-## ✅ Just shipped — TableForge Survey Analysis Studio (Phases 0 + 1)
+## ✅ Just shipped — TableForge Phase 6 (Causal + Power + Codebook + AI Summary + Mixed-LM + Roster)
+
+- **Causal** `routers/causal.py`: `/api/causal/did` (DiD OLS with `treatment:post` interaction), `/api/causal/psm` (logit-propensity + 1-NN matching + SMD balance), `/api/causal/mixed_lm` (random-intercept mixed-effects via `statsmodels.mixedlm`, optional random slope, returns ICC + fixed effects)
+- **Power planner** `routers/power.py` (5 endpoints): `two_sample_t`, `paired_t`, `proportions`, `anova`, `curve` — each supports `solve_for: n|power|effect` via `statsmodels.stats.power`
+- **Codebook** `routers/codebook.py`: `POST /api/export/codebook` → DOCX data dictionary (title page, dataset summary, study design block, per-variable directory with descriptives + value labels + frequencies)
+- **AI exec summary** in `routers/auto_analyze.py`: `POST /api/analyze/exec-summary` — markdown one-pager (Headline / Key findings / Caveats / Next steps) with executive (250w) / general (400w) / technical (600w) audience presets, reuses `_call_llm` from `routers/ai.py`
+- **Survey weights wired through inferential tests**: `stat_logistic_regression` → `glm(family=Binomial, freq_weights=…)`; `stat_multiple_regression` → `wls(weights=…)` when `StudyDesign.weight_col` is set
+- **Household roster helpers** in `routers/metadata.py`: `POST /api/metadata/roster/to_wide` (long → wide pivot with `{col}_1`, `{col}_2`…), `POST /api/metadata/roster/to_long` (reverse), supports member-id collapse via mean/sum/median/etc.
+- **Frontend wiring**: new `AdvancedAnalysisPanel.tsx` (6 modal forms: DiD, PSM, MixedLM, Power, Codebook, AI Summary); "Advanced Analysis" ribbon group in `RibbonBar.tsx` Statistics tab; `App.tsx` dispatches the 6 actions to `setAdvancedKind`; `AutoAnalyzePanel` now exposes `onPackReady` so the AI Summary form auto-fills the latest pack
+- Route count: 146 → 158. TS clean.
+
+## ✅ Just shipped — TableForge Phase 4 backend (Triangulation library)
+
+- New router `routers/triangulate.py` (6 endpoints): `/api/benchmarks/list`, `/api/benchmarks/{id}`, `/api/benchmarks/meta/topics`, `/api/triangulate` (single value vs indicator), `/api/triangulate/auto` (pull value from dataset column + weights), `/api/triangulate/pack` (batch), `/api/benchmarks/contribute` (analyst extension via `user_extensions.json`)
+- Seed library `tools/tableforge/benchmarks/india_2024.json` — 30 indicators across Census 2011, NFHS-5, NSSO 77, PLFS 2022-23, CGWB, NITI Aayog SDG, PMKSY-PDMC
+- `tools/tableforge/benchmarks/sources.md` — citation manifest + indicator schema + curation rules
+- Verified: backend boots with 146 routes (up from 144); library loads 30 indicators across 13 topics; one-sample z test on a proportion returns expected z = -3.68, p = 0.0002 on a 92%/95.9% smoke case
+- Frontend `TriangulationPanel.tsx` deferred (user instruction)
+
+## ✅ Earlier — TableForge Survey Analysis Studio (Phases 0 + 1 + 2 + 3)
 Roadmap: `tasks/roadmap_survey_analysis_studio.md` · Plan: `~/.claude/plans/zany-spinning-wren.md`
 
 **Phase 0 — Variable Metadata layer**
@@ -40,4 +59,4 @@ Programmatic SEO shipped (commit `125f8e2`): 8 competitor comparisons · 5 long-
 - All FG backend endpoints filter by `tenant_id` on every query
 - CORS: `allow_origins=settings.cors_origins` (env: `CORS_ORIGINS`)
 - RLS: `set_tenant_context()` called in `deps.py` on every authenticated request
-- `IntegrationsPanel.tsx:114` has a pre-existing TS syntax error (unrelated to sprint work)
+- `IntegrationsPanel.tsx`: pre-existing `allow_enumerator_edit` missing on `ProgramListItem` — fixed by adding the optional field to `frontend/src/types/api.ts:54`

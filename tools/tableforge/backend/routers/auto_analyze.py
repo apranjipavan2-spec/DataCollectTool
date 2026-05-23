@@ -23,6 +23,7 @@ from scipy import stats as sp_stats
 from ..shared import datasets, column_roles, study_designs, apply_metrics_and_bins, sanitize_for_json, add_audit_log
 from . import inferential_utils as iu
 from .test_chooser import plan_battery
+from .ai import _call_llm, _load_ai_cfg
 
 
 router = APIRouter()
@@ -601,3 +602,118 @@ async def auto_battery(config: AutoAnalyzeConfig):
         yield f"data: {json.dumps({'step': 'done', 'total': total, 'results': sanitized, 'correction': config.correction})}\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+# ───────────────────────── AI Executive Summary ─────────────────────────
+
+
+class ExecSummaryConfig(BaseModel):
+    dataset_id: str
+    results: list[dict]                         # AnalysisPack results
+    audience: str = "general"                   # general | technical | executive
+    correction: str | None = None
+    title: str | None = None
+    overrides: dict | None = None               # provider/api_key/model overrides
+
+
+def _condense_result(r: dict) -> dict:
+    """Strip an analysis result down to the fields the LLM needs."""
+    t = (r.get("test") or {})
+    return {
+        "kind": r.get("kind"),
+        "label": r.get("label"),
+        "outcome": (r.get("params") or {}).get("outcome") or (r.get("params") or {}).get("cols"),
+        "predictor": (r.get("params") or {}).get("predictor")
+                     or (r.get("params") or {}).get("group_col"),
+        "stat": t.get("stat"),
+        "p_raw": t.get("p_raw"),
+        "p_adj": t.get("p_adj"),
+        "effect_size": t.get("effect_size"),
+        "effect_label": t.get("effect_label"),
+        "ci": t.get("ci"),
+        "n": t.get("n"),
+        "interpretation": r.get("interpretation"),
+        "warnings": r.get("warnings") or [],
+    }
+
+
+@router.post("/api/analyze/exec-summary")
+async def exec_summary(config: ExecSummaryConfig):
+    """Generate a 1-page executive summary from an AnalysisPack."""
+    if config.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    if not config.results:
+        raise HTTPException(400, "results is empty")
+
+    cfg = _load_ai_cfg()
+    if config.overrides:
+        cfg = {**cfg, **{k: v for k, v in config.overrides.items() if v}}
+
+    condensed = [_condense_result(r) for r in config.results]
+    sig = [r for r in condensed if isinstance(r.get("p_adj") or r.get("p_raw"), (int, float))
+           and (r.get("p_adj") or r.get("p_raw")) < 0.05]
+    n_total = len(condensed)
+    n_sig = len(sig)
+
+    audience_guide = {
+        "executive": "Audience: senior decision-makers, non-technical. Lead with the so-what. "
+                     "No jargon. Use bullets. 250 words max.",
+        "general": "Audience: program managers + analysts. Plain English, but you may use terms "
+                   "like 'significant' and 'effect size'. 400 words max.",
+        "technical": "Audience: methodologists / researchers. Mention test names, effect sizes, "
+                     "CIs, and any caveats (multiple-testing correction, small n). 600 words max.",
+    }.get(config.audience, "")
+
+    prompt = f"""You are writing a one-page executive summary of a survey analysis.
+
+{audience_guide}
+
+Context:
+- Total tests run: {n_total}
+- Statistically significant (p<0.05 on {'adjusted' if any(r.get('p_adj') is not None for r in condensed) else 'raw'} p): {n_sig}
+- Multiple-testing correction: {config.correction or 'none'}
+{f'- Study title: {config.title}' if config.title else ''}
+
+Analysis pack (condensed JSON):
+{json.dumps(condensed[:80], default=str)}
+
+Produce the summary with these sections (use markdown headings):
+
+## Headline
+One sentence: the single most important finding.
+
+## Key findings
+3–6 bullets. Each bullet: the substantive finding in plain language, then the
+numeric evidence in parentheses (effect size + CI when present, n).
+
+## Caveats
+2–4 bullets on limitations: any small-n warnings, marginal effects, multiple
+testing, missing data, observational vs. causal.
+
+## Recommended next steps
+2–3 actionable bullets — what to investigate further, what to triangulate, what
+decision this informs.
+
+Rules:
+- Do NOT invent results that aren't in the pack.
+- Cite effect sizes and confidence intervals where present.
+- Mark findings that are only significant on raw p (not adjusted) as exploratory.
+- Match the audience tone.
+"""
+
+    try:
+        text = await _call_llm(cfg, prompt)
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(502, f"AI exec summary failed: {e}")
+
+    add_audit_log(config.dataset_id, "exec_summary",
+                  f"Generated exec summary ({config.audience}) for {n_total} results")
+    return {
+        "summary_markdown": text,
+        "n_total": n_total,
+        "n_significant": n_sig,
+        "audience": config.audience,
+    }

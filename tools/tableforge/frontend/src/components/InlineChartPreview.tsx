@@ -80,19 +80,20 @@ export function InlineChartPreview({ table, result, onEdit, onRemove, onToggleCh
         padding: '6px 12px',
         borderBottom: '1px solid rgba(59,130,246,0.15)',
         background: 'rgba(59,130,246,0.06)',
+        gap: 8,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <span style={{ fontSize: 13 }}>📊</span>
-          <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1, overflow: 'hidden' }}>
+          <span style={{ fontSize: 13, flexShrink: 0 }}>📊</span>
+          <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0 }}>
             Chart{chartOnly ? ' (table hidden)' : ''}
           </span>
           {title && (
-            <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
               · {title}
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 4, overflowX: 'auto', flexShrink: 0, maxWidth: '60%' }}>
           <button onClick={onToggleChartOnly} title={chartOnly ? 'Show table again' : 'Hide table, keep only chart'}
             style={btnStyle()}>
             {chartOnly ? '🗂 Show table' : '🙈 Hide table'}
@@ -127,5 +128,7 @@ function btnStyle(): React.CSSProperties {
     fontSize: 11,
     padding: '3px 8px',
     borderRadius: 4,
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
   };
 }

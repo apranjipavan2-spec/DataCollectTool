@@ -44,6 +44,11 @@ import { SurveyInsightsPanel } from './components/SurveyInsightsPanel';
 import { TypeConvertModal } from './components/TypeConvertModal';
 import { SurveyQualityPanel } from './components/SurveyQualityPanel';
 import { StatGuide, isGuideSkipped } from './components/StatGuide';
+import { AdvancedAnalysisPanel, AdvancedKind } from './components/AdvancedAnalysisPanel';
+
+const ADVANCED_ACTIONS = new Set<AdvancedKind>([
+  'causal_did', 'causal_psm', 'causal_mixed_lm', 'power_planner', 'export_codebook', 'exec_summary',
+]);
 
 function createEmptyTable(id: string, name: string): TableConfig {
   return {
@@ -183,6 +188,8 @@ export default function App() {
   const [previewFocus, setPreviewFocus] = useState<{ row: number; column?: string } | null>(null);
   const [draggedField, setDraggedField] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalType>(null);
+  const [advancedKind, setAdvancedKind] = useState<AdvancedKind | null>(null);
+  const [lastAnalysisPack, setLastAnalysisPack] = useState<any[] | null>(null);
   const [guideSection, setGuideSection] = useState<string | null>(null);
   const [guidePendingModal, setGuidePendingModal] = useState<ModalType>(null);
   const [extraColumns, setExtraColumns] = useState<ColumnInfo[]>([]);
@@ -1369,6 +1376,7 @@ export default function App() {
           else if (a.startsWith('apply_template:')) handleApplyTemplate(a.slice('apply_template:'.length));
           else if (a.startsWith('load_project:')) handleLoadProjectByPath(a.slice('load_project:'.length));
           else if (a === 'stat_guide') { setGuidePendingModal(null); setGuideSection('overview'); }
+          else if (ADVANCED_ACTIONS.has(a as AdvancedKind)) setAdvancedKind(a as AdvancedKind);
           else if (STAT_GUIDE_ACTIONS.has(a)) {
             if (isGuideSkipped(a)) setModal(a as ModalType);
             else { setGuidePendingModal(a as ModalType); setGuideSection(a); }
@@ -1657,7 +1665,8 @@ export default function App() {
               <span className="title-del-label">Delete</span>
             </button>
           </div>
-          {Object.entries(projectFilters).some(([, v]) => v && v.length > 0) && (
+          {Object.entries(projectFilters).some(([, v]) => v && v.length > 0) &&
+           (!activeTable.chartConfig || (!activeTable.chartConfig.chart_only && previewTab !== 'chart')) && (
             <div className="project-filter-chips" title="Project-wide filters apply to all tables">
               <span className="pf-chips-label">🌐 Project filters:</span>
               {Object.entries(projectFilters).map(([field, values]) => {
@@ -2005,11 +2014,21 @@ export default function App() {
           onClose={() => setModal(null)}
         />
       )}
+      {advancedKind && (
+        <AdvancedAnalysisPanel
+          kind={advancedKind}
+          datasetId={dataset.dataset_id}
+          columns={allColumns}
+          analysisPack={lastAnalysisPack}
+          onClose={() => setAdvancedKind(null)}
+        />
+      )}
       {modal === 'auto_analyze' && (
         <AutoAnalyzePanel
           datasetId={dataset.dataset_id}
           columns={allColumns}
           columnRoles={columnRolesMap}
+          onPackReady={(pack) => setLastAnalysisPack(pack)}
           onClose={() => setModal(null)}
           onPromote={(label, headers, rows, interpretation) => {
             const id = String(Date.now() + Math.floor(Math.random() * 1000));

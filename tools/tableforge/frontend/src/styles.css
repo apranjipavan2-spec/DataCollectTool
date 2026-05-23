@@ -1103,7 +1103,7 @@ body {
   position: absolute;
   top: calc(100% + 2px);
   left: 0;
-  z-index: 1200;
+  z-index: 5000;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -2044,13 +2044,42 @@ textarea.fdrop-input { resize: vertical; }
 }
 
 /* ─── Chart Builder ─── */
-.chart-modal { width: min(96vw, 1020px); max-height: 92vh; display: flex; flex-direction: column; }
+.chart-modal { width: min(96vw, 1180px); max-height: 94vh; display: flex; flex-direction: column; }
 .chart-layout { display: flex; gap: 0; flex: 1; overflow: hidden; }
 
 .chart-controls {
-  width: 220px; flex-shrink: 0; padding: 14px 12px; overflow-y: auto;
-  border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px;
+  width: 260px; flex-shrink: 0; padding: 0 0 8px 0; overflow: hidden;
+  border-right: 1px solid var(--border); display: flex; flex-direction: column;
 }
+.chart-controls-body { padding: 12px 12px 4px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+
+.chart-tabs {
+  display: flex; border-bottom: 1px solid var(--border); padding: 0 6px; gap: 2px;
+  background: rgba(0,0,0,0.18); flex-shrink: 0;
+}
+.chart-tab {
+  background: transparent; border: none; color: var(--text-dim);
+  padding: 8px 10px; font-size: 11px; cursor: pointer; font-weight: 600;
+  border-bottom: 2px solid transparent; transition: color 0.1s, border-color 0.1s;
+  letter-spacing: 0.03em; text-transform: uppercase;
+}
+.chart-tab:hover { color: var(--text); }
+.chart-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+.chart-modal-footer {
+  display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border);
+  background: rgba(0,0,0,0.22); flex-shrink: 0; align-items: center;
+}
+.chart-modal-footer .footer-spacer { flex: 1; }
+
+.chart-title-inline-input {
+  background: transparent; border: 1px dashed transparent; color: var(--text);
+  font-weight: 700; text-align: center; padding: 4px 8px; border-radius: 4px;
+  width: 100%; transition: border-color 0.1s, background 0.1s;
+}
+.chart-title-inline-input:hover { border-color: var(--border); }
+.chart-title-inline-input:focus { border-color: var(--primary); background: rgba(59,130,246,0.06); outline: none; }
+
 .chart-controls .form-group { gap: 5px; }
 .chart-controls label { font-size: 11px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 
@@ -2077,6 +2106,19 @@ textarea.fdrop-input { resize: vertical; }
   flex: 1; display: flex; flex-direction: column; align-items: center;
   justify-content: center; padding: 16px; overflow: hidden; gap: 8px;
 }
+.chart-resize-frame { user-select: none; }
+.chart-resize-handle {
+  position: absolute;
+  right: -2px; bottom: -2px;
+  width: 16px; height: 16px;
+  cursor: nwse-resize;
+  background:
+    linear-gradient(135deg, transparent 0%, transparent 45%, var(--primary, #3b82f6) 45%, var(--primary, #3b82f6) 55%, transparent 55%, transparent 70%, var(--primary, #3b82f6) 70%, var(--primary, #3b82f6) 80%, transparent 80%);
+  opacity: 0.65;
+  transition: opacity 0.12s;
+  z-index: 5;
+}
+.chart-resize-handle:hover { opacity: 1; }
 .chart-title-display { font-size: 15px; font-weight: 700; color: var(--text); text-align: center; }
 .chart-meta { font-size: 11px; color: var(--text-dim); text-align: center; }
 
@@ -2218,7 +2260,7 @@ textarea.fdrop-input { resize: vertical; }
   flex-shrink: 0;
   animation: ribbonSlideIn 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
-  z-index: 100;
+  z-index: 1500;
   scrollbar-width: thin;
   scrollbar-color: #2a2e3f transparent;
 }

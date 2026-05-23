@@ -475,7 +475,7 @@ async def stat_logistic_regression(config: InferConfig):
     """Binary logistic regression with odds ratios + 95% CI."""
     try:
         import statsmodels.api as sm
-        from statsmodels.formula.api import logit
+        from statsmodels.formula.api import logit, glm
         df = _prepare(config)
         y_col, x_cols = _resolve_regression_cols(config)
         sub = df[[y_col] + x_cols].copy()
@@ -498,11 +498,23 @@ async def stat_logistic_regression(config: InferConfig):
             else:
                 terms.append(f"C(Q('{c}'))")
         formula = f"Q('{y_col}') ~ " + " + ".join(terms)
-        sub = sub.dropna()
+
+        # Optional survey weights from StudyDesign
+        w_series, w_col = _resolve_weights(config.dataset_id, df)
+        if w_series is not None:
+            sub = sub.assign(__w__=pd.to_numeric(w_series.reindex(sub.index), errors="coerce"))
+            sub = sub.dropna()
+            sub = sub[sub["__w__"] > 0]
+        else:
+            sub = sub.dropna()
         if len(sub) < len(x_cols) + 5:
             raise HTTPException(400, f"Not enough data ({len(sub)}) for logistic regression")
         try:
-            model = logit(formula, data=sub).fit(disp=False, maxiter=200)
+            if w_series is not None:
+                model = glm(formula, data=sub, family=sm.families.Binomial(),
+                            freq_weights=sub["__w__"].values).fit(disp=False, maxiter=200)
+            else:
+                model = logit(formula, data=sub).fit(disp=False, maxiter=200)
         except Exception as e:
             raise HTTPException(400, f"Logit fit failed: {e}")
         coefs = model.params
@@ -524,19 +536,32 @@ async def stat_logistic_regression(config: InferConfig):
                 sig,
             ])
         # Goodness-of-fit
-        ll, ll_null = model.llf, model.llnull
-        pseudo_r2 = 1 - ll / ll_null if ll_null else float("nan")
-        aic, bic = model.aic, model.bic
+        ll = getattr(model, "llf", None)
+        ll_null = getattr(model, "llnull", None)
+        pseudo_r2 = (1 - ll / ll_null) if (ll is not None and ll_null) else float("nan")
+        aic = getattr(model, "aic", None)
+        bic = getattr(model, "bic", None)
         rows.append([""] * len(headers))
         rows.append(["N", int(model.nobs)] + [""] * (len(headers) - 2))
-        rows.append(["Log-likelihood", iu.safe_round(ll)] + [""] * (len(headers) - 2))
-        rows.append(["LL-Null", iu.safe_round(ll_null)] + [""] * (len(headers) - 2))
+        if ll is not None:
+            rows.append(["Log-likelihood", iu.safe_round(ll)] + [""] * (len(headers) - 2))
+        if ll_null is not None:
+            rows.append(["LL-Null", iu.safe_round(ll_null)] + [""] * (len(headers) - 2))
         rows.append(["McFadden pseudo-R²", iu.safe_round(pseudo_r2)] + [""] * (len(headers) - 2))
-        rows.append(["AIC", iu.safe_round(aic)] + [""] * (len(headers) - 2))
-        rows.append(["BIC", iu.safe_round(bic)] + [""] * (len(headers) - 2))
-        return {"headers": headers, "rows": sanitize_for_json(rows), "row_count": len(rows),
+        if aic is not None:
+            rows.append(["AIC", iu.safe_round(aic)] + [""] * (len(headers) - 2))
+        if bic is not None:
+            rows.append(["BIC", iu.safe_round(bic)] + [""] * (len(headers) - 2))
+        interp = "OR > 1 means higher odds of the outcome per unit increase. McFadden pseudo-R² ≥ 0.2 typically indicates good fit."
+        if w_series is not None:
+            interp += f" Weighted (freq_weights) using '{w_col}'; SEs are model-based."
+        resp = {"headers": headers, "rows": sanitize_for_json(rows), "row_count": len(rows),
                 "col_count": len(headers), "table_type": "logistic_regression",
-                "interpretation": "OR > 1 means higher odds of the outcome per unit increase. McFadden R² ≥ 0.2 typically indicates good fit."}
+                "interpretation": interp}
+        if w_series is not None:
+            resp["weighted"] = True
+            resp["weight_col"] = w_col
+        return resp
     except HTTPException:
         raise
     except Exception as e:
@@ -562,10 +587,22 @@ async def stat_multiple_regression(config: InferConfig):
             else:
                 terms.append(f"C(Q('{c}'))")
         formula = f"Q('{y_col}') ~ " + " + ".join(terms)
-        sub = sub.dropna()
+
+        # Optional survey weights from StudyDesign
+        w_series, w_col = _resolve_weights(config.dataset_id, df)
+        if w_series is not None:
+            sub = sub.assign(__w__=pd.to_numeric(w_series.reindex(sub.index), errors="coerce"))
+            sub = sub.dropna()
+            sub = sub[sub["__w__"] > 0]
+        else:
+            sub = sub.dropna()
         if len(sub) < len(x_cols) + 3:
             raise HTTPException(400, f"Not enough data ({len(sub)}) for regression")
-        model = ols(formula, data=sub).fit()
+        if w_series is not None:
+            from statsmodels.formula.api import wls
+            model = wls(formula, data=sub, weights=sub["__w__"].values).fit()
+        else:
+            model = ols(formula, data=sub).fit()
         coefs = model.params
         ses = model.bse
         pvals = model.pvalues
@@ -610,9 +647,15 @@ async def stat_multiple_regression(config: InferConfig):
         }
         interp = f"Model explains {model.rsquared*100:.1f}% of variance in {y_col}. "
         interp += "Overall F " + ("is" if (model.f_pvalue or 1) < 0.05 else "is NOT") + f" significant (p={iu.safe_round(model.f_pvalue, 6)})."
-        return {"headers": headers, "rows": sanitize_for_json(rows), "row_count": len(rows),
+        if w_series is not None:
+            interp += f" Weighted (WLS) using '{w_col}'; SEs are model-based."
+        resp = {"headers": headers, "rows": sanitize_for_json(rows), "row_count": len(rows),
                 "col_count": len(headers), "table_type": "multiple_regression",
                 "summary": summary, "interpretation": interp}
+        if w_series is not None:
+            resp["weighted"] = True
+            resp["weight_col"] = w_col
+        return resp
     except HTTPException:
         raise
     except Exception as e:

@@ -20,6 +20,8 @@ export interface ChartCanvasConfig {
   // Tick label rotation (degrees). Defaults to 'auto' (-35 when >8 categories).
   xLabelRotation?: number | 'auto';
   yLabelRotation?: number;  // for tick values on Y axis (default 0)
+  // When the cell display is "value (pct%)", render value on line 1 and percent on line 2.
+  valueLabelSplit?: boolean;
 }
 
 interface Props {
@@ -39,8 +41,11 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   svgRef,
 ) {
   const W = width, H = height;
-  const ML = 62, MR = 24, MT = 28, MB = 60;
-  const PW = W - ML - MR, PH = H - MT - MB;
+  // MB is recomputed below once we know whether x-tick labels are rotated.
+  const ML = 78, MR = 24, MT = 28;
+  let MB = 60;
+  let PH = H - MT - MB;
+  const PW = W - ML - MR;
 
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
   const showTip = (e: React.MouseEvent, text: string) => {
@@ -94,13 +99,60 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
     }));
   }, [rows, xIdx, yIndices]);
 
+  const valueLabelSplit = !!config.valueLabelSplit;
   // Use raw cell string when it carries formatting (%, parens, comma) the
   // bare fmt(v) would drop. Otherwise prefer the compact fmt rendering.
+  // If valueLabelSplit is set and the cell looks like "123 (45.6%)", split
+  // it onto two lines so the value/percent stack vertically above the bar.
   const dispLabel = (display: string | undefined, v: number): string => {
     if (!display) return fmt(v);
-    if (/[%()\/a-zA-Z]/.test(display)) return display;
-    return fmt(v);
+    const hasFormat = /[%()\/a-zA-Z]/.test(display);
+    if (!hasFormat) return fmt(v);
+    if (valueLabelSplit) {
+      const m = display.match(/^([^()]+?)\s*(\(.+\))\s*$/);
+      if (m) return `${m[1].trim()}\n${m[2].trim()}`;
+    }
+    return display;
   };
+
+  // Render a label that may contain newlines (table cells like "7\n(88%)"
+  // mirror through as multi-line tspans). y is the BOTTOM baseline so the
+  // block sits above the bar's y-offset.
+  const renderLabel = (
+    x: number, y: number, text: string,
+    opts: { anchor?: 'start' | 'middle' | 'end'; size: number; fill: string; weight?: number | string; transform?: string } = { size: 10, fill: '#fff' },
+  ) => {
+    const lines = String(text || '').split(/\r?\n+/);
+    const anchor = opts.anchor || 'middle';
+    if (lines.length === 1) {
+      return <text x={x} y={y} textAnchor={anchor} fontSize={opts.size} fill={opts.fill}
+        fontWeight={opts.weight as any} transform={opts.transform}>{text}</text>;
+    }
+    const lineH = opts.size + 1;
+    const liftFirst = -(lines.length - 1) * lineH;
+    return (
+      <text x={x} y={y} textAnchor={anchor} fontSize={opts.size} fill={opts.fill}
+        fontWeight={opts.weight as any} transform={opts.transform}>
+        {lines.map((ln, i) => (
+          <tspan key={i} x={x} dy={i === 0 ? liftFirst : lineH}>{ln}</tspan>
+        ))}
+      </text>
+    );
+  };
+
+  // Auto-rotation decision needs to happen BEFORE we pin MB so bottom margin
+  // can grow to fit rotated x-tick labels + the axis caption.
+  const effectiveXRot = xRot !== null ? xRot : (multiData.length > 8 ? -35 : 0);
+  const xIsRotated = effectiveXRot !== 0;
+  const xRotMag = Math.abs(effectiveXRot);
+  // How far down rotated labels visually sweep from the tick line.
+  const labelSweep = xIsRotated ? (xRotMag >= 60 ? 90 : 70) : 18;
+  const hasXCaption = !!xAxisLabel && chartType !== 'bar_h';
+  const captionGap = hasXCaption ? 22 : 0;
+  MB = 14 + labelSweep + captionGap;
+  PH = H - MT - MB;
+  // Where the x-axis caption sits (below the rotated label sweep).
+  const xLabelExtraOffset = labelSweep + 8;
 
   const allValues = multiData.flatMap(d => d.values);
   const maxVal = allValues.length ? Math.max(...allValues) : 1;
@@ -112,6 +164,15 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   const effectiveMax = chartType === 'stacked' ? stackMax : maxVal;
 
   const yTicks = ticksArr(minVal, effectiveMax);
+  // Pad the top tick if it sits below the actual max — otherwise bars overshoot
+  // the chart area (e.g., max=99 with step=20 produces ticks [0..80]).
+  const topTick0 = yTicks.length ? Math.max(...yTicks) : 1;
+  if (topTick0 < effectiveMax && yTicks.length >= 2) {
+    const step = yTicks[1] - yTicks[0];
+    let nextTop = topTick0 + step;
+    while (nextTop < effectiveMax) nextTop += step;
+    yTicks.push(parseFloat(nextTop.toFixed(10)));
+  }
   const yMax = Math.max(...yTicks);
   const yMin = Math.min(...yTicks);
   const yRange = yMax - yMin || 1;
@@ -191,35 +252,29 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
           );
         })}
         {chartType !== 'bar_h' && (() => {
-          const effectiveRot = xRot !== null ? xRot : (multiData.length > 8 ? -35 : 0);
-          const isRotated = effectiveRot !== 0;
           // When labels are rotated, give them room and anchor at the end so the text grows up-left from the tick.
           const tickY = MT + PH + 14;
           return multiData.map((d, i) => {
             const x = xToSvg(i, multiData.length);
-            const maxLen = isRotated ? 22 : 12;
+            const maxLen = xIsRotated ? 22 : 12;
             const shown = d.label.length > maxLen ? d.label.slice(0, maxLen) + '…' : d.label;
             return (
               <text key={i} x={x} y={tickY}
-                textAnchor={isRotated ? (effectiveRot < 0 ? 'end' : 'start') : 'middle'}
+                textAnchor={xIsRotated ? (effectiveXRot < 0 ? 'end' : 'start') : 'middle'}
                 fontSize={labelFontSize} fill={labelColor}
-                transform={isRotated ? `rotate(${effectiveRot},${x},${tickY})` : undefined}>
+                transform={xIsRotated ? `rotate(${effectiveXRot},${x},${tickY})` : undefined}>
                 <title>{d.label}</title>
                 {shown}
               </text>
             );
           });
         })()}
-        {(xAxisLabel || effectiveX) && chartType !== 'bar_h' && (() => {
-          const effectiveRot = xRot !== null ? xRot : (multiData.length > 8 ? -35 : 0);
-          const extraOffset = effectiveRot !== 0 ? (Math.abs(effectiveRot) >= 60 ? 56 : 38) : 24;
-          return (
-            <text x={ML + PW / 2} y={MT + PH + extraOffset + 8} textAnchor="middle"
-              fontSize={labelFontSize + 1} fill="#e4e4e7" fontWeight={500}>
-              {xAxisLabel || effectiveX}
-            </text>
-          );
-        })()}
+        {hasXCaption && (
+          <text x={ML + PW / 2} y={MT + PH + xLabelExtraOffset + 4} textAnchor="middle"
+            fontSize={labelFontSize + 1} fill="#e4e4e7" fontWeight={500}>
+            {xAxisLabel}
+          </text>
+        )}
         {(yAxisLabel || yFieldsResolved[0]) && (
           <text x={14} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill="#e4e4e7" fontWeight={500}
             transform={`rotate(-90,14,${MT + PH / 2})`}>
@@ -242,7 +297,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                 <rect x={x} y={y} width={barW} height={Math.max(h, 1)} fill={colors[i % colors.length]} rx={2} opacity={barOpacity}
                   onMouseEnter={e => showTip(e, `${d.label}\n${dispLabel(d.displays[0], v)}`)}
                   onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
-                {showLabels && <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={labelFontSize - 1} fill={colors[i % colors.length]}>{dispLabel(d.displays[0], v)}</text>}
+                {showLabels && renderLabel(x + barW / 2, y - 4, dispLabel(d.displays[0], v), { size: labelFontSize - 1, fill: colors[i % colors.length] })}
               </g>
             );
           })}
@@ -273,7 +328,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                   fill={colors[i % colors.length]} rx={2} opacity={barOpacity}
                   onMouseEnter={e => showTip(e, `${d.label}\n${dispLabel(d.displays[0], v)}`)}
                   onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
-                {showLabels && <text x={Math.max(xScale(0), xScale(v)) + 4} y={y + rowH / 2 + 4} fontSize={labelFontSize - 1} fill={colors[i % colors.length]}>{dispLabel(d.displays[0], v)}</text>}
+                {showLabels && renderLabel(Math.max(xScale(0), xScale(v)) + 4, y + rowH / 2 + 4, dispLabel(d.displays[0], v), { anchor: 'start', size: labelFontSize - 1, fill: colors[i % colors.length] })}
               </g>
             );
           })}
@@ -301,7 +356,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                       onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
                   );
                 })}
-                {showLabels && <text x={x + barW / 2} y={cumY - 4} textAnchor="middle" fontSize={labelFontSize - 1} fill="#e4e4e7">{fmt(d.values.reduce((s, v) => s + v, 0))}</text>}
+                {showLabels && renderLabel(x + barW / 2, cumY - 4, fmt(d.values.reduce((s, v) => s + v, 0)), { size: labelFontSize - 1, fill: '#e4e4e7' })}
               </g>
             );
           })}
@@ -327,12 +382,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                         fill={colors[si % colors.length]} rx={1} opacity={barOpacity}
                         onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${dispLabel(d.displays[si], v)}`)}
                         onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
-                      {showLabels && (
-                        <text x={x + groupBarW / 2} y={y - 3} textAnchor="middle"
-                          fontSize={labelFontSize - 2} fill={colors[si % colors.length]}>
-                          {dispLabel(d.displays[si], v)}
-                        </text>
-                      )}
+                      {showLabels && renderLabel(x + groupBarW / 2, y - 3, dispLabel(d.displays[si], v), { size: labelFontSize - 2, fill: colors[si % colors.length] })}
                     </g>
                   );
                 })}
@@ -362,8 +412,9 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                     onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
                 ))}
                 {showLabels && multiData.map((d, i) => (
-                  <text key={i} x={xToSvg(i, multiData.length)} y={yToSvg(d.values[si]) - 8}
-                    textAnchor="middle" fontSize={labelFontSize - 1} fill={colors[si % colors.length]}>{dispLabel(d.displays[si], d.values[si])}</text>
+                  <React.Fragment key={i}>
+                    {renderLabel(xToSvg(i, multiData.length), yToSvg(d.values[si]) - 8, dispLabel(d.displays[si], d.values[si]), { size: labelFontSize - 1, fill: colors[si % colors.length] })}
+                  </React.Fragment>
                 ))}
               </g>
             );
@@ -518,7 +569,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                     x2={xToSvg(i + 1, multiData.length) - barW / 2} y2={y1}
                     stroke="rgba(255,255,255,0.15)" strokeWidth={1} strokeDasharray="3,2" />
                 )}
-                {showLabels && <text x={xToSvg(i, multiData.length)} y={top - 4} textAnchor="middle" fontSize={labelFontSize - 1} fill={isPos ? colors[0] : '#ef4444'}>{dispLabel(d.displays[0], v)}</text>}
+                {showLabels && renderLabel(xToSvg(i, multiData.length), top - 4, dispLabel(d.displays[0], v), { size: labelFontSize - 1, fill: isPos ? colors[0] : '#ef4444' })}
               </g>
             );
           })}
