@@ -374,7 +374,16 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
           fontSize: titleSize,
           textAlign: titleAlign as any,
           color: tableConfig?.title_color || undefined,
-        }}>{tableNumberLabel}{title}</div>
+        }}>
+          {tableNumberLabel && (
+            <span className="table-number-badge" style={{
+              color: '#60a5fa',
+              fontWeight: 700,
+              marginRight: tableNumberLabel.trim().endsWith(':') ? 6 : 8,
+            }}>{tableNumberLabel.trim()}</span>
+          )}
+          {title}
+        </div>
       )}
       {subtitle && <div className="table-subtitle">{subtitle}</div>}
       {/* In-table filter bar (Ctrl+F to toggle) */}

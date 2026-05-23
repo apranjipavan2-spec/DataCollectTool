@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { TableResult, TableConfig } from '../types';
 import { ChartCanvas, ChartCanvasConfig } from './ChartCanvas';
-import { LegendPos, W_DEFAULT, H_DEFAULT } from './chartUtils';
+import { LegendPos, W_DEFAULT, H_DEFAULT, figTitleFromTable } from './chartUtils';
 
 interface Props {
   table: TableConfig;
@@ -28,10 +28,13 @@ export function InlineChartPreview({ table, result, onEdit, onRemove, onToggleCh
     yAxisLabel: cc.yAxisLabel,
     labelFontSize: cc.labelFontSize || 10,
     barOpacity: cc.barOpacity ?? 0.9,
+    xLabelRotation: cc.xLabelRotation,
+    yLabelRotation: cc.yLabelRotation,
   };
 
   const chartOnly = !!cc.chart_only;
-  const title = cc.chartTitle as string | undefined;
+  const savedTitle = (cc.chartTitle as string | undefined) || '';
+  const title = savedTitle.trim() || figTitleFromTable(table);
   const titleFontSize = (cc.titleFontSize as number | undefined) || 14;
 
   const downloadSvg = () => {

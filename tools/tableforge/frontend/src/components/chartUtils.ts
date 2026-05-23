@@ -31,6 +31,15 @@ export const PALETTES: { name: string; colors: string[] }[] = [
   { name: 'Lavender',  colors: ['#8b5cf6','#a78bfa','#c4b5fd','#7c3aed','#6d28d9','#ec4899','#f472b6'] },
   { name: 'Mono',      colors: ['#e2e8f0','#cbd5e1','#94a3b8','#64748b','#475569','#334155','#1e293b'] },
   { name: 'Corporate', colors: ['#1e3a5f','#4a90d9','#7ab3ef','#2c5f2d','#97bc62','#d4a017','#c75b12'] },
+  // — new vibrant / categorical palettes ——————————————————————————————
+  { name: 'Vibrant',   colors: ['#ef4444','#f59e0b','#10b981','#3b82f6','#8b5cf6','#ec4899','#06b6d4'] },
+  { name: 'Categorical', colors: ['#4e79a7','#f28e2c','#e15759','#76b7b2','#59a14f','#edc949','#af7aa1','#ff9da7','#9c755f','#bab0ab'] },
+  { name: 'Pastel',    colors: ['#fbb4ae','#b3cde3','#ccebc5','#decbe4','#fed9a6','#ffffcc','#e5d8bd','#fddaec'] },
+  { name: 'Viridis',   colors: ['#440154','#482878','#3e4989','#31688e','#26828e','#1f9e89','#35b779','#6ece58','#b5de2b','#fde725'] },
+  { name: 'Ocean',     colors: ['#0c4a6e','#0369a1','#0284c7','#0ea5e9','#38bdf8','#7dd3fc','#bae6fd','#06b6d4','#22d3ee','#67e8f9'] },
+  { name: 'Forest',    colors: ['#14532d','#166534','#15803d','#16a34a','#22c55e','#4ade80','#86efac','#65a30d','#84cc16','#a3e635'] },
+  { name: 'Warm',      colors: ['#7c2d12','#9a3412','#c2410c','#ea580c','#f97316','#fb923c','#fdba74','#fed7aa','#f59e0b','#fbbf24'] },
+  { name: 'Berry',     colors: ['#831843','#9d174d','#be185d','#db2777','#ec4899','#f472b6','#f9a8d4','#7c3aed','#a855f7','#c084fc'] },
 ];
 
 export function paletteColorsByName(name: string | undefined, fallback = PALETTES[0]): string[] {
@@ -115,3 +124,18 @@ export const ML_DEFAULT = 62;
 export const MR_DEFAULT = 24;
 export const MT_DEFAULT = 28;
 export const MB_DEFAULT = 60;
+
+// Build the default chart title for a table — "Fig N: <table title>".
+// If the table already has an explicit table_number, swap the "Table" prefix
+// for "Fig". Otherwise fall back to a plain "Fig: <title>".
+export function figTitleFromTable(t: { title?: string; name?: string; table_number?: string }): string {
+  const base = (t.title || t.name || '').trim();
+  if (!base) return '';
+  const tn = (t.table_number || '').trim();
+  if (tn) {
+    const numClean = tn.replace(/^Table\s+/i, '').replace(/[:.\s]+$/, '').trim();
+    const bareTitle = base.replace(/^Table\s+[^:]+:\s*/i, '').trim();
+    return numClean ? `Fig ${numClean}: ${bareTitle}` : `Fig: ${bareTitle}`;
+  }
+  return `Fig: ${base}`;
+}

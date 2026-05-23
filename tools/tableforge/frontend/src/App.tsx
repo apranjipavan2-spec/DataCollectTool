@@ -1567,19 +1567,18 @@ export default function App() {
                     {Math.round(h.success_rate * 100)}% parse OK
                     {h.fail_count > 0 ? `, ${h.fail_count} cells won't parse` : ''})
                   </span>
-                  <button className="type-hint-preview" title="See what will fail to parse"
+                  <button className="type-hint-btn type-hint-btn-primary" title="See what will fail to parse"
                     onClick={() => {
                       if (!dataset) return;
                       setTypeConvertModal({ column: h.column, newType: h.suggested_type });
-                    }}>Preview & convert</button>
-                  <button className="type-hint-apply" title="Convert without preview"
+                    }}>Preview &amp; convert</button>
+                  <button className="type-hint-btn" title="Convert without preview"
                     onClick={() => handleColumnTypeChange(h.column, h.suggested_type)}>
                     Convert
                   </button>
-                  <button className="type-hint-apply" title="Open this column in the Cleaner to inspect every cell, fix the failing ones, and return."
-                    style={{ background: 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff' }}
+                  <button className="type-hint-btn" title="Open this column in the Cleaner to inspect every cell, fix the failing ones, and return."
                     onClick={() => handleOpenInCleaner(h.column)}>
-                    🧹 Fix in Cleaner
+                    Fix in Cleaner
                   </button>
                   <button className="type-hint-dismiss" title="Dismiss this hint"
                     onClick={() => setDismissedHints(prev => new Set(prev).add(h.column))}>×</button>

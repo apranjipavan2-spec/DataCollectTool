@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { TableResult, TableConfig } from '../types';
 import { ChartCanvas, ChartCanvasConfig } from './ChartCanvas';
-import { CHART_TYPES, PALETTES, ChartType, LegendPos, classifyColumns, W_DEFAULT, H_DEFAULT } from './chartUtils';
+import { CHART_TYPES, PALETTES, ChartType, LegendPos, classifyColumns, W_DEFAULT, H_DEFAULT, figTitleFromTable } from './chartUtils';
 
 interface Props {
   tables: TableConfig[];
@@ -28,6 +28,8 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
   const [titleFontSize, setTitleFontSize] = useState(14);
   const [barOpacity, setBarOpacity] = useState(0.9);
   const [chartOnly, setChartOnly] = useState(false);
+  const [xLabelRotation, setXLabelRotation] = useState<number | 'auto'>('auto');
+  const [yLabelRotation, setYLabelRotation] = useState<number>(0);
   const svgRef = useRef<SVGSVGElement>(null);
 
   const table = tables[tableIdx];
@@ -49,12 +51,16 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
       setTitleFontSize(cc.titleFontSize || 14);
       setBarOpacity(cc.barOpacity ?? 0.9);
       setChartOnly(!!cc.chart_only);
+      const xRot = cc.xLabelRotation;
+      setXLabelRotation(xRot === undefined || xRot === null ? 'auto' : (xRot === 'auto' ? 'auto' : Number(xRot)));
+      setYLabelRotation(typeof cc.yLabelRotation === 'number' ? cc.yLabelRotation : 0);
     } else {
       setChartType('bar'); setXField(''); setYFields([]);
       setPalette(0); setShowGrid(true); setShowLabels(false); setShowLegend('right');
       setChartTitle(''); setXAxisLabel(''); setYAxisLabel('');
       setLabelFontSize(10); setTitleFontSize(14); setBarOpacity(0.9);
       setChartOnly(false);
+      setXLabelRotation('auto'); setYLabelRotation(0);
     }
   }, [table?.id]);
 
@@ -80,7 +86,11 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
     paletteName: PALETTES[palette]?.name,
     showGrid, showLabels, showLegend,
     xAxisLabel, yAxisLabel, labelFontSize, barOpacity,
+    xLabelRotation, yLabelRotation,
   });
+
+  const autoFigTitle = useMemo(() => table ? figTitleFromTable(table) : '', [table?.title, table?.name, table?.table_number]);
+  const effectiveTitle = chartTitle.trim() || autoFigTitle;
 
   const saveAndClose = () => {
     if (onChartChange && table) {
@@ -93,6 +103,7 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
         chartTitle, xAxisLabel, yAxisLabel,
         labelFontSize, titleFontSize, barOpacity,
         chart_only: chartOnly,
+        xLabelRotation, yLabelRotation,
       });
     }
     onClose();
@@ -200,7 +211,12 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
 
             <div className="form-group">
               <label>Chart Title</label>
-              <input type="text" value={chartTitle} onChange={e => setChartTitle(e.target.value)} placeholder="Optional title" />
+              <input type="text" value={chartTitle} onChange={e => setChartTitle(e.target.value)} placeholder={autoFigTitle || 'Optional title'} />
+              {!chartTitle && autoFigTitle && (
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3 }}>
+                  Defaulting to: <span style={{ color: '#60a5fa' }}>{autoFigTitle}</span>
+                </div>
+              )}
             </div>
 
             <div className="form-group" style={{ display: 'flex', gap: 6 }}>
@@ -211,6 +227,29 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 10 }}>Y Label</label>
                 <input type="text" value={yAxisLabel} onChange={e => setYAxisLabel(e.target.value)} placeholder="Auto" style={{ fontSize: 11 }} />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ display: 'flex', gap: 6 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 10 }}>X Label Angle</label>
+                <select value={String(xLabelRotation)} onChange={e => setXLabelRotation(e.target.value === 'auto' ? 'auto' : Number(e.target.value))} style={{ fontSize: 11 }}>
+                  <option value="auto">Auto</option>
+                  <option value="0">0° (horizontal)</option>
+                  <option value="-30">-30°</option>
+                  <option value="-45">-45°</option>
+                  <option value="-60">-60°</option>
+                  <option value="-90">-90° (vertical)</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 10 }}>Y Tick Angle</label>
+                <select value={String(yLabelRotation)} onChange={e => setYLabelRotation(Number(e.target.value))} style={{ fontSize: 11 }}>
+                  <option value="0">0°</option>
+                  <option value="-30">-30°</option>
+                  <option value="-45">-45°</option>
+                  <option value="-90">-90°</option>
+                </select>
               </div>
             </div>
 
@@ -254,7 +293,7 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
 
           {/* Chart canvas */}
           <div className="chart-canvas-wrap" style={{ flex: 1 }}>
-            {chartTitle && <div className="chart-title-display" style={{ fontSize: titleFontSize }}>{chartTitle}</div>}
+            {effectiveTitle && <div className="chart-title-display" style={{ fontSize: titleFontSize }}>{effectiveTitle}</div>}
             <ChartCanvas ref={svgRef} result={result} config={buildConfig()} width={W_DEFAULT} height={H_DEFAULT} />
             {result && (
               <div className="chart-meta">

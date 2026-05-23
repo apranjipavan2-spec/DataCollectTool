@@ -17,6 +17,9 @@ export interface ChartCanvasConfig {
   yAxisLabel?: string;
   labelFontSize?: number;
   barOpacity?: number;
+  // Tick label rotation (degrees). Defaults to 'auto' (-35 when >8 categories).
+  xLabelRotation?: number | 'auto';
+  yLabelRotation?: number;  // for tick values on Y axis (default 0)
 }
 
 interface Props {
@@ -67,6 +70,11 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   const barOpacity = config.barOpacity ?? 0.9;
   const xAxisLabel = config.xAxisLabel || '';
   const yAxisLabel = config.yAxisLabel || '';
+  const xRotRaw = config.xLabelRotation;
+  const xRot = (xRotRaw === undefined || xRotRaw === 'auto')
+    ? null  // auto-decide later (depends on category count)
+    : Number(xRotRaw);
+  const yTickRot = typeof config.yLabelRotation === 'number' ? config.yLabelRotation : 0;
 
   const multiData = useMemo(() => {
     if (xIdx < 0 || yIndices.length === 0) return [] as { label: string; values: number[] }[];
@@ -160,24 +168,43 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
           return (
             <g key={i}>
               {showGrid && <line x1={ML} y1={y} x2={ML + PW} y2={y} stroke={gridColor} strokeWidth={1} strokeDasharray="3,3" />}
-              <text x={ML - 6} y={y + 4} textAnchor="end" fontSize={labelFontSize} fill={labelColor}>{fmt(t)}</text>
+              <text x={ML - 6} y={y + 4} textAnchor="end" fontSize={labelFontSize} fill={labelColor}
+                transform={yTickRot ? `rotate(${yTickRot},${ML - 6},${y + 4})` : undefined}>
+                {fmt(t)}
+              </text>
             </g>
           );
         })}
-        {chartType !== 'bar_h' && multiData.map((d, i) => {
-          const x = xToSvg(i, multiData.length);
+        {chartType !== 'bar_h' && (() => {
+          const effectiveRot = xRot !== null ? xRot : (multiData.length > 8 ? -35 : 0);
+          const isRotated = effectiveRot !== 0;
+          // When labels are rotated, give them room and anchor at the end so the text grows up-left from the tick.
+          const tickY = MT + PH + 14;
+          return multiData.map((d, i) => {
+            const x = xToSvg(i, multiData.length);
+            const maxLen = isRotated ? 22 : 12;
+            const shown = d.label.length > maxLen ? d.label.slice(0, maxLen) + '…' : d.label;
+            return (
+              <text key={i} x={x} y={tickY}
+                textAnchor={isRotated ? (effectiveRot < 0 ? 'end' : 'start') : 'middle'}
+                fontSize={labelFontSize} fill={labelColor}
+                transform={isRotated ? `rotate(${effectiveRot},${x},${tickY})` : undefined}>
+                <title>{d.label}</title>
+                {shown}
+              </text>
+            );
+          });
+        })()}
+        {(xAxisLabel || effectiveX) && chartType !== 'bar_h' && (() => {
+          const effectiveRot = xRot !== null ? xRot : (multiData.length > 8 ? -35 : 0);
+          const extraOffset = effectiveRot !== 0 ? (Math.abs(effectiveRot) >= 60 ? 56 : 38) : 24;
           return (
-            <text key={i} x={x} y={MT + PH + 14} textAnchor="middle" fontSize={labelFontSize} fill={labelColor}
-              transform={multiData.length > 8 ? `rotate(-35,${x},${MT + PH + 14})` : undefined}>
-              {d.label.length > 12 ? d.label.slice(0, 12) + '...' : d.label}
+            <text x={ML + PW / 2} y={MT + PH + extraOffset + 8} textAnchor="middle"
+              fontSize={labelFontSize + 1} fill="#e4e4e7" fontWeight={500}>
+              {xAxisLabel || effectiveX}
             </text>
           );
-        })}
-        {(xAxisLabel || effectiveX) && chartType !== 'bar_h' && (
-          <text x={ML + PW / 2} y={MT + PH + (multiData.length > 8 ? 48 : 32)} textAnchor="middle" fontSize={labelFontSize + 1} fill="#e4e4e7" fontWeight={500}>
-            {xAxisLabel || effectiveX}
-          </text>
-        )}
+        })()}
         {(yAxisLabel || yFieldsResolved[0]) && (
           <text x={14} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill="#e4e4e7" fontWeight={500}
             transform={`rotate(-90,14,${MT + PH / 2})`}>
