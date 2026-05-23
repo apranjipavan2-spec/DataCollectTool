@@ -242,11 +242,14 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
       const tablesWithCharts = formatEmbedsCharts
         ? selectedT.filter(t => t.chartConfig && t.chartConfig.xField)
         : [];
-      if (tablesWithCharts.length > 0) setResultMsg(`Rendering ${tablesWithCharts.length} chart${tablesWithCharts.length !== 1 ? 's' : ''}…`);
-      for (const t of tablesWithCharts) {
+      for (let i = 0; i < tablesWithCharts.length; i++) {
+        const t = tablesWithCharts[i];
+        setResultMsg(`Rendering chart ${i + 1} of ${tablesWithCharts.length}: ${t.title || t.name}`);
         chartFieldsByTable[t.id] = await renderChartFor(t);
       }
-      if (tablesWithCharts.length > 0) setResultMsg(null);
+      if (selectedT.length > 0) {
+        setResultMsg(`Packaging ${selectedT.length} table${selectedT.length !== 1 ? 's' : ''} for ${format.toUpperCase()} export…`);
+      }
 
       const exportData = selectedT
         .map(t => {
@@ -358,11 +361,14 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
     const selectedT = tables.filter(t => selectedTables.has(t.id));
     const chartFieldsByTable: Record<string, { chart_image?: string; chart_title?: string }> = {};
     const tablesWithCharts = selectedT.filter(t => t.chartConfig && t.chartConfig.xField);
-    if (tablesWithCharts.length > 0) setResultMsg(`Rendering ${tablesWithCharts.length} chart${tablesWithCharts.length !== 1 ? 's' : ''}…`);
-    for (const t of tablesWithCharts) {
+    for (let i = 0; i < tablesWithCharts.length; i++) {
+      const t = tablesWithCharts[i];
+      setResultMsg(`Rendering chart ${i + 1} of ${tablesWithCharts.length}: ${t.title || t.name}`);
       chartFieldsByTable[t.id] = await renderChartFor(t);
     }
-    if (tablesWithCharts.length > 0) setResultMsg(null);
+    if (selectedT.length > 0) {
+      setResultMsg(`Packaging ${selectedT.length} table${selectedT.length !== 1 ? 's' : ''} for batch (Excel + Word) export…`);
+    }
     const exportData = selectedT
       .map(t => {
         const res = results.get(t.id);
@@ -640,6 +646,10 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
                       onChange={() => toggleTable(t.id)} disabled={!hasData} />
                     <span className="exp-table-num">#{i + 1}</span>
                     {t.pinned && <span title="Pinned" style={{ color: '#f59e0b', marginRight: 4 }}>★</span>}
+                    {t.chartConfig && t.chartConfig.xField && (
+                      <span title={`Chart attached${format === 'docx' ? ' — will be embedded in Word' : ' — only embedded in Word (.docx) exports'}`}
+                        style={{ color: '#60a5fa', marginRight: 4, fontSize: 12 }}>📊</span>
+                    )}
                     <span>{t.title || t.name}</span>
                     <span className="table-info">{hasData ? `${res!.row_count} rows` : 'No data'}</span>
                   </label>

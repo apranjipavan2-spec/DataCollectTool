@@ -41,11 +41,14 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   svgRef,
 ) {
   const W = width, H = height;
-  // MB is recomputed below once we know whether x-tick labels are rotated.
-  const ML = 78, MR = 24, MT = 28;
+  // All four margins are recomputed adaptively below once we know the actual
+  // label widths, legend slot, and rotation. These initial values are just
+  // safe defaults so any code that reads them before the recompute still works.
+  let ML = 56, MR = 24;
+  const MT = 28;
   let MB = 60;
   let PH = H - MT - MB;
-  const PW = W - ML - MR;
+  let PW = W - ML - MR;
 
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
   const showTip = (e: React.MouseEvent, text: string) => {
@@ -140,20 +143,9 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
     );
   };
 
-  // Auto-rotation decision needs to happen BEFORE we pin MB so bottom margin
-  // can grow to fit rotated x-tick labels + the axis caption.
-  const effectiveXRot = xRot !== null ? xRot : (multiData.length > 8 ? -35 : 0);
-  const xIsRotated = effectiveXRot !== 0;
-  const xRotMag = Math.abs(effectiveXRot);
-  // How far down rotated labels visually sweep from the tick line.
-  // Extra padding (+14) ensures the X-axis caption sits clearly below the rotated tick text.
-  const labelSweep = xIsRotated ? (xRotMag >= 60 ? 104 : 86) : 22;
-  const hasXCaption = !!xAxisLabel && chartType !== 'bar_h';
-  const captionGap = hasXCaption ? 28 : 0;
-  MB = 14 + labelSweep + captionGap;
-  PH = H - MT - MB;
-  // Where the x-axis caption sits (below the rotated label sweep).
-  const xLabelExtraOffset = labelSweep + 14;
+  // Compute series names + data extents up front so adaptive margins know
+  // legend width and tick-label width before plot area is finalized.
+  const seriesNames = yFieldsResolved.map(f => headers[headers.indexOf(f)] || f);
 
   const allValues = multiData.flatMap(d => d.values);
   const maxVal = allValues.length ? Math.max(...allValues) : 1;
@@ -178,10 +170,60 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   const yMin = Math.min(...yTicks);
   const yRange = yMax - yMin || 1;
 
+  // ─── Adaptive margins ────────────────────────────────────────────────
+  // Each margin grows just enough to fit the labels/legend that live in it.
+  // This is what stops the right legend and rotated x-labels from being
+  // clipped at the SVG edge.
+  const charPx = labelFontSize * 0.6; // approximate sans-serif glyph width
+
+  // Right margin: reserve room for the legend when it sits on the right.
+  if (showLegend === 'right' && seriesNames.length > 1) {
+    const maxLegendChars = seriesNames.reduce((m, n) => Math.max(m, Math.min(15, n.length)), 0);
+    const legendPx = 14 + maxLegendChars * (labelFontSize - 1) * 0.62 + 18;
+    MR = Math.max(MR, Math.ceil(legendPx));
+  }
+
+  // X-axis rotation + bottom margin: rotated labels project downward by
+  // labelLength * sin(angle). Pad for descenders + caption.
+  const effectiveXRot = xRot !== null ? xRot : (multiData.length > 8 ? -35 : 0);
+  const xIsRotated = effectiveXRot !== 0;
+  const xRotMag = Math.abs(effectiveXRot);
+  const maxXChars = chartType === 'bar_h'
+    ? 0  // bar_h labels live in the LEFT gutter, not bottom
+    : Math.min(22, multiData.reduce((m, d) => Math.max(m, String(d.label).length), 0));
+  const xLabelTextPx = maxXChars * charPx;
+  const rotRad = (Math.PI / 180) * xRotMag;
+  const labelSweep = xIsRotated
+    ? Math.ceil(xLabelTextPx * Math.sin(rotRad) + 14)
+    : Math.ceil(labelFontSize + 10);
+  const hasXCaption = !!xAxisLabel && chartType !== 'bar_h';
+  const captionGap = hasXCaption ? labelFontSize + 18 : 0;
+  MB = 14 + labelSweep + captionGap;
+  // Where the x-axis caption sits (below the rotated label sweep).
+  const xLabelExtraOffset = labelSweep + 14;
+
+  // Left margin: room for the widest Y tick label + (rotated) Y-axis caption.
+  // For bar_h the left gutter holds CATEGORY labels (truncated to 14 chars).
+  const yTickLabelMaxChars = Math.max(...yTicks.map(t => fmt(t).length), 2);
+  const yTickPx = yTickLabelMaxChars * charPx;
+  const hasYCaption = chartType !== 'bar_h' && !!(yAxisLabel || yFieldsResolved[0]);
+  const yCaptionSlot = hasYCaption ? labelFontSize + 10 : 0;
+  if (chartType === 'bar_h') {
+    const maxCatChars = Math.min(14, multiData.reduce((m, d) => Math.max(m, String(d.label).length), 0));
+    ML = Math.max(54, Math.ceil(maxCatChars * charPx + 14));
+  } else {
+    ML = Math.max(48, Math.ceil(yTickPx + yCaptionSlot + 16));
+  }
+  // Pin Y-axis caption inside the left gutter, just left of the tick text.
+  const yLabelX = chartType === 'bar_h' ? 12 : Math.max(10, ML - Math.ceil(yTickPx) - 12);
+
+  // All margins finalised — derive plot area.
+  PW = W - ML - MR;
+  PH = H - MT - MB;
+
   const yToSvg = (v: number) => MT + PH - ((v - yMin) / yRange) * PH;
   const xToSvg = (i: number, n: number) => ML + (i + 0.5) * (PW / n);
 
-  const seriesNames = yFieldsResolved.map(f => headers[headers.indexOf(f)] || f);
   const barW = multiData.length > 0 ? Math.max(4, Math.min(48, (PW / multiData.length) * 0.72)) : 20;
   const groupBarW = yIndices.length > 0 ? barW / yIndices.length : barW;
 
@@ -277,8 +319,8 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
           </text>
         )}
         {(yAxisLabel || yFieldsResolved[0]) && (
-          <text x={12} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill="#e4e4e7" fontWeight={500}
-            transform={`rotate(-90,12,${MT + PH / 2})`}>
+          <text x={yLabelX} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill="#e4e4e7" fontWeight={500}
+            transform={`rotate(-90,${yLabelX},${MT + PH / 2})`}>
             {yAxisLabel || yFieldsResolved[0]}
           </text>
         )}
@@ -537,8 +579,8 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             </g>
           ))}
           <text x={ML + PW / 2} y={MT + PH + 30} textAnchor="middle" fontSize={labelFontSize + 1} fill={labelColor}>{xAxisLabel || headers[sxIdx]}</text>
-          <text x={14} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill={labelColor}
-            transform={`rotate(-90,14,${MT + PH / 2})`}>{yAxisLabel || headers[syIdx]}</text>
+          <text x={yLabelX} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill={labelColor}
+            transform={`rotate(-90,${yLabelX},${MT + PH / 2})`}>{yAxisLabel || headers[syIdx]}</text>
           {sData.map((d, i) => (
             <circle key={i} cx={sx(d.x)} cy={sy(d.y)} r={5} fill={colors[i % colors.length]} opacity={0.8} stroke="var(--bg-card)" strokeWidth={1}
               onMouseEnter={e => showTip(e, `${d.label}\n${headers[sxIdx]}: ${fmt(d.x)}\n${headers[syIdx]}: ${fmt(d.y)}`)}
@@ -683,7 +725,8 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   return (
     <div className={className} style={{ position: 'relative', ...style }}>
       <svg ref={svgRef} width={W} height={H} viewBox={`0 0 ${W} ${H}`}
-        style={{ background: 'transparent', borderRadius: 8, display: 'block', maxWidth: '100%' }}>
+        overflow="visible"
+        style={{ background: 'transparent', borderRadius: 8, display: 'block', maxWidth: '100%', overflow: 'visible' }}>
         {renderChart()}
       </svg>
       {tooltip && interactive && (

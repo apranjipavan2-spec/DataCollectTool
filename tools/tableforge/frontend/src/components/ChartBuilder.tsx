@@ -100,7 +100,16 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
   const { textCols, numCols } = useMemo(() => classifyColumns(headers, rows), [headers, rows]);
 
   const effectiveX = xField || textCols[0] || headers[0] || '';
-  const effectiveY = yFields.length > 0 ? yFields : (numCols[0] ? [numCols[0]] : (headers[1] ? [headers[1]] : []));
+  // Default Y selection: pick all numeric columns except Total/Grand Total
+  // (so a District × Beneficiary/Non-Beneficiary table renders both series).
+  // Caps at 4 to keep the chart readable; user can deselect via the Y picker.
+  const effectiveY = (() => {
+    if (yFields.length > 0) return yFields;
+    const nonTotal = numCols.filter(c => !/\btotal\b/i.test(c));
+    const pool = nonTotal.length > 0 ? nonTotal : numCols;
+    if (pool.length > 0) return pool.slice(0, 4);
+    return headers[1] ? [headers[1]] : [];
+  })();
 
   const toggleYField = (field: string) => {
     setYFields(prev => {
