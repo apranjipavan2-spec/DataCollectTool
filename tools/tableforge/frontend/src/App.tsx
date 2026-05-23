@@ -4,6 +4,7 @@ import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, lis
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
 import { LivePreview } from './components/LivePreview';
+import { SubgroupSlicer } from './components/SubgroupSlicer';
 import { TopBar } from './components/TopBar';
 import { StatusBar } from './components/StatusBar';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -33,8 +34,14 @@ import { StudyDesignWizard } from './components/StudyDesignWizard';
 import { LikertPanel } from './components/LikertPanel';
 import { MultiResponsePanel } from './components/MultiResponsePanel';
 import { ObserverPanel } from './components/ObserverPanel';
+import { BalancePanel } from './components/BalancePanel';
+import { GeoSummaryPanel } from './components/GeoSummaryPanel';
+import { DriverPanel } from './components/DriverPanel';
+import { ClusterPanel } from './components/ClusterPanel';
+import { VerbatimPanel } from './components/VerbatimPanel';
 import { AutoAnalyzePanel } from './components/AutoAnalyzePanel';
 import { SurveyInsightsPanel } from './components/SurveyInsightsPanel';
+import { SurveyQualityPanel } from './components/SurveyQualityPanel';
 import { StatGuide, isGuideSkipped } from './components/StatGuide';
 
 function createEmptyTable(id: string, name: string): TableConfig {
@@ -60,7 +67,7 @@ function generateAutoTitle(t: TableConfig): { title: string; subtitle: string; n
   return { title, subtitle, name: nameShort };
 }
 
-type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'stat_paired_ttest' | 'stat_wilcoxon' | 'stat_mcnemar' | 'stat_kruskal' | 'stat_friedman' | 'stat_spearman' | 'stat_kendall' | 'stat_logistic_regression' | 'stat_multiple_regression' | 'stat_posthoc' | 'stat_reliability' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config' | 'anomalies' | 'diff' | 'variable_metadata' | 'study_design' | 'likert' | 'multi_response' | 'observer' | 'auto_analyze' | 'survey_insights';
+type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'stat_paired_ttest' | 'stat_wilcoxon' | 'stat_mcnemar' | 'stat_kruskal' | 'stat_friedman' | 'stat_spearman' | 'stat_kendall' | 'stat_logistic_regression' | 'stat_multiple_regression' | 'stat_posthoc' | 'stat_reliability' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config' | 'anomalies' | 'diff' | 'variable_metadata' | 'study_design' | 'likert' | 'multi_response' | 'observer' | 'auto_analyze' | 'survey_insights' | 'survey_quality' | 'balance' | 'geo_summary' | 'driver' | 'cluster' | 'verbatim';
 
 const STAT_GUIDE_ACTIONS = new Set<string>([
   'stat_correlation', 'stat_descriptive', 'stat_crosstab', 'stat_ttest', 'stat_anova',
@@ -69,6 +76,7 @@ const STAT_GUIDE_ACTIONS = new Set<string>([
   'stat_spearman', 'stat_kendall', 'stat_logistic_regression', 'stat_multiple_regression',
   'stat_posthoc', 'stat_reliability',
   'variable_metadata', 'study_design', 'likert', 'multi_response', 'observer', 'auto_analyze',
+  'balance', 'geo_summary', 'driver', 'cluster', 'verbatim',
 ]);
 
 interface ReconcileState {
@@ -524,6 +532,7 @@ export default function App() {
       date_groupings: config.date_groupings,
       blank_suppress: config.blank_suppress,
       hide_subgroup: config.hide_subgroup,
+      net_rows: config.net_rows,
     });
     setResults(prev => {
       const next = new Map(prev);
@@ -1305,6 +1314,7 @@ export default function App() {
           }}
           onReorderTables={handleReorderTables}
           onTogglePin={togglePinTable}
+          onOpenChartFor={(idx) => { setActiveTableIdx(idx); setModal('charts'); }}
         />
         <div className="center-area">
           {activeTable && (
@@ -1498,7 +1508,14 @@ export default function App() {
           {activeTableIdx === -1 ? (
             <SummaryDashboard tables={tables} results={results}
               onTableSelect={i => { setActiveTableIdx(i); if (tables[i].values.length > 0) runTabulation(tables[i]); }} />
-          ) : <LivePreview result={currentResult} loading={loading} error={error}
+          ) : (<>
+            <SubgroupSlicer
+              datasetId={dataset.dataset_id}
+              table={activeTable}
+              allColumns={allColumns.map(c => c.name)}
+              onUpdate={updateTable}
+            />
+          <LivePreview result={currentResult} loading={loading} error={error}
             title={activeTable.title} subtitle={activeTable.subtitle}
             datasetId={dataset.dataset_id} tableConfig={activeTable}
             annotations={annotationsMap[activeTable?.id] || []}
@@ -1516,7 +1533,8 @@ export default function App() {
               }
               updateTable({ header_renames: renames });
             }}
-          />}
+          />
+          </>)}
           {tableInterpretations[activeTable?.id] && (
             <div style={{ margin: '8px 12px', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 8, overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', cursor: 'pointer', userSelect: 'none' }}
@@ -1671,6 +1689,7 @@ export default function App() {
         auditLog={auditLog} />}
       {modal === 'table_compare' && tables.length >= 2 && <TableComparison tables={tables} results={results} onClose={() => setModal(null)} />}
       {modal === 'charts' && <ChartBuilder tables={tables} results={results}
+        activeTableIdx={activeTableIdx}
         onChartChange={(tableId, chartConfig) => {
           setTables(prev => prev.map(t => t.id === tableId ? { ...t, chartConfig } : t));
         }}
@@ -1725,6 +1744,45 @@ export default function App() {
           onClose={() => setModal(null)}
         />
       )}
+      {modal === 'balance' && (
+        <BalancePanel
+          datasetId={dataset.dataset_id}
+          columns={allColumns}
+          columnRoles={columnRolesMap}
+          studyDesign={null}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === 'geo_summary' && (
+        <GeoSummaryPanel
+          datasetId={dataset.dataset_id}
+          columns={allColumns}
+          columnRoles={columnRolesMap}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === 'driver' && (
+        <DriverPanel
+          datasetId={dataset.dataset_id}
+          columns={allColumns}
+          columnRoles={columnRolesMap}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === 'cluster' && (
+        <ClusterPanel
+          datasetId={dataset.dataset_id}
+          columns={allColumns}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === 'verbatim' && (
+        <VerbatimPanel
+          datasetId={dataset.dataset_id}
+          columns={allColumns}
+          onClose={() => setModal(null)}
+        />
+      )}
       {modal === 'auto_analyze' && (
         <AutoAnalyzePanel
           datasetId={dataset.dataset_id}
@@ -1756,6 +1814,14 @@ export default function App() {
             setTables(prev => [...prev, ...configs]);
             setActiveTableIdx(tables.length);
           }}
+        />
+      )}
+      {modal === 'survey_quality' && (
+        <SurveyQualityPanel
+          datasetId={dataset.dataset_id}
+          columns={allColumns}
+          columnRoles={columnRolesMap}
+          onClose={() => setModal(null)}
         />
       )}
       {guideSection && (

@@ -16,10 +16,41 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from scipy import stats as sp_stats
 
-from ..shared import datasets, sanitize_for_json, apply_metrics_and_bins, column_roles
+from ..shared import datasets, sanitize_for_json, apply_metrics_and_bins, column_roles, study_designs
 from . import inferential_utils as iu
 
 router = APIRouter()
+
+
+def _resolve_weights(dataset_id: str, df: pd.DataFrame):
+    """Return (weights_series, weight_col_name) from StudyDesign, or (None, None)."""
+    sd = study_designs.get(dataset_id) or {}
+    wc = sd.get("weight_col")
+    if not (isinstance(wc, str) and wc and wc in df.columns):
+        return None, None
+    w = pd.to_numeric(df[wc], errors="coerce")
+    if w.notna().sum() == 0:
+        return None, None
+    return w, wc
+
+
+def _wmean_sd_neff(x, w):
+    """Weighted mean, SD, and effective N from a Series x with aligned weights w."""
+    x = pd.to_numeric(x, errors="coerce")
+    if hasattr(w, "reindex"):
+        w = w.reindex(x.index)
+    w = pd.to_numeric(w, errors="coerce")
+    m = x.notna() & w.notna() & (w > 0)
+    if m.sum() < 1:
+        return float("nan"), float("nan"), 0.0
+    xv = x[m].astype(float).values
+    wv = w[m].astype(float).values
+    sum_w = wv.sum()
+    sum_w2 = (wv * wv).sum()
+    n_eff = (sum_w * sum_w) / sum_w2 if sum_w2 > 0 else 0.0
+    mean = float(np.average(xv, weights=wv))
+    var = float(np.average((xv - mean) ** 2, weights=wv))
+    return mean, float(np.sqrt(var)), float(n_eff)
 
 
 class InferConfig(BaseModel):
@@ -36,6 +67,7 @@ class InferConfig(BaseModel):
     weight_col: str | None = None
     outcome_col: str | None = None
     predictor_cols: list[str] | None = None
+    alpha: float = 0.05  # Significance level (0.10 / 0.05 / 0.01); drives CI level + star thresholds
 
 
 def _prepare(config: InferConfig) -> pd.DataFrame:
@@ -74,7 +106,11 @@ async def stat_paired_ttest(config: InferConfig):
         if not pairs:
             raise HTTPException(400, "Specify pre_col + post_col or paired_pairs")
 
-        headers = ["Pair", "N", "Mean Pre", "Mean Post", "Mean Diff", "95% CI", "t", "df", "p", "Cohen's d_z", "Effect", "Sig"]
+        w_series, w_col = _resolve_weights(config.dataset_id, df)
+        if w_series is not None:
+            headers = ["Pair", "N raw", "N eff", "Mean Pre (w)", "Mean Post (w)", "Mean Diff (w)", "95% CI", "t", "df", "p", "Cohen's d_z (w)", "Effect", "Sig"]
+        else:
+            headers = ["Pair", "N", "Mean Pre", "Mean Post", "Mean Diff", "95% CI", "t", "df", "p", "Cohen's d_z", "Effect", "Sig"]
         rows: list[list] = []
         results: list[dict] = []
 
@@ -82,32 +118,57 @@ async def stat_paired_ttest(config: InferConfig):
             pre, post = pair.get("pre"), pair.get("post")
             if pre not in df.columns or post not in df.columns:
                 continue
-            a = pd.to_numeric(df[pre], errors="coerce")
-            b = pd.to_numeric(df[post], errors="coerce")
-            mask = a.notna() & b.notna()
-            a, b = a[mask].to_numpy(), b[mask].to_numpy()
+            a_full = pd.to_numeric(df[pre], errors="coerce")
+            b_full = pd.to_numeric(df[post], errors="coerce")
+            mask = a_full.notna() & b_full.notna()
+            a, b = a_full[mask].to_numpy(), b_full[mask].to_numpy()
             if len(a) < 2:
                 continue
             diffs = b - a
             t_stat, p_val = sp_stats.ttest_rel(a, b)
             dz = iu.cohens_dz(diffs)
-            lo, hi = iu.ci_paired_diff(diffs)
-            sig = iu.sig_stars(p_val)
-            interp_d = iu.interpret_d(dz)
-            rows.append([
-                f"{pre} → {post}",
-                len(diffs),
-                iu.safe_round(a.mean()),
-                iu.safe_round(b.mean()),
-                iu.safe_round(diffs.mean()),
-                f"[{iu.safe_round(lo)}, {iu.safe_round(hi)}]",
-                iu.safe_round(t_stat),
-                len(diffs) - 1,
-                iu.safe_round(p_val, 6),
-                iu.safe_round(dz),
-                interp_d,
-                sig,
-            ])
+            _a = float(config.alpha or 0.05)
+            lo, hi = iu.ci_paired_diff(diffs, alpha=_a)
+            sig = iu.sig_stars(p_val, _a)
+
+            if w_series is not None:
+                # Weighted descriptives + weighted d_z on diffs
+                idx = a_full.index[mask]
+                w_aligned = pd.to_numeric(w_series.reindex(idx), errors="coerce")
+                m2 = w_aligned.notna() & (w_aligned > 0)
+                if m2.sum() >= 2:
+                    a_w = pd.Series(a, index=idx)[m2.values]
+                    b_w = pd.Series(b, index=idx)[m2.values]
+                    d_w = pd.Series(diffs, index=idx)[m2.values]
+                    wv = w_aligned[m2].astype(float).values
+                    sum_w = wv.sum()
+                    sum_w2 = (wv * wv).sum()
+                    n_eff = (sum_w * sum_w) / sum_w2 if sum_w2 > 0 else 0.0
+                    wmean_a = float(np.average(a_w.values, weights=wv))
+                    wmean_b = float(np.average(b_w.values, weights=wv))
+                    wmean_d = float(np.average(d_w.values, weights=wv))
+                    var_d = float(np.average((d_w.values - wmean_d) ** 2, weights=wv))
+                    sd_d = float(np.sqrt(var_d))
+                    dz_w = wmean_d / sd_d if sd_d > 0 else float("nan")
+                else:
+                    wmean_a = float(a.mean()); wmean_b = float(b.mean()); wmean_d = float(diffs.mean())
+                    n_eff = float(len(diffs)); dz_w = dz
+                rows.append([
+                    f"{pre} → {post}", len(diffs), round(n_eff, 1),
+                    iu.safe_round(wmean_a), iu.safe_round(wmean_b), iu.safe_round(wmean_d),
+                    f"[{iu.safe_round(lo)}, {iu.safe_round(hi)}]",
+                    iu.safe_round(t_stat), len(diffs) - 1, iu.safe_round(p_val, 6),
+                    iu.safe_round(dz_w), iu.interpret_d(dz_w if not (isinstance(dz_w, float) and math.isnan(dz_w)) else dz), sig,
+                ])
+            else:
+                interp_d = iu.interpret_d(dz)
+                rows.append([
+                    f"{pre} → {post}", len(diffs),
+                    iu.safe_round(a.mean()), iu.safe_round(b.mean()), iu.safe_round(diffs.mean()),
+                    f"[{iu.safe_round(lo)}, {iu.safe_round(hi)}]",
+                    iu.safe_round(t_stat), len(diffs) - 1, iu.safe_round(p_val, 6),
+                    iu.safe_round(dz), interp_d, sig,
+                ])
             results.append({
                 "pair": f"{pre} → {post}", "n": int(len(diffs)),
                 "t": iu.safe_round(t_stat), "p": iu.safe_round(p_val, 6),
@@ -115,9 +176,15 @@ async def stat_paired_ttest(config: InferConfig):
             })
 
         interpretation = "Paired t-test compares pre/post means within the same respondents. Cohen's d_z gauges practical magnitude (≥0.5 medium, ≥0.8 large)."
-        return {"headers": headers, "rows": sanitize_for_json(rows), "row_count": len(rows),
+        if w_series is not None:
+            interpretation += f" Means/d_z use survey weight '{w_col}'; t/p remain unweighted."
+        resp = {"headers": headers, "rows": sanitize_for_json(rows), "row_count": len(rows),
                 "col_count": len(headers), "table_type": "paired_ttest",
                 "results": results, "interpretation": interpretation}
+        if w_series is not None:
+            resp["weighted"] = True
+            resp["weight_col"] = w_col
+        return resp
     except HTTPException:
         raise
     except Exception as e:

@@ -526,6 +526,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
     { value: 'xlsx', label: 'Excel (.xlsx)', icon: '📊' },
     { value: 'csv', label: 'CSV (.csv)', icon: '📋' },
     { value: 'pdf', label: 'PDF (.pdf)', icon: '📕' },
+    { value: 'pptx', label: 'PowerPoint (.pptx)', icon: '📽' },
     { value: 'python', label: 'Python Script', icon: '🐍' },
   ];
 

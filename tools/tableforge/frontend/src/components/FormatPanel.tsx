@@ -688,6 +688,57 @@ export function FormatPanel({ table, onUpdate }: Props) {
               )}
             </Section>
 
+            {/* NET Rows */}
+            <Section title="NET Rows (calculated)" icon="∑" defaultOpen={false}>
+              {table.rows.length === 0 ? (
+                <p className="fp-hint">Add a row field first</p>
+              ) : (
+                <>
+                  <p className="fp-hint">
+                    NET rows re-aggregate selected categories of <strong>{table.rows[0]}</strong> using the same metric
+                    (e.g. NET Agree = Strongly Agree + Agree).
+                  </p>
+                  {(table.net_rows || []).map((nr, i) => (
+                    <div key={i} className="fp-sort-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4, padding: 6, border: '1px solid var(--border, #333)', borderRadius: 4, marginBottom: 6 }}>
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <input type="text" value={nr.label} className="fp-input" style={{ flex: 1 }} placeholder="Agree"
+                          onChange={e => {
+                            const arr = [...(table.net_rows || [])];
+                            arr[i] = { ...arr[i], label: e.target.value };
+                            onUpdate({ net_rows: arr });
+                          }} />
+                        <select value={nr.position || 'after_last_member'} className="fp-select" style={{ flex: 1 }}
+                          onChange={e => {
+                            const arr = [...(table.net_rows || [])];
+                            arr[i] = { ...arr[i], position: e.target.value as any };
+                            onUpdate({ net_rows: arr });
+                          }}>
+                          <option value="after_last_member">After last member</option>
+                          <option value="before_first_member">Before first member</option>
+                          <option value="end">End of table</option>
+                        </select>
+                        <button className="fp-btn-icon" onClick={() => {
+                          onUpdate({ net_rows: (table.net_rows || []).filter((_, j) => j !== i) });
+                        }}>✕</button>
+                      </div>
+                      <textarea rows={3} className="fp-textarea"
+                        value={(nr.members || []).join('\n')}
+                        onChange={e => {
+                          const vals = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
+                          const arr = [...(table.net_rows || [])];
+                          arr[i] = { ...arr[i], members: vals };
+                          onUpdate({ net_rows: arr });
+                        }}
+                        placeholder="Strongly Agree&#10;Agree" />
+                    </div>
+                  ))}
+                  <button className="fp-btn-sm fp-btn-ghost" onClick={() => {
+                    onUpdate({ net_rows: [...(table.net_rows || []), { label: '', members: [], position: 'after_last_member' as const }] });
+                  }}>+ Add NET Row</button>
+                </>
+              )}
+            </Section>
+
             {/* Conditional Formatting */}
             <Section title="Conditional Formatting" icon="🎯" defaultOpen={false}>
               {table.values.length === 0 ? (

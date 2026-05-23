@@ -23,6 +23,8 @@ const ROLE_OPTIONS: { value: ColumnRoleKind; label: string; hint?: string }[] = 
   { value: 'qualitative',     label: 'Qualitative',     hint: 'Open-ended text' },
   { value: 'weight',          label: 'Survey weight' },
   { value: 'id',              label: 'ID / Key' },
+  { value: 'attention_check', label: 'Attention check', hint: 'Trick / instructed-response item' },
+  { value: 'meta_time',       label: 'Meta: time',      hint: 'Duration, start, or end timestamp' },
   { value: 'other',           label: 'Other' },
 ];
 

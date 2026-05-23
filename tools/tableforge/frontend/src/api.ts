@@ -52,7 +52,7 @@ export async function tabulate(config: {
   dataset_id: string;
   rows: string[];
   columns: string[];
-  values: { field: string; agg: string; label?: string }[];
+  values: { field: string; agg: string; label?: string; suppress_below_n?: number; [key: string]: any }[];
   filters: Record<string, string[]>;
   grand_total: boolean;
   grand_total_rows?: boolean;
@@ -67,6 +67,7 @@ export async function tabulate(config: {
   date_groupings?: Record<string, string>;
   blank_suppress?: boolean;
   hide_subgroup?: boolean;
+  net_rows?: { label: string; members: string[]; position?: 'after_last_member' | 'before_first_member' | 'end' }[];
 }) {
   const res = await fetch(`${API_BASE}/tabulate`, {
     method: 'POST',
@@ -579,6 +580,45 @@ export const mrApi = {
 export const observerApi = {
   concordance: (b: any) => postStat('/observer/concordance', b),
   discrepancies: (b: any) => postStat('/observer/discrepancies', b),
+};
+
+export const sdqApi = {
+  straightLining: (b: any) => postStat('/sdq/straight_lining', b),
+  responseTime: (b: any) => postStat('/sdq/response_time', b),
+  duplicates: (b: any) => postStat('/sdq/duplicates', b),
+  missingness: (b: any) => postStat('/sdq/missingness', b),
+  attentionChecks: (b: any) => postStat('/sdq/attention_checks', b),
+  overview: (b: any) => postStat('/sdq/overview', b),
+};
+
+// ── Batch C/D/E — Balance, Geo, Driver, Cluster, Verbatim ────────────────────
+
+export const balanceApi = {
+  table: (b: any) => postStat('/balance/table', b),
+};
+
+export const geoApi = {
+  aggregate: (b: any) => postStat('/geo/aggregate', b),
+};
+
+export const driverApi = {
+  importance: (b: any) => postStat('/driver/importance', b),
+};
+
+export const clusterApi = {
+  kmeans: (b: any) => postStat('/cluster/kmeans', b),
+};
+
+export const verbatimApi = {
+  list: (b: any) => postStat('/verbatim/list', b),
+  setCodes: (b: any) => postStat('/verbatim/codes/set', b),
+  getCodes: async (datasetId: string) => {
+    const res = await fetch(`${API_BASE}/verbatim/codes/${datasetId}`);
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json();
+  },
+  savePalette: (b: any) => postStat('/verbatim/palette/save', b),
+  kappa: (b: any) => postStat('/verbatim/kappa', b),
 };
 
 // ── Phase 3 — Auto-Analyze battery ───────────────────────────────────────────

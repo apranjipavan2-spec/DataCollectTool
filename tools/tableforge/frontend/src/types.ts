@@ -41,6 +41,7 @@ export interface ValueField {
   show_n?: boolean;           // Show sample size
   missing_indicator?: string; // Custom missing data symbol e.g. "—", "n/a", "."
   change_arrows?: boolean;    // Show ▲/▼ arrows for positive/negative change
+  suppress_below_n?: number;  // Replace cell with "*" when N (effective if weighted) < threshold (DHS-style low-base suppression)
 }
 
 export interface NumberFormat {
@@ -186,6 +187,16 @@ export interface TableConfig {
   pinned?: boolean;
   // Table chains: this table's input is the result of another table
   source_table_id?: string;
+  // NET rows (Q/SPSS convention): aggregated rows summing member categories
+  net_rows?: NetRow[];
+  // Sub-group slicers: columns surfaced as click-to-filter chip rows above the table
+  slicers?: string[];
+}
+
+export interface NetRow {
+  label: string;             // e.g. "Agree" → renders as "NET Agree"
+  members: string[];         // e.g. ["Strongly Agree", "Agree"]
+  position?: 'after_last_member' | 'before_first_member' | 'end';
 }
 
 export interface ColumnGroup {
@@ -207,6 +218,10 @@ export interface TableResult {
   multi_response_note?: string;
   original_respondents?: number;
   total_responses?: number;
+  weighted?: boolean;
+  weight_col?: string;
+  suppress_count?: number;
+  suppress_basis?: 'effective' | 'raw';
 }
 
 export type DropZoneType = 'rows' | 'columns' | 'values' | 'filters';
@@ -273,7 +288,7 @@ export interface QualityReport {
 export type ColumnRoleKind =
   | 'treatment' | 'outcome' | 'demographic' | 'mediator' | 'moderator'
   | 'geographic' | 'panel_wave' | 'observer_rated' | 'qualitative' | 'weight'
-  | 'id' | 'other';
+  | 'id' | 'attention_check' | 'meta_time' | 'other';
 
 export type ColumnScale =
   | 'nominal' | 'ordinal' | 'interval' | 'ratio'

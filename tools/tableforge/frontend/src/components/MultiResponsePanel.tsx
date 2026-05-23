@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole } from '../types';
 import { mrApi } from '../api';
+import { Chart, adaptFrequencyToBar, adaptMatrixToHeatmap } from './Chart';
 
 interface Props {
   datasetId: string;
@@ -269,7 +270,27 @@ export function MultiResponsePanel({ datasetId, columns, columnRoles = {}, onClo
             </div>
           )}
 
-          {/* Co-occurrence matrix */}
+          {/* Frequencies bar chart */}
+          {mode === 'frequencies' && result?.headers && (() => {
+            const data = adaptFrequencyToBar(result.headers, result.rows);
+            return data ? (
+              <div style={{ marginBottom: 12 }}>
+                <Chart kind="bar" data={data} title="Option uptake (count of respondents)" />
+              </div>
+            ) : null;
+          })()}
+
+          {/* Co-occurrence: recharts heatmap (interactive) */}
+          {mode === 'cooccurrence' && result?.headers && (() => {
+            const data = adaptMatrixToHeatmap(result.headers, result.rows, 'sequential');
+            return data ? (
+              <div style={{ marginBottom: 12 }}>
+                <Chart kind="heatmap" data={data} title="Co-occurrence (Jaccard similarity)" height={Math.max(320, data.yLabels.length * 36 + 80)} />
+              </div>
+            ) : null;
+          })()}
+
+          {/* Co-occurrence matrix (legacy table render — kept as fallback / numeric reference) */}
           {mode === 'cooccurrence' && result?.headers && renderCooccurMatrix(result.headers, result.rows)}
 
           {/* Top co-occurring pairs */}

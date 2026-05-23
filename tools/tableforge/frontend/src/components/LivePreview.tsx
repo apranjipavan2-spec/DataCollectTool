@@ -569,6 +569,16 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
           {result.multi_response_note}
         </div>
       )}
+      {result.weighted && result.weight_col && (
+        <div className="table-footnote" style={{ color: '#60a5fa', borderLeft: '3px solid #60a5fa', paddingLeft: 8, marginTop: 6 }}>
+          Survey-weighted using <code style={{ fontFamily: 'monospace' }}>{result.weight_col}</code>.
+        </div>
+      )}
+      {typeof result.suppress_count === 'number' && result.suppress_count > 0 && (
+        <div className="table-footnote" style={{ color: '#a78bfa', borderLeft: '3px solid #a78bfa', paddingLeft: 8, marginTop: 6 }}>
+          {result.suppress_count} cell(s) suppressed (*) — N<sub>{result.suppress_basis === 'effective' ? 'eff' : 'raw'}</sub> below threshold.
+        </div>
+      )}
       {footnote && <div className="table-footnote">{footnote}</div>}
       {footnotes.length > 0 && (
         <div className="footnote-area">

@@ -42,10 +42,110 @@ async def export_tables(config: ExportConfig):
         return await export_csv(config)
     elif config.format == "pdf":
         return await export_pdf(config)
+    elif config.format == "pptx":
+        return await export_pptx(config)
     elif config.format == "python":
         return await export_python_script(config)
     else:
         raise HTTPException(400, f"Unsupported format: {config.format}")
+
+
+async def export_pptx(config: ExportConfig):
+    """One slide per table. Requires python-pptx."""
+    try:
+        from pptx import Presentation
+        from pptx.util import Inches, Pt
+        from pptx.dml.color import RGBColor
+    except ImportError:
+        raise HTTPException(500, "python-pptx not installed. pip install python-pptx")
+
+    prs = Presentation()
+    prs.slide_width = Inches(13.33)
+    prs.slide_height = Inches(7.5)
+
+    opts = config.options or {}
+    cover_title = opts.get("cover_title") or config.filename
+
+    # Cover slide
+    if opts.get("cover_page", True):
+        cover = prs.slides.add_slide(prs.slide_layouts[5])  # title only
+        title = cover.shapes.title
+        title.text = cover_title
+        if opts.get("cover_subtitle"):
+            tb = cover.shapes.add_textbox(Inches(1), Inches(3), Inches(11), Inches(1))
+            tf = tb.text_frame
+            tf.text = opts["cover_subtitle"]
+            for p in tf.paragraphs:
+                p.font.size = Pt(18)
+                p.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+
+    for tbl in config.tables:
+        slide = prs.slides.add_slide(prs.slide_layouts[5])
+        # Title
+        title_text = tbl.get("title") or tbl.get("name") or "Table"
+        slide.shapes.title.text = title_text
+        if tbl.get("subtitle"):
+            sub = slide.shapes.add_textbox(Inches(0.5), Inches(1.1), Inches(12), Inches(0.4))
+            sub.text_frame.text = tbl["subtitle"]
+            for p in sub.text_frame.paragraphs:
+                p.font.size = Pt(14)
+                p.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+
+        headers = tbl.get("headers") or []
+        rows = tbl.get("rows") or []
+        n_cols = len(headers)
+        n_rows = len(rows) + 1
+        if n_cols == 0 or n_rows == 1:
+            continue
+
+        # Cap to fit on slide
+        max_rows = 18
+        truncated = False
+        if len(rows) > max_rows:
+            rows = rows[:max_rows]
+            n_rows = max_rows + 1
+            truncated = True
+
+        left, top = Inches(0.5), Inches(1.6)
+        width, height = Inches(12.3), Inches(0.4 * n_rows)
+        shape = slide.shapes.add_table(n_rows, n_cols, left, top, width, height)
+        table = shape.table
+
+        # Header row
+        for j, h in enumerate(headers):
+            cell = table.cell(0, j)
+            cell.text = str(h)
+            for p in cell.text_frame.paragraphs:
+                for r in p.runs:
+                    r.font.size = Pt(11)
+                    r.font.bold = True
+                    r.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = RGBColor(0x2A, 0x4A, 0x7B)
+
+        # Data rows
+        for i, row in enumerate(rows, start=1):
+            for j in range(n_cols):
+                cell = table.cell(i, j)
+                val = row[j] if j < len(row) else ""
+                cell.text = str(val) if val is not None else ""
+                for p in cell.text_frame.paragraphs:
+                    for r in p.runs:
+                        r.font.size = Pt(10)
+
+        if truncated:
+            note = slide.shapes.add_textbox(Inches(0.5), Inches(6.9), Inches(12), Inches(0.4))
+            note.text_frame.text = f"(showing first {max_rows} rows of {len(tbl.get('rows') or [])})"
+            for p in note.text_frame.paragraphs:
+                p.font.size = Pt(10)
+                p.font.italic = True
+                p.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
+
+    fname = f"{config.filename}.pptx"
+    output_path = EXPORTS_DIR / fname
+    prs.save(str(output_path))
+    add_audit_log(config.dataset_id, "export_pptx", f"Exported {len(config.tables)} tables to PowerPoint")
+    return {"path": str(output_path), "message": f"PowerPoint exported to {fname}", "download_filename": fname}
 
 
 def _is_total_row(row):
@@ -1099,6 +1199,7 @@ async def download_export(filename: str):
         ".csv": "text/csv",
         ".pdf": "application/pdf",
         ".py": "text/x-python",
+        ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     }
     ext = filepath.suffix
     return FileResponse(filepath, media_type=media_types.get(ext, "application/octet-stream"), filename=filename)

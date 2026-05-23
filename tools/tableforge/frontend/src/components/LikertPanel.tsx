@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole } from '../types';
 import { likertApi } from '../api';
+import { Chart, adaptLikertToStackedBar } from './Chart';
 
 interface Props {
   datasetId: string;
@@ -229,6 +230,16 @@ export function LikertPanel({ datasetId, columns, columnRoles = {}, onClose, onC
               {result.kmo !== null && result.kmo !== undefined ? ` · KMO = ${result.kmo}` : ''}
             </div>
           )}
+
+          {/* Full stacked-bar chart (interactive) */}
+          {mode === 'summary' && result?.distributions && (() => {
+            const data = adaptLikertToStackedBar(result.distributions);
+            return data ? (
+              <div style={{ marginBottom: 12 }}>
+                <Chart kind="stackedBar" data={data} title="Likert distribution (% per level)" height={Math.max(220, data.items.length * 36 + 80)} />
+              </div>
+            ) : null;
+          })()}
 
           {/* Likert distribution preview (stacked bars) */}
           {mode === 'summary' && result?.distributions && (

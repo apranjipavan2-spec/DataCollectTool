@@ -6,9 +6,10 @@ interface Props {
   results: Map<string, TableResult>;
   onClose: () => void;
   onChartChange?: (tableId: string, chartConfig: any) => void;
+  activeTableIdx?: number;
 }
 
-type ChartType = 'bar' | 'bar_h' | 'stacked' | 'grouped' | 'line' | 'area' | 'pie' | 'donut' | 'scatter' | 'waterfall' | 'combo';
+type ChartType = 'bar' | 'bar_h' | 'stacked' | 'grouped' | 'line' | 'area' | 'pie' | 'donut' | 'scatter' | 'waterfall' | 'combo' | 'heatmap' | 'correlation';
 type LegendPos = 'right' | 'bottom' | 'top' | 'none';
 
 const CHART_TYPES: { value: ChartType; label: string; icon: string }[] = [
@@ -23,6 +24,8 @@ const CHART_TYPES: { value: ChartType; label: string; icon: string }[] = [
   { value: 'donut',    label: 'Donut',        icon: '⊙' },
   { value: 'scatter',  label: 'Scatter',      icon: '∴' },
   { value: 'waterfall',label: 'Waterfall',    icon: '⤵' },
+  { value: 'heatmap',  label: 'Heatmap',      icon: '⊞' },
+  { value: 'correlation', label: 'Correlation', icon: '◉' },
 ];
 
 const PALETTES: { name: string; colors: string[] }[] = [
@@ -71,8 +74,9 @@ function arcPath(cx: number, cy: number, r: number, startAngle: number, endAngle
   return `M${s.x},${s.y} A${r},${r} 0 ${large},1 ${e.x},${e.y} L${ei.x},${ei.y} A${inner},${inner} 0 ${large},0 ${si.x},${si.y} Z`;
 }
 
-export function ChartBuilder({ tables, results, onClose, onChartChange }: Props) {
-  const [tableIdx, setTableIdx] = useState(0);
+export function ChartBuilder({ tables, results, onClose, onChartChange, activeTableIdx }: Props) {
+  const initialIdx = (typeof activeTableIdx === 'number' && activeTableIdx >= 0 && activeTableIdx < tables.length) ? activeTableIdx : 0;
+  const [tableIdx, setTableIdx] = useState(initialIdx);
   const [chartType, setChartType] = useState<ChartType>('bar');
   const [xField, setXField] = useState('');
   const [yFields, setYFields] = useState<string[]>([]);
@@ -574,6 +578,106 @@ export function ChartBuilder({ tables, results, onClose, onChartChange }: Props)
     if (chartType === 'combo') {
       return <text x={W / 2} y={H / 2} textAnchor="middle" fill="#64748b" fontSize={12}>Combo chart needs 2+ Y fields selected</text>;
     }
+
+    if (chartType === 'heatmap' || chartType === 'correlation') {
+      // Matrix shape: first column = row labels, remaining columns = numeric grid
+      if (rows.length === 0 || headers.length < 2) {
+        return <text x={W / 2} y={H / 2} textAnchor="middle" fill="#64748b" fontSize={12}>Heatmap needs at least one row-label column and one numeric column</text>;
+      }
+      const colHeaders = headers.slice(1);
+      const cellMatrix: number[][] = rows.map(r => colHeaders.map((_, ci) => Number(r[ci + 1])).map(v => Number.isFinite(v) ? v : NaN));
+      const flat = cellMatrix.flat().filter(v => Number.isFinite(v));
+      if (flat.length === 0) {
+        return <text x={W / 2} y={H / 2} textAnchor="middle" fill="#64748b" fontSize={12}>No numeric cells to plot</text>;
+      }
+      const isCorr = chartType === 'correlation';
+      const vMin = isCorr ? -1 : Math.min(...flat);
+      const vMax = isCorr ?  1 : Math.max(...flat);
+      const valToColor = (v: number) => {
+        if (!Number.isFinite(v)) return '#1f2937';
+        if (isCorr) {
+          const t = Math.max(-1, Math.min(1, v));
+          if (t >= 0) {
+            const k = t;
+            const r = Math.round(15 + (34 - 15) * (1 - k));
+            const g = Math.round(23 + (197 - 23) * k);
+            const b = Math.round(42 + (94 - 42) * (1 - k));
+            return `rgb(${r},${g},${b})`;
+          } else {
+            const k = -t;
+            const r = Math.round(15 + (239 - 15) * k);
+            const g = Math.round(23 + (68 - 23) * (1 - k));
+            const b = Math.round(42 + (68 - 42) * (1 - k));
+            return `rgb(${r},${g},${b})`;
+          }
+        } else {
+          const t = (v - vMin) / Math.max(vMax - vMin, 1e-9);
+          const k = Math.max(0, Math.min(1, t));
+          const r = Math.round(15 + (59 - 15) * k);
+          const g = Math.round(23 + (130 - 23) * k);
+          const b = Math.round(42 + (246 - 42) * k);
+          return `rgb(${r},${g},${b})`;
+        }
+      };
+      const nRows = rows.length, nCols = colHeaders.length;
+      const cellW = PW / nCols, cellH = PH / nRows;
+      const fontPx = Math.max(7, Math.min(labelFontSize, Math.floor(Math.min(cellW, cellH) / 3)));
+      return (
+        <g>
+          {/* column headers */}
+          {colHeaders.map((h, ci) => (
+            <text key={'ch' + ci} x={ML + ci * cellW + cellW / 2} y={MT - 6}
+                  textAnchor="middle" fill="#9ca3af" fontSize={labelFontSize}
+                  transform={cellW < 60 ? `rotate(-30, ${ML + ci * cellW + cellW / 2}, ${MT - 6})` : undefined}>
+              {String(h).length > 16 ? String(h).slice(0, 16) + '…' : String(h)}
+            </text>
+          ))}
+          {/* row labels */}
+          {rows.map((r, ri) => (
+            <text key={'rl' + ri} x={ML - 6} y={MT + ri * cellH + cellH / 2 + 4}
+                  textAnchor="end" fill="#9ca3af" fontSize={labelFontSize}>
+              {String(r[0] ?? '').length > 18 ? String(r[0] ?? '').slice(0, 18) + '…' : String(r[0] ?? '')}
+            </text>
+          ))}
+          {/* cells */}
+          {cellMatrix.map((rowVals, ri) =>
+            rowVals.map((v, ci) => (
+              <g key={`c${ri}-${ci}`}>
+                <rect x={ML + ci * cellW} y={MT + ri * cellH} width={cellW - 1} height={cellH - 1}
+                      fill={valToColor(v)} stroke="#0f1117" strokeWidth={1}
+                      onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, text: `${colHeaders[ci]} × ${rows[ri][0]}\nValue: ${Number.isFinite(v) ? v.toFixed(isCorr ? 2 : 2) : 'n/a'}` })}
+                      onMouseLeave={() => setTooltip(null)} />
+                {showLabels && Number.isFinite(v) && (
+                  <text x={ML + ci * cellW + cellW / 2} y={MT + ri * cellH + cellH / 2 + fontPx / 2 - 1}
+                        textAnchor="middle" fill={Math.abs(v) > (isCorr ? 0.5 : (vMin + vMax) / 2) ? '#fff' : '#111'}
+                        fontSize={fontPx} fontWeight={600}>
+                    {isCorr ? v.toFixed(2) : (Number.isInteger(v) ? String(v) : v.toFixed(2))}
+                  </text>
+                )}
+              </g>
+            ))
+          )}
+          {/* colorbar */}
+          {(() => {
+            const barX = ML + PW + 8, barY = MT, barW = 12, barH = PH;
+            const stops = 24;
+            return (
+              <g>
+                {Array.from({ length: stops }).map((_, i) => {
+                  const t = i / (stops - 1);
+                  const v = isCorr ? (1 - 2 * t) : (vMax - (vMax - vMin) * t);
+                  return <rect key={'cb' + i} x={barX} y={barY + (barH / stops) * i} width={barW} height={barH / stops + 0.5} fill={valToColor(v)} />;
+                })}
+                <text x={barX + barW + 4} y={barY + 8} fill="#9ca3af" fontSize={labelFontSize - 1}>{isCorr ? '1.0' : fmt(vMax)}</text>
+                <text x={barX + barW + 4} y={barY + barH} fill="#9ca3af" fontSize={labelFontSize - 1}>{isCorr ? '-1.0' : fmt(vMin)}</text>
+                {isCorr && <text x={barX + barW + 4} y={barY + barH / 2 + 3} fill="#9ca3af" fontSize={labelFontSize - 1}>0</text>}
+              </g>
+            );
+          })()}
+        </g>
+      );
+    }
+
     return null;
   };
 
@@ -627,7 +731,7 @@ export function ChartBuilder({ tables, results, onClose, onChartChange }: Props)
               </div>
             </div>
 
-            {chartType !== 'scatter' && (
+            {chartType !== 'scatter' && chartType !== 'heatmap' && chartType !== 'correlation' && (
               <>
                 <div className="form-group">
                   <label>X Axis / Labels</label>
@@ -647,6 +751,12 @@ export function ChartBuilder({ tables, results, onClose, onChartChange }: Props)
                   </div>
                 </div>
               </>
+            )}
+            {(chartType === 'heatmap' || chartType === 'correlation') && (
+              <div className="form-group" style={{ fontSize: 11, color: 'var(--text-dim)', padding: 6, border: '1px dashed var(--border)', borderRadius: 4 }}>
+                Uses the whole table as a matrix. First column = row labels; remaining columns = numeric cells.
+                {chartType === 'correlation' && <div style={{ marginTop: 4 }}>Color scale fixed to −1 → +1 (red → green).</div>}
+              </div>
             )}
 
             <div className="form-group">

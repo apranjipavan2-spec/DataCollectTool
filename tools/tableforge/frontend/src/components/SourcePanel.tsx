@@ -26,6 +26,7 @@ interface Props {
   onDeleteTables?: (indices: number[]) => void;
   onReorderTables?: (fromIdx: number, toIdx: number) => void;
   onTogglePin?: (idx: number) => void;
+  onOpenChartFor?: (idx: number) => void;
 }
 
 const typeIcons: Record<string, string> = {
@@ -79,7 +80,7 @@ export function SourcePanel({
   usedColumns, columnDescriptions = {}, onColumnDescriptionChange, columnRoles = {},
   tables = [], activeTableIdx = 0, results, error,
   onTableSelect, onAddTable, onDuplicateTable, onDuplicateTables, onRenameTable, onDeleteTable, onDeleteTables,
-  onReorderTables, onTogglePin,
+  onReorderTables, onTogglePin, onOpenChartFor,
 }: Props) {
   const [search, setSearch] = useState('');
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
@@ -434,6 +435,14 @@ export function SourcePanel({
                 {hasError && <span className="table-nav-badge error-badge">!</span>}
                 {hasData && !hasError && hasResult && <span className="table-nav-badge ok-badge">✓</span>}
                 {isEmpty && <span className="table-nav-badge empty-badge">-</span>}
+                {onOpenChartFor && hasResult && (
+                  <span
+                    className="table-nav-badge"
+                    title={t.chartConfig ? 'Open chart for this table' : 'Create chart for this table'}
+                    style={{ cursor: 'pointer', background: t.chartConfig ? '#22c55e' : '#475569', color: '#fff' }}
+                    onClick={e => { e.stopPropagation(); onOpenChartFor(realIdx); }}
+                  >📊</span>
+                )}
               </span>
             </div>
           );

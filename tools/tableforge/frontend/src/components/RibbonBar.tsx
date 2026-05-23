@@ -664,11 +664,21 @@ function StatisticsRibbon({ dataset, onAction }: { dataset: boolean; onAction: (
         <RBtn icon="🧭" label="Study Design"  onClick={() => onAction('study_design')}      disabled={!dataset} />
         <RBtn icon="💡" label="Suggest Crosstabs" onClick={() => onAction('survey_insights')} disabled={!dataset} />
       </RGroup>
+      <RGroup label="Data Quality">
+        <RBtn icon="🩺" label="SDQ Checks" onClick={() => onAction('survey_quality')} disabled={!dataset} />
+      </RGroup>
       <RGroup label="Survey Analyses">
         <RBtn icon="⚡" label="Run Full"   onClick={() => onAction('auto_analyze')}   disabled={!dataset} />
         <RBtn icon="📊" label="Likert"    onClick={() => onAction('likert')}         disabled={!dataset} />
         <RBtn icon="☑️" label="Multi-Resp" onClick={() => onAction('multi_response')} disabled={!dataset} />
         <RBtn icon="👁️" label="Observer"  onClick={() => onAction('observer')}       disabled={!dataset} />
+        <RBtn icon="💬" label="Verbatims"  onClick={() => onAction('verbatim')}       disabled={!dataset} />
+      </RGroup>
+      <RGroup label="Impact / Driver">
+        <RBtn icon="⚖️" label="Balance"   onClick={() => onAction('balance')}      disabled={!dataset} />
+        <RBtn icon="🎯" label="Drivers"   onClick={() => onAction('driver')}       disabled={!dataset} />
+        <RBtn icon="🔮" label="Clusters"  onClick={() => onAction('cluster')}      disabled={!dataset} />
+        <RBtn icon="🗺" label="Geo"       onClick={() => onAction('geo_summary')}  disabled={!dataset} />
       </RGroup>
       <RGroup label="Descriptive">
         <RBtn icon="📋" label="Summary"   onClick={() => onAction('stat_descriptive')} disabled={!dataset} />

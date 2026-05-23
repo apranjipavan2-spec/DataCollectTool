@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ColumnInfo } from '../types';
 import { API_BASE } from '../api';
+import { Chart, adaptFrequencyToBar, adaptMatrixToHeatmap, adaptDescriptiveToBox } from './Chart';
 
 type StatType =
   | 'correlation'
@@ -36,6 +37,8 @@ export function StatisticalTables({ type, datasetId, columns, onClose }: Props) 
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'table' | 'chart'>('table');
+  const [alpha, setAlpha] = useState<number>(0.05);
 
   const numericCols = columns.filter(c => c.type === 'numeric');
   const allCols = columns;
@@ -101,7 +104,7 @@ export function StatisticalTables({ type, datasetId, columns, onClose }: Props) 
       const res = await fetch(`${API_BASE}/stat/${type}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataset_id: datasetId, columns: selectedCols }),
+        body: JSON.stringify({ dataset_id: datasetId, columns: selectedCols, alpha }),
       });
       if (!res.ok) {
         const text = await res.text();
@@ -258,19 +261,63 @@ export function StatisticalTables({ type, datasetId, columns, onClose }: Props) 
             {getSelectionHint()}
           </div>
 
-          <button className="btn-primary" onClick={runAnalysis}
-            disabled={loading || selectedCols.length < minCols}
-            style={{ marginBottom: 16 }}>
-            {loading ? 'Computing...' : 'Run Analysis'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+            <button className="btn-primary" onClick={runAnalysis}
+              disabled={loading || selectedCols.length < minCols}>
+              {loading ? 'Computing...' : 'Run Analysis'}
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)' }}>
+              <span>Significance level (α):</span>
+              {[0.10, 0.05, 0.01].map(a => (
+                <label key={a} style={{ display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}>
+                  <input type="radio" name="alpha-level" value={a} checked={alpha === a}
+                    onChange={() => setAlpha(a)} />
+                  <span style={{ fontFamily: 'monospace' }}>{a.toFixed(2)} ({Math.round((1-a)*100)}% CI)</span>
+                </label>
+              ))}
+            </div>
+          </div>
 
           {error && <div className="error-msg">{error}</div>}
 
           {/* Summary cards */}
           {result && renderSummary()}
 
+          {/* Table / Chart toggle (only when the result can be charted) */}
+          {result && (() => {
+            const chartable = ['descriptive', 'frequency', 'correlation', 'spearman', 'kendall', 'crosstab'].includes(type);
+            if (!chartable) return null;
+            return (
+              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                <button className={`btn-small ${view === 'table' ? 'btn-primary' : ''}`} onClick={() => setView('table')} style={{ fontSize: 11 }}>📋 Table</button>
+                <button className={`btn-small ${view === 'chart' ? 'btn-primary' : ''}`} onClick={() => setView('chart')} style={{ fontSize: 11 }}>📊 Chart</button>
+              </div>
+            );
+          })()}
+
+          {/* Chart view */}
+          {result && view === 'chart' && (() => {
+            if (type === 'descriptive') {
+              const data = adaptDescriptiveToBox(result.headers, result.rows);
+              return data ? <Chart kind="box" data={data} title="Distribution by variable (Min / Q1 / Median / Q3 / Max)" /> : <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Chart unavailable for this result.</div>;
+            }
+            if (type === 'frequency') {
+              const data = adaptFrequencyToBar(result.headers, result.rows);
+              return data ? <Chart kind="bar" data={data} title="Frequency" /> : <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Chart unavailable for this result.</div>;
+            }
+            if (type === 'correlation' || type === 'spearman' || type === 'kendall') {
+              const data = adaptMatrixToHeatmap(result.headers, result.rows, 'diverging');
+              return data ? <Chart kind="heatmap" data={data} title="Correlation heatmap (green = +, red = −)" height={Math.max(300, data.yLabels.length * 36 + 80)} /> : <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Chart unavailable for this result.</div>;
+            }
+            if (type === 'crosstab') {
+              const data = adaptMatrixToHeatmap(result.headers, result.rows, 'sequential');
+              return data ? <Chart kind="heatmap" data={data} title="Cross-tab heatmap (counts)" height={Math.max(300, data.yLabels.length * 36 + 80)} /> : <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Chart unavailable for this result.</div>;
+            }
+            return null;
+          })()}
+
           {/* Results table */}
-          {result && (
+          {result && view === 'table' && (
             <div style={{ overflow: 'auto' }}>
               {result.chi2 !== undefined && (
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
@@ -348,20 +395,20 @@ export function StatisticalTables({ type, datasetId, columns, onClose }: Props) 
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
 
-              {/* Interpretation footnotes */}
-              {result.interpretation && (
-                <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--bg-alt, #1e293b)',
-                  borderRadius: 6, fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5,
-                  border: '1px solid var(--border, #334155)' }}>
-                  <strong>Interpretation:</strong> {result.interpretation}
-                </div>
-              )}
-
-              {/* Significance legend */}
-              <div style={{ marginTop: 10, fontSize: 10, color: 'var(--text-dim)' }}>
-                *** p&lt;0.001 &nbsp; ** p&lt;0.01 &nbsp; * p&lt;0.05 &nbsp; ns = not significant
-              </div>
+          {/* Interpretation + legend (shown for both views) */}
+          {result && result.interpretation && (
+            <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--bg-alt, #1e293b)',
+              borderRadius: 6, fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5,
+              border: '1px solid var(--border, #334155)' }}>
+              <strong>Interpretation:</strong> {result.interpretation}
+            </div>
+          )}
+          {result && (
+            <div style={{ marginTop: 10, fontSize: 10, color: 'var(--text-dim)' }}>
+              *** p&lt;0.001 &nbsp; ** p&lt;0.01 &nbsp; * p&lt;0.05 &nbsp; ns = not significant
             </div>
           )}
         </div>

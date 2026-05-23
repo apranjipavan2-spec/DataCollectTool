@@ -12,14 +12,19 @@ import pandas as pd
 from scipy import stats as sp_stats
 
 
-def sig_stars(p: float) -> str:
+def sig_stars(p: float, alpha: float = 0.05) -> str:
+    """Significance stars relative to alpha. Three tiers: alpha, alpha/5, alpha/50.
+    Default alpha=0.05 → 0.05/0.01/0.001 (APA convention)."""
     if p is None or (isinstance(p, float) and math.isnan(p)):
         return ""
-    if p < 0.001:
+    a1 = float(alpha) if alpha and alpha > 0 else 0.05
+    a2 = a1 / 5.0
+    a3 = a1 / 50.0
+    if p < a3:
         return "***"
-    if p < 0.01:
+    if p < a2:
         return "**"
-    if p < 0.05:
+    if p < a1:
         return "*"
     return "ns"
 
