@@ -664,6 +664,7 @@ function StatisticsRibbon({ dataset, onAction }: { dataset: boolean; onAction: (
         <RBtn icon="🏷️" label="Variables"     onClick={() => onAction('variable_metadata')} disabled={!dataset} />
         <RBtn icon="🧭" label="Study Design"  onClick={() => onAction('study_design')}      disabled={!dataset} />
         <RBtn icon="💡" label="Suggest Crosstabs" onClick={() => onAction('survey_insights')} disabled={!dataset} />
+        <RBtn icon="🎮" label="Play Mode"     onClick={() => onAction('play_mode')}         disabled={!dataset} />
       </RGroup>
       <RGroup label="Data Quality">
         <RBtn icon="🩺" label="SDQ Checks" onClick={() => onAction('survey_quality')} disabled={!dataset} />

@@ -170,7 +170,7 @@ export function ProjectFilterPanel({ filters, datasetId, allColumns, onChange, o
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="filter-dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
+      <div className="filter-dialog" onClick={e => e.stopPropagation()}>
 
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className="filter-dialog-header">

@@ -45,6 +45,7 @@ import { TypeConvertModal } from './components/TypeConvertModal';
 import { SurveyQualityPanel } from './components/SurveyQualityPanel';
 import { StatGuide, isGuideSkipped } from './components/StatGuide';
 import { AdvancedAnalysisPanel, AdvancedKind } from './components/AdvancedAnalysisPanel';
+import { PlayModePanel } from './components/PlayModePanel';
 
 const ADVANCED_ACTIONS = new Set<AdvancedKind>([
   'causal_did', 'causal_psm', 'causal_mixed_lm', 'power_planner', 'export_codebook', 'exec_summary',
@@ -73,7 +74,7 @@ function generateAutoTitle(t: TableConfig): { title: string; subtitle: string; n
   return { title, subtitle, name: nameShort };
 }
 
-type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'stat_paired_ttest' | 'stat_wilcoxon' | 'stat_mcnemar' | 'stat_kruskal' | 'stat_friedman' | 'stat_spearman' | 'stat_kendall' | 'stat_logistic_regression' | 'stat_multiple_regression' | 'stat_posthoc' | 'stat_reliability' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config' | 'anomalies' | 'diff' | 'variable_metadata' | 'study_design' | 'likert' | 'multi_response' | 'observer' | 'auto_analyze' | 'survey_insights' | 'survey_quality' | 'balance' | 'geo_summary' | 'driver' | 'cluster' | 'verbatim';
+type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'stat_paired_ttest' | 'stat_wilcoxon' | 'stat_mcnemar' | 'stat_kruskal' | 'stat_friedman' | 'stat_spearman' | 'stat_kendall' | 'stat_logistic_regression' | 'stat_multiple_regression' | 'stat_posthoc' | 'stat_reliability' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config' | 'anomalies' | 'diff' | 'variable_metadata' | 'study_design' | 'likert' | 'multi_response' | 'observer' | 'auto_analyze' | 'survey_insights' | 'survey_quality' | 'balance' | 'geo_summary' | 'driver' | 'cluster' | 'verbatim' | 'play_mode';
 
 const STAT_GUIDE_ACTIONS = new Set<string>([
   'stat_correlation', 'stat_descriptive', 'stat_crosstab', 'stat_ttest', 'stat_anova',
@@ -305,11 +306,27 @@ export default function App() {
 
   // Track dirty state (unsaved changes)
   useEffect(() => {
-    const currentState = JSON.stringify({ tables, annotationsMap, comparisonState });
+    const currentState = JSON.stringify({ tables, annotationsMap, comparisonState, projectFilters });
     if (currentState !== lastSaveStateRef.current) {
       setIsDirty(true);
     }
-  }, [tables, annotationsMap, comparisonState]);
+  }, [tables, annotationsMap, comparisonState, projectFilters]);
+
+  // Debounced immediate autosave for project filters (otherwise they only hit
+  // disk on the 5-minute interval and reload-in-under-5-min loses them).
+  useEffect(() => {
+    if (!dataset) return;
+    const t = setTimeout(() => {
+      saveProject('__autosave__', {
+        tables, annotationsMap, comparisonState,
+        projectFilters: projectFiltersRef.current,
+        columnTypeOverrides, sections, numberingConfig,
+        dataset_id: dataset.dataset_id,
+        source_file: { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length },
+      }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(t);
+  }, [projectFilters, dataset?.dataset_id]);
 
   // Auto-save every 5 minutes
   useEffect(() => {
@@ -2012,6 +2029,23 @@ export default function App() {
           datasetId={dataset.dataset_id}
           columns={allColumns}
           onClose={() => setModal(null)}
+        />
+      )}
+      {modal === 'play_mode' && (
+        <PlayModePanel
+          datasetId={dataset.dataset_id}
+          onClose={() => setModal(null)}
+          onAction={(action) => {
+            // Close Play Mode and dispatch the chosen analysis action through the same pipeline.
+            setModal(null);
+            setTimeout(() => {
+              if (ADVANCED_ACTIONS.has(action as AdvancedKind)) {
+                setAdvancedKind(action as AdvancedKind);
+              } else {
+                setModal(action as ModalType);
+              }
+            }, 0);
+          }}
         />
       )}
       {advancedKind && (

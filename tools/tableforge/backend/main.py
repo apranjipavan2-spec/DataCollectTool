@@ -45,6 +45,7 @@ from .routers import (
     causal,
     power,
     codebook,
+    play_mode,
 )
 
 app = FastAPI(title="TableForge", version="2.0")
@@ -90,6 +91,7 @@ app.include_router(triangulate.router)
 app.include_router(causal.router)
 app.include_router(power.router)
 app.include_router(codebook.router)
+app.include_router(play_mode.router)
 
 # Serve frontend static files (production)
 STATIC_DIR = BASE_DIR / "static"
