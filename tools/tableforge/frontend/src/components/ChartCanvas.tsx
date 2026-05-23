@@ -77,15 +77,30 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   const yTickRot = typeof config.yLabelRotation === 'number' ? config.yLabelRotation : 0;
 
   const multiData = useMemo(() => {
-    if (xIdx < 0 || yIndices.length === 0) return [] as { label: string; values: number[] }[];
+    if (xIdx < 0 || yIndices.length === 0) return [] as { label: string; values: number[]; displays: string[] }[];
     return rows.map(r => ({
       label: String(r[xIdx] ?? ''),
       values: yIndices.map(yi => {
         const v = toNumber(r[yi]);
         return isFinite(v) ? v : 0;
       }),
+      // Original formatted cell strings from the table (e.g. "23 (45.2%)"),
+      // used for value labels + tooltips so the chart mirrors the table.
+      displays: yIndices.map(yi => {
+        const raw = r[yi];
+        if (raw === null || raw === undefined) return '';
+        return String(raw);
+      }),
     }));
   }, [rows, xIdx, yIndices]);
+
+  // Use raw cell string when it carries formatting (%, parens, comma) the
+  // bare fmt(v) would drop. Otherwise prefer the compact fmt rendering.
+  const dispLabel = (display: string | undefined, v: number): string => {
+    if (!display) return fmt(v);
+    if (/[%()\/a-zA-Z]/.test(display)) return display;
+    return fmt(v);
+  };
 
   const allValues = multiData.flatMap(d => d.values);
   const maxVal = allValues.length ? Math.max(...allValues) : 1;
@@ -225,9 +240,9 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             return (
               <g key={i}>
                 <rect x={x} y={y} width={barW} height={Math.max(h, 1)} fill={colors[i % colors.length]} rx={2} opacity={barOpacity}
-                  onMouseEnter={e => showTip(e, `${d.label}\n${fmt(v)}`)}
+                  onMouseEnter={e => showTip(e, `${d.label}\n${dispLabel(d.displays[0], v)}`)}
                   onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
-                {showLabels && <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={labelFontSize - 1} fill={colors[i % colors.length]}>{fmt(v)}</text>}
+                {showLabels && <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={labelFontSize - 1} fill={colors[i % colors.length]}>{dispLabel(d.displays[0], v)}</text>}
               </g>
             );
           })}
@@ -256,9 +271,9 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                 </text>
                 <rect x={xScale(0)} y={y} width={Math.abs(xScale(v) - xScale(0))} height={rowH}
                   fill={colors[i % colors.length]} rx={2} opacity={barOpacity}
-                  onMouseEnter={e => showTip(e, `${d.label}\n${fmt(v)}`)}
+                  onMouseEnter={e => showTip(e, `${d.label}\n${dispLabel(d.displays[0], v)}`)}
                   onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
-                {showLabels && <text x={Math.max(xScale(0), xScale(v)) + 4} y={y + rowH / 2 + 4} fontSize={labelFontSize - 1} fill={colors[i % colors.length]}>{fmt(v)}</text>}
+                {showLabels && <text x={Math.max(xScale(0), xScale(v)) + 4} y={y + rowH / 2 + 4} fontSize={labelFontSize - 1} fill={colors[i % colors.length]}>{dispLabel(d.displays[0], v)}</text>}
               </g>
             );
           })}
@@ -282,7 +297,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                   return (
                     <rect key={si} x={x} y={y} width={barW} height={Math.max(h, 0.5)} fill={colors[si % colors.length]}
                       rx={si === d.values.length - 1 ? 2 : 0} opacity={barOpacity}
-                      onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${fmt(v)}`)}
+                      onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${dispLabel(d.displays[si], v)}`)}
                       onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
                   );
                 })}
@@ -307,10 +322,18 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                   const y = yToSvg(Math.max(v, 0));
                   const h = Math.abs(yToSvg(0) - y);
                   return (
-                    <rect key={si} x={x} y={y} width={Math.max(groupBarW - 1, 2)} height={Math.max(h, 1)}
-                      fill={colors[si % colors.length]} rx={1} opacity={barOpacity}
-                      onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${fmt(v)}`)}
-                      onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
+                    <g key={si}>
+                      <rect x={x} y={y} width={Math.max(groupBarW - 1, 2)} height={Math.max(h, 1)}
+                        fill={colors[si % colors.length]} rx={1} opacity={barOpacity}
+                        onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${dispLabel(d.displays[si], v)}`)}
+                        onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
+                      {showLabels && (
+                        <text x={x + groupBarW / 2} y={y - 3} textAnchor="middle"
+                          fontSize={labelFontSize - 2} fill={colors[si % colors.length]}>
+                          {dispLabel(d.displays[si], v)}
+                        </text>
+                      )}
+                    </g>
                   );
                 })}
               </g>
@@ -335,12 +358,12 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                 {multiData.map((d, i) => (
                   <circle key={i} cx={xToSvg(i, multiData.length)} cy={yToSvg(d.values[si])} r={3.5}
                     fill={colors[si % colors.length]} stroke="var(--bg-card)" strokeWidth={1.5}
-                    onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${fmt(d.values[si])}`)}
+                    onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${dispLabel(d.displays[si], d.values[si])}`)}
                     onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
                 ))}
                 {showLabels && multiData.map((d, i) => (
                   <text key={i} x={xToSvg(i, multiData.length)} y={yToSvg(d.values[si]) - 8}
-                    textAnchor="middle" fontSize={labelFontSize - 1} fill={colors[si % colors.length]}>{fmt(d.values[si])}</text>
+                    textAnchor="middle" fontSize={labelFontSize - 1} fill={colors[si % colors.length]}>{dispLabel(d.displays[si], d.values[si])}</text>
                 ))}
               </g>
             );
@@ -362,7 +385,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             const h = Math.abs(yToSvg(0) - y);
             return (
               <rect key={i} x={x} y={y} width={barW} height={Math.max(h, 1)} fill={colors[0]} rx={2} opacity={barOpacity}
-                onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[barSeries]}: ${fmt(v)}`)}
+                onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[barSeries]}: ${dispLabel(d.displays[barSeries], v)}`)}
                 onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
             );
           })}
@@ -375,7 +398,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                 {multiData.map((d, i) => (
                   <circle key={i} cx={xToSvg(i, multiData.length)} cy={yToSvg(d.values[si])} r={3.5}
                     fill={colors[si % colors.length]} stroke="var(--bg-card)" strokeWidth={1.5}
-                    onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${fmt(d.values[si])}`)}
+                    onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${dispLabel(d.displays[si], d.values[si])}`)}
                     onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
                 ))}
               </g>
@@ -406,11 +429,19 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             return (
               <g key={i}>
                 <path d={path} fill={colors[i % colors.length]} opacity={barOpacity} stroke="var(--bg-card)" strokeWidth={1.5}
-                  onMouseEnter={e => showTip(e, `${d.label}\n${fmt(d.values[0])} (${pct}%)`)}
+                  onMouseEnter={e => showTip(e, `${d.label}\n${dispLabel(d.displays[0], d.values[0])} (${pct}%)`)}
                   onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
-                {slice > 0.25 && showLabels && (
-                  <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fontSize={labelFontSize} fill="#fff" fontWeight={600}>{pct}%</text>
-                )}
+                {slice > 0.25 && showLabels && (() => {
+                  // Use the table's own formatted cell where it differs from the
+                  // bare numeric — otherwise just show the percent share.
+                  const raw = d.displays[0] || '';
+                  const showRaw = /[%()\/a-zA-Z]/.test(raw) && raw !== `${pct}%`;
+                  return (
+                    <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fontSize={labelFontSize} fill="#fff" fontWeight={600}>
+                      {showRaw ? raw : `${pct}%`}
+                    </text>
+                  );
+                })()}
               </g>
             );
           })}
@@ -480,14 +511,14 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
               <g key={i}>
                 <rect x={xToSvg(i, multiData.length) - barW / 2} y={top} width={barW} height={Math.max(h, 1)}
                   fill={isPos ? colors[0] : '#ef4444'} rx={2} opacity={barOpacity}
-                  onMouseEnter={e => showTip(e, `${d.label}\n${v >= 0 ? '+' : ''}${fmt(v)}\nRunning: ${fmt(cum)}`)}
+                  onMouseEnter={e => showTip(e, `${d.label}\n${v >= 0 ? '+' : ''}${dispLabel(d.displays[0], v)}\nRunning: ${fmt(cum)}`)}
                   onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
                 {i < multiData.length - 1 && (
                   <line x1={xToSvg(i, multiData.length) + barW / 2} y1={y1}
                     x2={xToSvg(i + 1, multiData.length) - barW / 2} y2={y1}
                     stroke="rgba(255,255,255,0.15)" strokeWidth={1} strokeDasharray="3,2" />
                 )}
-                {showLabels && <text x={xToSvg(i, multiData.length)} y={top - 4} textAnchor="middle" fontSize={labelFontSize - 1} fill={isPos ? colors[0] : '#ef4444'}>{fmt(v)}</text>}
+                {showLabels && <text x={xToSvg(i, multiData.length)} y={top - 4} textAnchor="middle" fontSize={labelFontSize - 1} fill={isPos ? colors[0] : '#ef4444'}>{dispLabel(d.displays[0], v)}</text>}
               </g>
             );
           })}
