@@ -276,7 +276,12 @@ export default function App() {
       }
       if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
       if (data.comparisonState) setComparisonState(data.comparisonState);
-      if (data.projectFilters) setProjectFilters(data.projectFilters);
+      // Sync the ref alongside state so the deferred batch tabulation reads
+      // the loaded filters (state→ref mirror effect runs after commit).
+      if (data.projectFilters) {
+        setProjectFilters(data.projectFilters);
+        projectFiltersRef.current = data.projectFilters;
+      }
       if (Array.isArray(data.sections)) setSections(data.sections);
       if (data.numberingConfig) setNumberingConfig(data.numberingConfig);
       if (data.columnTypeOverrides && dataset) {
@@ -502,7 +507,10 @@ export default function App() {
     if (data.tables) setTables(data.tables);
     if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
     if (data.comparisonState) setComparisonState(data.comparisonState);
-    if (data.projectFilters) setProjectFilters(data.projectFilters);
+    if (data.projectFilters) {
+      setProjectFilters(data.projectFilters);
+      projectFiltersRef.current = data.projectFilters;
+    }
     if (Array.isArray(data.sections)) setSections(data.sections);
     if (data.numberingConfig) setNumberingConfig(data.numberingConfig);
     if (data.source_file) {
@@ -843,7 +851,13 @@ export default function App() {
 
       if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
       if (data.comparisonState) setComparisonState(data.comparisonState);
-      if (data.projectFilters) setProjectFilters(data.projectFilters);
+      // Push project filters into the ref synchronously so the batch tabulation
+      // below reads the new filters — the state→ref mirror effect runs after
+      // commit, which is too late for in-flight tabulate calls.
+      if (data.projectFilters) {
+        setProjectFilters(data.projectFilters);
+        projectFiltersRef.current = data.projectFilters;
+      }
       if (data.columnTypeOverrides && dataset) {
         const overrides = data.columnTypeOverrides as Record<string, string>;
         setColumnTypeOverrides(overrides);
@@ -1090,6 +1104,15 @@ export default function App() {
 
       if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
       if (data.comparisonState) setComparisonState(data.comparisonState);
+      // Restore the project (global) filter — was missing here, causing it to
+      // silently drop every time the user re-applied a project to a fresh file.
+      // Also push into the ref *synchronously* so the immediate runTabulationsBatch
+      // below sees the new filters (the React effect that mirrors state→ref runs
+      // after the commit, too late for in-flight tabulations).
+      if (data.projectFilters) {
+        setProjectFilters(data.projectFilters);
+        projectFiltersRef.current = data.projectFilters;
+      }
       if (data.columnTypeOverrides && dataset) {
         const overrides = data.columnTypeOverrides as Record<string, string>;
         setColumnTypeOverrides(overrides);
@@ -2236,7 +2259,10 @@ export default function App() {
           if (loadedAnnotations) setAnnotationsMap(loadedAnnotations);
           if (loadedExtra?.reportTemplate) setReportTemplate(loadedExtra.reportTemplate);
           if (loadedExtra?.comparisonState) setComparisonState(loadedExtra.comparisonState);
-          if (loadedExtra?.projectFilters) setProjectFilters(loadedExtra.projectFilters);
+          if (loadedExtra?.projectFilters) {
+            setProjectFilters(loadedExtra.projectFilters);
+            projectFiltersRef.current = loadedExtra.projectFilters;
+          }
           if (loadedExtra?.metadata) setPendingMetadataRestore(loadedExtra.metadata);
           if (Array.isArray(loadedExtra?.sections)) setSections(loadedExtra.sections);
           if (loadedExtra?.numberingConfig) setNumberingConfig(loadedExtra.numberingConfig);
