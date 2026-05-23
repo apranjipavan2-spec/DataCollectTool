@@ -654,77 +654,132 @@ function DataRibbon({ dataset, onAction }: { dataset: boolean; onAction: (action
 }
 
 // ── STATISTICS ─────────────────────────────────────────────
+type StatMenuItem = { icon: string; label: string; action: string; alwaysEnabled?: boolean };
+
+const STAT_MENUS: { key: string; icon: string; label: string; items: StatMenuItem[] }[] = [
+  { key: 'survey_design', icon: '🧭', label: 'Survey Design', items: [
+    { icon: '🏷️', label: 'Variables',         action: 'variable_metadata' },
+    { icon: '🧭', label: 'Study Design',      action: 'study_design' },
+    { icon: '💡', label: 'Suggest Crosstabs', action: 'survey_insights' },
+    { icon: '🎮', label: 'Play Mode',         action: 'play_mode' },
+  ]},
+  { key: 'data_quality', icon: '🩺', label: 'Data Quality', items: [
+    { icon: '🩺', label: 'SDQ Checks', action: 'survey_quality' },
+  ]},
+  { key: 'survey_analyses', icon: '📊', label: 'Survey Analyses', items: [
+    { icon: '⚡',  label: 'Run Full',    action: 'auto_analyze' },
+    { icon: '📊', label: 'Likert',      action: 'likert' },
+    { icon: '☑️', label: 'Multi-Resp',  action: 'multi_response' },
+    { icon: '👁️', label: 'Observer',    action: 'observer' },
+    { icon: '💬', label: 'Verbatims',   action: 'verbatim' },
+  ]},
+  { key: 'impact', icon: '🎯', label: 'Impact / Driver', items: [
+    { icon: '⚖️', label: 'Balance',  action: 'balance' },
+    { icon: '🎯', label: 'Drivers',  action: 'driver' },
+    { icon: '🔮', label: 'Clusters', action: 'cluster' },
+    { icon: '🗺', label: 'Geo',      action: 'geo_summary' },
+  ]},
+  { key: 'descriptive', icon: '📋', label: 'Descriptive', items: [
+    { icon: '📋', label: 'Summary',   action: 'stat_descriptive' },
+    { icon: '📊', label: 'Frequency', action: 'stat_frequency' },
+  ]},
+  { key: 'relationships', icon: '📐', label: 'Relationships', items: [
+    { icon: '📐', label: 'Correlation', action: 'stat_correlation' },
+    { icon: '📈', label: 'Regression',  action: 'stat_regression' },
+  ]},
+  { key: 'hypothesis', icon: '𝑡', label: 'Hypothesis Tests', items: [
+    { icon: '𝑡',  label: 't-Test',    action: 'stat_ttest' },
+    { icon: 'F',  label: 'ANOVA',     action: 'stat_anova' },
+    { icon: 'χ²', label: 'Cross-tab', action: 'stat_crosstab' },
+  ]},
+  { key: 'paired', icon: '↔', label: 'Paired / Pre-Post', items: [
+    { icon: '↔', label: 'Paired t', action: 'stat_paired_ttest' },
+    { icon: 'W', label: 'Wilcoxon', action: 'stat_wilcoxon' },
+    { icon: '±', label: 'McNemar',  action: 'stat_mcnemar' },
+  ]},
+  { key: 'nonparam', icon: 'K', label: 'Non-parametric', items: [
+    { icon: 'K',  label: 'Kruskal',  action: 'stat_kruskal' },
+    { icon: 'Fr', label: 'Friedman', action: 'stat_friedman' },
+    { icon: 'ρ',  label: 'Spearman', action: 'stat_spearman' },
+    { icon: 'τ',  label: 'Kendall',  action: 'stat_kendall' },
+  ]},
+  { key: 'models', icon: '📐', label: 'Models', items: [
+    { icon: '📐', label: 'Multi-Reg',   action: 'stat_multiple_regression' },
+    { icon: 'OR', label: 'Logistic',    action: 'stat_logistic_regression' },
+    { icon: '⇄',  label: 'Post-hoc',    action: 'stat_posthoc' },
+    { icon: 'α',  label: 'Reliability', action: 'stat_reliability' },
+  ]},
+  { key: 'distribution', icon: '📉', label: 'Distribution', items: [
+    { icon: '📉', label: 'Normality', action: 'stat_normality' },
+    { icon: '⚠',  label: 'Outliers',  action: 'stat_outlier' },
+  ]},
+  { key: 'advanced', icon: '⚡', label: 'Advanced Analysis', items: [
+    { icon: '📐', label: 'DiD',        action: 'causal_did' },
+    { icon: '≈',  label: 'PSM',        action: 'causal_psm' },
+    { icon: '🏘', label: 'Mixed LM',   action: 'causal_mixed_lm' },
+    { icon: '⚡', label: 'Power',      action: 'power_planner', alwaysEnabled: true },
+    { icon: '📖', label: 'Codebook',   action: 'export_codebook' },
+    { icon: '✨', label: 'AI Summary', action: 'exec_summary' },
+  ]},
+];
+
 function StatisticsRibbon({ dataset, onAction }: { dataset: boolean; onAction: (action: string) => void }) {
+  const [openDrop, setOpenDrop] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpenDrop(null);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const tog = (name: string) => setOpenDrop(o => o === name ? null : name);
+  const pick = (action: string) => { onAction(action); setOpenDrop(null); };
+
   return (
-    <>
+    <div ref={containerRef} style={{ display: 'contents' }}>
       <RGroup label="Help">
         <RBtn icon="📖" label="Guide" onClick={() => onAction('stat_guide')} />
       </RGroup>
-      <RGroup label="Survey Design">
-        <RBtn icon="🏷️" label="Variables"     onClick={() => onAction('variable_metadata')} disabled={!dataset} />
-        <RBtn icon="🧭" label="Study Design"  onClick={() => onAction('study_design')}      disabled={!dataset} />
-        <RBtn icon="💡" label="Suggest Crosstabs" onClick={() => onAction('survey_insights')} disabled={!dataset} />
-        <RBtn icon="🎮" label="Play Mode"     onClick={() => onAction('play_mode')}         disabled={!dataset} />
-      </RGroup>
-      <RGroup label="Data Quality">
-        <RBtn icon="🩺" label="SDQ Checks" onClick={() => onAction('survey_quality')} disabled={!dataset} />
-      </RGroup>
-      <RGroup label="Survey Analyses">
-        <RBtn icon="⚡" label="Run Full"   onClick={() => onAction('auto_analyze')}   disabled={!dataset} />
-        <RBtn icon="📊" label="Likert"    onClick={() => onAction('likert')}         disabled={!dataset} />
-        <RBtn icon="☑️" label="Multi-Resp" onClick={() => onAction('multi_response')} disabled={!dataset} />
-        <RBtn icon="👁️" label="Observer"  onClick={() => onAction('observer')}       disabled={!dataset} />
-        <RBtn icon="💬" label="Verbatims"  onClick={() => onAction('verbatim')}       disabled={!dataset} />
-      </RGroup>
-      <RGroup label="Impact / Driver">
-        <RBtn icon="⚖️" label="Balance"   onClick={() => onAction('balance')}      disabled={!dataset} />
-        <RBtn icon="🎯" label="Drivers"   onClick={() => onAction('driver')}       disabled={!dataset} />
-        <RBtn icon="🔮" label="Clusters"  onClick={() => onAction('cluster')}      disabled={!dataset} />
-        <RBtn icon="🗺" label="Geo"       onClick={() => onAction('geo_summary')}  disabled={!dataset} />
-      </RGroup>
-      <RGroup label="Descriptive">
-        <RBtn icon="📋" label="Summary"   onClick={() => onAction('stat_descriptive')} disabled={!dataset} />
-        <RBtn icon="📊" label="Frequency" onClick={() => onAction('stat_frequency')}   disabled={!dataset} />
-      </RGroup>
-      <RGroup label="Relationships">
-        <RBtn icon="📐" label="Correlation" onClick={() => onAction('stat_correlation')} disabled={!dataset} />
-        <RBtn icon="📈" label="Regression"  onClick={() => onAction('stat_regression')}  disabled={!dataset} />
-      </RGroup>
-      <RGroup label="Hypothesis Tests">
-        <RBtn icon="𝑡"  label="t-Test"   onClick={() => onAction('stat_ttest')}   disabled={!dataset} />
-        <RBtn icon="F"  label="ANOVA"    onClick={() => onAction('stat_anova')}   disabled={!dataset} />
-        <RBtn icon="χ²" label="Cross-tab" onClick={() => onAction('stat_crosstab')} disabled={!dataset} />
-      </RGroup>
-      <RGroup label="Paired / Pre-Post">
-        <RBtn icon="↔" label="Paired t"  onClick={() => onAction('stat_paired_ttest')} disabled={!dataset} />
-        <RBtn icon="W" label="Wilcoxon" onClick={() => onAction('stat_wilcoxon')}    disabled={!dataset} />
-        <RBtn icon="±" label="McNemar"  onClick={() => onAction('stat_mcnemar')}     disabled={!dataset} />
-      </RGroup>
-      <RGroup label="Non-parametric">
-        <RBtn icon="K"  label="Kruskal"  onClick={() => onAction('stat_kruskal')}  disabled={!dataset} />
-        <RBtn icon="Fr" label="Friedman" onClick={() => onAction('stat_friedman')} disabled={!dataset} />
-        <RBtn icon="ρ"  label="Spearman" onClick={() => onAction('stat_spearman')} disabled={!dataset} />
-        <RBtn icon="τ"  label="Kendall"  onClick={() => onAction('stat_kendall')}  disabled={!dataset} />
-      </RGroup>
-      <RGroup label="Models">
-        <RBtn icon="📐" label="Multi-Reg"   onClick={() => onAction('stat_multiple_regression')} disabled={!dataset} />
-        <RBtn icon="OR" label="Logistic"    onClick={() => onAction('stat_logistic_regression')} disabled={!dataset} />
-        <RBtn icon="⇄"  label="Post-hoc"    onClick={() => onAction('stat_posthoc')}              disabled={!dataset} />
-        <RBtn icon="α"  label="Reliability" onClick={() => onAction('stat_reliability')}          disabled={!dataset} />
-      </RGroup>
-      <RGroup label="Distribution">
-        <RBtn icon="📉" label="Normality" onClick={() => onAction('stat_normality')} disabled={!dataset} />
-        <RBtn icon="⚠"  label="Outliers"  onClick={() => onAction('stat_outlier')}   disabled={!dataset} />
-      </RGroup>
-      <RGroup label="Advanced Analysis">
-        <RBtn icon="📐" label="DiD"          onClick={() => onAction('causal_did')}      disabled={!dataset} />
-        <RBtn icon="≈"  label="PSM"          onClick={() => onAction('causal_psm')}      disabled={!dataset} />
-        <RBtn icon="🏘" label="Mixed LM"     onClick={() => onAction('causal_mixed_lm')} disabled={!dataset} />
-        <RBtn icon="⚡" label="Power"        onClick={() => onAction('power_planner')}   disabled={false} />
-        <RBtn icon="📖" label="Codebook"     onClick={() => onAction('export_codebook')} disabled={!dataset} />
-        <RBtn icon="✨" label="AI Summary"   onClick={() => onAction('exec_summary')}    disabled={!dataset} />
-      </RGroup>
-    </>
+      {STAT_MENUS.map(menu => {
+        const groupDisabled = !dataset && !menu.items.some(i => i.alwaysEnabled);
+        const isOpen = openDrop === menu.key;
+        return (
+          <RGroup key={menu.key} label={menu.label} style={{ position: 'relative' }}>
+            <button
+              className={`ribbon-btn fdrop-btn ${isOpen ? 'active' : ''}`}
+              onClick={() => tog(menu.key)}
+              disabled={groupDisabled}
+              title={menu.label}
+            >
+              <span className="ribbon-btn-icon">{menu.icon}</span>
+              <span className="ribbon-btn-label">{menu.label} ▾</span>
+            </button>
+            {isOpen && (
+              <div className="fdrop-panel rmenu-panel" style={{ width: 220 }}>
+                {menu.items.map(it => {
+                  const itemDisabled = !dataset && !it.alwaysEnabled;
+                  return (
+                    <button
+                      key={it.action}
+                      className="rmenu-item"
+                      onClick={() => pick(it.action)}
+                      disabled={itemDisabled}
+                      title={it.label}
+                    >
+                      <span className="rmenu-item-icon">{it.icon}</span>
+                      <span className="rmenu-item-label">{it.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </RGroup>
+        );
+      })}
+    </div>
   );
 }
 

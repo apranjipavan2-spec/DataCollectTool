@@ -964,8 +964,9 @@ export default function App() {
     copy.id = id;
     copy.name = `${src.name} (copy)`;
     pushUndo();
-    setTables(prev => [...prev, copy]);
-    setActiveTableIdx(tables.length);
+    const insertAt = activeTableIdx + 1;
+    setTables(prev => [...prev.slice(0, insertAt), copy, ...prev.slice(insertAt)]);
+    setActiveTableIdx(insertAt);
     runTabulation(copy);
   }, [tables, activeTableIdx, pushUndo, runTabulation]);
 
