@@ -380,9 +380,12 @@ export function SourcePanel({
           const isSelected = selectedTables.has(t.id);
 
           const isDragOver = tableDragOverIdx === realIdx && tableDragIdx !== realIdx;
+          const hasChart = !!t.chartConfig;
+          const chartOnly = !!t.chartConfig?.chart_only;
           return (
             <div key={t.id}
-              className={`table-nav-item ${realIdx === activeTableIdx ? 'active' : ''} ${hasError ? 'table-nav-error' : ''} ${isEmpty ? 'table-nav-empty' : ''} ${isSelected ? 'table-nav-selected' : ''} ${isDragOver ? 'table-nav-drag-over' : ''}`}
+              className={`table-nav-item ${realIdx === activeTableIdx ? 'active' : ''} ${hasError ? 'table-nav-error' : ''} ${isEmpty ? 'table-nav-empty' : ''} ${isSelected ? 'table-nav-selected' : ''} ${isDragOver ? 'table-nav-drag-over' : ''} ${hasChart ? 'table-nav-charted' : ''}`}
+              style={hasChart ? { borderLeft: `3px solid ${chartOnly ? '#a78bfa' : '#22c55e'}` } : undefined}
               draggable
               onDragStart={e => {
                 setTableDragIdx(realIdx);
@@ -438,10 +441,20 @@ export function SourcePanel({
                 {onOpenChartFor && hasResult && (
                   <span
                     className="table-nav-badge"
-                    title={t.chartConfig ? 'Open chart for this table' : 'Create chart for this table'}
-                    style={{ cursor: 'pointer', background: t.chartConfig ? '#22c55e' : '#475569', color: '#fff' }}
+                    title={
+                      chartOnly ? 'Chart only (table hidden) — click to edit'
+                      : hasChart ? 'Chart attached — click to edit'
+                      : 'No chart — click to create'
+                    }
+                    style={{
+                      cursor: 'pointer',
+                      background: chartOnly ? '#a78bfa' : hasChart ? '#22c55e' : '#475569',
+                      color: '#fff',
+                      fontWeight: hasChart ? 700 : 400,
+                      padding: hasChart ? '1px 6px' : undefined,
+                    }}
                     onClick={e => { e.stopPropagation(); onOpenChartFor(realIdx); }}
-                  >📊</span>
+                  >{chartOnly ? '📊 only' : hasChart ? '📊 ✓' : '📊'}</span>
                 )}
               </span>
             </div>

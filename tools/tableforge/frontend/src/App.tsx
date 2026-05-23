@@ -27,6 +27,7 @@ import { TableComparison } from './components/TableComparison';
 import { MetricLibrary } from './components/MetricLibrary';
 import { AnnotationReconcileDialog, detectOrphanedAnnotations, ReconcileAnnotation } from './components/AnnotationReconcile';
 import { ChartBuilder } from './components/ChartBuilder';
+import { InlineChartPreview } from './components/InlineChartPreview';
 import { RibbonBar, TABLE_TEMPLATES } from './components/RibbonBar';
 import { StatisticalTables } from './components/StatisticalTables';
 import { VariableMetadataPanel } from './components/VariableMetadataPanel';
@@ -1598,25 +1599,36 @@ export default function App() {
               allColumns={allColumns.map(c => c.name)}
               onUpdate={updateTable}
             />
-          <LivePreview result={currentResult} loading={loading} error={error}
-            title={activeTable.title} subtitle={activeTable.subtitle}
-            datasetId={dataset.dataset_id} tableConfig={activeTable}
-            annotations={annotationsMap[activeTable?.id] || []}
-            onAnnotationsChange={anns => setAnnotationsMap(prev => ({ ...prev, [activeTable.id]: anns }))}
-            tableMode={theme}
-            onHeaderRename={(original, newName) => {
-              const renames = { ...(activeTable.header_renames || {}) };
-              const trimmed = (newName || '').trim();
-              // Empty value or value matching the original field name = clear the rename
-              if (trimmed && trimmed !== original) {
-                renames[original] = trimmed;
-                if (dataset) logAuditEvent(dataset.dataset_id, 'column_rename', `Column "${original}" renamed to "${trimmed}" in table "${activeTable.name}"`);
-              } else {
-                delete renames[original];
-              }
-              updateTable({ header_renames: renames });
-            }}
-          />
+          {!activeTable.chartConfig?.chart_only && (
+            <LivePreview result={currentResult} loading={loading} error={error}
+              title={activeTable.title} subtitle={activeTable.subtitle}
+              datasetId={dataset.dataset_id} tableConfig={activeTable}
+              annotations={annotationsMap[activeTable?.id] || []}
+              onAnnotationsChange={anns => setAnnotationsMap(prev => ({ ...prev, [activeTable.id]: anns }))}
+              tableMode={theme}
+              onHeaderRename={(original, newName) => {
+                const renames = { ...(activeTable.header_renames || {}) };
+                const trimmed = (newName || '').trim();
+                // Empty value or value matching the original field name = clear the rename
+                if (trimmed && trimmed !== original) {
+                  renames[original] = trimmed;
+                  if (dataset) logAuditEvent(dataset.dataset_id, 'column_rename', `Column "${original}" renamed to "${trimmed}" in table "${activeTable.name}"`);
+                } else {
+                  delete renames[original];
+                }
+                updateTable({ header_renames: renames });
+              }}
+            />
+          )}
+          {activeTable.chartConfig && (
+            <InlineChartPreview
+              table={activeTable}
+              result={currentResult}
+              onEdit={() => setModal('charts')}
+              onRemove={() => updateTable({ chartConfig: undefined } as any)}
+              onToggleChartOnly={() => updateTable({ chartConfig: { ...activeTable.chartConfig, chart_only: !activeTable.chartConfig?.chart_only } } as any)}
+            />
+          )}
           </>)}
           {tableInterpretations[activeTable?.id] && (
             <div style={{ margin: '8px 12px', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 8, overflow: 'hidden' }}>
