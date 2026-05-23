@@ -160,20 +160,25 @@ export interface ChartExportSvgOpts {
 }
 
 export function buildChartExportSvg(opts: ChartExportSvgOpts): { xml: string; totalHeight: number } {
-  const { svgElement, title, titleFontSize, width, height, bgColor = '#1a1d27' } = opts;
+  const { svgElement, title, titleFontSize, width, height, bgColor = 'transparent' } = opts;
   const innerXml = new XMLSerializer().serializeToString(svgElement);
   const titleH = title ? Math.round(titleFontSize * 1.7 + 16) : 0;
   const totalH = height + titleH;
   const titleY = Math.round(titleFontSize * 1.2 + 8);
+  // Skip the background rect when transparent so PNG/Word/Slides see-through.
+  // Title text uses a dark fill so it remains legible on white document pages.
+  const isTransparent = bgColor === 'transparent' || bgColor === 'none';
+  const titleFill = isTransparent ? '#1f2937' : '#e5e7eb';
   const xml = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${totalH}" viewBox="0 0 ${width} ${totalH}">`
-    + `<rect width="${width}" height="${totalH}" fill="${bgColor}"/>`
-    + (title ? `<text x="${width / 2}" y="${titleY}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${titleFontSize}" font-weight="700" fill="#e5e7eb">${escapeXml(title)}</text>` : '')
+    + (isTransparent ? '' : `<rect width="${width}" height="${totalH}" fill="${bgColor}"/>`)
+    + (title ? `<text x="${width / 2}" y="${titleY}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${titleFontSize}" font-weight="700" fill="${titleFill}">${escapeXml(title)}</text>` : '')
     + `<g transform="translate(0, ${titleH})">${innerXml}</g>`
     + `</svg>`;
   return { xml, totalHeight: totalH };
 }
 
 // Rasterize SVG XML → PNG dataURL (e.g. "data:image/png;base64,..."). Scale=2 for crisp output.
+// Canvas is left unfilled so PNG alpha channel is preserved (transparent background).
 export function svgXmlToPngDataUrl(svgXml: string, width: number, totalHeight: number, scale = 2): Promise<string> {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
@@ -183,8 +188,6 @@ export function svgXmlToPngDataUrl(svgXml: string, width: number, totalHeight: n
     if (!ctx) { reject(new Error('No 2D context')); return; }
     const img = new Image();
     img.onload = () => {
-      ctx.fillStyle = '#1a1d27';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       resolve(canvas.toDataURL('image/png'));
     };
