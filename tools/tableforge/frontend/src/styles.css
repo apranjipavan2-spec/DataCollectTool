@@ -808,7 +808,7 @@ body {
 .filter-dialog-header .modal-close { margin-left: auto; }
 .filter-dialog-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 .filter-field-list {
-  width: 300px; border-right: 1px solid var(--border); overflow-y: auto; padding: 8px 0;
+  width: 380px; border-right: 1px solid var(--border); overflow-y: auto; padding: 8px 0;
   flex-shrink: 0;
 }
 .filter-field-btn {

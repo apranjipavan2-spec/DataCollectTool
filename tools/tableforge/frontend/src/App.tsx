@@ -276,6 +276,9 @@ export default function App() {
       }
       if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
       if (data.comparisonState) setComparisonState(data.comparisonState);
+      if (data.projectFilters) setProjectFilters(data.projectFilters);
+      if (Array.isArray(data.sections)) setSections(data.sections);
+      if (data.numberingConfig) setNumberingConfig(data.numberingConfig);
       if (data.columnTypeOverrides && dataset) {
         const overrides = data.columnTypeOverrides as Record<string, string>;
         setColumnTypeOverrides(overrides);
