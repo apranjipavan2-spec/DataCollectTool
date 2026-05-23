@@ -6,7 +6,7 @@ export type ChartType =
   | 'line' | 'area' | 'pie' | 'donut' | 'scatter'
   | 'waterfall' | 'combo' | 'heatmap' | 'correlation';
 
-export type LegendPos = 'right' | 'bottom' | 'top' | 'none';
+export type LegendPos = 'right' | 'bottom' | 'top' | 'left' | 'none';
 
 export const CHART_TYPES: { value: ChartType; label: string; icon: string }[] = [
   { value: 'bar',         label: 'Bar',          icon: '▐▐▐' },

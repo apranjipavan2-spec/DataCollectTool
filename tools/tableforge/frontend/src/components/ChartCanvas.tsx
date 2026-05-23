@@ -176,12 +176,14 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   // clipped at the SVG edge.
   const charPx = labelFontSize * 0.6; // approximate sans-serif glyph width
 
-  // Right margin: reserve room for the legend when it sits on the right.
+  // Right/Left margin: reserve room for the legend when it sits on the side.
+  const sideLegendPx = (showLegend === 'right' || showLegend === 'left') && seriesNames.length > 1
+    ? Math.ceil(14 + seriesNames.reduce((m, n) => Math.max(m, Math.min(15, n.length)), 0) * (labelFontSize - 1) * 0.62 + 18)
+    : 0;
   if (showLegend === 'right' && seriesNames.length > 1) {
-    const maxLegendChars = seriesNames.reduce((m, n) => Math.max(m, Math.min(15, n.length)), 0);
-    const legendPx = 14 + maxLegendChars * (labelFontSize - 1) * 0.62 + 18;
-    MR = Math.max(MR, Math.ceil(legendPx));
+    MR = Math.max(MR, sideLegendPx);
   }
+  // 'left' legend extends ML below — handled after ML is computed.
 
   // X-axis rotation + bottom margin: rotated labels project downward by
   // labelLength * sin(angle). Pad for descenders + caption.
@@ -213,6 +215,10 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
     ML = Math.max(54, Math.ceil(maxCatChars * charPx + 14));
   } else {
     ML = Math.max(48, Math.ceil(yTickPx + yCaptionSlot + 16));
+  }
+  // If legend is on the left, push axis content right to make room for it.
+  if (showLegend === 'left' && seriesNames.length > 1) {
+    ML += sideLegendPx;
   }
   // Pin Y-axis caption inside the left gutter, just left of the tick text.
   const yLabelX = chartType === 'bar_h' ? 12 : Math.max(10, ML - Math.ceil(yTickPx) - 12);
@@ -264,6 +270,14 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
           </g>
         );
       });
+    }
+    if (showLegend === 'left') {
+      return seriesNames.map((name, i) => (
+        <g key={i} transform={`translate(${8}, ${MT + i * 18})`}>
+          <rect width={10} height={10} fill={colors[i % colors.length]} rx={2} />
+          <text x={14} y={9} fontSize={labelFontSize - 1} fill="#9ca3af">{name.length > 15 ? name.slice(0, 15) + '...' : name}</text>
+        </g>
+      ));
     }
     return null;
   };
@@ -505,7 +519,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
 
     if (chartType === 'pie' || chartType === 'donut') {
       const total = multiData.reduce((s, d) => s + Math.abs(d.values[0]), 0) || 1;
-      const cx = W / 2 - (showLegend === 'right' ? 40 : 0), cy = H / 2, r = Math.min(PW, PH) / 2 - 10;
+      const cx = W / 2 + (showLegend === 'right' ? -40 : (showLegend === 'left' ? 40 : 0)), cy = H / 2, r = Math.min(PW, PH) / 2 - 10;
       const inner = chartType === 'donut' ? r * 0.52 : 0;
       let angle = -Math.PI / 2;
       return (
@@ -546,14 +560,21 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
               <text x={cx} y={cy + 10} textAnchor="middle" fontSize={14} fill="#e4e4e7" fontWeight={700}>{fmt(total)}</text>
             </>
           )}
-          {showLegend !== 'none' && multiData.slice(0, 12).map((d, i) => (
-            <g key={i} transform={showLegend === 'right'
+          {showLegend !== 'none' && multiData.slice(0, 12).map((d, i) => {
+            const transform = showLegend === 'right'
               ? `translate(${cx + r + 24}, ${MT + i * 18})`
-              : `translate(${ML + i * 80}, ${MT + PH + 20})`}>
-              <rect width={10} height={10} fill={colors[i % colors.length]} rx={2} />
-              <text x={14} y={9} fontSize={labelFontSize - 1} fill="#9ca3af">{d.label.length > 18 ? d.label.slice(0, 18) + '...' : d.label}</text>
-            </g>
-          ))}
+              : showLegend === 'left'
+                ? `translate(${8}, ${MT + i * 18})`
+                : showLegend === 'top'
+                  ? `translate(${ML + i * 80}, ${8})`
+                  : `translate(${ML + i * 80}, ${MT + PH + 20})`;
+            return (
+              <g key={i} transform={transform}>
+                <rect width={10} height={10} fill={colors[i % colors.length]} rx={2} />
+                <text x={14} y={9} fontSize={labelFontSize - 1} fill="#9ca3af">{d.label.length > 18 ? d.label.slice(0, 18) + '...' : d.label}</text>
+              </g>
+            );
+          })}
         </g>
       );
     }

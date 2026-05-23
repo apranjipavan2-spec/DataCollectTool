@@ -285,8 +285,9 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
         <label>Legend</label>
         <select value={showLegend} onChange={e => setShowLegend(e.target.value as LegendPos)}>
           <option value="right">Right</option>
-          <option value="bottom">Bottom</option>
+          <option value="left">Left</option>
           <option value="top">Top</option>
+          <option value="bottom">Bottom</option>
           <option value="none">Hidden</option>
         </select>
       </div>

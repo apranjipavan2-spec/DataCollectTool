@@ -686,6 +686,11 @@ async def export_word(config: ExportConfig):
             run.font.color.rgb = RGBColor(100, 100, 100)
 
         if not headers:
+            # Chart-only item: no table to render, but still embed the chart
+            # (e.g. the user picked a chart in the export dialog without its
+            # source table). Falls through silently if no chart_image is set.
+            if t.get("chart_image"):
+                _embed_chart_if_present(t, table_landscape)
             continue
 
         styled_html = t.get("styled_html", "")

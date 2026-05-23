@@ -196,6 +196,11 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
   const [format, setFormat] = useState('docx');
   const [filename, setFilename] = useState('TableForge_Export');
   const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set(tables.map(t => t.id)));
+  // Charts are tracked independently from tables — a user can include a chart
+  // without its source table, or include the table without the chart.
+  const [selectedCharts, setSelectedCharts] = useState<Set<string>>(
+    new Set(tables.filter(t => t.chartConfig && t.chartConfig.xField && (t.chartConfig.yFields?.length || 0) > 0).map(t => t.id))
+  );
   const [exporting, setExporting] = useState(false);
   const [resultMsg, setResultMsg] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -249,26 +254,50 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
     setSelectedTables(next);
   };
 
+  const toggleChart = (id: string) => {
+    const next = new Set(selectedCharts);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelectedCharts(next);
+  };
+
+  // Tables that have a chart configured AND a data result — eligible for the
+  // separate "Charts / Figures to Export" picker.
+  const chartTables = tables.filter(t => {
+    const cc = t.chartConfig;
+    if (!cc || !cc.xField || !(cc.yFields?.length)) return false;
+    const res = results.get(t.id);
+    return !!(res && res.rows.length > 0);
+  });
+
   const handleExport = async () => {
     setExporting(true);
     setError('');
     setResultMsg(null);
     try {
       const selectedT = tables.filter(t => selectedTables.has(t.id));
-      // Pre-render charts only for formats that embed them (Word currently).
-      // Sequential rendering — keeps memory bounded for large packs.
-      const chartFieldsByTable: Record<string, { chart_image?: string; chart_title?: string }> = {};
+      // Charts honour `selectedCharts` independently — and only the docx
+      // pipeline knows how to embed images today.
       const formatEmbedsCharts = format === 'docx';
-      const tablesWithCharts = formatEmbedsCharts
-        ? selectedT.filter(t => t.chartConfig && t.chartConfig.xField)
-        : [];
-      for (let i = 0; i < tablesWithCharts.length; i++) {
-        const t = tablesWithCharts[i];
-        setResultMsg(`Rendering chart ${i + 1} of ${tablesWithCharts.length}: ${t.title || t.name}`);
-        chartFieldsByTable[t.id] = await renderChartFor(t);
+      const chartFieldsByTable: Record<string, { chart_image?: string; chart_title?: string }> = {};
+      const chartOnlyIds: string[] = [];
+      if (formatEmbedsCharts) {
+        const chartTargets = tables.filter(t =>
+          selectedCharts.has(t.id) &&
+          t.chartConfig && t.chartConfig.xField &&
+          (t.chartConfig.yFields?.length || 0) > 0
+        );
+        for (let i = 0; i < chartTargets.length; i++) {
+          const t = chartTargets[i];
+          setResultMsg(`Rendering chart ${i + 1} of ${chartTargets.length}: ${t.title || t.name}`);
+          chartFieldsByTable[t.id] = await renderChartFor(t);
+          if (!selectedTables.has(t.id) && chartFieldsByTable[t.id]?.chart_image) {
+            chartOnlyIds.push(t.id);
+          }
+        }
       }
-      if (selectedT.length > 0) {
-        setResultMsg(`Packaging ${selectedT.length} table${selectedT.length !== 1 ? 's' : ''} for ${format.toUpperCase()} export…`);
+      if (selectedT.length > 0 || chartOnlyIds.length > 0) {
+        const totalItems = selectedT.length + chartOnlyIds.length;
+        setResultMsg(`Packaging ${totalItems} item${totalItems !== 1 ? 's' : ''} for ${format.toUpperCase()} export…`);
       }
 
       const exportData = selectedT
@@ -347,8 +376,52 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
         })
         .filter(t => t && t.headers.length > 0);
 
+      // Append chart-only items (chart picked but its table NOT picked).
+      // Backend treats empty headers + chart_image as "embed only the chart".
+      for (const id of chartOnlyIds) {
+        const t = tables.find(x => x.id === id);
+        const chartFields = chartFieldsByTable[id];
+        if (!t || !chartFields?.chart_image) continue;
+        exportData.push({
+          name: t.name,
+          headers: [],
+          rows: [],
+          formatted_rows: [],
+          styled_html: '',
+          title: '',  // chart-only: don't repeat the table title
+          subtitle: '',
+          footnote: '',
+          annotations: [],
+          interpretation: '',
+          num_row_fields: 0,
+          column_groups: undefined,
+          cell_align: 'right',
+          header_align: 'center',
+          row_label_align: 'left',
+          column_widths: {},
+          row_height: 0,
+          serial_number: false,
+          zebra: false,
+          zebra_color: '',
+          title_color: '',
+          title_bold: false,
+          title_italic: false,
+          title_size: 18,
+          title_align: 'left',
+          header_bg_color: '',
+          header_text_color: '',
+          total_bg_color: '',
+          bg_color: '',
+          row_bg_color: '',
+          header_formats: [],
+          footnotes: [],
+          value_formats: [],
+          ...chartFields,
+        } as any);
+      }
+
       if (exportData.length === 0) {
-        setError('No tables with data to export');
+        setError('No tables or charts selected for export');
         setExporting(false);
         return;
       }
@@ -380,14 +453,25 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
     setExporting(true); setError(''); setResultMsg(null);
     const selectedT = tables.filter(t => selectedTables.has(t.id));
     const chartFieldsByTable: Record<string, { chart_image?: string; chart_title?: string }> = {};
-    const tablesWithCharts = selectedT.filter(t => t.chartConfig && t.chartConfig.xField);
-    for (let i = 0; i < tablesWithCharts.length; i++) {
-      const t = tablesWithCharts[i];
-      setResultMsg(`Rendering chart ${i + 1} of ${tablesWithCharts.length}: ${t.title || t.name}`);
+    const chartOnlyIds: string[] = [];
+    // Honour the independent Charts/Figures picker — render every selected chart,
+    // attach to its table if also selected, else queue as a chart-only item.
+    const chartTargets = tables.filter(t =>
+      selectedCharts.has(t.id) &&
+      t.chartConfig && t.chartConfig.xField &&
+      (t.chartConfig.yFields?.length || 0) > 0
+    );
+    for (let i = 0; i < chartTargets.length; i++) {
+      const t = chartTargets[i];
+      setResultMsg(`Rendering chart ${i + 1} of ${chartTargets.length}: ${t.title || t.name}`);
       chartFieldsByTable[t.id] = await renderChartFor(t);
+      if (!selectedTables.has(t.id) && chartFieldsByTable[t.id]?.chart_image) {
+        chartOnlyIds.push(t.id);
+      }
     }
-    if (selectedT.length > 0) {
-      setResultMsg(`Packaging ${selectedT.length} table${selectedT.length !== 1 ? 's' : ''} for batch (Excel + Word) export…`);
+    const totalItems = selectedT.length + chartOnlyIds.length;
+    if (totalItems > 0) {
+      setResultMsg(`Packaging ${totalItems} item${totalItems !== 1 ? 's' : ''} for batch (Excel + Word) export…`);
     }
     const exportData = selectedT
       .map(t => {
@@ -463,7 +547,34 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
       })
       .filter(t => t && t.headers.length > 0);
 
-    if (exportData.length === 0) { setError('No tables with data'); setExporting(false); return; }
+    for (const id of chartOnlyIds) {
+      const t = tables.find(x => x.id === id);
+      const chartFields = chartFieldsByTable[id];
+      if (!t || !chartFields?.chart_image) continue;
+      exportData.push({
+        name: t.name,
+        headers: [],
+        rows: [],
+        formatted_rows: [],
+        styled_html: '',
+        title: '', subtitle: '', footnote: '',
+        header_renames: {},
+        annotations: [], interpretation: '',
+        num_row_fields: 0,
+        column_groups: undefined,
+        cell_align: 'right', header_align: 'center', row_label_align: 'left',
+        column_widths: {}, row_height: 0,
+        serial_number: false,
+        zebra: false, zebra_color: '',
+        title_color: '', title_bold: false, title_italic: false, title_size: 18, title_align: 'left',
+        header_bg_color: '', header_text_color: '', total_bg_color: '',
+        bg_color: '', row_bg_color: '',
+        header_formats: [], footnotes: [], value_formats: [],
+        ...chartFields,
+      } as any);
+    }
+
+    if (exportData.length === 0) { setError('No tables or charts selected'); setExporting(false); return; }
 
     try {
       const [xlsxRes, docxRes] = await Promise.all([
@@ -663,70 +774,109 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
                 const cc = t.chartConfig;
                 const hasChart = !!(cc && cc.xField && cc.yFields && cc.yFields.length > 0);
                 const isSelected = selectedTables.has(t.id);
-                const showThumb = hasChart && hasData && isSelected && format === 'docx';
-                const thumbTitle = hasChart
-                  ? (((cc!.chartTitle as string) || '').trim() || figTitleFromTable(t) || `Fig: ${t.title || t.name || 'Chart'}`)
-                  : '';
                 return (
-                  <div key={t.id} style={{ display: 'flex', flexDirection: 'column' }}>
-                    <label className={`table-select-item ${!hasData ? 'disabled' : ''}`}>
-                      <input type="checkbox" checked={isSelected}
-                        onChange={() => toggleTable(t.id)} disabled={!hasData} />
-                      <span className="exp-table-num">#{i + 1}</span>
-                      {t.pinned && <span title="Pinned" style={{ color: '#f59e0b', marginRight: 4 }}>★</span>}
-                      {hasChart && (
-                        <span title={`Chart attached${format === 'docx' ? ' — will be embedded in Word with title' : ' — only embedded in Word (.docx) exports'}`}
-                          style={{ color: '#60a5fa', marginRight: 4, fontSize: 12 }}>📊</span>
-                      )}
-                      <span>{t.title || t.name}</span>
-                      <span className="table-info">{hasData ? `${res!.row_count} rows` : 'No data'}</span>
-                    </label>
-                    {showThumb && (
-                      <div style={{
-                        margin: '4px 0 8px 28px',
-                        padding: 8,
-                        background: 'rgba(59,130,246,0.06)',
-                        border: '1px solid rgba(59,130,246,0.2)',
-                        borderRadius: 6,
-                      }}>
-                        <div style={{
-                          fontSize: 11, color: 'var(--text-dim)', marginBottom: 4,
-                          textAlign: 'center', fontWeight: 600,
-                        }}>
-                          Will embed in Word: <span style={{ color: '#60a5fa' }}>{thumbTitle}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
-                          <ChartCanvas
-                            result={res!}
-                            config={{
-                              type: (cc!.type as ChartType) || 'bar',
-                              xField: cc!.xField as string,
-                              yFields: (cc!.yFields as string[]) || [],
-                              paletteName: cc!.palette as string | undefined,
-                              showGrid: cc!.showGrid as boolean | undefined,
-                              showLabels: cc!.showLabels as boolean | undefined,
-                              showLegend: (cc!.showLegend as LegendPos | undefined),
-                              xAxisLabel: cc!.xAxisLabel as string | undefined,
-                              yAxisLabel: cc!.yAxisLabel as string | undefined,
-                              labelFontSize: (cc!.labelFontSize as number | undefined) || 9,
-                              barOpacity: cc!.barOpacity as number | undefined,
-                              xLabelRotation: cc!.xLabelRotation as number | 'auto' | undefined,
-                              yLabelRotation: cc!.yLabelRotation as number | undefined,
-                              valueLabelSplit: cc!.valueLabelSplit as boolean | undefined,
-                            }}
-                            width={420}
-                            height={180}
-                            interactive={false}
-                            style={{ maxWidth: '100%' }}
-                          />
-                        </div>
-                      </div>
+                  <label key={t.id} className={`table-select-item ${!hasData ? 'disabled' : ''}`}>
+                    <input type="checkbox" checked={isSelected}
+                      onChange={() => toggleTable(t.id)} disabled={!hasData} />
+                    <span className="exp-table-num">#{i + 1}</span>
+                    {t.pinned && <span title="Pinned" style={{ color: '#f59e0b', marginRight: 4 }}>★</span>}
+                    {hasChart && (
+                      <span title={format === 'docx'
+                        ? 'Chart attached — pick it below to embed in Word'
+                        : 'Chart attached — only embedded in Word (.docx) exports'}
+                        style={{ color: '#60a5fa', marginRight: 4, fontSize: 12 }}>📊</span>
                     )}
-                  </div>
+                    <span>{t.title || t.name}</span>
+                    <span className="table-info">{hasData ? `${res!.row_count} rows` : 'No data'}</span>
+                  </label>
                 );
               })}
             </div>
           </div>
+
+          {/* Charts / Figures to Export — only for formats that embed charts (docx).
+              Lists every table that has a chart configured AND a result; the user
+              picks each chart independently of its source table. */}
+          {format === 'docx' && chartTables.length > 0 && (
+            <div className="form-group">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label>Charts / Figures to Export</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn-secondary" style={{ padding: '2px 10px', fontSize: 11 }}
+                    onClick={() => setSelectedCharts(new Set(chartTables.map(t => t.id)))}>
+                    Select All
+                  </button>
+                  <button className="btn-secondary" style={{ padding: '2px 10px', fontSize: 11 }}
+                    onClick={() => setSelectedCharts(new Set())}>
+                    Deselect All
+                  </button>
+                </div>
+              </div>
+              <div className="table-select-list">
+                {chartTables.map((t, i) => {
+                  const cc = t.chartConfig!;
+                  const res = results.get(t.id)!;
+                  const isSelected = selectedCharts.has(t.id);
+                  const thumbTitle = ((cc.chartTitle as string) || '').trim() || figTitleFromTable(t) || `Fig: ${t.title || t.name || 'Chart'}`;
+                  const tableSelected = selectedTables.has(t.id);
+                  return (
+                    <div key={t.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                      <label className="table-select-item">
+                        <input type="checkbox" checked={isSelected}
+                          onChange={() => toggleChart(t.id)} />
+                        <span className="exp-table-num">📊 {i + 1}</span>
+                        <span>{thumbTitle}</span>
+                        {!tableSelected && isSelected && (
+                          <span className="table-info" style={{ color: '#f59e0b' }}>Chart-only (table not selected)</span>
+                        )}
+                      </label>
+                      {isSelected && (
+                        <div style={{
+                          margin: '4px 0 8px 28px',
+                          padding: 8,
+                          background: 'rgba(59,130,246,0.06)',
+                          border: '1px solid rgba(59,130,246,0.2)',
+                          borderRadius: 6,
+                        }}>
+                          <div style={{
+                            fontSize: 11, color: 'var(--text-dim)', marginBottom: 4,
+                            textAlign: 'center', fontWeight: 600,
+                          }}>
+                            Will embed in Word: <span style={{ color: '#60a5fa' }}>{thumbTitle}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
+                            <ChartCanvas
+                              result={res}
+                              config={{
+                                type: (cc.type as ChartType) || 'bar',
+                                xField: cc.xField as string,
+                                yFields: (cc.yFields as string[]) || [],
+                                paletteName: cc.palette as string | undefined,
+                                showGrid: cc.showGrid as boolean | undefined,
+                                showLabels: cc.showLabels as boolean | undefined,
+                                showLegend: (cc.showLegend as LegendPos | undefined),
+                                xAxisLabel: cc.xAxisLabel as string | undefined,
+                                yAxisLabel: cc.yAxisLabel as string | undefined,
+                                labelFontSize: (cc.labelFontSize as number | undefined) || 9,
+                                barOpacity: cc.barOpacity as number | undefined,
+                                xLabelRotation: cc.xLabelRotation as number | 'auto' | undefined,
+                                yLabelRotation: cc.yLabelRotation as number | undefined,
+                                valueLabelSplit: cc.valueLabelSplit as boolean | undefined,
+                              }}
+                              width={420}
+                              height={180}
+                              interactive={false}
+                              style={{ maxWidth: '100%' }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Advanced Options */}
           <div className="advanced-toggle" onClick={() => setShowAdvanced(!showAdvanced)}>
@@ -822,8 +972,14 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
             📋 Copy to Clipboard
           </button>
           <button className="btn-secondary" onClick={onClose}>Close</button>
-          <button className="btn-primary" onClick={handleExport} disabled={exporting || selectedTables.size === 0}>
-            {exporting ? 'Exporting...' : `↓ Export ${selectedTables.size} Table(s)`}
+          <button className="btn-primary" onClick={handleExport}
+            disabled={exporting || (selectedTables.size === 0 && !(format === 'docx' && selectedCharts.size > 0))}>
+            {exporting ? 'Exporting...' : (() => {
+              const tParts: string[] = [];
+              if (selectedTables.size > 0) tParts.push(`${selectedTables.size} Table${selectedTables.size === 1 ? '' : 's'}`);
+              if (format === 'docx' && selectedCharts.size > 0) tParts.push(`${selectedCharts.size} Chart${selectedCharts.size === 1 ? '' : 's'}`);
+              return `↓ Export ${tParts.join(' + ') || '0'}`;
+            })()}
           </button>
         </div>
       </div>
@@ -835,7 +991,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
         position: 'fixed', left: -100000, top: -100000,
         pointerEvents: 'none', visibility: 'hidden',
       }}>
-        {tables.filter(t => selectedTables.has(t.id) && t.chartConfig && t.chartConfig.xField).map(t => {
+        {tables.filter(t => selectedCharts.has(t.id) && t.chartConfig && t.chartConfig.xField).map(t => {
           const cc = t.chartConfig!;
           const res = results.get(t.id);
           if (!res) return null;
