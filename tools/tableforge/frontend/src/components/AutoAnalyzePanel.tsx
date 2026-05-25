@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole, TableResult } from '../types';
 import { runAutoBattery, planBattery, BatteryProgress } from '../api';
+import { ColPicker } from './ColPicker';
 
 interface Props {
   datasetId: string;
@@ -184,12 +185,12 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, onClose
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: 1200 }}>
+      <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: 1000, maxHeight: '90vh' }}>
         <div className="modal-header">
           <h2>⚡ Run Full Analysis</h2>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
-        <div className="modal-body" style={{ maxHeight: '82vh', overflow: 'auto' }}>
+        <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflow: 'auto' }}>
           <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
             Pick outcomes (what you care about) + predictors (what might explain them). The system picks the right test for
             each pairing, applies multi-test correction, and returns the full pack. Tag column roles in the
@@ -197,32 +198,22 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, onClose
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Outcomes {detectedOutcomes.length > 0 && <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>({detectedOutcomes.length} auto-detected)</span>}</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6, maxHeight: 120, overflow: 'auto', padding: 4, background: 'var(--bg-alt, #1e293b)', borderRadius: 4 }}>
-                {allCols.map(c => (
-                  <button key={c}
-                    className={`btn-small ${outcomes.includes(c) ? 'btn-primary' : ''}`}
-                    style={{ fontSize: 10 }}
-                    onClick={() => toggle(setOutcomes, c)}>
-                    {c}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600 }}>Predictors {detectedPredictors.length > 0 && <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>({detectedPredictors.length} auto-detected)</span>}</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6, maxHeight: 120, overflow: 'auto', padding: 4, background: 'var(--bg-alt, #1e293b)', borderRadius: 4 }}>
-                {allCols.map(c => (
-                  <button key={c}
-                    className={`btn-small ${predictors.includes(c) ? 'btn-primary' : ''}`}
-                    style={{ fontSize: 10 }}
-                    onClick={() => toggle(setPredictors, c)}>
-                    {c}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <ColPicker
+              allColumns={columns}
+              available={columns}
+              selected={outcomes}
+              label={`Outcomes (${outcomes.length} selected${detectedOutcomes.length > 0 ? `, ${detectedOutcomes.length} auto-detected` : ''})`}
+              height={180}
+              onToggle={c => toggle(setOutcomes, c)}
+            />
+            <ColPicker
+              allColumns={columns}
+              available={columns}
+              selected={predictors}
+              label={`Predictors (${predictors.length} selected${detectedPredictors.length > 0 ? `, ${detectedPredictors.length} auto-detected` : ''})`}
+              height={180}
+              onToggle={c => toggle(setPredictors, c)}
+            />
           </div>
 
           <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 12, alignItems: 'center', flexWrap: 'wrap' }}>

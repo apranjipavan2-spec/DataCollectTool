@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole } from '../types';
 import { observerApi } from '../api';
+import { ColOptions } from './ColPicker';
 
 interface Props {
   datasetId: string;
@@ -111,12 +112,12 @@ export function ObserverPanel({ datasetId, columns, columnRoles = {}, onClose }:
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: 1100 }}>
+      <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: 1000, maxHeight: '90vh' }}>
         <div className="modal-header">
           <h2>👁️ Observer-vs-Respondent Reconciliation</h2>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
-        <div className="modal-body" style={{ maxHeight: '78vh', overflow: 'auto' }}>
+        <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflow: 'auto' }}>
           {/* Mode tabs */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 14, borderBottom: '1px solid var(--border, #334155)' }}>
             {(['concordance', 'discrepancies'] as Mode[]).map(m => (
@@ -165,12 +166,10 @@ export function ObserverPanel({ datasetId, columns, columnRoles = {}, onClose }:
                 <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 1fr 32px',
                                        gap: 6, marginBottom: 6, fontSize: 11, alignItems: 'center' }}>
                   <select value={p.self_col} onChange={e => updatePair(i, { self_col: e.target.value })}>
-                    <option value="">— self-report —</option>
-                    {allCols.map(c => <option key={c} value={c}>{c}</option>)}
+                    <ColOptions allColumns={columns} available={columns} placeholder="— self-report —" />
                   </select>
                   <select value={p.observer_col} onChange={e => updatePair(i, { observer_col: e.target.value })}>
-                    <option value="">— observer —</option>
-                    {allCols.map(c => <option key={c} value={c}>{c}</option>)}
+                    <ColOptions allColumns={columns} available={columns} placeholder="— observer —" />
                   </select>
                   <select value={p.kind} onChange={e => updatePair(i, { kind: e.target.value as PairRow['kind'] })}>
                     <option value="">Auto-detect</option>
@@ -191,14 +190,12 @@ export function ObserverPanel({ datasetId, columns, columnRoles = {}, onClose }:
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: 10, marginBottom: 10, fontSize: 12, alignItems: 'center' }}>
                 <label>Self-report column:&nbsp;
                   <select value={discSelf} onChange={e => setDiscSelf(e.target.value)}>
-                    <option value="">(pick one)</option>
-                    {allCols.map(c => <option key={c} value={c}>{c}</option>)}
+                    <ColOptions allColumns={columns} available={columns} placeholder="(pick one)" />
                   </select>
                 </label>
                 <label>Observer column:&nbsp;
                   <select value={discObs} onChange={e => setDiscObs(e.target.value)}>
-                    <option value="">(pick one)</option>
-                    {allCols.map(c => <option key={c} value={c}>{c}</option>)}
+                    <ColOptions allColumns={columns} available={columns} placeholder="(pick one)" />
                   </select>
                 </label>
                 <label>Max rows:&nbsp;

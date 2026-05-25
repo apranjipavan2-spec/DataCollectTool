@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole } from '../types';
 import { likertApi } from '../api';
 import { Chart, adaptLikertToStackedBar } from './Chart';
+import { ColPicker, ColOptions } from './ColPicker';
 
 interface Props {
   datasetId: string;
@@ -89,12 +90,12 @@ export function LikertPanel({ datasetId, columns, columnRoles = {}, onClose, onC
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: 1100 }}>
+      <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: 1000, maxHeight: '90vh' }}>
         <div className="modal-header">
           <h2>📊 Likert Analysis</h2>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
-        <div className="modal-body" style={{ maxHeight: '78vh', overflow: 'auto' }}>
+        <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflow: 'auto' }}>
           {/* Mode tabs */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 14, borderBottom: '1px solid var(--border, #334155)' }}>
             {(['summary', 'composite', 'compare', 'factor'] as Mode[]).map(m => (
@@ -145,8 +146,7 @@ export function LikertPanel({ datasetId, columns, columnRoles = {}, onClose, onC
             <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <label>Group column:&nbsp;
                 <select value={groupCol} onChange={e => setGroupCol(e.target.value)}>
-                  <option value="">(pick one)</option>
-                  {allCategoricalCols.map(c => <option key={c} value={c}>{c}</option>)}
+                  <ColOptions allColumns={columns} available={columns.filter(c => allCategoricalCols.includes(c.name))} placeholder="(pick one)" />
                 </select>
               </label>
               <label>Correction:&nbsp;
@@ -174,22 +174,19 @@ export function LikertPanel({ datasetId, columns, columnRoles = {}, onClose, onC
 
           {/* Item picker */}
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 12, fontWeight: 600 }}>Select Likert items (≥{minSel}):</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6, maxHeight: 120, overflow: 'auto' }}>
-              {likertCols.length === 0 && (
-                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                  Tag columns as <code>likert</code> in the Variables panel for filtered suggestions.
-                </span>
-              )}
-              {likertCols.map(c => (
-                <button key={c}
-                  className={`btn-small ${selected.includes(c) ? 'btn-primary' : ''}`}
-                  style={{ fontSize: 11 }}
-                  onClick={() => toggle(c)}>
-                  {c}
-                </button>
-              ))}
-            </div>
+            {likertCols.length === 0 && (
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>
+                No Likert columns tagged — showing all numeric. Tag columns as <code>likert</code> in Variables panel for filtered suggestions.
+              </div>
+            )}
+            <ColPicker
+              allColumns={columns}
+              available={columns.filter(c => likertCols.includes(c.name) || (likertCols.length === 0 && c.type === 'numeric'))}
+              selected={selected}
+              label={`Likert items (≥${minSel} required, ${selected.length} selected)`}
+              height={200}
+              onToggle={toggle}
+            />
           </div>
 
           {/* Reverse-code chips for composite */}

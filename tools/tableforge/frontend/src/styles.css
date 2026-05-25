@@ -17,6 +17,13 @@
   --purple: #8b5cf6;
   --radius: 8px;
   --radius-sm: 4px;
+  /* Aliases used by fp-select, fp-input, filter-field-select, etc. */
+  --bg-main: #1a1d27;
+  --surface: #1a1d27;
+  --bg-alt: #1e2130;
+  --accent: #3b82f6;
+  --muted: #9ca3af;
+  color-scheme: dark;
   /* Standard table font — Times New Roman for publication-ready output */
   --table-font: 'Times New Roman', 'Georgia', 'Cambria', 'Palatino Linotype', serif;
   --table-font-size: 12px;

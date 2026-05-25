@@ -54,6 +54,31 @@ async def create_bin(bindef: BinDef):
     return {"name": bindef.name, "preview": preview, "type": "text"}
 
 
+@router.post("/api/bins/preview")
+async def preview_bin(bindef: BinDef):
+    """Preview a bin distribution without persisting it."""
+    if bindef.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+
+    bdef = bindef.model_dump()
+    saved = custom_bins.get(bindef.dataset_id, [])
+    temp_bins = [b for b in saved if b["name"] != bindef.name] + [bdef]
+    custom_bins[bindef.dataset_id] = temp_bins
+
+    try:
+        df = datasets[bindef.dataset_id]["df"].copy()
+        df = apply_metrics_and_bins(df, bindef.dataset_id)
+        if bindef.name in df.columns:
+            vc = df[bindef.name].value_counts().to_dict()
+            preview = {str(k): int(v) for k, v in list(vc.items())[:15]}
+        else:
+            preview = {}
+    finally:
+        custom_bins[bindef.dataset_id] = saved
+
+    return {"name": bindef.name, "preview": preview}
+
+
 @router.delete("/api/bins/{dataset_id}/{bin_name}")
 async def delete_bin(dataset_id: str, bin_name: str):
     if dataset_id not in custom_bins:

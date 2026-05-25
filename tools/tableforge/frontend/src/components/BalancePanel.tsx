@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole } from '../types';
 import { balanceApi, getColumnValues } from '../api';
+import { ColPicker, ColOptions } from './ColPicker';
 
 interface Props {
   datasetId: string;
@@ -60,7 +61,7 @@ export function BalancePanel({ datasetId, columns, columnRoles = {}, studyDesign
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content stat-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 1100 }}>
+      <div className="modal-content stat-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: 1000, maxHeight: '90vh' }}>
         <div className="modal-header">
           <div>
             <h2>⚖️ Balance Table</h2>
@@ -74,8 +75,7 @@ export function BalancePanel({ datasetId, columns, columnRoles = {}, studyDesign
             <label className="stat-field">
               <span>Treatment column</span>
               <select value={treatmentCol} onChange={e => setTreatmentCol(e.target.value)} className="fp-select">
-                <option value="">-- pick column --</option>
-                {allCols.map(c => <option key={c} value={c}>{c}</option>)}
+                <ColOptions allColumns={columns} available={columns} placeholder="-- pick column --" />
               </select>
             </label>
             <label className="stat-field">
@@ -96,16 +96,14 @@ export function BalancePanel({ datasetId, columns, columnRoles = {}, studyDesign
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Covariates ({covariates.length} selected)</div>
-            <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 4, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
-              {allCols.filter(c => c !== treatmentCol).map(c => (
-                <label key={c} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <input type="checkbox" checked={covariates.includes(c)}
-                    onChange={e => setCovariates(prev => e.target.checked ? [...prev, c] : prev.filter(x => x !== c))} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c}</span>
-                </label>
-              ))}
-            </div>
+            <ColPicker
+              allColumns={columns}
+              available={columns.filter(c => c.name !== treatmentCol)}
+              selected={covariates}
+              label={`Covariates (${covariates.length} selected)`}
+              height={200}
+              onToggle={name => setCovariates(prev => prev.includes(name) ? prev.filter(x => x !== name) : [...prev, name])}
+            />
           </div>
 
           <button className="fp-btn" onClick={run} disabled={loading}>

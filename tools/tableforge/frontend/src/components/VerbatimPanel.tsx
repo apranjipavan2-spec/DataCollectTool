@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnInfo } from '../types';
 import { verbatimApi } from '../api';
+import { ColOptions } from './ColPicker';
 
 interface Props {
   datasetId: string;
@@ -88,7 +89,7 @@ export function VerbatimPanel({ datasetId, columns, onClose }: Props) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content stat-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 1100, maxHeight: '90vh' }}>
+      <div className="modal-content stat-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: 1000, maxHeight: '90vh' }}>
         <div className="modal-header">
           <div>
             <h2>💬 Verbatims & Open-End Coding</h2>
@@ -109,8 +110,7 @@ export function VerbatimPanel({ datasetId, columns, onClose }: Props) {
                 <label className="stat-field">
                   <span>Text column</span>
                   <select value={column} onChange={e => { setColumn(e.target.value); setPage(0); }} className="fp-select">
-                    <option value="">-- pick --</option>
-                    {textCols.map(c => <option key={c} value={c}>{c}</option>)}
+                    <ColOptions allColumns={columns} available={columns.filter(c => textCols.includes(c.name))} placeholder="-- pick --" />
                   </select>
                 </label>
                 <label className="stat-field">

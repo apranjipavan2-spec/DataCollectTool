@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole } from '../types';
 import { driverApi } from '../api';
+import { ColPicker, ColOptions } from './ColPicker';
 
 interface Props {
   datasetId: string;
@@ -10,7 +11,6 @@ interface Props {
 }
 
 export function DriverPanel({ datasetId, columns, columnRoles = {}, onClose }: Props) {
-  const allCols = useMemo(() => columns.map(c => c.name), [columns]);
   const outcomeSuggestions = useMemo(() => Object.entries(columnRoles)
     .filter(([_, r]) => r?.role === 'outcome').map(([c]) => c), [columnRoles]);
 
@@ -27,10 +27,7 @@ export function DriverPanel({ datasetId, columns, columnRoles = {}, onClose }: P
     if (predictors.length === 0) { setError('Pick at least one predictor'); return; }
     setLoading(true);
     try {
-      const res = await driverApi.importance({
-        dataset_id: datasetId, outcome,
-        predictors, standardize: true, alpha,
-      });
+      const res = await driverApi.importance({ dataset_id: datasetId, outcome, predictors, standardize: true, alpha });
       setResult(res);
     } catch (e: any) {
       setError(e.message || 'Failed');
@@ -43,7 +40,7 @@ export function DriverPanel({ datasetId, columns, columnRoles = {}, onClose }: P
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content stat-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 1000 }}>
+      <div className="modal-content stat-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: 1000, maxHeight: '90vh' }}>
         <div className="modal-header">
           <div>
             <h2>🎯 Key Driver Analysis</h2>
@@ -52,13 +49,12 @@ export function DriverPanel({ datasetId, columns, columnRoles = {}, onClose }: P
           <button onClick={onClose} className="modal-close">×</button>
         </div>
 
-        <div className="modal-body">
+        <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflowY: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <label className="stat-field">
               <span>Outcome</span>
               <select value={outcome} onChange={e => setOutcome(e.target.value)} className="fp-select">
-                <option value="">-- pick --</option>
-                {allCols.map(c => <option key={c} value={c}>{c}</option>)}
+                <ColOptions allColumns={columns} available={columns} placeholder="-- pick --" />
               </select>
             </label>
             <label className="stat-field">
@@ -72,16 +68,14 @@ export function DriverPanel({ datasetId, columns, columnRoles = {}, onClose }: P
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Predictors ({predictors.length} selected)</div>
-            <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 4, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
-              {allCols.filter(c => c !== outcome).map(c => (
-                <label key={c} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <input type="checkbox" checked={predictors.includes(c)}
-                    onChange={e => setPredictors(prev => e.target.checked ? [...prev, c] : prev.filter(x => x !== c))} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c}</span>
-                </label>
-              ))}
-            </div>
+            <ColPicker
+              allColumns={columns}
+              available={columns.filter(c => c.name !== outcome)}
+              selected={predictors}
+              label={`Predictors (${predictors.length} selected)`}
+              height={200}
+              onToggle={name => setPredictors(prev => prev.includes(name) ? prev.filter(x => x !== name) : [...prev, name])}
+            />
           </div>
 
           <button className="fp-btn" onClick={run} disabled={loading}>
@@ -99,12 +93,7 @@ export function DriverPanel({ datasetId, columns, columnRoles = {}, onClose }: P
               <table className="stat-table" style={{ fontSize: 11 }}>
                 <thead>
                   <tr>
-                    <th>Rank</th>
-                    <th>Predictor</th>
-                    <th>Std β</th>
-                    <th>Importance</th>
-                    <th>Bar</th>
-                    <th>Importance %</th>
+                    <th>Rank</th><th>Predictor</th><th>Std β</th><th>Importance</th><th>Bar</th><th>Importance %</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -135,12 +124,8 @@ export function DriverPanel({ datasetId, columns, columnRoles = {}, onClose }: P
                   <tbody>
                     {result.drivers.flatMap((d: any) => d.levels).map((lv: any, i: number) => (
                       <tr key={i}>
-                        <td>{lv.label}</td>
-                        <td>{lv.beta}</td>
-                        <td>{lv.se}</td>
-                        <td>{lv.t}</td>
-                        <td>{lv.p_value}</td>
-                        <td>{lv.sig}</td>
+                        <td>{lv.label}</td><td>{lv.beta}</td><td>{lv.se}</td>
+                        <td>{lv.t}</td><td>{lv.p_value}</td><td>{lv.sig}</td>
                       </tr>
                     ))}
                   </tbody>

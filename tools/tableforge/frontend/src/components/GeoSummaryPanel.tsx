@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole } from '../types';
 import { geoApi } from '../api';
+import { ColOptions } from './ColPicker';
 
 interface Props {
   datasetId: string;
@@ -51,7 +52,7 @@ export function GeoSummaryPanel({ datasetId, columns, columnRoles = {}, onClose 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content stat-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 900 }}>
+      <div className="modal-content stat-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: 1000, maxHeight: '90vh' }}>
         <div className="modal-header">
           <div>
             <h2>🗺 Geographic Summary</h2>
@@ -65,15 +66,13 @@ export function GeoSummaryPanel({ datasetId, columns, columnRoles = {}, onClose 
             <label className="stat-field">
               <span>Geo column</span>
               <select value={geoCol} onChange={e => setGeoCol(e.target.value)} className="fp-select">
-                <option value="">-- pick --</option>
-                {allCols.map(c => <option key={c} value={c}>{c}</option>)}
+                <ColOptions allColumns={columns} available={columns} placeholder="-- pick --" />
               </select>
             </label>
             <label className="stat-field">
               <span>Value (optional)</span>
               <select value={valueCol} onChange={e => setValueCol(e.target.value)} className="fp-select">
-                <option value="">(count rows)</option>
-                {numericCols.map(c => <option key={c} value={c}>{c}</option>)}
+                <ColOptions allColumns={columns} available={columns.filter(c => c.type === 'numeric')} placeholder="(count rows)" />
               </select>
             </label>
             <label className="stat-field">

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole } from '../types';
 import { mrApi } from '../api';
 import { Chart, adaptFrequencyToBar, adaptMatrixToHeatmap } from './Chart';
+import { ColPicker, ColOptions } from './ColPicker';
 
 interface Props {
   datasetId: string;
@@ -141,12 +142,12 @@ export function MultiResponsePanel({ datasetId, columns, columnRoles = {}, onClo
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: 1100 }}>
+      <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: 1000, maxHeight: '90vh' }}>
         <div className="modal-header">
           <h2>☑️ Multi-Response Analysis</h2>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
-        <div className="modal-body" style={{ maxHeight: '78vh', overflow: 'auto' }}>
+        <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflow: 'auto' }}>
           {/* Mode tabs */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 14, borderBottom: '1px solid var(--border, #334155)' }}>
             {(['frequencies', 'cooccurrence', 'by_group', 'exclusive'] as Mode[]).map(m => (
@@ -189,11 +190,11 @@ export function MultiResponsePanel({ datasetId, columns, columnRoles = {}, onClo
                   <option value="">(pick one)</option>
                   {detectedMrSingle.length > 0 && (
                     <optgroup label="Detected">
-                      {detectedMrSingle.map(c => <option key={c} value={c}>{c}</option>)}
+                      <ColOptions allColumns={columns} available={columns.filter(c => detectedMrSingle.includes(c.name))} />
                     </optgroup>
                   )}
                   <optgroup label="All columns">
-                    {allCols.map(c => <option key={c} value={c}>{c}</option>)}
+                    <ColOptions allColumns={columns} available={columns} />
                   </optgroup>
                 </select>
               </label>
@@ -217,17 +218,14 @@ export function MultiResponsePanel({ datasetId, columns, columnRoles = {}, onClo
                 </div>
               )}
               <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 12, fontWeight: 600 }}>Pick dummy columns (≥2):</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6, maxHeight: 110, overflow: 'auto' }}>
-                  {allCols.map(c => (
-                    <button key={c}
-                      className={`btn-small ${mrCols.includes(c) ? 'btn-primary' : ''}`}
-                      style={{ fontSize: 11 }}
-                      onClick={() => toggleDummy(c)}>
-                      {c}
-                    </button>
-                  ))}
-                </div>
+                <ColPicker
+                  allColumns={columns}
+                  available={columns}
+                  selected={mrCols}
+                  label={`Dummy columns (≥2 required, ${mrCols.length} selected)`}
+                  height={160}
+                  onToggle={toggleDummy}
+                />
               </div>
               <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 11, color: 'var(--text-dim)' }}>
                 <label>Truthy values (comma-sep):&nbsp;

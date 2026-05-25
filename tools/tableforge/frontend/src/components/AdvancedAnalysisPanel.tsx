@@ -45,12 +45,12 @@ export function AdvancedAnalysisPanel({ kind, datasetId, columns, analysisPack, 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: 960 }}>
+      <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: 1000, maxHeight: '90vh' }}>
         <div className="modal-header">
           <h2>{TITLES[kind]}</h2>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
-        <div className="modal-body" style={{ maxHeight: '75vh', overflow: 'auto' }}>
+        <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflow: 'auto' }}>
           <p style={{ color: 'var(--text-dim)', fontSize: 13, marginBottom: 12 }}>{DESCRIPTIONS[kind]}</p>
 
           {kind === 'causal_did' && (
@@ -92,33 +92,53 @@ export function AdvancedAnalysisPanel({ kind, datasetId, columns, analysisPack, 
 
 // ── Shared widgets ────────────────────────────────────────────────────────
 
-function ColPicker({ value, onChange, cols, placeholder }: {
-  value: string; onChange: (v: string) => void; cols: ColumnInfo[]; placeholder?: string;
+function ColPicker({ value, onChange, cols, placeholder, allCols }: {
+  value: string; onChange: (v: string) => void; cols: ColumnInfo[];
+  placeholder?: string; allCols?: ColumnInfo[];
 }) {
+  const base = allCols || cols;
+  const indexMap = Object.fromEntries(base.map((c, i) => [c.name, i + 1]));
   return (
     <select value={value} onChange={e => onChange(e.target.value)}
       style={{ width: '100%', padding: 6, background: 'var(--bg-alt)', color: 'var(--text)',
         border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }}>
       <option value="">{placeholder || '— pick column —'}</option>
-      {cols.map(c => <option key={c.name} value={c.name}>{c.name} ({c.type})</option>)}
+      {cols.map(c => (
+        <option key={c.name} value={c.name}>
+          #{indexMap[c.name] ?? '?'}  {c.name} ({c.type})
+        </option>
+      ))}
     </select>
   );
 }
 
-function MultiColPicker({ values, onChange, cols }: {
-  values: string[]; onChange: (v: string[]) => void; cols: ColumnInfo[];
+function MultiColPicker({ values, onChange, cols, allCols }: {
+  values: string[]; onChange: (v: string[]) => void; cols: ColumnInfo[]; allCols?: ColumnInfo[];
 }) {
+  const [search, setSearch] = React.useState('');
+  const base = allCols || cols;
+  const indexMap = Object.fromEntries(base.map((c, i) => [c.name, i + 1]));
   const toggle = (n: string) => onChange(values.includes(n) ? values.filter(v => v !== n) : [...values, n]);
+  const filtered = search ? cols.filter(c =>
+    c.name.toLowerCase().includes(search.toLowerCase()) ||
+    String(indexMap[c.name] ?? '').includes(search)
+  ) : cols;
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 110, overflow: 'auto',
-      border: '1px solid var(--border)', padding: 6, borderRadius: 4 }}>
-      {cols.map(col => (
-        <button key={col.name}
-          className={`btn-small ${values.includes(col.name) ? 'btn-primary' : ''}`}
-          onClick={() => toggle(col.name)} style={{ fontSize: 11 }}>
-          {col.name}
-        </button>
-      ))}
+    <div>
+      <input value={search} onChange={e => setSearch(e.target.value)}
+        placeholder="Search by name or #number…"
+        style={{ width: '100%', padding: '4px 8px', marginBottom: 4, fontSize: 11, background: 'rgba(0,0,0,0.2)',
+          border: '1px solid rgba(255,255,255,0.12)', borderRadius: 4, color: 'inherit', boxSizing: 'border-box' as const }} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 110, overflow: 'auto',
+        border: '1px solid var(--border)', padding: 6, borderRadius: 4 }}>
+        {filtered.map(col => (
+          <button key={col.name}
+            className={`btn-small ${values.includes(col.name) ? 'btn-primary' : ''}`}
+            onClick={() => toggle(col.name)} style={{ fontSize: 11 }}>
+            <span style={{ fontSize: 9, opacity: 0.6, marginRight: 3 }}>#{indexMap[col.name] ?? '?'}</span>{col.name}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

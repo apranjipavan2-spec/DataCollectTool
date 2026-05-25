@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ColumnInfo } from '../types';
 import { clusterApi } from '../api';
+import { ColPicker } from './ColPicker';
 
 interface Props {
   datasetId: string;
@@ -41,7 +42,7 @@ export function ClusterPanel({ datasetId, columns, onClose }: Props) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content stat-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 1000 }}>
+      <div className="modal-content stat-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: 1000, maxHeight: '90vh' }}>
         <div className="modal-header">
           <div>
             <h2>🔮 K-Means Clustering</h2>
@@ -50,7 +51,7 @@ export function ClusterPanel({ datasetId, columns, onClose }: Props) {
           <button onClick={onClose} className="modal-close">×</button>
         </div>
 
-        <div className="modal-body">
+        <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflowY: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
             <label className="stat-field">
               <span>K (number of clusters)</span>
@@ -67,16 +68,14 @@ export function ClusterPanel({ datasetId, columns, onClose }: Props) {
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Columns for clustering ({selected.length} selected)</div>
-            <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 4, padding: 6, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
-              {numericCols.map(c => (
-                <label key={c} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <input type="checkbox" checked={selected.includes(c)}
-                    onChange={e => setSelected(prev => e.target.checked ? [...prev, c] : prev.filter(x => x !== c))} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c}</span>
-                </label>
-              ))}
-            </div>
+            <ColPicker
+              allColumns={columns}
+              available={columns.filter(c => c.type === 'numeric')}
+              selected={selected}
+              label={`Columns for clustering (${selected.length} selected, numeric only)`}
+              height={200}
+              onToggle={name => setSelected(prev => prev.includes(name) ? prev.filter(x => x !== name) : [...prev, name])}
+            />
           </div>
 
           <button className="fp-btn" onClick={run} disabled={loading}>

@@ -40,6 +40,7 @@ export function BinCreator({ datasetId, columns, onCreated, onClose, embedded }:
   const [autoDetectResult, setAutoDetectResult] = useState<Record<string, string>>({});
 
   const [preview, setPreview] = useState<Record<string, number>>({});
+  const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -69,61 +70,78 @@ export function BinCreator({ datasetId, columns, onCreated, onClose, embedded }:
     setRanges(newRanges);
   };
 
+  const buildBinDef = (): any => {
+    const bin: any = { name: name.trim(), source_column: sourceCol, bin_type: binType };
+    if (binType === 'numeric') {
+      if (quantileType === 'equal_width') {
+        bin.ranges = ranges.filter(r => r.label);
+        bin.lower_inclusive = lowerInclusive;
+        bin.upper_inclusive = upperInclusive;
+      } else {
+        bin.quantile_type = quantileType;
+        bin.num_bins = quantileType === 'quartile' ? 4 : quantileType === 'decile' ? 10 : numBins;
+      }
+      if (handleRemainder) bin.remainder_label = remainderLabel;
+    } else if (binType === 'date_range') {
+      bin.date_ranges = customDateRanges.filter(r => r.label && (r.start || r.end));
+      if (handleRemainder) bin.remainder_label = remainderLabel;
+    } else if (binType === 'relative_date') {
+      bin.frequency = frequency;
+    } else if (binType === 'date') {
+      bin.frequency = frequency;
+      if (frequency === 'fiscal_year') bin.fiscal_start_month = fiscalStartMonth;
+    } else if (binType === 'text') {
+      const mapping: Record<string, string> = {};
+      mappingText.split('\n').forEach(line => {
+        const [from, to] = line.split('=').map(s => s.trim());
+        if (from && to) mapping[from] = to;
+      });
+      bin.mapping = mapping;
+      if (caseNorm !== 'none') bin.case_normalize = caseNorm;
+    } else if (binType === 'regex') {
+      const patterns: { pattern: string; label: string }[] = [];
+      regexText.split('\n').forEach(line => {
+        const [pat, label] = line.split('→').map(s => s.trim());
+        if (pat && label) patterns.push({ pattern: pat, label });
+      });
+      bin.regex_patterns = patterns;
+    } else if (binType === 'group') {
+      const groupMap: Record<string, string[]> = {};
+      groupMapText.split('\n').forEach(line => {
+        const [newLabel, values] = line.split(':').map(s => s.trim());
+        if (newLabel && values) groupMap[newLabel] = values.split(',').map(s => s.trim());
+      });
+      bin.group_map = groupMap;
+      if (caseNorm !== 'none') bin.case_normalize = caseNorm;
+      if (handleRemainder) bin.remainder_label = remainderLabel;
+    }
+    return bin;
+  };
+
+  const handlePreview = async () => {
+    if (!name.trim()) { setError('Enter a name before previewing'); return; }
+    if (!sourceCol) { setError('Select a source column'); return; }
+    setPreviewing(true); setError('');
+    try {
+      const bin = buildBinDef();
+      const res = await fetch(`${API_BASE}/bins/preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataset_id: datasetId, ...bin }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setPreview(data.preview || {});
+    } catch (e: any) { setError(e.message || 'Preview failed'); }
+    finally { setPreviewing(false); }
+  };
+
   const handleSave = async () => {
     if (!name.trim()) { setError('Name is required'); return; }
     if (!sourceCol) { setError('Source column is required'); return; }
     setSaving(true); setError('');
     try {
-      const bin: any = { name: name.trim(), source_column: sourceCol, bin_type: binType };
-
-      if (binType === 'numeric') {
-        if (quantileType === 'equal_width') {
-          bin.ranges = ranges.filter(r => r.label);
-          bin.lower_inclusive = lowerInclusive;
-          bin.upper_inclusive = upperInclusive;
-        } else if (['equal_freq', 'quartile', 'decile'].includes(quantileType)) {
-          bin.quantile_type = quantileType;
-          bin.num_bins = quantileType === 'quartile' ? 4 : quantileType === 'decile' ? 10 : numBins;
-        }
-        if (handleRemainder) { bin.remainder_label = remainderLabel; }
-      } else if (binType === 'date_range') {
-        bin.bin_type = 'date_range';
-        bin.date_ranges = customDateRanges.filter(r => r.label && (r.start || r.end));
-        if (handleRemainder) { bin.remainder_label = remainderLabel; }
-      } else if (binType === 'relative_date') {
-        bin.bin_type = 'relative_date';
-        bin.frequency = frequency;
-      } else if (binType === 'date') {
-        bin.frequency = frequency;
-        if (frequency === 'fiscal_year') bin.fiscal_start_month = fiscalStartMonth;
-      } else if (binType === 'text') {
-        const mapping: Record<string, string> = {};
-        mappingText.split('\n').forEach(line => {
-          const [from, to] = line.split('=').map(s => s.trim());
-          if (from && to) mapping[from] = to;
-        });
-        bin.mapping = mapping;
-        if (caseNorm !== 'none') bin.case_normalize = caseNorm;
-      } else if (binType === 'regex') {
-        const patterns: { pattern: string; label: string }[] = [];
-        regexText.split('\n').forEach(line => {
-          const [pat, label] = line.split('→').map(s => s.trim());
-          if (pat && label) patterns.push({ pattern: pat, label });
-        });
-        bin.regex_patterns = patterns;
-        bin.bin_type = 'regex';
-      } else if (binType === 'group') {
-        const groupMap: Record<string, string[]> = {};
-        groupMapText.split('\n').forEach(line => {
-          const [newLabel, values] = line.split(':').map(s => s.trim());
-          if (newLabel && values) groupMap[newLabel] = values.split(',').map(s => s.trim());
-        });
-        bin.group_map = groupMap;
-        bin.bin_type = 'group';
-        if (caseNorm !== 'none') bin.case_normalize = caseNorm;
-        if (handleRemainder) bin.remainder_label = remainderLabel;
-      }
-
+      const bin = buildBinDef();
       const res = await createBin(datasetId, bin);
       setPreview(res.preview || {});
       onCreated(name.trim());
@@ -433,6 +451,9 @@ export function BinCreator({ datasetId, columns, onCreated, onClose, embedded }:
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn-secondary" onClick={handlePreview} disabled={previewing || !name.trim() || !sourceCol} title="Preview distribution without saving">
+            {previewing ? 'Loading...' : '▶ Preview Distribution'}
+          </button>
           <button className="btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? 'Creating...' : 'Create Bin'}
           </button>

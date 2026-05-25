@@ -65,6 +65,7 @@ export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLi
   const [condElseType, setCondElseType] = useState<'column' | 'value'>('value');
 
   const [preview, setPreview] = useState<any[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -90,6 +91,42 @@ export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLi
       metric.cond_else_type = condElseType; metric.cond_else_col = condElseCol; metric.cond_else_val = condElseVal;
     }
     return metric;
+  };
+
+  const getFormulaPreview = (): string => {
+    if (metricType === 'formula') return columnA && columnB ? `${columnA} ${operator} ${columnB}` : '';
+    if (metricType === 'ratio') return numerator && denominator ? `${numerator} ÷ ${denominator}` : '';
+    if (metricType === 'percentage') return part && whole ? `(${part} ÷ ${whole}) × 100` : '';
+    if (metricType === 'growth') return current && previous ? `((${current} − ${previous}) ÷ ${previous}) × 100` : '';
+    if (metricType === 'weighted_average') return valueCol && weightCol ? `${valueCol} × ${weightCol}` : '';
+    if (metricType === 'index') return baseColumn ? `(${baseColumn} ÷ mean(${baseColumn})) × ${baseValue}` : '';
+    if (metricType === 'rank') return rankColumn ? `rank(${rankColumn}, ${rankOrder === 'desc' ? 'highest=1' : 'lowest=1'})` : '';
+    if (metricType === 'cumulative') return valueCol ? `cumsum(${valueCol})` : '';
+    if (metricType === 'composite') return compositeMetricA && compositeMetricB ? `${compositeMetricA} ${compositeOp} ${compositeMetricB}` : '';
+    if (metricType === 'conditional') {
+      const cond = condColumn ? `${condColumn} ${condOperator} ${condOperator === 'is_null' || condOperator === 'not_null' ? '' : `"${condValue}"`}` : '?';
+      const then_ = condThenType === 'column' ? condThenCol : `"${condThenVal}"`;
+      const else_ = condElseType === 'column' ? condElseCol : `"${condElseVal}"`;
+      return `IF ${cond} → THEN ${then_ || '?'} ELSE ${else_ || '?'}`;
+    }
+    return '';
+  };
+
+  const handlePreview = async () => {
+    if (!name.trim()) { setError('Enter a name before previewing'); return; }
+    setPreviewLoading(true); setPreview([]); setError('');
+    try {
+      const metric = buildMetricDef();
+      const res = await fetch(`${API_BASE}/metrics/preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataset_id: datasetId, ...metric }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setPreview(data.preview || []);
+    } catch (e: any) { setError(e.message || 'Preview failed'); }
+    finally { setPreviewLoading(false); }
   };
 
   const handleSave = async () => {
@@ -344,6 +381,12 @@ export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLi
             </div>
           )}
 
+          {getFormulaPreview() && (
+            <div style={{ marginTop: 8, padding: '6px 10px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 6, fontFamily: 'monospace', fontSize: 12, color: '#93c5fd' }}>
+              {name.trim() ? <><strong>{name}</strong> = </> : ''}{getFormulaPreview()}
+            </div>
+          )}
+
           <div className="form-row" style={{ marginTop: 12 }}>
             <div className="form-group" style={{ flex: 1 }}>
               <label>Output Format</label>
@@ -385,6 +428,9 @@ export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLi
               📚 Library
             </button>
           )}
+          <button className="btn-secondary" onClick={handlePreview} disabled={previewLoading || !name.trim()} title="Preview values without saving">
+            {previewLoading ? 'Loading...' : '▶ Preview'}
+          </button>
           <button className="btn-secondary" onClick={handleSaveToLibrary} disabled={saving || !name.trim()} title="Save this metric definition to the Global Library">
             💾 Save to Library
           </button>

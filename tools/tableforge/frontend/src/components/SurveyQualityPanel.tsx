@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole } from '../types';
 import { sdqApi } from '../api';
+import { ColPicker, ColOptions } from './ColPicker';
 
 interface Props {
   datasetId: string;
@@ -137,12 +138,14 @@ export function SurveyQualityPanel({ datasetId, columns, columnRoles = {}, onClo
 
   const ColumnMultiPicker = ({ pool, value, onChange, label }: { pool: string[]; value: string[]; onChange: (v: string[]) => void; label: string }) => (
     <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>{label} ({value.length} picked)</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 120, overflowY: 'auto', border: '1px solid var(--border)', padding: 6, borderRadius: 4 }}>
-        {pool.map(c => (
-          <button key={c} className={`btn-small ${value.includes(c) ? 'btn-primary' : ''}`} style={{ fontSize: 11 }} onClick={() => { toggleIn(value, onChange, c); setResult(null); }}>{c}</button>
-        ))}
-      </div>
+      <ColPicker
+        allColumns={columns}
+        available={columns.filter(c => pool.includes(c.name))}
+        selected={value}
+        label={`${label} (${value.length} selected)`}
+        height={160}
+        onToggle={c => { toggleIn(value, onChange, c); setResult(null); }}
+      />
     </div>
   );
 
@@ -150,8 +153,7 @@ export function SurveyQualityPanel({ datasetId, columns, columnRoles = {}, onClo
     <div style={{ marginBottom: 10 }}>
       <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{label}</div>
       <select value={value} onChange={e => { onChange(e.target.value); setResult(null); }} style={{ width: '100%', padding: 4, background: 'var(--bg-alt)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
-        {allowBlank && <option value="">— none —</option>}
-        {pool.map(c => <option key={c} value={c}>{c}</option>)}
+        <ColOptions allColumns={columns} available={columns.filter(c => pool.includes(c.name))} placeholder={allowBlank ? '— none —' : undefined} />
       </select>
     </div>
   );
@@ -316,7 +318,7 @@ export function SurveyQualityPanel({ datasetId, columns, columnRoles = {}, onClo
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: 980, width: '92vw', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: 1000, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         <div className="modal-header">
           <h2 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 22 }}>🩺</span>

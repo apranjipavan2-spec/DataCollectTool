@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ColumnInfo } from '../types';
 import { API_BASE } from '../api';
 import { Chart, adaptFrequencyToBar, adaptMatrixToHeatmap, adaptDescriptiveToBox } from './Chart';
+import { ColPicker } from './ColPicker';
 
 type StatType =
   | 'correlation'
@@ -225,40 +226,32 @@ export function StatisticalTables({ type, datasetId, columns, onClose }: Props) 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: 960 }}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: 1000, maxHeight: '90vh' }}>
         <div className="modal-header">
           <h2>{titles[type]}</h2>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
-        <div className="modal-body" style={{ maxHeight: '75vh', overflow: 'auto' }}>
+        <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflow: 'auto' }}>
           <p style={{ color: 'var(--text-dim)', fontSize: 13, marginBottom: 12 }}>{descriptions[type]}</p>
 
           {/* Column selection */}
           <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, display: 'block' }}>
-              Select Columns {maxCols ? `(exactly ${maxCols})` : `(at least ${minCols})`}:
-            </label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 120, overflow: 'auto' }}>
-              {getAvailableCols().map(col => (
-                <button key={col.name}
-                  className={`btn-small ${selectedCols.includes(col.name) ? 'btn-primary' : ''}`}
-                  style={{ fontSize: 11 }}
-                  onClick={() => {
-                    if (maxCols && !selectedCols.includes(col.name) && selectedCols.length >= maxCols) {
-                      setSelectedCols(prev => [...prev.slice(0, -1), col.name]);
-                    } else {
-                      toggleCol(col.name);
-                    }
-                    setResult(null);
-                  }}>
-                  {col.name}
-                  <span style={{ opacity: 0.5, marginLeft: 4, fontSize: 9 }}>
-                    {col.type === 'numeric' ? '#' : 'A'}
-                  </span>
-                </button>
-              ))}
-            </div>
-            {getSelectionHint()}
+            <ColPicker
+              allColumns={columns}
+              available={getAvailableCols()}
+              selected={selectedCols}
+              label={`Select Columns ${maxCols ? `(exactly ${maxCols})` : `(at least ${minCols})`}`}
+              height={200}
+              onToggle={name => {
+                if (maxCols && !selectedCols.includes(name) && selectedCols.length >= maxCols) {
+                  setSelectedCols(prev => [...prev.slice(0, -1), name]);
+                } else {
+                  toggleCol(name);
+                }
+                setResult(null);
+              }}
+              selectionHint={getSelectionHint()}
+            />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
