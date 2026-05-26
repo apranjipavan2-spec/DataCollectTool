@@ -161,12 +161,12 @@ function HeatmapView({ data }: { data: HeatmapData }) {
         <div />
         {/* x labels */}
         {xLabels.map((x, i) => (
-          <div key={`xh-${i}`} style={{ color: AXIS_COLOR, textAlign: 'center', alignSelf: 'end', padding: '0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={x}>{x}</div>
+          <div key={`xh-${i}`} style={{ color: AXIS_COLOR, textAlign: 'center', alignSelf: 'end', padding: '0 2px', whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word', lineHeight: 1.15 }} title={x}>{x}</div>
         ))}
         {/* rows */}
         {yLabels.map((y, ry) => (
           <React.Fragment key={`row-${ry}`}>
-            <div style={{ color: AXIS_COLOR, padding: '0 8px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 160 }} title={y}>{y}</div>
+            <div style={{ color: AXIS_COLOR, padding: '0 8px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word', maxWidth: 180, lineHeight: 1.15, textAlign: 'right' }} title={y}>{y}</div>
             {xLabels.map((_, rx) => {
               const v = values[ry]?.[rx];
               const display = v == null || !isFinite(v as number) ? '' : (v as number).toFixed(2);

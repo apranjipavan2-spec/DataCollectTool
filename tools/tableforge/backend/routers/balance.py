@@ -31,6 +31,7 @@ class BalanceConfig(BaseModel):
     treatment_value: str | int | float | None = None  # which value = "treated"; else binarize 0/1
     covariates: list[str]
     alpha: float = 0.05
+    filters: dict = {}
 
 
 def _wstats(x: pd.Series, w: pd.Series | None) -> tuple[float, float, float]:
@@ -77,6 +78,9 @@ def balance_table(config: BalanceConfig):
     if config.dataset_id not in datasets:
         raise HTTPException(status_code=404, detail="Dataset not found")
     df = datasets[config.dataset_id]["df"].copy()
+    for col, vals in (config.filters or {}).items():
+        if vals and col in df.columns:
+            df = df[df[col].astype(str).isin([str(v) for v in vals])]
     if config.treatment_col not in df.columns:
         raise HTTPException(status_code=400, detail="treatment_col not in dataset")
 

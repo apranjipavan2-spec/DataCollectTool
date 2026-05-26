@@ -2,15 +2,17 @@ import React, { useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole } from '../types';
 import { driverApi } from '../api';
 import { ColPicker, ColOptions } from './ColPicker';
+import { ProjectFilterBanner } from './ProjectFilterBanner';
 
 interface Props {
   datasetId: string;
   columns: ColumnInfo[];
   columnRoles?: Record<string, ColumnRole>;
+  projectFilters?: Record<string, string[]>;
   onClose: () => void;
 }
 
-export function DriverPanel({ datasetId, columns, columnRoles = {}, onClose }: Props) {
+export function DriverPanel({ datasetId, columns, columnRoles = {}, projectFilters, onClose }: Props) {
   const outcomeSuggestions = useMemo(() => Object.entries(columnRoles)
     .filter(([_, r]) => r?.role === 'outcome').map(([c]) => c), [columnRoles]);
 
@@ -27,7 +29,7 @@ export function DriverPanel({ datasetId, columns, columnRoles = {}, onClose }: P
     if (predictors.length === 0) { setError('Pick at least one predictor'); return; }
     setLoading(true);
     try {
-      const res = await driverApi.importance({ dataset_id: datasetId, outcome, predictors, standardize: true, alpha });
+      const res = await driverApi.importance({ dataset_id: datasetId, outcome, predictors, standardize: true, alpha, filters: projectFilters || {} });
       setResult(res);
     } catch (e: any) {
       setError(e.message || 'Failed');
@@ -50,6 +52,7 @@ export function DriverPanel({ datasetId, columns, columnRoles = {}, onClose }: P
         </div>
 
         <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflowY: 'auto' }}>
+          <ProjectFilterBanner filters={projectFilters} />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <label className="stat-field">
               <span>Outcome</span>

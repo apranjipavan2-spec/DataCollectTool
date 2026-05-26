@@ -2,14 +2,16 @@ import React, { useMemo, useState } from 'react';
 import { ColumnInfo } from '../types';
 import { clusterApi } from '../api';
 import { ColPicker } from './ColPicker';
+import { ProjectFilterBanner } from './ProjectFilterBanner';
 
 interface Props {
   datasetId: string;
   columns: ColumnInfo[];
+  projectFilters?: Record<string, string[]>;
   onClose: () => void;
 }
 
-export function ClusterPanel({ datasetId, columns, onClose }: Props) {
+export function ClusterPanel({ datasetId, columns, projectFilters, onClose }: Props) {
   const numericCols = useMemo(() => columns.filter(c => c.type === 'numeric').map(c => c.name), [columns]);
   const [selected, setSelected] = useState<string[]>([]);
   const [k, setK] = useState<number>(3);
@@ -29,6 +31,7 @@ export function ClusterPanel({ datasetId, columns, onClose }: Props) {
         k,
         k_range: showElbow ? [2, 8] : null,
         standardize: true,
+        filters: projectFilters || {},
       });
       setResult(res);
     } catch (e: any) {
@@ -52,6 +55,7 @@ export function ClusterPanel({ datasetId, columns, onClose }: Props) {
         </div>
 
         <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflowY: 'auto' }}>
+          <ProjectFilterBanner filters={projectFilters} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
             <label className="stat-field">
               <span>K (number of clusters)</span>

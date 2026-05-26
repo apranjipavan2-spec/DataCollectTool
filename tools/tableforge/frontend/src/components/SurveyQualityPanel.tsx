@@ -2,11 +2,13 @@ import React, { useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole } from '../types';
 import { sdqApi } from '../api';
 import { ColPicker, ColOptions } from './ColPicker';
+import { ProjectFilterBanner } from './ProjectFilterBanner';
 
 interface Props {
   datasetId: string;
   columns: ColumnInfo[];
   columnRoles?: Record<string, ColumnRole>;
+  projectFilters?: Record<string, string[]>;
   onClose: () => void;
 }
 
@@ -35,7 +37,7 @@ const MODE_DESCRIPTIONS: Record<Mode, string> = {
   overview: 'Combined per-respondent quality score (0–100) using whichever signals are configured.',
 };
 
-export function SurveyQualityPanel({ datasetId, columns, columnRoles = {}, onClose }: Props) {
+export function SurveyQualityPanel({ datasetId, columns, columnRoles = {}, projectFilters, onClose }: Props) {
   const [mode, setMode] = useState<Mode>('overview');
   const [itemCols, setItemCols] = useState<string[]>([]);
   const [threshold, setThreshold] = useState<number>(0.95);
@@ -95,7 +97,7 @@ export function SurveyQualityPanel({ datasetId, columns, columnRoles = {}, onClo
     setLoading(true); setError(null); setResult(null);
     try {
       let r: any;
-      const base = { dataset_id: datasetId };
+      const base = { dataset_id: datasetId, filters: projectFilters || {} };
       if (mode === 'straight_lining') {
         if (itemCols.length < 2) throw new Error('Pick at least 2 item columns');
         r = await sdqApi.straightLining({ ...base, item_cols: itemCols, threshold });
@@ -329,6 +331,7 @@ export function SurveyQualityPanel({ datasetId, columns, columnRoles = {}, onClo
         </div>
 
         <div style={{ padding: 16, overflowY: 'auto' }}>
+          <ProjectFilterBanner filters={projectFilters} />
           {/* Mode tabs */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
             {(Object.keys(MODE_LABELS) as Mode[]).map(m => (

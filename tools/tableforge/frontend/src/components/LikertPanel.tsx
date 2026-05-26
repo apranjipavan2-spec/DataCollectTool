@@ -3,18 +3,20 @@ import { ColumnInfo, ColumnRole } from '../types';
 import { likertApi } from '../api';
 import { Chart, adaptLikertToStackedBar } from './Chart';
 import { ColPicker, ColOptions } from './ColPicker';
+import { ProjectFilterBanner } from './ProjectFilterBanner';
 
 interface Props {
   datasetId: string;
   columns: ColumnInfo[];
   columnRoles?: Record<string, ColumnRole>;
+  projectFilters?: Record<string, string[]>;
   onClose: () => void;
   onCompositeCreated?: () => void;
 }
 
 type Mode = 'summary' | 'composite' | 'compare' | 'factor';
 
-export function LikertPanel({ datasetId, columns, columnRoles = {}, onClose, onCompositeCreated }: Props) {
+export function LikertPanel({ datasetId, columns, columnRoles = {}, projectFilters, onClose, onCompositeCreated }: Props) {
   const [mode, setMode] = useState<Mode>('summary');
   const [selected, setSelected] = useState<string[]>([]);
   const [reverseCoded, setReverseCoded] = useState<string[]>([]);
@@ -62,7 +64,7 @@ export function LikertPanel({ datasetId, columns, columnRoles = {}, onClose, onC
     setError(null);
     setResult(null);
     try {
-      const base = { dataset_id: datasetId };
+      const base = { dataset_id: datasetId, filters: projectFilters || {} };
       let r: any;
       if (mode === 'summary') {
         r = await likertApi.summary({ ...base, item_cols: selected, scale_min: scaleMin, scale_max: scaleMax });
@@ -96,6 +98,7 @@ export function LikertPanel({ datasetId, columns, columnRoles = {}, onClose, onC
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflow: 'auto' }}>
+          <ProjectFilterBanner filters={projectFilters} />
           {/* Mode tabs */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 14, borderBottom: '1px solid var(--border, #334155)' }}>
             {(['summary', 'composite', 'compare', 'factor'] as Mode[]).map(m => (

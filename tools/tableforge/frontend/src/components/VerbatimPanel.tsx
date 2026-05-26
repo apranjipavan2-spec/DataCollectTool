@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnInfo } from '../types';
 import { verbatimApi } from '../api';
 import { ColOptions } from './ColPicker';
+import { ProjectFilterBanner } from './ProjectFilterBanner';
 
 interface Props {
   datasetId: string;
   columns: ColumnInfo[];
+  projectFilters?: Record<string, string[]>;
   onClose: () => void;
 }
 
@@ -19,7 +21,7 @@ interface CodePalette {
 
 const COLORS = ['#a78bfa', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#fb923c'];
 
-export function VerbatimPanel({ datasetId, columns, onClose }: Props) {
+export function VerbatimPanel({ datasetId, columns, projectFilters, onClose }: Props) {
   const [mode, setMode] = useState<Mode>('browse');
   const textCols = useMemo(() => columns.filter(c => c.type === 'text').map(c => c.name), [columns]);
   const [column, setColumn] = useState(textCols[0] || '');
@@ -47,6 +49,7 @@ export function VerbatimPanel({ datasetId, columns, onClose }: Props) {
       const res = await verbatimApi.list({
         dataset_id: datasetId, column, search: search || null,
         has_code: filterCode || null, page, page_size: 30,
+        filters: projectFilters || {},
       });
       setRows(res.rows); setTotal(res.total);
       const ck = await verbatimApi.getCodes(datasetId);
@@ -79,7 +82,7 @@ export function VerbatimPanel({ datasetId, columns, onClose }: Props) {
     if (!coderA || !coderB) { setError('Pick both coder columns'); return; }
     setLoading(true);
     try {
-      const res = await verbatimApi.kappa({ dataset_id: datasetId, coder_a_col: coderA, coder_b_col: coderB, weighted });
+      const res = await verbatimApi.kappa({ dataset_id: datasetId, coder_a_col: coderA, coder_b_col: coderB, weighted, filters: projectFilters || {} });
       setKappaResult(res);
     } catch (e: any) { setError(e.message || 'Failed'); }
     finally { setLoading(false); }

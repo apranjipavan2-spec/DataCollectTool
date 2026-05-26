@@ -2,11 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole } from '../types';
 import { observerApi } from '../api';
 import { ColOptions } from './ColPicker';
+import { ProjectFilterBanner } from './ProjectFilterBanner';
 
 interface Props {
   datasetId: string;
   columns: ColumnInfo[];
   columnRoles?: Record<string, ColumnRole>;
+  projectFilters?: Record<string, string[]>;
   onClose: () => void;
 }
 
@@ -19,7 +21,7 @@ interface PairRow {
   label: string;
 }
 
-export function ObserverPanel({ datasetId, columns, columnRoles = {}, onClose }: Props) {
+export function ObserverPanel({ datasetId, columns, columnRoles = {}, projectFilters, onClose }: Props) {
   const [mode, setMode] = useState<Mode>('concordance');
   const [pairs, setPairs] = useState<PairRow[]>([]);
   const [discSelf, setDiscSelf] = useState('');
@@ -90,6 +92,7 @@ export function ObserverPanel({ datasetId, columns, columnRoles = {}, onClose }:
             kind: p.kind || null,
             label: p.label || null,
           })),
+          filters: projectFilters || {},
         });
         setResult(r);
       } else {
@@ -100,6 +103,7 @@ export function ObserverPanel({ datasetId, columns, columnRoles = {}, onClose }:
           observer_col: discObs,
           id_cols: idCols,
           max_rows: maxRows,
+          filters: projectFilters || {},
         });
         setResult(r);
       }
@@ -118,6 +122,7 @@ export function ObserverPanel({ datasetId, columns, columnRoles = {}, onClose }:
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflow: 'auto' }}>
+          <ProjectFilterBanner filters={projectFilters} />
           {/* Mode tabs */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 14, borderBottom: '1px solid var(--border, #334155)' }}>
             {(['concordance', 'discrepancies'] as Mode[]).map(m => (

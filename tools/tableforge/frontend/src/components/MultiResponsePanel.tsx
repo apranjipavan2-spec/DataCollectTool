@@ -3,18 +3,20 @@ import { ColumnInfo, ColumnRole } from '../types';
 import { mrApi } from '../api';
 import { Chart, adaptFrequencyToBar, adaptMatrixToHeatmap } from './Chart';
 import { ColPicker, ColOptions } from './ColPicker';
+import { ProjectFilterBanner } from './ProjectFilterBanner';
 
 interface Props {
   datasetId: string;
   columns: ColumnInfo[];
   columnRoles?: Record<string, ColumnRole>;
+  projectFilters?: Record<string, string[]>;
   onClose: () => void;
 }
 
 type Mode = 'frequencies' | 'cooccurrence' | 'by_group' | 'exclusive';
 type SetKind = 'single' | 'dummies';
 
-export function MultiResponsePanel({ datasetId, columns, columnRoles = {}, onClose }: Props) {
+export function MultiResponsePanel({ datasetId, columns, columnRoles = {}, projectFilters, onClose }: Props) {
   const [mode, setMode] = useState<Mode>('frequencies');
   const [setKind, setSetKind] = useState<SetKind>('single');
   const [mrCol, setMrCol] = useState<string>('');
@@ -82,7 +84,7 @@ export function MultiResponsePanel({ datasetId, columns, columnRoles = {}, onClo
     setError(null);
     setResult(null);
     try {
-      const base: any = { dataset_id: datasetId, separator, truthy: truthy.split(',').map(s => s.trim()) };
+      const base: any = { dataset_id: datasetId, separator, truthy: truthy.split(',').map(s => s.trim()), filters: projectFilters || {} };
       if (setKind === 'single') base.mr_col = mrCol;
       else base.mr_cols = mrCols;
       if (mode === 'by_group') { base.group_col = groupCol; base.correction = correction; }
@@ -148,6 +150,7 @@ export function MultiResponsePanel({ datasetId, columns, columnRoles = {}, onClo
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflow: 'auto' }}>
+          <ProjectFilterBanner filters={projectFilters} />
           {/* Mode tabs */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 14, borderBottom: '1px solid var(--border, #334155)' }}>
             {(['frequencies', 'cooccurrence', 'by_group', 'exclusive'] as Mode[]).map(m => (

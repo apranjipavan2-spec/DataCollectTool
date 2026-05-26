@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { TableResult, TableConfig } from '../types';
 import { ChartCanvas, ChartCanvasConfig } from './ChartCanvas';
+import { Chart } from './Chart';
 import {
   LegendPos, W_DEFAULT, H_DEFAULT, figTitleFromTable,
   buildChartExportSvg, svgXmlToPngDataUrl,
@@ -133,9 +134,15 @@ export function InlineChartPreview({ table, result, onEdit, onRemove, onToggleCh
             style={btnStyle()}>
             {chartOnly ? '🗂 Show table' : '🙈 Hide table'}
           </button>
-          <button onClick={onEdit} title="Open Chart Builder" style={btnStyle()}>✏️ Edit</button>
-          <button onClick={downloadSvg} title="Download SVG (asks: with or without title)" style={btnStyle()}>SVG</button>
-          <button onClick={downloadPng} title="Download PNG (asks: with or without title)" style={btnStyle()}>PNG</button>
+          {!cc.statChart && (
+            <button onClick={onEdit} title="Open Chart Builder" style={btnStyle()}>✏️ Edit</button>
+          )}
+          {!cc.statChart && (
+            <button onClick={downloadSvg} title="Download SVG (asks: with or without title)" style={btnStyle()}>SVG</button>
+          )}
+          {!cc.statChart && (
+            <button onClick={downloadPng} title="Download PNG (asks: with or without title)" style={btnStyle()}>PNG</button>
+          )}
           <button onClick={onRemove} title="Remove chart from this table"
             style={{ ...btnStyle(), color: '#fca5a5' }}>×</button>
         </div>
@@ -151,8 +158,15 @@ export function InlineChartPreview({ table, result, onEdit, onRemove, onToggleCh
           </div>
         )}
         <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-          <ChartCanvas ref={svgRef} result={result} config={config} width={boxW} height={chartH}
-            style={{ width: '100%', maxWidth: '100%' }} />
+          {cc.statChart ? (
+            <div style={{ width: '100%', maxWidth: '100%' }}>
+              <Chart kind={cc.statChart.kind as any} data={cc.statChart.data}
+                title={cc.statChart.title} height={cc.statChart.height} />
+            </div>
+          ) : (
+            <ChartCanvas ref={svgRef} result={result} config={config} width={boxW} height={chartH}
+              style={{ width: '100%', maxWidth: '100%' }} />
+          )}
         </div>
       </div>
     </div>

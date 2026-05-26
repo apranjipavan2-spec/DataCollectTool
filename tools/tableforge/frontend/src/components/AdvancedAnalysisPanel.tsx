@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ColumnInfo } from '../types';
 import { API_BASE } from '../api';
+import { ProjectFilterBanner } from './ProjectFilterBanner';
 
 export type AdvancedKind =
   | 'causal_did'
@@ -15,6 +16,7 @@ interface Props {
   datasetId: string;
   columns: ColumnInfo[];
   analysisPack?: any[] | null;
+  projectFilters?: Record<string, string[]>;
   onClose: () => void;
 }
 
@@ -36,7 +38,7 @@ const DESCRIPTIONS: Record<AdvancedKind, string> = {
   exec_summary: 'AI-written one-pager from your latest Auto-Analyze pack.',
 };
 
-export function AdvancedAnalysisPanel({ kind, datasetId, columns, analysisPack, onClose }: Props) {
+export function AdvancedAnalysisPanel({ kind, datasetId, columns, analysisPack, projectFilters, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
@@ -53,16 +55,20 @@ export function AdvancedAnalysisPanel({ kind, datasetId, columns, analysisPack, 
         <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflow: 'auto' }}>
           <p style={{ color: 'var(--text-dim)', fontSize: 13, marginBottom: 12 }}>{DESCRIPTIONS[kind]}</p>
 
+          {(kind === 'causal_did' || kind === 'causal_psm' || kind === 'causal_mixed_lm') && (
+            <ProjectFilterBanner filters={projectFilters} />
+          )}
+
           {kind === 'causal_did' && (
-            <DiDForm datasetId={datasetId} columns={columns} numericCols={numericCols}
+            <DiDForm datasetId={datasetId} columns={columns} numericCols={numericCols} projectFilters={projectFilters}
               loading={loading} setLoading={setLoading} setError={setError} setResult={setResult} />
           )}
           {kind === 'causal_psm' && (
-            <PSMForm datasetId={datasetId} columns={columns} numericCols={numericCols}
+            <PSMForm datasetId={datasetId} columns={columns} numericCols={numericCols} projectFilters={projectFilters}
               loading={loading} setLoading={setLoading} setError={setError} setResult={setResult} />
           )}
           {kind === 'causal_mixed_lm' && (
-            <MixedLMForm datasetId={datasetId} columns={columns} numericCols={numericCols}
+            <MixedLMForm datasetId={datasetId} columns={columns} numericCols={numericCols} projectFilters={projectFilters}
               loading={loading} setLoading={setLoading} setError={setError} setResult={setResult} />
           )}
           {kind === 'power_planner' && (
@@ -179,6 +185,7 @@ interface RunnerProps {
   datasetId: string;
   columns: ColumnInfo[];
   numericCols: ColumnInfo[];
+  projectFilters?: Record<string, string[]>;
   loading: boolean;
   setLoading: (v: boolean) => void;
   setError: (v: string | null) => void;
@@ -186,7 +193,7 @@ interface RunnerProps {
 }
 
 // ── DiD form ─────────────────────────────────────────────────────────────
-function DiDForm({ datasetId, columns, numericCols, loading, setLoading, setError, setResult }: RunnerProps) {
+function DiDForm({ datasetId, columns, numericCols, projectFilters, loading, setLoading, setError, setResult }: RunnerProps) {
   const [tCol, setTCol] = useState(''); const [pCol, setPCol] = useState('');
   const [yCol, setYCol] = useState(''); const [covs, setCovs] = useState<string[]>([]);
   const run = async () => {
@@ -194,7 +201,7 @@ function DiDForm({ datasetId, columns, numericCols, loading, setLoading, setErro
     try {
       const r = await postJson('/causal/did', {
         dataset_id: datasetId, treatment_col: tCol, post_col: pCol,
-        outcome_col: yCol, covariate_cols: covs,
+        outcome_col: yCol, covariate_cols: covs, filters: projectFilters || {},
       });
       setResult(r);
     } catch (e: any) { setError(e.message); }
@@ -220,7 +227,7 @@ function DiDForm({ datasetId, columns, numericCols, loading, setLoading, setErro
 }
 
 // ── PSM form ─────────────────────────────────────────────────────────────
-function PSMForm({ datasetId, columns, numericCols, loading, setLoading, setError, setResult }: RunnerProps) {
+function PSMForm({ datasetId, columns, numericCols, projectFilters, loading, setLoading, setError, setResult }: RunnerProps) {
   const [tCol, setTCol] = useState(''); const [yCol, setYCol] = useState('');
   const [covs, setCovs] = useState<string[]>([]); const [caliper, setCaliper] = useState<string>('');
   const run = async () => {
@@ -228,6 +235,7 @@ function PSMForm({ datasetId, columns, numericCols, loading, setLoading, setErro
     try {
       const body: any = {
         dataset_id: datasetId, treatment_col: tCol, outcome_col: yCol, covariate_cols: covs,
+        filters: projectFilters || {},
       };
       if (caliper) body.caliper = parseFloat(caliper);
       const r = await postJson('/causal/psm', body);
@@ -258,7 +266,7 @@ function PSMForm({ datasetId, columns, numericCols, loading, setLoading, setErro
 }
 
 // ── MixedLM form ─────────────────────────────────────────────────────────
-function MixedLMForm({ datasetId, columns, numericCols, loading, setLoading, setError, setResult }: RunnerProps) {
+function MixedLMForm({ datasetId, columns, numericCols, projectFilters, loading, setLoading, setError, setResult }: RunnerProps) {
   const [yCol, setYCol] = useState(''); const [gCol, setGCol] = useState('');
   const [fixed, setFixed] = useState<string[]>([]); const [slope, setSlope] = useState('');
   const run = async () => {
@@ -266,7 +274,7 @@ function MixedLMForm({ datasetId, columns, numericCols, loading, setLoading, set
     try {
       const body: any = {
         dataset_id: datasetId, outcome_col: yCol, group_col: gCol,
-        fixed_cols: fixed, use_weights: true,
+        fixed_cols: fixed, use_weights: true, filters: projectFilters || {},
       };
       if (slope) body.random_slope_col = slope;
       const r = await postJson('/causal/mixed_lm', body);

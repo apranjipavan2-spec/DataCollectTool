@@ -30,6 +30,7 @@ class DriverConfig(BaseModel):
     predictors: list[str]
     standardize: bool = True
     alpha: float = 0.05
+    filters: dict = {}
 
 
 def _zscore(s: pd.Series) -> pd.Series:
@@ -59,6 +60,9 @@ def driver_importance(config: DriverConfig):
     if config.dataset_id not in datasets:
         raise HTTPException(status_code=404, detail="Dataset not found")
     df = datasets[config.dataset_id]["df"]
+    for col, vals in (config.filters or {}).items():
+        if vals and col in df.columns:
+            df = df[df[col].astype(str).isin([str(v) for v in vals])]
     if config.outcome not in df.columns:
         raise HTTPException(status_code=400, detail="outcome not in dataset")
     if not config.predictors:

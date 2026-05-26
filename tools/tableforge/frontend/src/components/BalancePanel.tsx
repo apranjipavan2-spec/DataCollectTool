@@ -2,16 +2,18 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole } from '../types';
 import { balanceApi, getColumnValues } from '../api';
 import { ColPicker, ColOptions } from './ColPicker';
+import { ProjectFilterBanner } from './ProjectFilterBanner';
 
 interface Props {
   datasetId: string;
   columns: ColumnInfo[];
   columnRoles?: Record<string, ColumnRole>;
   studyDesign?: { treatment_col?: string; treatment_value?: string } | null;
+  projectFilters?: Record<string, string[]>;
   onClose: () => void;
 }
 
-export function BalancePanel({ datasetId, columns, columnRoles = {}, studyDesign, onClose }: Props) {
+export function BalancePanel({ datasetId, columns, columnRoles = {}, studyDesign, projectFilters, onClose }: Props) {
   const allCols = useMemo(() => columns.map(c => c.name), [columns]);
   const [treatmentCol, setTreatmentCol] = useState(studyDesign?.treatment_col || '');
   const [treatmentValue, setTreatmentValue] = useState(studyDesign?.treatment_value || '');
@@ -50,6 +52,7 @@ export function BalancePanel({ datasetId, columns, columnRoles = {}, studyDesign
         treatment_value: treatmentValue || null,
         covariates,
         alpha,
+        filters: projectFilters || {},
       });
       setResult(res);
     } catch (e: any) {
@@ -71,6 +74,7 @@ export function BalancePanel({ datasetId, columns, columnRoles = {}, studyDesign
         </div>
 
         <div className="modal-body">
+          <ProjectFilterBanner filters={projectFilters} />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <label className="stat-field">
               <span>Treatment column</span>

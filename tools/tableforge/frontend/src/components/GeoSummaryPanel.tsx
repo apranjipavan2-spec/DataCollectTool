@@ -2,15 +2,17 @@ import React, { useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole } from '../types';
 import { geoApi } from '../api';
 import { ColOptions } from './ColPicker';
+import { ProjectFilterBanner } from './ProjectFilterBanner';
 
 interface Props {
   datasetId: string;
   columns: ColumnInfo[];
   columnRoles?: Record<string, ColumnRole>;
+  projectFilters?: Record<string, string[]>;
   onClose: () => void;
 }
 
-export function GeoSummaryPanel({ datasetId, columns, columnRoles = {}, onClose }: Props) {
+export function GeoSummaryPanel({ datasetId, columns, columnRoles = {}, projectFilters, onClose }: Props) {
   const allCols = useMemo(() => columns.map(c => c.name), [columns]);
   const geoSuggestions = useMemo(() => Object.entries(columnRoles)
     .filter(([_, r]) => r?.role === 'geographic').map(([c]) => c), [columnRoles]);
@@ -39,6 +41,7 @@ export function GeoSummaryPanel({ datasetId, columns, columnRoles = {}, onClose 
         agg,
         top_n: topN > 0 ? topN : null,
         benchmark: bv !== null && !isNaN(bv) ? { value: bv, label: 'Benchmark' } : null,
+        filters: projectFilters || {},
       });
       setResult(res);
     } catch (e: any) {
@@ -62,6 +65,7 @@ export function GeoSummaryPanel({ datasetId, columns, columnRoles = {}, onClose 
         </div>
 
         <div className="modal-body">
+          <ProjectFilterBanner filters={projectFilters} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 12 }}>
             <label className="stat-field">
               <span>Geo column</span>

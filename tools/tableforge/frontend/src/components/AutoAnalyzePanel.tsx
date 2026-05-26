@@ -2,11 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole, TableResult } from '../types';
 import { runAutoBattery, planBattery, BatteryProgress } from '../api';
 import { ColPicker } from './ColPicker';
+import { ProjectFilterBanner } from './ProjectFilterBanner';
 
 interface Props {
   datasetId: string;
   columns: ColumnInfo[];
   columnRoles?: Record<string, ColumnRole>;
+  projectFilters?: Record<string, string[]>;
   onClose: () => void;
   onPromote?: (label: string, headers: string[], rows: any[][], interpretation: string) => void;
   onPackReady?: (pack: any[]) => void;
@@ -14,7 +16,7 @@ interface Props {
 
 type Correction = 'fdr_bh' | 'bonferroni' | 'holm' | 'none';
 
-export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, onClose, onPromote, onPackReady }: Props) {
+export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, projectFilters, onClose, onPromote, onPackReady }: Props) {
   const [outcomes, setOutcomes] = useState<string[]>([]);
   const [predictors, setPredictors] = useState<string[]>([]);
   const [correction, setCorrection] = useState<Correction>('fdr_bh');
@@ -59,7 +61,7 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, onClose
     try {
       const r = await planBattery({
         dataset_id: datasetId, outcome_cols: outcomes, predictor_cols: predictors,
-        correction, use_design: useDesign,
+        correction, use_design: useDesign, filters: projectFilters || {},
       }) as any;
       setPlan(r.plan);
     } catch (e: any) {
@@ -77,7 +79,7 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, onClose
     setProgress({ idx: 0, total: 0, label: 'Preparing…' });
     try {
       await runAutoBattery(
-        { dataset_id: datasetId, outcome_cols: outcomes, predictor_cols: predictors, correction, use_design: useDesign },
+        { dataset_id: datasetId, outcome_cols: outcomes, predictor_cols: predictors, correction, use_design: useDesign, filters: projectFilters || {} },
         (e: BatteryProgress) => {
           if (e.step === 'start') {
             setProgress({ idx: 0, total: e.total || 0, label: 'Starting…' });
@@ -196,6 +198,8 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, onClose
             each pairing, applies multi-test correction, and returns the full pack. Tag column roles in the
             <strong> Variables </strong> panel for smarter test selection.
           </p>
+
+          <ProjectFilterBanner filters={projectFilters} context="battery" />
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <ColPicker

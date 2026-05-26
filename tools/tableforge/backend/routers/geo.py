@@ -31,6 +31,7 @@ class GeoConfig(BaseModel):
     top_n: int | None = None     # only return top-N areas by value
     benchmark: dict | None = None  # {value: float, label: str} to compare against
     benchmark_map: dict | None = None  # {area_name: value} per-area benchmark
+    filters: dict = {}
 
 
 @router.post("/aggregate")
@@ -38,6 +39,9 @@ def geo_aggregate(config: GeoConfig):
     if config.dataset_id not in datasets:
         raise HTTPException(status_code=404, detail="Dataset not found")
     df = datasets[config.dataset_id]["df"]
+    for col, vals in (config.filters or {}).items():
+        if vals and col in df.columns:
+            df = df[df[col].astype(str).isin([str(v) for v in vals])]
     if config.geo_col not in df.columns:
         raise HTTPException(status_code=400, detail="geo_col not in dataset")
 

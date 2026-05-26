@@ -3,6 +3,7 @@ import { ColumnInfo } from '../types';
 import { API_BASE } from '../api';
 import { Chart, adaptFrequencyToBar, adaptMatrixToHeatmap, adaptDescriptiveToBox } from './Chart';
 import { ColPicker } from './ColPicker';
+import { ProjectFilterBanner } from './ProjectFilterBanner';
 
 type StatType =
   | 'correlation'
@@ -26,14 +27,25 @@ type StatType =
   | 'posthoc'
   | 'reliability';
 
+interface InsertPayload {
+  label: string;
+  headers: string[];
+  rows: any[][];
+  interpretation: string;
+  statChart?: { kind: 'bar' | 'box' | 'heatmap'; data: any; title?: string; height?: number };
+  chartOnly?: boolean;
+}
+
 interface Props {
   type: StatType;
   datasetId: string;
   columns: ColumnInfo[];
+  projectFilters?: Record<string, string[]>;
+  onInsert?: (payload: InsertPayload) => void;
   onClose: () => void;
 }
 
-export function StatisticalTables({ type, datasetId, columns, onClose }: Props) {
+export function StatisticalTables({ type, datasetId, columns, projectFilters, onInsert, onClose }: Props) {
   const [selectedCols, setSelectedCols] = useState<string[]>([]);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -105,7 +117,12 @@ export function StatisticalTables({ type, datasetId, columns, onClose }: Props) 
       const res = await fetch(`${API_BASE}/stat/${type}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataset_id: datasetId, columns: selectedCols, alpha }),
+        body: JSON.stringify({
+          dataset_id: datasetId,
+          columns: selectedCols,
+          alpha,
+          filters: projectFilters || {},
+        }),
       });
       if (!res.ok) {
         const text = await res.text();
@@ -234,6 +251,8 @@ export function StatisticalTables({ type, datasetId, columns, onClose }: Props) 
         <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflow: 'auto' }}>
           <p style={{ color: 'var(--text-dim)', fontSize: 13, marginBottom: 12 }}>{descriptions[type]}</p>
 
+          <ProjectFilterBanner filters={projectFilters} />
+
           {/* Column selection */}
           <div style={{ marginBottom: 16 }}>
             <ColPicker
@@ -290,23 +309,51 @@ export function StatisticalTables({ type, datasetId, columns, onClose }: Props) 
 
           {/* Chart view */}
           {result && view === 'chart' && (() => {
-            if (type === 'descriptive') {
-              const data = adaptDescriptiveToBox(result.headers, result.rows);
-              return data ? <Chart kind="box" data={data} title="Distribution by variable (Min / Q1 / Median / Q3 / Max)" /> : <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Chart unavailable for this result.</div>;
-            }
-            if (type === 'frequency') {
-              const data = adaptFrequencyToBar(result.headers, result.rows);
-              return data ? <Chart kind="bar" data={data} title="Frequency" /> : <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Chart unavailable for this result.</div>;
-            }
-            if (type === 'correlation' || type === 'spearman' || type === 'kendall') {
-              const data = adaptMatrixToHeatmap(result.headers, result.rows, 'diverging');
-              return data ? <Chart kind="heatmap" data={data} title="Correlation heatmap (green = +, red = −)" height={Math.max(300, data.yLabels.length * 36 + 80)} /> : <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Chart unavailable for this result.</div>;
-            }
-            if (type === 'crosstab') {
-              const data = adaptMatrixToHeatmap(result.headers, result.rows, 'sequential');
-              return data ? <Chart kind="heatmap" data={data} title="Cross-tab heatmap (counts)" height={Math.max(300, data.yLabels.length * 36 + 80)} /> : <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Chart unavailable for this result.</div>;
-            }
-            return null;
+            const sc = buildStatChart(type, result);
+            return sc
+              ? <Chart kind={sc.kind as any} data={sc.data} title={sc.title} height={sc.height} />
+              : <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Chart unavailable for this result.</div>;
+          })()}
+
+          {/* Insert into workspace */}
+          {result && onInsert && (() => {
+            const sc = buildStatChart(type, result);
+            const label = titles[type];
+            const interpretation = result.interpretation || '';
+            const headers: string[] = result.headers || [];
+            const rows: any[][] = result.rows || [];
+            const doInsert = (mode: 'table' | 'chart' | 'both') => {
+              if (mode === 'table' || !sc) {
+                onInsert({ label, headers, rows, interpretation });
+              } else if (mode === 'chart') {
+                onInsert({ label, headers, rows, interpretation, statChart: sc, chartOnly: true });
+              } else {
+                onInsert({ label, headers, rows, interpretation, statChart: sc });
+              }
+              onClose();
+            };
+            return (
+              <div style={{ display: 'flex', gap: 8, marginTop: 14, paddingTop: 12,
+                borderTop: '1px solid var(--border, #334155)', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center',
+                  textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 4 }}>
+                  Insert into workspace:
+                </span>
+                <button className="btn-primary" style={{ fontSize: 12 }} onClick={() => doInsert('table')}>
+                  📋 Table
+                </button>
+                <button className="btn-primary" style={{ fontSize: 12, opacity: sc ? 1 : 0.5 }}
+                  disabled={!sc} onClick={() => doInsert('chart')}
+                  title={sc ? 'Insert as a chart-only card' : 'No chart available for this test'}>
+                  📊 Chart
+                </button>
+                <button className="btn-primary" style={{ fontSize: 12, opacity: sc ? 1 : 0.5 }}
+                  disabled={!sc} onClick={() => doInsert('both')}
+                  title={sc ? 'Insert one card showing both table and chart (toggleable)' : 'No chart available for this test'}>
+                  📋📊 Both
+                </button>
+              </div>
+            );
           })()}
 
           {/* Results table */}
@@ -408,4 +455,36 @@ export function StatisticalTables({ type, datasetId, columns, onClose }: Props) 
       </div>
     </div>
   );
+}
+
+// Build a Chart-component-compatible payload from a stat result.
+// Returns null when the test has no canonical chart representation.
+function buildStatChart(
+  type: StatType,
+  result: { headers: string[]; rows: any[][] },
+): { kind: 'bar' | 'box' | 'heatmap'; data: any; title?: string; height?: number } | null {
+  if (!result || !result.headers || !result.rows) return null;
+  if (type === 'descriptive') {
+    const data = adaptDescriptiveToBox(result.headers, result.rows);
+    return data ? { kind: 'box', data, title: 'Distribution by variable (Min / Q1 / Median / Q3 / Max)' } : null;
+  }
+  if (type === 'frequency') {
+    const data = adaptFrequencyToBar(result.headers, result.rows);
+    return data ? { kind: 'bar', data, title: 'Frequency' } : null;
+  }
+  if (type === 'correlation' || type === 'spearman' || type === 'kendall') {
+    const data = adaptMatrixToHeatmap(result.headers, result.rows, 'diverging');
+    return data
+      ? { kind: 'heatmap', data, title: 'Correlation heatmap (green = +, red = −)',
+          height: Math.max(300, data.yLabels.length * 36 + 80) }
+      : null;
+  }
+  if (type === 'crosstab') {
+    const data = adaptMatrixToHeatmap(result.headers, result.rows, 'sequential');
+    return data
+      ? { kind: 'heatmap', data, title: 'Cross-tab heatmap (counts)',
+          height: Math.max(300, data.yLabels.length * 36 + 80) }
+      : null;
+  }
+  return null;
 }

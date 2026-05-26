@@ -490,14 +490,18 @@ async def stat_logistic_regression(config: InferConfig):
                 if len(uniq) != 2:
                     raise HTTPException(400, f"Outcome must be binary — found {len(uniq)} levels")
                 sub[y_col] = (sub[y_col] == sorted(uniq, key=str)[1]).astype(int)
-        # Build formula with C() for categorical predictors
+        # Build formula with C() for categorical predictors.
+        # Use double-quoted Q("...") and escape \ and " so column names with
+        # apostrophes (e.g. "applicant's occupation") don't break patsy parsing.
+        def _q(name: str) -> str:
+            return 'Q("' + name.replace("\\", "\\\\").replace('"', '\\"') + '")'
         terms = []
         for c in x_cols:
             if pd.api.types.is_numeric_dtype(sub[c]):
-                terms.append(f"Q('{c}')")
+                terms.append(_q(c))
             else:
-                terms.append(f"C(Q('{c}'))")
-        formula = f"Q('{y_col}') ~ " + " + ".join(terms)
+                terms.append(f"C({_q(c)})")
+        formula = f"{_q(y_col)} ~ " + " + ".join(terms)
 
         # Optional survey weights from StudyDesign
         w_series, w_col = _resolve_weights(config.dataset_id, df)
@@ -580,13 +584,15 @@ async def stat_multiple_regression(config: InferConfig):
         y_col, x_cols = _resolve_regression_cols(config)
         sub = df[[y_col] + x_cols].copy()
         sub[y_col] = pd.to_numeric(sub[y_col], errors="coerce")
+        def _q(name: str) -> str:
+            return 'Q("' + name.replace("\\", "\\\\").replace('"', '\\"') + '")'
         terms = []
         for c in x_cols:
             if pd.api.types.is_numeric_dtype(sub[c]):
-                terms.append(f"Q('{c}')")
+                terms.append(_q(c))
             else:
-                terms.append(f"C(Q('{c}'))")
-        formula = f"Q('{y_col}') ~ " + " + ".join(terms)
+                terms.append(f"C({_q(c)})")
+        formula = f"{_q(y_col)} ~ " + " + ".join(terms)
 
         # Optional survey weights from StudyDesign
         w_series, w_col = _resolve_weights(config.dataset_id, df)

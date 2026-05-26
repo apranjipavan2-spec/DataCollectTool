@@ -1964,6 +1964,25 @@ export default function App() {
           type={modal.replace('stat_', '') as any}
           datasetId={dataset.dataset_id}
           columns={allColumns}
+          projectFilters={projectFilters}
+          onInsert={({ label, headers, rows, interpretation, statChart, chartOnly }) => {
+            const id = String(Date.now() + Math.floor(Math.random() * 1000));
+            pushUndo();
+            const empty = createEmptyTable(id, label.slice(0, 30));
+            empty.title = label;
+            empty.subtitle = interpretation;
+            if (statChart) {
+              empty.chartConfig = { statChart, chart_only: !!chartOnly };
+            }
+            setTables(prev => [...prev, empty]);
+            setResults(prev => {
+              const next = new Map(prev);
+              next.set(id, { headers, rows, row_count: rows.length, col_count: headers.length });
+              return next;
+            });
+            setActiveTableIdx(tables.length);
+            if (statChart && !chartOnly) setPreviewTab('chart');
+          }}
           onClose={() => setModal(null)}
         />
       )}
@@ -1989,6 +2008,7 @@ export default function App() {
           datasetId={dataset.dataset_id}
           columns={allColumns}
           columnRoles={columnRolesMap}
+          projectFilters={projectFilters}
           onClose={() => setModal(null)}
           onCompositeCreated={handleDataRefresh}
         />
@@ -1998,6 +2018,7 @@ export default function App() {
           datasetId={dataset.dataset_id}
           columns={allColumns}
           columnRoles={columnRolesMap}
+          projectFilters={projectFilters}
           onClose={() => setModal(null)}
         />
       )}
@@ -2006,6 +2027,7 @@ export default function App() {
           datasetId={dataset.dataset_id}
           columns={allColumns}
           columnRoles={columnRolesMap}
+          projectFilters={projectFilters}
           onClose={() => setModal(null)}
         />
       )}
@@ -2015,6 +2037,7 @@ export default function App() {
           columns={allColumns}
           columnRoles={columnRolesMap}
           studyDesign={null}
+          projectFilters={projectFilters}
           onClose={() => setModal(null)}
         />
       )}
@@ -2023,6 +2046,7 @@ export default function App() {
           datasetId={dataset.dataset_id}
           columns={allColumns}
           columnRoles={columnRolesMap}
+          projectFilters={projectFilters}
           onClose={() => setModal(null)}
         />
       )}
@@ -2031,6 +2055,7 @@ export default function App() {
           datasetId={dataset.dataset_id}
           columns={allColumns}
           columnRoles={columnRolesMap}
+          projectFilters={projectFilters}
           onClose={() => setModal(null)}
         />
       )}
@@ -2038,6 +2063,7 @@ export default function App() {
         <ClusterPanel
           datasetId={dataset.dataset_id}
           columns={allColumns}
+          projectFilters={projectFilters}
           onClose={() => setModal(null)}
         />
       )}
@@ -2045,6 +2071,7 @@ export default function App() {
         <VerbatimPanel
           datasetId={dataset.dataset_id}
           columns={allColumns}
+          projectFilters={projectFilters}
           onClose={() => setModal(null)}
         />
       )}
@@ -2071,6 +2098,7 @@ export default function App() {
           datasetId={dataset.dataset_id}
           columns={allColumns}
           analysisPack={lastAnalysisPack}
+          projectFilters={projectFilters}
           onClose={() => setAdvancedKind(null)}
         />
       )}
@@ -2079,6 +2107,7 @@ export default function App() {
           datasetId={dataset.dataset_id}
           columns={allColumns}
           columnRoles={columnRolesMap}
+          projectFilters={projectFilters}
           onPackReady={(pack) => setLastAnalysisPack(pack)}
           onClose={() => setModal(null)}
           onPromote={(label, headers, rows, interpretation) => {
@@ -2113,6 +2142,7 @@ export default function App() {
           datasetId={dataset.dataset_id}
           columns={allColumns}
           columnRoles={columnRolesMap}
+          projectFilters={projectFilters}
           onClose={() => setModal(null)}
         />
       )}

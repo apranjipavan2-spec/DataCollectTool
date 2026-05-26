@@ -312,6 +312,7 @@ class MixedLMConfig(BaseModel):
     group_col: str                                # cluster ID (e.g., village_id)
     random_slope_col: str | None = None           # optional random slope on this column
     use_weights: bool = True                      # use StudyDesign.weight_col if available
+    filters: dict = {}                            # project-filter rows (column → allowed values)
 
 
 def _split_terms(sub: pd.DataFrame, fixed_cols: list[str]) -> list[str]:
@@ -340,6 +341,9 @@ def causal_mixed_lm(cfg: MixedLMConfig):
 
         df = datasets[cfg.dataset_id]["df"].copy()
         df = apply_metrics_and_bins(df, cfg.dataset_id)
+        for col, vals in (cfg.filters or {}).items():
+            if vals and col in df.columns:
+                df = df[df[col].astype(str).isin([str(v) for v in vals])]
 
         needed = [cfg.outcome_col, cfg.group_col] + list(cfg.fixed_cols)
         if cfg.random_slope_col:

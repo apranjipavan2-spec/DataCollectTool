@@ -34,6 +34,7 @@ class VerbatimListConfig(BaseModel):
     min_length: int = 1
     page: int = 0
     page_size: int = 50
+    filters: dict = {}
 
 
 class CodeAssignConfig(BaseModel):
@@ -53,6 +54,7 @@ class KappaConfig(BaseModel):
     coder_a_col: str
     coder_b_col: str
     weighted: bool = False  # weighted κ for ordinal
+    filters: dict = {}
 
 
 @router.post("/list")
@@ -60,6 +62,9 @@ def verbatim_list(config: VerbatimListConfig):
     if config.dataset_id not in datasets:
         raise HTTPException(status_code=404, detail="Dataset not found")
     df = datasets[config.dataset_id]["df"]
+    for col, vals in (config.filters or {}).items():
+        if vals and col in df.columns:
+            df = df[df[col].astype(str).isin([str(v) for v in vals])]
     if config.column not in df.columns:
         raise HTTPException(status_code=400, detail="column not in dataset")
 
@@ -137,6 +142,9 @@ def cohens_kappa(config: KappaConfig):
     if config.dataset_id not in datasets:
         raise HTTPException(status_code=404, detail="Dataset not found")
     df = datasets[config.dataset_id]["df"]
+    for col, vals in (config.filters or {}).items():
+        if vals and col in df.columns:
+            df = df[df[col].astype(str).isin([str(v) for v in vals])]
     a_col, b_col = config.coder_a_col, config.coder_b_col
     if a_col not in df.columns or b_col not in df.columns:
         raise HTTPException(status_code=400, detail="Coder columns not in dataset")

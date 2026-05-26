@@ -31,6 +31,7 @@ class ClusterConfig(BaseModel):
     standardize: bool = True
     max_iter: int = 100
     seed: int = 42
+    filters: dict = {}
 
 
 def _kmeans(X: np.ndarray, k: int, max_iter: int, seed: int) -> tuple[np.ndarray, np.ndarray, float]:
@@ -108,6 +109,9 @@ def kmeans(config: ClusterConfig):
     if config.dataset_id not in datasets:
         raise HTTPException(status_code=404, detail="Dataset not found")
     df = datasets[config.dataset_id]["df"]
+    for col, vals in (config.filters or {}).items():
+        if vals and col in df.columns:
+            df = df[df[col].astype(str).isin([str(v) for v in vals])]
     cols = [c for c in config.columns if c in df.columns]
     if len(cols) < 2:
         raise HTTPException(status_code=400, detail="Need ≥2 columns")

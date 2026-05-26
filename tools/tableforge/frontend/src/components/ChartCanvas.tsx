@@ -36,6 +36,28 @@ interface Props {
 
 interface Tooltip { x: number; y: number; text: string }
 
+// Wrap long axis/legend labels onto multiple lines (word-aware, hard-break
+// if a single token exceeds the line budget). Keeps full text — never elides.
+function wrapText(text: string, maxChars: number, maxLines = 4): string[] {
+  const s = String(text ?? '');
+  if (s.length <= maxChars) return [s];
+  const tokens = s.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let cur = '';
+  for (const w of tokens) {
+    if (!cur) { cur = w; continue; }
+    if ((cur + ' ' + w).length <= maxChars) cur += ' ' + w;
+    else { lines.push(cur); cur = w; }
+  }
+  if (cur) lines.push(cur);
+  const out: string[] = [];
+  for (const ln of lines) {
+    if (ln.length <= maxChars) { out.push(ln); continue; }
+    for (let i = 0; i < ln.length; i += maxChars) out.push(ln.slice(i, i + maxChars));
+  }
+  return out.length > maxLines ? [...out.slice(0, maxLines - 1), out.slice(maxLines - 1).join(' ')] : out;
+}
+
 export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas(
   { result, config, width = 700, height = 340, interactive = true, className, style },
   svgRef,
@@ -190,14 +212,20 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   const effectiveXRot = xRot !== null ? xRot : (multiData.length > 8 ? -35 : 0);
   const xIsRotated = effectiveXRot !== 0;
   const xRotMag = Math.abs(effectiveXRot);
+  const xWrapCols = xIsRotated ? 24 : 12;
+  const maxXWrapLines = chartType === 'bar_h'
+    ? 1
+    : multiData.reduce((m, d) => Math.max(m, wrapText(String(d.label), xWrapCols).length), 1);
   const maxXChars = chartType === 'bar_h'
     ? 0  // bar_h labels live in the LEFT gutter, not bottom
-    : Math.min(22, multiData.reduce((m, d) => Math.max(m, String(d.label).length), 0));
+    : Math.min(xWrapCols, multiData.reduce((m, d) => Math.max(m, String(d.label).length), 0));
   const xLabelTextPx = maxXChars * charPx;
   const rotRad = (Math.PI / 180) * xRotMag;
+  const xLineHpx = labelFontSize * 1.15;
+  const extraXLineH = (maxXWrapLines - 1) * xLineHpx;
   const labelSweep = xIsRotated
-    ? Math.ceil(xLabelTextPx * Math.sin(rotRad) + 14)
-    : Math.ceil(labelFontSize + 10);
+    ? Math.ceil(xLabelTextPx * Math.sin(rotRad) + 14 + extraXLineH * Math.cos(rotRad))
+    : Math.ceil(labelFontSize + 10 + extraXLineH);
   const hasXCaption = !!xAxisLabel && chartType !== 'bar_h';
   const captionGap = hasXCaption ? labelFontSize + 18 : 0;
   MB = 14 + labelSweep + captionGap;
@@ -211,8 +239,8 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   const hasYCaption = chartType !== 'bar_h' && !!(yAxisLabel || yFieldsResolved[0]);
   const yCaptionSlot = hasYCaption ? labelFontSize + 10 : 0;
   if (chartType === 'bar_h') {
-    const maxCatChars = Math.min(14, multiData.reduce((m, d) => Math.max(m, String(d.label).length), 0));
-    ML = Math.max(54, Math.ceil(maxCatChars * charPx + 14));
+    const maxCatChars = Math.min(18, multiData.reduce((m, d) => Math.max(m, String(d.label).length), 0));
+    ML = Math.max(64, Math.ceil(maxCatChars * charPx + 16));
   } else {
     ML = Math.max(48, Math.ceil(yTickPx + yCaptionSlot + 16));
   }
@@ -240,12 +268,21 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   const renderLegend = () => {
     if (showLegend === 'none' || seriesNames.length <= 1) return null;
     if (showLegend === 'right') {
-      return seriesNames.map((name, i) => (
-        <g key={i} transform={`translate(${ML + PW + 8}, ${MT + i * 18})`}>
-          <rect width={10} height={10} fill={colors[i % colors.length]} rx={2} />
-          <text x={14} y={9} fontSize={labelFontSize - 1} fill="#9ca3af">{name.length > 15 ? name.slice(0, 15) + '...' : name}</text>
-        </g>
-      ));
+      return seriesNames.map((name, i) => {
+        const lines = wrapText(name, 20, 3);
+        const lineH = (labelFontSize - 1) * 1.15;
+        return (
+          <g key={i} transform={`translate(${ML + PW + 8}, ${MT + i * (18 + (lines.length - 1) * lineH)})`}>
+            <rect width={10} height={10} fill={colors[i % colors.length]} rx={2} />
+            <text x={14} y={9} fontSize={labelFontSize - 1} fill="#9ca3af">
+              <title>{name}</title>
+              {lines.map((ln, li) => (
+                <tspan key={li} x={14} dy={li === 0 ? 0 : lineH}>{ln}</tspan>
+              ))}
+            </text>
+          </g>
+        );
+      });
     }
     if (showLegend === 'bottom') {
       let cx = ML;
@@ -272,12 +309,21 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
       });
     }
     if (showLegend === 'left') {
-      return seriesNames.map((name, i) => (
-        <g key={i} transform={`translate(${8}, ${MT + i * 18})`}>
-          <rect width={10} height={10} fill={colors[i % colors.length]} rx={2} />
-          <text x={14} y={9} fontSize={labelFontSize - 1} fill="#9ca3af">{name.length > 15 ? name.slice(0, 15) + '...' : name}</text>
-        </g>
-      ));
+      return seriesNames.map((name, i) => {
+        const lines = wrapText(name, 20, 3);
+        const lineH = (labelFontSize - 1) * 1.15;
+        return (
+          <g key={i} transform={`translate(${8}, ${MT + i * (18 + (lines.length - 1) * lineH)})`}>
+            <rect width={10} height={10} fill={colors[i % colors.length]} rx={2} />
+            <text x={14} y={9} fontSize={labelFontSize - 1} fill="#9ca3af">
+              <title>{name}</title>
+              {lines.map((ln, li) => (
+                <tspan key={li} x={14} dy={li === 0 ? 0 : lineH}>{ln}</tspan>
+              ))}
+            </text>
+          </g>
+        );
+      });
     }
     return null;
   };
@@ -311,17 +357,21 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
         {chartType !== 'bar_h' && (() => {
           // When labels are rotated, give them room and anchor at the end so the text grows up-left from the tick.
           const tickY = MT + PH + 14;
+          const wrapCols = xIsRotated ? 24 : 12;
+          const lineH = labelFontSize * 1.15;
           return multiData.map((d, i) => {
             const x = xToSvg(i, multiData.length);
-            const maxLen = xIsRotated ? 22 : 12;
-            const shown = d.label.length > maxLen ? d.label.slice(0, maxLen) + '…' : d.label;
+            const lines = wrapText(d.label, wrapCols);
+            const anchor = xIsRotated ? (effectiveXRot < 0 ? 'end' : 'start') : 'middle';
             return (
               <text key={i} x={x} y={tickY}
-                textAnchor={xIsRotated ? (effectiveXRot < 0 ? 'end' : 'start') : 'middle'}
+                textAnchor={anchor}
                 fontSize={labelFontSize} fill={labelColor}
                 transform={xIsRotated ? `rotate(${effectiveXRot},${x},${tickY})` : undefined}>
                 <title>{d.label}</title>
-                {shown}
+                {lines.map((ln, li) => (
+                  <tspan key={li} x={x} dy={li === 0 ? 0 : lineH}>{ln}</tspan>
+                ))}
               </text>
             );
           });
@@ -378,9 +428,18 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             const y = MT + i * (PH / multiData.length) + (PH / multiData.length - rowH) / 2;
             return (
               <g key={i}>
-                <text x={ML - 6} y={y + rowH / 2 + 4} textAnchor="end" fontSize={labelFontSize} fill={labelColor}>
-                  {d.label.length > 14 ? d.label.slice(0, 14) + '...' : d.label}
-                </text>
+                {(() => {
+                  const lines = wrapText(d.label, 18);
+                  const lineH = labelFontSize * 1.15;
+                  const cy = y + rowH / 2 + 4 - ((lines.length - 1) * lineH) / 2;
+                  return (
+                    <text x={ML - 6} y={cy} textAnchor="end" fontSize={labelFontSize} fill={labelColor}>
+                      {lines.map((ln, li) => (
+                        <tspan key={li} x={ML - 6} dy={li === 0 ? 0 : lineH}>{ln}</tspan>
+                      ))}
+                    </text>
+                  );
+                })()}
                 <rect x={xScale(0)} y={y} width={Math.abs(xScale(v) - xScale(0))} height={rowH}
                   fill={colors[i % colors.length]} rx={2} opacity={barOpacity}
                   onMouseEnter={e => showTip(e, `${d.label}\n${dispLabel(d.displays[0], v)}`)}
@@ -561,17 +620,26 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             </>
           )}
           {showLegend !== 'none' && multiData.slice(0, 12).map((d, i) => {
+            const wrapCols = (showLegend === 'top' || showLegend === 'bottom') ? 14 : 22;
+            const lines = wrapText(d.label, wrapCols, 3);
+            const lineH = (labelFontSize - 1) * 1.15;
+            const rowH = Math.max(18, 14 + (lines.length - 1) * lineH);
             const transform = showLegend === 'right'
-              ? `translate(${cx + r + 24}, ${MT + i * 18})`
+              ? `translate(${cx + r + 24}, ${MT + i * rowH})`
               : showLegend === 'left'
-                ? `translate(${8}, ${MT + i * 18})`
+                ? `translate(${8}, ${MT + i * rowH})`
                 : showLegend === 'top'
                   ? `translate(${ML + i * 80}, ${8})`
                   : `translate(${ML + i * 80}, ${MT + PH + 20})`;
             return (
               <g key={i} transform={transform}>
                 <rect width={10} height={10} fill={colors[i % colors.length]} rx={2} />
-                <text x={14} y={9} fontSize={labelFontSize - 1} fill="#9ca3af">{d.label.length > 18 ? d.label.slice(0, 18) + '...' : d.label}</text>
+                <text x={14} y={9} fontSize={labelFontSize - 1} fill="#9ca3af">
+                  <title>{d.label}</title>
+                  {lines.map((ln, li) => (
+                    <tspan key={li} x={14} dy={li === 0 ? 0 : lineH}>{ln}</tspan>
+                  ))}
+                </text>
               </g>
             );
           })}
@@ -690,19 +758,38 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
       const fontPx = Math.max(7, Math.min(labelFontSize, Math.floor(Math.min(cellW, cellH) / 3)));
       return (
         <g>
-          {colHeaders.map((h, ci) => (
-            <text key={'ch' + ci} x={ML + ci * cellW + cellW / 2} y={MT - 6}
-              textAnchor="middle" fill="#9ca3af" fontSize={labelFontSize}
-              transform={cellW < 60 ? `rotate(-30, ${ML + ci * cellW + cellW / 2}, ${MT - 6})` : undefined}>
-              {String(h).length > 16 ? String(h).slice(0, 16) + '…' : String(h)}
-            </text>
-          ))}
-          {rows.map((r, ri) => (
-            <text key={'rl' + ri} x={ML - 6} y={MT + ri * cellH + cellH / 2 + 4}
-              textAnchor="end" fill="#9ca3af" fontSize={labelFontSize}>
-              {String(r[0] ?? '').length > 18 ? String(r[0] ?? '').slice(0, 18) + '…' : String(r[0] ?? '')}
-            </text>
-          ))}
+          {colHeaders.map((h, ci) => {
+            const cx = ML + ci * cellW + cellW / 2;
+            const rotated = cellW < 60;
+            const wrapCols = rotated ? 22 : Math.max(6, Math.floor(cellW / 7));
+            const lines = wrapText(String(h), wrapCols);
+            const lineH = labelFontSize * 1.15;
+            return (
+              <text key={'ch' + ci} x={cx} y={MT - 6}
+                textAnchor={rotated ? 'end' : 'middle'} fill="#9ca3af" fontSize={labelFontSize}
+                transform={rotated ? `rotate(-30, ${cx}, ${MT - 6})` : undefined}>
+                <title>{String(h)}</title>
+                {lines.map((ln, li) => (
+                  <tspan key={li} x={cx} dy={li === 0 ? 0 : lineH}>{ln}</tspan>
+                ))}
+              </text>
+            );
+          })}
+          {rows.map((r, ri) => {
+            const label = String(r[0] ?? '');
+            const lines = wrapText(label, 18);
+            const lineH = labelFontSize * 1.15;
+            const cy = MT + ri * cellH + cellH / 2 + 4 - ((lines.length - 1) * lineH) / 2;
+            return (
+              <text key={'rl' + ri} x={ML - 6} y={cy}
+                textAnchor="end" fill="#9ca3af" fontSize={labelFontSize}>
+                <title>{label}</title>
+                {lines.map((ln, li) => (
+                  <tspan key={li} x={ML - 6} dy={li === 0 ? 0 : lineH}>{ln}</tspan>
+                ))}
+              </text>
+            );
+          })}
           {cellMatrix.map((rowVals, ri) =>
             rowVals.map((v, ci) => (
               <g key={`c${ri}-${ci}`}>

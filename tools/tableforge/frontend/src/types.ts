@@ -175,6 +175,10 @@ export interface TableConfig {
     showGrid?: boolean;
     showLabels?: boolean;
     showLegend?: boolean;
+    // Pre-built stat chart (heatmap / box / bar from statistical tests).
+    // When set, InlineChartPreview renders <Chart kind=... data=... /> directly
+    // instead of building the chart from tabulated rows via ChartCanvas.
+    statChart?: { kind: 'bar' | 'box' | 'heatmap' | 'stackedBar'; data: any; title?: string; height?: number };
     [key: string]: any;
   };
   _lastValueConfig?: Partial<ValueField>;
