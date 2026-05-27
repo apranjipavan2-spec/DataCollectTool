@@ -123,10 +123,12 @@ async def load_server_file(file_id: str):
 
     try:
         if ext in ("xlsx", "xls"):
-            xls = pd.ExcelFile(cache_path, engine="openpyxl" if ext == "xlsx" else "xlrd")
+            _ekw = {"data_only": True} if ext == "xlsx" else {}
+            xls = pd.ExcelFile(cache_path, engine="openpyxl" if ext == "xlsx" else "xlrd",
+                               engine_kwargs=_ekw)
             sheets = xls.sheet_names
             df = pd.read_excel(xls, sheet_name=sheets[0])
-            _strip_formula_cells(df)   # replace un-evaluated formula strings with NaN
+            _strip_formula_cells(df)
         elif ext in ("csv", "tsv"):
             sep = "\t" if ext == "tsv" else ","
             df = None

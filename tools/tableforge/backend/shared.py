@@ -51,26 +51,40 @@ def is_super_admin(role: Optional[str]) -> bool:
 
 
 def sanitize_for_json(obj):
-    """Recursively replace NaN/Infinity with None in nested structures."""
+    """Recursively convert any value to a JSON-safe primitive.
+
+    The final fallback explicitly converts unknown types (openpyxl CellErrorValue,
+    datetime, custom objects, etc.) to string so React never receives an object
+    as a JSX child — which would throw React error #310.
+    """
+    import datetime as _dt
     if isinstance(obj, dict):
         return {k: sanitize_for_json(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [sanitize_for_json(v) for v in obj]
+    if isinstance(obj, bool):          # must come before int — bool is a subclass of int
+        return obj
+    if isinstance(obj, (np.bool_,)):
+        return bool(obj)
+    if isinstance(obj, (int,)):
+        return obj
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
     if isinstance(obj, float):
         if np.isnan(obj) or np.isinf(obj):
             return None
         return obj
-    if isinstance(obj, (np.integer,)):
-        return int(obj)
     if isinstance(obj, (np.floating,)):
         if np.isnan(obj) or np.isinf(obj):
             return None
         return float(obj)
-    if isinstance(obj, (np.bool_,)):
-        return bool(obj)
     if isinstance(obj, pd.Timestamp):
         if pd.isna(obj):
             return None
+        return obj.isoformat()
+    if isinstance(obj, _dt.datetime):
+        return obj.isoformat()
+    if isinstance(obj, _dt.date):
         return obj.isoformat()
     if isinstance(obj, pd.Period):
         return str(obj)
@@ -82,9 +96,17 @@ def sanitize_for_json(obj):
         obj = obj.replace('(nan%)', '(0%)').replace('(nan)', '(0)')
         obj = obj.replace('(inf%)', '(0%)').replace('(-inf%)', '(0%)')
         return obj
-    if pd.isna(obj) if not isinstance(obj, (str, list, dict)) else False:
+    if obj is None:
         return None
-    return obj
+    # Handle numpy/pandas NA sentinels
+    try:
+        if pd.isna(obj):
+            return None
+    except (TypeError, ValueError):
+        pass
+    # Unknown type (openpyxl CellErrorValue, custom object, etc.) — stringify
+    # rather than letting the raw object reach the React frontend.
+    return str(obj)
 
 
 def add_audit_log(dataset_id: str, action: str, details: str = ""):

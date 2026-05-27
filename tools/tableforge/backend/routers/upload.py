@@ -49,10 +49,13 @@ async def upload_file(file: UploadFile = File(...)):
 
     try:
         if ext in ("xlsx", "xls"):
-            xls = pd.ExcelFile(tmp_path, engine="openpyxl" if ext == "xlsx" else "xlrd")
+            _ekw = {"data_only": True} if ext == "xlsx" else {}
+            xls = pd.ExcelFile(tmp_path, engine="openpyxl" if ext == "xlsx" else "xlrd",
+                               engine_kwargs=_ekw)
             sheets = xls.sheet_names
             df = pd.read_excel(xls, sheet_name=sheets[0])
-            _strip_formula_cells(df)   # replace un-evaluated formula strings with NaN
+            # Strip any formula strings that still slipped through (no cached value).
+            _strip_formula_cells(df)
         elif ext in ("csv", "tsv"):
             sep = "\t" if ext == "tsv" else ","
             df = None
@@ -127,7 +130,11 @@ async def load_sheet(req: SheetSelect):
         raise HTTPException(404, "Dataset not found")
     ext = datasets[req.dataset_id]["filename"].rsplit(".", 1)[-1].lower()
     tmp_path = CACHE_DIR / f"{req.dataset_id}.{ext}"
-    df = pd.read_excel(tmp_path, sheet_name=req.sheet_name)
+    ext2 = datasets[req.dataset_id]["filename"].rsplit(".", 1)[-1].lower()
+    _ekw2 = {"data_only": True} if ext2 == "xlsx" else {}
+    df = pd.read_excel(tmp_path, sheet_name=req.sheet_name,
+                       engine="openpyxl" if ext2 == "xlsx" else None,
+                       engine_kwargs=_ekw2)
     _strip_formula_cells(df)
     datasets[req.dataset_id]["df"] = df
     add_audit_log(req.dataset_id, "sheet_change", f"Switched to sheet: {req.sheet_name}")
