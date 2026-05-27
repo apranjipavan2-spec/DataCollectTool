@@ -72,6 +72,34 @@ function savePresets(p: Record<string, ChartStylePreset>) {
   try { localStorage.setItem(PRESET_KEY, JSON.stringify(p)); } catch { /* quota or disabled */ }
 }
 
+// Global default chart style — saved automatically on every "Save & Close".
+// New charts (no existing chartConfig) inherit this so format carries across tables.
+const DEFAULT_STYLE_KEY = 'tableforge_default_chart_style';
+interface DefaultChartStyle {
+  chartType: string;
+  palette: number;
+  showGrid: boolean; showLabels: boolean; showLegend: LegendPos;
+  labelFontSize: number; titleFontSize: number; barOpacity: number;
+  fontFamily: string; axisColor: string; gridColor: string;
+  tickColor: string; axisLabelColor: string; dataLabelColor: string;
+  titleColor: string; singleColor: string; seriesColors: Record<number, string>;
+  titleAlign: 'left' | 'center' | 'right'; titleBold: boolean; titleItalic: boolean;
+  xLabelRotation: number | 'auto'; yLabelRotation: number; valueLabelSplit: boolean;
+  stacked100: boolean; labelPosition: 'inside' | 'outside'; patternFills: boolean;
+  condEnabled: boolean; condThreshold: number; condBelow: string; condAbove: string;
+  lightMode: boolean;
+}
+function loadDefaultStyle(): DefaultChartStyle | null {
+  try {
+    const raw = localStorage.getItem(DEFAULT_STYLE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as DefaultChartStyle;
+  } catch { return null; }
+}
+function saveDefaultStyle(s: DefaultChartStyle) {
+  try { localStorage.setItem(DEFAULT_STYLE_KEY, JSON.stringify(s)); } catch { /* quota */ }
+}
+
 export function ChartBuilder({ tables, results, onClose, onChartChange, activeTableIdx }: Props) {
   const initialIdx = (typeof activeTableIdx === 'number' && activeTableIdx >= 0 && activeTableIdx < tables.length) ? activeTableIdx : 0;
   const [tableIdx, setTableIdx] = useState(initialIdx);
@@ -187,24 +215,26 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
       setCondAbove(cc2?.above || '#10b981');
       setLightMode(!!cc.lightMode);
     } else {
-      setChartType('bar'); setXField(''); setYFields([]);
-      setPalette(0); setShowGrid(true); setShowLabels(false); setShowLegend('right');
+      // New chart — seed with the saved global default style if one exists.
+      const def = loadDefaultStyle();
+      setChartType((def?.chartType as any) || 'bar'); setXField(''); setYFields([]);
+      setPalette(def?.palette ?? 0); setShowGrid(def?.showGrid ?? true); setShowLabels(def?.showLabels ?? false); setShowLegend(def?.showLegend ?? 'right');
       setChartTitle(''); setXAxisLabel(''); setYAxisLabel('');
-      setLabelFontSize(10); setTitleFontSize(14); setBarOpacity(0.9);
+      setLabelFontSize(def?.labelFontSize ?? 10); setTitleFontSize(def?.titleFontSize ?? 14); setBarOpacity(def?.barOpacity ?? 0.9);
       setChartOnly(false);
-      setXLabelRotation('auto'); setYLabelRotation(0);
+      setXLabelRotation(def?.xLabelRotation ?? 'auto'); setYLabelRotation(def?.yLabelRotation ?? 0);
       setChartWidth(W_DEFAULT); setChartHeight(H_DEFAULT); setAspectPreset('auto');
-      setValueLabelSplit(false);
-      setFontFamily(''); setAxisColor('#374151'); setGridColor('rgba(255,255,255,0.05)');
-      setTickColor('#9ca3af'); setAxisLabelColor('#e4e4e7');
-      setDataLabelColor(''); setTitleColor(''); setSingleColor(''); setSeriesColors({});
-      setTitleAlign('center'); setTitleBold(true); setTitleItalic(false);
+      setValueLabelSplit(def?.valueLabelSplit ?? false);
+      setFontFamily(def?.fontFamily ?? ''); setAxisColor(def?.axisColor ?? '#374151'); setGridColor(def?.gridColor ?? 'rgba(255,255,255,0.05)');
+      setTickColor(def?.tickColor ?? '#9ca3af'); setAxisLabelColor(def?.axisLabelColor ?? '#e4e4e7');
+      setDataLabelColor(def?.dataLabelColor ?? ''); setTitleColor(def?.titleColor ?? ''); setSingleColor(def?.singleColor ?? ''); setSeriesColors(def?.seriesColors ?? {});
+      setTitleAlign(def?.titleAlign ?? 'center'); setTitleBold(def?.titleBold ?? true); setTitleItalic(def?.titleItalic ?? false);
       setRefLineValue(''); setRefLineLabel(''); setRefLineColor('#f97316');
       setCategorySort('none'); setTopN(0); setTopNOther(false);
-      setStacked100(false); setLabelPosition('outside');
-      setTrendline(false); setPatternFills(false);
-      setCondEnabled(false); setCondThreshold(0); setCondBelow('#ef4444'); setCondAbove('#10b981');
-      setLightMode(false);
+      setStacked100(def?.stacked100 ?? false); setLabelPosition(def?.labelPosition ?? 'outside');
+      setTrendline(false); setPatternFills(def?.patternFills ?? false);
+      setCondEnabled(def?.condEnabled ?? false); setCondThreshold(def?.condThreshold ?? 0); setCondBelow(def?.condBelow ?? '#ef4444'); setCondAbove(def?.condAbove ?? '#10b981');
+      setLightMode(def?.lightMode ?? false);
     }
   }, [table?.id]);
 
@@ -310,6 +340,18 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
         lightMode,
       });
     }
+    // Persist style as global default so new charts on any table inherit it.
+    saveDefaultStyle({
+      chartType, palette, showGrid, showLabels, showLegend,
+      labelFontSize, titleFontSize, barOpacity,
+      fontFamily, axisColor, gridColor, tickColor, axisLabelColor,
+      dataLabelColor, titleColor, singleColor, seriesColors,
+      titleAlign, titleBold, titleItalic,
+      xLabelRotation, yLabelRotation, valueLabelSplit,
+      stacked100, labelPosition, patternFills,
+      condEnabled, condThreshold, condBelow, condAbove,
+      lightMode,
+    });
     onClose();
   };
 
