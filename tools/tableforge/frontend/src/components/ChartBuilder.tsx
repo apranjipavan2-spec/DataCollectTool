@@ -39,26 +39,54 @@ const FONT_FAMILIES: { label: string; value: string }[] = [
 ];
 
 // Style preset persistence — list of named style snapshots stored in localStorage.
-// Each preset captures palette, font, all colors, sizes, opacity — the visual
-// settings only. Data + axes + size are NOT part of a preset so the same preset
-// can be re-applied across different tables/charts.
+// Each preset captures the full set of visual settings: palette, font, all
+// colors, sizes, opacity, title style, value labels, label position,
+// conditional bars, pattern fills, stacked100, trendline, light mode, axis
+// rotations, and per-series colors. Data shape (xField/yFields, chart type,
+// width/height, sort/topN) is NOT included so the same preset works across
+// different tables/charts.
 const PRESET_KEY = 'tableforge_chart_presets';
 interface ChartStylePreset {
-  paletteName: string;
-  fontFamily: string;
-  axisColor: string;
-  gridColor: string;
-  tickColor: string;
-  axisLabelColor: string;
-  dataLabelColor: string;
-  titleColor: string;
-  singleColor: string;
-  labelFontSize: number;
-  titleFontSize: number;
-  barOpacity: number;
-  showGrid: boolean;
-  showLabels: boolean;
-  showLegend: LegendPos;
+  paletteName?: string;
+  fontFamily?: string;
+  // Colors
+  axisColor?: string;
+  gridColor?: string;
+  tickColor?: string;
+  axisLabelColor?: string;
+  dataLabelColor?: string;
+  titleColor?: string;
+  singleColor?: string;
+  seriesColors?: Record<number, string>;
+  // Sizes / opacity
+  labelFontSize?: number;
+  titleFontSize?: number;
+  barOpacity?: number;
+  // Visibility
+  showGrid?: boolean;
+  showLabels?: boolean;
+  showLegend?: LegendPos;
+  // Title style
+  titleAlign?: 'left' | 'center' | 'right';
+  titleBold?: boolean;
+  titleItalic?: boolean;
+  // Value labels
+  valueLabelSplit?: boolean;
+  labelPosition?: 'inside' | 'outside';
+  // Fills / display modes
+  patternFills?: boolean;
+  stacked100?: boolean;
+  trendline?: boolean;
+  // Conditional bar colour
+  condEnabled?: boolean;
+  condThreshold?: number;
+  condBelow?: string;
+  condAbove?: string;
+  // Axis label rotation
+  xLabelRotation?: number | 'auto';
+  yLabelRotation?: number;
+  // Light/dark mode
+  lightMode?: boolean;
 }
 function loadPresets(): Record<string, ChartStylePreset> {
   try {
@@ -136,6 +164,7 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
   const [seriesColors, setSeriesColors] = useState<Record<number, string>>({});
   const [presets, setPresets] = useState<Record<string, ChartStylePreset>>(() => loadPresets());
   const [presetName, setPresetName] = useState<string>('');
+  const [presetApplyToAll, setPresetApplyToAll] = useState<boolean>(false);
   // ─── Advanced chart options (title align/bold/italic, ref line, sort/topN,
   // stacked100, label position, trendline, hatch fills, conditional bars, light mode) ─
   const [titleAlign, setTitleAlign] = useState<'left' | 'center' | 'right'>('center');
@@ -571,42 +600,139 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
     </>
   );
 
+  // ─── Preset snapshot helpers ───────────────────────────────────────────
+  // buildStyleSnapshot captures every style-relevant field. applyStyleSnapshot
+  // pushes it into local state. snapshotToChartConfig converts to the keys
+  // chartConfig uses (palette name, conditionalColor object). applyStyleToAllCharts
+  // overlays the snapshot onto every existing chartConfig so a single save can
+  // restyle the whole workbook.
+  const buildStyleSnapshot = (): ChartStylePreset => ({
+    paletteName: PALETTES[palette]?.name || 'Blueprint',
+    fontFamily,
+    axisColor, gridColor, tickColor, axisLabelColor,
+    dataLabelColor, titleColor, singleColor,
+    seriesColors: { ...seriesColors },
+    labelFontSize, titleFontSize, barOpacity,
+    showGrid, showLabels, showLegend,
+    titleAlign, titleBold, titleItalic,
+    valueLabelSplit, labelPosition,
+    patternFills, stacked100, trendline,
+    condEnabled, condThreshold, condBelow, condAbove,
+    xLabelRotation, yLabelRotation,
+    lightMode,
+  });
+  const applyStyleSnapshot = (p: ChartStylePreset) => {
+    if (p.paletteName) {
+      const idx = PALETTES.findIndex(pp => pp.name === p.paletteName);
+      if (idx >= 0) setPalette(idx);
+    }
+    if (p.fontFamily !== undefined) setFontFamily(p.fontFamily);
+    if (p.axisColor !== undefined) setAxisColor(p.axisColor);
+    if (p.gridColor !== undefined) setGridColor(p.gridColor);
+    if (p.tickColor !== undefined) setTickColor(p.tickColor);
+    if (p.axisLabelColor !== undefined) setAxisLabelColor(p.axisLabelColor);
+    if (p.dataLabelColor !== undefined) setDataLabelColor(p.dataLabelColor);
+    if (p.titleColor !== undefined) setTitleColor(p.titleColor);
+    if (p.singleColor !== undefined) setSingleColor(p.singleColor);
+    if (p.seriesColors) setSeriesColors({ ...p.seriesColors });
+    if (typeof p.labelFontSize === 'number') setLabelFontSize(p.labelFontSize);
+    if (typeof p.titleFontSize === 'number') setTitleFontSize(p.titleFontSize);
+    if (typeof p.barOpacity === 'number') setBarOpacity(p.barOpacity);
+    if (typeof p.showGrid === 'boolean') setShowGrid(p.showGrid);
+    if (typeof p.showLabels === 'boolean') setShowLabels(p.showLabels);
+    if (p.showLegend) setShowLegend(p.showLegend);
+    if (p.titleAlign) setTitleAlign(p.titleAlign);
+    if (typeof p.titleBold === 'boolean') setTitleBold(p.titleBold);
+    if (typeof p.titleItalic === 'boolean') setTitleItalic(p.titleItalic);
+    if (typeof p.valueLabelSplit === 'boolean') setValueLabelSplit(p.valueLabelSplit);
+    if (p.labelPosition) setLabelPosition(p.labelPosition);
+    if (typeof p.patternFills === 'boolean') setPatternFills(p.patternFills);
+    if (typeof p.stacked100 === 'boolean') setStacked100(p.stacked100);
+    if (typeof p.trendline === 'boolean') setTrendline(p.trendline);
+    if (typeof p.condEnabled === 'boolean') setCondEnabled(p.condEnabled);
+    if (typeof p.condThreshold === 'number') setCondThreshold(p.condThreshold);
+    if (p.condBelow !== undefined) setCondBelow(p.condBelow);
+    if (p.condAbove !== undefined) setCondAbove(p.condAbove);
+    if (p.xLabelRotation !== undefined) setXLabelRotation(p.xLabelRotation);
+    if (typeof p.yLabelRotation === 'number') setYLabelRotation(p.yLabelRotation);
+    if (typeof p.lightMode === 'boolean') setLightMode(p.lightMode);
+  };
+  const snapshotToChartConfig = (p: ChartStylePreset): Record<string, any> => {
+    const out: Record<string, any> = {};
+    if (p.paletteName) out.palette = p.paletteName;
+    if (p.fontFamily !== undefined) out.fontFamily = p.fontFamily;
+    if (p.axisColor !== undefined) out.axisColor = p.axisColor;
+    if (p.gridColor !== undefined) out.gridColor = p.gridColor;
+    if (p.tickColor !== undefined) out.tickColor = p.tickColor;
+    if (p.axisLabelColor !== undefined) out.axisLabelColor = p.axisLabelColor;
+    if (p.dataLabelColor !== undefined) out.dataLabelColor = p.dataLabelColor;
+    if (p.titleColor !== undefined) out.titleColor = p.titleColor;
+    if (p.singleColor !== undefined) out.singleColor = p.singleColor;
+    if (p.seriesColors) out.seriesColors = { ...p.seriesColors };
+    if (typeof p.labelFontSize === 'number') out.labelFontSize = p.labelFontSize;
+    if (typeof p.titleFontSize === 'number') out.titleFontSize = p.titleFontSize;
+    if (typeof p.barOpacity === 'number') out.barOpacity = p.barOpacity;
+    if (typeof p.showGrid === 'boolean') out.showGrid = p.showGrid;
+    if (typeof p.showLabels === 'boolean') out.showLabels = p.showLabels;
+    if (p.showLegend) out.showLegend = p.showLegend;
+    if (p.titleAlign) out.titleAlign = p.titleAlign;
+    if (typeof p.titleBold === 'boolean') out.titleBold = p.titleBold;
+    if (typeof p.titleItalic === 'boolean') out.titleItalic = p.titleItalic;
+    if (typeof p.valueLabelSplit === 'boolean') out.valueLabelSplit = p.valueLabelSplit;
+    if (p.labelPosition) out.labelPosition = p.labelPosition;
+    if (typeof p.patternFills === 'boolean') out.patternFills = p.patternFills;
+    if (typeof p.stacked100 === 'boolean') out.stacked100 = p.stacked100;
+    if (typeof p.trendline === 'boolean') out.trendline = p.trendline;
+    if (p.xLabelRotation !== undefined) out.xLabelRotation = p.xLabelRotation;
+    if (typeof p.yLabelRotation === 'number') out.yLabelRotation = p.yLabelRotation;
+    if (typeof p.lightMode === 'boolean') out.lightMode = p.lightMode;
+    if (p.condEnabled) {
+      out.conditionalColor = {
+        threshold: p.condThreshold ?? 0,
+        below: p.condBelow ?? '#ef4444',
+        above: p.condAbove ?? '#10b981',
+      };
+    } else if (p.condEnabled === false) {
+      out.conditionalColor = undefined;
+    }
+    return out;
+  };
+  const applyStyleToAllCharts = (p: ChartStylePreset): number => {
+    if (!onChartChange) return 0;
+    const overlay = snapshotToChartConfig(p);
+    let count = 0;
+    tables.forEach(t => {
+      if (!t.chartConfig) return;
+      onChartChange(t.id, { ...t.chartConfig, ...overlay });
+      count++;
+    });
+    return count;
+  };
+
   // ─── Preset application + persistence ──────────────────────────────────
   const applyPreset = (name: string) => {
     const p = presets[name];
     if (!p) return;
-    const idx = PALETTES.findIndex(pp => pp.name === p.paletteName);
-    if (idx >= 0) setPalette(idx);
-    setFontFamily(p.fontFamily || '');
-    setAxisColor(p.axisColor || '#374151');
-    setGridColor(p.gridColor || 'rgba(255,255,255,0.05)');
-    setTickColor(p.tickColor || '#9ca3af');
-    setAxisLabelColor(p.axisLabelColor || '#e4e4e7');
-    setDataLabelColor(p.dataLabelColor || '');
-    setTitleColor(p.titleColor || '');
-    setSingleColor(p.singleColor || '');
-    setLabelFontSize(p.labelFontSize || 10);
-    setTitleFontSize(p.titleFontSize || 14);
-    setBarOpacity(typeof p.barOpacity === 'number' ? p.barOpacity : 0.9);
-    setShowGrid(!!p.showGrid);
-    setShowLabels(!!p.showLabels);
-    setShowLegend((p.showLegend as LegendPos) || 'right');
+    applyStyleSnapshot(p);
+  };
+  const applyPresetToAll = (name: string) => {
+    const p = presets[name];
+    if (!p) return;
+    applyStyleSnapshot(p);
+    const n = applyStyleToAllCharts(p);
+    window.alert(`Applied "${name}" to ${n} chart${n === 1 ? '' : 's'}.`);
   };
   const saveCurrentAsPreset = () => {
     const n = presetName.trim();
     if (!n) return;
-    const next: Record<string, ChartStylePreset> = {
-      ...presets,
-      [n]: {
-        paletteName: PALETTES[palette]?.name || 'Blueprint',
-        fontFamily, axisColor, gridColor, tickColor, axisLabelColor,
-        dataLabelColor, titleColor, singleColor,
-        labelFontSize, titleFontSize, barOpacity,
-        showGrid, showLabels, showLegend,
-      },
-    };
+    const snap = buildStyleSnapshot();
+    const next: Record<string, ChartStylePreset> = { ...presets, [n]: snap };
     setPresets(next);
     savePresets(next);
+    if (presetApplyToAll) {
+      const c = applyStyleToAllCharts(snap);
+      window.alert(`Saved "${n}" and applied to ${c} chart${c === 1 ? '' : 's'}.`);
+    }
   };
   const deletePreset = (name: string) => {
     if (!presets[name]) return;
@@ -725,11 +851,20 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
           <button className="btn-small btn-primary" style={{ fontSize: 11 }}
             disabled={!presetName.trim()} onClick={saveCurrentAsPreset}>Save</button>
         </div>
+        <label className="checkbox-label" style={{ fontSize: 10, marginTop: 4 }}
+          title="When saving, also push this style onto every other table that already has a chart">
+          <input type="checkbox" checked={presetApplyToAll}
+            onChange={e => setPresetApplyToAll(e.target.checked)} />
+          Also apply to all existing charts on save
+        </label>
         {Object.keys(presets).length > 0 && (
-          <div style={{ marginTop: 6, maxHeight: 100, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 4, padding: 4 }}>
+          <div style={{ marginTop: 6, maxHeight: 120, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 4, padding: 4 }}>
             {Object.keys(presets).sort().map(n => (
-              <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: 11 }}>
-                <button className="btn-small" style={{ fontSize: 10, padding: '1px 8px' }} onClick={() => applyPreset(n)}>Apply</button>
+              <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', fontSize: 11 }}>
+                <button className="btn-small" style={{ fontSize: 10, padding: '1px 8px' }} onClick={() => applyPreset(n)}
+                  title="Apply to this chart only">Apply</button>
+                <button className="btn-small" style={{ fontSize: 10, padding: '1px 6px' }} onClick={() => applyPresetToAll(n)}
+                  title="Apply to every chart in the workbook">All</button>
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={n}>{n}</span>
                 <button className="btn-small" style={{ fontSize: 10, padding: '1px 6px', color: '#ef4444' }}
                   onClick={() => deletePreset(n)} title="Delete preset">×</button>
@@ -738,7 +873,7 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
           </div>
         )}
         <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
-          Presets save palette + colour overrides + fonts + sizes. Stored in this browser only.
+          Presets capture palette, fonts, all colours, sizes, title style, value labels, axis rotations, conditional bars, pattern fills, trendline, and light mode. Stored in this browser only.
         </div>
       </div>
     </>
@@ -847,27 +982,13 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
       <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 8 }}>
         <button className="btn-small" style={{ fontSize: 11, width: '100%' }}
           onClick={() => {
-            if (!onChartChange) return;
-            const styleSubset = {
-              palette: PALETTES[palette]?.name,
-              fontFamily, axisColor, gridColor, tickColor, axisLabelColor,
-              dataLabelColor, titleColor, singleColor,
-              labelFontSize, titleFontSize, barOpacity,
-              showGrid, showLabels, showLegend,
-              titleAlign, titleBold, titleItalic,
-              patternFills, lightMode, labelPosition,
-            };
-            tables.forEach(t => {
-              if (t.id === table?.id) return;
-              if (!t.chartConfig) return;
-              onChartChange(t.id, { ...t.chartConfig, ...styleSubset });
-            });
-            window.alert('Style applied to all charts with a chart configured.');
+            const n = applyStyleToAllCharts(buildStyleSnapshot());
+            window.alert(`Style applied to ${n} chart${n === 1 ? '' : 's'}.`);
           }}>
           Apply this style to all charts
         </button>
         <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
-          Copies fonts, palette, colours, legend/grid, label sizes — leaves Data/Axes alone.
+          Copies palette, fonts, colours, sizes, title style, value labels, axis rotations, conditional bars, patterns, trendline, and light mode. Leaves Data (X/Y) alone.
         </div>
       </div>
     </>
