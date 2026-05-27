@@ -176,6 +176,18 @@ def _detect_columns(df: pd.DataFrame) -> list:
         else:
             non_null = df[col].dropna()
             if len(non_null) > 0:
+                # Boolean-string detection runs FIRST: a column of "Yes"/"No" or "0"/"1"
+                # would otherwise be coerced to numeric (1.0/0.0) or stay as opaque text.
+                _bool_vocab = {'true', 'false', 'yes', 'no', 'y', 'n', '0', '1', 't', 'f'}
+                _normalized = non_null.astype(str).str.strip().str.lower()
+                _unique = set(_normalized.unique())
+                if 1 <= len(_unique) <= 2 and _unique.issubset(_bool_vocab):
+                    col_type = "boolean"
+                    columns.append({"name": col, "type": col_type,
+                                    "sample_values": [str(v) for v in non_null.head(10).tolist()],
+                                    "stats": {"nulls": int(df[col].isna().sum()),
+                                              "unique": int(df[col].nunique())}})
+                    continue
                 is_multi = _is_multi_choice(df[col])
                 if is_multi:
                     col_type = "multi_choice"

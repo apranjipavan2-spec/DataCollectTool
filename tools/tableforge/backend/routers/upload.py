@@ -168,7 +168,11 @@ async def modify_dataset(ops: ColumnOps):
         ext = datasets[ops.dataset_id]["filename"].rsplit(".", 1)[-1].lower()
         tmp_path = CACHE_DIR / f"{ops.dataset_id}.{ext}"
         if ext in ("xlsx", "xls"):
-            df = pd.read_excel(tmp_path, header=ops.header_row)
+            _eng = "openpyxl" if ext == "xlsx" else "xlrd"
+            _ekw = {"data_only": True} if ext == "xlsx" else {}
+            df = pd.read_excel(tmp_path, header=ops.header_row,
+                               engine=_eng, engine_kwargs=_ekw)
+            _strip_formula_cells(df)
         elif ext in ("csv", "tsv"):
             sep = "\t" if ext == "tsv" else ","
             df = pd.read_csv(tmp_path, sep=sep, header=ops.header_row)
@@ -202,7 +206,7 @@ async def modify_dataset(ops: ColumnOps):
 class ColumnTypeReq(BaseModel):
     dataset_id: str
     column: str
-    new_type: str  # "text", "numeric", "multi_choice", "date"
+    new_type: str  # "text", "numeric", "multi_choice", "date", "boolean"
     dry_run: bool | None = False
 
 @router.post("/api/dataset/column_type")
@@ -288,7 +292,10 @@ async def set_column_type(req: ColumnTypeReq):
             if cache_path.exists():
                 try:
                     if ext in ("xlsx", "xls"):
-                        raw_df = pd.read_excel(cache_path, dtype={req.column: str})
+                        _eng = "openpyxl" if ext == "xlsx" else "xlrd"
+                        _ekw = {"data_only": True} if ext == "xlsx" else {}
+                        raw_df = pd.read_excel(cache_path, dtype={req.column: str},
+                                               engine=_eng, engine_kwargs=_ekw)
                     else:
                         sep = "\t" if ext == "tsv" else ","
                         raw_df = pd.read_csv(cache_path, sep=sep, dtype={req.column: str})
@@ -309,6 +316,19 @@ async def set_column_type(req: ColumnTypeReq):
             datasets[req.dataset_id]["df"][req.column] = pd.to_datetime(df[req.column], errors="coerce")
         except Exception:
             pass
+    elif req.new_type == "boolean":
+        truthy = {'true', 'yes', 'y', 't', '1'}
+        falsy = {'false', 'no', 'n', 'f', '0'}
+        def _to_bool(v):
+            if pd.isna(v):
+                return None
+            s = str(v).strip().lower()
+            if s in truthy:
+                return True
+            if s in falsy:
+                return False
+            return None
+        datasets[req.dataset_id]["df"][req.column] = df[req.column].apply(_to_bool).astype("boolean")
 
     add_audit_log(req.dataset_id, "column_type_change", f"Changed '{req.column}' to {req.new_type}")
     return {"status": "ok", "column": req.column, "new_type": req.new_type}
@@ -423,11 +443,15 @@ async def union_sheets(config: UnionConfig):
         raise HTTPException(404, "Dataset not found")
     ext = datasets[config.dataset_id]["filename"].rsplit(".", 1)[-1].lower()
     tmp_path = CACHE_DIR / f"{config.dataset_id}.{ext}"
+    _eng = "openpyxl" if ext == "xlsx" else "xlrd"
+    _ekw = {"data_only": True} if ext == "xlsx" else {}
     frames = []
     used_sheets = []
     for sheet in config.sheet_names:
         try:
-            frames.append(pd.read_excel(tmp_path, sheet_name=sheet))
+            _f = pd.read_excel(tmp_path, sheet_name=sheet, engine=_eng, engine_kwargs=_ekw)
+            _strip_formula_cells(_f)
+            frames.append(_f)
             used_sheets.append(sheet)
         except Exception:
             pass
@@ -472,11 +496,14 @@ async def sheets_info(req: SheetsInfoRequest):
         raise HTTPException(404, "Dataset not found")
     ext = datasets[req.dataset_id]["filename"].rsplit(".", 1)[-1].lower()
     tmp_path = CACHE_DIR / f"{req.dataset_id}.{ext}"
+    _eng = "openpyxl" if ext == "xlsx" else "xlrd"
+    _ekw = {"data_only": True} if ext == "xlsx" else {}
     per_sheet = {}
     col_sets = []
     for sheet in req.sheet_names:
         try:
-            df_head = pd.read_excel(tmp_path, sheet_name=sheet, nrows=5)
+            df_head = pd.read_excel(tmp_path, sheet_name=sheet, nrows=5,
+                                    engine=_eng, engine_kwargs=_ekw)
             cols = list(df_head.columns)
             per_sheet[sheet] = cols
             col_sets.append(set(cols))
@@ -516,7 +543,10 @@ async def refresh_dataset(dataset_id: str):
         raise HTTPException(404, "Source file no longer cached")
     try:
         if ext in ("xlsx", "xls"):
-            df = pd.read_excel(tmp_path)
+            _eng = "openpyxl" if ext == "xlsx" else "xlrd"
+            _ekw = {"data_only": True} if ext == "xlsx" else {}
+            df = pd.read_excel(tmp_path, engine=_eng, engine_kwargs=_ekw)
+            _strip_formula_cells(df)
         else:
             df = pd.read_csv(tmp_path)
         datasets[dataset_id]["df"] = df
