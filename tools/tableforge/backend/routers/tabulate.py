@@ -218,7 +218,8 @@ async def tabulate(config: TableConfig):
         # Check user-set type overrides first, then auto-detect
         multi_choice_cols = []
         all_used_cols = list(set(config.rows + config.columns + list(config.filters.keys())))
-        _type_overrides = column_type_overrides.get(config.dataset_id, {})
+        from ..shared import get_overrides as _get_overrides
+        _type_overrides = _get_overrides(config.dataset_id)
         for col_name in all_used_cols:
             override = _type_overrides.get(col_name)
             if override == "multi_choice":

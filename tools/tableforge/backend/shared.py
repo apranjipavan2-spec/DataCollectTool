@@ -17,7 +17,7 @@ custom_bins: dict = {}     # dataset_id -> [bin_defs]
 audit_logs: dict = {}      # dataset_id -> [log_entries]
 annotations: dict = {}     # dataset_id -> {table_id -> [{row, col, text, color}]}
 upload_progress: dict = {}  # dataset_id -> {percent, rows_read, total_estimated, status}
-column_type_overrides: dict = {}  # dataset_id -> {col_name: "text"|"numeric"|"multi_choice"|"date"}
+column_type_overrides: dict = {}  # dataset_id -> {sheet_name: {col_name: "text"|"numeric"|"multi_choice"|"date"|"boolean"}}
 # Survey-analysis metadata layer (Phase 0)
 column_roles: dict = {}    # dataset_id -> {col_name: ColumnRole dict}
 study_designs: dict = {}   # dataset_id -> StudyDesign dict
@@ -107,6 +107,40 @@ def sanitize_for_json(obj):
     # Unknown type (openpyxl CellErrorValue, custom object, etc.) — stringify
     # rather than letting the raw object reach the React frontend.
     return str(obj)
+
+
+def get_active_sheet(dataset_id: str) -> str:
+    """Return the currently loaded sheet name for a dataset.
+
+    Falls back to the first sheet, or '__default__' for CSV/TSV datasets
+    that have no real sheets. Always safe to call.
+    """
+    ds = datasets.get(dataset_id)
+    if not ds:
+        return "__default__"
+    name = ds.get("active_sheet")
+    if name:
+        return str(name)
+    sheets = ds.get("sheets") or []
+    return str(sheets[0]) if sheets else "__default__"
+
+
+def get_overrides(dataset_id: str, sheet: Optional[str] = None) -> dict:
+    """Get the override dict for a given (or current) sheet. Always returns a dict."""
+    if dataset_id not in column_type_overrides:
+        column_type_overrides[dataset_id] = {}
+    sheet_name = sheet or get_active_sheet(dataset_id)
+    bucket = column_type_overrides[dataset_id]
+    # Self-heal: legacy flat layout {col: type} -> migrate to {sheet: {col: type}}.
+    if bucket and not any(isinstance(v, dict) for v in bucket.values()):
+        column_type_overrides[dataset_id] = {sheet_name: dict(bucket)}
+        bucket = column_type_overrides[dataset_id]
+    return bucket.setdefault(sheet_name, {})
+
+
+def set_override(dataset_id: str, column: str, new_type: str, sheet: Optional[str] = None) -> None:
+    overrides = get_overrides(dataset_id, sheet)
+    overrides[column] = new_type
 
 
 def add_audit_log(dataset_id: str, action: str, details: str = ""):

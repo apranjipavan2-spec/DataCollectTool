@@ -24,6 +24,9 @@ from ..shared import (
     _is_multi_choice,
     _detect_columns,
     _strip_formula_cells,
+    get_active_sheet,
+    get_overrides,
+    set_override,
 )
 
 router = APIRouter()
@@ -96,10 +99,12 @@ async def upload_file(file: UploadFile = File(...)):
     # Detect column types (modifies df in-place for numeric coercion)
     columns = _detect_columns(df)
 
+    _sheet_list = sheets if ext in ("xlsx", "xls") else [filename]
     datasets[dataset_id] = {
         "df": df,
         "filename": filename,
-        "sheets": sheets if ext in ("xlsx", "xls") else [filename],
+        "sheets": _sheet_list,
+        "active_sheet": _sheet_list[0] if _sheet_list else "__default__",
     }
     custom_metrics[dataset_id] = []
     custom_bins[dataset_id] = []
@@ -139,6 +144,7 @@ async def load_sheet(req: SheetSelect):
                        engine=_eng2, engine_kwargs=_ekw2)
     _strip_formula_cells(df)
     datasets[req.dataset_id]["df"] = df
+    datasets[req.dataset_id]["active_sheet"] = req.sheet_name
     add_audit_log(req.dataset_id, "sheet_change", f"Switched to sheet: {req.sheet_name}")
 
     columns = _detect_columns(df)
@@ -274,9 +280,7 @@ async def set_column_type(req: ColumnTypeReq):
                     "total": total, "non_null": non_null, "fail_count": 0,
                     "samples": [], "failing_cells": []}
 
-    if req.dataset_id not in column_type_overrides:
-        column_type_overrides[req.dataset_id] = {}
-    column_type_overrides[req.dataset_id][req.column] = req.new_type
+    set_override(req.dataset_id, req.column, req.new_type)
 
     current_dtype = str(df[req.column].dtype)
 
@@ -385,7 +389,7 @@ async def column_type_hints(dataset_id: str):
     if dataset_id not in datasets:
         raise HTTPException(404, "Dataset not found")
     df = datasets[dataset_id]["df"]
-    overrides = column_type_overrides.get(dataset_id, {})
+    overrides = get_overrides(dataset_id)
     hints = []
     for col in df.columns:
         if overrides.get(col):  # user already chose a type; respect it

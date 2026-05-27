@@ -226,7 +226,7 @@ export default function App() {
   const [pendingMetadataRestore, setPendingMetadataRestore] = useState<{ column_roles?: Record<string, any>; study_design?: any } | null>(null);
   const [typeHints, setTypeHints] = useState<Array<{ column: string; suggested_type: 'numeric' | 'date'; success_rate: number; fail_count: number; samples: string[] }>>([]);
   const [dismissedHints, setDismissedHints] = useState<Set<string>>(new Set());
-  const [typeConvertModal, setTypeConvertModal] = useState<{ column: string; newType: 'numeric' | 'date' | 'text' | 'multi_choice' } | null>(null);
+  const [typeConvertModal, setTypeConvertModal] = useState<{ column: string; newType: 'numeric' | 'date' | 'text' | 'multi_choice' | 'boolean' } | null>(null);
   const [comparisonState, setComparisonState] = useState<any>(null);
   const [orphanedAnnotations, setOrphanedAnnotations] = useState<ReconcileAnnotation[] | null>(null);
   // tabContextMenu removed — tables now listed in SourcePanel sidebar

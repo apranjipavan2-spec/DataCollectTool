@@ -99,7 +99,8 @@ async def export_codebook(config: CodebookConfig):
         if not isinstance(df, pd.DataFrame):
             df = ds["df"]
         roles = column_roles.get(config.dataset_id, {}) or {}
-        overrides = column_type_overrides.get(config.dataset_id, {}) or {}
+        from ..shared import get_overrides as _get_overrides
+        overrides = _get_overrides(config.dataset_id) or {}
         design = study_designs.get(config.dataset_id, {}) or {}
 
         doc = Document()

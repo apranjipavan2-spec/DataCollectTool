@@ -4,7 +4,7 @@ import { dryRunColumnType } from '../api';
 interface Props {
   datasetId: string;
   column: string;
-  newType: 'numeric' | 'date' | 'text' | 'multi_choice';
+  newType: 'numeric' | 'date' | 'text' | 'multi_choice' | 'boolean';
   onCancel: () => void;
   onApply: () => void;
   onOpenInCleaner?: () => void;
@@ -68,7 +68,10 @@ export function TypeConvertModal({ datasetId, column, newType, onCancel, onApply
   }, [onCancel]);
 
   const nameLines = splitColumnName(column);
-  const targetLabel = newType === 'numeric' ? '🔢 Numeric' : newType === 'date' ? '📅 Date' : newType;
+  const targetLabel = newType === 'numeric' ? '🔢 Numeric'
+                    : newType === 'date' ? '📅 Date'
+                    : newType === 'boolean' ? '☑ Boolean'
+                    : newType;
   const total = data?.total ?? 0;
   const nonNull = data?.non_null ?? 0;
   const fail = data?.fail_count ?? 0;

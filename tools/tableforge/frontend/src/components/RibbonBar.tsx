@@ -1343,6 +1343,7 @@ function FormatRibbon({ table, onUpdate, columns = [], onColumnTypeChange }: {
                         <option value="numeric">Numeric</option>
                         <option value="multi_choice">Multi-Choice</option>
                         <option value="date">Date</option>
+                        <option value="boolean">Boolean</option>
                       </select>
                     </div>
                   );

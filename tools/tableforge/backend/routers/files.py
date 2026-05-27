@@ -152,7 +152,9 @@ async def load_server_file(file_id: str):
     # Detect column types (modifies df in-place for numeric coercion)
     columns = _detect_columns(df)
 
-    datasets[dataset_id] = {"df": df, "filename": filename, "sheets": sheets, "server_file_id": file_id}
+    datasets[dataset_id] = {"df": df, "filename": filename, "sheets": sheets,
+                            "active_sheet": sheets[0] if sheets else "__default__",
+                            "server_file_id": file_id}
     custom_metrics[dataset_id] = []
     custom_bins[dataset_id] = []
     audit_logs[dataset_id] = []
