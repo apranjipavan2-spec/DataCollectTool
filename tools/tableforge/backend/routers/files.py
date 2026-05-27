@@ -123,11 +123,12 @@ async def load_server_file(file_id: str):
 
     try:
         if ext in ("xlsx", "xls"):
+            _eng = "openpyxl" if ext == "xlsx" else "xlrd"
             _ekw = {"data_only": True} if ext == "xlsx" else {}
-            xls = pd.ExcelFile(cache_path, engine="openpyxl" if ext == "xlsx" else "xlrd",
-                               engine_kwargs=_ekw)
+            xls = pd.ExcelFile(cache_path, engine=_eng)
             sheets = xls.sheet_names
-            df = pd.read_excel(xls, sheet_name=sheets[0])
+            df = pd.read_excel(cache_path, sheet_name=sheets[0],
+                               engine=_eng, engine_kwargs=_ekw)
             _strip_formula_cells(df)
         elif ext in ("csv", "tsv"):
             sep = "\t" if ext == "tsv" else ","

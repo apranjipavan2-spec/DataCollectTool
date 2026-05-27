@@ -120,7 +120,13 @@ def add_audit_log(dataset_id: str, action: str, details: str = ""):
 
 
 def _is_multi_choice(series: pd.Series) -> bool:
-    """Detect if a column contains multi-choice comma-separated values."""
+    """Detect if a column contains multi-choice comma-separated values.
+
+    A value qualifies as multi-choice only when:
+    - It has ≥2 comma-separated parts, each ≤20 chars (excludes "Smith, John")
+    - At least 10% of the sample rows match (avoids false positives from a
+      single address or sentence that happens to contain a comma).
+    """
     non_null = series.dropna().astype(str)
     non_null = non_null[~non_null.isin(['nan', 'NaN', 'None', ''])]
     if len(non_null) == 0:
@@ -134,9 +140,11 @@ def _is_multi_choice(series: pd.Series) -> bool:
         val = val.strip()
         if ',' in val:
             parts = [p.strip() for p in val.split(',')]
-            if all(len(p) <= 20 and len(p) > 0 for p in parts):
+            # Require ≥2 parts, each short enough to be a code/label not a sentence.
+            if len(parts) >= 2 and all(0 < len(p) <= 20 for p in parts):
                 multi_count += 1
-    return multi_count >= 2 or (multi_count >= 1 and multi_count > len(sample) * 0.02)
+    # Require at least 10% of sample to be multi-choice style.
+    return multi_count >= 2 and multi_count >= len(sample) * 0.10
 
 
 def _strip_formula_cells(df: pd.DataFrame) -> None:
@@ -176,14 +184,23 @@ def _detect_columns(df: pd.DataFrame) -> list:
                     num_coerced = pd.to_numeric(non_null, errors="coerce")
                     numeric_ratio = num_coerced.notna().sum() / len(num_coerced)
                     if numeric_ratio >= 0.5:
-                        col_type = "numeric"
-                        df[col] = pd.to_numeric(df[col], errors="coerce")
+                        # Guard: don't coerce columns whose values have leading zeros
+                        # (ID codes like "001", "002" must stay as text).
+                        has_leading_zeros = non_null.astype(str).str.match(r'^0\d').any()
+                        if has_leading_zeros:
+                            col_type = "text"
+                        else:
+                            col_type = "numeric"
+                            df[col] = pd.to_numeric(df[col], errors="coerce")
                     else:
-                        # Date check — only when values contain date-like separators.
+                        # Date check — require values that look like real date patterns,
+                        # not phone numbers (555-1234) or IPs (192.168.1.1).
+                        # Pattern: digit(s) separator digit(s) separator digit(s).
                         _samp = non_null.head(20).astype(str)
-                        if _samp.str.contains(r'[-/:]', regex=True).any():
+                        _date_re = r'^\d{1,4}[-/]\d{1,2}[-/]\d{1,4}'
+                        if _samp.str.match(_date_re).any():
                             try:
-                                pd.to_datetime(_samp)
+                                pd.to_datetime(_samp[_samp.str.match(_date_re)])
                                 col_type = "date"
                                 df[col] = pd.to_datetime(df[col], errors="coerce")
                             except (ValueError, TypeError):
@@ -195,14 +212,16 @@ def _detect_columns(df: pd.DataFrame) -> list:
         sample_values = df[col].dropna().head(10).tolist()
         stats = {}
         if col_type == "numeric":
+            # Recompute after coercion so nulls count reflects coerced NaNs.
             try:
-                num_series = pd.to_numeric(df[col], errors="coerce") if df[col].dtype == object else df[col]
+                num_series = df[col] if "float" in str(df[col].dtype) or "int" in str(df[col].dtype) \
+                    else pd.to_numeric(df[col], errors="coerce")
                 stats = {"min": float(num_series.min()) if not pd.isna(num_series.min()) else None,
                          "max": float(num_series.max()) if not pd.isna(num_series.max()) else None,
                          "mean": float(num_series.mean()) if not pd.isna(num_series.mean()) else None}
             except Exception:
                 stats = {"min": None, "max": None, "mean": None}
-        stats["nulls"] = int(df[col].isna().sum())
+        stats["nulls"] = int(df[col].isna().sum())  # post-coercion count
         stats["unique"] = int(df[col].nunique())
         if is_multi:
             all_vals = []

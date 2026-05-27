@@ -49,12 +49,15 @@ async def upload_file(file: UploadFile = File(...)):
 
     try:
         if ext in ("xlsx", "xls"):
+            _eng = "openpyxl" if ext == "xlsx" else "xlrd"
+            # engine_kwargs only on pd.read_excel(), not pd.ExcelFile().
+            # xlrd (for .xls) doesn't support data_only — xlsx only.
             _ekw = {"data_only": True} if ext == "xlsx" else {}
-            xls = pd.ExcelFile(tmp_path, engine="openpyxl" if ext == "xlsx" else "xlrd",
-                               engine_kwargs=_ekw)
+            xls = pd.ExcelFile(tmp_path, engine=_eng)
             sheets = xls.sheet_names
-            df = pd.read_excel(xls, sheet_name=sheets[0])
-            # Strip any formula strings that still slipped through (no cached value).
+            df = pd.read_excel(tmp_path, sheet_name=sheets[0],
+                               engine=_eng, engine_kwargs=_ekw)
+            # Strip formula strings that slipped through (no cached value in workbook).
             _strip_formula_cells(df)
         elif ext in ("csv", "tsv"):
             sep = "\t" if ext == "tsv" else ","
@@ -130,11 +133,10 @@ async def load_sheet(req: SheetSelect):
         raise HTTPException(404, "Dataset not found")
     ext = datasets[req.dataset_id]["filename"].rsplit(".", 1)[-1].lower()
     tmp_path = CACHE_DIR / f"{req.dataset_id}.{ext}"
-    ext2 = datasets[req.dataset_id]["filename"].rsplit(".", 1)[-1].lower()
-    _ekw2 = {"data_only": True} if ext2 == "xlsx" else {}
+    _eng2 = "openpyxl" if ext == "xlsx" else "xlrd"
+    _ekw2 = {"data_only": True} if ext == "xlsx" else {}
     df = pd.read_excel(tmp_path, sheet_name=req.sheet_name,
-                       engine="openpyxl" if ext2 == "xlsx" else None,
-                       engine_kwargs=_ekw2)
+                       engine=_eng2, engine_kwargs=_ekw2)
     _strip_formula_cells(df)
     datasets[req.dataset_id]["df"] = df
     add_audit_log(req.dataset_id, "sheet_change", f"Switched to sheet: {req.sheet_name}")
