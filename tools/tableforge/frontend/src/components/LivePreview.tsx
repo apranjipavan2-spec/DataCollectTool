@@ -288,6 +288,37 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
     return appliers;
   }, [tableConfig?.conditional_formats, displayRows, result, headerRenames]);
 
+  // ─── Hooks that USED to live after early returns ───
+  // These MUST run on every render (regardless of loading/error/empty state) so
+  // the hook count stays stable across renders. Moving them below the early
+  // returns triggers React error #310 ("Rendered more hooks than during the
+  // previous render") the first time `result` flips from null to populated.
+  const _sparklineColsForHook = tableConfig?.sparkline_columns || [];
+  const _autoFootForHook = tableConfig?.auto_footnote_markers ?? false;
+  const sparklineColIdx = useMemo(() => {
+    if (!result || _sparklineColsForHook.length === 0) return [] as number[];
+    const renames = tableConfig?.header_renames || {};
+    return _sparklineColsForHook
+      .map(t => result.headers.findIndex(h => (renames[h] || h) === t || h === t))
+      .filter(i => i >= 0);
+  }, [result, _sparklineColsForHook, tableConfig?.header_renames]);
+  const footMarkerByText = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!_autoFootForHook) return m;
+    let next = 1;
+    for (const row of displayRows) {
+      for (const cell of row) {
+        if (typeof cell === 'string') {
+          const trimmed = cell.trim();
+          if (trimmed === '*' || trimmed === '**' || trimmed === '***') {
+            if (!m.has(trimmed)) { m.set(trimmed, next++); }
+          }
+        }
+      }
+    }
+    return m;
+  }, [_autoFootForHook, displayRows]);
+
   if (loading) return <div className="live-preview empty"><div className="loading-spinner">Computing table...</div></div>;
   if (error) return <div className="live-preview empty"><div className="error-msg">{error}</div></div>;
   if (!result || result.rows.length === 0) {
@@ -363,35 +394,10 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
   const frozenHeader = tableConfig?.frozen_header ?? false;
   const headerWrap = tableConfig?.header_word_wrap ?? false;
   const mergeRowLabels = tableConfig?.merge_row_labels ?? false;
-  const sparklineCols = tableConfig?.sparkline_columns || [];
-  const autoFootMarkers = tableConfig?.auto_footnote_markers ?? false;
-  // Resolve sparkline target columns → absolute indices in result.headers.
-  const sparklineColIdx = useMemo(() => {
-    if (!result || sparklineCols.length === 0) return [] as number[];
-    const renames = tableConfig?.header_renames || {};
-    return sparklineCols
-      .map(t => result.headers.findIndex(h => (renames[h] || h) === t || h === t))
-      .filter(i => i >= 0);
-  }, [result, sparklineCols, tableConfig?.header_renames]);
+  const autoFootMarkers = _autoFootForHook;
+  // sparklineColIdx + footMarkerByText hoisted above the early returns to keep
+  // hook count stable (see comment near their definitions).
   const showSparklineCol = sparklineColIdx.length >= 2;
-  // Per-cell footnote marker assignment: a stable numeric marker keyed by cell
-  // text "*" gets [1], "**" gets [2], etc. Markers append to footnotes panel.
-  const footMarkerByText = useMemo(() => {
-    if (!autoFootMarkers) return new Map<string, number>();
-    const m = new Map<string, number>();
-    let next = 1;
-    for (const row of displayRows) {
-      for (const cell of row) {
-        if (typeof cell === 'string') {
-          const trimmed = cell.trim();
-          if (trimmed === '*' || trimmed === '**' || trimmed === '***') {
-            if (!m.has(trimmed)) { m.set(trimmed, next++); }
-          }
-        }
-      }
-    }
-    return m;
-  }, [autoFootMarkers, displayRows]);
 
   // Column-group separator: track which absolute column indices start a new group
   // and build a per-column → parent-top-label map (used to strip duplicate parent
