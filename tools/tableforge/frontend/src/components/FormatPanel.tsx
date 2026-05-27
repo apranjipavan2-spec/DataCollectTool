@@ -307,8 +307,16 @@ export function FormatPanel({ table, onUpdate }: Props) {
             <Section title="Table Display" icon="🖥">
               <Toggle label="Freeze First Column" checked={table.frozen_first_col ?? false}
                 onChange={v => onUpdate({ frozen_first_col: v })} />
+              <Toggle label="Freeze Header Row (sticky)" checked={table.frozen_header ?? false}
+                onChange={v => onUpdate({ frozen_header: v })} />
               <Toggle label="Header Word Wrap" checked={table.header_word_wrap ?? false}
                 onChange={v => onUpdate({ header_word_wrap: v })} />
+              <Toggle label="Merge Consecutive Row Labels" checked={table.merge_row_labels ?? false}
+                onChange={v => onUpdate({ merge_row_labels: v })} />
+              <Toggle label="Auto Footnote Markers (*/**/***)" checked={table.auto_footnote_markers ?? false}
+                onChange={v => onUpdate({ auto_footnote_markers: v })} />
+              <Toggle label="Page Break Before (Word export)" checked={table.page_break_before ?? false}
+                onChange={v => onUpdate({ page_break_before: v })} />
               <Toggle label="Show Serial Numbers" checked={table.serial_number ?? false}
                 onChange={v => onUpdate({ serial_number: v })} />
               {table.serial_number && (
@@ -327,6 +335,38 @@ export function FormatPanel({ table, onUpdate }: Props) {
                     <option key={z} value={z}>{z}%</option>
                   ))}
                 </select>
+              </Field>
+              {/* Sparkline columns: multi-select among value fields */}
+              {table.values.length > 0 && (
+                <Field label="Sparkline columns (inline mini-bars)">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 120, overflowY: 'auto' }}>
+                    {table.values.map(v => {
+                      const name = v.label || v.field;
+                      const selected = (table.sparkline_columns || []).includes(name);
+                      return (
+                        <label key={name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                          <input type="checkbox" checked={selected}
+                            onChange={e => {
+                              const list = new Set(table.sparkline_columns || []);
+                              if (e.target.checked) list.add(name); else list.delete(name);
+                              onUpdate({ sparkline_columns: Array.from(list) });
+                            }} />
+                          {name}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </Field>
+              )}
+              {/* Pinned rows (comma list of first-column values) */}
+              <Field label="Pin rows to top (comma-separated)">
+                <input type="text" className="fp-input"
+                  value={(table.pinned_row_keys || []).join(', ')}
+                  placeholder="e.g. Total, Q1, Q2"
+                  onChange={e => {
+                    const list = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                    onUpdate({ pinned_row_keys: list });
+                  }} />
               </Field>
             </Section>
 

@@ -620,6 +620,9 @@ async def export_word(config: ExportConfig):
             _setup_section(section, table_landscape)
             _setup_header_footer(section)
         else:
+            # Honour per-table "Page Break Before" before starting a new section.
+            if t.get("page_break_before"):
+                doc.add_page_break()
             doc.add_section()
             section = doc.sections[-1]
             _setup_section(section, table_landscape)

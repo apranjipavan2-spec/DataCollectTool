@@ -157,10 +157,16 @@ export interface ChartExportSvgOpts {
   width: number;
   height: number;
   bgColor?: string;
+  titleColor?: string;     // overrides the default light/dark title fill
+  fontFamily?: string;     // applied to wrapper SVG so title + chart text inherit
+  titleAlign?: 'left' | 'center' | 'right';
+  titleBold?: boolean;
+  titleItalic?: boolean;
 }
 
 export function buildChartExportSvg(opts: ChartExportSvgOpts): { xml: string; totalHeight: number } {
-  const { svgElement, title, titleFontSize, width, height, bgColor = 'transparent' } = opts;
+  const { svgElement, title, titleFontSize, width, height, bgColor = 'transparent', titleColor, fontFamily,
+    titleAlign = 'center', titleBold = true, titleItalic = false } = opts;
   // Resolve CSS variables that won't apply when the SVG renders standalone.
   // ChartCanvas uses var(--bg-card) for bar/pie/scatter separator strokes and
   // the donut centre hole. Outside the app's CSS context the variable becomes
@@ -177,10 +183,16 @@ export function buildChartExportSvg(opts: ChartExportSvgOpts): { xml: string; to
   // Skip the background rect when transparent so PNG/Word/Slides see-through.
   // Title text uses a dark fill so it remains legible on white document pages.
   const isTransparent = bgColor === 'transparent' || bgColor === 'none';
-  const titleFill = isTransparent ? '#1f2937' : '#e5e7eb';
-  const xml = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${totalH}" viewBox="0 0 ${width} ${totalH}">`
+  const titleFill = titleColor || (isTransparent ? '#1f2937' : '#e5e7eb');
+  const titleFontFamily = fontFamily || 'Arial, sans-serif';
+  const wrapperStyle = fontFamily ? ` style="font-family:${escapeXml(fontFamily)}"` : '';
+  const titleX = titleAlign === 'left' ? 8 : (titleAlign === 'right' ? width - 8 : width / 2);
+  const titleAnchor = titleAlign === 'left' ? 'start' : (titleAlign === 'right' ? 'end' : 'middle');
+  const titleWeight = titleBold ? 700 : 400;
+  const titleStyle = titleItalic ? ' font-style="italic"' : '';
+  const xml = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${totalH}" viewBox="0 0 ${width} ${totalH}"${wrapperStyle}>`
     + (isTransparent ? '' : `<rect width="${width}" height="${totalH}" fill="${bgColor}"/>`)
-    + (title ? `<text x="${width / 2}" y="${titleY}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${titleFontSize}" font-weight="700" fill="${titleFill}">${escapeXml(title)}</text>` : '')
+    + (title ? `<text x="${titleX}" y="${titleY}" text-anchor="${titleAnchor}" font-family="${escapeXml(titleFontFamily)}" font-size="${titleFontSize}" font-weight="${titleWeight}"${titleStyle} fill="${titleFill}">${escapeXml(title)}</text>` : '')
     + `<g transform="translate(0, ${titleH})">${innerXml}</g>`
     + `</svg>`;
   return { xml, totalHeight: totalH };

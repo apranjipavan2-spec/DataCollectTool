@@ -22,6 +22,26 @@ export interface ChartCanvasConfig {
   yLabelRotation?: number;  // for tick values on Y axis (default 0)
   // When the cell display is "value (pct%)", render value on line 1 and percent on line 2.
   valueLabelSplit?: boolean;
+  // ─── Style customisation (all optional with sensible defaults) ───────────
+  fontFamily?: string;            // applied to root SVG so all text inherits
+  axisColor?: string;             // axis lines
+  gridColor?: string;             // grid lines
+  tickColor?: string;             // tick text + legend text
+  axisLabelColor?: string;        // x/y caption text
+  dataLabelColor?: string;        // value labels above bars (overrides series color)
+  singleColor?: string;           // when set, all bars/slices use this single color
+  seriesColors?: Record<number, string>;  // per-index colour override
+  // ─── Behavioural / advanced rendering options ─────────────────────────────
+  referenceLines?: Array<{ value: number; label?: string; color?: string; axis?: 'y' | 'x'; dash?: boolean }>;
+  categorySort?: 'none' | 'asc' | 'desc';   // sort categories by first Y value
+  topN?: number;                            // keep only N categories (0/undef = all)
+  topNOther?: boolean;                      // roll the rest into a single "Other" bucket
+  stacked100?: boolean;                     // normalise stacked bars to 100%
+  labelPosition?: 'inside' | 'outside';     // data-label position (bar charts)
+  trendline?: boolean;                      // linear regression overlay for scatter
+  patternFills?: boolean;                   // B&W hatch fills instead of solid colors
+  conditionalColor?: { threshold: number; below: string; above: string }; // colour-by-value
+  lightMode?: boolean;                      // light theme preview (white bg, dark text)
 }
 
 interface Props {
@@ -106,23 +126,42 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
     : Number(xRotRaw);
   const yTickRot = typeof config.yLabelRotation === 'number' ? config.yLabelRotation : 0;
 
+  const categorySort = config.categorySort || 'none';
+  const topN = typeof config.topN === 'number' && config.topN > 0 ? Math.floor(config.topN) : 0;
+  const topNOther = !!config.topNOther;
+  const stacked100 = !!config.stacked100;
+
   const multiData = useMemo(() => {
     if (xIdx < 0 || yIndices.length === 0) return [] as { label: string; values: number[]; displays: string[] }[];
-    return rows.map(r => ({
+    let arr = rows.map(r => ({
       label: String(r[xIdx] ?? ''),
       values: yIndices.map(yi => {
         const v = toNumber(r[yi]);
         return isFinite(v) ? v : 0;
       }),
-      // Original formatted cell strings from the table (e.g. "23 (45.2%)"),
-      // used for value labels + tooltips so the chart mirrors the table.
       displays: yIndices.map(yi => {
         const raw = r[yi];
         if (raw === null || raw === undefined) return '';
         return String(raw);
       }),
     }));
-  }, [rows, xIdx, yIndices]);
+    if (categorySort !== 'none') {
+      arr = arr.slice().sort((a, b) => {
+        const av = a.values[0] || 0, bv = b.values[0] || 0;
+        return categorySort === 'asc' ? av - bv : bv - av;
+      });
+    }
+    if (topN > 0 && arr.length > topN) {
+      const kept = arr.slice(0, topN);
+      const rest = arr.slice(topN);
+      if (topNOther && rest.length) {
+        const combined = yIndices.map((_, si) => rest.reduce((s, d) => s + (d.values[si] || 0), 0));
+        kept.push({ label: 'Other', values: combined, displays: combined.map(v => fmt(v)) });
+      }
+      arr = kept;
+    }
+    return arr;
+  }, [rows, xIdx, yIndices, categorySort, topN, topNOther]);
 
   const valueLabelSplit = !!config.valueLabelSplit;
   // Use raw cell string when it carries formatting (%, parens, comma) the
@@ -176,7 +215,9 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   const stackMax = (chartType === 'stacked' || chartType === 'waterfall')
     ? Math.max(...multiData.map(d => d.values.reduce((s, v) => s + Math.max(v, 0), 0)), 1)
     : maxVal;
-  const effectiveMax = chartType === 'stacked' ? stackMax : maxVal;
+  const effectiveMax = chartType === 'stacked'
+    ? (stacked100 ? 100 : stackMax)
+    : maxVal;
 
   const yTicks = ticksArr(minVal, effectiveMax);
   // Pad the top tick if it sits below the actual max — otherwise bars overshoot
@@ -261,9 +302,42 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   const barW = multiData.length > 0 ? Math.max(4, Math.min(48, (PW / multiData.length) * 0.72)) : 20;
   const groupBarW = yIndices.length > 0 ? barW / yIndices.length : barW;
 
-  const axisColor = '#374151';
-  const gridColor = 'rgba(255,255,255,0.05)';
-  const labelColor = '#9ca3af';
+  const lightMode = !!config.lightMode;
+  const axisColor = config.axisColor || (lightMode ? '#6b7280' : '#374151');
+  const gridColor = config.gridColor || (lightMode ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)');
+  const labelColor = config.tickColor || (lightMode ? '#374151' : '#9ca3af');
+  const captionColor = config.axisLabelColor || (lightMode ? '#1f2937' : '#e4e4e7');
+  const fontFamily = config.fontFamily;
+  const singleColor = config.singleColor;
+  const seriesColors = config.seriesColors || {};
+  const colorFor = (i: number): string => {
+    if (seriesColors[i]) return seriesColors[i];
+    if (singleColor) return singleColor;
+    return colors[i % colors.length];
+  };
+  const dataLabelColor = config.dataLabelColor;
+  const labelFill = (seriesIdx: number): string => dataLabelColor || colorFor(seriesIdx);
+
+  // Conditional color: when a per-bar value crosses the threshold, swap color.
+  const condCol = config.conditionalColor;
+  const colorForBar = (seriesIdx: number, value: number): string => {
+    if (condCol && isFinite(value)) {
+      return value < condCol.threshold ? condCol.below : condCol.above;
+    }
+    return colorFor(seriesIdx);
+  };
+
+  // Pattern fills: produce SVG <pattern> defs so each series gets a B&W hatch.
+  const patternFills = !!config.patternFills;
+  const PATTERN_KINDS = ['diagonalL', 'diagonalR', 'horizontal', 'vertical', 'cross', 'dots', 'zigzag'];
+  const patternId = (i: number) => `tf-pat-${PATTERN_KINDS[i % PATTERN_KINDS.length]}-${i}`;
+  const fillRefFor = (i: number, value?: number): string => {
+    if (patternFills) return `url(#${patternId(i)})`;
+    return value !== undefined ? colorForBar(i, value) : colorFor(i);
+  };
+
+  const labelPos: 'inside' | 'outside' = config.labelPosition === 'inside' ? 'inside' : 'outside';
+  const refLines = Array.isArray(config.referenceLines) ? config.referenceLines : [];
 
   const renderLegend = () => {
     if (showLegend === 'none' || seriesNames.length <= 1) return null;
@@ -273,8 +347,8 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
         const lineH = (labelFontSize - 1) * 1.15;
         return (
           <g key={i} transform={`translate(${ML + PW + 8}, ${MT + i * (18 + (lines.length - 1) * lineH)})`}>
-            <rect width={10} height={10} fill={colors[i % colors.length]} rx={2} />
-            <text x={14} y={9} fontSize={labelFontSize - 1} fill="#9ca3af">
+            <rect width={10} height={10} fill={colorFor(i)} rx={2} />
+            <text x={14} y={9} fontSize={labelFontSize - 1} fill={labelColor}>
               <title>{name}</title>
               {lines.map((ln, li) => (
                 <tspan key={li} x={14} dy={li === 0 ? 0 : lineH}>{ln}</tspan>
@@ -290,8 +364,8 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
         const x = cx; cx += name.length * 6 + 24;
         return (
           <g key={i} transform={`translate(${x}, ${MT + PH + 38})`}>
-            <rect width={8} height={8} fill={colors[i % colors.length]} rx={2} />
-            <text x={12} y={8} fontSize={labelFontSize - 1} fill="#9ca3af">{name}</text>
+            <rect width={8} height={8} fill={colorFor(i)} rx={2} />
+            <text x={12} y={8} fontSize={labelFontSize - 1} fill={labelColor}>{name}</text>
           </g>
         );
       });
@@ -302,8 +376,8 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
         const x = cx; cx += name.length * 6 + 24;
         return (
           <g key={i} transform={`translate(${x}, ${8})`}>
-            <rect width={8} height={8} fill={colors[i % colors.length]} rx={2} />
-            <text x={12} y={8} fontSize={labelFontSize - 1} fill="#9ca3af">{name}</text>
+            <rect width={8} height={8} fill={colorFor(i)} rx={2} />
+            <text x={12} y={8} fontSize={labelFontSize - 1} fill={labelColor}>{name}</text>
           </g>
         );
       });
@@ -314,8 +388,8 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
         const lineH = (labelFontSize - 1) * 1.15;
         return (
           <g key={i} transform={`translate(${8}, ${MT + i * (18 + (lines.length - 1) * lineH)})`}>
-            <rect width={10} height={10} fill={colors[i % colors.length]} rx={2} />
-            <text x={14} y={9} fontSize={labelFontSize - 1} fill="#9ca3af">
+            <rect width={10} height={10} fill={colorFor(i)} rx={2} />
+            <text x={14} y={9} fontSize={labelFontSize - 1} fill={labelColor}>
               <title>{name}</title>
               {lines.map((ln, li) => (
                 <tspan key={li} x={14} dy={li === 0 ? 0 : lineH}>{ln}</tspan>
@@ -378,12 +452,12 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
         })()}
         {hasXCaption && (
           <text x={ML + PW / 2} y={MT + PH + xLabelExtraOffset + 4} textAnchor="middle"
-            fontSize={labelFontSize + 1} fill="#e4e4e7" fontWeight={500}>
+            fontSize={labelFontSize + 1} fill={captionColor} fontWeight={500}>
             {xAxisLabel}
           </text>
         )}
         {(yAxisLabel || yFieldsResolved[0]) && (
-          <text x={yLabelX} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill="#e4e4e7" fontWeight={500}
+          <text x={yLabelX} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill={captionColor} fontWeight={500}
             transform={`rotate(-90,${yLabelX},${MT + PH / 2})`}>
             {yAxisLabel || yFieldsResolved[0]}
           </text>
@@ -399,12 +473,15 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             const v = d.values[0];
             const y = yToSvg(Math.max(v, 0));
             const h = Math.abs(yToSvg(Math.min(v, 0)) - yToSvg(Math.max(v, 0)));
+            const fill = fillRefFor(i, v);
+            const lblY = labelPos === 'inside' ? y + Math.min(h - 4, labelFontSize + 2) : y - 4;
+            const lblFill = labelPos === 'inside' ? (dataLabelColor || '#ffffff') : labelFill(i);
             return (
               <g key={i}>
-                <rect x={x} y={y} width={barW} height={Math.max(h, 1)} fill={colors[i % colors.length]} rx={2} opacity={barOpacity}
+                <rect x={x} y={y} width={barW} height={Math.max(h, 1)} fill={fill} rx={2} opacity={barOpacity}
                   onMouseEnter={e => showTip(e, `${d.label}\n${dispLabel(d.displays[0], v)}`)}
                   onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
-                {showLabels && renderLabel(x + barW / 2, y - 4, dispLabel(d.displays[0], v), { size: labelFontSize - 1, fill: colors[i % colors.length] })}
+                {showLabels && renderLabel(x + barW / 2, lblY, dispLabel(d.displays[0], v), { size: labelFontSize - 1, fill: lblFill })}
               </g>
             );
           })}
@@ -441,10 +518,16 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                   );
                 })()}
                 <rect x={xScale(0)} y={y} width={Math.abs(xScale(v) - xScale(0))} height={rowH}
-                  fill={colors[i % colors.length]} rx={2} opacity={barOpacity}
+                  fill={fillRefFor(i, v)} rx={2} opacity={barOpacity}
                   onMouseEnter={e => showTip(e, `${d.label}\n${dispLabel(d.displays[0], v)}`)}
                   onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
-                {showLabels && renderLabel(Math.max(xScale(0), xScale(v)) + 4, y + rowH / 2 + 4, dispLabel(d.displays[0], v), { anchor: 'start', size: labelFontSize - 1, fill: colors[i % colors.length] })}
+                {showLabels && (() => {
+                  const inside = labelPos === 'inside';
+                  const lx = inside ? Math.max(xScale(0), xScale(v)) - 4 : Math.max(xScale(0), xScale(v)) + 4;
+                  const anchor = inside ? 'end' : 'start';
+                  const lf = inside ? (dataLabelColor || '#ffffff') : labelFill(i);
+                  return renderLabel(lx, y + rowH / 2 + 4, dispLabel(d.displays[0], v), { anchor, size: labelFontSize - 1, fill: lf });
+                })()}
               </g>
             );
           })}
@@ -458,21 +541,27 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
         <g>{axes}
           {multiData.map((d, i) => {
             const x = xToSvg(i, multiData.length) - barW / 2;
+            const total = d.values.reduce((s, v) => s + Math.max(v, 0), 0) || 1;
+            const scaleVal = (v: number): number => stacked100 ? (v / total) * 100 : v;
             let cumY = yToSvg(0);
             return (
               <g key={i}>
                 {d.values.map((v, si) => {
-                  const h = Math.abs(yToSvg(0) - yToSvg(v));
+                  const sv = scaleVal(v);
+                  const h = Math.abs(yToSvg(0) - yToSvg(sv));
                   const y = cumY - h;
                   cumY = y;
+                  const tipExtra = stacked100 ? ` (${((v / total) * 100).toFixed(1)}%)` : '';
                   return (
-                    <rect key={si} x={x} y={y} width={barW} height={Math.max(h, 0.5)} fill={colors[si % colors.length]}
+                    <rect key={si} x={x} y={y} width={barW} height={Math.max(h, 0.5)} fill={fillRefFor(si, v)}
                       rx={si === d.values.length - 1 ? 2 : 0} opacity={barOpacity}
-                      onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${dispLabel(d.displays[si], v)}`)}
+                      onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${dispLabel(d.displays[si], v)}${tipExtra}`)}
                       onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
                   );
                 })}
-                {showLabels && renderLabel(x + barW / 2, cumY - 4, fmt(d.values.reduce((s, v) => s + v, 0)), { size: labelFontSize - 1, fill: '#e4e4e7' })}
+                {showLabels && renderLabel(x + barW / 2, cumY - 4,
+                  stacked100 ? '100%' : fmt(d.values.reduce((s, v) => s + v, 0)),
+                  { size: labelFontSize - 1, fill: dataLabelColor || captionColor })}
               </g>
             );
           })}
@@ -492,13 +581,15 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                   const x = baseX + si * groupBarW;
                   const y = yToSvg(Math.max(v, 0));
                   const h = Math.abs(yToSvg(0) - y);
+                  const lblY = labelPos === 'inside' ? y + Math.min(h - 2, labelFontSize) : y - 3;
+                  const lblFill = labelPos === 'inside' ? (dataLabelColor || '#ffffff') : labelFill(si);
                   return (
                     <g key={si}>
                       <rect x={x} y={y} width={Math.max(groupBarW - 1, 2)} height={Math.max(h, 1)}
-                        fill={colors[si % colors.length]} rx={1} opacity={barOpacity}
+                        fill={fillRefFor(si, v)} rx={1} opacity={barOpacity}
                         onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${dispLabel(d.displays[si], v)}`)}
                         onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
-                      {showLabels && renderLabel(x + groupBarW / 2, y - 3, dispLabel(d.displays[si], v), { size: labelFontSize - 2, fill: colors[si % colors.length] })}
+                      {showLabels && renderLabel(x + groupBarW / 2, lblY, dispLabel(d.displays[si], v), { size: labelFontSize - 2, fill: lblFill })}
                     </g>
                   );
                 })}
@@ -519,17 +610,17 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             const baseY = yToSvg(0);
             return (
               <g key={si}>
-                {chartType === 'area' && <polygon points={`${first},${baseY} ${pts} ${last},${baseY}`} fill={colors[si % colors.length]} opacity={0.12} />}
-                <polyline points={pts} fill="none" stroke={colors[si % colors.length]} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+                {chartType === 'area' && <polygon points={`${first},${baseY} ${pts} ${last},${baseY}`} fill={colorFor(si)} opacity={0.12} />}
+                <polyline points={pts} fill="none" stroke={colorFor(si)} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
                 {multiData.map((d, i) => (
                   <circle key={i} cx={xToSvg(i, multiData.length)} cy={yToSvg(d.values[si])} r={3.5}
-                    fill={colors[si % colors.length]} stroke="var(--bg-card)" strokeWidth={1.5}
+                    fill={colorFor(si)} stroke="var(--bg-card)" strokeWidth={1.5}
                     onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${dispLabel(d.displays[si], d.values[si])}`)}
                     onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
                 ))}
                 {showLabels && multiData.map((d, i) => (
                   <React.Fragment key={i}>
-                    {renderLabel(xToSvg(i, multiData.length), yToSvg(d.values[si]) - 8, dispLabel(d.displays[si], d.values[si]), { size: labelFontSize - 1, fill: colors[si % colors.length] })}
+                    {renderLabel(xToSvg(i, multiData.length), yToSvg(d.values[si]) - 8, dispLabel(d.displays[si], d.values[si]), { size: labelFontSize - 1, fill: labelFill(si) })}
                   </React.Fragment>
                 ))}
               </g>
@@ -551,7 +642,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             const y = yToSvg(Math.max(v, 0));
             const h = Math.abs(yToSvg(0) - y);
             return (
-              <rect key={i} x={x} y={y} width={barW} height={Math.max(h, 1)} fill={colors[0]} rx={2} opacity={barOpacity}
+              <rect key={i} x={x} y={y} width={barW} height={Math.max(h, 1)} fill={colorFor(0)} rx={2} opacity={barOpacity}
                 onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[barSeries]}: ${dispLabel(d.displays[barSeries], v)}`)}
                 onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
             );
@@ -561,10 +652,10 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             const pts = multiData.map((d, i) => `${xToSvg(i, multiData.length)},${yToSvg(d.values[si])}`).join(' ');
             return (
               <g key={si}>
-                <polyline points={pts} fill="none" stroke={colors[si % colors.length]} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+                <polyline points={pts} fill="none" stroke={colorFor(si)} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
                 {multiData.map((d, i) => (
                   <circle key={i} cx={xToSvg(i, multiData.length)} cy={yToSvg(d.values[si])} r={3.5}
-                    fill={colors[si % colors.length]} stroke="var(--bg-card)" strokeWidth={1.5}
+                    fill={colorFor(si)} stroke="var(--bg-card)" strokeWidth={1.5}
                     onMouseEnter={e => showTip(e, `${d.label}\n${seriesNames[si]}: ${dispLabel(d.displays[si], d.values[si])}`)}
                     onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
                 ))}
@@ -595,7 +686,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             angle += slice;
             return (
               <g key={i}>
-                <path d={path} fill={colors[i % colors.length]} opacity={barOpacity} stroke="var(--bg-card)" strokeWidth={1.5}
+                <path d={path} fill={colorFor(i)} opacity={barOpacity} stroke="var(--bg-card)" strokeWidth={1.5}
                   onMouseEnter={e => showTip(e, `${d.label}\n${dispLabel(d.displays[0], d.values[0])} (${pct}%)`)}
                   onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
                 {slice > 0.25 && showLabels && (() => {
@@ -604,7 +695,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                   const raw = d.displays[0] || '';
                   const showRaw = /[%()\/a-zA-Z]/.test(raw) && raw !== `${pct}%`;
                   return (
-                    <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fontSize={labelFontSize} fill="#fff" fontWeight={600}>
+                    <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fontSize={labelFontSize} fill={dataLabelColor || '#fff'} fontWeight={600}>
                       {showRaw ? raw : `${pct}%`}
                     </text>
                   );
@@ -615,8 +706,8 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
           {chartType === 'donut' && (
             <>
               <circle cx={cx} cy={cy} r={inner - 2} fill="var(--bg-card)" />
-              <text x={cx} y={cy - 8} textAnchor="middle" fontSize={11} fill="#9ca3af">Total</text>
-              <text x={cx} y={cy + 10} textAnchor="middle" fontSize={14} fill="#e4e4e7" fontWeight={700}>{fmt(total)}</text>
+              <text x={cx} y={cy - 8} textAnchor="middle" fontSize={11} fill={labelColor}>Total</text>
+              <text x={cx} y={cy + 10} textAnchor="middle" fontSize={14} fill={captionColor} fontWeight={700}>{fmt(total)}</text>
             </>
           )}
           {showLegend !== 'none' && multiData.slice(0, 12).map((d, i) => {
@@ -633,8 +724,8 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                   : `translate(${ML + i * 80}, ${MT + PH + 20})`;
             return (
               <g key={i} transform={transform}>
-                <rect width={10} height={10} fill={colors[i % colors.length]} rx={2} />
-                <text x={14} y={9} fontSize={labelFontSize - 1} fill="#9ca3af">
+                <rect width={10} height={10} fill={colorFor(i)} rx={2} />
+                <text x={14} y={9} fontSize={labelFontSize - 1} fill={labelColor}>
                   <title>{d.label}</title>
                   {lines.map((ln, li) => (
                     <tspan key={li} x={14} dy={li === 0 ? 0 : lineH}>{ln}</tspan>
@@ -667,14 +758,41 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
               <line x1={ML} y1={MT + PH * (1 - f)} x2={ML + PW} y2={MT + PH * (1 - f)} stroke={gridColor} strokeWidth={1} strokeDasharray="3,3" />
             </g>
           ))}
-          <text x={ML + PW / 2} y={MT + PH + 30} textAnchor="middle" fontSize={labelFontSize + 1} fill={labelColor}>{xAxisLabel || headers[sxIdx]}</text>
-          <text x={yLabelX} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill={labelColor}
+          <text x={ML + PW / 2} y={MT + PH + 30} textAnchor="middle" fontSize={labelFontSize + 1} fill={captionColor}>{xAxisLabel || headers[sxIdx]}</text>
+          <text x={yLabelX} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill={captionColor}
             transform={`rotate(-90,${yLabelX},${MT + PH / 2})`}>{yAxisLabel || headers[syIdx]}</text>
           {sData.map((d, i) => (
-            <circle key={i} cx={sx(d.x)} cy={sy(d.y)} r={5} fill={colors[i % colors.length]} opacity={0.8} stroke="var(--bg-card)" strokeWidth={1}
+            <circle key={i} cx={sx(d.x)} cy={sy(d.y)} r={5} fill={colorFor(i)} opacity={0.8} stroke="var(--bg-card)" strokeWidth={1}
               onMouseEnter={e => showTip(e, `${d.label}\n${headers[sxIdx]}: ${fmt(d.x)}\n${headers[syIdx]}: ${fmt(d.y)}`)}
               onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
           ))}
+          {config.trendline && sData.length >= 2 && (() => {
+            const n = sData.length;
+            const sumX = sData.reduce((s, d) => s + d.x, 0);
+            const sumY = sData.reduce((s, d) => s + d.y, 0);
+            const sumXX = sData.reduce((s, d) => s + d.x * d.x, 0);
+            const sumXY = sData.reduce((s, d) => s + d.x * d.y, 0);
+            const denom = n * sumXX - sumX * sumX;
+            if (!denom) return null;
+            const m = (n * sumXY - sumX * sumY) / denom;
+            const b = (sumY - m * sumX) / n;
+            const meanY = sumY / n;
+            const ssTot = sData.reduce((s, d) => s + (d.y - meanY) ** 2, 0) || 1;
+            const ssRes = sData.reduce((s, d) => s + (d.y - (m * d.x + b)) ** 2, 0);
+            const r2 = 1 - ssRes / ssTot;
+            const yAt = (xv: number) => m * xv + b;
+            const x1v = sxMin, x2v = sxMax;
+            return (
+              <g>
+                <line x1={sx(x1v)} y1={sy(yAt(x1v))} x2={sx(x2v)} y2={sy(yAt(x2v))}
+                  stroke={config.singleColor || '#f97316'} strokeWidth={1.8} strokeDasharray="6,4" />
+                <text x={ML + PW - 4} y={MT + 12} textAnchor="end" fontSize={labelFontSize - 1}
+                  fill={config.singleColor || '#f97316'} fontWeight={600}>
+                  y = {m.toFixed(2)}x + {b.toFixed(2)}  R²={r2.toFixed(3)}
+                </text>
+              </g>
+            );
+          })()}
         </g>
       );
     }
@@ -693,7 +811,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             return (
               <g key={i}>
                 <rect x={xToSvg(i, multiData.length) - barW / 2} y={top} width={barW} height={Math.max(h, 1)}
-                  fill={isPos ? colors[0] : '#ef4444'} rx={2} opacity={barOpacity}
+                  fill={isPos ? colorFor(0) : '#ef4444'} rx={2} opacity={barOpacity}
                   onMouseEnter={e => showTip(e, `${d.label}\n${v >= 0 ? '+' : ''}${dispLabel(d.displays[0], v)}\nRunning: ${fmt(cum)}`)}
                   onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
                 {i < multiData.length - 1 && (
@@ -701,7 +819,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                     x2={xToSvg(i + 1, multiData.length) - barW / 2} y2={y1}
                     stroke="rgba(255,255,255,0.15)" strokeWidth={1} strokeDasharray="3,2" />
                 )}
-                {showLabels && renderLabel(xToSvg(i, multiData.length), top - 4, dispLabel(d.displays[0], v), { size: labelFontSize - 1, fill: isPos ? colors[0] : '#ef4444' })}
+                {showLabels && renderLabel(xToSvg(i, multiData.length), top - 4, dispLabel(d.displays[0], v), { size: labelFontSize - 1, fill: dataLabelColor || (isPos ? colorFor(0) : '#ef4444') })}
               </g>
             );
           })}
@@ -766,7 +884,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             const lineH = labelFontSize * 1.15;
             return (
               <text key={'ch' + ci} x={cx} y={MT - 6}
-                textAnchor={rotated ? 'end' : 'middle'} fill="#9ca3af" fontSize={labelFontSize}
+                textAnchor={rotated ? 'end' : 'middle'} fill={labelColor} fontSize={labelFontSize}
                 transform={rotated ? `rotate(-30, ${cx}, ${MT - 6})` : undefined}>
                 <title>{String(h)}</title>
                 {lines.map((ln, li) => (
@@ -782,7 +900,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             const cy = MT + ri * cellH + cellH / 2 + 4 - ((lines.length - 1) * lineH) / 2;
             return (
               <text key={'rl' + ri} x={ML - 6} y={cy}
-                textAnchor="end" fill="#9ca3af" fontSize={labelFontSize}>
+                textAnchor="end" fill={labelColor} fontSize={labelFontSize}>
                 <title>{label}</title>
                 {lines.map((ln, li) => (
                   <tspan key={li} x={ML - 6} dy={li === 0 ? 0 : lineH}>{ln}</tspan>
@@ -817,9 +935,9 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                   const v = isCorr ? (1 - 2 * t) : (vMax - (vMax - vMin) * t);
                   return <rect key={'cb' + i} x={barX} y={barY + (cbH / stops) * i} width={cbW} height={cbH / stops + 0.5} fill={valToColor(v)} />;
                 })}
-                <text x={barX + cbW + 4} y={barY + 8} fill="#9ca3af" fontSize={labelFontSize - 1}>{isCorr ? '1.0' : fmt(vMax)}</text>
-                <text x={barX + cbW + 4} y={barY + cbH} fill="#9ca3af" fontSize={labelFontSize - 1}>{isCorr ? '-1.0' : fmt(vMin)}</text>
-                {isCorr && <text x={barX + cbW + 4} y={barY + cbH / 2 + 3} fill="#9ca3af" fontSize={labelFontSize - 1}>0</text>}
+                <text x={barX + cbW + 4} y={barY + 8} fill={labelColor} fontSize={labelFontSize - 1}>{isCorr ? '1.0' : fmt(vMax)}</text>
+                <text x={barX + cbW + 4} y={barY + cbH} fill={labelColor} fontSize={labelFontSize - 1}>{isCorr ? '-1.0' : fmt(vMin)}</text>
+                {isCorr && <text x={barX + cbW + 4} y={barY + cbH / 2 + 3} fill={labelColor} fontSize={labelFontSize - 1}>0</text>}
               </g>
             );
           })()}
@@ -830,12 +948,93 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
     return null;
   };
 
+  // Pattern definitions for B&W / hatch fills — one per series index touched.
+  const patternsUsed = patternFills
+    ? Array.from(new Set([
+        ...Array.from({ length: Math.max(yIndices.length, multiData.length) }, (_, i) => i),
+      ]))
+    : [];
+  const renderPatternDef = (i: number) => {
+    const kind = PATTERN_KINDS[i % PATTERN_KINDS.length];
+    const id = patternId(i);
+    const stroke = lightMode ? '#111' : '#e5e7eb';
+    const bg = lightMode ? '#fff' : 'transparent';
+    if (kind === 'diagonalL') return (
+      <pattern id={id} key={id} patternUnits="userSpaceOnUse" width={8} height={8}>
+        <rect width={8} height={8} fill={bg} />
+        <path d="M0,8 l8,-8 M-2,2 l4,-4 M6,10 l4,-4" stroke={stroke} strokeWidth={1.5} />
+      </pattern>
+    );
+    if (kind === 'diagonalR') return (
+      <pattern id={id} key={id} patternUnits="userSpaceOnUse" width={8} height={8}>
+        <rect width={8} height={8} fill={bg} />
+        <path d="M0,0 l8,8 M-2,6 l4,4 M6,-2 l4,4" stroke={stroke} strokeWidth={1.5} />
+      </pattern>
+    );
+    if (kind === 'horizontal') return (
+      <pattern id={id} key={id} patternUnits="userSpaceOnUse" width={6} height={6}>
+        <rect width={6} height={6} fill={bg} />
+        <line x1={0} y1={3} x2={6} y2={3} stroke={stroke} strokeWidth={1.5} />
+      </pattern>
+    );
+    if (kind === 'vertical') return (
+      <pattern id={id} key={id} patternUnits="userSpaceOnUse" width={6} height={6}>
+        <rect width={6} height={6} fill={bg} />
+        <line x1={3} y1={0} x2={3} y2={6} stroke={stroke} strokeWidth={1.5} />
+      </pattern>
+    );
+    if (kind === 'cross') return (
+      <pattern id={id} key={id} patternUnits="userSpaceOnUse" width={8} height={8}>
+        <rect width={8} height={8} fill={bg} />
+        <path d="M0,0 l8,8 M0,8 l8,-8" stroke={stroke} strokeWidth={1} />
+      </pattern>
+    );
+    if (kind === 'dots') return (
+      <pattern id={id} key={id} patternUnits="userSpaceOnUse" width={6} height={6}>
+        <rect width={6} height={6} fill={bg} />
+        <circle cx={3} cy={3} r={1.2} fill={stroke} />
+      </pattern>
+    );
+    return (
+      <pattern id={id} key={id} patternUnits="userSpaceOnUse" width={10} height={6}>
+        <rect width={10} height={6} fill={bg} />
+        <path d="M0,3 l2.5,-2.5 l2.5,2.5 l2.5,-2.5 l2.5,2.5" fill="none" stroke={stroke} strokeWidth={1.2} />
+      </pattern>
+    );
+  };
+
+  // Reference / target lines (horizontal only — drawn on plot area when y-range
+  // includes the value). For waterfall/scatter still works if value lies inside.
+  const renderRefLines = () => {
+    if (refLines.length === 0) return null;
+    return refLines.map((rl, i) => {
+      if (!isFinite(rl.value)) return null;
+      if ((rl.axis || 'y') !== 'y') return null;
+      if (rl.value > yMax || rl.value < yMin) return null;
+      const y = yToSvg(rl.value);
+      const stroke = rl.color || '#f97316';
+      return (
+        <g key={'rl' + i}>
+          <line x1={ML} y1={y} x2={ML + PW} y2={y} stroke={stroke} strokeWidth={1.5}
+            strokeDasharray={rl.dash === false ? undefined : '6,4'} />
+          {rl.label && (
+            <text x={ML + PW - 4} y={y - 4} textAnchor="end" fontSize={labelFontSize - 1}
+              fill={stroke} fontWeight={600}>{rl.label}</text>
+          )}
+        </g>
+      );
+    });
+  };
+
+  const svgBg = lightMode ? '#ffffff' : 'transparent';
   return (
     <div className={className} style={{ position: 'relative', ...style }}>
       <svg ref={svgRef} width={W} height={H} viewBox={`0 0 ${W} ${H}`}
         overflow="visible"
-        style={{ background: 'transparent', borderRadius: 8, display: 'block', maxWidth: '100%', overflow: 'visible' }}>
+        style={{ background: svgBg, borderRadius: 8, display: 'block', maxWidth: '100%', overflow: 'visible', fontFamily: fontFamily || undefined }}>
+        {patternsUsed.length > 0 && <defs>{patternsUsed.map(i => renderPatternDef(i))}</defs>}
         {renderChart()}
+        {renderRefLines()}
       </svg>
       {tooltip && interactive && (
         <div className="chart-tooltip" style={{

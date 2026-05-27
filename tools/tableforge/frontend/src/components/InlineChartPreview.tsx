@@ -51,6 +51,25 @@ export function InlineChartPreview({ table, result, onEdit, onRemove, onToggleCh
     barOpacity: cc.barOpacity ?? 0.9,
     xLabelRotation: cc.xLabelRotation,
     yLabelRotation: cc.yLabelRotation,
+    valueLabelSplit: !!cc.valueLabelSplit,
+    fontFamily: cc.fontFamily,
+    axisColor: cc.axisColor,
+    gridColor: cc.gridColor,
+    tickColor: cc.tickColor,
+    axisLabelColor: cc.axisLabelColor,
+    dataLabelColor: cc.dataLabelColor,
+    singleColor: cc.singleColor,
+    seriesColors: cc.seriesColors,
+    referenceLines: cc.referenceLines,
+    categorySort: cc.categorySort,
+    topN: cc.topN,
+    topNOther: cc.topNOther,
+    stacked100: cc.stacked100,
+    labelPosition: cc.labelPosition,
+    trendline: cc.trendline,
+    patternFills: cc.patternFills,
+    conditionalColor: cc.conditionalColor,
+    lightMode: cc.lightMode,
   };
 
   const chartOnly = !!cc.chart_only;
@@ -74,6 +93,11 @@ export function InlineChartPreview({ table, result, onEdit, onRemove, onToggleCh
       titleFontSize,
       width: boxW,
       height: chartH,
+      titleColor: cc.titleColor,
+      fontFamily: cc.fontFamily,
+      titleAlign: cc.titleAlign,
+      titleBold: cc.titleBold,
+      titleItalic: cc.titleItalic,
     });
     const blob = new Blob([xml], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
@@ -90,6 +114,11 @@ export function InlineChartPreview({ table, result, onEdit, onRemove, onToggleCh
       titleFontSize,
       width: boxW,
       height: chartH,
+      titleColor: cc.titleColor,
+      fontFamily: cc.fontFamily,
+      titleAlign: cc.titleAlign,
+      titleBold: cc.titleBold,
+      titleItalic: cc.titleItalic,
     });
     try {
       const dataUrl = await svgXmlToPngDataUrl(xml, boxW, totalHeight, 2);
@@ -151,8 +180,14 @@ export function InlineChartPreview({ table, result, onEdit, onRemove, onToggleCh
       <div ref={boxRef} style={{ padding: 10, width: '100%', boxSizing: 'border-box' }}>
         {title && (
           <div className="chart-title-display" style={{
-            fontSize: titleFontSize, textAlign: 'center', marginBottom: 8,
-            color: 'var(--text)', fontWeight: 600, width: '100%',
+            fontSize: titleFontSize,
+            textAlign: (cc.titleAlign as any) || 'center',
+            marginBottom: 8,
+            color: cc.titleColor || 'var(--text)',
+            fontWeight: cc.titleBold === false ? 400 : 600,
+            fontStyle: cc.titleItalic ? 'italic' : 'normal',
+            fontFamily: cc.fontFamily || undefined,
+            width: '100%',
           }}>
             {title}
           </div>

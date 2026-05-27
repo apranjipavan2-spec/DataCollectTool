@@ -159,6 +159,18 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
     displayRows = [...filtered, ...totalRow];
   }
 
+  // Pin specific rows to the top (by first-column value). Grand Total stays last.
+  const pinnedKeys = tableConfig?.pinned_row_keys || [];
+  if (pinnedKeys.length > 0 && displayRows.length > 0) {
+    const lastIsTotal = String(displayRows[displayRows.length - 1][0]) === 'Grand Total';
+    const totalRow = lastIsTotal ? [displayRows[displayRows.length - 1]] : [];
+    const body = lastIsTotal ? displayRows.slice(0, -1) : displayRows;
+    const pinSet = new Set(pinnedKeys.map(k => String(k)));
+    const pinned = body.filter(r => pinSet.has(String(r[0])));
+    const rest = body.filter(r => !pinSet.has(String(r[0])));
+    displayRows = [...pinned, ...rest, ...totalRow];
+  }
+
   // Keyboard navigation handler
   React.useEffect(() => {
     if (!kbCell) return;
@@ -348,7 +360,38 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
 
   const borderPreset = tableConfig?.border_preset || 'full';
   const frozenCol = tableConfig?.frozen_first_col ?? false;
+  const frozenHeader = tableConfig?.frozen_header ?? false;
   const headerWrap = tableConfig?.header_word_wrap ?? false;
+  const mergeRowLabels = tableConfig?.merge_row_labels ?? false;
+  const sparklineCols = tableConfig?.sparkline_columns || [];
+  const autoFootMarkers = tableConfig?.auto_footnote_markers ?? false;
+  // Resolve sparkline target columns → absolute indices in result.headers.
+  const sparklineColIdx = useMemo(() => {
+    if (!result || sparklineCols.length === 0) return [] as number[];
+    const renames = tableConfig?.header_renames || {};
+    return sparklineCols
+      .map(t => result.headers.findIndex(h => (renames[h] || h) === t || h === t))
+      .filter(i => i >= 0);
+  }, [result, sparklineCols, tableConfig?.header_renames]);
+  const showSparklineCol = sparklineColIdx.length >= 2;
+  // Per-cell footnote marker assignment: a stable numeric marker keyed by cell
+  // text "*" gets [1], "**" gets [2], etc. Markers append to footnotes panel.
+  const footMarkerByText = useMemo(() => {
+    if (!autoFootMarkers) return new Map<string, number>();
+    const m = new Map<string, number>();
+    let next = 1;
+    for (const row of displayRows) {
+      for (const cell of row) {
+        if (typeof cell === 'string') {
+          const trimmed = cell.trim();
+          if (trimmed === '*' || trimmed === '**' || trimmed === '***') {
+            if (!m.has(trimmed)) { m.set(trimmed, next++); }
+          }
+        }
+      }
+    }
+    return m;
+  }, [autoFootMarkers, displayRows]);
 
   // Column-group separator: track which absolute column indices start a new group
   // and build a per-column → parent-top-label map (used to strip duplicate parent
@@ -377,7 +420,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
   const footnotes = tableConfig?.footnotes || [];
 
   return (
-    <div className={`live-preview ${zoomClass}`} data-theme-table={theme} data-table-mode={tableMode} data-border={borderPreset} data-frozen-col={frozenCol ? 'true' : 'false'} data-header-wrap={headerWrap ? 'true' : 'false'}>
+    <div className={`live-preview ${zoomClass}`} data-theme-table={theme} data-table-mode={tableMode} data-border={borderPreset} data-frozen-col={frozenCol ? 'true' : 'false'} data-frozen-header={frozenHeader ? 'true' : 'false'} data-header-wrap={headerWrap ? 'true' : 'false'}>
       {(title || tableNumberLabel) && (
         <div className="table-title" style={{
           fontWeight: titleBold ? 700 : 400,
@@ -411,9 +454,9 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
             style={{ fontSize: 10, padding: '2px 8px' }}>Clear</button>
         </div>
       )}
-      <div className="result-table-wrap">
+      <div className="result-table-wrap" style={frozenHeader ? { maxHeight: 600, overflow: 'auto' } : undefined}>
         <table className="result-table">
-          <thead>
+          <thead style={frozenHeader ? { position: 'sticky', top: 0, zIndex: 5 } : undefined}>
             {/* Multi-level header row (top level groups) */}
             {result.column_groups?.has_multi_level && (() => {
               const groups = result.column_groups!.top;
@@ -518,6 +561,11 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                   </th>
                 );
               })}
+              {showSparklineCol && (
+                <th style={{ background: tv.headerBg, color: tv.headerColor, borderColor: tv.borderColor, textAlign: 'center', minWidth: 80 }}>
+                  Trend
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -540,8 +588,25 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                     </td>
                   )}
                   {row.map((cell: any, ci: number) => {
+                    // Merge consecutive identical row labels: blank cells in the row-label
+                    // columns when the previous data row had the same value.
+                    let mergedCell: any = cell;
+                    if (mergeRowLabels && !isGrandTotal && !isSubtotal && ci < numRowFields && ri > 0) {
+                      const prev = displayRows[ri - 1];
+                      const prevIsTotal = prev && String(prev[0]) === 'Grand Total';
+                      if (prev && !prevIsTotal && String(prev[ci]) === String(cell)) {
+                        mergedCell = '';
+                      }
+                    }
                     const cfStyle = (!isGrandTotal && cfAppliers.has(ci)) ? cfAppliers.get(ci)!(cell, row) : {};
                     const iconSuffix = (!isGrandTotal) ? getIconSetIcon(ci, cell) : '';
+                    // Auto-footnote marker: any cell text "*" / "**" / "***" gets a
+                    // matching numeric superscript, which we surface in the footnote
+                    // panel below the table.
+                    const cellTextForMark = typeof cell === 'string' ? cell.trim() : '';
+                    const footMark = autoFootMarkers && footMarkerByText.has(cellTextForMark)
+                      ? footMarkerByText.get(cellTextForMark)
+                      : undefined;
                     const ann = getAnnotation(ri, ci);
                     const annStyle: React.CSSProperties = ann ? {
                       ...(ann.highlight ? { background: ann.highlight } : {}),
@@ -576,6 +641,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                         )}
                         {isError && <span className="cell-error-indicator" title="Calculation error">⚠</span>}
                         {isError ? <span style={{ color: '#ef4444', fontSize: 11 }}>{cell}</span> : (() => {
+                          if (mergedCell === '' && cell !== '') return '';
                           const txt = formatCellWithFmt(cell, ci);
                           if (typeof cell === 'string' && cell.includes('\n')) {
                             const parts = String(cell).split('\n');
@@ -583,6 +649,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                           }
                           return txt;
                         })()}{iconSuffix}
+                        {footMark !== undefined && <sup style={{ fontSize: 9, color: '#a78bfa', marginLeft: 2 }}>[{footMark}]</sup>}
                         {isHovered && !ann && (
                           <div className="cell-hover-tooltip">
                             {getCellTooltip(ri, ci, cell)}
@@ -591,6 +658,38 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                       </td>
                     );
                   })}
+                  {showSparklineCol && (() => {
+                    const vals = sparklineColIdx.map(ci => {
+                      const v = row[ci];
+                      return typeof v === 'number' ? v : parseFloat(String(v));
+                    }).filter(v => isFinite(v));
+                    if (vals.length < 2 || isGrandTotal) {
+                      return <td style={{ borderColor: tv.borderColor, textAlign: 'center', opacity: 0.5 }}>—</td>;
+                    }
+                    const sw = 80, sh = 18, pad = 2;
+                    const lo = Math.min(...vals), hi = Math.max(...vals);
+                    const span = hi - lo || 1;
+                    const stepX = (sw - pad * 2) / Math.max(vals.length - 1, 1);
+                    const ptsLine = vals.map((v, i) => {
+                      const x = pad + i * stepX;
+                      const y = sh - pad - ((v - lo) / span) * (sh - pad * 2);
+                      return `${x},${y}`;
+                    }).join(' ');
+                    const barW = Math.max(2, (sw - pad * 2) / vals.length - 1);
+                    return (
+                      <td style={{ borderColor: tv.borderColor, textAlign: 'center', padding: '2px 4px' }}>
+                        <svg width={sw} height={sh} style={{ display: 'block', margin: '0 auto' }} aria-label="row sparkline">
+                          {vals.map((v, i) => {
+                            const x = pad + i * stepX - barW / 2;
+                            const h = ((v - lo) / span) * (sh - pad * 2);
+                            const y = sh - pad - h;
+                            return <rect key={i} x={x} y={y} width={barW} height={Math.max(h, 1)} fill="#3b82f680" rx={1} />;
+                          })}
+                          <polyline points={ptsLine} fill="none" stroke="#3b82f6" strokeWidth={1.2} />
+                        </svg>
+                      </td>
+                    );
+                  })()}
                 </tr>
               );
             })}

@@ -155,8 +155,15 @@ export interface TableConfig {
   table_number?: string;
   // Advanced formatting
   frozen_first_col?: boolean;
+  frozen_header?: boolean;          // sticky header row
   header_word_wrap?: boolean;
   zoom_level?: number;  // 50, 75, 100, 125, 150, 200
+  // Phase-2 table customisation
+  merge_row_labels?: boolean;       // collapse consecutive identical row labels
+  sparkline_columns?: string[];     // value fields to render as inline mini-bars
+  pinned_row_keys?: string[];       // first-column values pinned to top of table
+  page_break_before?: boolean;      // force Word page break before this table
+  auto_footnote_markers?: boolean;  // auto-attach footnote markers to suppressed/flagged cells
   // Footnotes system
   footnotes?: { marker: string; text: string }[];
   footnote_style?: 'numeric' | 'alpha' | 'symbol' | 'custom';  // 1,2,3 / a,b,c / *,†,‡ / custom

@@ -219,6 +219,18 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
   // to a PNG (base64) and return { chart_image, chart_title } for the payload.
   // Title is sent SEPARATELY so the Word doc can place it as an editable paragraph
   // above the image (per user request: image = chart, title = editable text).
+  // Word export needs a chart wide enough to render crisply at print scale.
+  // The off-screen ChartCanvas (below) honours this same floor so the SVG
+  // we serialize already has the right intrinsic dimensions.
+  const DOCX_MIN_WIDTH = 1000;
+  function exportSize(cc: any) {
+    const rawWidth = (typeof cc?.chartWidth === 'number' && cc.chartWidth > 0) ? cc.chartWidth : W_DEFAULT;
+    const rawHeight = (typeof cc?.chartHeight === 'number' && cc.chartHeight > 0) ? cc.chartHeight : H_DEFAULT;
+    const width = Math.max(rawWidth, DOCX_MIN_WIDTH);
+    const height = width > rawWidth ? Math.round(rawHeight * (width / rawWidth)) : rawHeight;
+    return { width, height };
+  }
+
   async function renderChartFor(t: TableConfig): Promise<{ chart_image?: string; chart_title?: string }> {
     const cc = t.chartConfig;
     const res = results.get(t.id);
@@ -228,8 +240,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
     if (!svg) return {};
     const savedTitle = ((cc.chartTitle as string) || '').trim();
     const title = savedTitle || figTitleFromTable(t) || `Fig: ${t.title || t.name || 'Chart'}`;
-    const width = (typeof cc.chartWidth === 'number' && cc.chartWidth > 0) ? cc.chartWidth : W_DEFAULT;
-    const height = (typeof cc.chartHeight === 'number' && cc.chartHeight > 0) ? cc.chartHeight : H_DEFAULT;
+    const { width, height } = exportSize(cc);
     const titleFs = (typeof cc.titleFontSize === 'number' && cc.titleFontSize > 0) ? cc.titleFontSize : 14;
     const { xml, totalHeight } = buildChartExportSvg({
       svgElement: svg,
@@ -237,6 +248,11 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
       titleFontSize: titleFs,
       width,
       height,
+      titleColor: (cc.titleColor as string) || undefined,
+      fontFamily: (cc.fontFamily as string) || undefined,
+      titleAlign: cc.titleAlign,
+      titleBold: cc.titleBold,
+      titleItalic: cc.titleItalic,
     });
     try {
       const dataUrl = await svgXmlToPngDataUrl(xml, width, totalHeight, 2);
@@ -862,6 +878,24 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
                                 xLabelRotation: cc.xLabelRotation as number | 'auto' | undefined,
                                 yLabelRotation: cc.yLabelRotation as number | undefined,
                                 valueLabelSplit: cc.valueLabelSplit as boolean | undefined,
+                                fontFamily: cc.fontFamily as string | undefined,
+                                axisColor: cc.axisColor as string | undefined,
+                                gridColor: cc.gridColor as string | undefined,
+                                tickColor: cc.tickColor as string | undefined,
+                                axisLabelColor: cc.axisLabelColor as string | undefined,
+                                dataLabelColor: cc.dataLabelColor as string | undefined,
+                                singleColor: cc.singleColor as string | undefined,
+                                seriesColors: cc.seriesColors as Record<number, string> | undefined,
+                                referenceLines: cc.referenceLines,
+                                categorySort: cc.categorySort,
+                                topN: cc.topN,
+                                topNOther: cc.topNOther,
+                                stacked100: cc.stacked100,
+                                labelPosition: cc.labelPosition,
+                                trendline: cc.trendline,
+                                patternFills: cc.patternFills,
+                                conditionalColor: cc.conditionalColor,
+                                lightMode: cc.lightMode,
                               }}
                               width={420}
                               height={180}
@@ -995,8 +1029,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
           const cc = t.chartConfig!;
           const res = results.get(t.id);
           if (!res) return null;
-          const width = (typeof cc.chartWidth === 'number' && cc.chartWidth > 0) ? cc.chartWidth : W_DEFAULT;
-          const height = (typeof cc.chartHeight === 'number' && cc.chartHeight > 0) ? cc.chartHeight : H_DEFAULT;
+          const { width, height } = exportSize(cc);
           const canvasConfig = {
             type: (cc.type as ChartType) || 'bar',
             xField: cc.xField as string,
@@ -1012,6 +1045,24 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
             xLabelRotation: cc.xLabelRotation as number | 'auto' | undefined,
             yLabelRotation: cc.yLabelRotation as number | undefined,
             valueLabelSplit: cc.valueLabelSplit as boolean | undefined,
+            fontFamily: cc.fontFamily as string | undefined,
+            axisColor: cc.axisColor as string | undefined,
+            gridColor: cc.gridColor as string | undefined,
+            tickColor: cc.tickColor as string | undefined,
+            axisLabelColor: cc.axisLabelColor as string | undefined,
+            dataLabelColor: cc.dataLabelColor as string | undefined,
+            singleColor: cc.singleColor as string | undefined,
+            seriesColors: cc.seriesColors as Record<number, string> | undefined,
+            referenceLines: cc.referenceLines,
+            categorySort: cc.categorySort,
+            topN: cc.topN,
+            topNOther: cc.topNOther,
+            stacked100: cc.stacked100,
+            labelPosition: cc.labelPosition,
+            trendline: cc.trendline,
+            patternFills: cc.patternFills,
+            conditionalColor: cc.conditionalColor,
+            lightMode: cc.lightMode,
           };
           return (
             <ChartCanvas

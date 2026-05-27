@@ -11,7 +11,7 @@ interface Props {
   activeTableIdx?: number;
 }
 
-type Tab = 'data' | 'style' | 'axes' | 'size';
+type Tab = 'data' | 'style' | 'axes' | 'colors' | 'advanced' | 'size';
 const ASPECT_PRESETS: { value: string; label: string; ratio: number | null }[] = [
   { value: 'auto',  label: 'Auto (fit text)', ratio: null },
   { value: '16:9',  label: '16 : 9 (wide)',   ratio: 16 / 9 },
@@ -20,6 +20,57 @@ const ASPECT_PRESETS: { value: string; label: string; ratio: number | null }[] =
   { value: '1:1',   label: '1 : 1 (square)',  ratio: 1 },
   { value: 'custom', label: 'Custom',         ratio: null },
 ];
+
+// Font family options — value is the CSS font-family stack so the SVG renders
+// it correctly both in-app and after rasterization for Word/PNG.
+const FONT_FAMILIES: { label: string; value: string }[] = [
+  { label: 'Default (inherit)',  value: '' },
+  { label: 'Arial',              value: 'Arial, sans-serif' },
+  { label: 'Helvetica',          value: 'Helvetica, Arial, sans-serif' },
+  { label: 'Inter',              value: 'Inter, system-ui, sans-serif' },
+  { label: 'Segoe UI',           value: '"Segoe UI", Tahoma, sans-serif' },
+  { label: 'Verdana',            value: 'Verdana, Geneva, sans-serif' },
+  { label: 'Tahoma',             value: 'Tahoma, sans-serif' },
+  { label: 'Trebuchet MS',       value: '"Trebuchet MS", sans-serif' },
+  { label: 'Georgia (serif)',    value: 'Georgia, serif' },
+  { label: 'Times New Roman',    value: '"Times New Roman", Times, serif' },
+  { label: 'Cambria (serif)',    value: 'Cambria, Georgia, serif' },
+  { label: 'Courier New (mono)', value: '"Courier New", Courier, monospace' },
+];
+
+// Style preset persistence — list of named style snapshots stored in localStorage.
+// Each preset captures palette, font, all colors, sizes, opacity — the visual
+// settings only. Data + axes + size are NOT part of a preset so the same preset
+// can be re-applied across different tables/charts.
+const PRESET_KEY = 'tableforge_chart_presets';
+interface ChartStylePreset {
+  paletteName: string;
+  fontFamily: string;
+  axisColor: string;
+  gridColor: string;
+  tickColor: string;
+  axisLabelColor: string;
+  dataLabelColor: string;
+  titleColor: string;
+  singleColor: string;
+  labelFontSize: number;
+  titleFontSize: number;
+  barOpacity: number;
+  showGrid: boolean;
+  showLabels: boolean;
+  showLegend: LegendPos;
+}
+function loadPresets(): Record<string, ChartStylePreset> {
+  try {
+    const raw = localStorage.getItem(PRESET_KEY);
+    if (!raw) return {};
+    const p = JSON.parse(raw);
+    return (p && typeof p === 'object') ? p : {};
+  } catch { return {}; }
+}
+function savePresets(p: Record<string, ChartStylePreset>) {
+  try { localStorage.setItem(PRESET_KEY, JSON.stringify(p)); } catch { /* quota or disabled */ }
+}
 
 export function ChartBuilder({ tables, results, onClose, onChartChange, activeTableIdx }: Props) {
   const initialIdx = (typeof activeTableIdx === 'number' && activeTableIdx >= 0 && activeTableIdx < tables.length) ? activeTableIdx : 0;
@@ -45,6 +96,38 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
   const [chartHeight, setChartHeight] = useState<number>(H_DEFAULT);
   const [aspectPreset, setAspectPreset] = useState<string>('auto');
   const [valueLabelSplit, setValueLabelSplit] = useState<boolean>(false);
+  // ─── Color & font customisation ──────────────────────────────────────────
+  const [fontFamily, setFontFamily] = useState<string>('');
+  const [axisColor, setAxisColor] = useState<string>('#374151');
+  const [gridColor, setGridColor] = useState<string>('rgba(255,255,255,0.05)');
+  const [tickColor, setTickColor] = useState<string>('#9ca3af');
+  const [axisLabelColor, setAxisLabelColor] = useState<string>('#e4e4e7');
+  const [dataLabelColor, setDataLabelColor] = useState<string>('');  // blank = use series color
+  const [titleColor, setTitleColor] = useState<string>('');          // blank = default fill
+  const [singleColor, setSingleColor] = useState<string>('');        // blank = use palette
+  const [seriesColors, setSeriesColors] = useState<Record<number, string>>({});
+  const [presets, setPresets] = useState<Record<string, ChartStylePreset>>(() => loadPresets());
+  const [presetName, setPresetName] = useState<string>('');
+  // ─── Advanced chart options (title align/bold/italic, ref line, sort/topN,
+  // stacked100, label position, trendline, hatch fills, conditional bars, light mode) ─
+  const [titleAlign, setTitleAlign] = useState<'left' | 'center' | 'right'>('center');
+  const [titleBold, setTitleBold] = useState<boolean>(true);
+  const [titleItalic, setTitleItalic] = useState<boolean>(false);
+  const [refLineValue, setRefLineValue] = useState<string>('');
+  const [refLineLabel, setRefLineLabel] = useState<string>('');
+  const [refLineColor, setRefLineColor] = useState<string>('#f97316');
+  const [categorySort, setCategorySort] = useState<'none' | 'asc' | 'desc'>('none');
+  const [topN, setTopN] = useState<number>(0);
+  const [topNOther, setTopNOther] = useState<boolean>(false);
+  const [stacked100, setStacked100] = useState<boolean>(false);
+  const [labelPosition, setLabelPosition] = useState<'inside' | 'outside'>('outside');
+  const [trendline, setTrendline] = useState<boolean>(false);
+  const [patternFills, setPatternFills] = useState<boolean>(false);
+  const [condEnabled, setCondEnabled] = useState<boolean>(false);
+  const [condThreshold, setCondThreshold] = useState<number>(0);
+  const [condBelow, setCondBelow] = useState<string>('#ef4444');
+  const [condAbove, setCondAbove] = useState<string>('#10b981');
+  const [lightMode, setLightMode] = useState<boolean>(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
 
@@ -74,6 +157,35 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
       setChartHeight(typeof cc.chartHeight === 'number' ? cc.chartHeight : H_DEFAULT);
       setAspectPreset(typeof cc.aspectPreset === 'string' ? cc.aspectPreset : 'auto');
       setValueLabelSplit(!!cc.valueLabelSplit);
+      setFontFamily(typeof cc.fontFamily === 'string' ? cc.fontFamily : '');
+      setAxisColor(typeof cc.axisColor === 'string' ? cc.axisColor : '#374151');
+      setGridColor(typeof cc.gridColor === 'string' ? cc.gridColor : 'rgba(255,255,255,0.05)');
+      setTickColor(typeof cc.tickColor === 'string' ? cc.tickColor : '#9ca3af');
+      setAxisLabelColor(typeof cc.axisLabelColor === 'string' ? cc.axisLabelColor : '#e4e4e7');
+      setDataLabelColor(typeof cc.dataLabelColor === 'string' ? cc.dataLabelColor : '');
+      setTitleColor(typeof cc.titleColor === 'string' ? cc.titleColor : '');
+      setSingleColor(typeof cc.singleColor === 'string' ? cc.singleColor : '');
+      setSeriesColors(cc.seriesColors && typeof cc.seriesColors === 'object' ? cc.seriesColors : {});
+      setTitleAlign((cc.titleAlign as any) || 'center');
+      setTitleBold(cc.titleBold !== false);
+      setTitleItalic(!!cc.titleItalic);
+      const rl = Array.isArray(cc.referenceLines) && cc.referenceLines[0];
+      setRefLineValue(rl && isFinite(rl.value) ? String(rl.value) : '');
+      setRefLineLabel(rl?.label || '');
+      setRefLineColor(rl?.color || '#f97316');
+      setCategorySort((cc.categorySort as any) || 'none');
+      setTopN(typeof cc.topN === 'number' ? cc.topN : 0);
+      setTopNOther(!!cc.topNOther);
+      setStacked100(!!cc.stacked100);
+      setLabelPosition((cc.labelPosition as any) || 'outside');
+      setTrendline(!!cc.trendline);
+      setPatternFills(!!cc.patternFills);
+      const cc2 = cc.conditionalColor;
+      setCondEnabled(!!cc2);
+      setCondThreshold(cc2 && isFinite(cc2.threshold) ? cc2.threshold : 0);
+      setCondBelow(cc2?.below || '#ef4444');
+      setCondAbove(cc2?.above || '#10b981');
+      setLightMode(!!cc.lightMode);
     } else {
       setChartType('bar'); setXField(''); setYFields([]);
       setPalette(0); setShowGrid(true); setShowLabels(false); setShowLegend('right');
@@ -83,6 +195,16 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
       setXLabelRotation('auto'); setYLabelRotation(0);
       setChartWidth(W_DEFAULT); setChartHeight(H_DEFAULT); setAspectPreset('auto');
       setValueLabelSplit(false);
+      setFontFamily(''); setAxisColor('#374151'); setGridColor('rgba(255,255,255,0.05)');
+      setTickColor('#9ca3af'); setAxisLabelColor('#e4e4e7');
+      setDataLabelColor(''); setTitleColor(''); setSingleColor(''); setSeriesColors({});
+      setTitleAlign('center'); setTitleBold(true); setTitleItalic(false);
+      setRefLineValue(''); setRefLineLabel(''); setRefLineColor('#f97316');
+      setCategorySort('none'); setTopN(0); setTopNOther(false);
+      setStacked100(false); setLabelPosition('outside');
+      setTrendline(false); setPatternFills(false);
+      setCondEnabled(false); setCondThreshold(0); setCondBelow('#ef4444'); setCondAbove('#10b981');
+      setLightMode(false);
     }
   }, [table?.id]);
 
@@ -118,6 +240,12 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
     });
   };
 
+  const refLineParsed = (() => {
+    const v = parseFloat(refLineValue);
+    if (!isFinite(v)) return [];
+    return [{ value: v, label: refLineLabel || undefined, color: refLineColor }];
+  })();
+
   const buildConfig = (): ChartCanvasConfig => ({
     type: chartType,
     xField: effectiveX,
@@ -127,6 +255,24 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
     xAxisLabel, yAxisLabel, labelFontSize, barOpacity,
     xLabelRotation, yLabelRotation,
     valueLabelSplit,
+    fontFamily: fontFamily || undefined,
+    axisColor, gridColor,
+    tickColor, axisLabelColor,
+    dataLabelColor: dataLabelColor || undefined,
+    singleColor: singleColor || undefined,
+    seriesColors,
+    referenceLines: refLineParsed,
+    categorySort,
+    topN: topN > 0 ? topN : undefined,
+    topNOther,
+    stacked100,
+    labelPosition,
+    trendline,
+    patternFills,
+    conditionalColor: condEnabled
+      ? { threshold: condThreshold, below: condBelow, above: condAbove }
+      : undefined,
+    lightMode,
   });
 
   const autoFigTitle = useMemo(() => table ? figTitleFromTable(table) : '', [table?.title, table?.name, table?.table_number]);
@@ -146,6 +292,22 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
         xLabelRotation, yLabelRotation,
         chartWidth, chartHeight, aspectPreset,
         valueLabelSplit,
+        fontFamily, axisColor, gridColor,
+        tickColor, axisLabelColor, dataLabelColor, titleColor,
+        singleColor, seriesColors,
+        titleAlign, titleBold, titleItalic,
+        referenceLines: refLineParsed,
+        categorySort,
+        topN: topN > 0 ? topN : undefined,
+        topNOther,
+        stacked100,
+        labelPosition,
+        trendline,
+        patternFills,
+        conditionalColor: condEnabled
+          ? { threshold: condThreshold, below: condBelow, above: condAbove }
+          : undefined,
+        lightMode,
       });
     }
     onClose();
@@ -162,6 +324,9 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
       titleFontSize,
       width: chartWidth,
       height: effectiveHeight,
+      titleColor: titleColor || undefined,
+      fontFamily: fontFamily || undefined,
+      titleAlign, titleBold, titleItalic,
     });
     const fileBase = `chart_${table?.name || 'export'}`;
     if (format === 'svg') {
@@ -364,6 +529,308 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
     </>
   );
 
+  // ─── Preset application + persistence ──────────────────────────────────
+  const applyPreset = (name: string) => {
+    const p = presets[name];
+    if (!p) return;
+    const idx = PALETTES.findIndex(pp => pp.name === p.paletteName);
+    if (idx >= 0) setPalette(idx);
+    setFontFamily(p.fontFamily || '');
+    setAxisColor(p.axisColor || '#374151');
+    setGridColor(p.gridColor || 'rgba(255,255,255,0.05)');
+    setTickColor(p.tickColor || '#9ca3af');
+    setAxisLabelColor(p.axisLabelColor || '#e4e4e7');
+    setDataLabelColor(p.dataLabelColor || '');
+    setTitleColor(p.titleColor || '');
+    setSingleColor(p.singleColor || '');
+    setLabelFontSize(p.labelFontSize || 10);
+    setTitleFontSize(p.titleFontSize || 14);
+    setBarOpacity(typeof p.barOpacity === 'number' ? p.barOpacity : 0.9);
+    setShowGrid(!!p.showGrid);
+    setShowLabels(!!p.showLabels);
+    setShowLegend((p.showLegend as LegendPos) || 'right');
+  };
+  const saveCurrentAsPreset = () => {
+    const n = presetName.trim();
+    if (!n) return;
+    const next: Record<string, ChartStylePreset> = {
+      ...presets,
+      [n]: {
+        paletteName: PALETTES[palette]?.name || 'Blueprint',
+        fontFamily, axisColor, gridColor, tickColor, axisLabelColor,
+        dataLabelColor, titleColor, singleColor,
+        labelFontSize, titleFontSize, barOpacity,
+        showGrid, showLabels, showLegend,
+      },
+    };
+    setPresets(next);
+    savePresets(next);
+  };
+  const deletePreset = (name: string) => {
+    if (!presets[name]) return;
+    const next = { ...presets };
+    delete next[name];
+    setPresets(next);
+    savePresets(next);
+  };
+
+  // Series-color editor: the indices here track whatever the chart iterates by
+  // (categories for single-series bar/pie, series for stacked/grouped/line),
+  // so we surface the matching labels for the user.
+  const seriesEditorLabels = useMemo<string[]>(() => {
+    const multiSeries = effectiveY.length > 1
+      && ['stacked', 'grouped', 'line', 'area', 'combo'].includes(chartType);
+    if (multiSeries) return effectiveY.slice();
+    return rows.map(r => String(r[0] ?? '')).slice(0, 20);
+  }, [effectiveY, chartType, rows]);
+
+  const paletteColors = PALETTES[palette]?.colors || PALETTES[0].colors;
+  const setSeriesColor = (i: number, c: string) => {
+    setSeriesColors(prev => {
+      const next = { ...prev };
+      if (!c) delete next[i]; else next[i] = c;
+      return next;
+    });
+  };
+  const clearSeriesColors = () => setSeriesColors({});
+
+  const renderColorsTab = () => (
+    <>
+      <div className="form-group">
+        <label>Font family (charts & figures)</label>
+        <select value={fontFamily} onChange={e => setFontFamily(e.target.value)}>
+          {FONT_FAMILIES.map(f => <option key={f.label} value={f.value}>{f.label}</option>)}
+        </select>
+      </div>
+
+      <div className="form-group">
+        <label style={{ display: 'block', marginBottom: 4 }}>Title (export) color</label>
+        <input type="color" value={titleColor || '#1f2937'} onChange={e => setTitleColor(e.target.value)} style={{ width: 60, height: 28, padding: 0, border: '1px solid var(--border)', borderRadius: 4 }} />
+        {titleColor && <button className="btn-small" style={{ marginLeft: 8, fontSize: 10 }} onClick={() => setTitleColor('')}>Reset</button>}
+      </div>
+
+      <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <label style={{ fontSize: 11 }}>Axis lines
+          <input type="color" value={axisColor} onChange={e => setAxisColor(e.target.value)} style={{ display: 'block', width: '100%', height: 26, padding: 0, marginTop: 2 }} />
+        </label>
+        <label style={{ fontSize: 11 }}>Grid lines
+          <input type="color" value={gridColor.startsWith('rgba') ? '#1f2937' : gridColor} onChange={e => setGridColor(e.target.value)} style={{ display: 'block', width: '100%', height: 26, padding: 0, marginTop: 2 }} />
+        </label>
+        <label style={{ fontSize: 11 }}>Tick & legend text
+          <input type="color" value={tickColor} onChange={e => setTickColor(e.target.value)} style={{ display: 'block', width: '100%', height: 26, padding: 0, marginTop: 2 }} />
+        </label>
+        <label style={{ fontSize: 11 }}>Axis captions
+          <input type="color" value={axisLabelColor} onChange={e => setAxisLabelColor(e.target.value)} style={{ display: 'block', width: '100%', height: 26, padding: 0, marginTop: 2 }} />
+        </label>
+        <label style={{ fontSize: 11 }}>Value labels (override)
+          <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+            <input type="color" value={dataLabelColor || '#ffffff'} onChange={e => setDataLabelColor(e.target.value)} style={{ flex: 1, height: 26, padding: 0 }} />
+            {dataLabelColor && <button className="btn-small" style={{ fontSize: 10 }} onClick={() => setDataLabelColor('')} title="Use bar/series color">×</button>}
+          </div>
+          <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{dataLabelColor ? 'Custom' : 'Uses series colour'}</span>
+        </label>
+        <label style={{ fontSize: 11 }}>Single bar colour
+          <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+            <input type="color" value={singleColor || '#3b82f6'} onChange={e => setSingleColor(e.target.value)} style={{ flex: 1, height: 26, padding: 0 }} />
+            {singleColor && <button className="btn-small" style={{ fontSize: 10 }} onClick={() => setSingleColor('')} title="Use palette">×</button>}
+          </div>
+          <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{singleColor ? 'All bars one color' : 'Uses palette'}</span>
+        </label>
+      </div>
+
+      <div className="form-group">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <label style={{ margin: 0 }}>
+            {effectiveY.length > 1 && ['stacked','grouped','line','area','combo'].includes(chartType)
+              ? 'Per-series colour (by legend)'
+              : 'Per-category colour'}
+          </label>
+          {Object.keys(seriesColors).length > 0 && (
+            <button className="btn-small" style={{ fontSize: 10 }} onClick={clearSeriesColors}>Clear all</button>
+          )}
+        </div>
+        <div style={{ maxHeight: 140, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 4, padding: 4, marginTop: 4 }}>
+          {seriesEditorLabels.length === 0 && (
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>No data series yet — pick X / Y on the Data tab.</div>
+          )}
+          {seriesEditorLabels.map((name, i) => {
+            const fallback = paletteColors[i % paletteColors.length];
+            const cur = seriesColors[i] || singleColor || fallback;
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: 11 }}>
+                <input type="color" value={cur} onChange={e => setSeriesColor(i, e.target.value)} style={{ width: 28, height: 20, padding: 0, border: '1px solid var(--border)' }} />
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={name}>{name || `Item ${i + 1}`}</span>
+                {seriesColors[i] && (
+                  <button className="btn-small" style={{ fontSize: 10, padding: '0 6px' }} onClick={() => setSeriesColor(i, '')} title="Reset to palette/single">↺</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+        <label style={{ fontSize: 11, fontWeight: 600 }}>Style presets</label>
+        <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+          <select value="" onChange={e => { if (e.target.value) applyPreset(e.target.value); }} style={{ flex: 1, fontSize: 11 }}>
+            <option value="">— Load preset —</option>
+            {Object.keys(presets).sort().map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+          <input type="text" value={presetName} onChange={e => setPresetName(e.target.value)}
+            placeholder="Preset name" style={{ flex: 1, fontSize: 11, padding: '4px 6px' }} />
+          <button className="btn-small btn-primary" style={{ fontSize: 11 }}
+            disabled={!presetName.trim()} onClick={saveCurrentAsPreset}>Save</button>
+        </div>
+        {Object.keys(presets).length > 0 && (
+          <div style={{ marginTop: 6, maxHeight: 100, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 4, padding: 4 }}>
+            {Object.keys(presets).sort().map(n => (
+              <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: 11 }}>
+                <button className="btn-small" style={{ fontSize: 10, padding: '1px 8px' }} onClick={() => applyPreset(n)}>Apply</button>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={n}>{n}</span>
+                <button className="btn-small" style={{ fontSize: 10, padding: '1px 6px', color: '#ef4444' }}
+                  onClick={() => deletePreset(n)} title="Delete preset">×</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
+          Presets save palette + colour overrides + fonts + sizes. Stored in this browser only.
+        </div>
+      </div>
+    </>
+  );
+
+  const renderAdvancedTab = () => (
+    <>
+      <div className="form-group">
+        <label style={{ fontSize: 11, fontWeight: 600 }}>Title style</label>
+        <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+          <select value={titleAlign} onChange={e => setTitleAlign(e.target.value as any)} style={{ flex: 1, fontSize: 11 }}>
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
+          </select>
+          <label className="checkbox-label" style={{ fontSize: 11 }}><input type="checkbox" checked={titleBold} onChange={e => setTitleBold(e.target.checked)} /> Bold</label>
+          <label className="checkbox-label" style={{ fontSize: 11 }}><input type="checkbox" checked={titleItalic} onChange={e => setTitleItalic(e.target.checked)} /> Italic</label>
+        </div>
+      </div>
+
+      <div className="form-group">
+        <label style={{ fontSize: 11, fontWeight: 600 }}>Reference / target line</label>
+        <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+          <input type="number" value={refLineValue} onChange={e => setRefLineValue(e.target.value)}
+            placeholder="value" style={{ flex: 1, fontSize: 11 }} />
+          <input type="text" value={refLineLabel} onChange={e => setRefLineLabel(e.target.value)}
+            placeholder="label (e.g. 80% target)" style={{ flex: 2, fontSize: 11 }} />
+          <input type="color" value={refLineColor} onChange={e => setRefLineColor(e.target.value)}
+            style={{ width: 32, height: 24, padding: 0 }} />
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>Leave value empty to hide the line.</div>
+      </div>
+
+      <div className="form-group" style={{ display: 'flex', gap: 6 }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 11 }}>Sort categories</label>
+          <select value={categorySort} onChange={e => setCategorySort(e.target.value as any)} style={{ width: '100%', fontSize: 11 }}>
+            <option value="none">Original order</option>
+            <option value="desc">By value (high → low)</option>
+            <option value="asc">By value (low → high)</option>
+          </select>
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 11 }}>Top N</label>
+          <input type="number" min={0} max={50} value={topN}
+            onChange={e => setTopN(Math.max(0, Math.min(50, +e.target.value || 0)))}
+            placeholder="0 = all" style={{ width: '100%', fontSize: 11 }} />
+        </div>
+      </div>
+      <label className="checkbox-label" style={{ fontSize: 11 }}>
+        <input type="checkbox" checked={topNOther} onChange={e => setTopNOther(e.target.checked)} disabled={topN <= 0} />
+        Roll remaining into "Other" bucket
+      </label>
+
+      <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 8 }}>
+        <label className="checkbox-label" style={{ fontSize: 11 }}>
+          <input type="checkbox" checked={stacked100} onChange={e => setStacked100(e.target.checked)} />
+          Stacked 100% (normalised — only applies to Stacked chart)
+        </label>
+      </div>
+
+      <div className="form-group" style={{ display: 'flex', gap: 6 }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 11 }}>Data label position</label>
+          <select value={labelPosition} onChange={e => setLabelPosition(e.target.value as any)} style={{ width: '100%', fontSize: 11 }}>
+            <option value="outside">Outside bar (above)</option>
+            <option value="inside">Inside bar</option>
+          </select>
+        </div>
+      </div>
+
+      <label className="checkbox-label" style={{ fontSize: 11 }}>
+        <input type="checkbox" checked={trendline} onChange={e => setTrendline(e.target.checked)} />
+        Trendline / linear regression (scatter only)
+      </label>
+
+      <label className="checkbox-label" style={{ fontSize: 11 }}>
+        <input type="checkbox" checked={patternFills} onChange={e => setPatternFills(e.target.checked)} />
+        Hatch / pattern fills (B&W print-safe)
+      </label>
+
+      <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 8 }}>
+        <label className="checkbox-label" style={{ fontSize: 11 }}>
+          <input type="checkbox" checked={condEnabled} onChange={e => setCondEnabled(e.target.checked)} />
+          Colour bars by value (threshold)
+        </label>
+        {condEnabled && (
+          <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
+            <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>If &lt;</span>
+            <input type="number" value={condThreshold} onChange={e => setCondThreshold(+e.target.value || 0)}
+              style={{ width: 60, fontSize: 11 }} />
+            <input type="color" value={condBelow} onChange={e => setCondBelow(e.target.value)}
+              style={{ width: 28, height: 22, padding: 0 }} title="Below threshold" />
+            <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>else</span>
+            <input type="color" value={condAbove} onChange={e => setCondAbove(e.target.value)}
+              style={{ width: 28, height: 22, padding: 0 }} title="At/above threshold" />
+          </div>
+        )}
+      </div>
+
+      <label className="checkbox-label" style={{ fontSize: 11 }}>
+        <input type="checkbox" checked={lightMode} onChange={e => setLightMode(e.target.checked)} />
+        Light-mode preview (white background, dark text — for printed reports)
+      </label>
+
+      <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 8 }}>
+        <button className="btn-small" style={{ fontSize: 11, width: '100%' }}
+          onClick={() => {
+            if (!onChartChange) return;
+            const styleSubset = {
+              palette: PALETTES[palette]?.name,
+              fontFamily, axisColor, gridColor, tickColor, axisLabelColor,
+              dataLabelColor, titleColor, singleColor,
+              labelFontSize, titleFontSize, barOpacity,
+              showGrid, showLabels, showLegend,
+              titleAlign, titleBold, titleItalic,
+              patternFills, lightMode, labelPosition,
+            };
+            tables.forEach(t => {
+              if (t.id === table?.id) return;
+              if (!t.chartConfig) return;
+              onChartChange(t.id, { ...t.chartConfig, ...styleSubset });
+            });
+            window.alert('Style applied to all charts with a chart configured.');
+          }}>
+          Apply this style to all charts
+        </button>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
+          Copies fonts, palette, colours, legend/grid, label sizes — leaves Data/Axes alone.
+        </div>
+      </div>
+    </>
+  );
+
   const renderSizeTab = () => (
     <>
       <div className="form-group">
@@ -426,12 +893,16 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
               <button className={`chart-tab ${tab === 'data' ? 'active' : ''}`} onClick={() => setTab('data')}>Data</button>
               <button className={`chart-tab ${tab === 'style' ? 'active' : ''}`} onClick={() => setTab('style')}>Style</button>
               <button className={`chart-tab ${tab === 'axes' ? 'active' : ''}`} onClick={() => setTab('axes')}>Axes</button>
+              <button className={`chart-tab ${tab === 'colors' ? 'active' : ''}`} onClick={() => setTab('colors')}>Colors · Fonts</button>
+              <button className={`chart-tab ${tab === 'advanced' ? 'active' : ''}`} onClick={() => setTab('advanced')}>Advanced</button>
               <button className={`chart-tab ${tab === 'size' ? 'active' : ''}`} onClick={() => setTab('size')}>Size · Export</button>
             </div>
             <div className="chart-controls-body">
               {tab === 'data' && renderDataTab()}
               {tab === 'style' && renderStyleTab()}
               {tab === 'axes' && renderAxesTab()}
+              {tab === 'colors' && renderColorsTab()}
+              {tab === 'advanced' && renderAdvancedTab()}
               {tab === 'size' && renderSizeTab()}
             </div>
           </div>
@@ -440,7 +911,14 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
           <div className="chart-canvas-wrap" style={{ flex: 1, overflow: 'auto' }}>
             <input
               className="chart-title-inline-input"
-              style={{ fontSize: titleFontSize }}
+              style={{
+                fontSize: titleFontSize,
+                textAlign: titleAlign,
+                fontWeight: titleBold ? 700 : 400,
+                fontStyle: titleItalic ? 'italic' : 'normal',
+                color: titleColor || undefined,
+                fontFamily: fontFamily || undefined,
+              }}
               value={chartTitle}
               placeholder={autoFigTitle || 'Click to add chart title (used in Word export)'}
               onChange={e => setChartTitle(e.target.value)}
