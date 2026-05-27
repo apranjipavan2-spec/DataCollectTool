@@ -117,8 +117,22 @@ def _is_multi_choice(series: pd.Series) -> bool:
     return multi_count >= 2 or (multi_count >= 1 and multi_count > len(sample) * 0.02)
 
 
+def _strip_formula_cells(df: pd.DataFrame) -> None:
+    """Replace Excel formula strings (cells starting with '=') with NaN in-place.
+    Happens when openpyxl reads a workbook whose formula cache is empty."""
+    for col in df.columns:
+        if df[col].dtype == object:
+            mask = df[col].astype(str).str.match(r'^\s*=')
+            if mask.any():
+                df.loc[mask, col] = np.nan
+
+
 def _detect_columns(df: pd.DataFrame) -> list:
-    """Detect column types and return metadata."""
+    """Detect column types and return metadata.
+
+    Mixed-type columns (e.g. mostly numbers but some text labels) are treated
+    as numeric when ≥50 % of non-null values parse as numbers; the rest become NaN.
+    """
     columns = []
     for col in df.columns:
         dtype = str(df[col].dtype)
@@ -130,21 +144,26 @@ def _detect_columns(df: pd.DataFrame) -> list:
         elif "bool" in dtype:
             col_type = "boolean"
         else:
-            if df[col].dropna().shape[0] > 0:
+            non_null = df[col].dropna()
+            if len(non_null) > 0:
                 is_multi = _is_multi_choice(df[col])
                 if is_multi:
                     col_type = "multi_choice"
                 else:
-                    try:
-                        pd.to_numeric(df[col].dropna().head(20))
+                    # Coerce to numeric and measure coverage — tolerates mixed cols.
+                    num_coerced = pd.to_numeric(non_null, errors="coerce")
+                    numeric_ratio = num_coerced.notna().sum() / len(num_coerced)
+                    if numeric_ratio >= 0.5:
                         col_type = "numeric"
                         df[col] = pd.to_numeric(df[col], errors="coerce")
-                    except (ValueError, TypeError):
-                        _samp = df[col].dropna().head(20).astype(str)
+                    else:
+                        # Date check — only when values contain date-like separators.
+                        _samp = non_null.head(20).astype(str)
                         if _samp.str.contains(r'[-/:]', regex=True).any():
                             try:
                                 pd.to_datetime(_samp)
                                 col_type = "date"
+                                df[col] = pd.to_datetime(df[col], errors="coerce")
                             except (ValueError, TypeError):
                                 col_type = "text"
                         else:

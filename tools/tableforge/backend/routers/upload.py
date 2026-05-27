@@ -23,6 +23,7 @@ from ..shared import (
     add_audit_log,
     _is_multi_choice,
     _detect_columns,
+    _strip_formula_cells,
 )
 
 router = APIRouter()
@@ -51,6 +52,7 @@ async def upload_file(file: UploadFile = File(...)):
             xls = pd.ExcelFile(tmp_path, engine="openpyxl" if ext == "xlsx" else "xlrd")
             sheets = xls.sheet_names
             df = pd.read_excel(xls, sheet_name=sheets[0])
+            _strip_formula_cells(df)   # replace un-evaluated formula strings with NaN
         elif ext in ("csv", "tsv"):
             sep = "\t" if ext == "tsv" else ","
             df = None
@@ -85,73 +87,8 @@ async def upload_file(file: UploadFile = File(...)):
         except Exception:
             pass  # parquet cache is optional
 
-    # Detect column types
-    columns = []
-    for col in df.columns:
-        dtype = str(df[col].dtype)
-        if "int" in dtype or "float" in dtype:
-            col_type = "numeric"
-        elif "datetime" in dtype:
-            col_type = "date"
-        elif "bool" in dtype:
-            col_type = "boolean"
-        else:
-            is_mc = False
-            if df[col].dropna().shape[0] > 0:
-                # Check for multi-choice (comma-separated values like "1,2" or "3,4,5") FIRST
-                # before any numeric conversion that would destroy comma-separated strings
-                try:
-                    is_mc = _is_multi_choice(df[col])
-                except Exception:
-                    is_mc = False
-                if is_mc:
-                    col_type = "multi_choice"
-                else:
-                    # Try numeric first (to avoid small ints being parsed as dates)
-                    try:
-                        pd.to_numeric(df[col].dropna().head(20))
-                        col_type = "numeric"
-                        df[col] = pd.to_numeric(df[col], errors="coerce")
-                    except (ValueError, TypeError):
-                        # Try date — but only if values look like date strings, not plain numbers
-                        sample_str = df[col].dropna().head(20).astype(str)
-                        has_date_chars = sample_str.str.contains(r'[-/:]', regex=True).any()
-                        if has_date_chars:
-                            try:
-                                pd.to_datetime(sample_str)
-                                col_type = "date"
-                                df[col] = pd.to_datetime(df[col], errors="coerce")
-                            except (ValueError, TypeError):
-                                col_type = "text"
-                        else:
-                            col_type = "text"
-            else:
-                col_type = "text"
-
-        sample_values = df[col].dropna().head(10).tolist()
-        stats = {}
-        if col_type == "numeric":
-            stats = {
-                "min": float(df[col].min()) if not pd.isna(df[col].min()) else None,
-                "max": float(df[col].max()) if not pd.isna(df[col].max()) else None,
-                "mean": float(df[col].mean()) if not pd.isna(df[col].mean()) else None,
-            }
-        stats["nulls"] = int(df[col].isna().sum())
-        stats["unique"] = int(df[col].nunique())
-        if col_type == "multi_choice":
-            all_mc_vals: list = []
-            for mv in df[col].dropna().astype(str):
-                all_mc_vals.extend([p.strip() for p in mv.split(',') if p.strip()])
-            stats["unique_responses"] = len(set(all_mc_vals))
-            stats["total_responses"] = len(all_mc_vals)
-            stats["is_multi_choice"] = True
-
-        columns.append({
-            "name": col,
-            "type": col_type,
-            "sample_values": [str(v) for v in sample_values],
-            "stats": sanitize_for_json(stats),
-        })
+    # Detect column types (modifies df in-place for numeric coercion)
+    columns = _detect_columns(df)
 
     datasets[dataset_id] = {
         "df": df,
@@ -191,6 +128,7 @@ async def load_sheet(req: SheetSelect):
     ext = datasets[req.dataset_id]["filename"].rsplit(".", 1)[-1].lower()
     tmp_path = CACHE_DIR / f"{req.dataset_id}.{ext}"
     df = pd.read_excel(tmp_path, sheet_name=req.sheet_name)
+    _strip_formula_cells(df)
     datasets[req.dataset_id]["df"] = df
     add_audit_log(req.dataset_id, "sheet_change", f"Switched to sheet: {req.sheet_name}")
 
