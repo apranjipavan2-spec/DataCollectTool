@@ -490,18 +490,20 @@ async def stat_logistic_regression(config: InferConfig):
                 if len(uniq) != 2:
                     raise HTTPException(400, f"Outcome must be binary — found {len(uniq)} levels")
                 sub[y_col] = (sub[y_col] == sorted(uniq, key=str)[1]).astype(int)
-        # Build formula with C() for categorical predictors.
-        # Use double-quoted Q("...") and escape \ and " so column names with
-        # apostrophes (e.g. "applicant's occupation") don't break patsy parsing.
-        def _q(name: str) -> str:
-            return 'Q("' + name.replace("\\", "\\\\").replace('"', '\\"') + '")'
+        # Rename to safe aliases so patsy never sees the original (possibly very
+        # long, special-character-laden) column names. Map results back later.
+        alias_y = "__y__"
+        alias_x = [f"__x{i}__" for i in range(len(x_cols))]
+        alias_to_orig = {a: c for a, c in zip(alias_x, x_cols)}
+        alias_to_orig[alias_y] = y_col
+        sub = sub.rename(columns={y_col: alias_y, **{c: a for c, a in zip(x_cols, alias_x)}})
         terms = []
-        for c in x_cols:
-            if pd.api.types.is_numeric_dtype(sub[c]):
-                terms.append(_q(c))
+        for a, c in zip(alias_x, x_cols):
+            if pd.api.types.is_numeric_dtype(sub[a]):
+                terms.append(a)
             else:
-                terms.append(f"C({_q(c)})")
-        formula = f"{_q(y_col)} ~ " + " + ".join(terms)
+                terms.append(f"C({a})")
+        formula = f"{alias_y} ~ " + " + ".join(terms)
 
         # Optional survey weights from StudyDesign
         w_series, w_col = _resolve_weights(config.dataset_id, df)
@@ -521,6 +523,13 @@ async def stat_logistic_regression(config: InferConfig):
                 model = logit(formula, data=sub).fit(disp=False, maxiter=200)
         except Exception as e:
             raise HTTPException(400, f"Logit fit failed: {e}")
+        def _disp(term: str) -> str:
+            # Replace alias tokens inside term names (e.g. "C(__x2__)[T.foo]")
+            # with their original column names so the user sees readable rows.
+            out = term
+            for a, c in alias_to_orig.items():
+                out = out.replace(a, c)
+            return out
         coefs = model.params
         conf = model.conf_int()
         pvals = model.pvalues
@@ -532,7 +541,7 @@ async def stat_logistic_regression(config: InferConfig):
         for name in coefs.index:
             sig = iu.sig_stars(pvals[name])
             rows.append([
-                str(name), iu.safe_round(coefs[name]), iu.safe_round(model.bse[name]),
+                _disp(str(name)), iu.safe_round(coefs[name]), iu.safe_round(model.bse[name]),
                 iu.safe_round(coefs[name] / model.bse[name] if model.bse[name] else 0),
                 iu.safe_round(pvals[name], 6),
                 iu.safe_round(ors[name]),
@@ -584,15 +593,19 @@ async def stat_multiple_regression(config: InferConfig):
         y_col, x_cols = _resolve_regression_cols(config)
         sub = df[[y_col] + x_cols].copy()
         sub[y_col] = pd.to_numeric(sub[y_col], errors="coerce")
-        def _q(name: str) -> str:
-            return 'Q("' + name.replace("\\", "\\\\").replace('"', '\\"') + '")'
+        # Rename to safe aliases so patsy never sees the original column names.
+        alias_y = "__y__"
+        alias_x = [f"__x{i}__" for i in range(len(x_cols))]
+        alias_to_orig = {a: c for a, c in zip(alias_x, x_cols)}
+        alias_to_orig[alias_y] = y_col
+        sub = sub.rename(columns={y_col: alias_y, **{c: a for c, a in zip(x_cols, alias_x)}})
         terms = []
-        for c in x_cols:
-            if pd.api.types.is_numeric_dtype(sub[c]):
-                terms.append(_q(c))
+        for a, c in zip(alias_x, x_cols):
+            if pd.api.types.is_numeric_dtype(sub[a]):
+                terms.append(a)
             else:
-                terms.append(f"C({_q(c)})")
-        formula = f"{_q(y_col)} ~ " + " + ".join(terms)
+                terms.append(f"C({a})")
+        formula = f"{alias_y} ~ " + " + ".join(terms)
 
         # Optional survey weights from StudyDesign
         w_series, w_col = _resolve_weights(config.dataset_id, df)
@@ -609,6 +622,11 @@ async def stat_multiple_regression(config: InferConfig):
             model = wls(formula, data=sub, weights=sub["__w__"].values).fit()
         else:
             model = ols(formula, data=sub).fit()
+        def _disp(term: str) -> str:
+            out = term
+            for a, c in alias_to_orig.items():
+                out = out.replace(a, c)
+            return out
         coefs = model.params
         ses = model.bse
         pvals = model.pvalues
@@ -618,7 +636,7 @@ async def stat_multiple_regression(config: InferConfig):
         for name in coefs.index:
             sig = iu.sig_stars(pvals[name])
             rows.append([
-                str(name), iu.safe_round(coefs[name]), iu.safe_round(ses[name]),
+                _disp(str(name)), iu.safe_round(coefs[name]), iu.safe_round(ses[name]),
                 iu.safe_round(model.tvalues[name]), iu.safe_round(pvals[name], 6),
                 f"[{iu.safe_round(conf.loc[name, 0])}, {iu.safe_round(conf.loc[name, 1])}]",
                 sig,
@@ -639,7 +657,7 @@ async def stat_multiple_regression(config: InferConfig):
                 rows.append([""] * len(headers))
                 rows.append(["VIF (multicollinearity)", "", "", "", "", "", ""])
                 for name, v in vifs:
-                    rows.append([str(name), iu.safe_round(v), "", "", "", "VIF>5: caution; >10: serious", ""])
+                    rows.append([_disp(str(name)), iu.safe_round(v), "", "", "", "VIF>5: caution; >10: serious", ""])
         except Exception:
             pass
         summary = {

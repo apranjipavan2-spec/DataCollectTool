@@ -168,6 +168,8 @@ export interface TableConfig {
   footnotes?: { marker: string; text: string }[];
   footnote_style?: 'numeric' | 'alpha' | 'symbol' | 'custom';  // 1,2,3 / a,b,c / *,†,‡ / custom
   _autoTitle?: boolean;  // true = auto-generate title from config; false = user manually edited
+  _statResult?: boolean; // true = result was injected from a stat test, skip pivot tabulation
+  _statResultData?: { headers: string[]; rows: any[][] }; // persisted stat result, rehydrated into results map on project load
   bg_color?: string;           // Values area background color
   header_bg_color?: string;    // Header row background color
   header_text_color?: string;  // Header text color

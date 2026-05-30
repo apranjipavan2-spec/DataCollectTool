@@ -3,7 +3,6 @@ import { ColumnInfo } from '../types';
 import { API_BASE } from '../api';
 import { Chart, adaptFrequencyToBar, adaptMatrixToHeatmap, adaptDescriptiveToBox } from './Chart';
 import { ColPicker } from './ColPicker';
-import { ProjectFilterBanner } from './ProjectFilterBanner';
 
 type StatType =
   | 'correlation'
@@ -52,6 +51,11 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'table' | 'chart'>('table');
   const [alpha, setAlpha] = useState<number>(0.05);
+  // Stat tests can run with the active Project Filter, or independently on the
+  // full dataset — useful e.g. when the outcome column is itself in the project
+  // filter (binary outcome collapses to 1 level).
+  const projectFilterActive = !!projectFilters && Object.values(projectFilters).some(v => v && v.length > 0);
+  const [useProjectFilter, setUseProjectFilter] = useState<boolean>(projectFilterActive);
 
   const numericCols = columns.filter(c => c.type === 'numeric');
   const allCols = columns;
@@ -121,7 +125,7 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
           dataset_id: datasetId,
           columns: selectedCols,
           alpha,
-          filters: projectFilters || {},
+          filters: useProjectFilter ? (projectFilters || {}) : {},
         }),
       });
       if (!res.ok) {
@@ -251,7 +255,30 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
         <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflow: 'auto' }}>
           <p style={{ color: 'var(--text-dim)', fontSize: 13, marginBottom: 12 }}>{descriptions[type]}</p>
 
-          <ProjectFilterBanner filters={projectFilters} />
+          {projectFilterActive ? (
+            <div style={{
+              background: useProjectFilter ? 'rgba(56,189,248,0.10)' : 'rgba(148,163,184,0.08)',
+              border: `1px solid ${useProjectFilter ? 'rgba(56,189,248,0.35)' : 'rgba(148,163,184,0.30)'}`,
+              color: useProjectFilter ? '#7dd3fc' : '#94a3b8',
+              borderRadius: 6, padding: '8px 10px', marginBottom: 12, fontSize: 12,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+            }}>
+              <div>
+                {useProjectFilter
+                  ? <>🌐 Using Project Filter — analysis runs on the filtered subset
+                      ({Object.entries(projectFilters || {}).filter(([, v]) => v && v.length > 0).map(([k, v]) => `${k} (${v.length})`).join(', ')}).</>
+                  : <>⚪ Ignoring Project Filter — this analysis runs on the full dataset.</>}
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={useProjectFilter}
+                  onChange={e => { setUseProjectFilter(e.target.checked); setResult(null); }}
+                />
+                <span>Apply project filter to this test</span>
+              </label>
+            </div>
+          ) : null}
 
           {/* Column selection */}
           <div style={{ marginBottom: 16 }}>

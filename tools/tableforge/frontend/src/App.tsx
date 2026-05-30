@@ -59,6 +59,20 @@ function createEmptyTable(id: string, name: string): TableConfig {
   };
 }
 
+// Stat-test results aren't recomputable from TableConfig — they were injected once
+// when the user ran the test. We persist them on `_statResultData` so reload/resume
+// can put them back into the `results` map.
+function rehydrateStatResults(tables: TableConfig[]): Map<string, TableResult> {
+  const m = new Map<string, TableResult>();
+  for (const t of tables) {
+    const d = (t as any)._statResultData;
+    if (t._statResult && d?.headers && d?.rows) {
+      m.set(t.id, { headers: d.headers, rows: d.rows, row_count: d.rows.length, col_count: d.headers.length });
+    }
+  }
+  return m;
+}
+
 function generateAutoTitle(t: TableConfig): { title: string; subtitle: string; name: string } {
   if (!t.rows.length && !t.values.length) return { title: '', subtitle: '', name: t.name };
   const rowLabel = t.rows.length > 0 ? t.rows.map(r => r.replace(/^\d+\.\s*/, '').split('>').pop()?.trim() || r).join(' x ') : '';
@@ -301,7 +315,7 @@ export default function App() {
       } else {
         setTables(data.tables);
         setActiveTableIdx(0);
-        setResults(new Map());
+        setResults(rehydrateStatResults(data.tables));
         setShowDataPreview(false);
         // Trigger batch tabulation after state settles
         setTimeout(async () => {
@@ -517,7 +531,7 @@ export default function App() {
       setDataset({ dataset_id: data.source_file.dataset_id, filename: data.source_file.filename, row_count: data.source_file.row_count, columns: [], sheets: [], preview: [] });
     }
     setActiveTableIdx(0);
-    setResults(new Map());
+    setResults(Array.isArray(data.tables) ? rehydrateStatResults(data.tables) : new Map());
   }, [resumePrompt]);
 
   const handleResumeNo = useCallback(async () => {
@@ -562,6 +576,9 @@ export default function App() {
   }, []);
 
   const runTabulationCore = useCallback(async (config: TableConfig) => {
+    // Stat-result tables carry pre-computed headers/rows in `results` and have no
+    // values/rows/columns to pivot. Bail without touching the result map.
+    if ((config as any)._statResult) return;
     if (!dataset || config.values.length === 0) {
       if (config.values.length === 0) setResults(prev => { const next = new Map(prev); next.delete(config.id); return next; });
       return;
@@ -892,7 +909,7 @@ export default function App() {
         pushUndo();
         setTables(data.tables);
         setActiveTableIdx(0);
-        setResults(new Map());
+        setResults(rehydrateStatResults(data.tables));
         setLoading(false); setLoadingMsg('');
         return;
       }
@@ -919,7 +936,7 @@ export default function App() {
         pushUndo();
         setTables(data.tables);
         setActiveTableIdx(0);
-        setResults(new Map());
+        setResults(rehydrateStatResults(data.tables));
         const toRun = data.tables.filter((t: TableConfig) => t.values.length > 0);
         await runTabulationsBatch(toRun);
       }
@@ -1137,7 +1154,7 @@ export default function App() {
         pushUndo();
         setTables(data.tables);
         setActiveTableIdx(0);
-        setResults(new Map());
+        setResults(rehydrateStatResults(data.tables));
         setShowDataPreview(false);
         setLastProjectHint(null);
         const toRun = data.tables.filter((t: TableConfig) => t.values.length > 0);
@@ -1971,6 +1988,8 @@ export default function App() {
             const empty = createEmptyTable(id, label.slice(0, 30));
             empty.title = label;
             empty.subtitle = interpretation;
+            empty._statResult = true;
+            empty._statResultData = { headers, rows };
             if (statChart) {
               empty.chartConfig = { statChart, chart_only: !!chartOnly };
             }
@@ -2116,6 +2135,8 @@ export default function App() {
             const empty = createEmptyTable(id, label.slice(0, 30));
             empty.title = label;
             empty.subtitle = interpretation;
+            empty._statResult = true;
+            empty._statResultData = { headers, rows };
             setTables(prev => [...prev, empty]);
             setResults(prev => {
               const next = new Map(prev);
@@ -2337,19 +2358,19 @@ export default function App() {
                   pushUndo();
                   setTables(loadedTables);
                   setActiveTableIdx(0);
-                  setResults(new Map());
+                  setResults(rehydrateStatResults(loadedTables));
                 } else {
                   pushUndo();
                   setTables(loadedTables);
                   setActiveTableIdx(0);
-                  setResults(new Map());
+                  setResults(rehydrateStatResults(loadedTables));
                 }
                 setModal(null);
               }).catch(() => {
                 pushUndo();
                 setTables(loadedTables);
                 setActiveTableIdx(0);
-                setResults(new Map());
+                setResults(rehydrateStatResults(loadedTables));
                 setModal(null);
               });
               return;
@@ -2357,7 +2378,7 @@ export default function App() {
             pushUndo();
             setTables(loadedTables);
             setActiveTableIdx(0);
-            setResults(new Map());
+            setResults(rehydrateStatResults(loadedTables));
             setModal(null);
             return;
           }
@@ -2388,7 +2409,7 @@ export default function App() {
             pushUndo();
             setTables(loadedTables);
             setActiveTableIdx(0);
-            setResults(new Map());
+            setResults(rehydrateStatResults(loadedTables));
             setModal(null);
           }
         }}
@@ -2432,7 +2453,7 @@ export default function App() {
                 // Load without remapping
                 pushUndo();
                 setTables(reconcileState.pendingTables);
-                setActiveTableIdx(0); setResults(new Map());
+                setActiveTableIdx(0); setResults(rehydrateStatResults(reconcileState.pendingTables));
                 setReconcileState(null);
               }}>Load As-Is</button>
               <button className="btn-primary" onClick={() => {
@@ -2452,7 +2473,7 @@ export default function App() {
                 });
                 pushUndo();
                 setTables(remapped);
-                setActiveTableIdx(0); setResults(new Map());
+                setActiveTableIdx(0); setResults(rehydrateStatResults(remapped));
                 setReconcileState(null);
                 // Re-run tabulations
                 setTimeout(() => remapped.forEach(t => { if (t.values.length > 0) runTabulation(t); }), 100);
