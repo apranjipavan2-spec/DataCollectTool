@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ColumnInfo } from '../types';
-import { API_BASE } from '../api';
+import { API_BASE, getColumnValues } from '../api';
 import { Chart, adaptFrequencyToBar, adaptMatrixToHeatmap, adaptDescriptiveToBox } from './Chart';
 import { ColPicker } from './ColPicker';
 
@@ -56,6 +56,50 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
   // filter (binary outcome collapses to 1 level).
   const projectFilterActive = !!projectFilters && Object.values(projectFilters).some(v => v && v.length > 0);
   const [useProjectFilter, setUseProjectFilter] = useState<boolean>(projectFilterActive);
+
+  // Analysis-level subset filter (independent of project filter)
+  const [showSubsetFilter, setShowSubsetFilter] = useState(false);
+  const [analysisFilters, setAnalysisFilters] = useState<Record<string, string[]>>({});
+  const [filterColValues, setFilterColValues] = useState<Record<string, string[]>>({});
+  const [filterColSearch, setFilterColSearch] = useState<Record<string, string>>({});
+  const [filterColLoading, setFilterColLoading] = useState<Record<string, boolean>>({});
+  const [addingCol, setAddingCol] = useState('');
+  const [expandedFilterCol, setExpandedFilterCol] = useState<string | null>(null);
+
+  const loadColValues = async (col: string) => {
+    if (filterColValues[col]) return;
+    setFilterColLoading(prev => ({ ...prev, [col]: true }));
+    try {
+      const res = await getColumnValues(datasetId, col);
+      setFilterColValues(prev => ({ ...prev, [col]: res.values }));
+    } finally {
+      setFilterColLoading(prev => ({ ...prev, [col]: false }));
+    }
+  };
+
+  const addFilterCol = async (col: string) => {
+    if (!col || analysisFilters[col] !== undefined) return;
+    setAnalysisFilters(prev => ({ ...prev, [col]: [] }));
+    setExpandedFilterCol(col);
+    setAddingCol('');
+    await loadColValues(col);
+  };
+
+  const removeFilterCol = (col: string) => {
+    setAnalysisFilters(prev => { const n = { ...prev }; delete n[col]; return n; });
+    if (expandedFilterCol === col) setExpandedFilterCol(null);
+    setResult(null);
+  };
+
+  const toggleFilterValue = (col: string, val: string) => {
+    setAnalysisFilters(prev => {
+      const cur = prev[col] || [];
+      return { ...prev, [col]: cur.includes(val) ? cur.filter(v => v !== val) : [...cur, val] };
+    });
+    setResult(null);
+  };
+
+  const analysisFilterActive = Object.values(analysisFilters).some(v => v.length > 0);
 
   const numericCols = columns.filter(c => c.type === 'numeric');
   const allCols = columns;
@@ -125,7 +169,10 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
           dataset_id: datasetId,
           columns: selectedCols,
           alpha,
-          filters: useProjectFilter ? (projectFilters || {}) : {},
+          filters: {
+            ...(useProjectFilter ? (projectFilters || {}) : {}),
+            ...Object.fromEntries(Object.entries(analysisFilters).filter(([, v]) => v.length > 0)),
+          },
         }),
       });
       if (!res.ok) {
@@ -279,6 +326,141 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
               </label>
             </div>
           ) : null}
+
+          {/* Analysis-level subset filter */}
+          <div style={{
+            border: '1px solid var(--border, #334155)', borderRadius: 6,
+            marginBottom: 12, overflow: 'hidden',
+          }}>
+            <button
+              onClick={() => setShowSubsetFilter(s => !s)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '7px 10px', background: analysisFilterActive ? 'rgba(251,191,36,0.08)' : 'transparent',
+                border: 'none', cursor: 'pointer', color: analysisFilterActive ? '#fbbf24' : 'var(--text-dim)',
+                fontSize: 12, fontWeight: analysisFilterActive ? 600 : 400,
+              }}>
+              <span>
+                {analysisFilterActive
+                  ? `🔍 Subset Filter active — ${Object.entries(analysisFilters).filter(([,v])=>v.length>0).map(([k,v])=>`${k} (${v.length})`).join(', ')}`
+                  : '🔍 Subset Filter (run on a data subset for this analysis only)'}
+              </span>
+              <span style={{ fontSize: 10 }}>{showSubsetFilter ? '▲' : '▼'}</span>
+            </button>
+
+            {showSubsetFilter && (
+              <div style={{ padding: '8px 10px', borderTop: '1px solid var(--border, #334155)' }}>
+                {/* Active filter columns */}
+                {Object.keys(analysisFilters).length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                    {Object.entries(analysisFilters).map(([col, vals]) => (
+                      <button key={col}
+                        onClick={() => { setExpandedFilterCol(expandedFilterCol === col ? null : col); loadColValues(col); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px',
+                          borderRadius: 12, fontSize: 11, cursor: 'pointer',
+                          background: expandedFilterCol === col ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.06)',
+                          border: `1px solid ${expandedFilterCol === col ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.15)'}`,
+                          color: vals.length > 0 ? '#fbbf24' : 'var(--text-dim)',
+                        }}>
+                        <span>{col}{vals.length > 0 ? ` (${vals.length})` : ' — all'}</span>
+                        <span onClick={e => { e.stopPropagation(); removeFilterCol(col); }}
+                          style={{ marginLeft: 2, opacity: 0.6, fontWeight: 700 }}>×</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add column dropdown */}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: expandedFilterCol ? 8 : 0 }}>
+                  <select value={addingCol} onChange={e => addFilterCol(e.target.value)}
+                    style={{
+                      fontSize: 11, padding: '4px 8px', borderRadius: 4,
+                      background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.15)',
+                      color: 'inherit', flex: 1,
+                    }}>
+                    <option value="">+ Add filter column…</option>
+                    {columns.filter(c => !analysisFilters[c.name]).map(c => (
+                      <option key={c.name} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                  {analysisFilterActive && (
+                    <button onClick={() => { setAnalysisFilters({}); setExpandedFilterCol(null); setResult(null); }}
+                      style={{ fontSize: 11, padding: '4px 8px', borderRadius: 4, cursor: 'pointer',
+                        background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-dim)' }}>
+                      Clear all
+                    </button>
+                  )}
+                </div>
+
+                {/* Value picker for expanded column */}
+                {expandedFilterCol && analysisFilters[expandedFilterCol] !== undefined && (
+                  <div style={{
+                    border: '1px solid rgba(251,191,36,0.2)', borderRadius: 4,
+                    padding: '6px 8px', background: 'rgba(0,0,0,0.2)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#fbbf24' }}>{expandedFilterCol}</span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => setAnalysisFilters(prev => ({ ...prev, [expandedFilterCol]: [...(filterColValues[expandedFilterCol] || [])] }))}
+                          style={{ fontSize: 10, padding: '2px 6px', cursor: 'pointer', borderRadius: 3,
+                            background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-dim)' }}>
+                          All
+                        </button>
+                        <button onClick={() => setAnalysisFilters(prev => ({ ...prev, [expandedFilterCol]: [] }))}
+                          style={{ fontSize: 10, padding: '2px 6px', cursor: 'pointer', borderRadius: 3,
+                            background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-dim)' }}>
+                          None
+                        </button>
+                      </div>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search values…"
+                      value={filterColSearch[expandedFilterCol] || ''}
+                      onChange={e => setFilterColSearch(prev => ({ ...prev, [expandedFilterCol]: e.target.value }))}
+                      style={{
+                        width: '100%', padding: '3px 6px', fontSize: 11, marginBottom: 6,
+                        background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.12)',
+                        borderRadius: 3, color: 'inherit', boxSizing: 'border-box',
+                      }}
+                    />
+                    {filterColLoading[expandedFilterCol] ? (
+                      <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: '4px 0' }}>Loading values…</div>
+                    ) : (
+                      <div style={{ maxHeight: 140, overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                        {(filterColValues[expandedFilterCol] || [])
+                          .filter(v => !(filterColSearch[expandedFilterCol] || '').trim() ||
+                            v.toLowerCase().includes((filterColSearch[expandedFilterCol] || '').toLowerCase()))
+                          .map(v => {
+                            const checked = (analysisFilters[expandedFilterCol] || []).includes(v);
+                            return (
+                              <label key={v} style={{
+                                display: 'flex', alignItems: 'center', gap: 4, padding: '2px 7px',
+                                borderRadius: 10, cursor: 'pointer', fontSize: 11,
+                                background: checked ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.04)',
+                                border: `1px solid ${checked ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                                userSelect: 'none',
+                              }}>
+                                <input type="checkbox" checked={checked}
+                                  onChange={() => toggleFilterValue(expandedFilterCol, v)}
+                                  style={{ margin: 0, width: 11, height: 11, accentColor: '#fbbf24' }} />
+                                <span>{v}</span>
+                              </label>
+                            );
+                          })}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 5 }}>
+                      {(analysisFilters[expandedFilterCol] || []).length === 0
+                        ? 'No values selected — all data used'
+                        : `${(analysisFilters[expandedFilterCol] || []).length} of ${(filterColValues[expandedFilterCol] || []).length} values selected`}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Column selection */}
           <div style={{ marginBottom: 16 }}>

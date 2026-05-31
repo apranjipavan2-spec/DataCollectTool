@@ -25,6 +25,8 @@ const LoginPage       = lazy(() => import('@/auth/LoginPage'))
 const ForgotPasswordPage = lazy(() => import('@/auth/ForgotPasswordPage'))
 const ResetPasswordPage  = lazy(() => import('@/auth/ResetPasswordPage'))
 const QrLoginPage     = lazy(() => import('@/auth/QrLoginPage'))
+const RegisterPage    = lazy(() => import('@/auth/RegisterPage'))
+const VerifyEmailPage = lazy(() => import('@/auth/VerifyEmailPage'))
 const FieldApp        = lazy(() => import('@/collect/FieldApp.modern'))
 const AdminPanel      = lazy(() => import('@/admin/AdminPanel.modern'))
 const OrgAdminPanel   = lazy(() => import('@/admin/OrgAdminPanel.modern'))
@@ -131,6 +133,8 @@ export default function App() {
               <Route path="/forgot-password" element={<LazyRoute><ForgotPasswordPage /></LazyRoute>} />
               <Route path="/reset-password" element={<LazyRoute><ResetPasswordPage /></LazyRoute>} />
               <Route path="/auth/qr-login" element={<LazyRoute><QrLoginPage /></LazyRoute>} />
+              <Route path="/register" element={<LazyRoute><RegisterPage /></LazyRoute>} />
+              <Route path="/verify-email" element={<LazyRoute><VerifyEmailPage /></LazyRoute>} />
 
               <Route path="/" element={
                 <RequireAuth roles={['org_admin', 'supervisor', 'enumerator']}>

@@ -243,6 +243,31 @@ def send_otp_email(to: str, name: str, otp: str) -> bool:
     return send_email(to, "Your FieldGovern Login Code", html)
 
 
+def send_verification_email(to: str, name: str, token: str) -> bool:
+    """Send an email verification link to a newly registered user."""
+    url = f"{settings.APP_URL}/verify-email?token={token}"
+    html = f"""
+    <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+      <h2 style="color: #1e1e2e;">Verify Your Email</h2>
+      <p>Hi {name},</p>
+      <p>Thanks for signing up for FieldGovern! Click the button below to verify your email
+         and activate your free account:</p>
+      <a href="{url}"
+         style="display: inline-block; background: #2563eb; color: white;
+                padding: 12px 24px; border-radius: 8px; text-decoration: none;
+                font-weight: 600; margin: 16px 0;">
+        Verify Email &amp; Activate Account
+      </a>
+      <p style="color: #6c7086; font-size: 14px;">
+        This link expires in <strong>24 hours</strong>. If you didn't create an account, ignore this email.
+      </p>
+      <hr style="border: none; border-top: 1px solid #d4d4de; margin: 24px 0;">
+      <p style="color: #6c7086; font-size: 12px;">FieldGovern — Field Data Collection</p>
+    </div>
+    """
+    return send_email(to, "Verify your FieldGovern account", html)
+
+
 def send_assignment_email(to: str, enumerator_name: str, form_title: str) -> bool:
     """Notify an enumerator that a new form has been assigned to them."""
     url = f"{settings.APP_URL}/collect"
