@@ -570,6 +570,7 @@ function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0
             </span>
           )}
         </div>
+        <RBtn icon="↻" label="Refresh Stats" onClick={() => onAction('refresh_stat_tables')} disabled={!dataset} />
       </RGroup>
       <RGroup label="Number">
         <select className="ribbon-select" disabled={!dataset}

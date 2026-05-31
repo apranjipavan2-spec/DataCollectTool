@@ -651,26 +651,51 @@ export default function App() {
     await Promise.all(Array.from({ length: Math.min(concurrency, total) }, () => worker()));
   }, [runTabulationCore]);
 
-  const rerunStatTables = useCallback(async (newProjectFilters: Record<string, string[]>) => {
-    const statTables = tables.filter(t => (t as any)._statResult && (t as any)._statConfig?.useProjectFilter);
-    if (statTables.length === 0) return;
+  const rerunStatTables = useCallback(async (newProjectFilters: Record<string, string[]>, opts?: { force?: boolean; silent?: boolean }) => {
+    if (!dataset) return { refreshed: 0, skipped: 0, total: 0 };
+    const force = !!opts?.force;
+    const silent = !!opts?.silent;
+    const statTables = tables.filter(t => (t as any)._statResult);
+    if (statTables.length === 0) return { refreshed: 0, skipped: 0, total: 0 };
+    const knownColumnNames = new Set(allColumns.map(c => c.name));
+    let refreshed = 0;
+    let skipped = 0;
+    if (!silent) setLoadingMsg(`Refreshing stat tables… 0/${statTables.length}`);
     await Promise.all(statTables.map(async t => {
-      const cfg = (t as any)._statConfig as { statType: string; columns: string[]; alpha: number; analysisFilters: Record<string, string[]>; useProjectFilter: boolean };
+      let statType: string | null = null;
+      let columns: string[] = [];
+      let alpha = 0.05;
+      let analysisFilters: Record<string, string[]> = {};
+      let useProjectFilter = true;
+      const saved = (t as any)._statConfig as { statType: string; columns: string[]; alpha: number; analysisFilters: Record<string, string[]>; useProjectFilter: boolean } | undefined;
+      if (saved) {
+        if (!saved.useProjectFilter && !force) { skipped++; return; }
+        statType = saved.statType;
+        columns = saved.columns || [];
+        alpha = saved.alpha ?? 0.05;
+        analysisFilters = saved.analysisFilters || {};
+        useProjectFilter = saved.useProjectFilter;
+      } else {
+        const inferred = inferStatConfigFromResult(t.title || '', (t as any)._statResultData, knownColumnNames);
+        if (!inferred || inferred.columns.length === 0) { skipped++; return; }
+        statType = inferred.statType;
+        columns = inferred.columns;
+      }
       try {
-        const res = await fetch(`${API_BASE}/stat/${cfg.statType}`, {
+        const res = await fetch(`${API_BASE}/stat/${statType}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            dataset_id: dataset!.dataset_id,
-            columns: cfg.columns,
-            alpha: cfg.alpha,
+            dataset_id: dataset.dataset_id,
+            columns,
+            alpha,
             filters: {
-              ...newProjectFilters,
-              ...Object.fromEntries(Object.entries(cfg.analysisFilters).filter(([, v]) => v.length > 0)),
+              ...(useProjectFilter ? newProjectFilters : {}),
+              ...Object.fromEntries(Object.entries(analysisFilters).filter(([, v]) => v.length > 0)),
             },
           }),
         });
-        if (!res.ok) return;
+        if (!res.ok) { skipped++; return; }
         const data = await res.json();
         const { headers, rows } = data;
         setTables(prev => prev.map(p => p.id === t.id ? { ...p, _statResultData: { headers, rows } } as any : p));
@@ -679,9 +704,13 @@ export default function App() {
           next.set(t.id, { headers, rows, row_count: rows.length, col_count: headers.length });
           return next;
         });
-      } catch {}
+        refreshed++;
+      } catch { skipped++; }
+      if (!silent) setLoadingMsg(`Refreshing stat tables… ${refreshed + skipped}/${statTables.length}`);
     }));
-  }, [tables, dataset]);
+    if (!silent) setLoadingMsg('');
+    return { refreshed, skipped, total: statTables.length };
+  }, [tables, dataset, allColumns]);
 
   const updateTable = useCallback((update: Partial<TableConfig>) => {
     // Fields that affect what the backend computes; display-only fields (header_renames, title,
@@ -1487,6 +1516,15 @@ export default function App() {
           else if (a === 'clean_proper') handleTextClean('text_case', 'proper');
           else if (a === 'filter_panel') setShowFilterPanel(s => !s);
           else if (a === 'project_filter') setShowProjectFilterPanel(s => !s);
+          else if (a === 'refresh_stat_tables') {
+            (async () => {
+              const r = await rerunStatTables(projectFilters, { force: true });
+              if (r.total === 0) setError('No stat analysis tables to refresh.');
+              else if (r.skipped === 0) setLoadingMsg(`Refreshed ${r.refreshed} stat table${r.refreshed === 1 ? '' : 's'}.`);
+              else setError(`Refreshed ${r.refreshed} of ${r.total} stat tables. ${r.skipped} skipped — open them and click ✏️ Edit Analysis to re-run manually.`);
+              setTimeout(() => setLoadingMsg(''), 2500);
+            })();
+          }
           else if (a.startsWith('apply_template:')) handleApplyTemplate(a.slice('apply_template:'.length));
           else if (a.startsWith('load_project:')) handleLoadProjectByPath(a.slice('load_project:'.length));
           else if (a === 'stat_guide') { setGuidePendingModal(null); setGuideSection('overview'); }
@@ -1674,7 +1712,13 @@ export default function App() {
               filters={projectFilters}
               datasetId={dataset.dataset_id}
               allColumns={allColumns}
-              onChange={f => { setProjectFilters(f); rerunStatTables(f); }}
+              onChange={f => {
+                setProjectFilters(f);
+                rerunStatTables(f, { silent: true }).then(r => {
+                  if (r.skipped > 0) setLoadingMsg(`Project filter changed — refreshed ${r.refreshed}/${r.total} stat tables; ${r.skipped} need manual re-run (click ↻ Refresh Stats).`);
+                  setTimeout(() => setLoadingMsg(''), 3500);
+                });
+              }}
               onClose={() => setShowProjectFilterPanel(false)}
             />
           )}
