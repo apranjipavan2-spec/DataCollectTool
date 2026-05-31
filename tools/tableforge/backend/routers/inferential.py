@@ -845,3 +845,160 @@ async def stat_multitest_correction(req: MultitestRequest):
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(400, f"Multitest correction error: {e}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Multinomial Logistic Regression
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.post("/api/stat/multinomial_logistic")
+async def stat_multinomial_logistic(config: InferConfig):
+    """Multinomial logistic regression — outcome with 3+ unordered classes."""
+    try:
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.preprocessing import LabelEncoder
+        from scipy.stats import norm as sp_norm
+
+        df = _prepare(config)
+        y_col = config.columns[0]
+        x_cols = config.columns[1:]
+        if not x_cols:
+            raise HTTPException(400, "Select at least one predictor column (columns 2+)")
+
+        sub = df[[y_col] + x_cols].dropna().copy()
+        sub[y_col] = sub[y_col].astype(str)
+        classes = sorted(sub[y_col].unique())
+        if len(classes) < 2:
+            raise HTTPException(400, "Outcome column must have at least 2 distinct values")
+        if len(classes) == 2:
+            raise HTTPException(400, "Outcome has only 2 classes — use Logistic Regression instead")
+
+        _a = float(config.alpha or 0.05)
+        reference = classes[0]  # lowest alphabetical = reference
+
+        # Encode predictors: numeric stays numeric, categorical → dummies (drop_first)
+        X_parts = []
+        feature_names = []
+        for c in x_cols:
+            if pd.api.types.is_numeric_dtype(sub[c]):
+                X_parts.append(sub[[c]].astype(float))
+                feature_names.append(c)
+            else:
+                dummies = pd.get_dummies(sub[c].astype(str), prefix=c, drop_first=True)
+                X_parts.append(dummies)
+                feature_names.extend(dummies.columns.tolist())
+
+        X = pd.concat(X_parts, axis=1).fillna(0).astype(float)
+        le = LabelEncoder()
+        y = le.fit_transform(sub[y_col])
+        class_labels = le.classes_.tolist()
+
+        # Fit model
+        model = LogisticRegression(multi_class="auto", max_iter=2000, solver="lbfgs", C=1e6)
+        model.fit(X.values, y)
+
+        n = len(y)
+        k = X.shape[1]
+        n_classes = len(class_labels)
+
+        # Approximate SEs via Hessian / sandwich estimator (simplified)
+        # Use observed Fisher information: diag of inv(X'WX) per class
+        probs = model.predict_proba(X.values)  # (n, n_classes)
+        X_arr = np.column_stack([np.ones(n), X.values])  # add intercept column
+        n_feat = X_arr.shape[1]
+
+        # McFadden pseudo-R²: compare to null log-likelihood
+        log_lik = float(np.sum(np.log(np.clip(probs[np.arange(n), y], 1e-12, 1))))
+        null_probs = np.bincount(y, minlength=n_classes) / n
+        log_lik_null = float(np.sum(np.log(np.clip(null_probs[y], 1e-12, 1))))
+        mcfadden_r2 = 1 - log_lik / log_lik_null if log_lik_null != 0 else None
+
+        # Accuracy
+        y_pred = model.predict(X.values)
+        accuracy = float(np.mean(y_pred == y))
+
+        # Build coefficient rows per class (vs reference = class_labels[0])
+        headers = ["Variable", "Class (vs ref)", "β", "SE (approx)", "OR", "95% CI", "p (approx)", "Sig"]
+        rows = []
+
+        ref_idx = 0  # reference class index in sklearn's encoding
+        non_ref_indices = [i for i in range(n_classes) if i != ref_idx]
+
+        for cls_idx in non_ref_indices:
+            cls_label = class_labels[cls_idx]
+            coef = model.coef_[cls_idx]  # shape (n_features,)
+            intercept = model.intercept_[cls_idx]
+
+            # Approx SE using diagonal of sandwich (W = p_k*(1-p_k))
+            W = probs[:, cls_idx] * (1 - probs[:, cls_idx])
+            XtWX = X_arr.T @ (X_arr * W[:, None])
+            try:
+                cov = np.linalg.inv(XtWX + np.eye(n_feat) * 1e-8)
+                ses = np.sqrt(np.abs(np.diag(cov)))
+            except np.linalg.LinAlgError:
+                ses = np.full(n_feat, np.nan)
+
+            # Intercept row
+            b0, se0 = float(intercept), float(ses[0])
+            z0 = b0 / se0 if se0 > 0 else np.nan
+            p0 = float(2 * sp_norm.sf(abs(z0))) if not np.isnan(z0) else np.nan
+            lo0 = b0 - sp_norm.ppf(1 - _a / 2) * se0
+            hi0 = b0 + sp_norm.ppf(1 - _a / 2) * se0
+            rows.append([
+                "(Intercept)", f"{cls_label} vs {reference}",
+                iu.safe_round(b0), iu.safe_round(se0),
+                iu.safe_round(math.exp(b0)), f"[{iu.safe_round(math.exp(lo0))}, {iu.safe_round(math.exp(hi0))}]",
+                iu.safe_round(p0, 4), iu.sig_stars(p0, _a) if not np.isnan(p0) else "—"
+            ])
+
+            for fi, fname in enumerate(feature_names):
+                b, se = float(coef[fi]), float(ses[fi + 1])
+                z = b / se if se > 0 else np.nan
+                p = float(2 * sp_norm.sf(abs(z))) if not np.isnan(z) else np.nan
+                lo = b - sp_norm.ppf(1 - _a / 2) * se
+                hi = b + sp_norm.ppf(1 - _a / 2) * se
+                rows.append([
+                    fname, f"{cls_label} vs {reference}",
+                    iu.safe_round(b), iu.safe_round(se),
+                    iu.safe_round(math.exp(b)), f"[{iu.safe_round(math.exp(lo))}, {iu.safe_round(math.exp(hi))}]",
+                    iu.safe_round(p, 4), iu.sig_stars(p, _a) if not np.isnan(p) else "—"
+                ])
+
+            rows.append([""] * len(headers))  # spacer between classes
+
+        # Summary footer
+        rows.append(["Reference class", reference] + [""] * (len(headers) - 2))
+        rows.append(["N", n] + [""] * (len(headers) - 2))
+        rows.append(["Classes", ", ".join(class_labels)] + [""] * (len(headers) - 2))
+        rows.append(["McFadden R²", iu.safe_round(mcfadden_r2)] + [""] * (len(headers) - 2))
+        rows.append(["Accuracy", f"{accuracy * 100:.1f}%"] + [""] * (len(headers) - 2))
+
+        sig_vars = [r[0] for r in rows if r[-1] not in ("", "ns", "—") and r[0] not in ("(Intercept)", "", "Reference class", "N", "Classes", "McFadden R²", "Accuracy")]
+        if sig_vars:
+            interp = (f"Significant predictors: {', '.join(dict.fromkeys(sig_vars))}. "
+                      f"Reference class: '{reference}'. McFadden R²={iu.safe_round(mcfadden_r2)} "
+                      f"({'good' if (mcfadden_r2 or 0) >= 0.2 else 'moderate' if (mcfadden_r2 or 0) >= 0.1 else 'weak'} fit). "
+                      f"OR > 1 means higher odds of that class vs reference per unit increase.")
+        else:
+            interp = (f"No significant predictors at α={_a}. "
+                      f"Reference class: '{reference}'. McFadden R²={iu.safe_round(mcfadden_r2)}.")
+
+        return {
+            "headers": headers,
+            "rows": sanitize_for_json(rows),
+            "row_count": len(rows),
+            "col_count": len(headers),
+            "table_type": "multinomial_logistic",
+            "summary": {
+                "N": n, "Classes": len(class_labels),
+                "McFadden R²": iu.safe_round(mcfadden_r2),
+                "Accuracy": f"{accuracy * 100:.1f}%",
+                "Reference": reference,
+            },
+            "interpretation": interp,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(400, f"Multinomial logistic regression error: {e}")

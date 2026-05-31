@@ -686,6 +686,7 @@ const STAT_MENUS: { key: string; icon: string; label: string; items: StatMenuIte
   { key: 'relationships', icon: '📐', label: 'Relationships', items: [
     { icon: '📐', label: 'Correlation', action: 'stat_correlation' },
     { icon: '📈', label: 'Regression',  action: 'stat_regression' },
+    { icon: 'V',  label: "Cramér's V",  action: 'stat_cramers_matrix' },
   ]},
   { key: 'hypothesis', icon: '𝑡', label: 'Hypothesis Tests', items: [
     { icon: '𝑡',  label: 't-Test',    action: 'stat_ttest' },
@@ -706,6 +707,7 @@ const STAT_MENUS: { key: string; icon: string; label: string; items: StatMenuIte
   { key: 'models', icon: '📐', label: 'Models', items: [
     { icon: '📐', label: 'Multi-Reg',   action: 'stat_multiple_regression' },
     { icon: 'OR', label: 'Logistic',    action: 'stat_logistic_regression' },
+    { icon: 'MN', label: 'Multinomial', action: 'stat_multinomial_logistic' },
     { icon: '⇄',  label: 'Post-hoc',    action: 'stat_posthoc' },
     { icon: 'α',  label: 'Reliability', action: 'stat_reliability' },
   ]},

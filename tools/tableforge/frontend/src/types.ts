@@ -170,6 +170,7 @@ export interface TableConfig {
   _autoTitle?: boolean;  // true = auto-generate title from config; false = user manually edited
   _statResult?: boolean; // true = result was injected from a stat test, skip pivot tabulation
   _statResultData?: { headers: string[]; rows: any[][] }; // persisted stat result, rehydrated into results map on project load
+  _statConfig?: { statType: string; columns: string[]; alpha: number; analysisFilters: Record<string, string[]>; useProjectFilter: boolean };
   bg_color?: string;           // Values area background color
   header_bg_color?: string;    // Header row background color
   header_text_color?: string;  // Header text color

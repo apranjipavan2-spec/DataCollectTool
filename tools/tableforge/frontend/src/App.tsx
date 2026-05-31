@@ -88,14 +88,14 @@ function generateAutoTitle(t: TableConfig): { title: string; subtitle: string; n
   return { title, subtitle, name: nameShort };
 }
 
-type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'stat_paired_ttest' | 'stat_wilcoxon' | 'stat_mcnemar' | 'stat_kruskal' | 'stat_friedman' | 'stat_spearman' | 'stat_kendall' | 'stat_logistic_regression' | 'stat_multiple_regression' | 'stat_posthoc' | 'stat_reliability' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config' | 'anomalies' | 'diff' | 'variable_metadata' | 'study_design' | 'likert' | 'multi_response' | 'observer' | 'auto_analyze' | 'survey_insights' | 'survey_quality' | 'balance' | 'geo_summary' | 'driver' | 'cluster' | 'verbatim' | 'play_mode';
+type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'stat_paired_ttest' | 'stat_wilcoxon' | 'stat_mcnemar' | 'stat_kruskal' | 'stat_friedman' | 'stat_spearman' | 'stat_kendall' | 'stat_logistic_regression' | 'stat_multiple_regression' | 'stat_posthoc' | 'stat_reliability' | 'stat_cramers_matrix' | 'stat_multinomial_logistic' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config' | 'anomalies' | 'diff' | 'variable_metadata' | 'study_design' | 'likert' | 'multi_response' | 'observer' | 'auto_analyze' | 'survey_insights' | 'survey_quality' | 'balance' | 'geo_summary' | 'driver' | 'cluster' | 'verbatim' | 'play_mode';
 
 const STAT_GUIDE_ACTIONS = new Set<string>([
   'stat_correlation', 'stat_descriptive', 'stat_crosstab', 'stat_ttest', 'stat_anova',
   'stat_regression', 'stat_normality', 'stat_outlier', 'stat_frequency',
   'stat_paired_ttest', 'stat_wilcoxon', 'stat_mcnemar', 'stat_kruskal', 'stat_friedman',
   'stat_spearman', 'stat_kendall', 'stat_logistic_regression', 'stat_multiple_regression',
-  'stat_posthoc', 'stat_reliability',
+  'stat_posthoc', 'stat_reliability', 'stat_cramers_matrix', 'stat_multinomial_logistic',
   'variable_metadata', 'study_design', 'likert', 'multi_response', 'observer', 'auto_analyze',
   'balance', 'geo_summary', 'driver', 'cluster', 'verbatim',
 ]);
@@ -247,8 +247,8 @@ export default function App() {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [showProjectFilterPanel, setShowProjectFilterPanel] = useState(false);
   const [projectFilters, setProjectFilters] = useState<Record<string, string[]>>({});
-  // Ref so runTabulation always reads the latest project filters without needing them in its dep array
   const projectFiltersRef = useRef<Record<string, string[]>>({});
+  const [statEditConfig, setStatEditConfig] = useState<{ columns: string[]; alpha: number; analysisFilters: Record<string, string[]>; useProjectFilter: boolean } | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [lastProjectHint, setLastProjectHint] = useState<string | null>(null);
@@ -650,6 +650,38 @@ export default function App() {
     };
     await Promise.all(Array.from({ length: Math.min(concurrency, total) }, () => worker()));
   }, [runTabulationCore]);
+
+  const rerunStatTables = useCallback(async (newProjectFilters: Record<string, string[]>) => {
+    const statTables = tables.filter(t => (t as any)._statResult && (t as any)._statConfig?.useProjectFilter);
+    if (statTables.length === 0) return;
+    await Promise.all(statTables.map(async t => {
+      const cfg = (t as any)._statConfig as { statType: string; columns: string[]; alpha: number; analysisFilters: Record<string, string[]>; useProjectFilter: boolean };
+      try {
+        const res = await fetch(`${API_BASE}/stat/${cfg.statType}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dataset_id: dataset!.dataset_id,
+            columns: cfg.columns,
+            alpha: cfg.alpha,
+            filters: {
+              ...newProjectFilters,
+              ...Object.fromEntries(Object.entries(cfg.analysisFilters).filter(([, v]) => v.length > 0)),
+            },
+          }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const { headers, rows } = data;
+        setTables(prev => prev.map(p => p.id === t.id ? { ...p, _statResultData: { headers, rows } } as any : p));
+        setResults(prev => {
+          const next = new Map(prev);
+          next.set(t.id, { headers, rows, row_count: rows.length, col_count: headers.length });
+          return next;
+        });
+      } catch {}
+    }));
+  }, [tables, dataset]);
 
   const updateTable = useCallback((update: Partial<TableConfig>) => {
     // Fields that affect what the backend computes; display-only fields (header_renames, title,
@@ -1642,7 +1674,7 @@ export default function App() {
               filters={projectFilters}
               datasetId={dataset.dataset_id}
               allColumns={allColumns}
-              onChange={f => setProjectFilters(f)}
+              onChange={f => { setProjectFilters(f); rerunStatTables(f); }}
               onClose={() => setShowProjectFilterPanel(false)}
             />
           )}
@@ -1727,6 +1759,18 @@ export default function App() {
                 );
               })}
             </select>
+            {(activeTable as any)._statResult && (activeTable as any)._statConfig && (
+              <button className="title-dup-btn"
+                title="Re-open this stat analysis to edit columns, filters, or alpha"
+                onClick={() => {
+                  const cfg = (activeTable as any)._statConfig;
+                  setStatEditConfig({ columns: cfg.columns, alpha: cfg.alpha, analysisFilters: cfg.analysisFilters, useProjectFilter: cfg.useProjectFilter });
+                  setModal(`stat_${cfg.statType}` as any);
+                }}>
+                <span className="title-dup-icon">✏️</span>
+                <span className="title-dup-label">Edit Analysis</span>
+              </button>
+            )}
             <button className="title-dup-btn" onClick={duplicateTable}
               title="Duplicate this table (same structure, new copy)">
               <span className="title-dup-icon">⧉</span>
@@ -1976,13 +2020,14 @@ export default function App() {
           setPreviewTab('chart');
         }}
         onClose={() => setModal(null)} />}
-      {(modal === 'stat_correlation' || modal === 'stat_descriptive' || modal === 'stat_crosstab' || modal === 'stat_ttest' || modal === 'stat_anova' || modal === 'stat_regression' || modal === 'stat_normality' || modal === 'stat_outlier' || modal === 'stat_frequency' || modal === 'stat_paired_ttest' || modal === 'stat_wilcoxon' || modal === 'stat_mcnemar' || modal === 'stat_kruskal' || modal === 'stat_friedman' || modal === 'stat_spearman' || modal === 'stat_kendall' || modal === 'stat_logistic_regression' || modal === 'stat_multiple_regression' || modal === 'stat_posthoc' || modal === 'stat_reliability') && (
+      {(modal === 'stat_correlation' || modal === 'stat_descriptive' || modal === 'stat_crosstab' || modal === 'stat_ttest' || modal === 'stat_anova' || modal === 'stat_regression' || modal === 'stat_normality' || modal === 'stat_outlier' || modal === 'stat_frequency' || modal === 'stat_paired_ttest' || modal === 'stat_wilcoxon' || modal === 'stat_mcnemar' || modal === 'stat_kruskal' || modal === 'stat_friedman' || modal === 'stat_spearman' || modal === 'stat_kendall' || modal === 'stat_logistic_regression' || modal === 'stat_multiple_regression' || modal === 'stat_posthoc' || modal === 'stat_reliability' || modal === 'stat_cramers_matrix' || modal === 'stat_multinomial_logistic') && (
         <StatisticalTables
           type={modal.replace('stat_', '') as any}
           datasetId={dataset.dataset_id}
           columns={allColumns}
           projectFilters={projectFilters}
-          onInsert={({ label, headers, rows, interpretation, statChart, chartOnly }) => {
+          initialConfig={statEditConfig ?? undefined}
+          onInsert={({ label, headers, rows, interpretation, statChart, chartOnly, statConfig }) => {
             const id = String(Date.now() + Math.floor(Math.random() * 1000));
             pushUndo();
             const empty = createEmptyTable(id, label.slice(0, 30));
@@ -1990,6 +2035,7 @@ export default function App() {
             empty.subtitle = interpretation;
             empty._statResult = true;
             empty._statResultData = { headers, rows };
+            if (statConfig) (empty as any)._statConfig = statConfig;
             if (statChart) {
               empty.chartConfig = { statChart, chart_only: !!chartOnly };
             }
@@ -2002,7 +2048,7 @@ export default function App() {
             setActiveTableIdx(tables.length);
             if (statChart && !chartOnly) setPreviewTab('chart');
           }}
-          onClose={() => setModal(null)}
+          onClose={() => { setModal(null); setStatEditConfig(null); }}
         />
       )}
       {modal === 'audit' && <AuditTrail datasetId={dataset.dataset_id} onClose={() => setModal(null)} />}

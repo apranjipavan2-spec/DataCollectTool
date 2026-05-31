@@ -191,6 +191,115 @@ async def stat_descriptive(config: StatTableConfig):
         raise HTTPException(400, f"Descriptive stats error: {str(e)}")
 
 
+@router.post("/api/stat/cramers_matrix")
+async def stat_cramers_matrix(config: StatTableConfig):
+    """Pairwise Cramér's V for N categorical columns — like a correlation matrix for categorical data."""
+    if config.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    try:
+        from scipy.stats import chi2_contingency
+        df = datasets[config.dataset_id]["df"].copy()
+        df = apply_metrics_and_bins(df, config.dataset_id)
+        for col, vals in config.filters.items():
+            if vals and col in df.columns:
+                df = df[df[col].astype(str).isin([str(v) for v in vals])]
+
+        cols = [c for c in config.columns if c in df.columns]
+        if len(cols) < 2:
+            raise HTTPException(400, "Select at least 2 categorical columns")
+
+        _a = float(config.alpha or 0.05)
+        n_cols = len(cols)
+
+        # Build pairwise matrices
+        v_matrix: list[list] = [[1.0] * n_cols for _ in range(n_cols)]
+        p_matrix: list[list] = [[0.0] * n_cols for _ in range(n_cols)]
+        n_matrix: list[list] = [[0] * n_cols for _ in range(n_cols)]
+        n_pairs = n_cols * (n_cols - 1) // 2
+        raw_pvals = []
+        pair_indices = []
+
+        for i in range(n_cols):
+            for j in range(i + 1, n_cols):
+                sub = df[[cols[i], cols[j]]].dropna()
+                sub = sub.astype(str)
+                n_pair = len(sub)
+                n_matrix[i][j] = n_matrix[j][i] = n_pair
+                if n_pair < 5:
+                    v_matrix[i][j] = v_matrix[j][i] = None
+                    p_matrix[i][j] = p_matrix[j][i] = None
+                    continue
+                ct = pd.crosstab(sub[cols[i]], sub[cols[j]])
+                if ct.shape[0] < 2 or ct.shape[1] < 2:
+                    v_matrix[i][j] = v_matrix[j][i] = None
+                    p_matrix[i][j] = p_matrix[j][i] = None
+                    continue
+                chi2, p_raw, _, _ = chi2_contingency(ct)
+                v = iu.cramers_v(chi2, n_pair, ct.shape[0], ct.shape[1])
+                v_matrix[i][j] = v_matrix[j][i] = round(float(v), 4)
+                raw_pvals.append(p_raw)
+                pair_indices.append((i, j))
+
+        # Bonferroni correction
+        adj_pvals = iu.bonferroni(raw_pvals) if raw_pvals else []
+        for k, (i, j) in enumerate(pair_indices):
+            p_matrix[i][j] = p_matrix[j][i] = round(float(adj_pvals[k]), 6)
+
+        # Build table rows: V value + significance stars in each cell
+        headers = [""] + cols
+        rows = []
+        for i, row_col in enumerate(cols):
+            row = [row_col]
+            for j in range(n_cols):
+                if i == j:
+                    row.append("—")
+                elif v_matrix[i][j] is None:
+                    row.append("n/a")
+                else:
+                    stars = iu.sig_stars(p_matrix[i][j], _a) if p_matrix[i][j] is not None else ""
+                    cell = f"{v_matrix[i][j]:.3f}"
+                    if stars and stars != "ns":
+                        cell = f"{cell} {stars}"
+                    row.append(cell)
+            rows.append(row)
+
+        rows.append([""] * len(headers))
+        rows.append(["Cramér's V range", "0 = no association", "1 = perfect association"] + [""] * (len(headers) - 3))
+        rows.append(["Effect size", "< 0.1 negligible", "0.1–0.3 small", "0.3–0.5 medium", "> 0.5 large"] + [""] * max(0, len(headers) - 5))
+        rows.append([f"p-values Bonferroni-corrected (n={n_pairs} tests)"] + [""] * (len(headers) - 1))
+        rows.append([f"*** p<0.001  ** p<0.01  * p<0.05  ns = not significant"] + [""] * (len(headers) - 1))
+
+        # Plain-text interpretation
+        strong = [(cols[i], cols[j], v_matrix[i][j]) for i, j in pair_indices
+                  if v_matrix[i][j] is not None and v_matrix[i][j] >= 0.3
+                  and p_matrix[i][j] is not None and p_matrix[i][j] < _a]
+        strong.sort(key=lambda x: -x[2])
+        if strong:
+            top = strong[0]
+            interp = (f"Strongest association: {top[0]} ↔ {top[1]} (V={top[2]:.3f}, "
+                      f"{iu.interpret_v(top[2])}). "
+                      f"{len(strong)} pair(s) show medium-to-strong association (V≥0.3, p<{_a}).")
+        else:
+            interp = f"No medium-to-strong associations found (V<0.3) among the selected columns at α={_a}."
+
+        return {
+            "headers": headers,
+            "rows": sanitize_for_json(rows),
+            "row_count": len(rows),
+            "col_count": len(headers),
+            "table_type": "cramers_matrix",
+            "v_matrix": sanitize_for_json(v_matrix),
+            "pvalue_matrix": sanitize_for_json(p_matrix),
+            "n_matrix": sanitize_for_json(n_matrix),
+            "interpretation": interp,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(400, f"Cramér's V matrix error: {e}")
+
+
 @router.post("/api/stat/crosstab")
 async def stat_crosstab(config: StatTableConfig):
     """Generate cross-tabulation with chi-square test."""

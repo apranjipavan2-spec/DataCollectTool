@@ -864,6 +864,72 @@ export const GUIDES: GuideEntry[] = [
     example: 'A right-skewed numeric column → Shapiro p<0.05 + skew > 1 → prefer Mann-Whitney over t-test.',
   },
   {
+    id: 'stat_cramers_matrix',
+    title: "Cramér's V Association Matrix",
+    category: 'Relationships',
+    icon: 'V',
+    useWhen: 'You have 2+ categorical columns and want to know which pairs are associated — like a correlation matrix but for categories.',
+    criteria: [
+      'All selected columns are categorical (nominal or ordinal). (Numeric columns should be binned first.)',
+      'At least 2 columns selected. (No maximum — matrix scales to N×N.)',
+      'Cell counts should be ≥ 5 in most cells. (Sparse tables inflate Cramér\'s V — use frequency first to check.)',
+    ],
+    requires: [
+      '2 or more categorical columns.',
+      'Enough rows that most cells in each cross-tab have ≥ 5 observations.',
+    ],
+    steps: [
+      'Select 2+ categorical columns.',
+      'Set alpha (default 0.05) for significance stars.',
+      'Run. Each cell shows V + sig stars (** p<0.01, * p<0.05). Bonferroni correction applied.',
+      'Switch to Chart view for the heatmap (darker = stronger association).',
+    ],
+    outputs: [
+      'N×N symmetric matrix of Cramér\'s V values (0 = no association, 1 = perfect).',
+      'Significance stars with Bonferroni correction for multiple tests.',
+      'Heatmap in Chart view — scan diagonals for patterns.',
+    ],
+    pitfalls: [
+      'V is inflated by large N. (A V of 0.05 on 10,000 rows can be "significant" but practically meaningless — always read V alongside p.)',
+      'V is always ≥ 0 — it can\'t show direction. (Use the cross-tab for which category pairs drive the association.)',
+      'Bonferroni is conservative. (If you get no significant pairs on a large matrix, try FDR correction externally.)',
+    ],
+    example: 'Columns: gender, region, education, occupation → 4×4 matrix → gender–education V=0.32 *** is the strongest association.',
+  },
+  {
+    id: 'stat_multinomial_logistic',
+    title: 'Multinomial Logistic Regression',
+    category: 'Models',
+    icon: 'MN',
+    useWhen: 'Your outcome has 3+ unordered categories and you want to know which predictors drive membership in each category vs a reference.',
+    criteria: [
+      'Outcome column has 3 or more nominal categories. (For 2 categories use binary Logistic Regression. For ordered categories, consider ordinal logistic.)',
+      'You want odds ratios per class vs reference. (Answers: "who is more likely to be in class X vs class Y?")',
+      'Sample size ≥ 10 observations per category per predictor. (Small cells produce unreliable SEs.)',
+    ],
+    requires: [
+      'First column = categorical outcome with 3+ classes.',
+      'One or more predictor columns (categorical or numeric — categoricals are auto-encoded).',
+    ],
+    steps: [
+      'Select outcome column first, then predictors.',
+      'Run. Reference class = lowest alphabetical category.',
+      'Read OR > 1 = more likely than reference; OR < 1 = less likely.',
+      'SEs are approximate (sandwich estimator) — treat p-values as indicative, not exact.',
+    ],
+    outputs: [
+      'Coefficient (β), SE, Odds Ratio (OR), 95% CI, p-value, and significance stars per predictor per class.',
+      'Summary: N, number of classes, McFadden R², model accuracy.',
+      'Reference class shown in summary — all ORs are relative to it.',
+    ],
+    pitfalls: [
+      'IIA assumption. (Multinomial logistic assumes independence of irrelevant alternatives — if categories compete, results may be misleading.)',
+      'Approximate SEs. (The sandwich estimator is a reasonable approximation but not exact MLE standard errors — for publication, validate with a stats package.)',
+      'Perfect separation. (If a predictor perfectly predicts a class, coefficients blow up — check class frequencies first.)',
+    ],
+    example: 'Outcome: transport mode (bus, car, bike, walk). Predictors: income, distance, age → OR per mode vs bus, by predictor.',
+  },
+  {
     id: 'stat_outlier',
     title: 'Outlier Detection',
     category: 'Distribution',

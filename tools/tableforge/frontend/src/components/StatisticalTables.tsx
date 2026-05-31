@@ -24,7 +24,9 @@ type StatType =
   | 'logistic_regression'
   | 'multiple_regression'
   | 'posthoc'
-  | 'reliability';
+  | 'reliability'
+  | 'cramers_matrix'
+  | 'multinomial_logistic';
 
 interface InsertPayload {
   label: string;
@@ -33,6 +35,14 @@ interface InsertPayload {
   interpretation: string;
   statChart?: { kind: 'bar' | 'box' | 'heatmap'; data: any; title?: string; height?: number };
   chartOnly?: boolean;
+  statConfig?: { statType: string; columns: string[]; alpha: number; analysisFilters: Record<string, string[]>; useProjectFilter: boolean };
+}
+
+interface InitialConfig {
+  columns: string[];
+  alpha: number;
+  analysisFilters: Record<string, string[]>;
+  useProjectFilter: boolean;
 }
 
 interface Props {
@@ -40,26 +50,24 @@ interface Props {
   datasetId: string;
   columns: ColumnInfo[];
   projectFilters?: Record<string, string[]>;
+  initialConfig?: InitialConfig;
   onInsert?: (payload: InsertPayload) => void;
   onClose: () => void;
 }
 
-export function StatisticalTables({ type, datasetId, columns, projectFilters, onInsert, onClose }: Props) {
-  const [selectedCols, setSelectedCols] = useState<string[]>([]);
+export function StatisticalTables({ type, datasetId, columns, projectFilters, initialConfig, onInsert, onClose }: Props) {
+  const [selectedCols, setSelectedCols] = useState<string[]>(initialConfig?.columns ?? []);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'table' | 'chart'>('table');
-  const [alpha, setAlpha] = useState<number>(0.05);
-  // Stat tests can run with the active Project Filter, or independently on the
-  // full dataset — useful e.g. when the outcome column is itself in the project
-  // filter (binary outcome collapses to 1 level).
+  const [alpha, setAlpha] = useState<number>(initialConfig?.alpha ?? 0.05);
   const projectFilterActive = !!projectFilters && Object.values(projectFilters).some(v => v && v.length > 0);
-  const [useProjectFilter, setUseProjectFilter] = useState<boolean>(projectFilterActive);
+  const [useProjectFilter, setUseProjectFilter] = useState<boolean>(initialConfig?.useProjectFilter ?? projectFilterActive);
 
   // Analysis-level subset filter (independent of project filter)
-  const [showSubsetFilter, setShowSubsetFilter] = useState(false);
-  const [analysisFilters, setAnalysisFilters] = useState<Record<string, string[]>>({});
+  const [showSubsetFilter, setShowSubsetFilter] = useState(() => !!initialConfig?.analysisFilters && Object.keys(initialConfig.analysisFilters).length > 0);
+  const [analysisFilters, setAnalysisFilters] = useState<Record<string, string[]>>(initialConfig?.analysisFilters ?? {});
   const [filterColValues, setFilterColValues] = useState<Record<string, string[]>>({});
   const [filterColSearch, setFilterColSearch] = useState<Record<string, string>>({});
   const [filterColLoading, setFilterColLoading] = useState<Record<string, boolean>>({});
@@ -102,6 +110,8 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
   const [addingColSearch, setAddingColSearch] = useState('');
   const [showColPicker, setShowColPicker] = useState(false);
   const colPickerRef = useRef<HTMLDivElement>(null);
+  const addingColInputRef = useRef<HTMLInputElement>(null);
+  const [pickerRect, setPickerRect] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const colIndexMap = useMemo(
     () => Object.fromEntries(columns.map((c, i) => [c.name, i + 1])),
@@ -141,6 +151,8 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
     multiple_regression: 'Multiple Regression (with categorical encoding + VIF)',
     posthoc: 'Post-Hoc Pairwise Comparisons',
     reliability: 'Cronbach\u2019s \u03b1 (scale reliability)',
+    cramers_matrix: "Cramér\u2019s V Association Matrix",
+    multinomial_logistic: 'Multinomial Logistic Regression',
   };
 
   const descriptions: Record<StatType, string> = {
@@ -164,6 +176,8 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
     multiple_regression: 'First column = numeric outcome. Rest = predictors (categoricals auto-encoded). Includes VIF.',
     posthoc: 'Select group column then numeric column. Pairwise comparisons after ANOVA (Tukey HSD default).',
     reliability: 'Select \u22652 Likert item columns to compute Cronbach\u2019s \u03b1 and item-rest correlations.',
+    cramers_matrix: 'Select 2+ categorical columns. Returns pairwise chi-square and Cram\u00e9r\u2019s V for every pair \u2014 like a correlation matrix for categorical associations.',
+    multinomial_logistic: 'First column = categorical outcome (3+ classes). Rest = predictors (categorical or numeric). Returns log-odds and OR per class vs reference.',
   };
 
   const toggleCol = (col: string) => {
@@ -239,6 +253,8 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
       case 'friedman': return [3, undefined];
       case 'posthoc': return [2, 2];
       case 'reliability': return [2, undefined];
+      case 'cramers_matrix': return [2, undefined];
+      case 'multinomial_logistic': return [2, undefined];
       default: return [1, undefined];
     }
   };
@@ -260,6 +276,13 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
       return (
         <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
           PRE: <strong>{selectedCols[0] || '?'}</strong> | POST: <strong>{selectedCols[1] || '?'}</strong>
+        </div>
+      );
+    }
+    if (type === 'multinomial_logistic' && selectedCols.length > 0) {
+      return (
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+          Outcome: <strong>{selectedCols[0] || '?'}</strong> | Predictors: <strong>{selectedCols.slice(1).join(', ') || '?'}</strong>
         </div>
       );
     }
@@ -310,13 +333,20 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: 1000, maxHeight: '90vh' }}>
-        <div className="modal-header">
+      <div className="modal" onClick={e => e.stopPropagation()}
+        style={{ maxWidth: '96vw', width: 1100, maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+        <div className="modal-header" style={{ flexShrink: 0 }}>
           <h2>{titles[type]}</h2>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
-        <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflow: 'auto' }}>
-          <p style={{ color: 'var(--text-dim)', fontSize: 13, marginBottom: 12 }}>{descriptions[type]}</p>
+
+        {/* Two-column body */}
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+
+          {/* ── LEFT: Controls ── */}
+          <div style={{ width: 420, flexShrink: 0, overflowY: 'auto', padding: '12px 14px',
+            borderRight: '1px solid var(--border, #334155)' }}>
+            <p style={{ color: 'var(--text-dim)', fontSize: 13, marginBottom: 12 }}>{descriptions[type]}</p>
 
           {projectFilterActive ? (
             <div style={{
@@ -391,10 +421,17 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
                 <div style={{ position: 'relative', marginBottom: expandedFilterCol ? 8 : 0 }} ref={colPickerRef}>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                     <input
+                      ref={addingColInputRef}
                       type="text"
                       placeholder="Search column by name or #number to add filter…"
                       value={addingColSearch}
-                      onFocus={() => setShowColPicker(true)}
+                      onFocus={() => {
+                        setShowColPicker(true);
+                        if (addingColInputRef.current) {
+                          const r = addingColInputRef.current.getBoundingClientRect();
+                          setPickerRect({ top: r.bottom + 2, left: r.left, width: r.width });
+                        }
+                      }}
                       onBlur={() => setTimeout(() => setShowColPicker(false), 150)}
                       onChange={e => { setAddingColSearch(e.target.value); setShowColPicker(true); }}
                       style={{
@@ -411,11 +448,12 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
                       </button>
                     )}
                   </div>
-                  {showColPicker && availableFilterCols.length > 0 && (
+                  {showColPicker && pickerRect && availableFilterCols.length > 0 && (
                     <div style={{
-                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                      position: 'fixed', top: pickerRect.top, left: pickerRect.left, width: pickerRect.width,
+                      zIndex: 9999,
                       background: 'var(--bg, #0f172a)', border: '1px solid rgba(255,255,255,0.18)',
-                      borderRadius: 4, marginTop: 2, maxHeight: 180, overflowY: 'auto',
+                      borderRadius: 4, maxHeight: 180, overflowY: 'auto',
                       boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
                     }}>
                       {availableFilterCols.map(c => {
@@ -451,11 +489,12 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
                       })}
                     </div>
                   )}
-                  {showColPicker && availableFilterCols.length === 0 && addingColSearch.trim() && (
+                  {showColPicker && pickerRect && availableFilterCols.length === 0 && addingColSearch.trim() && (
                     <div style={{
-                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                      position: 'fixed', top: pickerRect.top, left: pickerRect.left, width: pickerRect.width,
+                      zIndex: 9999,
                       background: 'var(--bg, #0f172a)', border: '1px solid rgba(255,255,255,0.18)',
-                      borderRadius: 4, marginTop: 2, padding: '8px', fontSize: 11, color: 'var(--text-dim)',
+                      borderRadius: 4, padding: '8px', fontSize: 11, color: 'var(--text-dim)',
                       boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
                     }}>
                       No columns match
@@ -570,167 +609,185 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
           </div>
 
           {error && <div className="error-msg">{error}</div>}
+          </div>{/* end LEFT column */}
 
-          {/* Summary cards */}
-          {result && renderSummary()}
+          {/* ── RIGHT: Results ── */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', minWidth: 0 }}>
 
-          {/* Table / Chart toggle (only when the result can be charted) */}
-          {result && (() => {
-            const chartable = ['descriptive', 'frequency', 'correlation', 'spearman', 'kendall', 'crosstab'].includes(type);
-            if (!chartable) return null;
-            return (
-              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                <button className={`btn-small ${view === 'table' ? 'btn-primary' : ''}`} onClick={() => setView('table')} style={{ fontSize: 11 }}>📋 Table</button>
-                <button className={`btn-small ${view === 'chart' ? 'btn-primary' : ''}`} onClick={() => setView('chart')} style={{ fontSize: 11 }}>📊 Chart</button>
+            {/* Empty state */}
+            {!result && !loading && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', height: '100%', color: 'var(--text-dim)', textAlign: 'center' }}>
+                <span style={{ fontSize: 36, marginBottom: 10 }}>📊</span>
+                <p style={{ fontSize: 13 }}>Configure your analysis on the left<br />then click <strong>Run Analysis</strong></p>
               </div>
-            );
-          })()}
+            )}
 
-          {/* Chart view */}
-          {result && view === 'chart' && (() => {
-            const sc = buildStatChart(type, result);
-            return sc
-              ? <Chart kind={sc.kind as any} data={sc.data} title={sc.title} height={sc.height} />
-              : <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Chart unavailable for this result.</div>;
-          })()}
-
-          {/* Insert into workspace */}
-          {result && onInsert && (() => {
-            const sc = buildStatChart(type, result);
-            const label = titles[type];
-            const interpretation = result.interpretation || '';
-            const headers: string[] = result.headers || [];
-            const rows: any[][] = result.rows || [];
-            const doInsert = (mode: 'table' | 'chart' | 'both') => {
-              if (mode === 'table' || !sc) {
-                onInsert({ label, headers, rows, interpretation });
-              } else if (mode === 'chart') {
-                onInsert({ label, headers, rows, interpretation, statChart: sc, chartOnly: true });
-              } else {
-                onInsert({ label, headers, rows, interpretation, statChart: sc });
-              }
-              onClose();
-            };
-            return (
-              <div style={{ display: 'flex', gap: 8, marginTop: 14, paddingTop: 12,
-                borderTop: '1px solid var(--border, #334155)', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center',
-                  textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 4 }}>
-                  Insert into workspace:
-                </span>
-                <button className="btn-primary" style={{ fontSize: 12 }} onClick={() => doInsert('table')}>
-                  📋 Table
-                </button>
-                <button className="btn-primary" style={{ fontSize: 12, opacity: sc ? 1 : 0.5 }}
-                  disabled={!sc} onClick={() => doInsert('chart')}
-                  title={sc ? 'Insert as a chart-only card' : 'No chart available for this test'}>
-                  📊 Chart
-                </button>
-                <button className="btn-primary" style={{ fontSize: 12, opacity: sc ? 1 : 0.5 }}
-                  disabled={!sc} onClick={() => doInsert('both')}
-                  title={sc ? 'Insert one card showing both table and chart (toggleable)' : 'No chart available for this test'}>
-                  📋📊 Both
-                </button>
+            {loading && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
+                height: '100%', color: 'var(--text-dim)', fontSize: 13 }}>
+                Computing…
               </div>
-            );
-          })()}
+            )}
 
-          {/* Results table */}
-          {result && view === 'table' && (
-            <div style={{ overflow: 'auto' }}>
-              {result.chi2 !== undefined && (
-                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
-                  χ² = {result.chi2}, p = {result.p_value}{result.dof !== undefined ? `, df = ${result.dof}` : ''}
-                  {result.cramers_v !== undefined && result.cramers_v !== null ? `, Cramér's V = ${result.cramers_v}` : ''}
-                  {result.fisher_p ? `, Fisher's p = ${result.fisher_p}` : ''}
+            {/* Summary cards */}
+            {result && renderSummary()}
+
+            {/* Table / Chart toggle */}
+            {result && (() => {
+              const chartable = ['descriptive', 'frequency', 'correlation', 'spearman', 'kendall', 'crosstab'].includes(type);
+              if (!chartable) return null;
+              return (
+                <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                  <button className={`btn-small ${view === 'table' ? 'btn-primary' : ''}`} onClick={() => setView('table')} style={{ fontSize: 11 }}>📋 Table</button>
+                  <button className={`btn-small ${view === 'chart' ? 'btn-primary' : ''}`} onClick={() => setView('chart')} style={{ fontSize: 11 }}>📊 Chart</button>
                 </div>
-              )}
-              {result.f_stat !== undefined && (
-                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
-                  F = {result.f_stat}, p = {result.p_value}
-                  {result.eta_squared !== undefined && result.eta_squared !== null ? `, η² = ${result.eta_squared}` : ''}
-                  {result.omega_squared !== undefined && result.omega_squared !== null ? `, ω² = ${result.omega_squared}` : ''}
-                </div>
-              )}
-              {result.H !== undefined && (
-                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
-                  Kruskal H = {result.H}, p = {result.p_value}{result.eta_squared !== undefined ? `, η²_H = ${result.eta_squared}` : ''}
-                </div>
-              )}
-              {result.kendalls_w !== undefined && (
-                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
-                  Friedman χ² = {result.chi2}, p = {result.p_value}, Kendall's W = {result.kendalls_w}
-                </div>
-              )}
-              {result.alpha !== undefined && (
-                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
-                  Cronbach's α = {result.alpha}
-                </div>
-              )}
-              <table className="result-table" style={{ fontSize: 12 }}>
-                <thead>
-                  <tr>
-                    {result.headers.map((h: string, i: number) => (
-                      <th key={i} style={{ padding: '6px 10px', fontSize: 11 }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.rows.map((row: any[], ri: number) => (
-                    <tr key={ri}>
-                      {row.map((cell: any, ci: number) => {
-                        const isNum = typeof cell === 'number';
-                        const isCorr = type === 'correlation' && ci > 0;
-                        let cellStyle: React.CSSProperties = { padding: '5px 10px', fontSize: 12 };
-                        // Heatmap for correlation matrix
-                        if (isCorr && isNum) {
-                          const abs = Math.abs(cell);
-                          const r = cell >= 0 ? 0 : 220;
-                          const g = cell >= 0 ? Math.round(100 + abs * 155) : 0;
-                          const b = cell >= 0 ? 0 : Math.round(100 + abs * 155);
-                          cellStyle.background = `rgba(${r},${g},${b},${abs * 0.4})`;
-                          cellStyle.fontWeight = abs > 0.5 ? 600 : 400;
-                        }
-                        // Significance highlighting
-                        if (typeof cell === 'string' && (cell === '***' || cell === '**' || cell === '*')) {
-                          cellStyle.color = cell === '***' ? '#ef4444' : cell === '**' ? '#f59e0b' : '#22c55e';
-                          cellStyle.fontWeight = 700;
-                        }
-                        if (typeof cell === 'string' && cell === 'ns') {
-                          cellStyle.color = 'var(--text-dim)';
-                        }
-                        // Outlier flag highlighting
-                        if (type === 'outlier' && typeof cell === 'string' && cell.toLowerCase().includes('outlier')) {
-                          cellStyle.color = '#ef4444';
-                          cellStyle.fontWeight = 600;
-                        }
-                        return (
-                          <td key={ci} className={isNum ? 'num-cell' : ''} style={cellStyle}>
-                            {cell != null ? String(cell) : ''}
-                          </td>
-                        );
-                      })}
+              );
+            })()}
+
+            {/* Chart view */}
+            {result && view === 'chart' && (() => {
+              const sc = buildStatChart(type, result);
+              return sc
+                ? <Chart kind={sc.kind as any} data={sc.data} title={sc.title} height={sc.height} />
+                : <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Chart unavailable for this result.</div>;
+            })()}
+
+            {/* Results table */}
+            {result && view === 'table' && (
+              <div style={{ overflow: 'auto' }}>
+                {result.chi2 !== undefined && (
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+                    χ² = {result.chi2}, p = {result.p_value}{result.dof !== undefined ? `, df = ${result.dof}` : ''}
+                    {result.cramers_v !== undefined && result.cramers_v !== null ? `, Cramér's V = ${result.cramers_v}` : ''}
+                    {result.fisher_p ? `, Fisher's p = ${result.fisher_p}` : ''}
+                  </div>
+                )}
+                {result.f_stat !== undefined && (
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+                    F = {result.f_stat}, p = {result.p_value}
+                    {result.eta_squared !== undefined && result.eta_squared !== null ? `, η² = ${result.eta_squared}` : ''}
+                    {result.omega_squared !== undefined && result.omega_squared !== null ? `, ω² = ${result.omega_squared}` : ''}
+                  </div>
+                )}
+                {result.H !== undefined && (
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+                    Kruskal H = {result.H}, p = {result.p_value}{result.eta_squared !== undefined ? `, η²_H = ${result.eta_squared}` : ''}
+                  </div>
+                )}
+                {result.kendalls_w !== undefined && (
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+                    Friedman χ² = {result.chi2}, p = {result.p_value}, Kendall's W = {result.kendalls_w}
+                  </div>
+                )}
+                {result.alpha !== undefined && (
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+                    Cronbach's α = {result.alpha}
+                  </div>
+                )}
+                <table className="result-table" style={{ fontSize: 12 }}>
+                  <thead>
+                    <tr>
+                      {result.headers.map((h: string, i: number) => (
+                        <th key={i} style={{ padding: '6px 10px', fontSize: 11 }}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {result.rows.map((row: any[], ri: number) => (
+                      <tr key={ri}>
+                        {row.map((cell: any, ci: number) => {
+                          const isNum = typeof cell === 'number';
+                          const isCorr = type === 'correlation' && ci > 0;
+                          let cellStyle: React.CSSProperties = { padding: '5px 10px', fontSize: 12 };
+                          if (isCorr && isNum) {
+                            const abs = Math.abs(cell);
+                            const r = cell >= 0 ? 0 : 220;
+                            const g = cell >= 0 ? Math.round(100 + abs * 155) : 0;
+                            const b = cell >= 0 ? 0 : Math.round(100 + abs * 155);
+                            cellStyle.background = `rgba(${r},${g},${b},${abs * 0.4})`;
+                            cellStyle.fontWeight = abs > 0.5 ? 600 : 400;
+                          }
+                          if (typeof cell === 'string' && (cell === '***' || cell === '**' || cell === '*')) {
+                            cellStyle.color = cell === '***' ? '#ef4444' : cell === '**' ? '#f59e0b' : '#22c55e';
+                            cellStyle.fontWeight = 700;
+                          }
+                          if (typeof cell === 'string' && cell === 'ns') {
+                            cellStyle.color = 'var(--text-dim)';
+                          }
+                          if (type === 'outlier' && typeof cell === 'string' && cell.toLowerCase().includes('outlier')) {
+                            cellStyle.color = '#ef4444';
+                            cellStyle.fontWeight = 600;
+                          }
+                          return (
+                            <td key={ci} className={isNum ? 'num-cell' : ''} style={cellStyle}>
+                              {cell != null ? String(cell) : ''}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
-          {/* Interpretation + legend (shown for both views) */}
-          {result && result.interpretation && (
-            <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--bg-alt, #1e293b)',
-              borderRadius: 6, fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5,
-              border: '1px solid var(--border, #334155)' }}>
-              <strong>Interpretation:</strong> {result.interpretation}
-            </div>
-          )}
-          {result && (
-            <div style={{ marginTop: 10, fontSize: 10, color: 'var(--text-dim)' }}>
-              *** p&lt;0.001 &nbsp; ** p&lt;0.01 &nbsp; * p&lt;0.05 &nbsp; ns = not significant
-            </div>
-          )}
-        </div>
+            {/* Interpretation + legend */}
+            {result && result.interpretation && (
+              <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--bg-alt, #1e293b)',
+                borderRadius: 6, fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5,
+                border: '1px solid var(--border, #334155)' }}>
+                <strong>Interpretation:</strong> {result.interpretation}
+              </div>
+            )}
+            {result && (
+              <div style={{ marginTop: 10, fontSize: 10, color: 'var(--text-dim)' }}>
+                *** p&lt;0.001 &nbsp; ** p&lt;0.01 &nbsp; * p&lt;0.05 &nbsp; ns = not significant
+              </div>
+            )}
+
+            {/* Insert into workspace */}
+            {result && onInsert && (() => {
+              const sc = buildStatChart(type, result);
+              const label = titles[type];
+              const interpretation = result.interpretation || '';
+              const headers: string[] = result.headers || [];
+              const rows: any[][] = result.rows || [];
+              const cfg = { statType: type, columns: selectedCols, alpha, analysisFilters, useProjectFilter };
+              const doInsert = (mode: 'table' | 'chart' | 'both') => {
+                if (mode === 'table' || !sc) {
+                  onInsert({ label, headers, rows, interpretation, statConfig: cfg });
+                } else if (mode === 'chart') {
+                  onInsert({ label, headers, rows, interpretation, statChart: sc, chartOnly: true, statConfig: cfg });
+                } else {
+                  onInsert({ label, headers, rows, interpretation, statChart: sc, statConfig: cfg });
+                }
+                onClose();
+              };
+              return (
+                <div style={{ display: 'flex', gap: 8, marginTop: 14, paddingTop: 12,
+                  borderTop: '1px solid var(--border, #334155)', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center',
+                    textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 4 }}>
+                    Insert into workspace:
+                  </span>
+                  <button className="btn-primary" style={{ fontSize: 12 }} onClick={() => doInsert('table')}>📋 Table</button>
+                  <button className="btn-primary" style={{ fontSize: 12, opacity: sc ? 1 : 0.5 }}
+                    disabled={!sc} onClick={() => doInsert('chart')}
+                    title={sc ? 'Insert as a chart-only card' : 'No chart available for this test'}>
+                    📊 Chart
+                  </button>
+                  <button className="btn-primary" style={{ fontSize: 12, opacity: sc ? 1 : 0.5 }}
+                    disabled={!sc} onClick={() => doInsert('both')}
+                    title={sc ? 'Insert one card showing both table and chart' : 'No chart available for this test'}>
+                    📋📊 Both
+                  </button>
+                </div>
+              );
+            })()}
+          </div>{/* end RIGHT column */}
+
+        </div>{/* end two-column body */}
       </div>
     </div>
   );
@@ -762,6 +819,13 @@ function buildStatChart(
     const data = adaptMatrixToHeatmap(result.headers, result.rows, 'sequential');
     return data
       ? { kind: 'heatmap', data, title: 'Cross-tab heatmap (counts)',
+          height: Math.max(300, data.yLabels.length * 36 + 80) }
+      : null;
+  }
+  if (type === 'cramers_matrix') {
+    const data = adaptMatrixToHeatmap(result.headers, result.rows, 'sequential');
+    return data
+      ? { kind: 'heatmap', data, title: "Cramér\u2019s V heatmap (0 = no association, 1 = perfect)",
           height: Math.max(300, data.yLabels.length * 36 + 80) }
       : null;
   }
