@@ -157,6 +157,12 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid phone or password")
 
+    # User-level TOTP 2FA check (takes priority over tenant OTP flow)
+    if getattr(user, "totp_enabled", False) and getattr(user, "totp_secret", None):
+        from app.api.routes.two_factor import issue_2fa_challenge
+        temp_token = issue_2fa_challenge(str(user.id))
+        return {"2fa_required": True, "method": "totp", "temp_token": temp_token}
+
     # Check if tenant has 2FA enabled and plan supports it
     from app.models.tenant import Tenant
     from app.models.billing import Subscription, Plan as BillingPlan

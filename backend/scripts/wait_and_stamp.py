@@ -104,8 +104,12 @@ def detect_and_stamp():
             stamp = "0030"
         elif not col_exists(cur, "shared_files", "folder"):
             stamp = "0035"
-        else:
+        elif not col_exists(cur, "tenants", "reseller_code"):
             stamp = "0036"
+        elif not col_exists(cur, "users", "totp_secret"):
+            stamp = "0037"
+        else:
+            stamp = "0038"
 
         print(f"Stamping alembic_version to {stamp}")
         if not has_alembic:

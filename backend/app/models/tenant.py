@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Boolean, func
+from sqlalchemy import Column, String, DateTime, Boolean, Numeric, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 import uuid
 from app.core.database import Base
@@ -21,3 +21,8 @@ class Tenant(Base):
     notification_config = Column(JSONB, default=dict, server_default="'{}'::jsonb")
     ai_config = Column(JSONB, default=dict, server_default="'{}'::jsonb")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # Reseller / partner program (migration 0037)
+    reseller_code = Column(String(32), unique=True, nullable=True)
+    referred_by_reseller_code = Column(String(32), nullable=True)
+    commission_rate = Column(Numeric(5, 2), default=20.00)
+    is_reseller = Column(Boolean, default=False, server_default='false')

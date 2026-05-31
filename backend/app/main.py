@@ -106,7 +106,40 @@ async def lifespan(app: FastAPI):
     stop_scheduler()
 
 
-app = FastAPI(title="FieldGovern API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="FieldGovern API",
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
+)
+
+
+def _custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    from fastapi.openapi.utils import get_openapi
+    schema = get_openapi(
+        title="FieldGovern API",
+        version="0.1.0",
+        description=(
+            "Multi-tenant field data collection API. "
+            "All endpoints except `/auth/*` and `/public/*` require a Bearer JWT. "
+            "Obtain a token via `POST /api/v1/auth/login` or `POST /api/v1/auth/google`."
+        ),
+        routes=app.routes,
+    )
+    schema.setdefault("components", {})
+    schema["components"]["securitySchemes"] = {
+        "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+    }
+    schema["security"] = [{"BearerAuth": []}]
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = _custom_openapi
 
 
 # ── Security headers ──────────────────────────────────────────────────────────
@@ -125,10 +158,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Allow the SPA to function; restrict everything else
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline' https://us-assets.i.posthog.com; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: blob: https://*.tile.openstreetmap.org; "
-            "connect-src 'self' https://api.deepseek.com; "
+            "connect-src 'self' https://api.deepseek.com https://us.i.posthog.com https://us-assets.i.posthog.com; "
             "media-src 'self' blob:; "
             "worker-src 'self' blob:; "
             "frame-ancestors 'none';"

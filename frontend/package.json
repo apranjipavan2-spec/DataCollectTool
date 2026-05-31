@@ -18,6 +18,7 @@
     "file-saver": "^2.0.5",
     "i18next": "^23.11.5",
     "leaflet": "^1.9.4",
+    "posthog-js": "^1.376.4",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -23,3 +23,6 @@ class User(Base):
     google_id    = Column(String(255), unique=True, nullable=True)
     auth_provider = Column(String(20), server_default="email")
     avatar_url   = Column(Text, nullable=True)
+    # TOTP 2FA — added in migration 0038
+    totp_secret  = Column(String(64), nullable=True)
+    totp_enabled = Column(Boolean, default=False, server_default='false')

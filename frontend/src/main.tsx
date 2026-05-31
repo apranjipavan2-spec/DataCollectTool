@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import * as Sentry from '@sentry/react'
+import posthog from 'posthog-js'
 import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
 import './i18n'
@@ -20,6 +21,18 @@ if (SENTRY_DSN) {
     integrations: [
       Sentry.browserTracingIntegration(),
     ],
+  })
+}
+
+const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined
+if (POSTHOG_KEY) {
+  posthog.init(POSTHOG_KEY, {
+    api_host: 'https://us.i.posthog.com',
+    defaults: '2026-01-30',
+    person_profiles: 'identified_only',
+    capture_pageview: true,
+    capture_pageleave: true,
+    session_recording: { maskAllInputs: true },
   })
 }
 
