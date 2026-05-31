@@ -657,7 +657,6 @@ export default function App() {
     const silent = !!opts?.silent;
     const statTables = tables.filter(t => (t as any)._statResult);
     if (statTables.length === 0) return { refreshed: 0, skipped: 0, total: 0 };
-    const knownColumnNames = new Set(allColumns.map(c => c.name));
     let refreshed = 0;
     let skipped = 0;
     if (!silent) setLoadingMsg(`Refreshing stat tables… 0/${statTables.length}`);
@@ -676,7 +675,7 @@ export default function App() {
         analysisFilters = saved.analysisFilters || {};
         useProjectFilter = saved.useProjectFilter;
       } else {
-        const inferred = inferStatConfigFromResult(t.title || '', (t as any)._statResultData, knownColumnNames);
+        const inferred = inferStatConfigFromResult(t.title || '', (t as any)._statResultData, allColumns);
         if (!inferred || inferred.columns.length === 0) { skipped++; return; }
         statType = inferred.statType;
         columns = inferred.columns;
@@ -1856,8 +1855,7 @@ export default function App() {
                 analysisFilters = saved.analysisFilters || {};
                 useProjectFilter = !!saved.useProjectFilter;
               } else {
-                const knownColumnNames = new Set(allColumns.map(c => c.name));
-                const inferred = inferStatConfigFromResult(activeTable.title || '', (activeTable as any)._statResultData, knownColumnNames);
+                const inferred = inferStatConfigFromResult(activeTable.title || '', (activeTable as any)._statResultData, allColumns);
                 if (!inferred) return null;
                 statType = inferred.statType;
                 columns = inferred.columns;

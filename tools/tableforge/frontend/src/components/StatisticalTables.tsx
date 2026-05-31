@@ -36,26 +36,130 @@ const STAT_TYPES_WITH_COLS_IN_ROWS = new Set([
   'descriptive', 'normality', 'outlier', 'reliability',
 ]);
 
+// Two-column stat types where one (or both) inputs are categorical and their distinct values
+// surface in the result headers or first column. We can recover those columns by matching
+// result values against each known column's sample_values (value-overlap heuristic).
+// Order in tuple = [row_var_position, col_var_position] within the saved `columns` array.
+const STAT_TYPES_RECOVERABLE_BY_VALUE_OVERLAP: Record<string, { fromRows: boolean; fromHeaders: boolean }> = {
+  crosstab: { fromRows: true, fromHeaders: true },
+  ttest: { fromRows: true, fromHeaders: false },
+  anova: { fromRows: true, fromHeaders: false },
+  kruskal: { fromRows: true, fromHeaders: false },
+  mcnemar: { fromRows: false, fromHeaders: true },
+  paired_ttest: { fromRows: false, fromHeaders: true },
+  wilcoxon: { fromRows: false, fromHeaders: true },
+  posthoc: { fromRows: true, fromHeaders: false },
+  frequency: { fromRows: true, fromHeaders: false },
+};
+
+// Score a column by how many of its sample_values appear in the candidate value set.
+function scoreColumnByValueOverlap(col: { sample_values?: string[] }, candidates: Set<string>): number {
+  if (!col.sample_values || col.sample_values.length === 0 || candidates.size === 0) return 0;
+  let hits = 0;
+  for (const v of col.sample_values) {
+    if (v != null && candidates.has(String(v).trim())) hits++;
+  }
+  return hits;
+}
+
+// Pick the best-matching known column (≥2 sample value hits) for a given candidate value set,
+// excluding columns already chosen. Returns null when no strong match.
+function pickColumnByOverlap(
+  knownColumns: { name: string; sample_values?: string[] }[],
+  candidates: Set<string>,
+  exclude: Set<string>,
+): string | null {
+  let best: { name: string; score: number } | null = null;
+  for (const col of knownColumns) {
+    if (exclude.has(col.name)) continue;
+    const s = scoreColumnByValueOverlap(col, candidates);
+    if (s >= 2 && (!best || s > best.score)) best = { name: col.name, score: s };
+  }
+  return best ? best.name : null;
+}
+
 export function inferStatConfigFromResult(
   title: string,
   resultData: { headers: string[]; rows: any[][] } | undefined,
-  knownColumnNames: Set<string>,
+  knownColumns: { name: string; sample_values?: string[] }[] | Set<string>,
 ): { statType: string; columns: string[] } | null {
   if (!title) return null;
+  // Accept either an array of column metadata (preferred, enables value-overlap recovery)
+  // or a bare Set<string> (back-compat — only matrix-style recovery works in that case).
+  const colsArray: { name: string; sample_values?: string[] }[] = Array.isArray(knownColumns)
+    ? knownColumns
+    : Array.from(knownColumns).map(name => ({ name }));
+  const nameSet = new Set(colsArray.map(c => c.name));
   // Try exact match first, then prefix match (titles can be suffixed with " - <column>" by auto-title).
   // Prefer the LONGEST matching prefix to disambiguate (e.g. "Cramér's V Association Matrix" vs "Cramér").
   const candidates = Object.entries(STAT_TITLES).filter(([, t]) => title === t || title.startsWith(t + ' ') || title.startsWith(t + '-') || title.startsWith(t + ' -'));
   if (candidates.length === 0) return null;
   candidates.sort((a, b) => b[1].length - a[1].length);
   const statType = candidates[0][0];
-  let columns: string[] = [];
+
+  // Pass 1: matrix-style stat — column names ARE the row labels.
   if (resultData?.rows && STAT_TYPES_WITH_COLS_IN_ROWS.has(statType)) {
-    columns = resultData.rows
+    const matrixCols = resultData.rows
       .map(r => String(r?.[0] ?? ''))
-      .filter(name => name && knownColumnNames.has(name));
-    columns = Array.from(new Set(columns));
+      .filter(name => name && nameSet.has(name));
+    const deduped = Array.from(new Set(matrixCols));
+    if (deduped.length > 0) return { statType, columns: deduped };
   }
-  return { statType, columns };
+
+  // Pass 2: title-suffix recovery — many auto-titles append " - <column>" or " - <colA> vs <colB>".
+  // Scan the suffix after the matched stat title for known column names.
+  const matchedTitle = candidates[0][1];
+  const suffix = title.slice(matchedTitle.length).replace(/^[\s\-:]+/, '');
+  const titleColumns: string[] = [];
+  if (suffix) {
+    // Sort known columns by length desc so longer names match before substrings.
+    const sorted = colsArray.slice().sort((a, b) => b.name.length - a.name.length);
+    for (const c of sorted) {
+      if (suffix.includes(c.name) && !titleColumns.includes(c.name)) titleColumns.push(c.name);
+    }
+  }
+
+  // Pass 3: value-overlap recovery for non-matrix two-column stats.
+  if (resultData && STAT_TYPES_RECOVERABLE_BY_VALUE_OVERLAP[statType]) {
+    const cfg = STAT_TYPES_RECOVERABLE_BY_VALUE_OVERLAP[statType];
+    const exclude = new Set<string>(titleColumns);
+    const recovered: string[] = [...titleColumns];
+    if (cfg.fromRows && recovered.length < 2) {
+      const rowVals = new Set<string>();
+      for (const r of resultData.rows || []) {
+        const v = r?.[0];
+        if (v != null) {
+          const s = String(v).trim();
+          // Skip footer/legend rows that don't look like data values.
+          if (s && s.length < 200 && !/^(total|grand total|n|sample size|p-value|chi|cram|signific|^\*+|—|-+)$/i.test(s)) {
+            rowVals.add(s);
+          }
+        }
+      }
+      const pick = pickColumnByOverlap(colsArray, rowVals, exclude);
+      if (pick) { recovered.push(pick); exclude.add(pick); }
+    }
+    if (cfg.fromHeaders && recovered.length < 2) {
+      const headerVals = new Set<string>();
+      const headers = resultData.headers || [];
+      // Skip first header (often "") and known footer/aggregate headers.
+      for (let i = 1; i < headers.length; i++) {
+        const h = String(headers[i] ?? '').trim();
+        if (h && h.length < 200 && !/^(total|grand total|n|count|%|sum|mean|sd|p-value|chi|cram)$/i.test(h)) {
+          headerVals.add(h);
+        }
+      }
+      const pick = pickColumnByOverlap(colsArray, headerVals, exclude);
+      if (pick) { recovered.push(pick); exclude.add(pick); }
+    }
+    if (recovered.length > 0) return { statType, columns: recovered };
+  }
+
+  // Pass 4 (fallback): if title alone gave us any columns, surface them even for stat types
+  // we don't have explicit recovery logic for — better than nothing.
+  if (titleColumns.length > 0) return { statType, columns: titleColumns };
+
+  return { statType, columns: [] };
 }
 
 type StatType =
