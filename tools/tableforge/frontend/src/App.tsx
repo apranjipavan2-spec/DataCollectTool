@@ -1237,10 +1237,11 @@ export default function App() {
       await refreshDataset(dataset.dataset_id);
       const toRun = tables.filter(t => t.values.length > 0);
       await runTabulationsBatch(toRun);
+      await rerunStatTables(projectFiltersRef.current, { force: true, silent: true });
     } catch (e: any) {
       setError('Refresh failed: ' + (e.message || ''));
     } finally { setLoading(false); setLoadingMsg(''); }
-  }, [dataset, tables, runTabulationsBatch]);
+  }, [dataset, tables, runTabulationsBatch, rerunStatTables]);
 
   // Cleaner handoff: open datacleaner in a new tab with a token, refresh dataset when it saves back.
   const cleanerWindowRef = useRef<Window | null>(null);
@@ -1359,10 +1360,13 @@ export default function App() {
       setColumnTypeOverrides(prev => ({ ...prev, [column]: newType }));
       const activeT = tables[activeTableIdx];
       if (activeT && activeT.values.length > 0) runTabulation(activeT);
+      // Refresh any stat table that depends on this column
+      const affects = tables.some(t => (t as any)._statResult && ((t as any)._statConfig?.columns || []).includes(column));
+      if (affects) await rerunStatTables(projectFiltersRef.current, { force: true, silent: true });
     } catch (e: any) {
       setError(e.message || 'Failed to change column type');
     }
-  }, [dataset, tables, activeTableIdx, runTabulation]);
+  }, [dataset, tables, activeTableIdx, runTabulation, rerunStatTables]);
 
   const reloadFileRef = useRef<HTMLInputElement>(null);
   const handleReloadFile = useCallback(async (file: File) => {
@@ -1373,13 +1377,14 @@ export default function App() {
       setDataset(meta);
       setExtraColumns([]);
       setLoadingMsg('Regenerating tables…');
-      setTimeout(() => {
+      setTimeout(async () => {
         tables.forEach(t => { if (t.values.length > 0) runTabulation(t); });
+        await rerunStatTables(projectFiltersRef.current, { force: true, silent: true });
       }, 100);
     } catch (e: any) {
       setError('Reload failed: ' + (e.message || ''));
     } finally { setLoading(false); setLoadingMsg(''); }
-  }, [dataset, tables, runTabulation]);
+  }, [dataset, tables, runTabulation, rerunStatTables]);
 
   if (!dataset) {
     return (
@@ -1803,6 +1808,39 @@ export default function App() {
                 );
               })}
             </select>
+            {(activeTable as any)._statResult && (() => {
+              const saved = (activeTable as any)._statConfig as { statType: string; columns: string[]; alpha: number; analysisFilters: Record<string, string[]>; useProjectFilter: boolean; columnsMeta?: Array<{ name: string; type: string; role?: string }>; datasetId?: string; computedAt?: string } | undefined;
+              if (!saved) return null;
+              const liveNames = new Set(allColumns.map(c => c.name));
+              const missing = (saved.columns || []).filter(n => !liveNames.has(n));
+              const stale = saved.datasetId && dataset && saved.datasetId !== dataset.dataset_id;
+              const tip = [
+                saved.computedAt ? `Computed: ${new Date(saved.computedAt).toLocaleString()}` : '',
+                `Columns (${saved.columns.length}):`,
+                ...(saved.columnsMeta || saved.columns.map(n => ({ name: n, type: '?', role: undefined as string | undefined })))
+                  .map((m: any) => `  • ${m.name} [${m.type}${m.role ? ' · ' + m.role : ''}]`),
+                `Alpha: ${saved.alpha}`,
+                `Project filter: ${saved.useProjectFilter ? 'on' : 'off'}`,
+                `Subset filters: ${Object.keys(saved.analysisFilters || {}).length === 0 ? 'none' : Object.keys(saved.analysisFilters).join(', ')}`,
+                missing.length ? `⚠ Missing columns: ${missing.join(', ')}` : '',
+                stale ? '⚠ Computed on a different dataset' : '',
+              ].filter(Boolean).join('\n');
+              return (
+                <span
+                  title={tip}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '2px 8px', borderRadius: 12, fontSize: 11,
+                    background: missing.length || stale ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.12)',
+                    border: '1px solid ' + (missing.length || stale ? 'rgba(245,158,11,0.4)' : 'rgba(59,130,246,0.3)'),
+                    color: missing.length || stale ? '#f59e0b' : '#3b82f6',
+                    cursor: 'help', whiteSpace: 'nowrap',
+                  }}
+                >
+                  🔗 {saved.columns.length} col{saved.columns.length === 1 ? '' : 's'}{missing.length ? ` (${missing.length} missing)` : ''}{stale ? ' · stale' : ''}
+                </span>
+              );
+            })()}
             {(() => {
               if (!(activeTable as any)._statResult) return null;
               const saved = (activeTable as any)._statConfig as { statType: string; columns: string[]; alpha: number; analysisFilters: Record<string, string[]>; useProjectFilter: boolean } | undefined;
@@ -2100,7 +2138,19 @@ export default function App() {
             empty.subtitle = interpretation;
             empty._statResult = true;
             empty._statResultData = { headers, rows };
-            if (statConfig) (empty as any)._statConfig = statConfig;
+            if (statConfig) {
+              const columnsMeta = statConfig.columns.map(name => {
+                const col = allColumns.find(c => c.name === name);
+                const role = columnRolesMap[name]?.role;
+                return { name, type: col?.type || 'unknown', role };
+              });
+              (empty as any)._statConfig = {
+                ...statConfig,
+                columnsMeta,
+                datasetId: dataset.dataset_id,
+                computedAt: new Date().toISOString(),
+              };
+            }
             if (statChart) {
               empty.chartConfig = { statChart, chart_only: !!chartOnly };
             }
