@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>DPDP Act 2023 Compliance — FieldGovern</title>
+  <meta name="description" content="FieldGovern's full compliance mapping to India's Digital Personal Data Protection Act 2023. Consent capture, data fiduciary obligations, data principal rights, breach reporting."/>
+  <link rel="canonical" href="https://www.fieldgovern.com/dpdp-compliance.html"/>
+  <link rel="icon" href="/assets/logo-icon.png" type="image/png"/>
+  <meta name="robots" content="index,follow"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:url" content="https://www.fieldgovern.com/dpdp-compliance.html"/>
+  <meta property="og:title" content="DPDP Act 2023 Compliance — FieldGovern"/>
+  <meta property="og:description" content="Complete DPDP compliance mapping for field data collection. Consent, breach reporting, data principal rights, DPA template."/>
+  <meta property="og:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
+  <meta property="og:site_name" content="FieldGovern"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <script defer data-domain="fieldgovern.com" src="https://plausible.io/js/script.js"></script>
+  <style>
+    :root{--brand:#0ea5e9;--brand-dark:#0369a1;--green:#10b981;--amber:#f59e0b;--red:#ef4444;--bg:#ffffff;--bg2:#f8fafc;--bg3:#f1f5f9;--text:#0f172a;--text2:#334155;--text3:#64748b;--border:#e2e8f0}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{font-family:'Inter',sans-serif;color:var(--text);background:var(--bg)}
+    body{overflow-x:hidden}
+    a{color:var(--brand);text-decoration:none}
+    a:hover{text-decoration:underline}
+    nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.95);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:0 1.5rem}
+    .nav-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:64px}
+    .nav-logo{font-weight:800;font-size:1.2rem;color:var(--text)}
+    .nav-links{display:flex;gap:1.5rem;font-size:.9rem}
+    .hero{background:linear-gradient(135deg,#0369a1 0%,#0ea5e9 60%,#10b981 100%);color:#fff;padding:5rem 1.5rem 4rem;text-align:center}
+    .hero h1{font-size:clamp(2rem,5vw,3rem);font-weight:900;margin-bottom:1rem}
+    .hero p{font-size:1.15rem;opacity:.9;max-width:700px;margin:0 auto 2rem}
+    .badge{display:inline-block;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:.35rem 1rem;font-size:.85rem;font-weight:600;margin:.25rem}
+    section{max-width:900px;margin:0 auto;padding:3rem 1.5rem}
+    h2{font-size:1.6rem;font-weight:800;margin-bottom:.5rem;color:var(--text)}
+    h3{font-size:1.15rem;font-weight:700;margin-bottom:.5rem;color:var(--text)}
+    p{color:var(--text2);line-height:1.75;margin-bottom:1rem}
+    .divider{border:none;border-top:1px solid var(--border);margin:2.5rem 0}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.25rem;margin:1.5rem 0}
+    .card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.5rem}
+    .card-icon{font-size:1.8rem;margin-bottom:.75rem}
+    .card h3{font-size:1rem;margin-bottom:.5rem}
+    .card p{font-size:.9rem;margin:0}
+    .checklist{list-style:none;margin:1rem 0}
+    .checklist li{display:flex;align-items:flex-start;gap:.75rem;padding:.6rem 0;border-bottom:1px solid var(--border);font-size:.95rem;color:var(--text2)}
+    .checklist li:last-child{border-bottom:none}
+    .checklist li::before{content:"✓";color:var(--green);font-weight:700;flex-shrink:0;margin-top:.1rem}
+    .checklist li.partial::before{content:"◑";color:var(--amber)}
+    .table-wrap{overflow-x:auto;margin:1.5rem 0}
+    table{width:100%;border-collapse:collapse;font-size:.9rem}
+    th{background:var(--bg3);font-weight:700;text-align:left;padding:.75rem 1rem;border:1px solid var(--border)}
+    td{padding:.7rem 1rem;border:1px solid var(--border);color:var(--text2);vertical-align:top}
+    .pill{display:inline-block;border-radius:999px;padding:.2rem .75rem;font-size:.78rem;font-weight:600}
+    .pill-green{background:#dcfce7;color:#166534}
+    .pill-amber{background:#fef3c7;color:#92400e}
+    .pill-blue{background:#dbeafe;color:#1e40af}
+    .cta-box{background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff;border-radius:16px;padding:3rem 2rem;text-align:center;margin:3rem 0}
+    .cta-box h2{color:#fff;font-size:1.8rem;margin-bottom:.75rem}
+    .cta-box p{color:rgba(255,255,255,.85);margin-bottom:1.5rem}
+    .btn{display:inline-block;padding:.85rem 2rem;border-radius:8px;font-weight:700;font-size:.95rem;cursor:pointer}
+    .btn-white{background:#fff;color:var(--brand-dark)}
+    .btn-outline{background:transparent;border:2px solid #fff;color:#fff;margin-left:.75rem}
+    footer{background:var(--bg3);border-top:1px solid var(--border);padding:2rem 1.5rem;text-align:center;font-size:.85rem;color:var(--text3)}
+    @media(max-width:640px){.nav-links{display:none}.btn-outline{display:none}}
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="/">FieldGovern</a>
+    <div class="nav-links">
+      <a href="/features.html">Features</a>
+      <a href="/pricing.html">Pricing</a>
+      <a href="/security.html">Security</a>
+      <a href="/dpa-template.html">DPA Template</a>
+      <a href="https://app.fieldgovern.com" style="color:var(--brand);font-weight:600">Get Started</a>
+    </div>
+  </div>
+</nav>
+
+<div class="hero">
+  <h1>DPDP Act 2023 Compliance</h1>
+  <p>FieldGovern is built for India's Digital Personal Data Protection Act 2023. Full compliance mapping — purpose limitation, consent, data principal rights, breach reporting.</p>
+  <span class="badge">DPDP 2023 Ready</span>
+  <span class="badge">Data Localisation</span>
+  <span class="badge">Consent Audit Trail</span>
+  <span class="badge">Breach Notification</span>
+</div>
+
+<section>
+  <h2>What the DPDP Act requires</h2>
+  <p>The Digital Personal Data Protection Act 2023 (DPDP) governs how organisations collect, process, store, and share personal data of Indian citizens. For field data collection — surveys, enumerations, panel studies — the key obligations are:</p>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-icon">📋</div>
+      <h3>Lawful Purpose &amp; Consent</h3>
+      <p>Personal data must be collected for a specific, clear purpose. Consent must be free, specific, informed, and unconditional — and must be recorded.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🔒</div>
+      <h3>Data Minimisation</h3>
+      <p>Only data necessary for the stated purpose may be collected. Extra fields that aren't needed = liability.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">👤</div>
+      <h3>Data Principal Rights</h3>
+      <p>Respondents have the right to access, correct, and erase their data. Organisations must have a mechanism to honour these requests.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">⚠️</div>
+      <h3>Breach Notification</h3>
+      <p>Data breaches must be reported to the Data Protection Board and affected data principals within 72 hours of discovery.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🏛️</div>
+      <h3>Data Fiduciary Obligations</h3>
+      <p>Organisations that decide the purpose and means of processing (data fiduciaries) must appoint a Data Protection Officer if required, and publish a privacy policy.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🤝</div>
+      <h3>Data Processing Agreements</h3>
+      <p>When engaging a data processor (like FieldGovern), a written DPA is required that specifies the scope, purpose, and security obligations.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<section>
+  <h2>FieldGovern's DPDP compliance mapping</h2>
+  <p>Below is a clause-by-clause mapping of the DPDP Act's obligations to FieldGovern's implemented controls.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>DPDP Obligation</th>
+          <th>FieldGovern Control</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>S.6 — Consent</strong><br/>Free, specific, informed, unconditional consent before collection</td>
+          <td>Consent question type in form builder. Consent timestamp + IP logged per submission. Public-survey link includes consent preamble.</td>
+          <td><span class="pill pill-green">Implemented</span></td>
+        </tr>
+        <tr>
+          <td><strong>S.6(6) — Consent withdrawal</strong><br/>Data principal can withdraw at any time</td>
+          <td>Soft-delete endpoint for submission data. Org admins can action withdrawal requests against respondent ID/phone.</td>
+          <td><span class="pill pill-green">Implemented</span></td>
+        </tr>
+        <tr>
+          <td><strong>S.8 — Purpose limitation</strong><br/>Data used only for stated purpose</td>
+          <td>Form-level "data purpose" field (JSONB). Export API tags all exports with purpose + user ID in audit log.</td>
+          <td><span class="pill pill-green">Implemented</span></td>
+        </tr>
+        <tr>
+          <td><strong>S.8(3) — Data accuracy</strong><br/>Data must be accurate and complete</td>
+          <td>FgCleaner QC engine flags duplicate, incomplete, and implausible submissions before approval. Approval workflow prevents inaccurate data from becoming "official".</td>
+          <td><span class="pill pill-green">Implemented</span></td>
+        </tr>
+        <tr>
+          <td><strong>S.8(7) — Storage limitation</strong><br/>Data not retained beyond purpose</td>
+          <td>Tenant-level retention policy setting (days). Scheduler auto-archives submissions past retention. Configurable per program.</td>
+          <td><span class="pill pill-amber">In roadmap</span></td>
+        </tr>
+        <tr>
+          <td><strong>S.11 — Right to access</strong><br/>Data principal can request their data</td>
+          <td>Export by respondent ID/phone exports all submissions for that individual. CSV/PDF output.</td>
+          <td><span class="pill pill-green">Implemented</span></td>
+        </tr>
+        <tr>
+          <td><strong>S.12 — Right to correction/erasure</strong><br/>Data principal can correct or erase their data</td>
+          <td>Org admins can edit or delete individual submission records. Audit log records the action, actor, and timestamp.</td>
+          <td><span class="pill pill-green">Implemented</span></td>
+        </tr>
+        <tr>
+          <td><strong>S.13 — Right to grievance redressal</strong><br/>Mechanism to raise and address grievances</td>
+          <td>Grievance email configurable per-tenant (shown in privacy policy template). Response SLA tracked by org admin.</td>
+          <td><span class="pill pill-amber">Manual process</span></td>
+        </tr>
+        <tr>
+          <td><strong>S.8(5) — Data breach notification</strong><br/>Notify Board + data principals within 72h</td>
+          <td>Sentry real-time error alerting. Breach notification template included in DPA (see link below). Manual escalation process.</td>
+          <td><span class="pill pill-amber">Template provided</span></td>
+        </tr>
+        <tr>
+          <td><strong>S.9 — Children's data</strong><br/>Verifiable parental consent for minors</td>
+          <td>Form-level "minor respondent" flag triggers guardian-consent question. Age-gate logic configurable.</td>
+          <td><span class="pill pill-green">Implemented</span></td>
+        </tr>
+        <tr>
+          <td><strong>S.8(4) — Security safeguards</strong><br/>Appropriate technical + organisational measures</td>
+          <td>JWT HS256 + bcrypt. Row-level tenant isolation. TLS everywhere. OPFS encrypted offline storage. Sentry + structured audit log.</td>
+          <td><span class="pill pill-green">Implemented</span></td>
+        </tr>
+        <tr>
+          <td><strong>Data localisation</strong><br/>Personal data of Indian citizens stored in India</td>
+          <td>Deployable on Oracle Cloud India (Mumbai/Hyderabad), Hetzner India, or any on-premise server. Data never leaves your chosen region.</td>
+          <td><span class="pill pill-green">Self-hosted option</span></td>
+        </tr>
+        <tr>
+          <td><strong>Data Processing Agreement</strong><br/>Written DPA with processor required</td>
+          <td>Standard DPA template available below. Can be customised for each client engagement.</td>
+          <td><span class="pill pill-green">Template available</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<section>
+  <h2>Built-in compliance checklist for field teams</h2>
+  <p>Before deploying a survey program, run through this checklist in FieldGovern:</p>
+  <ul class="checklist">
+    <li>Form includes an explicit consent question (type = "consent") as the first question</li>
+    <li>Consent preamble states the purpose, data fiduciary name, and grievance officer contact</li>
+    <li>Form does not collect data fields beyond what is needed for the stated purpose</li>
+    <li>Guardian-consent question enabled if any respondent may be under 18</li>
+    <li>Enumerator briefed that consent withdrawal requests must be routed to the org admin within 24h</li>
+    <li>Data export permissions restricted to org_admin and above (default setting)</li>
+    <li>Audit log enabled and accessible to data protection officer (DPO)</li>
+    <li>Retention period set on the program (if personal data)</li>
+    <li>Privacy policy URL configured in tenant settings (shown to respondents on public-survey link)</li>
+    <li>DPA signed with FieldGovern / Dataworx before going live</li>
+  </ul>
+</section>
+
+<hr class="divider"/>
+
+<section>
+  <h2>Frequently asked questions</h2>
+
+  <h3 style="margin-top:1.5rem">Is FieldGovern a data fiduciary or data processor?</h3>
+  <p>FieldGovern (operated by Dataworx) is a <strong>data processor</strong>. Your organisation — the NGO, research institute, or government body running the survey — is the data fiduciary. You determine the purpose and means of processing; we process data on your instructions.</p>
+
+  <h3 style="margin-top:1.5rem">Can we self-host to keep data on our own servers?</h3>
+  <p>Yes. FieldGovern is fully self-hostable via Docker Compose on any Linux server in India. Your data never leaves your infrastructure. This satisfies both DPDP data localisation requirements and internal IT policies at most government bodies.</p>
+
+  <h3 style="margin-top:1.5rem">What happens if there is a data breach on FieldGovern's hosted service?</h3>
+  <p>We will notify the affected tenant within 6 hours of discovery. Our breach notification template (included in the DPA) guides you through notifying the Data Protection Board and affected data principals within the 72-hour DPDP window. Sentry monitors all backend errors in real time.</p>
+
+  <h3 style="margin-top:1.5rem">Do we need a DPA if we use FieldGovern's hosted service?</h3>
+  <p>Yes — the DPDP Act requires a written agreement between data fiduciary and data processor. We provide a standard DPA template that can be signed digitally. Download it below.</p>
+
+  <h3 style="margin-top:1.5rem">Can FieldGovern export a consent audit trail for regulators?</h3>
+  <p>Yes. The audit log export (CSV) includes every consent capture event: submission ID, respondent phone (hashed), form version, timestamp, and GPS coordinates of the device at time of consent.</p>
+</section>
+
+<div class="cta-box" style="max-width:900px;margin:0 auto 3rem;border-radius:16px">
+  <h2>Download the DPA template</h2>
+  <p>Our standard Data Processing Agreement is pre-filled with FieldGovern's security commitments and DPDP obligations. Have your legal team review and sign digitally.</p>
+  <a class="btn btn-white" href="/dpa-template.html">View DPA Template</a>
+  <a class="btn btn-outline" href="https://app.fieldgovern.com">Start Free Trial</a>
+</div>
+
+<footer>
+  <p>© 2026 Dataworx · FieldGovern · <a href="/privacy.html">Privacy Policy</a> · <a href="/terms.html">Terms</a> · <a href="/security.html">Security</a> · <a href="mailto:pallavi@dataworx.co.in">pallavi@dataworx.co.in</a></p>
+</footer>
+
+</body>
+</html>
