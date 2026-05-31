@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { ColumnInfo } from '../types';
 import { API_BASE, getColumnValues } from '../api';
 import { Chart, adaptFrequencyToBar, adaptMatrixToHeatmap, adaptDescriptiveToBox } from './Chart';
@@ -63,7 +63,6 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
   const [filterColValues, setFilterColValues] = useState<Record<string, string[]>>({});
   const [filterColSearch, setFilterColSearch] = useState<Record<string, string>>({});
   const [filterColLoading, setFilterColLoading] = useState<Record<string, boolean>>({});
-  const [addingCol, setAddingCol] = useState('');
   const [expandedFilterCol, setExpandedFilterCol] = useState<string | null>(null);
 
   const loadColValues = async (col: string) => {
@@ -81,7 +80,6 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
     if (!col || analysisFilters[col] !== undefined) return;
     setAnalysisFilters(prev => ({ ...prev, [col]: [] }));
     setExpandedFilterCol(col);
-    setAddingCol('');
     await loadColValues(col);
   };
 
@@ -100,6 +98,24 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
   };
 
   const analysisFilterActive = Object.values(analysisFilters).some(v => v.length > 0);
+
+  const [addingColSearch, setAddingColSearch] = useState('');
+  const [showColPicker, setShowColPicker] = useState(false);
+  const colPickerRef = useRef<HTMLDivElement>(null);
+
+  const colIndexMap = useMemo(
+    () => Object.fromEntries(columns.map((c, i) => [c.name, i + 1])),
+    [columns],
+  );
+
+  const availableFilterCols = useMemo(() => {
+    const q = addingColSearch.trim().toLowerCase();
+    const unfiltered = columns.filter(c => !analysisFilters[c.name]);
+    if (!q) return unfiltered;
+    return unfiltered.filter(c =>
+      c.name.toLowerCase().includes(q) || String(colIndexMap[c.name] ?? '').includes(q)
+    );
+  }, [columns, analysisFilters, addingColSearch, colIndexMap]);
 
   const numericCols = columns.filter(c => c.type === 'numeric');
   const allCols = columns;
@@ -371,25 +387,79 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, on
                   </div>
                 )}
 
-                {/* Add column dropdown */}
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: expandedFilterCol ? 8 : 0 }}>
-                  <select value={addingCol} onChange={e => addFilterCol(e.target.value)}
-                    style={{
-                      fontSize: 11, padding: '4px 8px', borderRadius: 4,
-                      background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.15)',
-                      color: 'inherit', flex: 1,
+                {/* Add column — searchable picker */}
+                <div style={{ position: 'relative', marginBottom: expandedFilterCol ? 8 : 0 }} ref={colPickerRef}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      placeholder="Search column by name or #number to add filter…"
+                      value={addingColSearch}
+                      onFocus={() => setShowColPicker(true)}
+                      onBlur={() => setTimeout(() => setShowColPicker(false), 150)}
+                      onChange={e => { setAddingColSearch(e.target.value); setShowColPicker(true); }}
+                      style={{
+                        flex: 1, padding: '4px 8px', fontSize: 11, borderRadius: 4,
+                        background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.18)',
+                        color: 'inherit', outline: 'none',
+                      }}
+                    />
+                    {analysisFilterActive && (
+                      <button onClick={() => { setAnalysisFilters({}); setExpandedFilterCol(null); setResult(null); }}
+                        style={{ fontSize: 11, padding: '4px 8px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap',
+                          background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-dim)' }}>
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                  {showColPicker && availableFilterCols.length > 0 && (
+                    <div style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                      background: 'var(--bg, #0f172a)', border: '1px solid rgba(255,255,255,0.18)',
+                      borderRadius: 4, marginTop: 2, maxHeight: 180, overflowY: 'auto',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
                     }}>
-                    <option value="">+ Add filter column…</option>
-                    {columns.filter(c => !analysisFilters[c.name]).map(c => (
-                      <option key={c.name} value={c.name}>{c.name}</option>
-                    ))}
-                  </select>
-                  {analysisFilterActive && (
-                    <button onClick={() => { setAnalysisFilters({}); setExpandedFilterCol(null); setResult(null); }}
-                      style={{ fontSize: 11, padding: '4px 8px', borderRadius: 4, cursor: 'pointer',
-                        background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-dim)' }}>
-                      Clear all
-                    </button>
+                      {availableFilterCols.map(c => {
+                        const idx = colIndexMap[c.name] ?? 0;
+                        const TYPE_COLOR: Record<string, string> = {
+                          numeric: '#3b82f6', text: '#22c55e', date: '#f59e0b', boolean: '#a855f7', multi_choice: '#ec4899',
+                        };
+                        const TYPE_ICON: Record<string, string> = {
+                          numeric: '#', text: 'Aa', date: 'D', boolean: '01', multi_choice: 'M',
+                        };
+                        return (
+                          <div key={c.name}
+                            onMouseDown={() => { addFilterCol(c.name); setAddingColSearch(''); setShowColPicker(false); }}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px',
+                              cursor: 'pointer', fontSize: 11,
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251,191,36,0.12)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', minWidth: 24, textAlign: 'right' }}>
+                              #{idx}
+                            </span>
+                            <span style={{
+                              fontSize: 8, fontWeight: 700, padding: '1px 3px', borderRadius: 2, flexShrink: 0,
+                              color: TYPE_COLOR[c.type] || '#888', background: `${TYPE_COLOR[c.type] || '#888'}22`,
+                            }}>
+                              {TYPE_ICON[c.type] || '?'}
+                            </span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {showColPicker && availableFilterCols.length === 0 && addingColSearch.trim() && (
+                    <div style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                      background: 'var(--bg, #0f172a)', border: '1px solid rgba(255,255,255,0.18)',
+                      borderRadius: 4, marginTop: 2, padding: '8px', fontSize: 11, color: 'var(--text-dim)',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                    }}>
+                      No columns match
+                    </div>
                   )}
                 </div>
 
