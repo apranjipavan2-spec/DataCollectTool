@@ -4,6 +4,57 @@ import { API_BASE, getColumnValues } from '../api';
 import { Chart, adaptFrequencyToBar, adaptMatrixToHeatmap, adaptDescriptiveToBox } from './Chart';
 import { ColPicker } from './ColPicker';
 
+export const STAT_TITLES: Record<string, string> = {
+  correlation: 'Correlation Matrix (Pearson)',
+  descriptive: 'Descriptive Statistics (Table 1)',
+  crosstab: 'Cross-Tabulation + Cramér\u2019s V',
+  ttest: 't-Test (Welch) + Cohen\u2019s d',
+  anova: 'One-Way ANOVA + \u03b7\u00b2/\u03c9\u00b2',
+  regression: 'OLS Regression',
+  normality: 'Normality Tests',
+  outlier: 'Outlier Detection',
+  frequency: 'Frequency Distribution',
+  paired_ttest: 'Paired t-Test (Pre vs Post)',
+  wilcoxon: 'Wilcoxon Signed-Rank (paired, non-parametric)',
+  mcnemar: 'McNemar\u2019s Test (paired binary)',
+  kruskal: 'Kruskal-Wallis (non-parametric ANOVA)',
+  friedman: 'Friedman Test (repeated measures)',
+  spearman: 'Spearman Rank Correlation',
+  kendall: 'Kendall\u2019s \u03c4 Correlation',
+  logistic_regression: 'Logistic Regression (binary outcome)',
+  multiple_regression: 'Multiple Regression (with categorical encoding + VIF)',
+  posthoc: 'Post-Hoc Pairwise Comparisons',
+  reliability: 'Cronbach\u2019s \u03b1 (scale reliability)',
+  cramers_matrix: "Cramér\u2019s V Association Matrix",
+  multinomial_logistic: 'Multinomial Logistic Regression',
+};
+
+// Stat types whose results have column names in the first row of each data row.
+// For these, we can recover the original `columns` from `_statResultData.rows`.
+const STAT_TYPES_WITH_COLS_IN_ROWS = new Set([
+  'correlation', 'spearman', 'kendall', 'cramers_matrix',
+  'descriptive', 'normality', 'outlier', 'reliability',
+]);
+
+export function inferStatConfigFromResult(
+  title: string,
+  resultData: { headers: string[]; rows: any[][] } | undefined,
+  knownColumnNames: Set<string>,
+): { statType: string; columns: string[] } | null {
+  if (!title) return null;
+  const entry = Object.entries(STAT_TITLES).find(([, t]) => t === title);
+  if (!entry) return null;
+  const statType = entry[0];
+  let columns: string[] = [];
+  if (resultData?.rows && STAT_TYPES_WITH_COLS_IN_ROWS.has(statType)) {
+    columns = resultData.rows
+      .map(r => String(r?.[0] ?? ''))
+      .filter(name => name && knownColumnNames.has(name));
+    columns = Array.from(new Set(columns));
+  }
+  return { statType, columns };
+}
+
 type StatType =
   | 'correlation'
   | 'descriptive'
@@ -130,30 +181,7 @@ export function StatisticalTables({ type, datasetId, columns, projectFilters, in
   const numericCols = columns.filter(c => c.type === 'numeric');
   const allCols = columns;
 
-  const titles: Record<StatType, string> = {
-    correlation: 'Correlation Matrix (Pearson)',
-    descriptive: 'Descriptive Statistics (Table 1)',
-    crosstab: 'Cross-Tabulation + Cramér\u2019s V',
-    ttest: 't-Test (Welch) + Cohen\u2019s d',
-    anova: 'One-Way ANOVA + \u03b7\u00b2/\u03c9\u00b2',
-    regression: 'OLS Regression',
-    normality: 'Normality Tests',
-    outlier: 'Outlier Detection',
-    frequency: 'Frequency Distribution',
-    paired_ttest: 'Paired t-Test (Pre vs Post)',
-    wilcoxon: 'Wilcoxon Signed-Rank (paired, non-parametric)',
-    mcnemar: 'McNemar\u2019s Test (paired binary)',
-    kruskal: 'Kruskal-Wallis (non-parametric ANOVA)',
-    friedman: 'Friedman Test (repeated measures)',
-    spearman: 'Spearman Rank Correlation',
-    kendall: 'Kendall\u2019s \u03c4 Correlation',
-    logistic_regression: 'Logistic Regression (binary outcome)',
-    multiple_regression: 'Multiple Regression (with categorical encoding + VIF)',
-    posthoc: 'Post-Hoc Pairwise Comparisons',
-    reliability: 'Cronbach\u2019s \u03b1 (scale reliability)',
-    cramers_matrix: "Cramér\u2019s V Association Matrix",
-    multinomial_logistic: 'Multinomial Logistic Regression',
-  };
+  const titles = STAT_TITLES as Record<StatType, string>;
 
   const descriptions: Record<StatType, string> = {
     correlation: 'Select numeric columns to compute pairwise Pearson correlations.',

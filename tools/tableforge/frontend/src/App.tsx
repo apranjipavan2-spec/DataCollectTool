@@ -28,7 +28,7 @@ import { AnnotationReconcileDialog, detectOrphanedAnnotations, ReconcileAnnotati
 import { ChartBuilder } from './components/ChartBuilder';
 import { InlineChartPreview } from './components/InlineChartPreview';
 import { RibbonBar, TABLE_TEMPLATES } from './components/RibbonBar';
-import { StatisticalTables } from './components/StatisticalTables';
+import { StatisticalTables, inferStatConfigFromResult } from './components/StatisticalTables';
 import { VariableMetadataPanel } from './components/VariableMetadataPanel';
 import { StudyDesignWizard } from './components/StudyDesignWizard';
 import { LikertPanel } from './components/LikertPanel';
@@ -1759,18 +1759,39 @@ export default function App() {
                 );
               })}
             </select>
-            {(activeTable as any)._statResult && (activeTable as any)._statConfig && (
-              <button className="title-dup-btn"
-                title="Re-open this stat analysis to edit columns, filters, or alpha"
-                onClick={() => {
-                  const cfg = (activeTable as any)._statConfig;
-                  setStatEditConfig({ columns: cfg.columns, alpha: cfg.alpha, analysisFilters: cfg.analysisFilters, useProjectFilter: cfg.useProjectFilter });
-                  setModal(`stat_${cfg.statType}` as any);
-                }}>
-                <span className="title-dup-icon">✏️</span>
-                <span className="title-dup-label">Edit Analysis</span>
-              </button>
-            )}
+            {(() => {
+              if (!(activeTable as any)._statResult) return null;
+              const saved = (activeTable as any)._statConfig as { statType: string; columns: string[]; alpha: number; analysisFilters: Record<string, string[]>; useProjectFilter: boolean } | undefined;
+              let statType: string | null = null;
+              let columns: string[] = [];
+              let alpha = 0.05;
+              let analysisFilters: Record<string, string[]> = {};
+              let useProjectFilter = false;
+              if (saved) {
+                statType = saved.statType;
+                columns = saved.columns || [];
+                alpha = saved.alpha ?? 0.05;
+                analysisFilters = saved.analysisFilters || {};
+                useProjectFilter = !!saved.useProjectFilter;
+              } else {
+                const knownColumnNames = new Set(allColumns.map(c => c.name));
+                const inferred = inferStatConfigFromResult(activeTable.title || '', (activeTable as any)._statResultData, knownColumnNames);
+                if (!inferred) return null;
+                statType = inferred.statType;
+                columns = inferred.columns;
+              }
+              return (
+                <button className="title-dup-btn"
+                  title={saved ? 'Re-open this stat analysis to edit columns, filters, or alpha' : 'Re-open this analysis (inferred from saved result — columns may need re-selecting)'}
+                  onClick={() => {
+                    setStatEditConfig({ columns, alpha, analysisFilters, useProjectFilter });
+                    setModal(`stat_${statType}` as any);
+                  }}>
+                  <span className="title-dup-icon">✏️</span>
+                  <span className="title-dup-label">Edit Analysis</span>
+                </button>
+              );
+            })()}
             <button className="title-dup-btn" onClick={duplicateTable}
               title="Duplicate this table (same structure, new copy)">
               <span className="title-dup-icon">⧉</span>
