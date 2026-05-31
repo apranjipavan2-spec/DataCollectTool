@@ -42,9 +42,12 @@ export function inferStatConfigFromResult(
   knownColumnNames: Set<string>,
 ): { statType: string; columns: string[] } | null {
   if (!title) return null;
-  const entry = Object.entries(STAT_TITLES).find(([, t]) => t === title);
-  if (!entry) return null;
-  const statType = entry[0];
+  // Try exact match first, then prefix match (titles can be suffixed with " - <column>" by auto-title).
+  // Prefer the LONGEST matching prefix to disambiguate (e.g. "Cramér's V Association Matrix" vs "Cramér").
+  const candidates = Object.entries(STAT_TITLES).filter(([, t]) => title === t || title.startsWith(t + ' ') || title.startsWith(t + '-') || title.startsWith(t + ' -'));
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => b[1].length - a[1].length);
+  const statType = candidates[0][0];
   let columns: string[] = [];
   if (resultData?.rows && STAT_TYPES_WITH_COLS_IN_ROWS.has(statType)) {
     columns = resultData.rows
