@@ -10,6 +10,22 @@ depends_on = None
 
 def upgrade():
     conn = op.get_bind()
+    # A prior failed CREATE TABLE can leave an orphan composite type behind
+    # in pg_type. CREATE TABLE IF NOT EXISTS still fails in that state with
+    # pg_type_typname_nsp_index uniqueness — drop the orphan first.
+    conn.execute(sa.text("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_class
+                WHERE relname = 'ai_usage_logs'
+                  AND relkind = 'r'
+                  AND relnamespace = 'public'::regnamespace
+            ) THEN
+                DROP TYPE IF EXISTS ai_usage_logs CASCADE;
+            END IF;
+        END $$;
+    """))
     conn.execute(sa.text("""
         CREATE TABLE IF NOT EXISTS ai_usage_logs (
             id            BIGSERIAL PRIMARY KEY,
