@@ -2,55 +2,112 @@ import json
 import re
 
 
+def with_log(cfg: dict, *, tenant_id, user_id, feature: str) -> dict:
+    """Attach usage-log context to a cfg dict. Endpoints call this before invoking service fns."""
+    return {**cfg, "__log__": {"tenant_id": tenant_id, "user_id": user_id, "feature": feature}}
+
+
+def _write_usage(log_ctx: dict, provider: str, model: str,
+                 tokens_in: int, tokens_out: int, success: bool, error: str = None):
+    """Persist one ai_usage_logs row. Best-effort: never raises."""
+    if not log_ctx:
+        return
+    try:
+        from app.core.database import SessionLocal
+        from app.models.ai_usage_log import AiUsageLog
+        with SessionLocal() as sess:
+            row = AiUsageLog(
+                tenant_id=log_ctx.get("tenant_id"),
+                user_id=log_ctx.get("user_id"),
+                feature=log_ctx.get("feature", "unknown"),
+                provider=provider or "",
+                model=model,
+                tokens_in=tokens_in or 0,
+                tokens_out=tokens_out or 0,
+                success=success,
+                error=(error or "")[:1000] if error else None,
+            )
+            sess.add(row)
+            sess.commit()
+    except Exception:
+        pass  # never let logging break the AI call
+
+
 async def _call_llm(cfg: dict, prompt: str) -> str:
-    """cfg = {'provider': ..., 'api_key': ..., 'model': ...} from system_settings."""
+    """cfg = {'provider': ..., 'api_key': ..., 'model': ...} from system_settings.
+    Optional `cfg['__log__']` = {tenant_id, user_id, feature} → writes ai_usage_logs row."""
     provider = cfg.get('provider')
     key = cfg.get('api_key')
     model = cfg.get('model')
+    log_ctx = cfg.get('__log__')
     if not provider or not key:
         raise ValueError("AI not configured. Contact your platform administrator.")
 
     LLM_TIMEOUT = 300  # seconds — extended for large reports; runs in background tasks so no worker stall
 
-    if provider == 'openai':
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=key, timeout=LLM_TIMEOUT)
-        r = await client.chat.completions.create(
-            model=model or 'gpt-4o',
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=4096,
-        )
-        return r.choices[0].message.content or ""
+    try:
+        if provider == 'openai':
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=key, timeout=LLM_TIMEOUT)
+            r = await client.chat.completions.create(
+                model=model or 'gpt-4o',
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=4096,
+            )
+            text = r.choices[0].message.content or ""
+            usage = getattr(r, 'usage', None)
+            ti = getattr(usage, 'prompt_tokens', 0) if usage else 0
+            to = getattr(usage, 'completion_tokens', 0) if usage else 0
+            _write_usage(log_ctx, provider, model or 'gpt-4o', ti, to, True)
+            return text
 
-    elif provider == 'anthropic':
-        from anthropic import AsyncAnthropic
-        client = AsyncAnthropic(api_key=key, timeout=LLM_TIMEOUT)
-        r = await client.messages.create(
-            model=model or 'claude-sonnet-4-6',
-            max_tokens=4096,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return r.content[0].text
+        elif provider == 'anthropic':
+            from anthropic import AsyncAnthropic
+            client = AsyncAnthropic(api_key=key, timeout=LLM_TIMEOUT)
+            r = await client.messages.create(
+                model=model or 'claude-sonnet-4-6',
+                max_tokens=4096,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = r.content[0].text
+            usage = getattr(r, 'usage', None)
+            ti = getattr(usage, 'input_tokens', 0) if usage else 0
+            to = getattr(usage, 'output_tokens', 0) if usage else 0
+            _write_usage(log_ctx, provider, model or 'claude-sonnet-4-6', ti, to, True)
+            return text
 
-    elif provider == 'gemini':
-        import asyncio
-        import google.generativeai as genai
-        genai.configure(api_key=key)
-        m = genai.GenerativeModel(model or 'gemini-1.5-pro')
-        r = await asyncio.wait_for(m.generate_content_async(prompt), timeout=LLM_TIMEOUT)
-        return r.text
+        elif provider == 'gemini':
+            import asyncio
+            import google.generativeai as genai
+            genai.configure(api_key=key)
+            m = genai.GenerativeModel(model or 'gemini-1.5-pro')
+            r = await asyncio.wait_for(m.generate_content_async(prompt), timeout=LLM_TIMEOUT)
+            text = r.text
+            meta = getattr(r, 'usage_metadata', None)
+            ti = getattr(meta, 'prompt_token_count', 0) if meta else 0
+            to = getattr(meta, 'candidates_token_count', 0) if meta else 0
+            _write_usage(log_ctx, provider, model or 'gemini-1.5-pro', ti, to, True)
+            return text
 
-    elif provider == 'deepseek':
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=key, base_url="https://api.deepseek.com", timeout=LLM_TIMEOUT)
-        r = await client.chat.completions.create(
-            model=model or 'deepseek-v4-flash',
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=8192,
-        )
-        return r.choices[0].message.content or ""
+        elif provider == 'deepseek':
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=key, base_url="https://api.deepseek.com", timeout=LLM_TIMEOUT)
+            r = await client.chat.completions.create(
+                model=model or 'deepseek-v4-flash',
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=8192,
+            )
+            text = r.choices[0].message.content or ""
+            usage = getattr(r, 'usage', None)
+            ti = getattr(usage, 'prompt_tokens', 0) if usage else 0
+            to = getattr(usage, 'completion_tokens', 0) if usage else 0
+            _write_usage(log_ctx, provider, model or 'deepseek-v4-flash', ti, to, True)
+            return text
 
-    raise ValueError(f"Unsupported provider: {provider}")
+        raise ValueError(f"Unsupported provider: {provider}")
+    except Exception as e:
+        _write_usage(log_ctx, provider or "", model, 0, 0, False, str(e))
+        raise
 
 
 async def generate_report(cfg: dict, form_title: str, field_labels: list, submissions: list) -> str:

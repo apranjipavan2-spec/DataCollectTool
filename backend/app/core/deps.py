@@ -16,21 +16,33 @@ def _get_token_payload(credentials: HTTPAuthorizationCredentials = Depends(beare
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 
+_WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
 def get_current_user(
     request: Request,
     payload: dict = Depends(_get_token_payload),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Decode JWT and set RLS tenant context on the DB session."""
+    """Decode JWT and set RLS tenant context on the DB session.
+
+    master_admin may pass X-Tenant-ID to INSPECT another tenant's data (read-only).
+    Writes are blocked while the override is active so master_admin cannot silently
+    create or modify data in a tenant they were only meant to view.
+    """
     tenant_id = payload.get("tenant_id")
     if not tenant_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing tenant")
-    # master_admin may pass X-Tenant-ID to act in another tenant's context
     if payload.get("role") == "master_admin":
         override = request.headers.get("X-Tenant-ID")
-        if override:
+        if override and override != tenant_id:
+            if request.method.upper() in _WRITE_METHODS:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="X-Tenant-ID override is read-only. Remove the header to write in your own tenant.",
+                )
             tenant_id = override
-            payload = {**payload, "tenant_id": override}
+            payload = {**payload, "tenant_id": override, "_tenant_override": True}
     set_tenant_context(db, tenant_id)
     return payload
 

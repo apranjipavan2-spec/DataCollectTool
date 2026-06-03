@@ -41,6 +41,14 @@ def table_exists(cur, table):
     return bool(cur.fetchone())
 
 
+def _index_exists(cur, index):
+    cur.execute(
+        "SELECT 1 FROM pg_indexes WHERE indexname=%s",
+        (index,),
+    )
+    return bool(cur.fetchone())
+
+
 def detect_and_stamp():
     conn = psycopg2.connect(DATABASE_URL)
     conn.autocommit = True
@@ -108,8 +116,14 @@ def detect_and_stamp():
             stamp = "0036"
         elif not col_exists(cur, "users", "totp_secret"):
             stamp = "0037"
-        else:
+        elif not table_exists(cur, "ai_usage_logs"):
             stamp = "0038"
+        elif not col_exists(cur, "shared_files", "tenant_id"):
+            stamp = "0039"
+        elif not _index_exists(cur, "uq_users_active_phone"):
+            stamp = "0041"
+        else:
+            stamp = "0042"
 
         print(f"Stamping alembic_version to {stamp}")
         if not has_alembic:

@@ -70,6 +70,6 @@ def mark_all_read(user: dict = Depends(get_current_user), db: Session = Depends(
 def mark_one_read(notif_id: str, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     _ensure_table(db)
     db.execute(text(
-        "UPDATE in_app_notifications SET read=TRUE WHERE id=:id AND recipient_id=:rid"
-    ), {"id": notif_id, "rid": str(user["sub"])})
+        "UPDATE in_app_notifications SET read=TRUE WHERE id=:id AND recipient_id=:rid AND tenant_id=:tid"
+    ), {"id": notif_id, "rid": str(user["sub"]), "tid": str(user["tenant_id"])})
     db.commit()
