@@ -145,8 +145,9 @@ async def list_projects(x_user_id: Optional[str] = Header(None), x_user_role: Op
     elif x_user_id:
         user_dir = get_user_projects_dir(x_user_id)
         scan_dir(user_dir)
-    else:
-        scan_dir(PROJECTS_DIR)
+    # No x_user_id and not super_admin → return empty rather than scanning
+    # the root, which previously leaked super_admin's projects to every
+    # caller that omitted the X-User-Id header.
 
     return {"projects": sorted(projects, key=lambda p: p.get("created", ""), reverse=True), "projects_dir": str(PROJECTS_DIR)}
 
@@ -161,7 +162,9 @@ async def rename_project(req: ProjectRenameRequest, x_user_id: Optional[str] = H
     p = Path(req.path)
     if not p.exists():
         raise HTTPException(404, "Project not found")
-    if x_user_id and not is_super_admin(x_user_role):
+    if not is_super_admin(x_user_role):
+        if not x_user_id:
+            raise HTTPException(401, "Authentication required")
         user_dir = get_user_projects_dir(x_user_id)
         if not str(p.resolve()).startswith(str(user_dir.resolve())):
             raise HTTPException(403, "Access denied")
@@ -193,7 +196,9 @@ async def delete_project(req: ProjectDeleteRequest, x_user_id: Optional[str] = H
     p = Path(req.path)
     if not p.exists():
         raise HTTPException(404, "Project not found")
-    if x_user_id and not is_super_admin(x_user_role):
+    if not is_super_admin(x_user_role):
+        if not x_user_id:
+            raise HTTPException(401, "Authentication required")
         user_dir = get_user_projects_dir(x_user_id)
         if not str(p.resolve()).startswith(str(user_dir.resolve())):
             raise HTTPException(403, "Access denied")
@@ -323,7 +328,9 @@ async def load_project(path: str, password: Optional[str] = None, x_user_id: Opt
     p = Path(path)
     if not p.exists():
         raise HTTPException(404, "Project file not found")
-    if x_user_id and not is_super_admin(x_user_role):
+    if not is_super_admin(x_user_role):
+        if not x_user_id:
+            raise HTTPException(401, "Authentication required")
         user_dir = get_user_projects_dir(x_user_id)
         if not str(p.resolve()).startswith(str(user_dir.resolve())):
             raise HTTPException(403, "Access denied: you can only access your own projects")

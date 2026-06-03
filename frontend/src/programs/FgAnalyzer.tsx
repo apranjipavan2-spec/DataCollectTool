@@ -1785,7 +1785,10 @@ export default function FgAnalyzer() {
                 <button
                   onClick={() => {
                     const token = localStorage.getItem('fp_token')
-                    window.location.href = `${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}`
+                    const u = getStoredUser()
+                    const userId = u?.id ? `&user_id=${encodeURIComponent(u.id)}` : ''
+                    const userRole = u?.role ? `&user_role=${encodeURIComponent(u.role)}` : ''
+                    window.location.href = `${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}${userId}${userRole}`
                   }}
                   className="shrink-0 px-5 py-2.5 bg-catalan-primary text-catalan-bg rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity whitespace-nowrap"
                 >
@@ -1842,7 +1845,10 @@ export default function FgAnalyzer() {
                           <button
                             onClick={() => {
                               const token = localStorage.getItem('fp_token')
-                              window.location.href = `${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}`
+                              const u = getStoredUser()
+                              const userId = u?.id ? `&user_id=${encodeURIComponent(u.id)}` : ''
+                              const userRole = u?.role ? `&user_role=${encodeURIComponent(u.role)}` : ''
+                              window.location.href = `${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}${userId}${userRole}`
                             }}
                             className={`${card} flex flex-col items-start gap-3 text-left hover:border-catalan-primary/50 hover:bg-catalan-primary/5 transition-all cursor-pointer`}
                           >

@@ -457,7 +457,11 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Read FG context from URL params; auto-load if program_id present
+  // Read FG context from URL params. The program_id is wired into the
+  // WelcomeScreen so the user can opt to import — we do NOT auto-import
+  // here, because previously refreshing or navigating into the analyzer
+  // with a program_id query param would silently re-pull the dataset
+  // every time, surprising users who only wanted to open a saved project.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const fgUrl = params.get('fg_url');
@@ -465,13 +469,6 @@ export default function App() {
     const token = params.get('token');
     if (!fgUrl || !token) return;
     setFgContext({ fgUrl, token, programId: programId || undefined });
-    if (!programId) return; // no auto-load; user will pick in WelcomeScreen
-    setLoading(true); setLoadingMsg('Connecting to FieldGovern…');
-    importFromFg(fgUrl, token, programId, undefined, (ev) => {
-      setLoadingMsg(ev.message);
-    })
-      .then(meta => { setDataset(meta); setLoading(false); setLoadingMsg(''); })
-      .catch(err => { setLoading(false); setLoadingMsg(''); setError(`Failed to load FieldGovern data: ${err}`); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
