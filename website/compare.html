@@ -419,15 +419,9 @@
         <label>Submissions per month <span class="hint">total responses across all forms</span></label>
         <input id="ci-subs" type="number" min="1" value="5000"/>
       </div>
-      <div class="calc-sub-fields" id="cf-quest" style="display:none">
-        <div class="calc-field">
-          <label>Questionnaires / tools per project</label>
-          <input id="ci-qpp" type="number" min="1" value="3"/>
-        </div>
-        <div class="calc-field">
-          <label>Submissions per questionnaire / month</label>
-          <input id="ci-perq" type="number" min="1" value="800"/>
-        </div>
+      <div class="calc-field" id="cf-quest" style="display:none">
+        <label>Questionnaire submissions per project <span class="hint">total responses targeted per project</span></label>
+        <input id="ci-perproject" type="number" min="1" value="3000"/>
       </div>
       <div class="calc-field">
         <label>Pages per form <span class="hint">printed double-sided</span></label>
@@ -579,13 +573,14 @@
     var programs = v('ci-programs'), pages = v('ci-pages'), months = v('ci-months');
     var opSal = n('ci-opsal'), anSal = n('ci-ansal');
 
-    var subsPerMonth;
+    var subsPerMonth, totalSubs;
     if (volMode === 'quest'){
-      subsPerMonth = (programs * v('ci-qpp')) * v('ci-perq');
+      totalSubs = programs * v('ci-perproject');   // target responses per project × projects
+      subsPerMonth = Math.max(1, Math.round(totalSubs / months));
     } else {
       subsPerMonth = v('ci-subs');
+      totalSubs = subsPerMonth * months;
     }
-    var totalSubs = subsPerMonth * months;
     var sheets = Math.ceil(pages / 2);
 
     var operators = Math.max(1, Math.ceil(subsPerMonth / 800)); // ~800 forms/operator/mo
@@ -629,7 +624,7 @@
       verdictEl.innerHTML = 'We recommend the <strong>' + plan.name + '</strong> plan — ' + fmtINR(fgTotal) + ' vs ~' + fmtINR(paperTotal) + ' on paper over ' + mLabel + ', with cleaning, analysis &amp; AI reports included and results in days.';
     }
   }
-  ['ci-programs','ci-subs','ci-qpp','ci-perq','ci-pages','ci-months','ci-opsal','ci-ansal'].forEach(function(id){
+  ['ci-programs','ci-subs','ci-perproject','ci-pages','ci-months','ci-opsal','ci-ansal'].forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.addEventListener('input', calcCost);
   });
