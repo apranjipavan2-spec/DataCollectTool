@@ -161,7 +161,7 @@
     .calc-tile::before{content:'';position:absolute;inset:0;border-radius:26px;padding:2px;background:linear-gradient(135deg,var(--brand),var(--accent));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;opacity:.55}
     .calc-eyebrow{display:inline-flex;align-items:center;gap:7px;background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;border-radius:999px;padding:6px 16px;font-size:.78rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;box-shadow:0 8px 22px rgba(124,58,237,.28)}
     @media(max-width:640px){.calc-tile{padding:24px 16px 22px;border-radius:20px}}
-    .calc-rank-head{display:flex;justify-content:space-between;font-size:.74rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+    .calc-rank-head{display:flex;justify-content:space-between;align-items:baseline;font-size:.8rem;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin:0 0 14px;padding-bottom:10px;border-bottom:2px solid var(--border)}
     .calc-rank{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
     .cr-row{border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:white}
     .cr-row.win{border-color:var(--brand);background:#f0f9ff}
@@ -209,14 +209,16 @@
     .cc-extras li::before{content:'✓';color:var(--green);font-weight:900;flex-shrink:0}
     .cc-extras li.no{color:var(--text3);font-weight:600}
     .cc-extras li.no::before{content:'✗';color:#dc2626}
-    .calc-inputs-top{border:1px solid var(--border);border-radius:18px;padding:24px;background:var(--bg2);margin-bottom:22px}
-    .calc-volmode{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border)}
-    .cvm-label{font-size:.82rem;font-weight:700;color:var(--text2);white-space:nowrap}
-    .calc-volmode .calc-toggle{flex:1;min-width:260px;max-width:460px}
-    .calc-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-    .calc-fields .calc-field{margin-bottom:0}
+    .calc-inputs-top{border:1px solid var(--border);border-radius:18px;padding:18px;background:var(--bg3);margin-bottom:26px}
+    .calc-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .calc-fields .calc-field{margin-bottom:0;background:#fff;border:1px solid var(--border);border-radius:12px;padding:13px 15px;display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+    .calc-fields .calc-field label{margin-bottom:0}
+    .calc-fields .calc-field input{background:var(--bg2)}
+    .calc-field-vol{gap:9px}
+    .calc-toggle-sm{padding:3px}
+    .calc-toggle-sm .ct-btn{padding:6px 6px;font-size:.7rem}
     @media(max-width:760px){.calc-fields{grid-template-columns:repeat(2,1fr)}}
-    @media(max-width:440px){.calc-fields{grid-template-columns:1fr}.calc-volmode{gap:10px}.calc-volmode .calc-toggle{min-width:0;max-width:none;width:100%}}
+    @media(max-width:440px){.calc-fields{grid-template-columns:1fr}}
     @media(max-width:900px){
       .calc-grid{grid-template-columns:1fr}
       .calc-grid .calc-inputs{position:static}
@@ -371,25 +373,19 @@
 
   <!-- INPUTS (top) -->
   <div class="calc-inputs-top">
-    <div class="calc-volmode">
-      <span class="cvm-label">Volume — enter by</span>
-      <div class="calc-toggle">
-        <button type="button" class="ct-btn active" data-mode="subs" onclick="setVolMode('subs')">Submissions / month</button>
-        <button type="button" class="ct-btn" data-mode="quest" onclick="setVolMode('quest')">Questionnaires / project</button>
-      </div>
-    </div>
     <div class="calc-fields">
       <div class="calc-field">
         <label>Programs / projects <span class="hint">distinct studies</span></label>
         <input id="ci-programs" type="number" min="1" value="2"/>
       </div>
-      <div class="calc-field" id="cf-subs">
-        <label>Submissions / month <span class="hint">total responses</span></label>
-        <input id="ci-subs" type="number" min="1" value="2000"/>
-      </div>
-      <div class="calc-field" id="cf-quest" style="display:none">
-        <label>Submissions / project <span class="hint">target per project</span></label>
-        <input id="ci-perproject" type="number" min="1" value="3000"/>
+      <div class="calc-field calc-field-vol">
+        <label>Volume <span class="hint">enter by</span></label>
+        <div class="calc-toggle calc-toggle-sm">
+          <button type="button" class="ct-btn active" data-mode="subs" onclick="setVolMode('subs')">Submissions / month</button>
+          <button type="button" class="ct-btn" data-mode="quest" onclick="setVolMode('quest')">Questionnaires / project</button>
+        </div>
+        <input id="ci-subs" type="number" min="1" value="2000" placeholder="total responses / month"/>
+        <input id="ci-perproject" type="number" min="1" value="3000" placeholder="target per project" style="display:none"/>
       </div>
       <div class="calc-field">
         <label>Pages / form <span class="hint">double-sided</span></label>
@@ -643,8 +639,8 @@
   function setVolMode(m){
     volMode = m;
     document.querySelectorAll('.ct-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.mode === m); });
-    document.getElementById('cf-subs').style.display = m === 'subs' ? '' : 'none';
-    document.getElementById('cf-quest').style.display = m === 'quest' ? '' : 'none';
+    document.getElementById('ci-subs').style.display = m === 'subs' ? '' : 'none';
+    document.getElementById('ci-perproject').style.display = m === 'quest' ? '' : 'none';
     calcCost();
   }
   function fmtINR(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
