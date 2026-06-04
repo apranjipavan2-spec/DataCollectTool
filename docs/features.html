@@ -65,6 +65,8 @@
     .afu{animation:fadeUp .7s ease forwards;opacity:0}
     .d1{animation-delay:.12s}.d2{animation-delay:.26s}.d3{animation-delay:.4s}
     .section-tag{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(14,165,233,.1),rgba(124,58,237,.1));border:1px solid rgba(14,165,233,.2);border-radius:999px;padding:5px 14px;font-size:.78rem;font-weight:700;color:var(--brand-dark);letter-spacing:.04em;text-transform:uppercase;margin-bottom:16px}
+    .section-tag svg,.cat-tag svg,.feat-tag svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+    .fqn-item svg{width:14px;height:14px;stroke:currentColor;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
     .page-hero h1{font-size:3rem;font-weight:900;color:var(--text);line-height:1.15;margin-bottom:16px}
     .grad-text{background:linear-gradient(135deg,var(--brand),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
     .page-hero p{font-size:1.1rem;color:var(--text2);line-height:1.7;max-width:580px;margin:0 auto 36px}
@@ -409,6 +411,7 @@
     .psn-body::-webkit-scrollbar{display:none}
     .psn-group{margin-bottom:2px}
     .psn-cat{display:flex;align-items:center;gap:5px;padding:10px 14px 4px;font-size:.6rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.09em}
+    .psn-cat svg{width:12px;height:12px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
     .psn-link{display:flex;align-items:center;gap:7px;padding:5px 14px 5px 18px;font-size:.76rem;color:var(--text3);text-decoration:none;transition:all .16s;border-left:2px solid transparent}
     .psn-dot{width:4px;height:4px;border-radius:50%;background:var(--border);flex-shrink:0;transition:all .16s}
     .psn-link:hover{color:var(--brand);background:rgba(14,165,233,.04)}
@@ -503,27 +506,27 @@
   </div>
   <div class="psn-body">
     <div class="psn-group">
-      <div class="psn-cat">📱 Data</div>
+      <div class="psn-cat"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg> Data</div>
       <a href="#f1-offline" class="psn-link" data-s="f1-offline"><span class="psn-dot"></span>Offline-First</a>
       <a href="#f2-forms" class="psn-link" data-s="f2-forms"><span class="psn-dot"></span>Form Builder</a>
       <a href="#f3-ai-form" class="psn-link" data-s="f3-ai-form"><span class="psn-dot"></span>AI Form Builder</a>
       <a href="#f4-import" class="psn-link" data-s="f4-import"><span class="psn-dot"></span>Migrate &amp; Import</a>
     </div>
     <div class="psn-group">
-      <div class="psn-cat">👁️ Operate</div>
+      <div class="psn-cat"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Operate</div>
       <a href="#f5-sync" class="psn-link" data-s="f5-sync"><span class="psn-dot"></span>Sync &amp; Media</a>
       <a href="#f6-supervisor" class="psn-link" data-s="f6-supervisor"><span class="psn-dot"></span>Supervisor</a>
       <a href="#f7-whatsapp" class="psn-link" data-s="f7-whatsapp"><span class="psn-dot"></span>WhatsApp Alerts</a>
       <a href="#f8-sheets" class="psn-link" data-s="f8-sheets"><span class="psn-dot"></span>Google Sheets</a>
     </div>
     <div class="psn-group">
-      <div class="psn-cat">🤖 AI Tools</div>
+      <div class="psn-cat"><svg viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg> AI Tools</div>
       <a href="#f9-writer" class="psn-link" data-s="f9-writer"><span class="psn-dot"></span>Report Writer</a>
       <a href="#f9b-builder" class="psn-link" data-s="f9b-builder"><span class="psn-dot"></span>Smart Builder</a>
       <a href="#f9c-interpret" class="psn-link" data-s="f9c-interpret"><span class="psn-dot"></span>Interpretation</a>
     </div>
     <div class="psn-group">
-      <div class="psn-cat">✅ Quality</div>
+      <div class="psn-cat"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Quality</div>
       <a href="#f10-qc" class="psn-link" data-s="f10-qc"><span class="psn-dot"></span>QC Suite</a>
       <a href="#f11-dpdp" class="psn-link" data-s="f11-dpdp"><span class="psn-dot"></span>DPDP 2023</a>
       <a href="#f12-lang" class="psn-link" data-s="f12-lang"><span class="psn-dot"></span>Multilingual</a>
@@ -535,32 +538,32 @@
 <div class="feat-quicknav">
   <div class="fqn-inner">
     <span class="fqn-cat">Collect</span>
-    <a href="#f1-offline" class="fqn-item">📵 Offline</a>
-    <a href="#f2-forms" class="fqn-item">🏗️ Forms</a>
-    <a href="#f3-ai-form" class="fqn-item">🤖 AI Builder</a>
-    <a href="#f4-import" class="fqn-item">🔄 Import</a>
+    <a href="#f1-offline" class="fqn-item"><svg viewBox="0 0 24 24"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12" y2="20"/></svg>Offline</a>
+    <a href="#f2-forms" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Forms</a>
+    <a href="#f3-ai-form" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg>AI Builder</a>
+    <a href="#f4-import" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Import</a>
     <div class="fqn-sep"></div>
     <span class="fqn-cat">Operate</span>
-    <a href="#f5-sync" class="fqn-item">🌐 Sync</a>
-    <a href="#f6-supervisor" class="fqn-item">📊 Supervisor</a>
-    <a href="#f7-whatsapp" class="fqn-item">💬 WhatsApp</a>
-    <a href="#f8-sheets" class="fqn-item">🟢 Sheets</a>
+    <a href="#f5-sync" class="fqn-item"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Sync</a>
+    <a href="#f6-supervisor" class="fqn-item"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Supervisor</a>
+    <a href="#f7-whatsapp" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>WhatsApp</a>
+    <a href="#f8-sheets" class="fqn-item"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>Sheets</a>
     <div class="fqn-sep"></div>
     <span class="fqn-cat">AI</span>
-    <a href="#f9-writer" class="fqn-item">📝 Writer</a>
-    <a href="#f9b-builder" class="fqn-item">🔨 Builder</a>
-    <a href="#f9c-interpret" class="fqn-item">💬 Interpret</a>
+    <a href="#f9-writer" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Writer</a>
+    <a href="#f9b-builder" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>Builder</a>
+    <a href="#f9c-interpret" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Interpret</a>
     <div class="fqn-sep"></div>
     <span class="fqn-cat">Quality</span>
-    <a href="#f10-qc" class="fqn-item">✅ QC</a>
-    <a href="#f11-dpdp" class="fqn-item">🛡️ DPDP</a>
-    <a href="#f12-lang" class="fqn-item">🌍 Languages</a>
+    <a href="#f10-qc" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>QC</a>
+    <a href="#f11-dpdp" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>DPDP</a>
+    <a href="#f12-lang" class="fqn-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Languages</a>
   </div>
 </div>
 
 <!-- HERO -->
 <div class="page-hero">
-  <div class="section-tag afu">🚀 Platform Features</div>
+  <div class="section-tag afu"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg> Platform Features</div>
   <h1 class="afu d1">Every tool your field team needs<br/><span class="grad-text">— in one platform</span></h1>
   <p class="afu d2">From offline-first data collection to AI-generated reports — purpose-built for India's connectivity realities and compliance requirements.</p>
   <a href="https://app.fieldgovern.com" class="btn-primary pulse-btn afu d3" style="font-size:1rem;padding:14px 28px">Start Free Trial →</a>
@@ -570,7 +573,7 @@
      CATEGORY 1: DATA COLLECTION
 ═══════════════════════════════════════════════ -->
 <div class="cat-heading reveal">
-  <div class="cat-tag">📱 Data Collection</div>
+  <div class="cat-tag"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg> Data Collection</div>
   <h2>Collect data anywhere, on any form</h2>
   <p>Works without internet, builds complex surveys visually, and imports from every tool you already use.</p>
 </div>
@@ -579,7 +582,7 @@
 <section id="f1-offline" class="feat-section">
   <div class="feat-inner reveal">
     <div class="feat-content">
-      <div class="feat-tag blue">📵 Offline-First</div>
+      <div class="feat-tag blue"><svg viewBox="0 0 24 24"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12" y2="20"/></svg> Offline-First</div>
       <h3>Works without internet.<br/>Zero data loss.</h3>
       <p>Forms are cached locally the moment they're assigned. Enumerators collect GPS, photos, and responses even in remote villages with no signal — data syncs automatically and securely the instant a connection returns.</p>
       <ul class="feat-bullets">
@@ -619,7 +622,7 @@
 <section id="f2-forms" class="feat-section alt">
   <div class="feat-inner flip reveal">
     <div class="feat-content">
-      <div class="feat-tag purple">🏗️ Form Builder</div>
+      <div class="feat-tag purple"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg> Form Builder</div>
       <h3>Drag-and-drop forms.<br/>No coding required.</h3>
       <p>Design complex surveys with 14+ field types, visual AND/OR skip logic, form versioning, and nested repeat groups. What you build is exactly what your enumerators see — no surprises in the field.</p>
       <ul class="feat-bullets">
@@ -665,7 +668,7 @@
 <section id="f3-ai-form" class="feat-section" style="background:linear-gradient(135deg,#0f172a 0%,#1a1040 100%)">
   <div class="feat-inner reveal">
     <div class="feat-content">
-      <div class="feat-tag white">🤖 AI-Powered · Live Now</div>
+      <div class="feat-tag white"><svg viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg> AI-Powered · Live Now</div>
       <h3 style="color:white">Describe your study.<br/><span style="background:linear-gradient(135deg,#38bdf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">AI builds the form.</span></h3>
       <p>Share your study objectives and target population — our AI designs a complete, field-ready form with proper sections, skip logic, field types, sub-questions, and enumerator hints. Complex surveys in 90 seconds.</p>
       <ul class="feat-bullets">
@@ -699,7 +702,7 @@
 <section id="f4-import" class="feat-section alt">
   <div class="feat-inner flip reveal">
     <div class="feat-content">
-      <div class="feat-tag blue">🔄 Migration</div>
+      <div class="feat-tag blue"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Migration</div>
       <h3>Already on KoboToolbox?<br/>Migrate in one click.</h3>
       <p>Import from XLSForm, KoboToolbox, SurveyCTO, or ODK Central with a single upload — your existing forms come in exactly as designed, with all skip logic and field types preserved. No manual re-entry.</p>
       <ul class="feat-bullets">
@@ -742,7 +745,7 @@
      CATEGORY 2: OPERATIONS & OVERSIGHT
 ═══════════════════════════════════════════════ -->
 <div class="cat-heading reveal" style="background:var(--bg2);padding-bottom:8px">
-  <div class="cat-tag">👁️ Operations & Oversight</div>
+  <div class="cat-tag"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Operations & Oversight</div>
   <h2>Real-time visibility across your entire field team</h2>
   <p>Supervisor dashboard, live sync, WhatsApp alerts, and Google Sheets integration — all connected.</p>
 </div>
@@ -751,7 +754,7 @@
 <section id="f5-sync" class="feat-section alt">
   <div class="feat-inner reveal">
     <div class="feat-content">
-      <div class="feat-tag blue">🌐 Sync Engine</div>
+      <div class="feat-tag blue"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Sync Engine</div>
       <h3>5 MB photos.<br/>200 KB by sync time.</h3>
       <p>Photos, GPS coordinates, and audio sync securely using a two-phase approach — text fields go first on 2G, then media uploads in background batches when bandwidth allows. Auto-compression included.</p>
       <ul class="feat-bullets">
@@ -790,7 +793,7 @@
 <section id="f6-supervisor" class="feat-section">
   <div class="feat-inner flip reveal">
     <div class="feat-content">
-      <div class="feat-tag green">👁️ Supervisor</div>
+      <div class="feat-tag green"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Supervisor</div>
       <h3>Flag. Approve. Reject.<br/>In real time.</h3>
       <p>Review every submission with GPS map view, full audit trail, and photo evidence. Flag suspicious records, assign back-checks, and export any subset as CSV, Stata .dta, or directly to Google Sheets.</p>
       <ul class="feat-bullets">
@@ -832,7 +835,7 @@
 <section id="f7-whatsapp" class="feat-section alt">
   <div class="feat-inner reveal">
     <div class="feat-content">
-      <div class="feat-tag green">🟢 WhatsApp Alerts</div>
+      <div class="feat-tag green"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> WhatsApp Alerts</div>
       <h3>Instant notifications.<br/>No dashboard refresh needed.</h3>
       <p>MSG91 WABA-powered alerts keep supervisors informed the moment enumerators sync, flag a record, or complete their assignment. Real-time field awareness without any polling.</p>
       <ul class="feat-bullets">
@@ -874,7 +877,7 @@
 <section id="f8-sheets" class="feat-section">
   <div class="feat-inner flip reveal">
     <div class="feat-content">
-      <div class="feat-tag green">📊 Google Sheets</div>
+      <div class="feat-tag green"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg> Google Sheets</div>
       <h3>Every submission.<br/>Auto-appended live.</h3>
       <p>Connect once and every new submission is automatically appended as a new row to your Google Sheet — in real time, the moment it syncs. Your data is always current without any manual exports.</p>
       <ul class="feat-bullets">
@@ -921,7 +924,7 @@
 <section id="f9-writer" class="feat-section dark-bg">
   <div class="feat-inner reveal">
     <div class="feat-content">
-      <div class="feat-tag white">📝 AI Report Writer</div>
+      <div class="feat-tag white"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> AI Report Writer</div>
       <h3>Data in. Report out.<br/><span style="background:linear-gradient(135deg,#38bdf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Interpretation-aware.</span></h3>
       <p>Connect OpenAI, Anthropic Claude, or Google Gemini using your own API key. FG Writer reads the per-table interpretations you stored in the Analyzer — generating richer, contextually accurate narratives instead of re-summarizing raw numbers. Export to Word, Markdown, or scheduled email.</p>
       <ul class="feat-bullets">
@@ -954,7 +957,7 @@
 <section id="f9b-builder" class="feat-section dark-bg">
   <div class="feat-inner flip reveal">
     <div class="feat-content">
-      <div class="feat-tag white">🔨 Smart Builder</div>
+      <div class="feat-tag white"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> Smart Builder</div>
       <h3>Build tables in two ways.<br/><span style="background:linear-gradient(135deg,#38bdf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Both powered by AI.</span></h3>
       <p><strong>Column Picker:</strong> Search and select specific columns from your dataset. AI sees the real unique values from your submissions, then designs the optimal table structure — groupby, aggregation, chart type, and pre-cleaned column labels in one shot.</p>
       <p style="margin-top:12px"><strong>Ask a Question:</strong> Type in plain English — "average age of beneficiaries per district, broken down by gender" — and AI parses all your column headers to build the full table specification automatically.</p>
@@ -993,7 +996,7 @@
 <section id="f9c-interpret" class="feat-section dark-bg">
   <div class="feat-inner reveal">
     <div class="feat-content">
-      <div class="feat-tag white">💬 AI Interpretation</div>
+      <div class="feat-tag white"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> AI Interpretation</div>
       <h3>Every table gets<br/><span style="background:linear-gradient(135deg,#38bdf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">its own narrative.</span></h3>
       <p>Choose from 10 methodology-driven focus templates — Distribution & Spread, High vs Low Performers, Equity & Disparity, Change Over Time, Interaction Effect, Concentration Analysis, Outlier & Anomaly, Program Performance, Group Comparison, or Custom focus. No length restrictions — the AI writes as much as the data warrants.</p>
       <ul class="feat-bullets" style="margin-top:16px">
@@ -1035,7 +1038,7 @@
      CATEGORY 4: QUALITY & COMPLIANCE
 ═══════════════════════════════════════════════ -->
 <div class="cat-heading reveal">
-  <div class="cat-tag">✅ Quality & Compliance</div>
+  <div class="cat-tag"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Quality & Compliance</div>
   <h2>Clean data. Full compliance. Always.</h2>
   <p>Server-side QC, back-check audit workflow, DPDP consent tracking, and multilingual support — built in from day one.</p>
 </div>
@@ -1044,7 +1047,7 @@
 <section id="f10-qc" class="feat-section">
   <div class="feat-inner reveal">
     <div class="feat-content">
-      <div class="feat-tag orange">✅ QC Suite</div>
+      <div class="feat-tag orange"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> QC Suite</div>
       <h3>Catch problems<br/>before analysis begins.</h3>
       <p>Server-side validation, duplicate detection using idempotency keys, GPS mismatch alerts, and a built-in back-check workflow. Your data is clean before it ever reaches the analysis team.</p>
       <ul class="feat-bullets">
@@ -1091,7 +1094,7 @@
 <section id="f11-dpdp" class="feat-section alt">
   <div class="feat-inner flip reveal">
     <div class="feat-content">
-      <div class="feat-tag blue">🛡️ DPDP 2023</div>
+      <div class="feat-tag blue"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> DPDP 2023</div>
       <h3>India's data protection law.<br/>Built into every form.</h3>
       <p>The Digital Personal Data Protection Act 2023 is baked into the platform — consent tracking per respondent, full audit logs, a data erasure endpoint, and a purpose field on every form. No custom compliance work needed.</p>
       <ul class="feat-bullets">
@@ -1125,7 +1128,7 @@
 <section id="f12-lang" class="feat-section">
   <div class="feat-inner reveal">
     <div class="feat-content">
-      <div class="feat-tag blue">🌍 Multilingual</div>
+      <div class="feat-tag blue"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Multilingual</div>
       <h3>English. Hindi. Kannada.<br/>Telugu. And more.</h3>
       <p>Four languages available out of the box for the enumerator interface. AI-powered label translation lets you add new languages to any existing form in minutes — no developer needed, no strings file to manage.</p>
       <ul class="feat-bullets">
