@@ -17,13 +17,13 @@ export default function OrgAdminPanel() {
 
   const isMasterAdmin = user.role === 'master_admin'
   const tabs = [
-    { id: 'users',        label: '👥 Users',        description: 'Manage team members' },
-    { id: 'api-keys',     label: '🔑 API Keys',      description: 'Integration access' },
-    { id: 'forms',        label: '📋 Forms',         description: 'Form templates' },
-    { id: 'migration',    label: '🔄 Import',        description: 'Kobo · SurveyCTO · XLSForm' },
-    { id: 'integrations', label: '🔗 Integrations',  description: 'Alerts · Webhooks · Sheets · Access' },
-    { id: 'security',     label: '🔒 Security',      description: 'QR login · Password' },
-    ...(isMasterAdmin ? [{ id: 'ai', label: '🤖 AI', description: 'OpenAI · Claude · Gemini' }] : []),
+    { id: 'users',        label: 'Users',        description: 'Manage team members' },
+    { id: 'api-keys',     label: 'API Keys',      description: 'Integration access' },
+    { id: 'forms',        label: 'Forms',         description: 'Form templates' },
+    { id: 'migration',    label: 'Import',        description: 'Kobo · SurveyCTO · XLSForm' },
+    { id: 'integrations', label: 'Integrations',  description: 'Alerts · Webhooks · Sheets · Access' },
+    { id: 'security',     label: 'Security',      description: 'QR login · Password' },
+    ...(isMasterAdmin ? [{ id: 'ai', label: 'AI', description: 'OpenAI · Claude · Gemini' }] : []),
   ]
 
   return (

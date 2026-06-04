@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface ToastProps {
   id: string
@@ -45,7 +46,7 @@ const Toast: React.FC<ToastProps> = ({
         animate-fade-in
       `}
     >
-      <span className="text-lg font-bold">{icon[type]}</span>
+      <span className="text-lg font-bold"><EmojiIcon e={icon[type]} /></span>
       <span className="text-sm">{message}</span>
       <button
         onClick={() => onClose(id)}

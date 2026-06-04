@@ -398,7 +398,7 @@ export default function FileManagerPage() {
                     ? 'bg-catalan-primary/10 text-catalan-primary border border-catalan-primary/20'
                     : 'text-catalan-textMuted hover:bg-catalan-hover'
                 }`}>
-                <span>{f.icon}</span>
+                <span><EmojiIcon e={f.icon} /></span>
                 <span>{f.label}</span>
                 <span className="ml-auto text-xs text-catalan-textMuted">{f.count}</span>
               </button>
@@ -578,9 +578,9 @@ export default function FileManagerPage() {
                             writer:   'bg-purple-100 text-purple-700',
                           }
                           const TOOL_LABEL: Record<string, string> = {
-                            analyzer: '📊 Analyzer',
-                            cleaner:  '🧹 Cleaner',
-                            writer:   '✍️ Writer',
+                            analyzer: 'Analyzer',
+                            cleaner:  'Cleaner',
+                            writer:   'Writer',
                           }
                           return (
                             <tr key={proj.id}

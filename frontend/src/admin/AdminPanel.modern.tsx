@@ -8,6 +8,7 @@ import { getNavItems } from '@/lib/navigation'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { Button, Input, Modal, Alert } from '@/components/ui'
+import EmojiIcon from '@/components/EmojiIcon'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -137,7 +138,7 @@ function TableHeader({ columns }: { columns: string[] }) {
 function EmptyState({ icon, message }: { icon: string; message: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-catalan-textMuted">
-      <div className="text-5xl mb-4 opacity-40">{icon}</div>
+      <div className="text-5xl mb-4 opacity-40"><EmojiIcon e={icon} /></div>
       <p className="text-sm">{message}</p>
     </div>
   )

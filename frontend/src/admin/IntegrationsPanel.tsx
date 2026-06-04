@@ -362,7 +362,7 @@ function WebhooksSection() {
               </div>
               {testResult?.id === wh.id && (
                 <div className={`mt-2 text-xs px-2.5 py-1.5 rounded ${testResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-                  {testResult.success ? `✓ Succeeded (HTTP ${testResult.status_code})` : `⚠ Failed (HTTP ${testResult.status_code ?? 'error'})`}
+                  {testResult.success ? `✓ Succeeded (HTTP ${testResult.status_code})` : `Failed (HTTP ${testResult.status_code ?? 'error'})`}
                 </div>
               )}
             </div>
@@ -686,11 +686,11 @@ export default function IntegrationsPanel() {
     <div className="space-y-6">
       <div className="flex gap-3 flex-wrap">
         {([
-          ['alerts',   '🔔 Alerts'],
-          ['webhooks', '🔗 Webhooks'],
-          ['sheets',   '📊 Google Sheets'],
-          ['consent',  '📑 Consent Reports'],
-          ['access',   '⚙️ Form Access'],
+          ['alerts',   'Alerts'],
+          ['webhooks', 'Webhooks'],
+          ['sheets',   'Google Sheets'],
+          ['consent',  'Consent Reports'],
+          ['access',   'Form Access'],
         ] as const).map(([id, label]) => (
           <button key={id} onClick={() => setSection(id)}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${

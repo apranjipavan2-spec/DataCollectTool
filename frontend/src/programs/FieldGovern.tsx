@@ -7,6 +7,7 @@ import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
 import LineChart from '@/components/charts/LineChart'
 import BarChart from '@/components/charts/BarChart'
+import EmojiIcon from '@/components/EmojiIcon'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -362,7 +363,7 @@ function TabulatorTab({ programId }: { programId: string }) {
             onChange={e => setUserPrompt(e.target.value)}
           />
           <button onClick={suggestAI} disabled={aiLoading} className={btnPrimary}>
-            {aiLoading ? 'Thinking…' : '✨ AI Suggest'}
+            <>{aiLoading ? 'Thinking…' : <><EmojiIcon e="✨" /> AI Suggest</>}</>
           </button>
         </div>
         {aiSuggestion?.rationale && (
@@ -539,7 +540,7 @@ function WriterTab({ programId }: { programId: string }) {
       </div>
 
       <button onClick={generate} disabled={loading} className={`${btnPrimary} w-full py-3 text-base`}>
-        {loading ? 'Generating report…' : '✨ Generate Program Report'}
+        {loading ? 'Generating report…' : <><EmojiIcon e="✨" /> Generate Program Report</>}
       </button>
 
       {error && (
@@ -832,7 +833,7 @@ export default function FieldGovern() {
                       ? 'border-catalan-primary text-catalan-primary'
                       : 'border-transparent text-catalan-textMuted hover:text-catalan-text'
                   }`}>
-                  <span>{t.icon}</span> {t.label}
+                  <span><EmojiIcon e={t.icon} /></span> {t.label}
                 </button>
               ))}
             </div>

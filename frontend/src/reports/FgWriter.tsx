@@ -582,9 +582,9 @@ export default function FgWriter() {
 
                 {!writerJob.isRunning && writerJob.job?.status !== 'done' && (
                   <button onClick={generate} disabled={writerJob.isRunning} className={`${btnPr} w-full py-3 text-base`}>
-                    {selectedTabIds.size > 0
-                      ? `✨ Narrate ${selectedTabIds.size} Table${selectedTabIds.size > 1 ? 's' : ''}`
-                      : '✨ Generate AI Report'}
+                    <><EmojiIcon e="✨" /> {selectedTabIds.size > 0
+                      ? `Narrate ${selectedTabIds.size} Table${selectedTabIds.size > 1 ? 's' : ''}`
+                      : 'Generate AI Report'}</>
                   </button>
                 )}
 

@@ -353,7 +353,7 @@ export default function SubscriptionPage() {
                   className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
                     paymentTab === t ? 'bg-catalan-surface text-catalan-text shadow-sm' : 'text-catalan-textMuted hover:text-catalan-text'
                   }`}>
-                  {t === 'upi' ? '📱 UPI / QR Code' : '🏦 Bank Transfer'}
+                  {t === 'upi' ? <><EmojiIcon e="📱" /> UPI / QR Code</> : <><EmojiIcon e="🏦" /> Bank Transfer</>}
                 </button>
               ))}
             </div>

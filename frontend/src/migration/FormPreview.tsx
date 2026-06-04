@@ -39,7 +39,7 @@ export default function FormPreview({ title, schema, warnings, sectionCount, fie
             disabled={saving}
             className="px-5 py-2 rounded-lg bg-catalan-primary text-white font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            {saving ? 'Saving…' : '💾 Save as Draft Form'}
+            {saving ? 'Saving…' : <><EmojiIcon e="💾" /> Save as Draft Form</>}
           </button>
         </div>
       </div>

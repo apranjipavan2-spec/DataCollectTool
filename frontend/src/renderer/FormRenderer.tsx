@@ -294,7 +294,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
               ))}
             </div>
             <span className={`text-xs flex-shrink-0 ${syncStatus === 'saved' ? 'text-catalan-success' : syncStatus === 'saving' ? 'text-catalan-warning' : 'text-catalan-error'}`}>
-              {syncStatus === 'saved' ? '● Saved' : syncStatus === 'saving' ? '●' : '⚠'}
+              {syncStatus === 'saved' ? '● Saved' : syncStatus === 'saving' ? '●' : <EmojiIcon e="⚠" />}
             </span>
           </div>
           {/* Progress bar */}

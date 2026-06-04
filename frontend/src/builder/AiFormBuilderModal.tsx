@@ -11,14 +11,14 @@ interface Props {
 }
 
 const STUDY_TYPES = [
-  { value: 'field_survey',     label: '📊 Field Survey / Household Survey' },
-  { value: 'health_assessment',label: '🏥 Health / WASH / Nutrition Assessment' },
-  { value: 'agriculture',      label: '🌾 Agricultural / Livelihood Survey' },
-  { value: 'government_program', label: '🏛️ Government Program Monitoring (MGNREGA, PMAY, etc.)' },
-  { value: 'rct_baseline',     label: '🔬 RCT Baseline / Endline' },
-  { value: 'ngo_monitoring',   label: '🌍 NGO M&E / Impact Assessment' },
-  { value: 'education',        label: '📚 Education / School Survey' },
-  { value: 'custom',           label: '✏️ Custom / Other' },
+  { value: 'field_survey',     label: 'Field Survey / Household Survey' },
+  { value: 'health_assessment',label: 'Health / WASH / Nutrition Assessment' },
+  { value: 'agriculture',      label: 'Agricultural / Livelihood Survey' },
+  { value: 'government_program', label: 'Government Program Monitoring (MGNREGA, PMAY, etc.)' },
+  { value: 'rct_baseline',     label: 'RCT Baseline / Endline' },
+  { value: 'ngo_monitoring',   label: 'NGO M&E / Impact Assessment' },
+  { value: 'education',        label: 'Education / School Survey' },
+  { value: 'custom',           label: 'Custom / Other' },
 ]
 
 const LOADING_MSGS = [

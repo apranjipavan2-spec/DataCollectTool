@@ -81,10 +81,10 @@ export default function MigrationPage() {
   const [activeTab, setActiveTab] = useState<Tab>('xlsform')
 
   const tabs: { id: Tab; label: string; desc: string }[] = [
-    { id: 'xlsform', label: '📄 XLSForm', desc: 'Upload .xlsx file' },
-    { id: 'kobo',    label: '🟠 KoboToolbox', desc: 'Connect via API token' },
-    { id: 'surveycto', label: '🔵 SurveyCTO', desc: 'Connect via credentials' },
-    { id: 'odk',    label: '🟢 ODK Central', desc: 'Connect via credentials' },
+    { id: 'xlsform', label: 'XLSForm', desc: 'Upload .xlsx file' },
+    { id: 'kobo',    label: 'KoboToolbox', desc: 'Connect via API token' },
+    { id: 'surveycto', label: 'SurveyCTO', desc: 'Connect via credentials' },
+    { id: 'odk',    label: 'ODK Central', desc: 'Connect via credentials' },
   ]
 
   return (

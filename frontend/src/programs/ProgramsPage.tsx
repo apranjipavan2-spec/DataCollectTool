@@ -764,7 +764,7 @@ export default function ProgramsPage() {
                     <button key={t} onClick={() => setDetailTab(t)}
                       className={`px-4 py-2 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${
                         detailTab === t ? 'border-catalan-primary text-catalan-primary' : 'border-transparent text-catalan-textMuted hover:text-catalan-text'
-                      }`}>{t === 'setup' ? '⚙️ Setup' : '📈 Progress'}</button>
+                      }`}>{t === 'setup' ? <><EmojiIcon e="⚙" /> Setup</> : <><EmojiIcon e="📈" /> Progress</>}</button>
                   ))}
                 </div>
 
@@ -838,7 +838,7 @@ export default function ProgramsPage() {
                                   {(q.start_date || q.end_date) && <span><EmojiIcon e="📅" /> {q.start_date ?? '?'} → {q.end_date ?? 'ongoing'}</span>}
                                 </div>
                                 <ProgressBar pct={q.total_target > 0 ? 0 : 0} />
-                                <p className="text-xs text-catalan-textMuted mt-2">Add location targets in ⚙️ Setup to track per-location progress.</p>
+                                <p className="text-xs text-catalan-textMuted mt-2">Add location targets in  to track per-location progress.</p>
                               </div>
                             ))}
                           </div>
