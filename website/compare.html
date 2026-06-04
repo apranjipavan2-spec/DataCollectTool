@@ -154,13 +154,22 @@
     .calc-verdict .cv-plan{margin-top:8px;font-size:.88rem;line-height:1.55;color:rgba(255,255,255,.95)}
     .calc-verdict .cv-plan strong{background:rgba(255,255,255,.22);padding:2px 8px;border-radius:6px;font-weight:800}
     .calc-assume{font-size:.72rem;color:var(--text3);line-height:1.5;margin-top:10px;text-align:center;max-width:760px;margin-left:auto;margin-right:auto}
+    .calc-big,.cv-save{transition:color .2s}
+    @keyframes cvPulse{0%{transform:scale(1)}40%{transform:scale(1.025)}100%{transform:scale(1)}}
+    .calc-verdict.pulse{animation:cvPulse .45s ease}
     @media(max-width:820px){.calc-wrap{grid-template-columns:1fr}}
+    @media(prefers-reduced-motion:reduce){
+      thead th.highlight{animation:none}
+      .cmp-wrap.animate-fg td.col-fg{animation:none}
+      .calc-verdict.pulse{animation:none}
+    }
 
     /* TABLES */
     .cmp-wrap{overflow-x:auto;border-radius:16px;border:1px solid var(--border);box-shadow:0 4px 24px rgba(0,0,0,.05)}
     table{width:100%;border-collapse:collapse;font-size:.86rem;background:white;min-width:680px}
     thead th{background:var(--bg2);padding:14px 16px;text-align:center;font-weight:800;color:var(--text);border-bottom:2px solid var(--border);font-size:.82rem}
-    thead th.highlight{background:linear-gradient(135deg,rgba(14,165,233,.12),rgba(124,58,237,.12));color:var(--brand-dark)}
+    thead th.highlight{background:linear-gradient(110deg,rgba(14,165,233,.12),rgba(124,58,237,.22),rgba(14,165,233,.12));background-size:220% 100%;color:var(--brand-dark);animation:fgShimmer 5s linear infinite}
+    @keyframes fgShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
     thead th:first-child{text-align:left}
     tbody td{padding:11px 16px;text-align:center;border-bottom:1px solid var(--border);color:var(--text2)}
     tbody td:first-child{text-align:left;font-weight:600;color:var(--text)}
@@ -170,6 +179,13 @@
     .tag-better{color:#047857;font-weight:700}
     .tag-ok{color:#b45309}
     .tag-worse{color:#b91c1c}
+    /* FG column scroll-reveal + glow */
+    @keyframes fgCellIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+    @keyframes fgGlow{0%,100%{box-shadow:inset 3px 0 0 -1px rgba(14,165,233,0)}50%{box-shadow:inset 3px 0 0 0 rgba(14,165,233,.45)}}
+    .cmp-wrap.animate-fg td.col-fg{animation:fgCellIn .5s ease both, fgGlow 1.4s ease 1}
+    .fg-plan{font-weight:800;color:var(--brand-dark)}
+    .fg-meta{font-size:.72rem;color:var(--text3);margin-top:1px}
+    .fg-meta del{opacity:.7}
 
     /* PAPER */
     .paper-note{text-align:center;font-size:.78rem;color:var(--text3);margin-top:12px}
@@ -382,11 +398,11 @@
         <tr><th>Tier (per month)</th><th class="highlight">FieldGovern ✦</th><th>SurveyCTO</th><th>KoboToolbox</th><th>ODK</th></tr>
       </thead>
       <tbody>
-        <tr><td>Free</td><td class="col-fg"><span class="tag-better">₹0 — students · 1,000 subs/mo</span></td><td><span class="tag-ok">Community · 200 subs/mo</span></td><td><span class="tag-better">Community · 5,000 subs/mo</span></td><td><span class="tag-ok">Software free (self-host)</span></td></tr>
-        <tr><td>Entry</td><td class="col-fg"><span class="tag-better">Starter ₹6,999 <small style="color:var(--text3)">(reg ₹7,999)</small> · 5,000 subs · ~$84</span></td><td><span class="tag-worse">~$198 (₹16,500+)</span></td><td><span class="tag-ok">Professional · 25,000 subs</span></td><td><span class="tag-ok">ODK Cloud / your hosting</span></td></tr>
-        <tr><td>Mid</td><td class="col-fg"><span class="tag-better">Growth ₹12,999 <small style="color:var(--text3)">(reg ₹14,999)</small> · 25,000 subs · ~$156</span></td><td><span class="tag-worse">~$300 (₹25,000+)</span></td><td><span class="tag-ok">Teams · 50,000 subs</span></td><td><span class="tag-ok">Larger server + DevOps</span></td></tr>
-        <tr><td>Top managed</td><td class="col-fg"><span class="tag-better">Pro ₹24,999 <small style="color:var(--text3)">(reg ₹28,999)</small> · 1,00,000 subs · ~$300</span></td><td><span class="tag-worse">up to ~$700 (₹58,000+)</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Your servers + DevOps</span></td></tr>
-        <tr><td>Beyond / custom</td><td class="col-fg"><span class="tag-better">Custom — by subs / schedules / project</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Self-managed</span></td></tr>
+        <tr><td>Free</td><td class="col-fg"><div class="fg-plan">₹0 · Students</div><div class="fg-meta">1,000 subs/mo</div></td><td><span class="tag-ok">Community · 200/mo</span></td><td><span class="tag-better">Community · 5,000/mo</span></td><td><span class="tag-ok">Free (self-host)</span></td></tr>
+        <tr><td>Entry</td><td class="col-fg"><div class="fg-plan">Starter · ₹6,999</div><div class="fg-meta">5,000 subs · <del>₹7,999</del></div></td><td><span class="tag-worse">~$198 (₹16,500+)</span></td><td><span class="tag-ok">Professional · 25,000</span></td><td><span class="tag-ok">ODK Cloud / hosting</span></td></tr>
+        <tr><td>Mid</td><td class="col-fg"><div class="fg-plan">Growth · ₹12,999</div><div class="fg-meta">25,000 subs · <del>₹14,999</del></div></td><td><span class="tag-worse">~$300 (₹25,000+)</span></td><td><span class="tag-ok">Teams · 50,000</span></td><td><span class="tag-ok">Server + DevOps</span></td></tr>
+        <tr><td>Top managed</td><td class="col-fg"><div class="fg-plan">Pro · ₹24,999</div><div class="fg-meta">1,00,000 subs · <del>₹28,999</del></div></td><td><span class="tag-worse">up to ~$700 (₹58,000+)</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Your servers + DevOps</span></td></tr>
+        <tr><td>Beyond / custom</td><td class="col-fg"><div class="fg-plan">Custom</div><div class="fg-meta">by subs / schedules / project</div></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Self-managed</span></td></tr>
         <tr><td>Built-in cleaning + analysis + AI reports</td><td class="col-fg"><span class="tag-better">✓ Included in price</span></td><td><span class="tag-worse">✕ Buy Stata + analyst</span></td><td><span class="tag-worse">✕ Buy tools + analyst</span></td><td><span class="tag-worse">✕ Buy tools + analyst</span></td></tr>
         <tr><td>Payment</td><td class="col-fg"><span class="tag-better">UPI / NEFT (INR)</span></td><td><span class="tag-worse">USD card</span></td><td><span class="tag-worse">USD card</span></td><td><span class="tag-ok">n/a</span></td></tr>
       </tbody>
@@ -560,6 +576,22 @@
     calcCost();
   }
   function fmtINR(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function animateINR(el, target){
+    if (!el) return;
+    if (reduceMotion){ el.textContent = fmtINR(target); el.dataset.val = target; return; }
+    var start = parseInt(el.dataset.val || '0', 10) || 0;
+    el.dataset.val = target;
+    if (start === target){ el.textContent = fmtINR(target); return; }
+    var t0 = performance.now(), dur = 450;
+    function step(now){
+      var p = Math.min(1, (now - t0) / dur);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtINR(start + (target - start) * eased);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
   function recommendPlan(subsPerMonth, programs){
     if (subsPerMonth <= 1000 && programs <= 1) return {name:'Free (Students)', price:0};
     if (subsPerMonth <= 5000 && programs <= 2) return {name:'Starter', price:6999};
@@ -595,7 +627,7 @@
     var mLabel = months + ' month' + (months > 1 ? 's' : '');
     var set = function(id, txt){ document.getElementById(id).textContent = txt; };
 
-    set('co-paper-total', fmtINR(paperTotal));
+    animateINR(document.getElementById('co-paper-total'), paperTotal);
     set('co-paper-sub', 'over ' + mLabel);
     set('co-print', fmtINR(printing));
     set('co-entry', fmtINR(entry));
@@ -606,7 +638,9 @@
     set('co-subs', subsPerMonth.toLocaleString('en-IN') + ' / mo');
     set('co-plan', plan.name);
     set('co-permonth', plan.price === null ? 'Custom quote' : (plan.price === 0 ? '₹0' : fmtINR(plan.price)));
-    set('co-fg-total', fgTotal === null ? 'Custom' : fmtINR(fgTotal));
+    var fgTotalEl = document.getElementById('co-fg-total');
+    if (fgTotal === null){ fgTotalEl.textContent = 'Custom'; fgTotalEl.dataset.val = 0; }
+    else animateINR(fgTotalEl, fgTotal);
     set('co-fg-sub', fgTotal === null ? 'metered quote' : 'over ' + mLabel);
 
     var saveEl = document.getElementById('co-save');
@@ -623,12 +657,30 @@
       saveEl.textContent = saved > 0 ? (fmtINR(saved) + ' saved · ' + pct + '% less') : 'Comparable cost — far faster';
       verdictEl.innerHTML = 'We recommend the <strong>' + plan.name + '</strong> plan — ' + fmtINR(fgTotal) + ' vs ~' + fmtINR(paperTotal) + ' on paper over ' + mLabel + ', with cleaning, analysis &amp; AI reports included and results in days.';
     }
+    if (!reduceMotion){
+      var vc = document.querySelector('.calc-verdict');
+      if (vc){ vc.classList.remove('pulse'); void vc.offsetWidth; vc.classList.add('pulse'); }
+    }
   }
   ['ci-programs','ci-subs','ci-perproject','ci-pages','ci-months','ci-opsal','ci-ansal'].forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.addEventListener('input', calcCost);
   });
   calcCost();
+
+  /* Cascade-reveal the FieldGovern column when each comparison table scrolls in */
+  if ('IntersectionObserver' in window && !reduceMotion){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (!e.isIntersecting) return;
+        var wrap = e.target;
+        wrap.querySelectorAll('td.col-fg').forEach(function(c, i){ c.style.animationDelay = (i * 45) + 'ms'; });
+        wrap.classList.add('animate-fg');
+        io.unobserve(wrap);
+      });
+    }, {threshold:0.12});
+    document.querySelectorAll('.cmp-wrap').forEach(function(w){ io.observe(w); });
+  }
 </script>
 </body>
 </html>
