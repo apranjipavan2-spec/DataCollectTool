@@ -491,7 +491,7 @@
       </div>
     </div>
   </div>
-  <p class="calc-assume"><strong>Assumptions:</strong> printing ₹1 per double-sided sheet; data entry ₹1 per page (front &amp; back counted), with a ₹15,000 minimum base; one analyst at the salary you set (prefilled ₹30,000) for the project period; report writing ₹15,000/program; paper error rate 5–10% vs &lt;1% on FieldGovern. We suggest the FieldGovern plan with headroom above your volume (introductory price, +18% GST extra). Estimates are indicative — actual costs vary by location and team.</p>
+  <p class="calc-assume"><strong>Assumptions:</strong> printing ₹1 per double-sided sheet; data entry ₹1 per page (front &amp; back counted), with a ₹15,000 minimum base; one analyst at the salary you set (prefilled ₹30,000) for the project period; report writing ₹15,000/program; paper error rate 5–10% vs &lt;1% on FieldGovern. We suggest the FieldGovern plan that fits your volume (introductory price, +18% GST extra). Estimates are indicative — actual costs vary by location and team.</p>
 </div>
 
 <!-- CTA -->
@@ -592,12 +592,12 @@
     }
     requestAnimationFrame(step);
   }
-  // Recommend the plan with headroom above the user's volume (one tier up from the
-  // minimum fit), so they don't hit caps mid-project. Free stays for the student case.
+  // Recommend the plan that genuinely fits the user's volume (real pricing.html caps,
+  // gated by submissions/month; Free is also limited to 1 project). No upselling.
   function recommendPlan(subsPerMonth, programs){
     if (subsPerMonth <= 1000 && programs <= 1) return {name:'Free (Students)', price:0};
-    if (subsPerMonth <= 5000)   return {name:'Growth', price:12999};  // headroom over Starter
-    if (subsPerMonth <= 25000)  return {name:'Pro', price:24999};     // headroom over Growth
+    if (subsPerMonth <= 5000)   return {name:'Starter', price:6999};
+    if (subsPerMonth <= 25000)  return {name:'Growth', price:12999};
     if (subsPerMonth <= 100000) return {name:'Pro', price:24999};
     return {name:'Custom', price:null};
   }
