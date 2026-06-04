@@ -448,7 +448,7 @@
         <input id="ci-months" type="number" min="1" value="3"/>
       </div>
       <div class="calc-field">
-        <label>Data-entry operator salary <span class="hint">₹ / month, editable</span></label>
+        <label>Data-entry base (minimum) <span class="hint">₹ — used if ₹1/page total is lower</span></label>
         <input id="ci-opsal" type="number" min="0" step="500" value="15000"/>
       </div>
       <div class="calc-field">
@@ -491,7 +491,7 @@
       </div>
     </div>
   </div>
-  <p class="calc-assume"><strong>Assumptions:</strong> printing ₹1 per double-sided sheet; one data-entry operator handles ~800 forms/month at the salary you set (prefilled ₹15,000); one analyst at the salary you set (prefilled ₹30,000) for the project period; report writing ₹15,000/program; paper error rate 5–10% vs &lt;1% on FieldGovern. FieldGovern prices are introductory, +18% GST extra. Estimates are indicative — actual costs vary by location and team.</p>
+  <p class="calc-assume"><strong>Assumptions:</strong> printing ₹1 per double-sided sheet; data entry ₹1 per page (front &amp; back counted), with a ₹15,000 minimum base; one analyst at the salary you set (prefilled ₹30,000) for the project period; report writing ₹15,000/program; paper error rate 5–10% vs &lt;1% on FieldGovern. We suggest the FieldGovern plan with headroom above your volume (introductory price, +18% GST extra). Estimates are indicative — actual costs vary by location and team.</p>
 </div>
 
 <!-- CTA -->
@@ -592,11 +592,12 @@
     }
     requestAnimationFrame(step);
   }
-  // Plans are gated by submissions/month (Free is also limited to 1 project)
+  // Recommend the plan with headroom above the user's volume (one tier up from the
+  // minimum fit), so they don't hit caps mid-project. Free stays for the student case.
   function recommendPlan(subsPerMonth, programs){
     if (subsPerMonth <= 1000 && programs <= 1) return {name:'Free (Students)', price:0};
-    if (subsPerMonth <= 5000)   return {name:'Starter', price:6999};
-    if (subsPerMonth <= 25000)  return {name:'Growth', price:12999};
+    if (subsPerMonth <= 5000)   return {name:'Growth', price:12999};  // headroom over Starter
+    if (subsPerMonth <= 25000)  return {name:'Pro', price:24999};     // headroom over Growth
     if (subsPerMonth <= 100000) return {name:'Pro', price:24999};
     return {name:'Custom', price:null};
   }
@@ -617,10 +618,11 @@
     var sheets = Math.ceil(pages / 2);
 
     var operators = Math.max(1, Math.ceil(subsPerMonth / 800)); // ~800 forms/operator/mo
-    var printing = totalSubs * sheets * 1;   // ₹1 per double-sided sheet
-    var entry = operators * opSal * months;  // operators × salary × months
-    var analyst = anSal * months;            // one analyst for the project
-    var report = programs * 15000;           // ₹15k/program
+    var printing = totalSubs * sheets * 1;        // ₹1 per double-sided sheet
+    var entryRaw = totalSubs * pages * 1;         // ₹1 per page (front & back counted)
+    var entry = Math.max(entryRaw, opSal);        // floor at the base (default ₹15,000)
+    var analyst = anSal * months;                 // one analyst for the project
+    var report = programs * 15000;                // ₹15k/program
     var paperTotal = printing + entry + analyst + report;
 
     var plan = recommendPlan(subsPerMonth, programs);
