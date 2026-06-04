@@ -149,9 +149,10 @@
     .calc-sub{font-size:.74rem;color:var(--text3);margin-bottom:12px}
     .calc-line{display:flex;justify-content:space-between;gap:8px;font-size:.79rem;padding:5px 0;border-top:1px dashed var(--border);color:var(--text2)}
     .calc-line span:last-child{font-weight:700;color:var(--text);white-space:nowrap}
-    .calc-verdict{border-radius:16px;padding:20px 22px;background:linear-gradient(135deg,var(--brand),var(--accent));color:white}
-    .calc-verdict .cv-save{font-size:1.7rem;font-weight:900;line-height:1.15}
-    .calc-verdict .cv-plan{margin-top:8px;font-size:.88rem;line-height:1.55;color:rgba(255,255,255,.95)}
+    .calc-verdict{border-radius:18px;padding:30px 24px;background:linear-gradient(135deg,var(--brand),var(--accent));color:white;text-align:center;margin-top:8px}
+    .calc-verdict .cv-pct{font-size:2.7rem;font-weight:900;line-height:1;letter-spacing:-.01em}
+    .calc-verdict .cv-save{font-size:1.02rem;font-weight:700;opacity:.96;margin-top:6px}
+    .calc-verdict .cv-plan{margin-top:10px;font-size:.88rem;line-height:1.55;color:rgba(255,255,255,.95);max-width:600px;margin-left:auto;margin-right:auto}
     .calc-verdict .cv-plan strong{background:rgba(255,255,255,.22);padding:2px 8px;border-radius:6px;font-weight:800}
     /* multi-platform ranked comparison */
     .calc-rank-head{display:flex;justify-content:space-between;font-size:.74rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
@@ -176,9 +177,10 @@
     .calc-grid{display:grid;grid-template-columns:290px minmax(0,1fr);gap:20px;align-items:start}
     .calc-grid .calc-inputs{position:sticky;top:84px}
     .calc-right{min-width:0}
-    .calc-matrix{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
-    .cmpcol{border:1px solid var(--border);border-radius:14px;padding:16px 14px;background:white;display:flex;flex-direction:column}
-    .cmpcol.fg{border:2px solid var(--brand);background:#f0f9ff;box-shadow:0 6px 24px rgba(14,165,233,.12)}
+    .calc-matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:0 0 24px}
+    .cmpcol{border:1px solid var(--border);border-radius:14px;padding:18px 16px;background:white;display:flex;flex-direction:column}
+    @keyframes fgCardGlow{0%,100%{box-shadow:0 6px 22px rgba(14,165,233,.12)}50%{box-shadow:0 8px 30px rgba(14,165,233,.34)}}
+    .cmpcol.fg{border:2px solid var(--brand);background:#f0f9ff;animation:fgCardGlow 2.6s ease-in-out infinite}
     .cmpcol.paper{border-color:#fecaca;background:#fef2f2}
     .cc-name{font-weight:800;font-size:.88rem;line-height:1.25;min-height:2.6em;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
     .cmpcol.fg .cc-name{color:var(--brand-dark)}
@@ -196,6 +198,12 @@
     .cc-lines b{color:var(--text);font-weight:700;text-align:right;white-space:nowrap}
     .cc-lines b.inc{color:var(--green)}
     .cc-foot{margin-top:10px;font-size:.66rem;color:var(--text3);line-height:1.45;border-top:1px solid var(--border);padding-top:8px}
+    .cc-extras{list-style:none;margin:10px 0 0;padding:8px 0 0;border-top:1px dashed var(--border);display:flex;flex-direction:column;gap:5px}
+    .cc-extras li{font-size:.7rem;color:var(--brand-dark);font-weight:700;display:flex;gap:6px;align-items:flex-start;line-height:1.3}
+    .cc-extras li::before{content:'✓';color:var(--green);font-weight:900;flex-shrink:0}
+    .calc-inputs-top{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;align-items:end;border:1px solid var(--border);border-radius:16px;padding:20px;background:var(--bg2);margin-bottom:22px}
+    .calc-inputs-top .calc-field{margin-bottom:0}
+    .calc-field-wide{grid-column:span 2}
     @media(max-width:900px){
       .calc-grid{grid-template-columns:1fr}
       .calc-grid .calc-inputs{position:static}
@@ -211,6 +219,7 @@
       thead th.highlight{animation:none}
       .cmp-wrap.animate-fg td.col-fg{animation:none}
       .calc-verdict.pulse{animation:none}
+      .cmpcol.fg{animation:none}
     }
 
     /* TABLES */
@@ -461,66 +470,68 @@
 </div>
 </div>
 
-<!-- ═══ COST CALCULATOR — full-width side-by-side ═══ -->
-<div class="section-inner" id="calc" style="padding-bottom:20px">
+<!-- ═══ COST CALCULATOR — inputs on top, tiles below ═══ -->
+<div class="section-inner" id="calc">
   <div class="sec-head">
     <h2>Your numbers: every platform, side by side</h2>
-    <p>Set the shape of your fieldwork on the left. We compute the <strong>total project cost</strong> for each platform — FieldGovern, KoboToolbox, ODK, SurveyCTO and paper/manual — broken down line by line.</p>
+    <p>Set the shape of your fieldwork below. We compute the <strong>total project cost</strong> for FieldGovern, KoboToolbox, SurveyCTO and paper/manual — broken down line by line.</p>
   </div>
-</div>
-<div class="calc-full">
-  <div class="calc-grid">
-    <div class="calc-inputs">
-      <div class="calc-field">
-        <label>Programs / projects <span class="hint">distinct studies you run</span></label>
-        <input id="ci-programs" type="number" min="1" value="2"/>
-      </div>
-      <div class="calc-field">
-        <label>Volume — enter by</label>
-        <div class="calc-toggle">
-          <button type="button" class="ct-btn active" data-mode="subs" onclick="setVolMode('subs')">Submissions / month</button>
-          <button type="button" class="ct-btn" data-mode="quest" onclick="setVolMode('quest')">Questionnaires per project</button>
-        </div>
-      </div>
-      <div class="calc-field" id="cf-subs">
-        <label>Submissions per month <span class="hint">total responses across all forms</span></label>
-        <input id="ci-subs" type="number" min="1" value="2000"/>
-      </div>
-      <div class="calc-field" id="cf-quest" style="display:none">
-        <label>Questionnaire submissions per project <span class="hint">total responses targeted per project</span></label>
-        <input id="ci-perproject" type="number" min="1" value="3000"/>
-      </div>
-      <div class="calc-field">
-        <label>Pages per form <span class="hint">printed double-sided</span></label>
-        <input id="ci-pages" type="number" min="1" value="12"/>
-      </div>
-      <div class="calc-field">
-        <label>Project duration <span class="hint">months</span></label>
-        <input id="ci-months" type="number" min="1" value="6"/>
-      </div>
-      <div class="calc-field">
-        <label>Data-entry base (minimum) <span class="hint">₹ — used if ₹1/page total is lower</span></label>
-        <input id="ci-opsal" type="number" min="0" step="500" value="15000"/>
-      </div>
-      <div class="calc-field">
-        <label>Analyst salary <span class="hint">₹ / month, editable</span></label>
-        <input id="ci-ansal" type="number" min="0" step="1000" value="30000"/>
+
+  <!-- INPUTS (top) -->
+  <div class="calc-inputs-top">
+    <div class="calc-field">
+      <label>Programs / projects <span class="hint">distinct studies</span></label>
+      <input id="ci-programs" type="number" min="1" value="2"/>
+    </div>
+    <div class="calc-field calc-field-wide">
+      <label>Volume — enter by</label>
+      <div class="calc-toggle">
+        <button type="button" class="ct-btn active" data-mode="subs" onclick="setVolMode('subs')">Submissions / month</button>
+        <button type="button" class="ct-btn" data-mode="quest" onclick="setVolMode('quest')">Questionnaires / project</button>
       </div>
     </div>
-    <div class="calc-right">
-      <div class="calc-rank-head"><span>Total project cost — line by line</span><span id="co-context">—</span></div>
-      <div class="calc-matrix" id="calc-matrix"></div>
-      <div class="calc-verdict">
-        <div class="cv-save" id="co-save">—</div>
-        <div class="cv-plan" id="co-verdict">—</div>
-        <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px">
-          <a href="pricing.html" class="btn-outline" style="background:white;border-color:white;color:var(--brand-dark);padding:9px 16px;font-size:.84rem">See plan details</a>
-          <a href="https://wa.me/918088709011?text=Hi%2C%20I%27d%20like%20a%20FieldGovern%20quote%20for%20my%20fieldwork." target="_blank" class="btn-outline" style="background:transparent;border-color:rgba(255,255,255,.6);color:white;padding:9px 16px;font-size:.84rem">Get a quote</a>
-        </div>
-      </div>
+    <div class="calc-field" id="cf-subs">
+      <label>Submissions / month <span class="hint">total responses</span></label>
+      <input id="ci-subs" type="number" min="1" value="2000"/>
+    </div>
+    <div class="calc-field" id="cf-quest" style="display:none">
+      <label>Submissions / project <span class="hint">target per project</span></label>
+      <input id="ci-perproject" type="number" min="1" value="3000"/>
+    </div>
+    <div class="calc-field">
+      <label>Pages / form <span class="hint">double-sided</span></label>
+      <input id="ci-pages" type="number" min="1" value="12"/>
+    </div>
+    <div class="calc-field">
+      <label>Duration <span class="hint">months</span></label>
+      <input id="ci-months" type="number" min="1" value="6"/>
+    </div>
+    <div class="calc-field">
+      <label>Data-entry base <span class="hint">₹ min</span></label>
+      <input id="ci-opsal" type="number" min="0" step="500" value="15000"/>
+    </div>
+    <div class="calc-field">
+      <label>Analyst salary <span class="hint">₹ / month</span></label>
+      <input id="ci-ansal" type="number" min="0" step="1000" value="30000"/>
     </div>
   </div>
-  <p class="calc-assume"><strong>Assumptions:</strong> printing ₹1 per double-sided sheet; data entry ₹1 per page (front &amp; back), min ₹15,000; analyst at the salary you set (prefilled ₹30,000/mo) for the project; report writing ₹15,000/program. <strong>SurveyCTO, KoboToolbox and ODK don't include cleaning, analysis or report writing</strong>, so an analyst + report cost still applies to them — only FieldGovern bundles these. Software assumed: SurveyCTO ~$198–700/mo (₹83/$); KoboToolbox free Community tier (paid quote at higher volumes); ODK ~₹6,000/mo self-host + ops. FieldGovern price introductory, +18% GST extra. Indicative only — actual costs vary by team and location.</p>
+
+  <!-- TILES (below) -->
+  <div class="calc-rank-head"><span>Total project cost — line by line</span><span id="co-context">—</span></div>
+  <div class="calc-matrix" id="calc-matrix"></div>
+
+  <!-- SAVINGS -->
+  <div class="calc-verdict">
+    <div class="cv-pct" id="co-pct">—</div>
+    <div class="cv-save" id="co-save">—</div>
+    <div class="cv-plan" id="co-verdict">—</div>
+    <div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:10px;justify-content:center">
+      <a href="pricing.html" class="btn-outline" style="background:white;border-color:white;color:var(--brand-dark);padding:9px 18px;font-size:.86rem">See plan details</a>
+      <a href="https://wa.me/918088709011?text=Hi%2C%20I%27d%20like%20a%20FieldGovern%20quote%20for%20my%20fieldwork." target="_blank" class="btn-outline" style="background:transparent;border-color:rgba(255,255,255,.6);color:white;padding:9px 18px;font-size:.86rem">Get a quote</a>
+    </div>
+  </div>
+
+  <p class="calc-assume"><strong>Assumptions:</strong> printing ₹1 per double-sided sheet; data entry ₹1 per page (front &amp; back), min ₹15,000; analyst at the salary you set (prefilled ₹30,000/mo) for the project; report writing ₹15,000/program. <strong>KoboToolbox and SurveyCTO don't include cleaning, analysis or report writing</strong>, so an analyst + report cost still applies to them — only FieldGovern bundles these. Software assumed: SurveyCTO ~$198–700/mo (₹83/$); KoboToolbox free Community tier (paid quote at higher volumes). FieldGovern price introductory, +18% GST extra. Indicative only — actual costs vary by team and location.</p>
 </div>
 
 <!-- CTA -->
@@ -621,6 +632,22 @@
     }
     requestAnimationFrame(step);
   }
+  function animatePct(el, target){
+    if (!el) return;
+    var suffix = '% less than paper';
+    if (reduceMotion){ el.textContent = target + suffix; el.dataset.val = target; return; }
+    var start = parseInt(el.dataset.val || '0', 10) || 0;
+    el.dataset.val = target;
+    if (start === target){ el.textContent = target + suffix; return; }
+    var t0 = performance.now(), dur = 550;
+    function step(now){
+      var p = Math.min(1, (now - t0) / dur);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(start + (target - start) * eased) + suffix;
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
   // Recommend the plan that genuinely fits the user's volume (real pricing.html caps,
   // gated by submissions/month; Free is also limited to 1 project). No upselling.
   function recommendPlan(subsPerMonth, programs){
@@ -670,22 +697,20 @@
 
     set('co-context', subsPerMonth.toLocaleString('en-IN') + ' subs/mo · ' + mLabel);
 
-    var maxT = Math.max(paperTotal, sctoTotal, koboTotal, odkTotal, (fgTotal || 0)) || 1;
+    var maxT = Math.max(paperTotal, sctoTotal, koboTotal, (fgTotal || 0)) || 1;
     var fgSoftLabel = plan.price === null ? 'FieldGovern (Custom)' : plan.name + ' plan';
     var fgFoot = plan.price === null
-      ? 'Custom metered — cleaning, analysis &amp; AI reports all included'
+      ? 'Custom metered — everything below included'
       : (plan.price === 0
-          ? '<strong>Free student plan</strong> — everything included, no analyst'
-          : '<strong>' + plan.name + '</strong> · ' + fmtINR(plan.price) + '/mo × ' + months + ' — cleaning, analysis &amp; AI reports built in, no separate analyst');
+          ? '<strong>Free student plan</strong> — everything below included'
+          : '<strong>' + plan.name + '</strong> · ' + fmtINR(plan.price) + '/mo × ' + months + ' — no analyst, no report writer to hire');
     var cols = [
       {name:'✦ FieldGovern', badge:'best value', cls:'fg', total:fgTotal,
-        lines:[['Printing',0],['Data entry',0],[fgSoftLabel,fgTotal],['Analyst','inc'],['Report writing','inc']], foot:fgFoot},
+        lines:[['Printing',0],['Data entry',0],[fgSoftLabel,fgTotal],['Analyst','inc'],['Report writing','inc']], foot:fgFoot,
+        extras:['AI summariser','1-click AI stat analyst','Auto report generator','24×7 support']},
       {name:'KoboToolbox', cls:'', total:koboTotal,
         lines:[['Printing',0],['Data entry',0],['Software',0],['Analyst',analyst],['Report writing',report]],
         foot:'Free Community software' + (subsPerMonth > 5000 ? ' (paid &gt;5k/mo)' : '') + ' — but you still hire an analyst + report writer'},
-      {name:'ODK (self-host)', cls:'', total:odkTotal,
-        lines:[['Printing',0],['Data entry',0],['Hosting + ops',odkMo * months],['Analyst',analyst],['Report writing',report]],
-        foot:'Self-host server + ops — but you still hire an analyst + report writer'},
       {name:'SurveyCTO', cls:'', total:sctoTotal,
         lines:[['Printing',0],['Data entry',0],['Subscription',sctoMo * months],['Analyst',analyst],['Report writing',report]],
         foot:'USD subscription (~' + fmtINR(sctoMo) + '/mo) — but you still hire an analyst + report writer'},
@@ -708,23 +733,28 @@
         + '<div class="cc-sub">over ' + mLabel + '</div>'
         + '<div class="cc-bar"><i style="width:' + pct + '%"></i></div>'
         + '<ul class="cc-lines">' + lines + '</ul>'
+        + (c.extras ? '<ul class="cc-extras">' + c.extras.map(function(x){ return '<li>' + x + '</li>'; }).join('') + '</ul>' : '')
         + '<div class="cc-foot">' + c.foot + '</div>'
         + '</div>';
     }).join('');
 
+    var pctEl = document.getElementById('co-pct');
     var saveEl = document.getElementById('co-save');
     var verdictEl = document.getElementById('co-verdict');
     if (fgTotal === null){
-      saveEl.textContent = 'Custom plan recommended';
+      pctEl.textContent = 'Custom'; pctEl.dataset.val = 0;
+      saveEl.textContent = 'Metered quote recommended';
       verdictEl.innerHTML = 'At <strong>' + subsPerMonth.toLocaleString('en-IN') + ' submissions/mo</strong> across ' + programs + ' programs, talk to us for a metered <strong>Custom</strong> quote — still a fraction of the paper path (' + fmtINR(paperTotal) + ').';
     } else if (fgTotal === 0){
-      saveEl.textContent = fmtINR(paperTotal) + ' saved';
+      animatePct(pctEl, 100);
+      saveEl.textContent = fmtINR(paperTotal) + ' saved vs paper · Free student plan';
       verdictEl.innerHTML = 'You fit the <strong>Free student plan</strong> — ₹0 vs ' + fmtINR(paperTotal) + ' on paper, and results in days not weeks.';
     } else {
       var saved = paperTotal - fgTotal;
-      var pct = paperTotal > 0 ? Math.round(saved / paperTotal * 100) : 0;
-      saveEl.textContent = saved > 0 ? (fmtINR(saved) + ' saved · ' + pct + '% less') : 'Comparable cost — far faster';
-      verdictEl.innerHTML = 'We recommend the <strong>' + plan.name + '</strong> plan — ' + fmtINR(fgTotal) + ' vs ~' + fmtINR(paperTotal) + ' on paper over ' + mLabel + ', with cleaning, analysis &amp; AI reports included and results in days.';
+      var pctv = paperTotal > 0 ? Math.round(saved / paperTotal * 100) : 0;
+      animatePct(pctEl, pctv);
+      saveEl.textContent = fmtINR(saved) + ' saved vs paper · ' + plan.name + ' plan';
+      verdictEl.innerHTML = 'FieldGovern <strong>' + fmtINR(fgTotal) + '</strong> vs ~' + fmtINR(paperTotal) + ' on paper over ' + mLabel + ' — cleaning, analysis &amp; AI reports included, results in days.';
     }
     if (!reduceMotion){
       var vc = document.querySelector('.calc-verdict');
