@@ -171,6 +171,37 @@
     .cr-row.paper .cr-fill{background:#ef4444}
     .cr-row:not(.win):not(.paper) .cr-fill{background:#94a3b8}
     .cr-note{font-size:.72rem;color:var(--text3);line-height:1.4}
+    /* full-width side-by-side comparison */
+    .calc-full{width:100%;padding:0 clamp(16px,4vw,48px);margin:0 auto}
+    .calc-grid{display:grid;grid-template-columns:290px minmax(0,1fr);gap:20px;align-items:start}
+    .calc-grid .calc-inputs{position:sticky;top:84px}
+    .calc-right{min-width:0}
+    .calc-matrix{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+    .cmpcol{border:1px solid var(--border);border-radius:14px;padding:16px 14px;background:white;display:flex;flex-direction:column}
+    .cmpcol.fg{border:2px solid var(--brand);background:#f0f9ff;box-shadow:0 6px 24px rgba(14,165,233,.12)}
+    .cmpcol.paper{border-color:#fecaca;background:#fef2f2}
+    .cc-name{font-weight:800;font-size:.88rem;line-height:1.25;min-height:2.6em;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+    .cmpcol.fg .cc-name{color:var(--brand-dark)}
+    .cc-badge{font-size:.55rem;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--brand),var(--accent));padding:2px 6px;border-radius:999px;text-transform:uppercase;letter-spacing:.03em}
+    .cc-total{font-size:1.25rem;font-weight:900;line-height:1.1;margin-top:2px}
+    .cmpcol.fg .cc-total{color:var(--brand)}
+    .cmpcol.paper .cc-total{color:#b91c1c}
+    .cc-sub{font-size:.66rem;color:var(--text3);margin-bottom:8px}
+    .cc-bar{height:6px;border-radius:999px;background:var(--bg3);overflow:hidden;margin-bottom:10px}
+    .cc-bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--brand),var(--accent))}
+    .cmpcol.paper .cc-bar i{background:#ef4444}
+    .cmpcol:not(.fg):not(.paper) .cc-bar i{background:#94a3b8}
+    .cc-lines{list-style:none;margin:0;padding:0;flex:1}
+    .cc-lines li{display:flex;justify-content:space-between;gap:6px;font-size:.72rem;padding:6px 0;border-top:1px dashed var(--border);color:var(--text3)}
+    .cc-lines b{color:var(--text);font-weight:700;text-align:right;white-space:nowrap}
+    .cc-lines b.inc{color:var(--green)}
+    .cc-foot{margin-top:10px;font-size:.66rem;color:var(--text3);line-height:1.45;border-top:1px solid var(--border);padding-top:8px}
+    @media(max-width:900px){
+      .calc-grid{grid-template-columns:1fr}
+      .calc-grid .calc-inputs{position:static}
+      .calc-matrix{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+      .calc-matrix .cmpcol{flex:0 0 210px;scroll-snap-align:start}
+    }
     .calc-assume{font-size:.72rem;color:var(--text3);line-height:1.5;margin-top:10px;text-align:center;max-width:760px;margin-left:auto;margin-right:auto}
     .calc-big,.cv-save{transition:color .2s}
     @keyframes cvPulse{0%{transform:scale(1)}40%{transform:scale(1.025)}100%{transform:scale(1)}}
@@ -430,13 +461,15 @@
 </div>
 </div>
 
-<!-- ═══ COST CALCULATOR — paper + FieldGovern + alternatives ═══ -->
-<div class="section-inner" id="calc">
+<!-- ═══ COST CALCULATOR — full-width side-by-side ═══ -->
+<div class="section-inner" id="calc" style="padding-bottom:20px">
   <div class="sec-head">
-    <h2>Your numbers: every option in one place</h2>
-    <p>Enter the shape of your fieldwork. We'll estimate the <strong>total cost over the project</strong> for paper/manual, FieldGovern, SurveyCTO, KoboToolbox and ODK — and recommend the FieldGovern plan that fits.</p>
+    <h2>Your numbers: every platform, side by side</h2>
+    <p>Set the shape of your fieldwork on the left. We compute the <strong>total project cost</strong> for each platform — FieldGovern, KoboToolbox, ODK, SurveyCTO and paper/manual — broken down line by line.</p>
   </div>
-  <div class="calc-wrap">
+</div>
+<div class="calc-full">
+  <div class="calc-grid">
     <div class="calc-inputs">
       <div class="calc-field">
         <label>Programs / projects <span class="hint">distinct studies you run</span></label>
@@ -474,35 +507,9 @@
         <input id="ci-ansal" type="number" min="0" step="1000" value="30000"/>
       </div>
     </div>
-    <div class="calc-out">
-      <div class="calc-rank-head"><span>Total cost over the project</span><span id="co-context">—</span></div>
-      <div class="calc-rank">
-        <div class="cr-row win">
-          <div class="cr-head"><span class="cr-name">✦ FieldGovern <span class="cr-tag">best value</span></span><span class="cr-total" id="cr-fg">—</span></div>
-          <div class="cr-bar"><div class="cr-fill" id="crf-fg"></div></div>
-          <div class="cr-note" id="crn-fg">—</div>
-        </div>
-        <div class="cr-row">
-          <div class="cr-head"><span class="cr-name">KoboToolbox</span><span class="cr-total" id="cr-kobo">—</span></div>
-          <div class="cr-bar"><div class="cr-fill" id="crf-kobo"></div></div>
-          <div class="cr-note" id="crn-kobo">—</div>
-        </div>
-        <div class="cr-row">
-          <div class="cr-head"><span class="cr-name">ODK (self-host)</span><span class="cr-total" id="cr-odk">—</span></div>
-          <div class="cr-bar"><div class="cr-fill" id="crf-odk"></div></div>
-          <div class="cr-note" id="crn-odk">—</div>
-        </div>
-        <div class="cr-row">
-          <div class="cr-head"><span class="cr-name">SurveyCTO</span><span class="cr-total" id="cr-scto">—</span></div>
-          <div class="cr-bar"><div class="cr-fill" id="crf-scto"></div></div>
-          <div class="cr-note" id="crn-scto">—</div>
-        </div>
-        <div class="cr-row paper">
-          <div class="cr-head"><span class="cr-name">📄 Paper / manual</span><span class="cr-total" id="cr-paper">—</span></div>
-          <div class="cr-bar"><div class="cr-fill" id="crf-paper"></div></div>
-          <div class="cr-note" id="crn-paper">—</div>
-        </div>
-      </div>
+    <div class="calc-right">
+      <div class="calc-rank-head"><span>Total project cost — line by line</span><span id="co-context">—</span></div>
+      <div class="calc-matrix" id="calc-matrix"></div>
       <div class="calc-verdict">
         <div class="cv-save" id="co-save">—</div>
         <div class="cv-plan" id="co-verdict">—</div>
@@ -663,24 +670,47 @@
 
     set('co-context', subsPerMonth.toLocaleString('en-IN') + ' subs/mo · ' + mLabel);
 
-    var maxT = Math.max(paperTotal, sctoTotal, koboTotal, odkTotal, (fgTotal || 0));
-    function row(key, total, note){
-      var t = document.getElementById('cr-' + key), f = document.getElementById('crf-' + key), nn = document.getElementById('crn-' + key);
-      if (total === null){ t.textContent = 'Custom'; t.dataset.val = 0; }
-      else animateINR(t, total);
-      f.style.width = (total === null || maxT === 0 ? 0 : Math.round(total / maxT * 100)) + '%';
-      nn.innerHTML = note;
-    }
-    var fgNote = plan.price === null
-      ? 'Custom metered — cleaning + analysis + AI reports all included'
+    var maxT = Math.max(paperTotal, sctoTotal, koboTotal, odkTotal, (fgTotal || 0)) || 1;
+    var fgSoftLabel = plan.price === null ? 'FieldGovern (Custom)' : plan.name + ' plan';
+    var fgFoot = plan.price === null
+      ? 'Custom metered — cleaning, analysis &amp; AI reports all included'
       : (plan.price === 0
-          ? '<strong>Free student plan</strong> — everything included, no analyst needed'
-          : '<strong>' + plan.name + '</strong> · ' + fmtINR(plan.price) + '/mo × ' + months + ' — cleaning, analysis &amp; AI reports included, <strong>no separate analyst</strong>');
-    row('fg', fgTotal, fgNote);
-    row('kobo', koboTotal, 'Free Community software' + (subsPerMonth > 5000 ? ' (paid quote &gt;5k/mo)' : '') + ' — but still needs an analyst + report writing');
-    row('odk', odkTotal, 'Self-host ~' + fmtINR(odkMo) + '/mo (server + ops) — but still needs an analyst + report writing');
-    row('scto', sctoTotal, 'Subscription ~' + fmtINR(sctoMo) + '/mo — but still needs an analyst + report writing');
-    row('paper', paperTotal, 'Printing ' + fmtINR(printing) + ' + data entry ' + fmtINR(entry) + ' + analyst ' + fmtINR(analyst) + ' + report ' + fmtINR(report));
+          ? '<strong>Free student plan</strong> — everything included, no analyst'
+          : '<strong>' + plan.name + '</strong> · ' + fmtINR(plan.price) + '/mo × ' + months + ' — cleaning, analysis &amp; AI reports built in, no separate analyst');
+    var cols = [
+      {name:'✦ FieldGovern', badge:'best value', cls:'fg', total:fgTotal,
+        lines:[['Printing',0],['Data entry',0],[fgSoftLabel,fgTotal],['Analyst','inc'],['Report writing','inc']], foot:fgFoot},
+      {name:'KoboToolbox', cls:'', total:koboTotal,
+        lines:[['Printing',0],['Data entry',0],['Software',0],['Analyst',analyst],['Report writing',report]],
+        foot:'Free Community software' + (subsPerMonth > 5000 ? ' (paid &gt;5k/mo)' : '') + ' — but you still hire an analyst + report writer'},
+      {name:'ODK (self-host)', cls:'', total:odkTotal,
+        lines:[['Printing',0],['Data entry',0],['Hosting + ops',odkMo * months],['Analyst',analyst],['Report writing',report]],
+        foot:'Self-host server + ops — but you still hire an analyst + report writer'},
+      {name:'SurveyCTO', cls:'', total:sctoTotal,
+        lines:[['Printing',0],['Data entry',0],['Subscription',sctoMo * months],['Analyst',analyst],['Report writing',report]],
+        foot:'USD subscription (~' + fmtINR(sctoMo) + '/mo) — but you still hire an analyst + report writer'},
+      {name:'📄 Paper / manual', cls:'paper', total:paperTotal,
+        lines:[['Printing',printing],['Data entry',entry],['Software',0],['Analyst',analyst],['Report writing',report]],
+        foot:'Print, ship &amp; re-key by hand, then analyst + report writer'}
+    ];
+    function cell(v){
+      if (v === 'inc') return '<b class="inc">incl.</b>';
+      if (v === null)  return '<b>Custom</b>';
+      return '<b class="' + (v === 0 ? 'inc' : '') + '">' + fmtINR(v) + '</b>';
+    }
+    document.getElementById('calc-matrix').innerHTML = cols.map(function(c){
+      var totTxt = c.total === null ? 'Custom' : fmtINR(c.total);
+      var pct = c.total === null ? 0 : Math.round(c.total / maxT * 100);
+      var lines = c.lines.map(function(l){ return '<li><span>' + l[0] + '</span>' + cell(l[1]) + '</li>'; }).join('');
+      return '<div class="cmpcol ' + c.cls + '">'
+        + '<div class="cc-name">' + c.name + (c.badge ? ' <span class="cc-badge">' + c.badge + '</span>' : '') + '</div>'
+        + '<div class="cc-total">' + totTxt + '</div>'
+        + '<div class="cc-sub">over ' + mLabel + '</div>'
+        + '<div class="cc-bar"><i style="width:' + pct + '%"></i></div>'
+        + '<ul class="cc-lines">' + lines + '</ul>'
+        + '<div class="cc-foot">' + c.foot + '</div>'
+        + '</div>';
+    }).join('');
 
     var saveEl = document.getElementById('co-save');
     var verdictEl = document.getElementById('co-verdict');
