@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react'
 import type { FormField } from '@/types/form'
 import { labelCls, hintCls, captureButtonCls, fieldHintCls, requiredCls } from './styles'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface Props { field: FormField; value: string | null; onChange: (v: string) => void }
 
@@ -95,11 +96,11 @@ export default function PhotoField({ field, value, onChange }: Props) {
       ) : (
         <div className="grid grid-cols-2 gap-3">
           <button onClick={() => cameraRef.current?.click()} className={captureButtonCls}>
-            <span className="text-3xl">📷</span>
+            <span className="text-3xl"><EmojiIcon e="📷" /></span>
             <span className="text-sm">{value ? 'Retake' : 'Take Photo'}</span>
           </button>
           <button onClick={() => galleryRef.current?.click()} className={captureButtonCls}>
-            <span className="text-3xl">🖼</span>
+            <span className="text-3xl"><EmojiIcon e="🖼" /></span>
             <span className="text-sm">From Gallery</span>
           </button>
         </div>
@@ -124,7 +125,7 @@ export default function PhotoField({ field, value, onChange }: Props) {
             onClick={() => { onChange(''); setSizeInfo('') }}
             className="mt-2 w-full text-xs px-3 py-2 rounded-lg border border-catalan-error/30 text-catalan-error hover:bg-catalan-error/10 transition-colors"
           >
-            🗑 Delete Photo
+            <EmojiIcon e="🗑" /> Delete Photo
           </button>
         </div>
       )}

@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
+import EmojiIcon from '@/components/EmojiIcon'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -307,11 +308,11 @@ function SetupPanel({ prog, locations, forms, onRefresh }: {
                 <div>
                   <div className="font-medium text-sm text-catalan-text">{q.name}</div>
                   <div className="text-xs text-catalan-textMuted mt-0.5 flex flex-wrap gap-x-3">
-                    {q.participant_type_name && <span>👤 {q.participant_type_name}</span>}
-                    {q.form_title && <span>📋 {q.form_title}</span>}
+                    {q.participant_type_name && <span><EmojiIcon e="👤" /> {q.participant_type_name}</span>}
+                    {q.form_title && <span><EmojiIcon e="📋" /> {q.form_title}</span>}
                     <span>Sample target: <strong>{q.total_target}</strong></span>
                     {q.location_targets.length > 0 && <span>{q.location_targets.length} location(s)</span>}
-                    {(q.start_date || q.end_date) && <span>📅 {q.start_date ?? '…'} → {q.end_date ?? '…'}</span>}
+                    {(q.start_date || q.end_date) && <span><EmojiIcon e="📅" /> {q.start_date ?? '…'} → {q.end_date ?? '…'}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -587,16 +588,16 @@ export default function ProgramsPage() {
                 <>
                   <button onClick={() => { setSelectedId(''); setDetail(null); setProgress(null) }}
                     className="px-3 py-1.5 text-sm border border-catalan-border rounded-lg text-catalan-textMuted hover:bg-catalan-hover">
-                    ← All Programs
+                    <EmojiIcon e="←" /> All Programs
                   </button>
                   {detail && user?.role && ['supervisor', 'org_admin', 'master_admin'].includes(user.role) && <>
                     <button onClick={() => { const t = token; window.location.href = `${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${selectedId}&token=${t}` }}
                       className="px-3 py-1.5 text-sm bg-slate-800 text-white rounded-lg hover:bg-slate-700 active:scale-95 transition-all font-medium shadow-sm">
-                      🔬 Analyzer
+                      <EmojiIcon e="🔬" /> Analyzer
                     </button>
                     <button onClick={() => { const t = token; window.location.href = `${window.location.origin}/cleaner/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${selectedId}&token=${t}` }}
                       className="px-3 py-1.5 text-sm bg-slate-800 text-white rounded-lg hover:bg-slate-700 active:scale-95 transition-all font-medium shadow-sm">
-                      🧹 Cleaner
+                      <EmojiIcon e="🧹" /> Cleaner
                     </button>
                   </>}
                   {detailTab === 'progress' && <>
@@ -644,7 +645,7 @@ export default function ProgramsPage() {
                   <p className="text-center text-catalan-textMuted py-12">Loading…</p>
                 ) : filtered.length === 0 ? (
                   <div className="text-center py-16 text-catalan-textMuted">
-                    <div className="text-4xl mb-3">🗂️</div>
+                    <div className="text-4xl mb-3"><EmojiIcon e="🗂" /></div>
                     <p className="font-medium text-catalan-text mb-1">No programs yet</p>
                     <p className="text-sm">Create a program to start tracking field data collection.</p>
                   </div>
@@ -662,7 +663,7 @@ export default function ProgramsPage() {
                         </div>
                         {p.scheme_name && <div className="text-xs text-catalan-textMuted mb-1">{p.scheme_name}</div>}
                         {(p.start_date || p.end_date) && (
-                          <div className="text-xs text-catalan-textMuted mb-2">📅 {p.start_date ?? '?'} → {p.end_date ?? 'ongoing'}</div>
+                          <div className="text-xs text-catalan-textMuted mb-2"><EmojiIcon e="📅" /> {p.start_date ?? '?'} → {p.end_date ?? 'ongoing'}</div>
                         )}
                         <div className="flex justify-between text-xs text-catalan-textMuted mb-1">
                           <span>{p.total_collected.toLocaleString()} / {p.total_target.toLocaleString()} collected</span>
@@ -675,8 +676,8 @@ export default function ProgramsPage() {
                         </div>
                         {((p.participant_type_count ?? 0) > 0 || (p.questionnaire_count ?? 0) > 0) && (
                           <div className="mt-2 flex gap-2 flex-wrap text-[10px] text-catalan-textMuted">
-                            {(p.participant_type_count ?? 0) > 0 && <span className="bg-catalan-hover rounded px-1.5 py-0.5">👤 {p.participant_type_count} type{(p.participant_type_count ?? 0) > 1 ? 's' : ''}</span>}
-                            {(p.questionnaire_count ?? 0) > 0 && <span className="bg-catalan-hover rounded px-1.5 py-0.5">📋 {p.questionnaire_count} questionnaire{(p.questionnaire_count ?? 0) > 1 ? 's' : ''}</span>}
+                            {(p.participant_type_count ?? 0) > 0 && <span className="bg-catalan-hover rounded px-1.5 py-0.5"><EmojiIcon e="👤" /> {p.participant_type_count} type{(p.participant_type_count ?? 0) > 1 ? 's' : ''}</span>}
+                            {(p.questionnaire_count ?? 0) > 0 && <span className="bg-catalan-hover rounded px-1.5 py-0.5"><EmojiIcon e="📋" /> {p.questionnaire_count} questionnaire{(p.questionnaire_count ?? 0) > 1 ? 's' : ''}</span>}
                           </div>
                         )}
                       </div>
@@ -736,7 +737,7 @@ export default function ProgramsPage() {
                         {selectedProg.scheme_name && <p className="text-sm text-catalan-textMuted mt-0.5">{selectedProg.scheme_name}</p>}
                         {selectedProg.description && <p className="text-sm text-catalan-text mt-1">{selectedProg.description}</p>}
                         {(selectedProg.start_date || selectedProg.end_date) && (
-                          <p className="text-xs text-catalan-textMuted mt-1">📅 {selectedProg.start_date ?? '?'} → {selectedProg.end_date ?? 'ongoing'}</p>
+                          <p className="text-xs text-catalan-textMuted mt-1"><EmojiIcon e="📅" /> {selectedProg.start_date ?? '?'} → {selectedProg.end_date ?? 'ongoing'}</p>
                         )}
                       </div>
                       <div className="flex gap-2 flex-shrink-0 ml-3">
@@ -827,14 +828,14 @@ export default function ProgramsPage() {
                                 <div className="flex items-center justify-between mb-2">
                                   <div>
                                     <span className="font-medium text-sm text-catalan-text">{q.name}</span>
-                                    {q.participant_type_name && <span className="ml-2 text-xs text-catalan-textMuted">👤 {q.participant_type_name}</span>}
-                                    {q.form_title && <span className="ml-2 text-xs text-catalan-textMuted">📋 {q.form_title}</span>}
+                                    {q.participant_type_name && <span className="ml-2 text-xs text-catalan-textMuted"><EmojiIcon e="👤" /> {q.participant_type_name}</span>}
+                                    {q.form_title && <span className="ml-2 text-xs text-catalan-textMuted"><EmojiIcon e="📋" /> {q.form_title}</span>}
                                   </div>
                                   <Badge label={q.status} cls={PROG_BADGE_CLS[q.status] ?? 'bg-gray-100 text-gray-500'} />
                                 </div>
                                 <div className="flex items-center gap-4 text-xs text-catalan-textMuted mb-1.5">
                                   <span>Target: <strong className="text-catalan-text">{q.total_target.toLocaleString()}</strong></span>
-                                  {(q.start_date || q.end_date) && <span>📅 {q.start_date ?? '?'} → {q.end_date ?? 'ongoing'}</span>}
+                                  {(q.start_date || q.end_date) && <span><EmojiIcon e="📅" /> {q.start_date ?? '?'} → {q.end_date ?? 'ongoing'}</span>}
                                 </div>
                                 <ProgressBar pct={q.total_target > 0 ? 0 : 0} />
                                 <p className="text-xs text-catalan-textMuted mt-2">Add location targets in ⚙️ Setup to track per-location progress.</p>
@@ -844,9 +845,9 @@ export default function ProgramsPage() {
                         </div>
                       ) : rows.length === 0 && progress ? (
                         <div className="py-10 text-center text-catalan-textMuted">
-                          <div className="text-3xl mb-3">📍</div>
+                          <div className="text-3xl mb-3"><EmojiIcon e="📍" /></div>
                           <p className="font-medium text-catalan-text mb-1">No questionnaires configured yet</p>
-                          <p className="text-sm max-w-md mx-auto">Switch to <strong>⚙️ Setup</strong> → add questionnaires and location targets to track progress.</p>
+                          <p className="text-sm max-w-md mx-auto">Switch to <strong><EmojiIcon e="⚙" /> Setup</strong> <EmojiIcon e="→" /> add questionnaires and location targets to track progress.</p>
                         </div>
                       ) : (
                         <div className="overflow-x-auto">

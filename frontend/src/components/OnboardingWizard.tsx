@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '@/lib/api'
+import EmojiIcon from '@/components/EmojiIcon'
 
 const STORAGE_KEY = 'fg_onboarding_done'
 
@@ -234,7 +235,7 @@ export default function OnboardingWizard() {
 
           {step === 4 && (
             <div className="space-y-4 text-center py-2">
-              <div className="text-5xl">🎉</div>
+              <div className="text-5xl"><EmojiIcon e="🎉" /></div>
               <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
                 Your workspace is set up. Head to the dashboard to publish your first form, assign it to enumerators, and watch submissions come in — even offline.
               </p>

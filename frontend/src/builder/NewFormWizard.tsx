@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid'
 import api from '@/lib/api'
 import { useToast } from '@/lib/ToastContext'
 import { Button } from '@/components/ui'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface Program { id: string; name: string; scheme_name: string }
 interface ParticipantType { id: string; name: string }

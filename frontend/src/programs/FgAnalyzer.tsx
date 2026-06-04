@@ -11,11 +11,11 @@ import { useToast } from '@/lib/ToastContext'
 import LineChart from '@/components/charts/LineChart'
 import BarChart from '@/components/charts/BarChart'
 import { BatchRenameModal } from './BatchRenameModal'
-import EmojiIcon from '@/components/EmojiIcon'
 import {
   loadTabulations, loadTabulationsCache, saveTabulation, deleteTabulation,
   saveAnalyzerToolProject, getLastProgram, setLastProgram, type SavedTabulation,
 } from '@/lib/fgStorage'
+import EmojiIcon from '@/components/EmojiIcon'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -345,7 +345,7 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
                 {Object.entries(editColLabels).map(([raw, clean]) => (
                   <div key={raw} className="flex items-center gap-2">
                     <span className="text-xs text-catalan-textMuted font-mono shrink-0 max-w-[110px] truncate" title={raw}>{raw}</span>
-                    <span className="text-xs text-catalan-textMuted">→</span>
+                    <span className="text-xs text-catalan-textMuted"><EmojiIcon e="→" /></span>
                     <input className={`${inp} flex-1 py-1 text-xs`} value={clean}
                       onChange={e => setEditColLabels(p => ({ ...p, [raw]: e.target.value }))} />
                   </div>
@@ -1067,7 +1067,7 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
               <button onClick={runSmartSuggestion} disabled={smartRunning} className={btnPr}>
                 {smartRunning ? 'Building…' : '▶ Build This Table'}
               </button>
-              <button onClick={callSmartBuild} disabled={smartBuilding} className={btnSe}>↻ Try Again</button>
+              <button onClick={callSmartBuild} disabled={smartBuilding} className={btnSe}><EmojiIcon e="↻" /> Try Again</button>
             </div>
           </div>
         )}

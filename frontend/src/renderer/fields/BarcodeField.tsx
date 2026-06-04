@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react'
 import type { FormField } from '@/types/form'
 import { labelCls, hintCls, inputCls, captureButtonCls, recordingButtonCls, fieldErrorCls, requiredCls } from './styles'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface Props { field: FormField; value: string; onChange: (v: string) => void }
 
@@ -105,7 +106,7 @@ export default function BarcodeField({ field, value, onChange }: Props) {
         <div className="flex gap-2">
           {hasDetector && (
             <button onClick={startScanning} className={`${captureButtonCls} flex-1`}>
-              <span className="text-3xl">📷</span>
+              <span className="text-3xl"><EmojiIcon e="📷" /></span>
               <span>Scan Barcode</span>
             </button>
           )}

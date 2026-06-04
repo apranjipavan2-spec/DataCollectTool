@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import api from '@/lib/api'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Input, Alert } from '@/components/ui'
+import EmojiIcon from '@/components/EmojiIcon'
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate()
@@ -54,7 +55,7 @@ export default function ResetPasswordPage() {
       <div className="min-h-screen bg-catalan-bg flex items-center justify-center p-6">
         <div className="w-full max-w-md text-center space-y-4">
           <img src="/logo-wide.png" alt="FieldGovern" className="h-10 w-auto object-contain mx-auto mb-2" />
-          <div className="text-5xl mb-4">🔗</div>
+          <div className="text-5xl mb-4"><EmojiIcon e="🔗" /></div>
           <h2 className="text-xl font-semibold text-catalan-text">Invalid Reset Link</h2>
           <p className="text-catalan-textMuted text-sm">
             This link is missing a reset token. Please request a new password reset link.

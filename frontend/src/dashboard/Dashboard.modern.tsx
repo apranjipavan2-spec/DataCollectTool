@@ -12,6 +12,7 @@ import BarChart from '@/components/charts/BarChart'
 import LineChart from '@/components/charts/LineChart'
 import AuditLog from '@/components/AuditLog'
 import AiReportModal from '@/dashboard/AiReportModal'
+import EmojiIcon from '@/components/EmojiIcon'
 const RosterTab = lazy(() => import('@/dashboard/RosterTab'))
 const AnalyticsTab  = lazy(() => import('@/dashboard/AnalyticsTab'))
 const ScorecardTab  = lazy(() => import('@/dashboard/ScorecardTab'))
@@ -121,9 +122,9 @@ function RoleBadge({ role }: { role: string }) {
 function renderFieldValue(val: unknown): React.ReactNode {
   if (val === null || val === undefined) return <span className="text-catalan-textMuted">—</span>
   if (typeof val === 'string') {
-    if (val.startsWith('media://')) return <span className="text-catalan-primary">📎 Media uploaded</span>
-    if (val === '__photo_pending__') return <span className="text-catalan-warning">📷 Photo pending upload</span>
-    if (val === '__audio_pending__') return <span className="text-catalan-warning">🎙️ Audio pending upload</span>
+    if (val.startsWith('media://')) return <span className="text-catalan-primary"><EmojiIcon e="📎" /> Media uploaded</span>
+    if (val === '__photo_pending__') return <span className="text-catalan-warning"><EmojiIcon e="📷" /> Photo pending upload</span>
+    if (val === '__audio_pending__') return <span className="text-catalan-warning"><EmojiIcon e="🎙" /> Audio pending upload</span>
     if (val.startsWith('data:image/')) return <img src={val} alt="photo" className="max-w-[200px] rounded-lg mt-1" />
     return val
   }
@@ -1618,7 +1619,7 @@ export default function Dashboard() {
                 <Card title="Recent Submissions">
                   {(subsLoaded ? submissions : recentSubmissions).length === 0 ? (
                     <div className="text-center py-8">
-                      <div className="text-4xl mb-2">📋</div>
+                      <div className="text-4xl mb-2"><EmojiIcon e="📋" /></div>
                       <p className="text-sm text-catalan-textMuted">No submissions yet</p>
                     </div>
                   ) : (
@@ -1659,7 +1660,7 @@ export default function Dashboard() {
                 <Card title="Forms Status">
                   {forms.length === 0 ? (
                     <div className="text-center py-8">
-                      <div className="text-4xl mb-2">📝</div>
+                      <div className="text-4xl mb-2"><EmojiIcon e="📝" /></div>
                       <p className="text-sm text-catalan-textMuted">No forms yet</p>
                       <button onClick={() => setShowNewFormWizard(true)} className="text-xs text-catalan-primary hover:underline mt-1 inline-block">
                         Create your first form →
@@ -1740,7 +1741,7 @@ export default function Dashboard() {
                       disabled={sendingDigest}
                       className="w-full justify-start"
                     >
-                      {sendingDigest ? 'Sending…' : '📧 Send Daily Digest Now'}
+                      <><EmojiIcon e="📧" /> {sendingDigest ? 'Sending…' : 'Send Daily Digest Now'}</>
                     </Button>
                     <p className="text-xs text-catalan-textMuted pl-1">
                       Emails yesterday's summary to all supervisors &amp; admins with email set.
@@ -1829,7 +1830,7 @@ export default function Dashboard() {
                           toast.success('Labelled CSV exported')
                         } catch { toast.error('Export failed') } finally { setExportingCsv(false) }
                       }}>
-                      ↓ CSV (Labels)
+                      <EmojiIcon e="↓" /> CSV (Labels)
                     </Button>
                     <Button variant="secondary" size="sm" onClick={handleExportXlsx} disabled={exportingXlsx} title="Download as Excel (.xlsx)">
                       {exportingXlsx ? 'Creating…' : '↓ Excel'}
@@ -1853,7 +1854,7 @@ export default function Dashboard() {
                         }}
                         title="Generate AI summary report for this form"
                       >
-                        🤖 AI Report
+                        <EmojiIcon e="🤖" /> AI Report
                       </Button>
                     )}
                     {sheetsConfigured === false ? (
@@ -1862,7 +1863,7 @@ export default function Dashboard() {
                         className="text-xs px-3 py-1.5 rounded border border-catalan-border text-catalan-textMuted opacity-60 cursor-not-allowed"
                         disabled
                       >
-                        ↗ Sheets
+                        <EmojiIcon e="↗" /> Sheets
                       </button>
                     ) : (
                       <Button variant="secondary" size="sm" onClick={handleExportSheets} disabled={exportingSheets || sheetsConfigured === null} title="Export to Google Sheets">
@@ -1875,7 +1876,7 @@ export default function Dashboard() {
                       onClick={() => { const next = !showDuplicates; setShowDuplicates(next); if (next) handleLoadDuplicates() }}
                       title="Show potential duplicate submissions"
                     >
-                      ⚠ Dupes
+                      <EmojiIcon e="⚠" /> Dupes
                     </Button>
                     <Button
                       variant={filterViolations ? 'primary' : 'secondary'}
@@ -1883,7 +1884,7 @@ export default function Dashboard() {
                       onClick={() => { setFilterViolations(v => !v); setSubPage(1) }}
                       title="Show only submissions with validation violations"
                     >
-                      ⚠️ Violations
+                      <EmojiIcon e="⚠" /> Violations
                     </Button>
                     <Button
                       variant={filterDupSuspect ? 'primary' : 'secondary'}
@@ -1891,7 +1892,7 @@ export default function Dashboard() {
                       onClick={() => { setFilterDupSuspect(v => !v); setSubPage(1) }}
                       title="Show only suspected duplicate submissions"
                     >
-                      🔁 Duplicates
+                      <EmojiIcon e="🔁" /> Duplicates
                     </Button>
                     <Button
                       variant={filterBackcheck ? 'primary' : 'secondary'}
@@ -1899,7 +1900,7 @@ export default function Dashboard() {
                       onClick={() => { setFilterBackcheck(v => !v); setSubPage(1) }}
                       title="Show back-check queue"
                     >
-                      🔍 Back-Check
+                      <EmojiIcon e="🔍" /> Back-Check
                     </Button>
                   </div>}
                 </div>
@@ -2080,9 +2081,9 @@ export default function Dashboard() {
                             <td className="px-3 py-2 cursor-pointer" onClick={() => openDetail(sub.id)}>
                               <div className="flex items-center gap-1 flex-wrap">
                                 <StatusBadge status={sub.status} />
-                                {sub.has_violations && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-yellow-700 bg-yellow-100">⚠️ Violations</span>}
+                                {sub.has_violations && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-yellow-700 bg-yellow-100"><EmojiIcon e="⚠" /> Violations</span>}
                                 {sub.data_json?.['_duplicate_suspect'] && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-orange-700 bg-orange-100">Dup?</span>}
-                                {sub.backcheck_required && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-blue-700 bg-blue-100">🔍 Back-Check</span>}
+                                {sub.backcheck_required && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-blue-700 bg-blue-100"><EmojiIcon e="🔍" /> Back-Check</span>}
                               </div>
                             </td>
                             <td className="px-3 py-2 text-catalan-textMuted text-xs cursor-pointer" onClick={() => openDetail(sub.id)}>{new Date(sub.server_received_at).toLocaleString()}</td>
@@ -2095,7 +2096,7 @@ export default function Dashboard() {
                                     onClick={() => handleFlagBackcheck(sub.id)}
                                     title="Flag for back-check"
                                   >
-                                    🔍
+                                    <EmojiIcon e="🔍" />
                                   </button>
                                 )}
                               </div>
@@ -2147,7 +2148,7 @@ export default function Dashboard() {
                               {sub.enumerator_name} · {new Date(sub.server_received_at).toLocaleDateString()}
                             </div>
                           </button>
-                          <button onClick={() => openDetail(sub.id)} className="flex-shrink-0 text-catalan-primary text-lg px-2">→</button>
+                          <button onClick={() => openDetail(sub.id)} className="flex-shrink-0 text-catalan-primary text-lg px-2"><EmojiIcon e="→" /></button>
                         </div>
                       ))}
                     </div>
@@ -2343,7 +2344,7 @@ export default function Dashboard() {
                         : 'text-catalan-textMuted hover:text-catalan-text hover:bg-catalan-hover'
                     }`}
                   >
-                    {t === 'my-forms' ? `My Forms (${forms.length})` : '📚 Template Library'}
+                    {t === 'my-forms' ? `My Forms (${forms.length})` : <><EmojiIcon e="📚" /> Template Library</>}
                   </button>
                 ))}
               </div>
@@ -2367,7 +2368,7 @@ export default function Dashboard() {
                     {templates.map(tpl => (
                       <Card key={tpl.slug}>
                         <div className="flex items-start gap-3">
-                          <span className="text-3xl">{tpl.icon}</span>
+                          <span className="text-3xl"><EmojiIcon e={tpl.icon} /></span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <h3 className="font-semibold text-catalan-text text-sm">{tpl.title}</h3>
@@ -2495,14 +2496,14 @@ export default function Dashboard() {
             <div className="space-y-6">
 
               {/* ── Compliance — Consent Reports ── */}
-              <Card title="📋 Compliance — Consent Reports">
+              <Card title="Compliance — Consent Reports">
                 <p className="text-sm text-catalan-textMuted mb-3">Download DPDP consent audit records. Includes submission ID, enumerator phone, consent flag and timestamp.</p>
                 {forms.length === 0 ? <p className="text-sm text-catalan-textMuted">No forms available.</p> : (
                   <div className="space-y-2">
                     {forms.map(f => (
                       <div key={f.id} className="flex items-center justify-between py-1.5 border-b border-catalan-border last:border-0">
                         <span className="text-sm text-catalan-text">{f.title}</span>
-                        <a href={`/api/v1/export/consent-report?form_id=${f.id}`} target="_blank" rel="noopener noreferrer" className="text-xs px-2.5 py-1 rounded border border-catalan-primary/30 text-catalan-primary hover:bg-catalan-primary/10 transition-colors">📥 Download CSV</a>
+                        <a href={`/api/v1/export/consent-report?form_id=${f.id}`} target="_blank" rel="noopener noreferrer" className="text-xs px-2.5 py-1 rounded border border-catalan-primary/30 text-catalan-primary hover:bg-catalan-primary/10 transition-colors"><EmojiIcon e="📥" /> Download CSV</a>
                       </div>
                     ))}
                   </div>
@@ -2852,7 +2853,7 @@ export default function Dashboard() {
                         </div>
                         {testResult?.id === wh.id && (
                           <div className={`mt-2 text-xs px-2.5 py-1.5 rounded ${testResult.success ? 'bg-catalan-success/10 text-catalan-success' : 'bg-catalan-error/10 text-catalan-error'}`}>
-                            {testResult.success ? `✓ Test succeeded (HTTP ${testResult.status_code})` : `⚠ Test failed (HTTP ${testResult.status_code ?? 'error'})`}
+                            {testResult.success ? `✓ Test succeeded (HTTP ${testResult.status_code})` : `Test failed (HTTP ${testResult.status_code ?? 'error'})`}
                           </div>
                         )}
                       </div>
@@ -3045,7 +3046,7 @@ export default function Dashboard() {
                                       className="text-xs px-2 py-1 rounded border border-catalan-primary/30 text-catalan-primary hover:bg-catalan-primary/10 transition-colors disabled:opacity-50"
                                       title="Generate QR login code"
                                     >
-                                      {generatingQr === member.id ? '…' : '🔲 QR'}
+                                      {generatingQr === member.id ? '…' : 'QR'}
                                     </button>
                                   )}
                                   <button
@@ -3233,14 +3234,14 @@ export default function Dashboard() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap mb-0.5">
                             <span className="font-medium text-catalan-text text-sm">{sc.form_title}</span>
-                            <span className="text-catalan-textMuted text-xs">→</span>
+                            <span className="text-catalan-textMuted text-xs"><EmojiIcon e="→" /></span>
                             <span className="text-catalan-text text-sm">{sc.enumerator_name}</span>
                             <StatusBadge status={sc.status} />
                           </div>
                           <div className="text-xs text-catalan-textMuted flex flex-wrap gap-3">
-                            <span>📅 {sc.start_date} – {sc.end_date}</span>
-                            {sc.location && <span>📍 {sc.location}</span>}
-                            {sc.target_count > 0 && <span>🎯 {sc.target_count} target</span>}
+                            <span><EmojiIcon e="📅" /> {sc.start_date} – {sc.end_date}</span>
+                            {sc.location && <span><EmojiIcon e="📍" /> {sc.location}</span>}
+                            {sc.target_count > 0 && <span><EmojiIcon e="🎯" /> {sc.target_count} target</span>}
                           </div>
                           {sc.notes && (
                             <p className="text-xs text-catalan-textMuted mt-1 italic">{sc.notes}</p>
@@ -3285,7 +3286,7 @@ export default function Dashboard() {
                   : 'text-catalan-textMuted hover:text-catalan-text'
               }`}
             >
-              <span className="text-base leading-none">{icon}</span>
+              <span className="text-base leading-none"><EmojiIcon e={icon} /></span>
               <span>{label}</span>
               {key === 'submissions' && stats.flagged > 0 && tab !== 'submissions' && (
                 <span className="absolute top-1.5 right-1/4 translate-x-2 w-4 h-4 text-[10px] font-bold bg-catalan-warning text-catalan-bg rounded-full flex items-center justify-center leading-none">

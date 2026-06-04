@@ -11,6 +11,7 @@ import {
   getLastProgram, setLastProgram,
   type SavedTabulation, type SavedReport,
 } from '@/lib/fgStorage'
+import EmojiIcon from '@/components/EmojiIcon'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -478,7 +479,7 @@ export default function FgWriter() {
             {!programId && (
               <div className={card}>
                 <div className="flex flex-col items-center text-center py-6">
-                  <div className="text-5xl mb-4">✍️</div>
+                  <div className="text-5xl mb-4"><EmojiIcon e="✍" /></div>
                   <h2 className="text-base font-semibold text-catalan-text mb-2">Step 1 — Select a Program</h2>
                   <p className="text-sm text-catalan-textMuted mb-5 max-w-sm">Choose the program you want to generate a report for. The Writer will use your saved Analyzer tables as data.</p>
                   <div className="w-full max-w-xs">
@@ -526,13 +527,13 @@ export default function FgWriter() {
                           <button onClick={() => setSelectedTabIds(new Set())} className={btnSe}>None</button>
                         </>
                       )}
-                      <button onClick={reload} className={btnSe}>↻ Refresh</button>
+                      <button onClick={reload} className={btnSe}><EmojiIcon e="↻" /> Refresh</button>
                     </div>
                   </div>
                   {tabulations.length === 0 ? (
                     <p className="text-sm text-catalan-textMuted">
                       No saved tabulations found for this program.
-                      Go to <strong>FG Analyzer</strong> → Tabulator tab to build tables first — the Writer will automatically use them.
+                      Go to <strong>FG Analyzer</strong> <EmojiIcon e="→" /> Tabulator tab to build tables first — the Writer will automatically use them.
                     </p>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

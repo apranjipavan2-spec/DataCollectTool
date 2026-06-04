@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import api from '@/lib/api'
+import EmojiIcon from '@/components/EmojiIcon'
 
 export interface RosterEntry {
   id: string
@@ -159,7 +160,7 @@ export default function BeneficiaryListScreen({ formTitle, formId, onSelect, onB
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-2">
         {hasLocationData && !selectedDistrict && (
           <div className="text-center py-16 text-catalan-textMuted text-sm">
-            📍 Select your area first
+            <EmojiIcon e="📍" /> Select your area first
           </div>
         )}
 
@@ -190,7 +191,7 @@ export default function BeneficiaryListScreen({ formTitle, formId, onSelect, onB
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0 mt-0.5">
                 {entry.collected ? (
-                  <span className="text-catalan-success text-lg">✅</span>
+                  <span className="text-catalan-success text-lg"><EmojiIcon e="✅" /></span>
                 ) : (
                   <span className="text-catalan-textMuted text-lg">⏳</span>
                 )}
@@ -204,7 +205,7 @@ export default function BeneficiaryListScreen({ formTitle, formId, onSelect, onB
                   <div className="text-xs text-catalan-textMuted mt-0.5 truncate">{entry.address}</div>
                 )}
                 {entry.scheduled_date && (
-                  <div className="text-xs text-catalan-textMuted mt-0.5">📅 {entry.scheduled_date}</div>
+                  <div className="text-xs text-catalan-textMuted mt-0.5"><EmojiIcon e="📅" /> {entry.scheduled_date}</div>
                 )}
               </div>
               <div className="flex-shrink-0">

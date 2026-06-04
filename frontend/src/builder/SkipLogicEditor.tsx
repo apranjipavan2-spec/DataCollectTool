@@ -2,6 +2,7 @@ import { useState } from 'react'
 import api from '@/lib/api'
 import type { FormField, FormSection, SkipLogic, SkipCondition, ConditionGroup } from '@/types/form'
 import { isConditionGroup } from '@/types/form'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface AiSuggestion {
   logic: 'AND' | 'OR'; action: 'show' | 'skip'
@@ -313,7 +314,7 @@ export default function SkipLogicEditor({ field, sections, onChange, prevFieldsO
             onClick={() => setShowAi(v => !v)}
             className="text-xs px-3 py-1.5 rounded-lg border border-dashed border-catalan-primary/40 text-catalan-primary/70 hover:border-catalan-primary hover:text-catalan-primary transition-colors"
           >
-            🤖 AI Suggest
+            <EmojiIcon e="🤖" /> AI Suggest
           </button>
         </div>
         {showAi && (
@@ -382,7 +383,7 @@ export default function SkipLogicEditor({ field, sections, onChange, prevFieldsO
           className="text-xs px-2.5 py-1 rounded border border-dashed border-catalan-primary/40 text-catalan-primary/70 hover:border-catalan-primary hover:text-catalan-primary transition-colors"
           onClick={() => setShowAi(v => !v)}
         >
-          🤖 AI
+          <EmojiIcon e="🤖" /> AI
         </button>
         <button
           className="text-xs px-3 py-1 rounded-lg bg-catalan-error/10 border border-catalan-error/30 text-catalan-error hover:bg-catalan-error/20 font-medium transition-colors ml-auto flex items-center gap-1"

@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface PlanFeatures {
   ai_cleaning: boolean; ai_writer: boolean; ai_smart_builder: boolean
@@ -158,7 +159,7 @@ export default function SubscriptionPage() {
 
           {/* Online payment coming soon banner */}
           <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs">
-            <span className="text-amber-600 font-semibold">🚀 Online payment coming soon</span>
+            <span className="text-amber-600 font-semibold"><EmojiIcon e="🚀" /> Online payment coming soon</span>
             <span className="text-catalan-textMuted">For now, contact us to subscribe — we'll send you an invoice and activate your plan within 2–4 hours.</span>
             <div className="flex gap-3 ml-auto flex-wrap">
               <a href="https://wa.me/918088709011?text=Hi%2C%20I%27d%20like%20to%20subscribe%20to%20FieldGovern" target="_blank" rel="noopener noreferrer"
@@ -245,15 +246,15 @@ export default function SubscriptionPage() {
 
                   <div className="space-y-1.5 text-xs">
                     <div className="flex items-center gap-2 text-catalan-text">
-                      <span className="text-catalan-primary">📊</span>
+                      <span className="text-catalan-primary"><EmojiIcon e="📊" /></span>
                       <span><b>{plan.submissions_limit?.toLocaleString() ?? 'Unlimited'}</b> submissions/mo</span>
                     </div>
                     <div className="flex items-center gap-2 text-catalan-text">
-                      <span className="text-catalan-primary">💾</span>
+                      <span className="text-catalan-primary"><EmojiIcon e="💾" /></span>
                       <span><b>{plan.storage_limit_mb ? `${plan.storage_limit_mb} MB` : 'Unlimited'}</b> storage</span>
                     </div>
                     <div className="flex items-center gap-2 text-catalan-text">
-                      <span className="text-catalan-primary">🎤</span>
+                      <span className="text-catalan-primary"><EmojiIcon e="🎤" /></span>
                       <span><b>{plan.asr_minutes_limit ?? 'Unlimited'} min</b> auto-transcription/mo</span>
                     </div>
                     <div className="border-t border-catalan-border/50 pt-2 mt-2 space-y-1">

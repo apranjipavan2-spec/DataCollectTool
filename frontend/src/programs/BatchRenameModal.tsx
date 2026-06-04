@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import api from '../lib/api'
 import { useToast } from '../lib/ToastContext'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface ColHeader { id: string; label: string; type: string; options: any[] }
 export interface SavedTabulation {
@@ -146,7 +147,7 @@ export function BatchRenameModal({ saved, programId, programName, cols, onClose,
       <div className="bg-white dark:bg-catalan-darkBg rounded-lg shadow-2xl max-w-2xl w-full max-h-96 flex flex-col border border-catalan-border">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-catalan-border">
-          <h2 className="text-lg font-semibold">✨ Batch AI Rename</h2>
+          <h2 className="text-lg font-semibold"><EmojiIcon e="✨" /> Batch AI Rename</h2>
           <button onClick={onClose} className="text-catalan-textMuted hover:text-catalan-text">✕</button>
         </div>
 
@@ -182,7 +183,7 @@ export function BatchRenameModal({ saved, programId, programName, cols, onClose,
                 {rs.status === 'done' && <span className="text-catalan-success">✓</span>}
                 {rs.status === 'running' && <span className="text-catalan-primary animate-spin">⟳</span>}
                 {rs.status === 'pending' && <span className="text-catalan-textMuted">○</span>}
-                {rs.status === 'error' && <span className="text-catalan-error">⚠</span>}
+                {rs.status === 'error' && <span className="text-catalan-error"><EmojiIcon e="⚠" /></span>}
                 {rs.status === 'skipped' && <span className="text-catalan-textMuted">–</span>}
                 <span className="flex-1 truncate">{rs.title}</span>
                 <span className="text-catalan-textMuted">{rs.status}</span>

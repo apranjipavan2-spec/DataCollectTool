@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import api, { getStoredUser } from '@/lib/api'
 import Sidebar from '@/components/Sidebar'
-import EmojiIcon from '@/components/EmojiIcon'
 import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import { getLastProgram, setLastProgram } from '@/lib/fgStorage'
+import EmojiIcon from '@/components/EmojiIcon'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -239,7 +239,7 @@ export default function FgCleaner() {
                 {/* Pagination */}
                 {totalPages > 1 && (
                   <div className="flex items-center justify-center gap-3">
-                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1 || loading} className={btnSe}>← Prev</button>
+                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1 || loading} className={btnSe}><EmojiIcon e="←" /> Prev</button>
                     <span className="text-sm text-catalan-textMuted">Page {page} of {totalPages}</span>
                     <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || loading} className={btnSe}>Next →</button>
                   </div>

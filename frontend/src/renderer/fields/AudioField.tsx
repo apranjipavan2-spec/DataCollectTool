@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react'
 import type { FormField } from '@/types/form'
 import { labelCls, hintCls, captureButtonCls, recordingButtonCls, fieldErrorCls, fieldHintCls, requiredCls } from './styles'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface Props { field: FormField; value: string | null; onChange: (v: string) => void }
 
@@ -79,7 +80,7 @@ export default function AudioField({ field, value, onChange }: Props) {
         </button>
       ) : (
         <button onClick={startRecording} className={captureButtonCls}>
-          <span className="text-3xl">🎙️</span>
+          <span className="text-3xl"><EmojiIcon e="🎙" /></span>
           <span>{value ? 'Re-record Audio' : 'Record Audio'}</span>
         </button>
       )}

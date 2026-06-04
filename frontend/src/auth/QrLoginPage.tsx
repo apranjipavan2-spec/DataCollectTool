@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '@/lib/api'
+import EmojiIcon from '@/components/EmojiIcon'
 
 const ACCESS_TOKEN_KEY = 'fieldgovern_access_token'
 const REFRESH_TOKEN_KEY = 'fieldgovern_refresh_token'
@@ -36,14 +37,14 @@ export default function QrLoginPage() {
         <img src="/logo-wide.png" alt="FieldGovern" className="h-8 w-auto object-contain mx-auto mb-6" />
         {error ? (
           <>
-            <div className="text-4xl mb-3">⚠️</div>
+            <div className="text-4xl mb-3"><EmojiIcon e="⚠" /></div>
             <h2 className="text-lg font-semibold text-catalan-text mb-2">Login Failed</h2>
             <p className="text-sm text-catalan-textMuted mb-4">{error}</p>
             <button
               onClick={() => window.location.href = '/login'}
               className="text-sm text-catalan-primary hover:underline font-medium"
             >
-              ← Back to Login
+              <EmojiIcon e="←" /> Back to Login
             </button>
           </>
         ) : (

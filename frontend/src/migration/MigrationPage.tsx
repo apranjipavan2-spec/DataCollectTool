@@ -8,6 +8,7 @@ import { getNavItems } from '@/lib/navigation'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import FormPreview from './FormPreview'
+import EmojiIcon from '@/components/EmojiIcon'
 
 // ── types ─────────────────────────────────────────────────────────────────────
 
@@ -188,14 +189,14 @@ function XLSFormTab() {
 
       <label className="block border-2 border-dashed border-catalan-border rounded-xl p-10 text-center cursor-pointer hover:border-catalan-primary transition-colors group">
         <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile} />
-        <div className="text-4xl mb-3">📄</div>
+        <div className="text-4xl mb-3"><EmojiIcon e="📄" /></div>
         <p className="font-semibold text-catalan-text group-hover:text-catalan-primary">Click to select XLSForm file</p>
         <p className="text-sm text-catalan-textMuted mt-1">.xlsx or .xls · max 20 MB</p>
       </label>
 
       {loading && <p className="text-center text-catalan-textMuted text-sm animate-pulse">Parsing XLSForm…</p>}
-      {error && <p className="text-red-500 text-sm bg-red-50 border border-red-200 rounded-lg p-3">❌ {error}</p>}
-      {success && <p className="text-green-700 text-sm bg-green-50 border border-green-200 rounded-lg p-3">✅ {success}</p>}
+      {error && <p className="text-red-500 text-sm bg-red-50 border border-red-200 rounded-lg p-3"><EmojiIcon e="❌" /> {error}</p>}
+      {success && <p className="text-green-700 text-sm bg-green-50 border border-green-200 rounded-lg p-3"><EmojiIcon e="✅" /> {success}</p>}
 
       <div className="bg-catalan-bg rounded-xl p-4 text-sm text-catalan-textMuted space-y-1">
         <p className="font-semibold text-catalan-text">Supported field types</p>
@@ -403,7 +404,7 @@ function PlatformTab({
         {connecting ? 'Connecting…' : `Connect to ${platformName}`}
       </button>
 
-      {error && <p className="text-red-500 text-sm bg-red-50 border border-red-200 rounded-lg p-3">❌ {error}</p>}
+      {error && <p className="text-red-500 text-sm bg-red-50 border border-red-200 rounded-lg p-3"><EmojiIcon e="❌" /> {error}</p>}
 
       {forms.length > 0 && (
         <div className="space-y-4">
@@ -431,7 +432,7 @@ function PlatformTab({
                   <div className="flex items-center gap-2">
                     {result && (
                       <span className="text-xs text-green-600 font-medium">
-                        ✅ {result.submissions_imported > 0 ? `+${result.submissions_imported} subs` : 'imported'}
+                        <EmojiIcon e="✅" /> {result.submissions_imported > 0 ? `+${result.submissions_imported} subs` : 'imported'}
                       </span>
                     )}
                     <button

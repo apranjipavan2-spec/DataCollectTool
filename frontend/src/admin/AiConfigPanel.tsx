@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api, { getStoredUser } from '@/lib/api'
+import EmojiIcon from '@/components/EmojiIcon'
 
 const PROVIDERS = [
   { id: 'openai',    label: 'OpenAI',    icon: '🟢', placeholder: 'sk-…',     defaultModel: 'gpt-4o',               models: ['gpt-4o','gpt-4o-mini','gpt-4-turbo','gpt-3.5-turbo'] },
@@ -102,7 +103,7 @@ function AiUsagePanel() {
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm font-semibold text-catalan-text">📊 AI Usage</div>
+          <div className="text-sm font-semibold text-catalan-text"><EmojiIcon e="📊" /> AI Usage</div>
           <div className="text-xs text-catalan-textMuted">
             {data?.scope === 'global' ? 'All tenants' : 'Your organisation'} · last {days} days
           </div>
@@ -260,7 +261,7 @@ function MasterAiConfig({ initial, onUpdated }: { initial: ConfigData | null; on
   return (
     <div className="max-w-2xl space-y-6">
       <div className="p-4 rounded-xl bg-catalan-primary/5 border border-catalan-primary/20">
-        <div className="text-sm font-semibold text-catalan-text mb-1">🌐 Global AI Keys</div>
+        <div className="text-sm font-semibold text-catalan-text mb-1"><EmojiIcon e="🌐" /> Global AI Keys</div>
         <div className="text-xs text-catalan-textMuted">
           Configure one or more AI providers. Select the <strong>active provider</strong> that will be used for all AI features.
           Keys are stored encrypted and never exposed to org admins.

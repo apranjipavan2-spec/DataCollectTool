@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import axios from 'axios'
 import FormRenderer, { type SubmissionDraft } from '@/renderer/FormRenderer'
 import type { FormSchema } from '@/types/form'
+import EmojiIcon from '@/components/EmojiIcon'
 
 export default function PublicSurveyPage() {
   const { token } = useParams<{ token: string }>()
@@ -53,7 +54,7 @@ export default function PublicSurveyPage() {
     return (
       <div className="min-h-screen bg-catalan-bg flex items-center justify-center p-6">
         <div className="max-w-md w-full text-center">
-          <div className="text-4xl mb-4">🔒</div>
+          <div className="text-4xl mb-4"><EmojiIcon e="🔒" /></div>
           <h1 className="text-lg font-semibold text-catalan-text mb-2">Survey Unavailable</h1>
           <p className="text-sm text-catalan-textMuted">{error}</p>
         </div>
@@ -65,7 +66,7 @@ export default function PublicSurveyPage() {
     return (
       <div className="min-h-screen bg-catalan-bg flex items-center justify-center p-6">
         <div className="max-w-md w-full text-center bg-catalan-surface border border-catalan-border rounded-2xl p-8">
-          <div className="text-5xl mb-4">✅</div>
+          <div className="text-5xl mb-4"><EmojiIcon e="✅" /></div>
           <h1 className="text-xl font-bold text-catalan-text mb-2">Thank you!</h1>
           <p className="text-sm text-catalan-textMuted">Your response has been recorded successfully.</p>
         </div>

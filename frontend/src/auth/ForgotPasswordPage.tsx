@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import api from '@/lib/api'
 import { useNavigate } from 'react-router-dom'
+import EmojiIcon from '@/components/EmojiIcon'
 
 const FG_WHATSAPP = '918088709011'
 
@@ -85,20 +86,20 @@ export default function ForgotPasswordPage() {
                 onClick={() => setRole('enumerator')}
                 className="w-full text-left p-4 rounded-xl border-2 border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 transition-all group"
               >
-                <div className="font-semibold text-slate-800 group-hover:text-blue-700">📱 Field Enumerator / Supervisor</div>
+                <div className="font-semibold text-slate-800 group-hover:text-blue-700"><EmojiIcon e="📱" /> Field Enumerator / Supervisor</div>
                 <div className="text-xs text-slate-500 mt-0.5">I collect data in the field</div>
               </button>
               <button
                 onClick={() => setRole('admin')}
                 className="w-full text-left p-4 rounded-xl border-2 border-slate-200 hover:border-purple-400 hover:bg-purple-50/50 transition-all group"
               >
-                <div className="font-semibold text-slate-800 group-hover:text-purple-700">🏢 Organization Admin</div>
+                <div className="font-semibold text-slate-800 group-hover:text-purple-700"><EmojiIcon e="🏢" /> Organization Admin</div>
                 <div className="text-xs text-slate-500 mt-0.5">I manage the organization account</div>
               </button>
             </div>
             <div className="mt-6 text-center">
               <button onClick={() => navigate('/login')} className="text-sm text-slate-400 hover:text-blue-600 transition-colors">
-                ← Back to Sign In
+                <EmojiIcon e="←" /> Back to Sign In
               </button>
             </div>
           </div>
@@ -107,7 +108,7 @@ export default function ForgotPasswordPage() {
         {/* Enumerator — find admin + WhatsApp */}
         {role === 'enumerator' && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-            <div className="text-3xl mb-4 text-center">📱</div>
+            <div className="text-3xl mb-4 text-center"><EmojiIcon e="📱" /></div>
             <h2 className="text-xl font-bold text-slate-900 mb-1 text-center">Contact Your Admin</h2>
             <p className="text-slate-400 text-sm text-center mb-6">
               Enter your phone number — we'll find your admin and open WhatsApp with a pre-filled message.
@@ -131,7 +132,7 @@ export default function ForgotPasswordPage() {
                       enumPhoneErr ? 'border-red-400 focus:border-red-400 focus:ring-2 focus:ring-red-100'
                                    : 'border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'}`}
                   />
-                  {enumPhoneErr && <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1"><span>⚠</span>{enumPhoneErr}</p>}
+                  {enumPhoneErr && <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1"><span><EmojiIcon e="⚠" /></span>{enumPhoneErr}</p>}
                 </div>
                 <button
                   onClick={handleEnumLookup}
@@ -168,7 +169,7 @@ export default function ForgotPasswordPage() {
                     className="w-full py-2.5 rounded-xl font-semibold text-sm text-white transition-all shadow-sm mb-3"
                     style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}
                   >
-                    📷 Login via QR Code
+                    <EmojiIcon e="📷" /> Login via QR Code
                   </button>
                 )}
                 <button
@@ -194,7 +195,7 @@ export default function ForgotPasswordPage() {
             )}
 
             <button onClick={() => setRole(null)} className="w-full py-3 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">
-              ← Back
+              <EmojiIcon e="←" /> Back
             </button>
           </div>
         )}
@@ -202,7 +203,7 @@ export default function ForgotPasswordPage() {
         {/* Admin — WhatsApp contact (password reset + subscription) */}
         {role === 'admin' && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-            <div className="text-3xl mb-4 text-center">🏢</div>
+            <div className="text-3xl mb-4 text-center"><EmojiIcon e="🏢" /></div>
             <h2 className="text-xl font-bold text-slate-900 mb-1 text-center">Contact FieldGovern</h2>
             <p className="text-slate-400 text-sm text-center mb-6">
               For password resets or subscription enquiries, message us on WhatsApp — we respond within a few hours.
@@ -254,7 +255,7 @@ export default function ForgotPasswordPage() {
             </div>
 
             <button onClick={() => setRole(null)} className="w-full py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">
-              ← Back
+              <EmojiIcon e="←" /> Back
             </button>
           </div>
         )}

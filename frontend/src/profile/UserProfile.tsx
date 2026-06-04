@@ -7,6 +7,7 @@ import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { Card, Button, Alert } from '@/components/ui'
 import NotificationSettings from '@/components/NotificationSettings'
+import EmojiIcon from '@/components/EmojiIcon'
 
 const ROLE_LABELS: Record<string, string> = {
   master_admin: 'Master Admin',
@@ -192,7 +193,7 @@ export default function UserProfile() {
                   ))}
                 </div>
                 <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
-                  ✎ Edit Profile
+                  <EmojiIcon e="✎" /> Edit Profile
                 </Button>
               </div>
             )}

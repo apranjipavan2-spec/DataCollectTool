@@ -11,6 +11,7 @@ import { Button } from '@/components/ui'
 import Sidebar from '@/components/Sidebar'
 import { getNavItems } from '@/lib/navigation'
 import BeneficiaryListScreen, { type RosterEntry } from './BeneficiaryListScreen'
+import EmojiIcon from '@/components/EmojiIcon'
 
 function _haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000
@@ -789,14 +790,14 @@ export default function FieldApp() {
           <div className="text-center py-12 text-catalan-textMuted text-sm">Loading…</div>
         ) : backchecks.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-5xl mb-4">✅</div>
+            <div className="text-5xl mb-4"><EmojiIcon e="✅" /></div>
             <p className="text-catalan-textMuted font-semibold">No back-checks pending</p>
             <p className="text-catalan-textMuted text-sm mt-1">Your supervisor will assign back-checks here when needed.</p>
           </div>
         ) : (
           <div className="space-y-3">
             <div className="text-xs text-catalan-textMuted bg-catalan-warning/10 border border-catalan-warning/30 rounded-lg px-3 py-2">
-              ⚠️ Your supervisor flagged {backchecks.length} submission{backchecks.length !== 1 ? 's' : ''} for verification. Open each one, fill the back-check form, and submit.
+              <EmojiIcon e="⚠" /> Your supervisor flagged {backchecks.length} submission{backchecks.length !== 1 ? 's' : ''} for verification. Open each one, fill the back-check form, and submit.
             </div>
             {backchecks.map(task => {
               const keyFields = task.data_json
@@ -825,7 +826,7 @@ export default function FieldApp() {
                     </div>
                   )}
                   <div className="text-xs text-catalan-primary font-medium">
-                    📋 Back-check form: {task.backcheck_form_title}
+                    <EmojiIcon e="📋" /> Back-check form: {task.backcheck_form_title}
                   </div>
                   <button
                     onClick={() => openBackcheckForm(task)}
@@ -861,7 +862,7 @@ export default function FieldApp() {
           <div className="text-center py-12 text-catalan-textMuted text-sm">Loading…</div>
         ) : myHistory.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-5xl mb-4">📭</div>
+            <div className="text-5xl mb-4"><EmojiIcon e="📭" /></div>
             <p className="text-catalan-textMuted">No submissions yet.</p>
           </div>
         ) : (
@@ -895,7 +896,7 @@ export default function FieldApp() {
                   onClick={() => openEdit(s)}
                   className="w-full text-xs px-3 py-2 rounded-lg border border-catalan-primary/40 text-catalan-primary hover:bg-catalan-primary/10 transition-colors font-medium"
                 >
-                  ✏ Edit
+                  <EmojiIcon e="✏" /> Edit
                 </button>
               </div>
             )})}
@@ -913,7 +914,7 @@ export default function FieldApp() {
           <div className="text-center py-12 text-catalan-textMuted text-sm">Loading drafts…</div>
         ) : drafts.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-5xl mb-4">📝</div>
+            <div className="text-5xl mb-4"><EmojiIcon e="📝" /></div>
             <p className="text-catalan-textMuted">No saved drafts.</p>
             <p className="text-catalan-textMuted text-sm mt-1">Start filling a form and save it as a draft to continue later.</p>
           </div>
@@ -955,7 +956,7 @@ export default function FieldApp() {
       <WithSidebar>
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="text-center max-w-sm w-full">
-            <div className="text-6xl mb-6">✅</div>
+            <div className="text-6xl mb-6"><EmojiIcon e="✅" /></div>
             <h2 className="text-2xl font-bold text-catalan-success mb-2">Saved!</h2>
             <p className="text-sm text-catalan-textMuted mb-3">Your response has been recorded.</p>
             <div className="inline-flex items-center gap-2 text-xs text-catalan-info bg-catalan-info/10 border border-catalan-info/20 rounded-full px-3 py-1.5 mb-8">
@@ -1016,7 +1017,7 @@ export default function FieldApp() {
       <div className="flex flex-col h-[100dvh]">
         {assignedArm && (
           <div className="bg-catalan-primary text-catalan-bg px-4 py-2 text-xs font-medium shrink-0 z-50 flex items-center gap-2">
-            <span>📊 Arm: {assignedArm}</span>
+            <span><EmojiIcon e="📊" /> Arm: {assignedArm}</span>
           </div>
         )}
         {/* GPS accuracy indicator */}
@@ -1033,17 +1034,17 @@ export default function FieldApp() {
         </div>
         {geofenceWarning && (
           <div className="bg-catalan-warning/20 border-b border-catalan-warning/40 text-catalan-warning px-4 py-2 text-xs shrink-0 z-50 flex items-center gap-2">
-            <span>⚠️ You are outside the designated survey area. Submissions will be flagged.</span>
+            <span><EmojiIcon e="⚠" /> You are outside the designated survey area. Submissions will be flagged.</span>
           </div>
         )}
         {programContext && (
           <div className="bg-blue-700 text-white px-4 py-2 text-xs flex items-center gap-3 flex-wrap shrink-0 z-50">
             <span className="font-medium truncate">
-              🗂️ {programContext.scheme_name ? `${programContext.scheme_name} › ` : ''}{programContext.program_name}
+              <EmojiIcon e="🗂" /> {programContext.scheme_name ? `${programContext.scheme_name} › ` : ''}{programContext.program_name}
               {programContext.participant_type_name ? ` · 👤 ${programContext.participant_type_name}` : ''}
             </span>
             {programContext.location_id ? (
-              <span className="text-blue-200 truncate">📍 {[programContext.location_district, programContext.location_block, programContext.location_village].filter(Boolean).join(' › ')}</span>
+              <span className="text-blue-200 truncate"><EmojiIcon e="📍" /> {[programContext.location_district, programContext.location_block, programContext.location_village].filter(Boolean).join(' › ')}</span>
             ) : (
               <select className="ml-auto text-blue-900 bg-white text-xs rounded px-2 py-0.5 border-0"
                 value={selectedLocationId}
@@ -1058,7 +1059,7 @@ export default function FieldApp() {
                     localStorage.setItem(`fieldgovern_prog_ctx_${activeForm.meta.id}`, JSON.stringify({ ...ctx, location_id: lid }))
                   } catch { }
                 }}>
-                <option value="">📍 Pick collection location…</option>
+                <option value=""><EmojiIcon e="📍" /> Pick collection location…</option>
                 {locations.map((l) => <option key={l.id} value={l.id}>{[l.district, l.block, l.village].filter(Boolean).join(' › ')}</option>)}
               </select>
             )}
@@ -1106,7 +1107,7 @@ export default function FieldApp() {
               </div>
               {isOffline && (
                 <span className="text-xs text-catalan-warning bg-catalan-warning/10 px-2 py-1 rounded-full font-medium hidden sm:inline">
-                  📡 Offline
+                  <EmojiIcon e="📡" /> Offline
                 </span>
               )}
             </div>
@@ -1114,7 +1115,7 @@ export default function FieldApp() {
             <div className="flex items-center gap-2">
               {isOffline && (
                 <span className="text-xs text-catalan-warning bg-catalan-warning/10 px-2 py-1 rounded-full font-medium sm:hidden">
-                  📡
+                  <EmojiIcon e="📡" />
                 </span>
               )}
               {/* Back-checks — always visible; badge shows count */}
@@ -1127,7 +1128,7 @@ export default function FieldApp() {
                 }`}
                 title="Back-check queue"
               >
-                <span>🔁</span>
+                <span><EmojiIcon e="🔁" /></span>
                 <span className="hidden sm:inline">Back-checks</span>
                 {backchecks.length > 0 && (
                   <span className="bg-catalan-warning text-white text-[10px] font-bold rounded-full px-1.5 leading-4">{backchecks.length}</span>
@@ -1138,7 +1139,7 @@ export default function FieldApp() {
                 className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-catalan-hover border border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50 transition-all"
                 title="My submissions"
               >
-                <span>📋</span>
+                <span><EmojiIcon e="📋" /></span>
                 <span className="hidden sm:inline">History</span>
               </button>
               <button
@@ -1146,7 +1147,7 @@ export default function FieldApp() {
                 className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-catalan-hover border border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50 transition-all"
                 title="Saved drafts"
               >
-                <span>📝</span>
+                <span><EmojiIcon e="📝" /></span>
                 <span className="hidden sm:inline">Drafts</span>
                 {drafts.length > 0 && (
                   <span className="bg-catalan-primary text-catalan-bg text-[10px] font-bold rounded-full px-1.5 leading-4">{drafts.length}</span>
@@ -1172,7 +1173,7 @@ export default function FieldApp() {
                   onClick={syncToServer}
                   className="text-catalan-warning bg-catalan-warning/10 px-3 py-1 rounded-full border border-catalan-warning/30 hover:bg-catalan-warning/20 transition-colors text-xs font-medium"
                 >
-                  ↑ Sync {outboxCount > 0 ? `${outboxCount}` : ''}{mediaQueueCount > 0 ? ` · ${mediaQueueCount} 📷` : ''}
+                  <EmojiIcon e="↑" /> Sync {outboxCount > 0 ? `${outboxCount}` : ''}{mediaQueueCount > 0 ? ` · ${mediaQueueCount} 📷` : ''}
                 </button>
               )}
               {failedMediaCount > 0 && (
@@ -1194,7 +1195,7 @@ export default function FieldApp() {
       {lowStorage && (
         <div className="bg-catalan-warning/10 border-b border-catalan-warning/30 text-catalan-warning text-xs px-4 py-2.5 flex items-center gap-2">
           <div className="w-full w-full flex items-center gap-2">
-            <span>⚠️</span>
+            <span><EmojiIcon e="⚠" /></span>
             <span><strong>Low storage.</strong> Sync now and free space on your device.</span>
           </div>
         </div>
@@ -1221,7 +1222,7 @@ export default function FieldApp() {
                         <div key={s.id} className="bg-catalan-surface border border-catalan-border rounded-xl p-4">
                           {pc && (
                             <div className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 rounded-lg px-2 py-1 mb-2 flex-wrap">
-                              <span>🗂️ {pc.scheme_name ? `${pc.scheme_name} › ` : ''}{pc.program_name}</span>
+                              <span><EmojiIcon e="🗂" /> {pc.scheme_name ? `${pc.scheme_name} › ` : ''}{pc.program_name}</span>
                               {pc.participant_type_name && <span>· 👤 {pc.participant_type_name}</span>}
                               {lc && <span>· 📍 {[lc.district, lc.block, lc.village].filter(Boolean).join(' › ')}</span>}
                             </div>
@@ -1270,7 +1271,7 @@ export default function FieldApp() {
 
               {!loading && forms.length === 0 && (
                 <div className="text-center py-16 bg-catalan-surface border border-catalan-border rounded-xl">
-                  <div className="text-5xl mb-4">📋</div>
+                  <div className="text-5xl mb-4"><EmojiIcon e="📋" /></div>
                   <p className="text-catalan-textMuted font-medium">No forms assigned yet</p>
                   <p className="text-catalan-textMuted text-sm mt-1">Your supervisor will assign forms to you.</p>
                 </div>
@@ -1325,13 +1326,13 @@ export default function FieldApp() {
                     onClick={() => { loadHistory(); setScreen('history') }}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-catalan-hover hover:bg-catalan-primary/10 hover:text-catalan-primary text-catalan-text text-sm transition-colors text-left"
                   >
-                    <span>📋</span> My Submissions
+                    <span><EmojiIcon e="📋" /></span> My Submissions
                   </button>
                   <button
                     onClick={() => { loadDrafts(); setScreen('drafts') }}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-catalan-hover hover:bg-catalan-primary/10 hover:text-catalan-primary text-catalan-text text-sm transition-colors text-left"
                   >
-                    <span>📝</span> Saved Drafts
+                    <span><EmojiIcon e="📝" /></span> Saved Drafts
                     {drafts.length > 0 && <span className="ml-auto bg-catalan-primary text-catalan-bg text-xs font-bold rounded-full px-2 py-0.5">{drafts.length}</span>}
                   </button>
                   <button
@@ -1342,7 +1343,7 @@ export default function FieldApp() {
                         : 'bg-catalan-hover hover:bg-catalan-primary/10 hover:text-catalan-primary text-catalan-text'
                     }`}
                   >
-                    <span>🔁</span> Back-checks
+                    <span><EmojiIcon e="🔁" /></span> Back-checks
                     {backchecks.length > 0
                       ? <span className="ml-auto bg-catalan-warning text-white text-xs font-bold rounded-full px-2 py-0.5">{backchecks.length}</span>
                       : <span className="ml-auto text-xs text-catalan-textMuted">0</span>
@@ -1353,7 +1354,7 @@ export default function FieldApp() {
                     disabled={cachingTiles}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-catalan-hover hover:bg-catalan-primary/10 hover:text-catalan-primary text-catalan-textMuted text-sm transition-colors text-left disabled:opacity-50"
                   >
-                    <span>🗺</span>
+                    <span><EmojiIcon e="🗺" /></span>
                     {cachingTiles ? 'Caching map…' : 'Cache map offline'}
                   </button>
                 </div>

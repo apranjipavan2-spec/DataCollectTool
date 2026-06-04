@@ -120,7 +120,7 @@ export default function Navbar() {
               </div>
               <div style={menuDivider} />
               <button onClick={logout} style={menuItem}>
-                <span>↪</span> Sign out
+                <span><EmojiIcon e="↪" /></span> Sign out
               </button>
             </div>
           </>

@@ -7,6 +7,7 @@ import { Card } from '@/components/ui'
 import ApiKeyManager from './ApiKeyManager'
 import IntegrationsPanel from './IntegrationsPanel'
 import AiConfigPanel from './AiConfigPanel'
+import EmojiIcon from '@/components/EmojiIcon'
 
 export default function OrgAdminPanel() {
   const [activeTab, setActiveTab] = useState('users')
@@ -111,7 +112,7 @@ function MigrationTab() {
           Migrate your forms and historical data from KoboToolbox, SurveyCTO, ODK Central, or any standard XLSForm file.
         </p>
         <a href="/migration" className="inline-block px-5 py-2.5 bg-catalan-primary text-catalan-bg rounded-lg font-semibold hover:opacity-90 transition-opacity">
-          🔄 Open Migration Wizard →
+          <EmojiIcon e="🔄" /> Open Migration Wizard →
         </a>
       </div>
     </Card>
@@ -128,10 +129,10 @@ function FormsTab() {
         </p>
         <div className="flex flex-wrap gap-3">
           <a href="/builder" className="inline-flex items-center gap-2 px-5 py-3 bg-catalan-primary text-catalan-bg rounded-xl font-semibold text-sm hover:bg-catalan-primaryDark transition-colors shadow-sm">
-            📋 Open Form Builder →
+            <EmojiIcon e="📋" /> Open Form Builder →
           </a>
           <a href="/builder" className="inline-flex items-center gap-2 px-5 py-3 border border-catalan-border text-catalan-text rounded-xl font-medium text-sm hover:bg-catalan-hover transition-colors">
-            ➕ Create New Form
+            <EmojiIcon e="➕" /> Create New Form
           </a>
         </div>
         <div className="mt-6 p-4 bg-catalan-bg border border-catalan-border rounded-xl text-sm text-catalan-textMuted">
@@ -261,7 +262,7 @@ function SecurityTab() {
           </div>
           {twoFaError && (
             <p className="text-xs text-catalan-error mt-2 flex items-center gap-1">
-              <span>⚠</span>{twoFaError}
+              <span><EmojiIcon e="⚠" /></span>{twoFaError}
               {twoFaError.includes('plan') && (
                 <a href="/subscription" className="underline ml-1 font-semibold">Upgrade →</a>
               )}
@@ -295,7 +296,7 @@ function SecurityTab() {
                 className="w-full bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary transition-colors"
                 placeholder="Re-enter new password" />
             </div>
-            {pwError && <p className="text-xs text-catalan-error flex items-center gap-1"><span>⚠</span>{pwError}</p>}
+            {pwError && <p className="text-xs text-catalan-error flex items-center gap-1"><span><EmojiIcon e="⚠" /></span>{pwError}</p>}
             <button
               onClick={handlePasswordChange}
               disabled={pwSaving || !currentPw || !newPw || !confirmPw}

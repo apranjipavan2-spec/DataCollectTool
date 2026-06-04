@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '@/lib/api'
 import { getStoredUser } from '@/lib/api'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface PlanFeatures {
   ai_cleaning: boolean; ai_writer: boolean; ai_smart_builder: boolean
@@ -270,16 +271,16 @@ export default function PricingPage() {
                   {/* Limits */}
                   <div className="space-y-2.5 text-sm border-t border-slate-100 pt-5 mb-5">
                     <div className="flex items-center gap-2.5 text-slate-700">
-                      <span className="text-base">📊</span>
+                      <span className="text-base"><EmojiIcon e="📊" /></span>
                       <span><b>{plan.submissions_limit?.toLocaleString() ?? 'Unlimited'}</b> submissions / month</span>
                     </div>
                     <div className="flex items-center gap-2.5 text-slate-700">
-                      <span className="text-base">💾</span>
+                      <span className="text-base"><EmojiIcon e="💾" /></span>
                       <span><b>{plan.storage_limit_mb ? `${plan.storage_limit_mb} MB` : 'Unlimited'}</b> storage</span>
                     </div>
                     {plan.asr_minutes_limit ? (
                       <div className="flex items-center gap-2.5 text-slate-700">
-                        <span className="text-base">🎤</span>
+                        <span className="text-base"><EmojiIcon e="🎤" /></span>
                         <span><b>{plan.asr_minutes_limit} min</b> voice transcription / month</span>
                       </div>
                     ) : null}
@@ -303,7 +304,7 @@ export default function PricingPage() {
 
             {/* Enterprise card */}
             <div className="flex flex-col rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-7 justify-center items-center text-center gap-4">
-              <div className="text-4xl">🏗️</div>
+              <div className="text-4xl"><EmojiIcon e="🏗" /></div>
               <div>
                 <h3 className="text-lg font-bold text-slate-900 mb-1">Enterprise</h3>
                 <p className="text-sm text-slate-500">Custom limits · Dedicated infra · White-label · SSO · On-premise available</p>

@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useHelp } from './HelpContext'
 import { getSectionsForRole, type HelpTopic, type HelpSection } from './helpContent'
 import { getStoredUser } from '@/lib/api'
+import EmojiIcon from '@/components/EmojiIcon'
 
 function TopicCard({ topic, isActive, onClick, onHighlight }: {
   topic: HelpTopic
@@ -66,7 +67,7 @@ function TopicCard({ topic, isActive, onClick, onHighlight }: {
               "
               type="button"
             >
-              <span>🎯</span> Highlight in app
+              <span><EmojiIcon e="🎯" /></span> Highlight in app
             </button>
           )}
         </div>
@@ -195,7 +196,7 @@ export default function HelpPanel() {
         {/* Search */}
         <div className="px-4 py-3 border-b border-catalan-border">
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-catalan-textMuted text-sm">🔍</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-catalan-textMuted text-sm"><EmojiIcon e="🔍" /></span>
             <input
               type="search"
               placeholder="Search help topics…"
@@ -216,7 +217,7 @@ export default function HelpPanel() {
         <div className="flex-1 overflow-y-auto px-4 py-4">
           {filteredSections.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-4xl mb-3">🔍</p>
+              <p className="text-4xl mb-3"><EmojiIcon e="🔍" /></p>
               <p className="text-sm text-catalan-textMuted">No help topics match "{search}"</p>
               <button onClick={() => setSearch('')} className="mt-2 text-xs text-catalan-primary hover:underline">Clear search</button>
             </div>
@@ -236,7 +237,7 @@ export default function HelpPanel() {
         {/* Footer */}
         <div className="px-5 py-3 border-t border-catalan-border bg-catalan-surface">
           <p className="text-xs text-catalan-textMuted text-center">
-            Click <span className="font-semibold text-catalan-primary">🎯 Highlight in app</span> on any topic to see it in action
+            Click <span className="font-semibold text-catalan-primary"><EmojiIcon e="🎯" /> Highlight in app</span> on any topic to see it in action
           </p>
         </div>
       </div>

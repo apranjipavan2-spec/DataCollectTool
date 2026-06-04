@@ -17,6 +17,7 @@ import BarcodeField     from './fields/BarcodeField'
 import RatingField      from './fields/RatingField'
 import NoteField        from './fields/NoteField'
 import SignatureField   from './fields/SignatureField'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface Props {
   schema: FormSchema
@@ -208,7 +209,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
     return (
       <div className="h-full bg-catalan-bg flex flex-col items-center justify-center px-5 font-sans">
         <div className="w-full max-w-lg bg-catalan-surface border border-catalan-border rounded-2xl p-8 text-center">
-          <div className="text-4xl mb-4">📋</div>
+          <div className="text-4xl mb-4"><EmojiIcon e="📋" /></div>
           <h2 className="text-lg font-semibold text-catalan-text mb-2">Data Collection Purpose</h2>
           <p className="text-sm text-catalan-textMuted mb-6 leading-relaxed">{purpose}</p>
           <button
@@ -235,7 +236,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
     return (
       <div className="min-h-screen bg-catalan-bg text-catalan-text font-sans flex items-center justify-center">
         <div className="text-center">
-          <div className="text-5xl mb-4">📋</div>
+          <div className="text-5xl mb-4"><EmojiIcon e="📋" /></div>
           <div className="text-base">This form has no questions.</div>
         </div>
       </div>
@@ -256,7 +257,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
                 className="flex items-center gap-1 min-w-[44px] min-h-[44px] -ml-2 px-2 rounded-lg text-catalan-primary hover:bg-catalan-primary/10 transition-colors text-sm font-medium"
                 title="Save draft and go back"
               >
-                ← <span className="hidden sm:inline">Save &amp; Exit</span>
+                <EmojiIcon e="←" /> <span className="hidden sm:inline">Save &amp; Exit</span>
               </button>
             )}
             <div className="flex-1 min-w-0">
@@ -379,7 +380,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
 
         {errors[currentField.name] && (
           <div className="text-catalan-error text-sm mt-3 flex items-center gap-1.5">
-            <span>⚠</span> {errors[currentField.name]}
+            <span><EmojiIcon e="⚠" /></span> {errors[currentField.name]}
           </div>
         )}
       </div>
@@ -393,7 +394,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
               onClick={goPrev}
               className="flex-1 bg-catalan-hover border border-catalan-border text-catalan-text rounded-xl py-4 text-[15px] font-medium cursor-pointer hover:bg-catalan-surface active:scale-[0.98] transition-all min-h-[56px]"
             >
-              ← Back
+              <EmojiIcon e="←" /> Back
             </button>
           ) : null}
           {isLast ? (
