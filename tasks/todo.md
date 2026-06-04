@@ -39,19 +39,49 @@ Next: Phase 2 (Likert / Multi-Response / Observer modules) — see roadmap.
 
 ## 🔴 Blocked / Needs external action
 - [ ] Sentry DSN env vars (`SENTRY_DSN`, `VITE_SENTRY_DSN`) — see `planning/PENDING_MANUAL.md`
-- [ ] Each org needs AI keys set via Org Settings → AI (master_admin assigns)
+
+## ✅ AI key model (confirmed 2026-06-02)
+- AI key is **global**, set once by master_admin via `PATCH /api/ai/config` (stored in `SystemSetting.ai_config`). Auto-replicated to every tenant/user — no per-org assignment needed.
 
 ## 📋 Next sprint candidates (low priority)
 - [ ] DHIS2 push integration
 - [ ] ODK Central compatibility layer — import ODK XLS form, export ODK-compatible submissions
 
 ## 🌐 SEO / marketing site (zero-budget plan)
-Full plan in `tasks/seo_actions.md`. Top 3 do-this-week tasks:
-- [ ] GSC verification + sitemap submit + URL-inspect 21 URLs (30 min)
-- [ ] GA4 setup → send me the Measurement ID (15 min)
-- [ ] Product Hunt scheduled launch (Tue/Wed) (30 min)
+Full plan + copy-paste URL list in `tasks/seo_actions.md`. Site verified ready 2026-06-02: 30 indexable URLs, all with canonicals, no noindex on indexable pages, robots.txt + sitemap correct.
 
-Programmatic SEO shipped (commit `125f8e2`): 8 competitor comparisons · 5 long-tail landings · 21-URL sitemap · 404 · Product+Offer JSON-LD on pricing · lazy-loaded images · CTR-optimised titles.
+### ✅ Done 2026-06-02
+- GSC: domain `fieldgovern.com` verified
+- GSC: sitemap submitted → Success, 30 pages discovered
+- GSC: requested indexing for top 5 URLs (`/`, `/pricing`, `/surveycto-alt`, `/kobotoolbox-alt`, `/dpdp-compliant-survey-software`) — `/` already indexed, others queued
+
+### 📋 Pending — do in this order
+
+**Day 2 (tomorrow) — GSC: request indexing, 10 mid-priority URLs**
+- [ ] `/features.html` · `/demo.html` · `/use-cases.html`
+- [ ] `/odk-alternative.html` · `/commcare-alternative.html` · `/googleforms-alternative.html`
+- [ ] `/best-survey-app-india.html` · `/offline-survey-app-india.html`
+- [ ] `/survey-tool-for-ngos-india.html` · `/capi-software-india.html`
+
+**Day 3 — GSC: request indexing, final 15 URLs**
+- [ ] `/security.html` · `/about.html` · `/integrations.html`
+- [ ] `/dpdp-compliance.html` · `/dpa-template.html` · `/partners.html`
+- [ ] `/surveymonkey-alternative.html` · `/qualtrics-alternative.html` · `/magpi-alternative.html`
+- [ ] `/blog/` + 5 blog posts (surveycto-alt-india, dpdp-act-2023, offline-data-collection, odk-kobo-commcare-comparison, panel-study-india-guide)
+
+**GA4 (15 min, do this week)**
+- [ ] Create GA4 property at analytics.google.com (8 steps listed in chat / seo_actions.md)
+- [ ] Send Measurement ID `G-XXXXXXXXXX` to Claude → wire `gtag.js` into all 33 pages in one commit
+- [ ] Link GSC under GA4 Admin → Product Links
+
+**Google Business Profile (15 min, do this week)**
+- [ ] google.com/business → name FieldGovern · Software Company · +91 80887 09011
+
+**Product Hunt (start warm-up now, launch next Tue/Wed)**
+- [ ] Create PH account · follow 20 makers · upvote 10 · comment on 3 (3 days before launch)
+- [ ] Schedule launch Tue/Wed 12:01am PT — copy ready in `tasks/seo_actions.md`
+
+Programmatic SEO shipped (commit `125f8e2`): 8 competitor comparisons · 5 long-tail landings · 30-URL sitemap · 404 · Product+Offer JSON-LD on pricing · lazy-loaded images · CTR-optimised titles.
 
 ## Review notes
 - FG Analyzer/Cleaner/Writer use program-picker (not URL params); program selection synced via localStorage

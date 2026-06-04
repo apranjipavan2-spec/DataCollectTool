@@ -47,7 +47,12 @@
       "Bash(printenv)",
       "Bash(PYTHONIOENCODING=utf-8 python -c \"from routers.export import router; print\\('export router OK:', len\\(router.routes\\), 'routes'\\)\")",
       "Bash(PYTHONIOENCODING=utf-8 python -c \"from backend.routers.export import router; print\\('export router OK:', len\\(router.routes\\), 'routes'\\)\")",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:www.fieldgovern.com)",
+      "WebFetch(domain:www.kobotoolbox.org)",
+      "Read(//c/c/Life/DataCollectTool/tools/**)",
+      "Read(//c/c/Life/DataCollectTool/tools/ngo_intel/**)",
+      "PowerShell(Get-CimInstance *)"
     ]
   },
   "mcpServers": {

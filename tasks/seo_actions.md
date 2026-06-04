@@ -16,10 +16,57 @@
    - **Cloudflare:** DNS → Add Record → TXT, Name `@`, Content: paste
 4. Wait 5–30 min → click **Verify**
 5. **Sitemaps** → submit `https://www.fieldgovern.com/sitemap.xml`
-6. **URL Inspection** → Request Indexing on all 21 URLs:
-   - `/`, `/features.html`, `/pricing.html`, `/use-cases.html`, `/integrations.html`, `/security.html`, `/about.html`, `/demo.html`
-   - 8 comparison pages: `/surveycto-`, `/kobotoolbox-`, `/odk-`, `/commcare-`, `/googleforms-`, `/surveymonkey-`, `/qualtrics-`, `/magpi-alternative.html`
-   - 5 long-tail: `/best-survey-app-india.html`, `/offline-survey-app-india.html`, `/dpdp-compliant-survey-software.html`, `/capi-software-india.html`, `/survey-tool-for-ngos-india.html`
+6. **URL Inspection** → Request Indexing on all 30 URLs (verified against sitemap on 2026-06-02 — every URL has a canonical tag, none has `noindex`):
+
+**Core (8)**
+```
+https://www.fieldgovern.com/
+https://www.fieldgovern.com/features.html
+https://www.fieldgovern.com/pricing.html
+https://www.fieldgovern.com/use-cases.html
+https://www.fieldgovern.com/integrations.html
+https://www.fieldgovern.com/security.html
+https://www.fieldgovern.com/about.html
+https://www.fieldgovern.com/demo.html
+```
+
+**Competitor comparisons (8)**
+```
+https://www.fieldgovern.com/surveycto-alternative.html
+https://www.fieldgovern.com/kobotoolbox-alternative.html
+https://www.fieldgovern.com/odk-alternative.html
+https://www.fieldgovern.com/commcare-alternative.html
+https://www.fieldgovern.com/googleforms-alternative.html
+https://www.fieldgovern.com/surveymonkey-alternative.html
+https://www.fieldgovern.com/qualtrics-alternative.html
+https://www.fieldgovern.com/magpi-alternative.html
+```
+
+**Long-tail landings (5)**
+```
+https://www.fieldgovern.com/best-survey-app-india.html
+https://www.fieldgovern.com/offline-survey-app-india.html
+https://www.fieldgovern.com/dpdp-compliant-survey-software.html
+https://www.fieldgovern.com/capi-software-india.html
+https://www.fieldgovern.com/survey-tool-for-ngos-india.html
+```
+
+**Compliance + partner (3)**
+```
+https://www.fieldgovern.com/dpdp-compliance.html
+https://www.fieldgovern.com/dpa-template.html
+https://www.fieldgovern.com/partners.html
+```
+
+**Blog (6)**
+```
+https://www.fieldgovern.com/blog/
+https://www.fieldgovern.com/blog/surveycto-alternative-india.html
+https://www.fieldgovern.com/blog/dpdp-act-2023-field-research.html
+https://www.fieldgovern.com/blog/offline-data-collection-india.html
+https://www.fieldgovern.com/blog/odk-kobotoolbox-commcare-comparison.html
+https://www.fieldgovern.com/blog/panel-study-india-guide.html
+```
 
 ### 2. GA4 (15 min)
 - <https://analytics.google.com/> → create property → web data stream → copy Measurement ID (`G-XXXXXXXXXX`)
