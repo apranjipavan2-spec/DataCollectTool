@@ -79,25 +79,28 @@
     #mobileMenu a{display:flex;align-items:center;padding:14px 24px;color:var(--text2);font-weight:500;font-size:0.95rem;text-decoration:none;border-bottom:1px solid var(--border);transition:background 0.15s,color 0.15s}
     #mobileMenu a:last-child{border-bottom:none}
     #mobileMenu a:hover,#mobileMenu a:active{background:var(--bg2);color:var(--brand)}
-    .page-hero{padding:140px 24px 80px;background:linear-gradient(160deg,#f0f9ff 0%,#ffffff 50%,#faf5ff 100%);text-align:center}
-    .page-hero h1{font-size:2.8rem;font-weight:900;color:var(--text);line-height:1.15;margin-bottom:16px}
+    .page-hero{padding:108px 24px 40px;background:linear-gradient(160deg,#f0f9ff 0%,#ffffff 50%,#faf5ff 100%);text-align:center}
+    .page-hero h1{font-size:2.6rem;font-weight:900;color:var(--text);line-height:1.15;margin-bottom:14px}
     .grad-text{background:linear-gradient(135deg,var(--brand),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .page-hero p{font-size:1.1rem;color:var(--text2);line-height:1.7;max-width:580px;margin:0 auto 36px}
-    .section-tag{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(14,165,233,0.1),rgba(124,58,237,0.1));border:1px solid rgba(14,165,233,0.2);border-radius:999px;padding:5px 14px;font-size:0.78rem;font-weight:700;color:var(--brand-dark);letter-spacing:0.04em;text-transform:uppercase;margin-bottom:16px}
-    section{padding:80px 24px}
-    .section-inner{max-width:1100px;margin:0 auto}
-    .section-title{font-size:2rem;font-weight:900;color:var(--text);line-height:1.2;margin-bottom:40px}
-    .use-cases-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
-    .uc-card{background:white;border:1px solid var(--border);border-radius:16px;padding:28px;transition:all 0.35s cubic-bezier(.16,1,.3,1)}
+    .page-hero p{font-size:1.05rem;color:var(--text2);line-height:1.65;max-width:820px;margin:0 auto 12px}
+    .section-tag{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(14,165,233,0.1),rgba(124,58,237,0.1));border:1px solid rgba(14,165,233,0.2);border-radius:999px;padding:5px 14px;font-size:0.78rem;font-weight:700;color:var(--brand-dark);letter-spacing:0.04em;text-transform:uppercase;margin-bottom:12px}
+    .section-tag svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+    section{padding:48px 24px}
+    .section-inner{max-width:1340px;margin:0 auto}
+    .section-title{font-size:1.9rem;font-weight:900;color:var(--text);line-height:1.2;margin-bottom:24px}
+    .use-cases-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+    .uc-card{background:white;border:1px solid var(--border);border-radius:16px;padding:24px;transition:all 0.35s cubic-bezier(.16,1,.3,1)}
     .uc-card:hover{transform:translateY(-6px);box-shadow:0 20px 48px rgba(14,165,233,0.12);border-color:rgba(14,165,233,0.3)}
-    .uc-icon{font-size:2.4rem;margin-bottom:14px;display:block}
+    .uc-icon{width:44px;height:44px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px;background:linear-gradient(135deg,rgba(14,165,233,0.1),rgba(124,58,237,0.1));border:1px solid rgba(14,165,233,0.16);color:var(--brand-dark);transition:all 0.35s cubic-bezier(.16,1,.3,1)}
+    .uc-card:hover .uc-icon{background:linear-gradient(135deg,var(--brand),var(--accent));color:white;border-color:transparent}
+    .uc-icon svg{width:21px;height:21px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
     .uc-card h3{font-size:1rem;font-weight:800;color:var(--text);margin-bottom:4px}
     .uc-audience{font-size:0.78rem;font-weight:600;color:var(--brand);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px}
     .uc-card p{font-size:0.85rem;color:var(--text2);line-height:1.6}
     .uc-chip{display:inline-block;background:#fff;border:1px solid var(--border);border-radius:999px;padding:7px 14px;font-size:0.82rem;font-weight:600;color:var(--text2);transition:all .2s}
     .uc-chip:hover{border-color:var(--brand);color:var(--brand-dark);box-shadow:0 2px 10px rgba(14,165,233,0.1)}
     /* PRICING COMPARE */
-    .compare-section{background:var(--bg2);padding:80px 24px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .compare-section{background:var(--bg2);padding:52px 24px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
     .compare-box{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:700px;margin:40px auto 0}
     .price-compare-card{border-radius:16px;padding:32px;text-align:center}
     .price-compare-card.ours{background:linear-gradient(135deg,rgba(14,165,233,0.08),rgba(124,58,237,0.08));border:2px solid rgba(14,165,233,0.3)}
@@ -107,7 +110,7 @@
     .price-compare-card .per{font-size:0.85rem;color:var(--text3);margin-top:4px}
     .price-compare-card.ours .amount{color:var(--brand-dark)}
     .savings-tag{text-align:center;margin-top:24px;font-size:1rem;font-weight:700;color:var(--green)}
-    .cta-section{background:linear-gradient(135deg,#f0f9ff,#faf5ff);text-align:center;padding:80px 24px;border-top:1px solid var(--border)}
+    .cta-section{background:linear-gradient(135deg,#f0f9ff,#faf5ff);text-align:center;padding:52px 24px;border-top:1px solid var(--border)}
     .cta-section h2{font-size:2rem;font-weight:900;color:var(--text);margin-bottom:12px}
     .cta-section p{color:var(--text2);margin-bottom:32px;font-size:1rem}
     footer{background:#0f172a;color:rgba(255,255,255,0.7);padding:60px 24px 32px}
@@ -119,6 +122,9 @@
     .footer-col a{font-size:0.85rem;color:rgba(255,255,255,0.5);text-decoration:none;transition:color 0.2s}
     .footer-col a:hover{color:white}
     .footer-bottom{border-top:1px solid rgba(255,255,255,0.08);padding-top:24px;display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;color:rgba(255,255,255,0.35);flex-wrap:wrap;gap:12px}
+    @media(min-width:1280px){
+      .use-cases-grid{grid-template-columns:repeat(4,1fr)}
+    }
     @media(max-width:1024px){
       .use-cases-grid{grid-template-columns:repeat(2,1fr)}
       .footer-grid{grid-template-columns:1fr 1fr}
@@ -181,10 +187,10 @@
 </div>
 
 <div class="page-hero">
-  <div class="section-tag animate-fade-up">🏘️ Use Cases</div>
+  <div class="section-tag animate-fade-up"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Use Cases</div>
   <h1 class="animate-fade-up delay-1">Built for every<br/><span class="grad-text">research &amp; survey type</span></h1>
-  <p class="animate-fade-up delay-2">Whatever you're running — household &amp; socio-economic surveys, baseline/midline/endline studies, impact evaluation &amp; RCTs, monitoring &amp; evaluation (M&amp;E), KAP &amp; public-health surveys, agriculture, education, WASH, livelihoods, census enumeration, panel &amp; longitudinal studies, CAPI/CATI, social audits or market research — FieldGovern handles it.</p>
-  <p class="animate-fade-up delay-2" style="font-size:0.9rem;color:var(--text3);margin-top:10px">🤝 Built with <strong>Dataworx</strong> · 5 projects delivered · used on fieldwork for a <strong>Karnataka State M&amp;E authority</strong></p>
+  <p class="animate-fade-up delay-2">Household, socio-economic and M&amp;E surveys · baseline/midline/endline · impact evaluation &amp; RCTs · KAP &amp; public health · agriculture, education, WASH &amp; livelihoods · census enumeration · panel &amp; longitudinal studies · CAPI/CATI · social audits and market research. FieldGovern handles them all.</p>
+  <p class="animate-fade-up delay-2" style="font-size:0.88rem;color:var(--text3);margin-top:8px;display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:var(--brand);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Built with <strong>Dataworx</strong> · 5 projects delivered · used on fieldwork for a <strong>Karnataka State M&amp;E authority</strong></span></p>
 </div>
 
 <section>
@@ -192,91 +198,91 @@
     <div class="use-cases-grid">
 
       <div class="uc-card reveal">
-        <span class="uc-icon">🏘️</span>
+        <span class="uc-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
         <h3>Household Surveys</h3>
         <p class="uc-audience">NGOs · Government Welfare Programs</p>
         <p>Collect household-level data across thousands of respondents with GPS-tagged interviews, skip-logic branching based on household composition, and offline-first reliability in areas with no connectivity.</p>
       </div>
 
       <div class="uc-card reveal">
-        <span class="uc-icon">🏥</span>
+        <span class="uc-icon"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
         <h3>Clinical Data Collection</h3>
         <p class="uc-audience">Health Researchers · ICMR Studies</p>
         <p>Capture clinical measurements, patient consent, and diagnostic observations with structured repeat groups and DPDP-compliant data handling. Purpose field and audit trail built in for IRB compliance.</p>
       </div>
 
       <div class="uc-card reveal">
-        <span class="uc-icon">🌾</span>
+        <span class="uc-icon"><svg viewBox="0 0 24 24"><path d="M12 22V8"/><path d="M12 8c0-3 2-5 6-5 0 4-3 5-6 5z"/><path d="M12 12c0-3-2-5-6-5 0 4 3 5 6 5z"/></svg></span>
         <h3>Agricultural Census</h3>
         <p class="uc-audience">State Governments · Agri-Research Institutes</p>
         <p>Map plots via GPS, capture crop type, area, and input usage with barcode support for package scanning. Works in remote fields with zero mobile internet — syncs when enumerators return to range.</p>
       </div>
 
       <div class="uc-card reveal">
-        <span class="uc-icon">🏫</span>
+        <span class="uc-icon"><svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span>
         <h3>Education Monitoring</h3>
         <p class="uc-audience">School Inspection · Attendance Tracking</p>
         <p>Conduct school visits, infrastructure audits, and attendance spot-checks using photo evidence and GPS verification. Supervisors get real-time alerts when inspectors complete a school round.</p>
       </div>
 
       <div class="uc-card reveal">
-        <span class="uc-icon">🔬</span>
+        <span class="uc-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
         <h3>Impact Evaluation</h3>
         <p class="uc-audience">RCTs · J-PAL Style Studies · DIME</p>
         <p>Rigorous double-blind data collection with idempotent submission IDs, back-check audit modules, and Stata .dta export ready for analysis. Designed around the J-PAL and DIME field protocols.</p>
       </div>
 
       <div class="uc-card reveal">
-        <span class="uc-icon">🛒</span>
+        <span class="uc-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
         <h3>Market Research</h3>
         <p class="uc-audience">Consumer Insights · Brand Tracking</p>
         <p>Run brand tracking surveys, product intercept interviews, and consumer perception studies. Google Sheets live sync means your research team sees results as data arrives from the field.</p>
       </div>
 
       <div class="uc-card reveal">
-        <span class="uc-icon">📈</span>
+        <span class="uc-icon"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>
         <h3>Baseline · Midline · Endline</h3>
         <p class="uc-audience">M&amp;E Teams · Donor-funded Programs</p>
         <p>Run multi-round evaluations on the same instrument with versioned questionnaires, wave tracking, and comparison-ready exports — purpose-built for baseline–midline–endline study designs.</p>
       </div>
 
       <div class="uc-card reveal">
-        <span class="uc-icon">🔁</span>
+        <span class="uc-icon"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>
         <h3>Panel &amp; Longitudinal Studies</h3>
         <p class="uc-audience">Cohort Tracking · Attrition Analysis</p>
         <p>Track the same respondents across waves with built-in panel-study tooling and attrition reports — follow individuals and households over months or years without losing the thread.</p>
       </div>
 
       <div class="uc-card reveal">
-        <span class="uc-icon">🩺</span>
+        <span class="uc-icon"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 1 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg></span>
         <h3>Public Health &amp; Nutrition</h3>
         <p class="uc-audience">KAP · DHS-style · Anthropometry</p>
         <p>Knowledge-Attitude-Practice (KAP) surveys, nutrition and anthropometric measurement, and DHS-style health indicators with validation, consent capture, and DPDP-compliant handling.</p>
       </div>
 
       <div class="uc-card reveal">
-        <span class="uc-icon">🚰</span>
+        <span class="uc-icon"><svg viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg></span>
         <h3>WASH &amp; Livelihoods</h3>
         <p class="uc-audience">Water · Sanitation · SHG Programs</p>
         <p>Facility audits, water-quality and sanitation surveys, and livelihoods / self-help-group assessments with GPS, photo evidence, and offline collection in the most remote locations.</p>
       </div>
 
       <div class="uc-card reveal">
-        <span class="uc-icon">🏛️</span>
+        <span class="uc-icon"><svg viewBox="0 0 24 24"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>
         <h3>Government Schemes &amp; Social Audits</h3>
         <p class="uc-audience">Scheme Monitoring · Governance · Beneficiary Tracking</p>
         <p>Monitor scheme implementation, run social audits, and track beneficiaries across districts, blocks and gram panchayats with hierarchy-aware roles and real-time field monitoring.</p>
       </div>
 
       <div class="uc-card reveal">
-        <span class="uc-icon">📞</span>
+        <span class="uc-icon"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
         <h3>CATI &amp; Phone Surveys</h3>
         <p class="uc-audience">Remote Interviewing · Rapid Assessments</p>
         <p>Run computer-assisted telephone interviews (CATI) and rapid phone-based assessments alongside in-person CAPI — same form, same dashboard, whether the interview is face-to-face or remote.</p>
       </div>
 
       <div class="uc-card reveal">
-        <span class="uc-icon">🗳️</span>
+        <span class="uc-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
         <h3>Census &amp; Large Enumeration</h3>
         <p class="uc-audience">State-scale Counts · Listing Operations</p>
         <p>Run large-scale enumeration and listing operations with location targets, progress dashboards by area, and reliable offline sync across hundreds of enumerators.</p>
@@ -289,7 +295,7 @@
 <!-- APPLICABLE TO EVERY RESEARCH TYPE -->
 <section style="padding:56px 24px;background:var(--bg2)">
   <div style="max-width:980px;margin:0 auto;text-align:center">
-    <div class="section-tag" style="margin:0 auto 14px">🧭 One platform, every method</div>
+    <div class="section-tag" style="margin:0 auto 14px"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg> One platform, every method</div>
     <h2 style="font-size:1.7rem;font-weight:900;letter-spacing:-0.01em;margin-bottom:10px">Applicable to every type of research &amp; survey</h2>
     <p style="color:var(--text2);font-size:1rem;max-width:680px;margin:0 auto 24px;line-height:1.7">If it involves collecting data in the field or by phone, FieldGovern fits. A few of the methods and study types teams run on FieldGovern:</p>
     <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">
@@ -325,7 +331,7 @@
 
 <div class="compare-section">
   <div class="section-inner" style="text-align:center">
-    <div class="section-tag" style="margin:0 auto 16px">💰 Cost Comparison</div>
+    <div class="section-tag" style="margin:0 auto 16px"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Cost Comparison</div>
     <h2 style="font-size:2rem;font-weight:900;color:var(--text);margin-bottom:8px">Same capability. 52% lower cost.</h2>
     <p style="color:var(--text2);font-size:0.95rem;max-width:520px;margin:0 auto">Professional plan comparison for a 100-user field team running 50,000 submissions per month.</p>
     <div class="compare-box reveal">
@@ -357,8 +363,8 @@
   </div>
 </div>
 
-<section style="padding:56px 24px;background:linear-gradient(135deg,#f8fafc,#f1f5f9)">
-  <div style="max-width:1100px;margin:0 auto">
+<section style="padding:48px 24px;background:linear-gradient(135deg,#f8fafc,#f1f5f9)">
+  <div style="max-width:1340px;margin:0 auto">
     <div style="text-align:center;margin-bottom:28px">
       <h2 style="font-size:1.7rem;font-weight:800;letter-spacing:-0.01em;margin-bottom:8px">Already on another platform?</h2>
       <p style="color:#475569;font-size:0.98rem;max-width:620px;margin:0 auto">See how FieldGovern compares to the tools your team is probably already using.</p>

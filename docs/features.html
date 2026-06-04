@@ -60,7 +60,7 @@
     #mobileMenu a:hover{background:var(--bg2);color:var(--brand)}
 
     /* ── HERO ─────────────────────────────── */
-    .page-hero{padding:140px 24px 80px;background:linear-gradient(160deg,#f0f9ff 0%,#fff 55%,#faf5ff 100%);text-align:center}
+    .page-hero{padding:48px 24px 56px;background:linear-gradient(160deg,#f0f9ff 0%,#fff 55%,#faf5ff 100%);text-align:center}
     @keyframes fadeUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
     .afu{animation:fadeUp .7s ease forwards;opacity:0}
     .d1{animation-delay:.12s}.d2{animation-delay:.26s}.d3{animation-delay:.4s}
@@ -390,7 +390,7 @@
     .ai-compare-lbl.new{color:#34d399}
 
     /* ── QUICK NAV BAR ─────────────────────── */
-    .feat-quicknav{background:white;border-bottom:1px solid var(--border);padding:0 24px;position:sticky;top:68px;z-index:30;box-shadow:0 1px 8px rgba(0,0,0,.04)}
+    .feat-quicknav{background:white;border-bottom:1px solid var(--border);padding:0 24px;position:sticky;top:68px;margin-top:68px;z-index:30;box-shadow:0 1px 8px rgba(0,0,0,.04)}
     .fqn-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:2px;overflow-x:auto;scrollbar-width:none;padding:8px 0}
     .fqn-inner::-webkit-scrollbar{display:none}
     .fqn-cat{font-size:.62rem;font-weight:800;color:var(--text3);padding:4px 8px;white-space:nowrap;text-transform:uppercase;letter-spacing:.07em;flex-shrink:0}
@@ -531,15 +531,7 @@
   </div>
 </nav>
 
-<!-- HERO -->
-<div class="page-hero">
-  <div class="section-tag afu">🚀 Platform Features</div>
-  <h1 class="afu d1">Every tool your field team needs<br/><span class="grad-text">— in one platform</span></h1>
-  <p class="afu d2">From offline-first data collection to AI-generated reports — purpose-built for India's connectivity realities and compliance requirements.</p>
-  <a href="https://app.fieldgovern.com" class="btn-primary pulse-btn afu d3" style="font-size:1rem;padding:14px 28px">Start Free Trial →</a>
-</div>
-
-<!-- QUICK NAV BAR -->
+<!-- QUICK NAV BAR (top, just below navbar) -->
 <div class="feat-quicknav">
   <div class="fqn-inner">
     <span class="fqn-cat">Collect</span>
@@ -564,6 +556,14 @@
     <a href="#f11-dpdp" class="fqn-item">🛡️ DPDP</a>
     <a href="#f12-lang" class="fqn-item">🌍 Languages</a>
   </div>
+</div>
+
+<!-- HERO -->
+<div class="page-hero">
+  <div class="section-tag afu">🚀 Platform Features</div>
+  <h1 class="afu d1">Every tool your field team needs<br/><span class="grad-text">— in one platform</span></h1>
+  <p class="afu d2">From offline-first data collection to AI-generated reports — purpose-built for India's connectivity realities and compliance requirements.</p>
+  <a href="https://app.fieldgovern.com" class="btn-primary pulse-btn afu d3" style="font-size:1rem;padding:14px 28px">Start Free Trial →</a>
 </div>
 
 <!-- ══════════════════════════════════════════════
