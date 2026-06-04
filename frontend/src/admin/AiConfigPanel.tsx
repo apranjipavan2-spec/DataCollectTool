@@ -37,7 +37,7 @@ export default function AiConfigPanel() {
         <div className={`flex items-center gap-3 p-4 rounded-xl border ${
           configured ? 'bg-green-500/10 border-green-500/30' : 'bg-catalan-warning/10 border-catalan-warning/30'
         }`}>
-          <span className="text-2xl">{configured ? '✅' : '⚠️'}</span>
+          <span className="text-2xl">{configured ? <EmojiIcon e="✅" /> : <EmojiIcon e="⚠" />}</span>
           <div>
             <div className="text-sm font-semibold text-catalan-text">
               {configured ? `AI Enabled — ${active}` : 'AI Not Configured'}
@@ -279,7 +279,7 @@ function MasterAiConfig({ initial, onUpdated }: { initial: ConfigData | null; on
                   ? 'border-catalan-primary bg-catalan-primary/10 text-catalan-primary'
                   : 'border-catalan-border text-catalan-textMuted hover:border-catalan-primary/40'
               }`}>
-              <span>{p.icon}</span>
+              <span><EmojiIcon e={p.icon} /></span>
               <span>{p.label}</span>
               {configured[p.id] && <span className="text-green-500 text-xs">●</span>}
             </button>
@@ -297,14 +297,14 @@ function MasterAiConfig({ initial, onUpdated }: { initial: ConfigData | null; on
           }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-lg">{p.icon}</span>
+                <span className="text-lg"><EmojiIcon e={p.icon} /></span>
                 <span className="font-semibold text-catalan-text">{p.label}</span>
                 {activeProvider === pid && (
                   <span className="text-xs bg-catalan-primary/15 text-catalan-primary px-2 py-0.5 rounded-full font-medium">Active</span>
                 )}
               </div>
               <span className={`text-xs font-semibold ${configured[pid] ? 'text-green-500' : 'text-catalan-textMuted'}`}>
-                {configured[pid] ? '✅ Configured' : '○ Not set'}
+                {configured[pid] ? <><EmojiIcon e="✅" /> Configured</> : '○ Not set'}
               </span>
             </div>
 

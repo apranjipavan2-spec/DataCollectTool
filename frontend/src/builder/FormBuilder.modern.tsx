@@ -449,9 +449,9 @@ export default function FormBuilder() {
           } ${isDragging ? 'opacity-40' : ''}`}
         >
           <span className="text-catalan-textMuted/40 text-xs cursor-grab active:cursor-grabbing flex-shrink-0 select-none">⠿</span>
-          <span className="text-catalan-textMuted text-xs w-4 text-center flex-shrink-0">{FIELD_TYPE_ICONS[field.type] ?? '?'}</span>
+          <span className="text-catalan-textMuted text-xs w-4 text-center flex-shrink-0"><EmojiIcon e={FIELD_TYPE_ICONS[field.type] ?? '?'} /></span>
           <span className={`flex-1 text-xs leading-snug break-words min-w-0 ${field.label ? 'text-catalan-text' : 'text-catalan-error/80'}`}>
-            {field.label || '⚠ label missing'}
+            {field.label || 'label missing'}
           </span>
           <button
             onClick={e => { e.stopPropagation(); requestDeleteField(sectionId, field.id, field.label || 'this field') }}
@@ -1254,7 +1254,7 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
                     disabled={locating}
                     className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-catalan-primary/40 text-catalan-primary hover:bg-catalan-primary/10 transition-colors disabled:opacity-50"
                   >
-                    {locating ? '⏳ Getting location…' : '📍 Use my location'}
+                    {locating ? <><EmojiIcon e="⏳" /> Getting location…</> : <><EmojiIcon e="📍" /> Use my location</>}
                   </button>
                 </>
               )}

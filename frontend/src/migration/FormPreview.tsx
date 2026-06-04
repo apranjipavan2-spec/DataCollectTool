@@ -67,7 +67,7 @@ export default function FormPreview({ title, schema, warnings, sectionCount, fie
             <div className="divide-y divide-catalan-border">
               {section.fields.map((field, fi) => (
                 <div key={fi} className="px-4 py-2.5 flex items-center gap-3">
-                  <span className="text-base flex-shrink-0">{TYPE_ICON[field.type] || '📋'}</span>
+                  <span className="text-base flex-shrink-0"><EmojiIcon e={TYPE_ICON[field.type] || '📋'} /></span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-catalan-text truncate">{field.label}</p>
                     <p className="text-xs text-catalan-textMuted font-mono">{field.name} · {field.type}</p>

@@ -203,7 +203,7 @@ export default function FieldApp() {
         textSynced = data.received
         setOutboxCount(0)
       } catch {
-        setSyncMsg(navigator.onLine ? '⚠ Sync failed — tap to retry' : '⚠ Offline — will sync when connected')
+        setSyncMsg(navigator.onLine ? 'Sync failed — tap to retry' : 'Offline — will sync when connected')
         return
       }
     }
@@ -410,7 +410,7 @@ export default function FieldApp() {
       setActiveForm(null)
       setTimeout(() => setEditMsg(''), 3000)
     } catch {
-      setEditMsg('⚠ Failed to save changes')
+      setEditMsg('Failed to save changes')
       setTimeout(() => setEditMsg(''), 4000)
     }
   }
@@ -586,7 +586,7 @@ export default function FieldApp() {
       setTilesCacheMsg(`✓ ${tilesToCache.length} tiles cached for offline use`)
       setTimeout(() => setTilesCacheMsg(''), 4000)
     } catch (err: any) {
-      setTilesCacheMsg(err?.code === 1 ? '⚠ Location permission denied' : '⚠ Could not cache tiles')
+      setTilesCacheMsg(err?.code === 1 ? 'Location permission denied' : 'Could not cache tiles')
       setTimeout(() => setTilesCacheMsg(''), 4000)
     } finally {
       setCachingTiles(false)
@@ -1028,7 +1028,7 @@ export default function FieldApp() {
             : gpsAccuracy <= 30 ? 'bg-catalan-warning/10 text-catalan-warning'
             : 'bg-catalan-error/10 text-catalan-error'
         }`}>
-          <span>{gpsAccuracy === null ? '📡 Acquiring GPS…' : gpsAccuracy <= 10 ? '📍 GPS locked' : gpsAccuracy <= 30 ? '📡 GPS: fair signal' : '⚠️ GPS: weak signal'}</span>
+          <span>{gpsAccuracy === null ? <><EmojiIcon e="📡" /> Acquiring GPS…</> : gpsAccuracy <= 10 ? <><EmojiIcon e="📍" /> GPS locked</> : gpsAccuracy <= 30 ? <><EmojiIcon e="📡" /> GPS: fair signal</> : <><EmojiIcon e="⚠" /> GPS: weak signal</>}</span>
           {gpsAccuracy !== null && <span className="font-medium">±{Math.round(gpsAccuracy)}m</span>}
           {gpsAccuracy !== null && gpsAccuracy > 30 && <span className="text-[10px] opacity-75">· Move to open sky for better accuracy</span>}
         </div>
@@ -1041,7 +1041,7 @@ export default function FieldApp() {
           <div className="bg-blue-700 text-white px-4 py-2 text-xs flex items-center gap-3 flex-wrap shrink-0 z-50">
             <span className="font-medium truncate">
               <EmojiIcon e="🗂" /> {programContext.scheme_name ? `${programContext.scheme_name} › ` : ''}{programContext.program_name}
-              {programContext.participant_type_name ? ` · 👤 ${programContext.participant_type_name}` : ''}
+              {programContext.participant_type_name ? ` · ${programContext.participant_type_name}` : ''}
             </span>
             {programContext.location_id ? (
               <span className="text-blue-200 truncate"><EmojiIcon e="📍" /> {[programContext.location_district, programContext.location_block, programContext.location_village].filter(Boolean).join(' › ')}</span>
@@ -1173,7 +1173,7 @@ export default function FieldApp() {
                   onClick={syncToServer}
                   className="text-catalan-warning bg-catalan-warning/10 px-3 py-1 rounded-full border border-catalan-warning/30 hover:bg-catalan-warning/20 transition-colors text-xs font-medium"
                 >
-                  <EmojiIcon e="↑" /> Sync {outboxCount > 0 ? `${outboxCount}` : ''}{mediaQueueCount > 0 ? ` · ${mediaQueueCount} 📷` : ''}
+                  <EmojiIcon e="↑" /> Sync {outboxCount > 0 ? `${outboxCount}` : ''}{mediaQueueCount > 0 ? ` · ${mediaQueueCount} photos` : ''}
                 </button>
               )}
               {failedMediaCount > 0 && (
@@ -1182,7 +1182,7 @@ export default function FieldApp() {
                   disabled={retryingMedia}
                   className="text-catalan-error bg-catalan-error/10 px-3 py-1 rounded-full border border-catalan-error/30 hover:bg-catalan-error/20 transition-colors text-xs disabled:opacity-50"
                 >
-                  {retryingMedia ? '⏳' : `⚠ ${failedMediaCount} failed`}
+                  {retryingMedia ? '⏳' : `${failedMediaCount} failed`}
                 </button>
               )}
               {syncMsg && <span className="text-catalan-info text-xs">{syncMsg}</span>}
@@ -1223,8 +1223,8 @@ export default function FieldApp() {
                           {pc && (
                             <div className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 rounded-lg px-2 py-1 mb-2 flex-wrap">
                               <span><EmojiIcon e="🗂" /> {pc.scheme_name ? `${pc.scheme_name} › ` : ''}{pc.program_name}</span>
-                              {pc.participant_type_name && <span>· 👤 {pc.participant_type_name}</span>}
-                              {lc && <span>· 📍 {[lc.district, lc.block, lc.village].filter(Boolean).join(' › ')}</span>}
+                              {pc.participant_type_name && <span>· <EmojiIcon e="👤" /> {pc.participant_type_name}</span>}
+                              {lc && <span>· <EmojiIcon e="📍" /> {[lc.district, lc.block, lc.village].filter(Boolean).join(' › ')}</span>}
                             </div>
                           )}
                           <div className="flex justify-between items-start gap-2">
@@ -1233,7 +1233,7 @@ export default function FieldApp() {
                               <p className="text-xs text-catalan-textMuted">
                                 {s.location && <span>{s.location} · </span>}
                                 {s.start_date} → {s.end_date}
-                                {s.target_count > 0 && <span> · 🎯 {s.target_count}</span>}
+                                {s.target_count > 0 && <span> · <EmojiIcon e="🎯" /> {s.target_count}</span>}
                               </p>
                               {s.notes && <p className="text-xs text-catalan-textMuted italic mt-1 truncate">{s.notes}</p>}
                             </div>
