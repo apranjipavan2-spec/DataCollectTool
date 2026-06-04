@@ -131,6 +131,10 @@
     .calc-field label .hint{font-weight:500;color:var(--text3);font-size:.72rem}
     .calc-field input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:1rem;font-family:inherit;color:var(--text)}
     .calc-field input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(14,165,233,.12)}
+    .calc-toggle{display:flex;gap:6px;background:var(--bg3);border-radius:10px;padding:4px}
+    .ct-btn{flex:1;border:none;background:transparent;border-radius:8px;padding:8px 10px;font-family:inherit;font-size:.76rem;font-weight:700;color:var(--text3);cursor:pointer;transition:all .15s;line-height:1.2}
+    .ct-btn.active{background:white;color:var(--brand-dark);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+    .calc-sub-fields{border-left:2px solid var(--border);padding-left:14px;margin-left:2px}
     .calc-out{display:flex;flex-direction:column;gap:14px}
     .calc-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
     .calc-card{border:1px solid var(--border);border-radius:16px;padding:18px 20px;background:white}
@@ -401,16 +405,29 @@
   <div class="calc-wrap">
     <div class="calc-inputs">
       <div class="calc-field">
-        <label>Programs / studies <span class="hint">distinct projects you run</span></label>
+        <label>Programs / projects <span class="hint">distinct studies you run</span></label>
         <input id="ci-programs" type="number" min="1" value="2"/>
       </div>
       <div class="calc-field">
-        <label>Schedules (forms) <span class="hint">total questionnaires across programs</span></label>
-        <input id="ci-schedules" type="number" min="1" value="5"/>
+        <label>Volume — enter by</label>
+        <div class="calc-toggle">
+          <button type="button" class="ct-btn active" data-mode="subs" onclick="setVolMode('subs')">Submissions / month</button>
+          <button type="button" class="ct-btn" data-mode="quest" onclick="setVolMode('quest')">Questionnaires per project</button>
+        </div>
       </div>
-      <div class="calc-field">
-        <label>Submissions per schedule / month <span class="hint">avg responses per form each month</span></label>
-        <input id="ci-persched" type="number" min="1" value="1000"/>
+      <div class="calc-field" id="cf-subs">
+        <label>Submissions per month <span class="hint">total responses across all forms</span></label>
+        <input id="ci-subs" type="number" min="1" value="5000"/>
+      </div>
+      <div class="calc-sub-fields" id="cf-quest" style="display:none">
+        <div class="calc-field">
+          <label>Questionnaires / tools per project</label>
+          <input id="ci-qpp" type="number" min="1" value="3"/>
+        </div>
+        <div class="calc-field">
+          <label>Submissions per questionnaire / month</label>
+          <input id="ci-perq" type="number" min="1" value="800"/>
+        </div>
       </div>
       <div class="calc-field">
         <label>Pages per form <span class="hint">printed double-sided</span></label>
@@ -419,6 +436,14 @@
       <div class="calc-field">
         <label>Project duration <span class="hint">months</span></label>
         <input id="ci-months" type="number" min="1" value="3"/>
+      </div>
+      <div class="calc-field">
+        <label>Data-entry operator salary <span class="hint">₹ / month, editable</span></label>
+        <input id="ci-opsal" type="number" min="0" step="500" value="15000"/>
+      </div>
+      <div class="calc-field">
+        <label>Analyst salary <span class="hint">₹ / month, editable</span></label>
+        <input id="ci-ansal" type="number" min="0" step="1000" value="30000"/>
       </div>
     </div>
     <div class="calc-out">
@@ -456,7 +481,7 @@
       </div>
     </div>
   </div>
-  <p class="calc-assume"><strong>Assumptions:</strong> printing ₹1 per double-sided sheet; data entry ₹25/form (~12 min); analyst ₹30,000/month for the project period; report writing ₹15,000/program; paper error rate 5–10% vs &lt;1% on FieldGovern. FieldGovern prices are introductory, +18% GST extra; competitor parity not included in the paper figure. Estimates are indicative — actual costs vary by location and team.</p>
+  <p class="calc-assume"><strong>Assumptions:</strong> printing ₹1 per double-sided sheet; one data-entry operator handles ~800 forms/month at the salary you set (prefilled ₹15,000); one analyst at the salary you set (prefilled ₹30,000) for the project period; report writing ₹15,000/program; paper error rate 5–10% vs &lt;1% on FieldGovern. FieldGovern prices are introductory, +18% GST extra. Estimates are indicative — actual costs vary by location and team.</p>
 </div>
 
 <!-- CTA -->
@@ -532,30 +557,45 @@
   }
 
   /* Cost calculator — paper/manual vs FieldGovern */
+  var volMode = 'subs';
+  function setVolMode(m){
+    volMode = m;
+    document.querySelectorAll('.ct-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.mode === m); });
+    document.getElementById('cf-subs').style.display = m === 'subs' ? '' : 'none';
+    document.getElementById('cf-quest').style.display = m === 'quest' ? '' : 'none';
+    calcCost();
+  }
   function fmtINR(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
-  function recommendPlan(subsPerMonth, programs, schedules){
+  function recommendPlan(subsPerMonth, programs){
     if (subsPerMonth <= 1000 && programs <= 1) return {name:'Free (Students)', price:0};
-    if (subsPerMonth <= 5000 && programs <= 2 && schedules <= 10) return {name:'Starter', price:6999};
+    if (subsPerMonth <= 5000 && programs <= 2) return {name:'Starter', price:6999};
     if (subsPerMonth <= 25000 && programs <= 6) return {name:'Growth', price:12999};
     if (subsPerMonth <= 100000) return {name:'Pro', price:24999};
     return {name:'Custom', price:null};
   }
   function calcCost(){
     var v = function(id){ return Math.max(1, parseInt(document.getElementById(id).value, 10) || 1); };
-    var programs = v('ci-programs'), schedules = v('ci-schedules'),
-        perSched = v('ci-persched'), pages = v('ci-pages'), months = v('ci-months');
-    var subsPerMonth = schedules * perSched;
+    var n = function(id){ return Math.max(0, parseInt(document.getElementById(id).value, 10) || 0); };
+    var programs = v('ci-programs'), pages = v('ci-pages'), months = v('ci-months');
+    var opSal = n('ci-opsal'), anSal = n('ci-ansal');
+
+    var subsPerMonth;
+    if (volMode === 'quest'){
+      subsPerMonth = (programs * v('ci-qpp')) * v('ci-perq');
+    } else {
+      subsPerMonth = v('ci-subs');
+    }
     var totalSubs = subsPerMonth * months;
     var sheets = Math.ceil(pages / 2);
 
+    var operators = Math.max(1, Math.ceil(subsPerMonth / 800)); // ~800 forms/operator/mo
     var printing = totalSubs * sheets * 1;   // ₹1 per double-sided sheet
-    var entry = totalSubs * 25;              // ₹25/form
-    var analyst = 30000 * months;            // ₹30k/mo for the project
+    var entry = operators * opSal * months;  // operators × salary × months
+    var analyst = anSal * months;            // one analyst for the project
     var report = programs * 15000;           // ₹15k/program
     var paperTotal = printing + entry + analyst + report;
-    var operators = Math.max(1, Math.ceil(subsPerMonth / 800)); // ~800 forms/operator/mo
 
-    var plan = recommendPlan(subsPerMonth, programs, schedules);
+    var plan = recommendPlan(subsPerMonth, programs);
     var fgTotal = plan.price === null ? null : plan.price * months;
     var mLabel = months + ' month' + (months > 1 ? 's' : '');
     var set = function(id, txt){ document.getElementById(id).textContent = txt; };
@@ -589,7 +629,7 @@
       verdictEl.innerHTML = 'We recommend the <strong>' + plan.name + '</strong> plan — ' + fmtINR(fgTotal) + ' vs ~' + fmtINR(paperTotal) + ' on paper over ' + mLabel + ', with cleaning, analysis &amp; AI reports included and results in days.';
     }
   }
-  ['ci-programs','ci-schedules','ci-persched','ci-pages','ci-months'].forEach(function(id){
+  ['ci-programs','ci-subs','ci-qpp','ci-perq','ci-pages','ci-months','ci-opsal','ci-ansal'].forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.addEventListener('input', calcCost);
   });
