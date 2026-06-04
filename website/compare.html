@@ -112,6 +112,46 @@
     .rank-row.win .rank-score .num{font-size:1.45rem;color:var(--brand)}
     .rank-score .den{font-size:.68rem;color:var(--text3)}
 
+    /* RANKING — featured #1 + 2-column grid */
+    .rank-featured{display:flex;align-items:center;gap:16px;border:2px solid var(--brand);border-radius:18px;padding:20px 22px;background:linear-gradient(135deg,rgba(14,165,233,.08),rgba(124,58,237,.08));box-shadow:0 6px 28px rgba(14,165,233,.14);margin-bottom:16px;max-width:920px;margin-left:auto;margin-right:auto}
+    .rank-featured .rank-no{color:var(--brand);font-size:1.7rem;min-width:42px}
+    .rank-featured .rank-name{font-weight:800;font-size:1.15rem}
+    .rank-featured .rank-score .num{font-size:1.6rem;color:var(--brand)}
+    .rank-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:920px;margin:0 auto}
+    .rank-cell{display:flex;align-items:flex-start;gap:12px;border:1px solid var(--border);border-radius:14px;padding:16px 18px;background:white;transition:box-shadow .2s}
+    .rank-cell:hover{box-shadow:0 4px 18px rgba(0,0,0,.06)}
+    .rank-cell .rank-no{font-size:1.15rem;color:var(--text3)}
+
+    /* COST CALCULATOR */
+    .calc-wrap{display:grid;grid-template-columns:1fr 1.15fr;gap:24px;align-items:start;max-width:960px;margin:0 auto}
+    .calc-inputs{border:1px solid var(--border);border-radius:18px;padding:24px;background:white}
+    .calc-field{margin-bottom:16px}
+    .calc-field:last-child{margin-bottom:0}
+    .calc-field label{display:block;font-size:.82rem;font-weight:700;color:var(--text2);margin-bottom:6px}
+    .calc-field label .hint{font-weight:500;color:var(--text3);font-size:.72rem}
+    .calc-field input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:1rem;font-family:inherit;color:var(--text)}
+    .calc-field input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(14,165,233,.12)}
+    .calc-out{display:flex;flex-direction:column;gap:14px}
+    .calc-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .calc-card{border:1px solid var(--border);border-radius:16px;padding:18px 20px;background:white}
+    .calc-card.paper{border-color:#fecaca;background:#fef2f2}
+    .calc-card.fg{border-color:#bae6fd;background:#f0f9ff}
+    .calc-card h4{font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
+    .calc-card.paper h4{color:#b91c1c}
+    .calc-card.fg h4{color:var(--brand-dark)}
+    .calc-big{font-size:1.65rem;font-weight:900;line-height:1.1;margin-bottom:2px}
+    .calc-card.paper .calc-big{color:#b91c1c}
+    .calc-card.fg .calc-big{color:var(--brand)}
+    .calc-sub{font-size:.74rem;color:var(--text3);margin-bottom:12px}
+    .calc-line{display:flex;justify-content:space-between;gap:8px;font-size:.79rem;padding:5px 0;border-top:1px dashed var(--border);color:var(--text2)}
+    .calc-line span:last-child{font-weight:700;color:var(--text);white-space:nowrap}
+    .calc-verdict{border-radius:16px;padding:20px 22px;background:linear-gradient(135deg,var(--brand),var(--accent));color:white}
+    .calc-verdict .cv-save{font-size:1.7rem;font-weight:900;line-height:1.15}
+    .calc-verdict .cv-plan{margin-top:8px;font-size:.88rem;line-height:1.55;color:rgba(255,255,255,.95)}
+    .calc-verdict .cv-plan strong{background:rgba(255,255,255,.22);padding:2px 8px;border-radius:6px;font-weight:800}
+    .calc-assume{font-size:.72rem;color:var(--text3);line-height:1.5;margin-top:10px;text-align:center;max-width:760px;margin-left:auto;margin-right:auto}
+    @media(max-width:820px){.calc-wrap{grid-template-columns:1fr}}
+
     /* TABLES */
     .cmp-wrap{overflow-x:auto;border-radius:16px;border:1px solid var(--border);box-shadow:0 4px 24px rgba(0,0,0,.05)}
     table{width:100%;border-collapse:collapse;font-size:.86rem;background:white;min-width:680px}
@@ -165,7 +205,8 @@
       .footer-grid{grid-template-columns:1fr}
       .section-inner{padding:48px 16px}
       .cta-block{padding:40px 20px}
-      .rank-why{display:none}
+      .rank-grid2{grid-template-columns:1fr}
+      .calc-cols{grid-template-columns:1fr}
     }
   </style>
   <script defer data-domain="fieldgovern.com" src="https://plausible.io/js/script.js"></script>
@@ -211,7 +252,7 @@
   <p>An honest 2026 comparison of the tools Indian teams actually evaluate — SurveyCTO, KoboToolbox, ODK and CommCare — on features, price and an overall ranking. Then the real cost of staying on paper.</p>
   <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px">
     <a href="#ranking" class="btn-outline" style="padding:10px 18px;font-size:.88rem">Overall ranking ↓</a>
-    <a href="#paper" class="btn-primary" style="padding:10px 18px;font-size:.88rem">Paper vs FieldGovern ↓</a>
+    <a href="#calc" class="btn-primary" style="padding:10px 18px;font-size:.88rem">Cost calculator ↓</a>
   </div>
 </div>
 
@@ -221,16 +262,16 @@
     <h2>Overall ranking for Indian field teams</h2>
     <p>Scored on offline reliability, built-in analysis &amp; AI, India-first features (languages, DPDP, UPI) and total cost of ownership. Each tool is excellent at something — here's where they win.</p>
   </div>
-  <div class="rank-wrap">
-    <div class="rank-row win">
-      <div class="rank-no">#1</div>
-      <div class="rank-body">
-        <div class="rank-name">FieldGovern <span class="rank-badge">BEST OVERALL · INDIA</span></div>
-        <div class="rank-why"><span class="rank-bestfor">Best for:</span> end-to-end field research in India — collect, clean, analyse and report in one place. Offline PWA (no install), AI data cleaning, cross-tabs, panel study, FG Writer reports, DPDP compliance, UPI billing, 22 Indian languages. Lowest total cost.</div>
-      </div>
-      <div class="rank-score"><div class="num">9.6</div><div class="den">/ 10</div></div>
+  <div class="rank-featured">
+    <div class="rank-no">#1</div>
+    <div class="rank-body">
+      <div class="rank-name">FieldGovern <span class="rank-badge">BEST OVERALL · INDIA</span></div>
+      <div class="rank-why"><span class="rank-bestfor">Best for:</span> end-to-end field research in India — collect, clean, analyse and report in one place. Offline PWA (no install), AI data cleaning, cross-tabs, panel study, FG Writer reports, DPDP compliance, UPI billing, 22 Indian languages. Lowest total cost.</div>
     </div>
-    <div class="rank-row">
+    <div class="rank-score"><div class="num">9.6</div><div class="den">/ 10</div></div>
+  </div>
+  <div class="rank-grid2">
+    <div class="rank-cell">
       <div class="rank-no">#2</div>
       <div class="rank-body">
         <div class="rank-name"><a href="surveycto-alternative.html">SurveyCTO</a></div>
@@ -238,7 +279,7 @@
       </div>
       <div class="rank-score"><div class="num">9.0</div><div class="den">/ 10</div></div>
     </div>
-    <div class="rank-row">
+    <div class="rank-cell">
       <div class="rank-no">#3</div>
       <div class="rank-body">
         <div class="rank-name"><a href="kobotoolbox-alternative.html">KoboToolbox</a></div>
@@ -246,7 +287,7 @@
       </div>
       <div class="rank-score"><div class="num">8.3</div><div class="den">/ 10</div></div>
     </div>
-    <div class="rank-row">
+    <div class="rank-cell">
       <div class="rank-no">#4</div>
       <div class="rank-body">
         <div class="rank-name"><a href="odk-alternative.html">ODK</a></div>
@@ -254,7 +295,7 @@
       </div>
       <div class="rank-score"><div class="num">8.0</div><div class="den">/ 10</div></div>
     </div>
-    <div class="rank-row">
+    <div class="rank-cell">
       <div class="rank-no">#5</div>
       <div class="rank-body">
         <div class="rank-name"><a href="commcare-alternative.html">CommCare</a></div>
@@ -291,15 +332,19 @@
         <tr><td>GPS, photo, audio capture</td><td class="col-fg"><span class="tag-better">✓ + auto-compress</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td></tr>
         <tr><td>Auto photo compression</td><td class="col-fg"><span class="tag-better">✓ 96% smaller</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
         <tr><td>Multi-language forms &amp; UI</td><td class="col-fg"><span class="tag-better">✓ 22 Indian languages</span></td><td><span class="tag-ok">⚡ EN-only UI</span></td><td><span class="tag-ok">✓ Many</span></td><td><span class="tag-ok">✓ Many</span></td></tr>
-        <tr><td>Real-time dashboard</td><td class="col-fg"><span class="tag-better">✓ Instant</span></td><td><span class="tag-ok">✓ Delayed</span></td><td><span class="tag-ok">⚡ Delayed</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Live dashboard &amp; charts</td><td class="col-fg"><span class="tag-better">✓ Instant, in-app</span></td><td><span class="tag-ok">⚡ Basic</span></td><td><span class="tag-ok">⚡ Basic</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>GPS / Map view of submissions</td><td class="col-fg"><span class="tag-better">✓ Built-in map (Leaflet)</span></td><td><span class="tag-ok">⚡ External</span></td><td><span class="tag-ok">⚡ Basic</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Real-time field monitoring</td><td class="col-fg"><span class="tag-better">✓ Live agent tracking</span></td><td><span class="tag-ok">✓ Strong</span></td><td><span class="tag-ok">⚡ Basic</span></td><td><span class="tag-ok">⚡ Basic</span></td></tr>
 
         <tr class="grp" style="background:rgba(124,58,237,.05)"><td colspan="5" style="color:var(--accent)">🧠 Analysis &amp; reporting — FieldGovern's advantage</td></tr>
         <tr><td>Built-in data cleaner (dedup, QC)</td><td class="col-fg"><span class="tag-better">✓ AI, audit trail</span></td><td><span class="tag-worse">✕ Export to Stata</span></td><td><span class="tag-worse">✕ Export to R</span></td><td><span class="tag-worse">✕ Export to R</span></td></tr>
         <tr><td>Cross-tab / tabulation engine</td><td class="col-fg"><span class="tag-better">✓ Live, in browser</span></td><td><span class="tag-worse">✕ External tool</span></td><td><span class="tag-worse">✕ External tool</span></td><td><span class="tag-worse">✕ External tool</span></td></tr>
+        <tr><td>Statistical analysis (significance)</td><td class="col-fg"><span class="tag-better">✓ In-app + AI interpret</span></td><td><span class="tag-ok">⚡ Export to Stata/R</span></td><td><span class="tag-worse">✕ Export to R</span></td><td><span class="tag-worse">✕ Export to R</span></td></tr>
         <tr><td>AI auto-generate insights</td><td class="col-fg"><span class="tag-better">✓ 1-click tables</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
         <tr><td>AI report writer</td><td class="col-fg"><span class="tag-better">✓ 6 styles</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
         <tr><td>Panel study &amp; attrition</td><td class="col-fg"><span class="tag-better">✓ Wave tracking</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
         <tr><td>SPSS / Stata export</td><td class="col-fg"><span class="tag-better">✓ Built-in</span></td><td><span class="tag-ok">✓ Paid add-on</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Scheduled report sharing (email)</td><td class="col-fg"><span class="tag-better">✓ Daily / weekly auto-send</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
 
         <tr class="grp" style="background:rgba(16,185,129,.04)"><td colspan="5" style="color:var(--green)">🔒 Platform &amp; compliance</td></tr>
         <tr><td>Data stored in India</td><td class="col-fg"><span class="tag-better">✓ Mumbai</span></td><td><span class="tag-worse">✕ US</span></td><td><span class="tag-worse">✕ EU</span></td><td><span class="tag-ok">⚡ Self-hosted</span></td></tr>
@@ -307,6 +352,8 @@
         <tr><td>UPI / INR billing</td><td class="col-fg"><span class="tag-better">✓ UPI, NEFT</span></td><td><span class="tag-worse">✕ USD card</span></td><td><span class="tag-worse">✕ USD card</span></td><td><span class="tag-ok">n/a</span></td></tr>
         <tr><td>White-label branding</td><td class="col-fg"><span class="tag-better">✓ Per tenant</span></td><td><span class="tag-ok">Enterprise only</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
         <tr><td>REST API + webhooks</td><td class="col-fg"><span class="tag-better">✓ Paid plans</span></td><td><span class="tag-ok">⚡ Add-on</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td></tr>
+        <tr><td>Telegram / WhatsApp alerts</td><td class="col-fg"><span class="tag-better">✓ Submission &amp; report alerts</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Audit log</td><td class="col-fg"><span class="tag-better">✓ Full trail</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">⚡ Basic</span></td><td><span class="tag-ok">⚡ Basic</span></td></tr>
       </tbody>
     </table>
   </div>
@@ -323,62 +370,93 @@
 <div class="section-inner">
   <div class="sec-head">
     <h2>Pricing, head to head</h2>
-    <p>FieldGovern includes data cleaning, analysis and report writing in the subscription. With other tools those are separate software and analyst costs.</p>
+    <p>Every FieldGovern paid plan bundles data cleaning, analysis and AI report writing. With the others, those are separate software licences and analyst costs on top of the price below.</p>
   </div>
   <div class="cmp-wrap">
     <table>
       <thead>
-        <tr><th>Plan / tool</th><th class="highlight">FieldGovern ✦</th><th>SurveyCTO</th><th>KoboToolbox</th><th>ODK</th></tr>
+        <tr><th>Tier (per month)</th><th class="highlight">FieldGovern ✦</th><th>SurveyCTO</th><th>KoboToolbox</th><th>ODK</th></tr>
       </thead>
       <tbody>
-        <tr><td>Free tier</td><td class="col-fg"><span class="tag-better">Free forever (students) · 1,000/mo</span></td><td><span class="tag-ok">200 submissions/mo</span></td><td><span class="tag-better">5,000 submissions/mo</span></td><td><span class="tag-ok">Software free (self-host)</span></td></tr>
-        <tr><td>Entry paid plan</td><td class="col-fg"><span class="tag-better">₹6,999/mo (~$84)</span></td><td><span class="tag-worse">~$198/mo</span></td><td><span class="tag-ok">Professional (25,000/mo)</span></td><td><span class="tag-ok">ODK Cloud / hosting</span></td></tr>
-        <tr><td>Top managed plan</td><td class="col-fg"><span class="tag-better">₹24,999/mo (~$300)</span></td><td><span class="tag-worse">up to ~$700/mo</span></td><td><span class="tag-ok">Teams / Enterprise (quote)</span></td><td><span class="tag-ok">Your servers + DevOps</span></td></tr>
-        <tr><td>Built-in cleaning + analysis + AI reports</td><td class="col-fg"><span class="tag-better">✓ Included</span></td><td><span class="tag-worse">✕ Buy Stata + analyst</span></td><td><span class="tag-worse">✕ Buy tools + analyst</span></td><td><span class="tag-worse">✕ Buy tools + analyst</span></td></tr>
+        <tr><td>Free</td><td class="col-fg"><span class="tag-better">₹0 — students · 1,000 subs/mo</span></td><td><span class="tag-ok">Community · 200 subs/mo</span></td><td><span class="tag-better">Community · 5,000 subs/mo</span></td><td><span class="tag-ok">Software free (self-host)</span></td></tr>
+        <tr><td>Entry</td><td class="col-fg"><span class="tag-better">Starter ₹6,999 <small style="color:var(--text3)">(reg ₹7,999)</small> · 5,000 subs · ~$84</span></td><td><span class="tag-worse">~$198 (₹16,500+)</span></td><td><span class="tag-ok">Professional · 25,000 subs</span></td><td><span class="tag-ok">ODK Cloud / your hosting</span></td></tr>
+        <tr><td>Mid</td><td class="col-fg"><span class="tag-better">Growth ₹12,999 <small style="color:var(--text3)">(reg ₹14,999)</small> · 25,000 subs · ~$156</span></td><td><span class="tag-worse">~$300 (₹25,000+)</span></td><td><span class="tag-ok">Teams · 50,000 subs</span></td><td><span class="tag-ok">Larger server + DevOps</span></td></tr>
+        <tr><td>Top managed</td><td class="col-fg"><span class="tag-better">Pro ₹24,999 <small style="color:var(--text3)">(reg ₹28,999)</small> · 1,00,000 subs · ~$300</span></td><td><span class="tag-worse">up to ~$700 (₹58,000+)</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Your servers + DevOps</span></td></tr>
+        <tr><td>Beyond / custom</td><td class="col-fg"><span class="tag-better">Custom — by subs / schedules / project</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Self-managed</span></td></tr>
+        <tr><td>Built-in cleaning + analysis + AI reports</td><td class="col-fg"><span class="tag-better">✓ Included in price</span></td><td><span class="tag-worse">✕ Buy Stata + analyst</span></td><td><span class="tag-worse">✕ Buy tools + analyst</span></td><td><span class="tag-worse">✕ Buy tools + analyst</span></td></tr>
         <tr><td>Payment</td><td class="col-fg"><span class="tag-better">UPI / NEFT (INR)</span></td><td><span class="tag-worse">USD card</span></td><td><span class="tag-worse">USD card</span></td><td><span class="tag-ok">n/a</span></td></tr>
       </tbody>
     </table>
   </div>
-  <p class="paper-note">Competitor prices are public list prices (2026) and may change; FieldGovern intro pricing shown (+18% GST on Indian plans). See <a href="pricing.html" style="color:var(--brand);font-weight:600">full FieldGovern pricing →</a></p>
+  <p class="paper-note">FieldGovern shows live introductory pricing (struck regular price in brackets); +18% GST on Indian plans. Competitor figures are public 2026 list prices (USD ≈ INR at ₹83/$) and may change. See <a href="pricing.html" style="color:var(--brand);font-weight:600">full FieldGovern pricing →</a></p>
 </div>
 </div>
 
-<!-- ═══ PAPER VS FIELDGOVERN ═══ -->
-<div class="section-inner" id="paper">
+<!-- ═══ COST CALCULATOR — paper/manual vs FieldGovern ═══ -->
+<div class="section-inner" id="calc">
   <div class="sec-head">
-    <h2>Still on paper? Here's what it really costs</h2>
-    <p>Paper looks cheap until you add printing, logistics, manual data entry, errors, separate analysis software and an analyst's time. Here's an honest, side-by-side breakdown.</p>
+    <h2>Your numbers: paper &amp; manual vs FieldGovern</h2>
+    <p>Enter the shape of your fieldwork. We'll estimate the paper/manual cost and people needed, then recommend the FieldGovern plan that fits — and the saving.</p>
   </div>
-  <div class="cmp-wrap">
-    <table>
-      <thead>
-        <tr><th>What it takes</th><th>📄 Paper / manual</th><th class="highlight">✦ FieldGovern</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Printing &amp; stationery</td><td><span class="tag-worse">₹2–4 per page × thousands of forms</span></td><td class="col-fg"><span class="tag-better">₹0 — fully digital</span></td></tr>
-        <tr><td>Logistics</td><td><span class="tag-worse">Print, ship, store &amp; retrieve paper</span></td><td class="col-fg"><span class="tag-better">None — forms sync from the field</span></td></tr>
-        <tr><td>Data entry</td><td><span class="tag-worse">10–15 min/form, re-keyed by operators</span></td><td class="col-fg"><span class="tag-better">✕ Captured digitally at source</span></td></tr>
-        <tr><td>Accuracy</td><td><span class="tag-worse">~5–10% transcription errors</span></td><td class="col-fg"><span class="tag-better">&lt;1% — validation, skip logic, GPS</span></td></tr>
-        <tr><td>Data cleaning</td><td><span class="tag-worse">Manual in Excel — days of work</span></td><td class="col-fg"><span class="tag-better">✓ AI cleaner with audit trail</span></td></tr>
-        <tr><td>Cross-tab / analysis</td><td><span class="tag-worse">Buy SPSS/Stata + analyst time</span></td><td class="col-fg"><span class="tag-better">✓ Built-in tabulation engine</span></td></tr>
-        <tr><td>Report writing</td><td><span class="tag-worse">Consultant, ₹ per report</span></td><td class="col-fg"><span class="tag-better">✓ FG Writer — drafts in minutes</span></td></tr>
-        <tr><td>People needed</td><td><span class="tag-worse">Data-entry operators + analyst</span></td><td class="col-fg"><span class="tag-better">Your existing field team</span></td></tr>
-        <tr><td>Turnaround (field → report)</td><td><span class="tag-worse">6–10 weeks</span></td><td class="col-fg"><span class="tag-better">Days</span></td></tr>
-      </tbody>
-    </table>
+  <div class="calc-wrap">
+    <div class="calc-inputs">
+      <div class="calc-field">
+        <label>Programs / studies <span class="hint">distinct projects you run</span></label>
+        <input id="ci-programs" type="number" min="1" value="2"/>
+      </div>
+      <div class="calc-field">
+        <label>Schedules (forms) <span class="hint">total questionnaires across programs</span></label>
+        <input id="ci-schedules" type="number" min="1" value="5"/>
+      </div>
+      <div class="calc-field">
+        <label>Submissions per schedule / month <span class="hint">avg responses per form each month</span></label>
+        <input id="ci-persched" type="number" min="1" value="1000"/>
+      </div>
+      <div class="calc-field">
+        <label>Pages per form <span class="hint">printed double-sided</span></label>
+        <input id="ci-pages" type="number" min="1" value="6"/>
+      </div>
+      <div class="calc-field">
+        <label>Project duration <span class="hint">months</span></label>
+        <input id="ci-months" type="number" min="1" value="3"/>
+      </div>
+    </div>
+    <div class="calc-out">
+      <div class="calc-cols">
+        <div class="calc-card paper">
+          <h4>📄 Paper / manual</h4>
+          <div class="calc-big" id="co-paper-total">—</div>
+          <div class="calc-sub" id="co-paper-sub">over the project</div>
+          <div class="calc-line"><span>Printing</span><span id="co-print">—</span></div>
+          <div class="calc-line"><span>Data entry</span><span id="co-entry">—</span></div>
+          <div class="calc-line"><span>Analyst (clean + analyse)</span><span id="co-analyst">—</span></div>
+          <div class="calc-line"><span>Report writing</span><span id="co-report">—</span></div>
+          <div class="calc-line"><span>People needed</span><span id="co-people">—</span></div>
+          <div class="calc-line"><span>Turnaround</span><span>6–10 weeks</span></div>
+        </div>
+        <div class="calc-card fg">
+          <h4>✦ FieldGovern</h4>
+          <div class="calc-big" id="co-fg-total">—</div>
+          <div class="calc-sub" id="co-fg-sub">over the project</div>
+          <div class="calc-line"><span>Recommended plan</span><span id="co-plan">—</span></div>
+          <div class="calc-line"><span>Submissions / month</span><span id="co-subs">—</span></div>
+          <div class="calc-line"><span>Plan price / month</span><span id="co-permonth">—</span></div>
+          <div class="calc-line"><span>Data entry</span><span>₹0 — at source</span></div>
+          <div class="calc-line"><span>Clean + analyse + reports</span><span>Included</span></div>
+          <div class="calc-line"><span>Turnaround</span><span>Days</span></div>
+        </div>
+      </div>
+      <div class="calc-verdict">
+        <div class="cv-save" id="co-save">—</div>
+        <div class="cv-plan" id="co-verdict">—</div>
+        <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px">
+          <a href="pricing.html" class="btn-outline" style="background:white;border-color:white;color:var(--brand-dark);padding:9px 16px;font-size:.84rem">See plan details</a>
+          <a href="https://wa.me/918088709011?text=Hi%2C%20I%27d%20like%20a%20FieldGovern%20quote%20for%20my%20fieldwork." target="_blank" class="btn-outline" style="background:transparent;border-color:rgba(255,255,255,.6);color:white;padding:9px 16px;font-size:.84rem">Get a quote</a>
+        </div>
+      </div>
+    </div>
   </div>
-
-  <div style="margin-top:32px;border:1px solid var(--border);border-radius:16px;padding:24px;background:white">
-    <div style="font-weight:800;font-size:1.05rem;margin-bottom:6px">Worked example — a 5,000-survey study</div>
-    <p style="color:var(--text3);font-size:.85rem;line-height:1.6;margin-bottom:8px">Illustrative, ~8-page questionnaire. Paper path: printing (₹80,000+), two data-entry operators for ~a month (₹60,000+), SPSS/analyst and a report consultant — typically <strong>₹3–5 lakh and 6–10 weeks</strong>, with a 5–10% error rate baked in. FieldGovern path: <strong>two months of Growth (₹12,999/mo ≈ ₹26,000)</strong>, zero data entry, cleaning + cross-tabs + AI report included, results in <strong>days</strong>.</p>
-  </div>
-
-  <div class="roi-cards">
-    <div class="roi-card"><div class="roi-big">~90%</div><div class="roi-lbl">lower cost than the paper path on a typical 5,000-survey study</div></div>
-    <div class="roi-card"><div class="roi-big">Weeks → days</div><div class="roi-lbl">from last interview to a draft report</div></div>
-    <div class="roi-card"><div class="roi-big">&lt;1%</div><div class="roi-lbl">data error rate vs 5–10% with manual entry</div></div>
-  </div>
-  <p class="paper-note">Figures are illustrative and depend on questionnaire length, location and team — but the direction holds: digital removes printing, re-keying, error correction and tooling overhead.</p>
+  <p class="calc-assume"><strong>Assumptions:</strong> printing ₹1 per double-sided sheet; data entry ₹25/form (~12 min); analyst ₹30,000/month for the project period; report writing ₹15,000/program; paper error rate 5–10% vs &lt;1% on FieldGovern. FieldGovern prices are introductory, +18% GST extra; competitor parity not included in the paper figure. Estimates are indicative — actual costs vary by location and team.</p>
 </div>
 
 <!-- CTA -->
@@ -452,6 +530,70 @@
     document.getElementById('mobileMenu').classList.toggle('open');
     document.getElementById('hamburgerBtn').classList.toggle('open');
   }
+
+  /* Cost calculator — paper/manual vs FieldGovern */
+  function fmtINR(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
+  function recommendPlan(subsPerMonth, programs, schedules){
+    if (subsPerMonth <= 1000 && programs <= 1) return {name:'Free (Students)', price:0};
+    if (subsPerMonth <= 5000 && programs <= 2 && schedules <= 10) return {name:'Starter', price:6999};
+    if (subsPerMonth <= 25000 && programs <= 6) return {name:'Growth', price:12999};
+    if (subsPerMonth <= 100000) return {name:'Pro', price:24999};
+    return {name:'Custom', price:null};
+  }
+  function calcCost(){
+    var v = function(id){ return Math.max(1, parseInt(document.getElementById(id).value, 10) || 1); };
+    var programs = v('ci-programs'), schedules = v('ci-schedules'),
+        perSched = v('ci-persched'), pages = v('ci-pages'), months = v('ci-months');
+    var subsPerMonth = schedules * perSched;
+    var totalSubs = subsPerMonth * months;
+    var sheets = Math.ceil(pages / 2);
+
+    var printing = totalSubs * sheets * 1;   // ₹1 per double-sided sheet
+    var entry = totalSubs * 25;              // ₹25/form
+    var analyst = 30000 * months;            // ₹30k/mo for the project
+    var report = programs * 15000;           // ₹15k/program
+    var paperTotal = printing + entry + analyst + report;
+    var operators = Math.max(1, Math.ceil(subsPerMonth / 800)); // ~800 forms/operator/mo
+
+    var plan = recommendPlan(subsPerMonth, programs, schedules);
+    var fgTotal = plan.price === null ? null : plan.price * months;
+    var mLabel = months + ' month' + (months > 1 ? 's' : '');
+    var set = function(id, txt){ document.getElementById(id).textContent = txt; };
+
+    set('co-paper-total', fmtINR(paperTotal));
+    set('co-paper-sub', 'over ' + mLabel);
+    set('co-print', fmtINR(printing));
+    set('co-entry', fmtINR(entry));
+    set('co-analyst', fmtINR(analyst));
+    set('co-report', fmtINR(report));
+    set('co-people', operators + ' operator' + (operators > 1 ? 's' : '') + ' + 1 analyst');
+
+    set('co-subs', subsPerMonth.toLocaleString('en-IN') + ' / mo');
+    set('co-plan', plan.name);
+    set('co-permonth', plan.price === null ? 'Custom quote' : (plan.price === 0 ? '₹0' : fmtINR(plan.price)));
+    set('co-fg-total', fgTotal === null ? 'Custom' : fmtINR(fgTotal));
+    set('co-fg-sub', fgTotal === null ? 'metered quote' : 'over ' + mLabel);
+
+    var saveEl = document.getElementById('co-save');
+    var verdictEl = document.getElementById('co-verdict');
+    if (fgTotal === null){
+      saveEl.textContent = 'Custom plan recommended';
+      verdictEl.innerHTML = 'At <strong>' + subsPerMonth.toLocaleString('en-IN') + ' submissions/mo</strong> across ' + programs + ' programs, talk to us for a metered <strong>Custom</strong> quote — still a fraction of the paper path (' + fmtINR(paperTotal) + ').';
+    } else if (fgTotal === 0){
+      saveEl.textContent = fmtINR(paperTotal) + ' saved';
+      verdictEl.innerHTML = 'You fit the <strong>Free student plan</strong> — ₹0 vs ' + fmtINR(paperTotal) + ' on paper, and results in days not weeks.';
+    } else {
+      var saved = paperTotal - fgTotal;
+      var pct = paperTotal > 0 ? Math.round(saved / paperTotal * 100) : 0;
+      saveEl.textContent = saved > 0 ? (fmtINR(saved) + ' saved · ' + pct + '% less') : 'Comparable cost — far faster';
+      verdictEl.innerHTML = 'We recommend the <strong>' + plan.name + '</strong> plan — ' + fmtINR(fgTotal) + ' vs ~' + fmtINR(paperTotal) + ' on paper over ' + mLabel + ', with cleaning, analysis &amp; AI reports included and results in days.';
+    }
+  }
+  ['ci-programs','ci-schedules','ci-persched','ci-pages','ci-months'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', calcCost);
+  });
+  calcCost();
 </script>
 </body>
 </html>
