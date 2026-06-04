@@ -306,6 +306,10 @@
     @keyframes cs-pulse{0%,100%{box-shadow:0 12px 32px rgba(14,165,233,.32)}50%{box-shadow:0 14px 42px rgba(124,58,237,.55)}}
     @media(prefers-reduced-motion:reduce){.calc-sticker{animation:none}}
     @media(max-width:640px){.calc-sticker{right:12px;bottom:14px;padding:10px 12px;max-width:188px}.cs-text strong{font-size:.82rem}.cs-text span{font-size:.66rem}}
+      .ei{display:inline-block;width:1em;height:1em;vertical-align:-0.14em;stroke:currentColor;stroke-width:1.85;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;transition:transform .25s ease}
+    .ei:hover{transform:scale(1.18) rotate(-3deg)}
+    a:hover .ei,button:hover .ei,[class*='card']:hover .ei{transform:scale(1.15)}
+    @media(prefers-reduced-motion:reduce){.ei{transition:none}}
   </style>
   <script defer data-domain="fieldgovern.com" src="https://plausible.io/js/script.js"></script>
 </head>
@@ -335,18 +339,18 @@
 
 <div id="mobileMenu" role="navigation">
   <a href="features.html">✦ Features</a>
-  <a href="integrations.html">🔗 Integrations</a>
-  <a href="use-cases.html">🏘️ Use Cases</a>
-  <a href="compare.html">📊 Compare</a>
-  <a href="security.html">🔒 Security</a>
-  <a href="pricing.html">💰 Pricing</a>
-  <a href="about.html">🏛️ About Us</a>
-  <a href="demo.html" style="color:var(--brand);font-weight:700">🚀 Try Free Demo</a>
+  <a href="integrations.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Integrations</a>
+  <a href="use-cases.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Use Cases</a>
+  <a href="compare.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Compare</a>
+  <a href="security.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Security</a>
+  <a href="pricing.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Pricing</a>
+  <a href="about.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg> About Us</a>
+  <a href="demo.html" style="color:var(--brand);font-weight:700"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Try Free Demo</a>
 </div>
 
 <!-- Floating cost-calculator sticker — stays on screen, scrolls to calculator -->
 <a href="#calc" class="calc-sticker" aria-label="Jump to the cost calculator">
-  <span class="cs-emoji">🧮</span>
+  <span class="cs-emoji"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></span>
   <span class="cs-text"><strong>Cost calculator</strong><span>See your 6-month savings →</span></span>
 </a>
 
@@ -357,7 +361,7 @@
 <div class="section-inner" id="calc" style="padding-bottom:0">
  <div class="calc-tile">
   <div class="sec-head">
-    <span class="calc-eyebrow">🧮 Cost calculator</span>
+    <span class="calc-eyebrow"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg> Cost calculator</span>
     <h2 style="margin-top:14px">Your numbers: every platform, side by side</h2>
     <p>Set the shape of your fieldwork below. We compute the <strong>total project cost</strong> for FieldGovern, KoboToolbox, SurveyCTO and paper/manual — broken down line by line.</p>
   </div>
@@ -489,19 +493,19 @@
         </tr>
       </thead>
       <tbody>
-        <tr class="grp" style="background:rgba(14,165,233,.04)"><td colspan="5" style="color:var(--brand)">📦 Collection &amp; Field</td></tr>
+        <tr class="grp" style="background:rgba(14,165,233,.04)"><td colspan="5" style="color:var(--brand)"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> Collection &amp; Field</td></tr>
         <tr><td>Monthly Price</td><td class="col-fg"><span class="tag-better">From ₹6,999 (~$84)</span></td><td><span class="tag-worse">$198–700</span></td><td><span class="tag-ok">Free (limited)</span></td><td><span class="tag-ok">Self-hosted + ops</span></td></tr>
-        <tr><td>True Offline Mode</td><td class="col-fg"><span class="tag-better">✓ Full offline</span></td><td><span class="tag-ok">✓ App only</span></td><td><span class="tag-ok">⚡ Partial</span></td><td><span class="tag-ok">⚡ App only</span></td></tr>
+        <tr><td>True Offline Mode</td><td class="col-fg"><span class="tag-better">✓ Full offline</span></td><td><span class="tag-ok">✓ App only</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Partial</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> App only</span></td></tr>
         <tr><td>No Installation Needed</td><td class="col-fg"><span class="tag-better">✓ PWA — any browser</span></td><td><span class="tag-worse">✕ App required</span></td><td><span class="tag-worse">✕ App required</span></td><td><span class="tag-worse">✕ App required</span></td></tr>
         <tr><td>GPS Capture in Forms</td><td class="col-fg"><span class="tag-better">✓ Built-in geopoint</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td></tr>
         <tr><td>Photo &amp; Audio Capture</td><td class="col-fg"><span class="tag-better">✓ + auto-compress</span></td><td><span class="tag-ok">✓ No compression</span></td><td><span class="tag-ok">✓ No compression</span></td><td><span class="tag-ok">✓ No compression</span></td></tr>
         <tr><td>Auto Photo Compression</td><td class="col-fg"><span class="tag-better">✓ 96% reduction</span></td><td><span class="tag-worse">✕ None</span></td><td><span class="tag-worse">✕ None</span></td><td><span class="tag-worse">✕ None</span></td></tr>
-        <tr><td>Multi-language Forms</td><td class="col-fg"><span class="tag-better">✓ 22 Indian languages</span></td><td><span class="tag-ok">⚡ EN only UI</span></td><td><span class="tag-ok">✓ Many</span></td><td><span class="tag-ok">✓ Many</span></td></tr>
+        <tr><td>Multi-language Forms</td><td class="col-fg"><span class="tag-better">✓ 22 Indian languages</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> EN only UI</span></td><td><span class="tag-ok">✓ Many</span></td><td><span class="tag-ok">✓ Many</span></td></tr>
         <tr><td>Background Sync</td><td class="col-fg"><span class="tag-better">✓ Even app-closed</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
-        <tr><td>Real-Time Dashboard</td><td class="col-fg"><span class="tag-better">✓ Instant</span></td><td><span class="tag-ok">✓ Delayed</span></td><td><span class="tag-ok">⚡ Delayed</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Real-Time Dashboard</td><td class="col-fg"><span class="tag-better">✓ Instant</span></td><td><span class="tag-ok">✓ Delayed</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Delayed</span></td><td><span class="tag-worse">✕</span></td></tr>
         <tr><td>Skip Logic (AND/OR)</td><td class="col-fg"><span class="tag-better">✓ Nested</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td></tr>
 
-        <tr class="grp" style="background:rgba(124,58,237,.05)"><td colspan="5" style="color:var(--accent)">🧠 Analysis &amp; Reporting — FieldGovern's Unique Advantage</td></tr>
+        <tr class="grp" style="background:rgba(124,58,237,.05)"><td colspan="5" style="color:var(--accent)"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2z"/></svg> Analysis &amp; Reporting — FieldGovern's Unique Advantage</td></tr>
         <tr><td>Built-in Data Cleaner</td><td class="col-fg"><span class="tag-better">✓ Dedup, type-fix, QC</span></td><td><span class="tag-worse">✕ Export &amp; use Stata</span></td><td><span class="tag-worse">✕ Export &amp; use R</span></td><td><span class="tag-worse">✕ Export &amp; use R</span></td></tr>
         <tr><td>Cross-tab / Tabulation Engine</td><td class="col-fg"><span class="tag-better">✓ Browser, live</span></td><td><span class="tag-worse">✕ External tool</span></td><td><span class="tag-worse">✕ External tool</span></td><td><span class="tag-worse">✕ External tool</span></td></tr>
         <tr><td>AI Auto-Generate Insights</td><td class="col-fg"><span class="tag-better">✓ 10 tables, 1 click</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
@@ -513,12 +517,12 @@
         <tr><td>Stata .dta Export</td><td class="col-fg"><span class="tag-better">✓ Built-in</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
         <tr><td>SPSS .sav Export</td><td class="col-fg"><span class="tag-better">✓ Built-in</span></td><td><span class="tag-ok">✓ Paid add-on</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
 
-        <tr class="grp" style="background:rgba(16,185,129,.04)"><td colspan="5" style="color:var(--green)">🔧 Platform &amp; Compliance</td></tr>
-        <tr><td>Indian Language UI</td><td class="col-fg"><span class="tag-better">✓ HI, KN, TE, MR, TA…</span></td><td><span class="tag-ok">⚡ Limited</span></td><td><span class="tag-ok">✓ Many</span></td><td><span class="tag-ok">✓ Many</span></td></tr>
+        <tr class="grp" style="background:rgba(16,185,129,.04)"><td colspan="5" style="color:var(--green)"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> Platform &amp; Compliance</td></tr>
+        <tr><td>Indian Language UI</td><td class="col-fg"><span class="tag-better">✓ HI, KN, TE, MR, TA…</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Limited</span></td><td><span class="tag-ok">✓ Many</span></td><td><span class="tag-ok">✓ Many</span></td></tr>
         <tr><td>White-label Branding</td><td class="col-fg"><span class="tag-better">✓ Per tenant</span></td><td><span class="tag-ok">Enterprise only</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
-        <tr><td>REST API + API Keys</td><td class="col-fg"><span class="tag-better">✓ All paid plans</span></td><td><span class="tag-ok">⚡ Paid add-on</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td></tr>
+        <tr><td>REST API + API Keys</td><td class="col-fg"><span class="tag-better">✓ All paid plans</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Paid add-on</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-ok">✓</span></td></tr>
         <tr><td>Multi-tenant SaaS</td><td class="col-fg"><span class="tag-better">✓ Full DB isolation</span></td><td><span class="tag-ok">✓</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
-        <tr><td>Data Stored in India</td><td class="col-fg"><span class="tag-better">✓ Mumbai servers</span></td><td><span class="tag-worse">✕ US servers</span></td><td><span class="tag-worse">✕ EU servers</span></td><td><span class="tag-ok">⚡ Self-hosted</span></td></tr>
+        <tr><td>Data Stored in India</td><td class="col-fg"><span class="tag-better">✓ Mumbai servers</span></td><td><span class="tag-worse">✕ US servers</span></td><td><span class="tag-worse">✕ EU servers</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Self-hosted</span></td></tr>
       </tbody>
     </table>
   </div>
@@ -743,7 +747,7 @@
         lines:[['Printing',0],['Data entry',0],['Subscription',sctoMo * months],['Analyst',analyst],['Report writing',report]],
         foot:'USD subscription (~' + fmtINR(sctoMo) + '/mo) — but you still hire an analyst + report writer',
         extras:FEATURES, hasExtras:false},
-      {name:'📄 Paper / manual', cls:'paper', total:paperTotal,
+      {name:'<svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Paper / manual', cls:'paper', total:paperTotal,
         lines:[['Printing',printing],['Data entry',entry],['Software',0],['Analyst',analyst],['Report writing',report]],
         foot:'Print, ship &amp; re-key by hand, then analyst + report writer',
         extras:FEATURES, hasExtras:false}
