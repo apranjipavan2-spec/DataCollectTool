@@ -592,10 +592,11 @@
     }
     requestAnimationFrame(step);
   }
+  // Plans are gated by submissions/month (Free is also limited to 1 project)
   function recommendPlan(subsPerMonth, programs){
     if (subsPerMonth <= 1000 && programs <= 1) return {name:'Free (Students)', price:0};
-    if (subsPerMonth <= 5000 && programs <= 2) return {name:'Starter', price:6999};
-    if (subsPerMonth <= 25000 && programs <= 6) return {name:'Growth', price:12999};
+    if (subsPerMonth <= 5000)   return {name:'Starter', price:6999};
+    if (subsPerMonth <= 25000)  return {name:'Growth', price:12999};
     if (subsPerMonth <= 100000) return {name:'Pro', price:24999};
     return {name:'Custom', price:null};
   }
@@ -641,7 +642,7 @@
     var fgTotalEl = document.getElementById('co-fg-total');
     if (fgTotal === null){ fgTotalEl.textContent = 'Custom'; fgTotalEl.dataset.val = 0; }
     else animateINR(fgTotalEl, fgTotal);
-    set('co-fg-sub', fgTotal === null ? 'metered quote' : 'over ' + mLabel);
+    set('co-fg-sub', fgTotal === null ? 'metered quote' : (plan.price === 0 ? 'free · ' + mLabel : fmtINR(plan.price) + '/mo × ' + months + ' = total'));
 
     var saveEl = document.getElementById('co-save');
     var verdictEl = document.getElementById('co-verdict');
