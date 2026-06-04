@@ -209,7 +209,7 @@
     .cc-extras li::before{content:'✓';color:var(--green);font-weight:900;flex-shrink:0}
     .cc-extras li.no{color:var(--text3);font-weight:600}
     .cc-extras li.no::before{content:'✗';color:#dc2626}
-    .calc-inputs-top{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 18px;align-items:end;border:1px solid var(--border);border-radius:16px;padding:20px;background:var(--bg2);margin-bottom:22px}
+    .calc-inputs-top{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 18px;align-items:start;border:1px solid var(--border);border-radius:16px;padding:20px;background:var(--bg2);margin-bottom:22px}
     .calc-inputs-top .calc-field{margin-bottom:0}
     .calc-field-wide{grid-column:span 2}
     @media(max-width:760px){.calc-inputs-top{grid-template-columns:repeat(2,1fr)}.calc-field-wide{grid-column:span 1}}
@@ -374,14 +374,14 @@
         <button type="button" class="ct-btn active" data-mode="subs" onclick="setVolMode('subs')">Submissions / month</button>
         <button type="button" class="ct-btn" data-mode="quest" onclick="setVolMode('quest')">Questionnaires / project</button>
       </div>
-    </div>
-    <div class="calc-field" id="cf-subs">
-      <label>Submissions / month <span class="hint">total responses</span></label>
-      <input id="ci-subs" type="number" min="1" value="2000"/>
-    </div>
-    <div class="calc-field" id="cf-quest" style="display:none">
-      <label>Submissions / project <span class="hint">target per project</span></label>
-      <input id="ci-perproject" type="number" min="1" value="3000"/>
+      <div id="cf-subs" style="margin-top:10px">
+        <label>Submissions / month <span class="hint">total responses</span></label>
+        <input id="ci-subs" type="number" min="1" value="2000"/>
+      </div>
+      <div id="cf-quest" style="display:none;margin-top:10px">
+        <label>Submissions / project <span class="hint">target per project</span></label>
+        <input id="ci-perproject" type="number" min="1" value="3000"/>
+      </div>
     </div>
     <div class="calc-field">
       <label>Pages / form <span class="hint">double-sided</span></label>
