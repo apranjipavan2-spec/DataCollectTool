@@ -1,4 +1,5 @@
 import type { FieldType } from '@/types/form'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface Props {
   onSelect: (type: FieldType) => void
@@ -54,7 +55,7 @@ export default function FieldTypeMenu({ onSelect, onClose }: Props) {
                 onClick={() => { onSelect(ft.type); onClose() }}
                 className="flex items-center gap-3 bg-catalan-hover border border-catalan-border rounded-lg px-3.5 py-3 text-left cursor-pointer hover:border-catalan-primary hover:bg-catalan-primary/5 transition-all group"
               >
-                <span className="text-xl w-7 text-center flex-shrink-0 leading-none">{ft.icon}</span>
+                <span className="text-xl w-7 text-center flex-shrink-0 leading-none"><EmojiIcon e={ft.icon} /></span>
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-catalan-text group-hover:text-catalan-primary transition-colors">
                     {ft.label}
