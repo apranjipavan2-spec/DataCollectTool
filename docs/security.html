@@ -83,13 +83,15 @@
     .grad-text{background:linear-gradient(135deg,var(--brand),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
     .page-hero p{font-size:1.05rem;color:var(--text2);line-height:1.6;max-width:680px;margin:0 auto}
     .section-tag{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(14,165,233,0.1),rgba(124,58,237,0.1));border:1px solid rgba(14,165,233,0.2);border-radius:999px;padding:5px 14px;font-size:0.78rem;font-weight:700;color:var(--brand-dark);letter-spacing:0.04em;text-transform:uppercase;margin-bottom:10px}
+    .section-tag svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
     section{padding:48px 32px}
     .section-inner{max-width:1080px;margin:0 auto}
     .section-title{font-size:1.7rem;font-weight:900;color:var(--text);line-height:1.2;margin-bottom:24px}
     .sec-list{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 64px}
     .sec-block{padding:18px 0;border-top:1px solid var(--border)}
     .sec-block h3{font-size:1.05rem;font-weight:800;color:var(--text);margin-bottom:7px;display:flex;align-items:center;gap:9px}
-    .sec-block h3 .sec-icon{font-size:1.3rem}
+    .sec-block h3 .sec-icon{width:38px;height:38px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(14,165,233,0.1),rgba(124,58,237,0.1));border:1px solid rgba(14,165,233,0.16);color:var(--brand-dark);flex-shrink:0}
+    .sec-block h3 .sec-icon svg{width:19px;height:19px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
     .sec-block p{font-size:0.92rem;color:var(--text2);line-height:1.65}
     .sec-block p b{color:var(--text);font-weight:700}
     /* FAQ */
@@ -173,7 +175,7 @@
 </div>
 
 <div class="page-hero">
-  <div class="section-tag animate-fade-up">🛡️ Security</div>
+  <div class="section-tag animate-fade-up"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Security</div>
   <h1 class="animate-fade-up delay-1">Enterprise-grade security.<br/><span class="grad-text">India-first compliance.</span></h1>
   <p class="animate-fade-up delay-2">Built from the ground up for DPDP 2023, with JWT auth, bcrypt passwords, row-level tenant isolation, and encrypted offline storage.</p>
 </div>
@@ -183,32 +185,32 @@
     <div class="sec-list">
 
       <div class="sec-block reveal">
-        <h3><span class="sec-icon">🔐</span>Authentication</h3>
+        <h3><span class="sec-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>Authentication</h3>
         <p><b>JWT HS256</b> tokens with a 2-hour expiry and secure refresh-token rotation. Passwords are hashed with <b>bcrypt</b> (cost factor 12), API keys are bcrypt-hashed before storage, and enumerator sessions time out after 30 minutes of inactivity.</p>
       </div>
 
       <div class="sec-block reveal">
-        <h3><span class="sec-icon">🛡️</span>DPDP 2023 Compliance</h3>
+        <h3><span class="sec-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></span>DPDP 2023 Compliance</h3>
         <p>Every form carries a <b>consent-tracking field</b> and a purpose declaration, all data changes are written to full audit logs, and a <b>data-erasure endpoint</b> anonymizes <code>data_json</code> on request — built end-to-end for India's Digital Personal Data Protection Act 2023.</p>
       </div>
 
       <div class="sec-block reveal">
-        <h3><span class="sec-icon">📱</span>Offline Security</h3>
+        <h3><span class="sec-icon"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg></span>Offline Security</h3>
         <p>Offline data lives in the browser's <b>OPFS</b> (Chrome/Android) or <b>IndexedDB</b> (Safari/iOS) — never in localStorage or plain cookies. It is bound to its origin and inaccessible to other sites, syncs over <b>HTTPS with TLS 1.3</b>, and is never written to disk unencrypted.</p>
       </div>
 
       <div class="sec-block reveal">
-        <h3><span class="sec-icon">👥</span>Access Control</h3>
+        <h3><span class="sec-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>Access Control</h3>
         <p>A 4-tier role hierarchy (<b>master_admin → org_admin → supervisor → enumerator</b>) with tenant isolation enforced by SQLAlchemy row-level security on every query. Enumerators see only their assigned forms, supervisors only their tenant's submissions, and cross-tenant leakage is blocked at the database layer.</p>
       </div>
 
       <div class="sec-block reveal">
-        <h3><span class="sec-icon">📁</span>Media Security</h3>
+        <h3><span class="sec-icon"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>Media Security</h3>
         <p>Photos and audio are stored on <b>private VPS storage</b> — not in public cloud buckets or S3 public URLs. Downloads use <b>presigned URLs with a short TTL</b>, filenames carry a non-guessable UUID, and files sit outside the web root so they can't be browsed directly.</p>
       </div>
 
       <div class="sec-block reveal">
-        <h3><span class="sec-icon">📋</span>Audit Trail</h3>
+        <h3><span class="sec-icon"><svg viewBox="0 0 24 24"><path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"/><rect x="9" y="2" width="6" height="6" rx="1"/><line x1="9" y1="14" x2="15" y2="14"/><line x1="9" y1="18" x2="13" y2="18"/></svg></span>Audit Trail</h3>
         <p>Every status change (flag / approve / reject) is logged with a <b>timestamp, actor ID, and previous state</b>. The submission-history panel is visible to supervisors, entries are <b>append-only and non-repudiable</b>, and the full log exports alongside submission data.</p>
       </div>
 
@@ -218,7 +220,7 @@
 
 <section style="background:var(--bg2);border-top:1px solid var(--border)">
   <div class="section-inner">
-    <div class="section-tag" style="display:inline-flex">❓ Security FAQ</div>
+    <div class="section-tag" style="display:inline-flex"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg> Security FAQ</div>
     <h2 class="section-title" style="margin-top:8px">Common security questions</h2>
     <div class="faq-list">
       <details class="reveal">
