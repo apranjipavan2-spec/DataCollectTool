@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import api, { getStoredUser } from '@/lib/api'
 import Sidebar from '@/components/Sidebar'
+import EmojiIcon from '@/components/EmojiIcon'
 import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import { getLastProgram, setLastProgram } from '@/lib/fgStorage'
@@ -108,7 +109,7 @@ export default function FgCleaner() {
 
             {!programId && (
               <div className="flex flex-col items-center justify-center h-64 text-catalan-textMuted">
-                <div className="text-5xl mb-4">🧹</div>
+                <div className="text-5xl mb-4"><EmojiIcon e="🧹" /></div>
                 <p className="text-sm font-medium">Select a program to review data quality</p>
               </div>
             )}

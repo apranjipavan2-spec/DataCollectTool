@@ -11,6 +11,7 @@ import { useToast } from '@/lib/ToastContext'
 import LineChart from '@/components/charts/LineChart'
 import BarChart from '@/components/charts/BarChart'
 import { BatchRenameModal } from './BatchRenameModal'
+import EmojiIcon from '@/components/EmojiIcon'
 import {
   loadTabulations, loadTabulationsCache, saveTabulation, deleteTabulation,
   saveAnalyzerToolProject, getLastProgram, setLastProgram, type SavedTabulation,
@@ -309,16 +310,16 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
         </div>
         <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
           <button onClick={() => submitFeedback('up')}
-            className={`px-2 py-1.5 text-sm rounded-lg border transition-colors ${feedback === 'up' ? 'border-green-500 text-green-400 bg-green-500/10' : 'border-catalan-border text-catalan-textMuted hover:text-catalan-text'}`}>👍</button>
+            className={`px-2 py-1.5 text-sm rounded-lg border transition-colors ${feedback === 'up' ? 'border-green-500 text-green-400 bg-green-500/10' : 'border-catalan-border text-catalan-textMuted hover:text-catalan-text'}`}><EmojiIcon e="👍" /></button>
           <button onClick={() => submitFeedback('down')}
-            className={`px-2 py-1.5 text-sm rounded-lg border transition-colors ${feedback === 'down' ? 'border-catalan-error text-catalan-error bg-catalan-error/10' : 'border-catalan-border text-catalan-textMuted hover:text-catalan-text'}`}>👎</button>
+            className={`px-2 py-1.5 text-sm rounded-lg border transition-colors ${feedback === 'down' ? 'border-catalan-error text-catalan-error bg-catalan-error/10' : 'border-catalan-border text-catalan-textMuted hover:text-catalan-text'}`}><EmojiIcon e="👎" /></button>
           <button onClick={copyCSV} className={btnSe}>CSV</button>
           <button onClick={runPolish} disabled={polishing} className={btnSe}>
-            {polishing ? '✨…' : '✨ Rename'}
+            <EmojiIcon e="✨" /> {polishing ? '…' : 'Rename'}
           </button>
           <button onClick={() => setShowInterpret(s => !s)}
             className={`${btnSe} ${showInterpret ? 'border-catalan-primary/60 text-catalan-primary' : ''}`}>
-            {interpretation ? '📝 Edit Interpretation' : '📝 Interpret'}
+            <EmojiIcon e="📝" /> {interpretation ? 'Edit Interpretation' : 'Interpret'}
           </button>
           <button onClick={() => setExpanded(e => !e)} className={btnSe}>{expanded ? 'Hide' : 'Expand'}</button>
           <button onClick={onDelete} className="px-2 py-1.5 text-sm border border-catalan-error/30 text-catalan-error rounded-lg hover:bg-catalan-error/10">✕</button>
@@ -431,7 +432,7 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
           </div>
 
           <button onClick={runInterpret} disabled={interpreting} className={btnPr}>
-            {interpreting ? '✨ Generating…' : interpretation ? '✨ Refine & Compare' : '✨ Generate Interpretation'}
+            <EmojiIcon e="✨" /> {interpreting ? 'Generating…' : interpretation ? 'Refine & Compare' : 'Generate Interpretation'}
           </button>
 
           {/* Side-by-side compare when re-generating */}
@@ -967,7 +968,7 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                 smartMode === mode ? 'bg-catalan-surface text-catalan-text shadow-sm' : 'text-catalan-textMuted hover:text-catalan-text'
               }`}>
-              {mode === 'columns' ? '📊 Column Picker' : '💬 Ask a Question'}
+              {mode === 'columns' ? <><EmojiIcon e="📊" /> Column Picker</> : <><EmojiIcon e="💬" /> Ask a Question</>}
             </button>
           ))}
         </div>
@@ -1034,7 +1035,7 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
           disabled={smartBuilding || !cols.length}
           className={`${btnPr} mt-4`}
         >
-          {smartBuilding ? '✨ Analysing data…' : '✨ Smart Build'}
+          <EmojiIcon e="✨" /> {smartBuilding ? 'Analysing data…' : 'Smart Build'}
         </button>
 
         {/* Suggestion result */}
@@ -1093,7 +1094,7 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
           )}
           <div className="flex gap-2">
             <button onClick={callSuggest} disabled={aiLoading || !cols.length} className={btnPr}>
-              {aiLoading ? '✨ Thinking…' : '✨ AI Suggest'}
+              <EmojiIcon e="✨" /> {aiLoading ? 'Thinking…' : 'AI Suggest'}
             </button>
             {suggestions.length > 1 && (
               <button onClick={runAllSuggestions} disabled={runningIdx !== null} className={btnSe}>
@@ -1197,7 +1198,7 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
                   className={btnSe}
                   title="Rename all tables with AI"
                 >
-                  ✨ Batch Rename ({saved.length})
+                  <EmojiIcon e="✨" /> Batch Rename ({saved.length})
                 </button>
               )}
               {hasBatchSnapshot && (
@@ -1388,7 +1389,7 @@ function PanelStudyTab({ programId }: { programId: string }) {
   if (!attrition?.is_panel_study) {
     return (
       <div className={`${card} text-center py-10`}>
-        <div className="text-3xl mb-2">🔗</div>
+        <div className="text-3xl mb-2"><EmojiIcon e="🔗" /></div>
         <div className="text-sm font-medium text-catalan-text mb-1">Panel Study not enabled</div>
         <div className="text-xs text-catalan-textMuted">Enable panel mode and assign waves in <strong>Programs → Setup</strong>.</div>
       </div>
@@ -1398,7 +1399,7 @@ function PanelStudyTab({ programId }: { programId: string }) {
   if ((attrition.waves?.length ?? 0) < 2) {
     return (
       <div className={`${card} text-center py-10`}>
-        <div className="text-3xl mb-2">📊</div>
+        <div className="text-3xl mb-2"><EmojiIcon e="📊" /></div>
         <div className="text-sm font-medium text-catalan-text mb-1">Not enough waves yet</div>
         <div className="text-xs text-catalan-textMuted">Assign at least 2 waves with data in <strong>Programs → Setup</strong> to see the attrition report.</div>
       </div>
@@ -1760,7 +1761,7 @@ export default function FgAnalyzer() {
           <div className="w-full p-6">
             {!programId && (
               <div className="flex flex-col items-center justify-center h-64 text-catalan-textMuted">
-                <div className="text-5xl mb-4">🔬</div>
+                <div className="text-5xl mb-4"><EmojiIcon e="🔬" /></div>
                 <p className="text-sm font-medium">Select a program from the dropdown above to begin analysis</p>
               </div>
             )}
@@ -1832,7 +1833,7 @@ export default function FgAnalyzer() {
                             disabled={colDataLoading}
                             className={`${card} flex flex-col items-start gap-3 text-left hover:border-catalan-primary/50 hover:bg-catalan-primary/5 transition-all disabled:opacity-40 cursor-pointer`}
                           >
-                            <div className="text-2xl">🤖</div>
+                            <div className="text-2xl"><EmojiIcon e="🤖" /></div>
                             <div>
                               <div className="text-sm font-semibold text-catalan-text mb-1">
                                 {colDataLoading ? 'Loading…' : 'Build with AI'}
@@ -1852,7 +1853,7 @@ export default function FgAnalyzer() {
                             }}
                             className={`${card} flex flex-col items-start gap-3 text-left hover:border-catalan-primary/50 hover:bg-catalan-primary/5 transition-all cursor-pointer`}
                           >
-                            <div className="text-2xl">✏️</div>
+                            <div className="text-2xl"><EmojiIcon e="✏️" /></div>
                             <div>
                               <div className="text-sm font-semibold text-catalan-text mb-1">Build Manually</div>
                               <p className="text-xs text-catalan-textMuted leading-relaxed">
