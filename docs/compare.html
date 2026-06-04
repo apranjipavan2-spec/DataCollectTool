@@ -248,12 +248,15 @@
 
     /* TABLES */
     .cmp-wrap{overflow-x:auto;border-radius:16px;border:1px solid var(--border);box-shadow:0 4px 24px rgba(0,0,0,.05)}
-    table{width:100%;border-collapse:collapse;font-size:.86rem;background:white;min-width:680px}
-    thead th{background:var(--bg2);padding:14px 16px;text-align:center;font-weight:800;color:var(--text);border-bottom:2px solid var(--border);font-size:.82rem}
+    table{width:100%;border-collapse:collapse;font-size:.82rem;background:white;table-layout:fixed}
+    thead th{background:var(--bg2);padding:12px 12px;text-align:center;font-weight:800;color:var(--text);border-bottom:2px solid var(--border);font-size:.8rem;width:17%}
+    thead th:first-child{width:32%}
+    .cmp-wrap .tag-better,.cmp-wrap .tag-ok,.cmp-wrap .tag-worse{white-space:normal;line-height:1.35}
+    @media(max-width:720px){.cmp-wrap table{min-width:680px}}
     thead th.highlight{background:linear-gradient(110deg,rgba(14,165,233,.12),rgba(124,58,237,.22),rgba(14,165,233,.12));background-size:220% 100%;color:var(--brand-dark);animation:fgShimmer 5s linear infinite}
     @keyframes fgShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
     thead th:first-child{text-align:left}
-    tbody td{padding:11px 16px;text-align:center;border-bottom:1px solid var(--border);color:var(--text2)}
+    tbody td{padding:10px 12px;text-align:center;border-bottom:1px solid var(--border);color:var(--text2)}
     tbody td:first-child{text-align:left;font-weight:600;color:var(--text)}
     tbody tr:hover{background:var(--bg2)}
     .col-fg{background:rgba(14,165,233,.04)}
@@ -280,8 +283,9 @@
     .cta-block{background:linear-gradient(135deg,#eff6ff 0%,#f5f3ff 100%);border:1px solid rgba(14,165,233,.15);border-radius:28px;padding:56px 40px;text-align:center;max-width:1100px;margin:0 auto}
     .cta-block h2{font-size:1.9rem;font-weight:900;color:var(--text);margin-bottom:12px}
     .cta-block p{font-size:1rem;color:var(--text2);max-width:460px;margin:0 auto 28px}
-    .cta-buttons{display:flex;flex-wrap:wrap;justify-content:center;gap:14px}
-    .wa-btn{display:inline-flex;align-items:center;gap:8px;padding:13px 28px;background:#25d366;color:white;border-radius:12px;font-weight:700;font-size:.92rem;text-decoration:none;transition:all .2s}
+    .cta-buttons{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:18px;max-width:680px;margin:0 auto}
+    .cta-buttons>a{flex:1 1 180px;justify-content:center;text-align:center;white-space:nowrap}
+    .wa-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 28px;background:#25d366;color:white;border-radius:12px;font-weight:700;font-size:.92rem;text-decoration:none;transition:all .2s}
     .wa-btn:hover{background:#1ebe5d;transform:translateY(-2px)}
 
     /* FOOTER */
@@ -514,7 +518,7 @@
         <tr><td>True Offline Mode</td><td class="col-fg"><span class="tag-better">✓ Full offline</span></td><td><span class="tag-better">✓ App only</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Partial</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> App only</span></td></tr>
         <tr><td>No Installation Needed</td><td class="col-fg"><span class="tag-better">✓ PWA — any browser</span></td><td><span class="tag-worse">✕ App required</span></td><td><span class="tag-worse">✕ App required</span></td><td><span class="tag-worse">✕ App required</span></td></tr>
         <tr><td>GPS Capture in Forms</td><td class="col-fg"><span class="tag-better">✓ Built-in geopoint</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-better">✓</span></td></tr>
-        <tr><td>Photo &amp; Audio Capture</td><td class="col-fg"><span class="tag-better">✓ + auto-compress</span></td><td><span class="tag-better">✓ No compression</span></td><td><span class="tag-better">✓ No compression</span></td><td><span class="tag-better">✓ No compression</span></td></tr>
+        <tr><td>Photo &amp; Audio Capture</td><td class="col-fg"><span class="tag-better">✓ + auto-compress</span></td><td><span class="tag-worse">✗ No compression</span></td><td><span class="tag-worse">✗ No compression</span></td><td><span class="tag-worse">✗ No compression</span></td></tr>
         <tr><td>Auto Photo Compression</td><td class="col-fg"><span class="tag-better">✓ 96% reduction</span></td><td><span class="tag-worse">✕ None</span></td><td><span class="tag-worse">✕ None</span></td><td><span class="tag-worse">✕ None</span></td></tr>
         <tr><td>Multi-language Forms</td><td class="col-fg"><span class="tag-better">✓ 22 Indian languages</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> EN only UI</span></td><td><span class="tag-better">✓ Many</span></td><td><span class="tag-better">✓ Many</span></td></tr>
         <tr><td>Background Sync</td><td class="col-fg"><span class="tag-better">✓ Even app-closed</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
@@ -534,7 +538,6 @@
         <tr><td>SPSS .sav Export</td><td class="col-fg"><span class="tag-better">✓ Built-in</span></td><td><span class="tag-better">✓ Paid add-on</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
 
         <tr class="grp" style="background:rgba(16,185,129,.04)"><td colspan="5" style="color:var(--green)"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> Platform &amp; Compliance</td></tr>
-        <tr><td>Indian Language UI</td><td class="col-fg"><span class="tag-better">✓ HI, KN, TE, MR, TA…</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Limited</span></td><td><span class="tag-better">✓ Many</span></td><td><span class="tag-better">✓ Many</span></td></tr>
         <tr><td>White-label Branding</td><td class="col-fg"><span class="tag-better">✓ Per tenant</span></td><td><span class="tag-ok">Enterprise only</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
         <tr><td>REST API + API Keys</td><td class="col-fg"><span class="tag-better">✓ All paid plans</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Paid add-on</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-better">✓</span></td></tr>
         <tr><td>Multi-tenant SaaS</td><td class="col-fg"><span class="tag-better">✓ Full DB isolation</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
