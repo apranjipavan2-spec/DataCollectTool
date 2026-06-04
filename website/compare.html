@@ -149,11 +149,15 @@
     .calc-sub{font-size:.74rem;color:var(--text3);margin-bottom:12px}
     .calc-line{display:flex;justify-content:space-between;gap:8px;font-size:.79rem;padding:5px 0;border-top:1px dashed var(--border);color:var(--text2)}
     .calc-line span:last-child{font-weight:700;color:var(--text);white-space:nowrap}
-    .calc-verdict{border-radius:18px;padding:30px 24px;background:linear-gradient(135deg,var(--brand),var(--accent));color:white;text-align:center;margin-top:8px}
-    .calc-verdict .cv-pct{font-size:2.7rem;font-weight:900;line-height:1;letter-spacing:-.01em}
-    .calc-verdict .cv-save{font-size:1.02rem;font-weight:700;opacity:.96;margin-top:6px}
-    .calc-verdict .cv-plan{margin-top:10px;font-size:.88rem;line-height:1.55;color:rgba(255,255,255,.95);max-width:600px;margin-left:auto;margin-right:auto}
+    .calc-verdict{border-radius:18px;padding:18px 24px;background:linear-gradient(135deg,var(--brand),var(--accent));color:white;margin-top:8px;display:grid;grid-template-columns:auto 1fr;gap:8px 28px;align-items:center}
+    .calc-verdict .cv-left{text-align:center;padding-right:24px;border-right:1px solid rgba(255,255,255,.25)}
+    .calc-verdict .cv-right{display:flex;flex-direction:column;gap:10px}
+    .calc-verdict .cv-pct{font-size:2.4rem;font-weight:900;line-height:1;letter-spacing:-.01em}
+    .calc-verdict .cv-save{font-size:.92rem;font-weight:700;opacity:.96;margin-top:4px}
+    .calc-verdict .cv-plan{font-size:.88rem;line-height:1.5;color:rgba(255,255,255,.95)}
     .calc-verdict .cv-plan strong{background:rgba(255,255,255,.22);padding:2px 8px;border-radius:6px;font-weight:800}
+    .calc-verdict .cv-btns{display:flex;flex-wrap:wrap;gap:10px}
+    @media(max-width:600px){.calc-verdict{grid-template-columns:1fr;text-align:center}.calc-verdict .cv-left{padding-right:0;border-right:none;border-bottom:1px solid rgba(255,255,255,.25);padding-bottom:12px}.calc-verdict .cv-btns{justify-content:center}}
     /* multi-platform ranked comparison */
     /* Calculator tile — highlighted, distinct from page flow */
     #calc{max-width:1400px}
@@ -210,7 +214,9 @@
     .cc-extras li.no{color:var(--text3);font-weight:600}
     .cc-extras li.no::before{content:'✗';color:#dc2626}
     .calc-inputs-top{border:1px solid var(--border);border-radius:18px;padding:18px;background:var(--bg3);margin-bottom:26px}
-    .calc-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .calc-fields{display:grid;grid-template-columns:1fr 1.7fr 1fr 1fr 1fr 1fr;gap:12px;align-items:start}
+    @media(max-width:1100px){.calc-fields{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:600px){.calc-fields{grid-template-columns:repeat(2,1fr)}}
     .calc-fields .calc-field{margin-bottom:0;background:#fff;border:1px solid var(--border);border-radius:12px;padding:13px 15px;display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
     .calc-fields .calc-field label{margin-bottom:0}
     .calc-fields .calc-field input{background:var(--bg2)}
@@ -412,12 +418,16 @@
 
   <!-- SAVINGS -->
   <div class="calc-verdict">
-    <div class="cv-pct" id="co-pct">—</div>
-    <div class="cv-save" id="co-save">—</div>
-    <div class="cv-plan" id="co-verdict">—</div>
-    <div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:10px;justify-content:center">
-      <a href="pricing.html" class="btn-outline" style="background:white;border-color:white;color:var(--brand-dark);padding:9px 18px;font-size:.86rem">See plan details</a>
-      <a href="https://wa.me/918088709011?text=Hi%2C%20I%27d%20like%20a%20FieldGovern%20quote%20for%20my%20fieldwork." target="_blank" class="btn-outline" style="background:transparent;border-color:rgba(255,255,255,.6);color:white;padding:9px 18px;font-size:.86rem">Get a quote</a>
+    <div class="cv-left">
+      <div class="cv-pct" id="co-pct">—</div>
+      <div class="cv-save" id="co-save">—</div>
+    </div>
+    <div class="cv-right">
+      <div class="cv-plan" id="co-verdict">—</div>
+      <div class="cv-btns">
+        <a href="pricing.html" class="btn-outline" style="background:white;border-color:white;color:var(--brand-dark);padding:9px 18px;font-size:.86rem">See plan details</a>
+        <a href="https://wa.me/918088709011?text=Hi%2C%20I%27d%20like%20a%20FieldGovern%20quote%20for%20my%20fieldwork." target="_blank" class="btn-outline" style="background:transparent;border-color:rgba(255,255,255,.6);color:white;padding:9px 18px;font-size:.86rem">Get a quote</a>
+      </div>
     </div>
   </div>
 
