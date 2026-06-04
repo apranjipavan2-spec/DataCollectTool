@@ -96,3 +96,12 @@ _archive.zip
 deploy/monitor-config.json
 process_deployment.md
 .gstack/
+
+# Personal data — never commit (lead-gen / outreach / prospect intel)
+tools/INDEX.md
+tools/SNAPSHOT.md
+tools/data_store/
+tools/ngo_intel/
+tools/outreach/
+tools/prospect_intel/
+.claude/scheduled_tasks.lock
