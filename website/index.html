@@ -845,103 +845,12 @@
   </div>
 </section>
 
-<section class="ai-showcase-bg">
-  <div class="section-inner">
-    <div class="text-center reveal">
-      <div class="section-tag" style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.35);color:#6ee7b7">✦ Now Live</div>
-      <h2 class="section-title" style="color:white">The Complete AI Analysis Suite</h2>
-      <p class="section-sub" style="color:rgba(255,255,255,0.65);margin:0 auto">Four paths from data to insight: 1-click AI auto-generate, Smart Builder with NL query or column picker, manual tabulation, and per-table AI interpretation with iterative refinement.</p>
-    </div>
-    <div class="ai-flow-wrap">
-      <div class="ai-flow-steps">
-        <div class="ai-step active reveal delay-1">
-          <div class="ai-step-num">1</div>
-          <div>
-            <h4>Choose your table creation path</h4>
-            <p>1-click AI auto-generate (up to 10 tables), Smart Builder with column picker or NL query, manual tabulation, or CSV upload.</p>
-          </div>
-        </div>
-        <div class="ai-step reveal delay-2">
-          <div class="ai-step-num">2</div>
-          <div>
-            <h4>AI cleans labels &amp; designs the structure</h4>
-            <p>Smart Builder sees real unique values from your submissions. AI picks groupby, value field, chart type, and pre-cleans all column labels.</p>
-          </div>
-        </div>
-        <div class="ai-step reveal delay-3">
-          <div class="ai-step-num">3</div>
-          <div>
-            <h4>Generate a per-table AI interpretation</h4>
-            <p>Choose from 10 methodology templates (Distribution, Equity, Outlier, Interaction Effect…) or write a custom focus. Refine iteratively — compare Previous vs Refined before committing.</p>
-          </div>
-        </div>
-        <div class="ai-step reveal delay-4">
-          <div class="ai-step-num">4</div>
-          <div>
-            <h4>FG Writer reads your interpretations</h4>
-            <p>The report writer AI picks up stored interpretations from every table — generating richer narratives that reference your analyst context, not just the raw data.</p>
-          </div>
-        </div>
-      </div>
-      <div class="reveal-right">
-        <div class="ai-mock-screen">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-            <span style="font-size:0.8rem;font-weight:700;color:white">FG Analyzer — Demo Program</span>
-            <span class="live-badge">Live</span>
-          </div>
-          <div style="text-align:center;margin-bottom:16px">
-            <button class="ai-mock-btn">✦ Auto-Generate AI Insights</button>
-          </div>
-          <div class="ai-progress-msg" id="aiMsg">Analyzing dataset schema…</div>
-          <div id="aiCards" style="display:none">
-            <div class="ai-result-card">
-              <div class="ai-card-title"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>District-wise Sample Count <span style="font-size:0.6rem;color:#7dd3fc;background:rgba(14,165,233,0.15);border-radius:4px;padding:1px 5px">bar</span></div>
-              <div class="ai-mini-bars">
-                <div class="ai-mini-bar" style="height:60%"></div>
-                <div class="ai-mini-bar" style="height:45%"></div>
-                <div class="ai-mini-bar" style="height:80%"></div>
-                <div class="ai-mini-bar" style="height:35%"></div>
-                <div class="ai-mini-bar" style="height:70%"></div>
-              </div>
-            </div>
-            <div class="ai-result-card">
-              <div class="ai-card-title"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Gender × Household type <span style="font-size:0.6rem;color:#7dd3fc;background:rgba(14,165,233,0.15);border-radius:4px;padding:1px 5px">cross-tab</span></div>
-              <div class="ai-mini-bars">
-                <div class="ai-mini-bar" style="height:50%"></div>
-                <div class="ai-mini-bar" style="height:90%"></div>
-                <div class="ai-mini-bar" style="height:40%"></div>
-                <div class="ai-mini-bar" style="height:65%"></div>
-                <div class="ai-mini-bar" style="height:55%"></div>
-              </div>
-            </div>
-            <div class="ai-result-card">
-              <div class="ai-card-title"><svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Age Distribution <span style="font-size:0.6rem;color:#7dd3fc;background:rgba(14,165,233,0.15);border-radius:4px;padding:1px 5px">pie</span></div>
-              <div class="ai-mini-bars">
-                <div class="ai-mini-bar" style="height:30%"></div>
-                <div class="ai-mini-bar" style="height:75%"></div>
-                <div class="ai-mini-bar" style="height:100%"></div>
-                <div class="ai-mini-bar" style="height:55%"></div>
-                <div class="ai-mini-bar" style="height:40%"></div>
-              </div>
-            </div>
-          </div>
-          <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-            <span style="font-size:0.65rem;color:rgba(255,255,255,0.5)">2 generations / day</span>
-            <span style="font-size:0.65rem;color:rgba(255,255,255,0.5)">Auto-refresh 30 min</span>
-            <span style="font-size:0.65rem;color:rgba(255,255,255,0.5)">History view</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="pipeline" style="background:#fff">
+<section id="pipeline" class="coming-soon-bg">
   <div class="section-inner">
     <div class="text-center reveal">
       <div class="section-tag" style="background:rgba(124,58,237,0.1);border-color:rgba(124,58,237,0.3);color:#7c3aed"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg> Unique Advantage</div>
-      <h2 class="section-title">The only platform that closes the loop</h2>
-      <p class="section-sub">SurveyCTO, KoboToolbox, and ODK give you raw data — and stop there. FieldGovern takes you from first interview to final report, inside a single platform.</p>
+      <h2 class="section-title" style="color:white">The only platform that closes the loop</h2>
+      <p class="section-sub" style="color:rgba(255,255,255,0.7)">SurveyCTO, KoboToolbox, and ODK give you raw data — and stop there. FieldGovern takes you from first interview to final report, inside a single platform.</p>
     </div>
 
     <!-- Pipeline visual -->
@@ -998,40 +907,13 @@
       </div>
     </div>
 
-    <!-- Three differentiator callouts -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:48px">
-      <div class="reveal delay-1" style="background:#f8fafc;border:1px solid var(--border);border-radius:16px;padding:28px;border-top:3px solid #10b981">
-        <div style="margin-bottom:12px"><svg viewBox="0 0 24 24" style="width:26px;height:26px;stroke:#10b981;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></div>
-        <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:8px">Built-in Data Cleaner</h3>
-        <p style="font-size:0.83rem;color:var(--text2);line-height:1.6">Automatically flag duplicates, fix data types, identify outliers, and view a quality report — without ever leaving FieldGovern. Competitors make you export to R or Stata first.</p>
-        <div style="margin-top:14px;font-size:0.72rem;color:#10b981;font-weight:700">← Step 3 of your pipeline</div>
-      </div>
-      <div class="reveal delay-2" style="background:#f8fafc;border:1px solid var(--border);border-radius:16px;padding:28px;border-top:3px solid #f59e0b">
-        <div style="margin-bottom:12px"><svg viewBox="0 0 24 24" style="width:26px;height:26px;stroke:#f59e0b;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
-        <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:8px">Analyzer + Smart Builder + Interpretation</h3>
-        <p style="font-size:0.83rem;color:var(--text2);line-height:1.6">Ask a question in plain English, pick columns from a searchable list, or 1-click AI auto-generate. Every table gets per-table AI interpretation with 10 methodology templates. Refine iteratively — compare old vs new before committing.</p>
-        <div style="margin-top:14px;font-size:0.72rem;color:#f59e0b;font-weight:700">← Step 4 of your pipeline</div>
-      </div>
-      <div class="reveal delay-3" style="background:#f8fafc;border:1px solid var(--border);border-radius:16px;padding:28px;border-top:3px solid #ef4444">
-        <div style="margin-bottom:12px"><svg viewBox="0 0 24 24" style="width:26px;height:26px;stroke:#ef4444;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
-        <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:8px">AI Report Writer + Interpretation-Aware</h3>
-        <p style="font-size:0.83rem;color:var(--text2);line-height:1.6">Turn tables into full narrative reports in 6 styles. The Writer AI reads your stored per-table interpretations from the Analyzer — so it starts with analyst context, not raw numbers. Schedule weekly emails to your PI automatically.</p>
-        <div style="margin-top:14px;font-size:0.72rem;color:#ef4444;font-weight:700">← Step 5 of your pipeline</div>
-      </div>
+    <!-- Module grid (same section) -->
+    <div id="analytics" class="text-center reveal" style="margin-top:64px">
+      <h3 style="font-size:1.35rem;font-weight:900;color:white;letter-spacing:-0.01em">Every module that powers steps 3–5</h3>
+      <p class="section-sub" style="color:rgba(255,255,255,0.7);margin:8px auto 0">Six modules live now, GIS coming Q3 2026 — the full intelligence suite, built in.</p>
     </div>
 
-  </div>
-</section>
-
-<section id="analytics" class="coming-soon-bg">
-  <div class="section-inner">
-    <div class="text-center reveal">
-      <div class="section-tag" style="background:rgba(14,165,233,0.15);border-color:rgba(14,165,233,0.3);color:#7dd3fc"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Intelligence Suite</div>
-      <h2 class="section-title" style="color:white">End-to-End Analysis & Reporting</h2>
-      <p class="section-sub" style="color:rgba(255,255,255,0.7);margin:0 auto">FieldGovern is a complete intelligence suite — from data collection to publication-ready reports. Four modules are live now.</p>
-    </div>
-    
-    <div class="coming-grid">
+    <div class="coming-grid" style="margin-top:36px">
       <div class="coming-card reveal delay-1">
         <span class="icon"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>
         <h3>Real-Time Data Analysis</h3>
