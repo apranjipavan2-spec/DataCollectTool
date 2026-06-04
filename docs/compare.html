@@ -129,7 +129,7 @@
     .calc-field:last-child{margin-bottom:0}
     .calc-field label{display:block;font-size:.82rem;font-weight:700;color:var(--text2);margin-bottom:6px}
     .calc-field label .hint{font-weight:500;color:var(--text3);font-size:.72rem}
-    .calc-field input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:1rem;font-family:inherit;color:var(--text)}
+    .calc-field input{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:10px;font-size:1rem;font-family:inherit;color:var(--text);background:#fff;transition:border-color .15s,box-shadow .15s}
     .calc-field input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(14,165,233,.12)}
     .calc-toggle{display:flex;gap:6px;background:var(--bg3);border-radius:10px;padding:4px}
     .ct-btn{flex:1;border:none;background:transparent;border-radius:8px;padding:8px 10px;font-family:inherit;font-size:.76rem;font-weight:700;color:var(--text3);cursor:pointer;transition:all .15s;line-height:1.2}
@@ -209,11 +209,14 @@
     .cc-extras li::before{content:'✓';color:var(--green);font-weight:900;flex-shrink:0}
     .cc-extras li.no{color:var(--text3);font-weight:600}
     .cc-extras li.no::before{content:'✗';color:#dc2626}
-    .calc-inputs-top{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 18px;align-items:start;border:1px solid var(--border);border-radius:16px;padding:20px;background:var(--bg2);margin-bottom:22px}
-    .calc-inputs-top .calc-field{margin-bottom:0}
-    .calc-field-wide{grid-column:span 2}
-    @media(max-width:760px){.calc-inputs-top{grid-template-columns:repeat(2,1fr)}.calc-field-wide{grid-column:span 1}}
-    @media(max-width:440px){.calc-inputs-top{grid-template-columns:1fr}}
+    .calc-inputs-top{border:1px solid var(--border);border-radius:18px;padding:24px;background:var(--bg2);margin-bottom:22px}
+    .calc-volmode{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border)}
+    .cvm-label{font-size:.82rem;font-weight:700;color:var(--text2);white-space:nowrap}
+    .calc-volmode .calc-toggle{flex:1;min-width:260px;max-width:460px}
+    .calc-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+    .calc-fields .calc-field{margin-bottom:0}
+    @media(max-width:760px){.calc-fields{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:440px){.calc-fields{grid-template-columns:1fr}.calc-volmode{gap:10px}.calc-volmode .calc-toggle{min-width:0;max-width:none;width:100%}}
     @media(max-width:900px){
       .calc-grid{grid-template-columns:1fr}
       .calc-grid .calc-inputs{position:static}
@@ -368,40 +371,42 @@
 
   <!-- INPUTS (top) -->
   <div class="calc-inputs-top">
-    <div class="calc-field">
-      <label>Programs / projects <span class="hint">distinct studies</span></label>
-      <input id="ci-programs" type="number" min="1" value="2"/>
-    </div>
-    <div class="calc-field calc-field-wide">
-      <label>Volume — enter by</label>
+    <div class="calc-volmode">
+      <span class="cvm-label">Volume — enter by</span>
       <div class="calc-toggle">
         <button type="button" class="ct-btn active" data-mode="subs" onclick="setVolMode('subs')">Submissions / month</button>
         <button type="button" class="ct-btn" data-mode="quest" onclick="setVolMode('quest')">Questionnaires / project</button>
       </div>
-      <div id="cf-subs" style="margin-top:10px">
+    </div>
+    <div class="calc-fields">
+      <div class="calc-field">
+        <label>Programs / projects <span class="hint">distinct studies</span></label>
+        <input id="ci-programs" type="number" min="1" value="2"/>
+      </div>
+      <div class="calc-field" id="cf-subs">
         <label>Submissions / month <span class="hint">total responses</span></label>
         <input id="ci-subs" type="number" min="1" value="2000"/>
       </div>
-      <div id="cf-quest" style="display:none;margin-top:10px">
+      <div class="calc-field" id="cf-quest" style="display:none">
         <label>Submissions / project <span class="hint">target per project</span></label>
         <input id="ci-perproject" type="number" min="1" value="3000"/>
       </div>
-    </div>
-    <div class="calc-field">
-      <label>Pages / form <span class="hint">double-sided</span></label>
-      <input id="ci-pages" type="number" min="1" value="12"/>
-    </div>
-    <div class="calc-field">
-      <label>Duration <span class="hint">months</span></label>
-      <input id="ci-months" type="number" min="1" value="6"/>
-    </div>
-    <div class="calc-field">
-      <label>Data-entry base <span class="hint">₹ min</span></label>
-      <input id="ci-opsal" type="number" min="0" step="500" value="15000"/>
-    </div>
-    <div class="calc-field">
-      <label>Analyst salary <span class="hint">₹ / month</span></label>
-      <input id="ci-ansal" type="number" min="0" step="1000" value="30000"/>
+      <div class="calc-field">
+        <label>Pages / form <span class="hint">double-sided</span></label>
+        <input id="ci-pages" type="number" min="1" value="12"/>
+      </div>
+      <div class="calc-field">
+        <label>Duration <span class="hint">months</span></label>
+        <input id="ci-months" type="number" min="1" value="6"/>
+      </div>
+      <div class="calc-field">
+        <label>Data-entry base <span class="hint">₹ min</span></label>
+        <input id="ci-opsal" type="number" min="0" step="500" value="15000"/>
+      </div>
+      <div class="calc-field">
+        <label>Analyst salary <span class="hint">₹ / month</span></label>
+        <input id="ci-ansal" type="number" min="0" step="1000" value="30000"/>
+      </div>
     </div>
   </div>
 
