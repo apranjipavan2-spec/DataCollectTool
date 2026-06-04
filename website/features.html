@@ -203,7 +203,7 @@
     @keyframes uploadFill{0%,10%{width:0}80%{width:100%}100%{width:100%}}
     @keyframes sizeChange{0%,5%{opacity:1} 14%{opacity:0} 15%{opacity:1} 29%{opacity:0} 30%{opacity:1} 44%{opacity:0} 45%{opacity:1} 59%{opacity:0} 60%,100%{opacity:1}}
     .f5-photo{width:100%;height:100px;background:linear-gradient(135deg,#1e3a5f,#0c2340,#1a4080);border-radius:8px;margin-bottom:10px;position:relative;overflow:hidden;animation:shimmer 3s infinite}
-    .f5-photo::after{content:'📷';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.6rem}
+    .f5-photo::after{content:'<svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.6rem}
     .f5-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
     .f5-name{font-size:.68rem;color:rgba(255,255,255,.6);font-family:'JetBrains Mono',monospace}
     .f5-sizes{display:flex;flex-direction:column;gap:3px;text-align:right}
@@ -452,6 +452,10 @@
       .page-hero h1{font-size:1.8rem}
     }
     @media(max-width:1024px){.footer-grid{grid-template-columns:1fr 1fr}}
+      .ei{display:inline-block;width:1em;height:1em;vertical-align:-0.14em;stroke:currentColor;stroke-width:1.85;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;transition:transform .25s ease}
+    .ei:hover{transform:scale(1.18) rotate(-3deg)}
+    a:hover .ei,button:hover .ei,[class*='card']:hover .ei{transform:scale(1.15)}
+    @media(prefers-reduced-motion:reduce){.ei{transition:none}}
   </style>
   <script type="application/ld+json">
   {
@@ -489,13 +493,13 @@
 
 <div id="mobileMenu" role="navigation">
   <a href="features.html">✦ Features</a>
-  <a href="integrations.html">🔗 Integrations</a>
-  <a href="use-cases.html">🏘️ Use Cases</a>
-  <a href="compare.html">📊 Compare</a>
-  <a href="security.html">🔒 Security</a>
-  <a href="pricing.html">💰 Pricing</a>
-  <a href="about.html">🏛️ About Us</a>
-  <a href="demo.html" style="color:var(--brand);font-weight:700">🚀 Try Free Demo</a>
+  <a href="integrations.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Integrations</a>
+  <a href="use-cases.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Use Cases</a>
+  <a href="compare.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Compare</a>
+  <a href="security.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Security</a>
+  <a href="pricing.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Pricing</a>
+  <a href="about.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg> About Us</a>
+  <a href="demo.html" style="color:var(--brand);font-weight:700"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Try Free Demo</a>
 </div>
 
 <!-- PAGE SIDEBAR (shown at ≥1440px desktop) -->
@@ -596,7 +600,7 @@
       <div class="feat-screen">
         <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">FieldGovern — Enumerator App</span></div>
         <div style="position:relative;margin-bottom:14px">
-          <div class="f1-offline a">📵 Offline — 4 forms saved locally</div>
+          <div class="f1-offline a"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12" y2="20"/></svg> Offline — 4 forms saved locally</div>
           <div class="f1-online a" style="position:relative;top:auto;left:auto;margin-top:0">⟳ Connection restored — syncing…</div>
         </div>
         <div class="f1-field">
@@ -612,7 +616,7 @@
           <div class="f1-track"><div class="f1-fill b3 a"></div></div>
         </div>
         <div class="f1-synctrack"><div class="f1-syncfill a"></div></div>
-        <div class="f1-done a">✅ 4 submissions synced successfully</div>
+        <div class="f1-done a"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> 4 submissions synced successfully</div>
       </div>
     </div>
   </div>
@@ -636,22 +640,22 @@
       <div class="feat-screen">
         <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Form Builder</span></div>
         <div style="margin-bottom:8px;display:flex;flex-wrap:wrap">
-          <div class="f2-pill">📝 Text</div>
-          <div class="f2-pill">🔢 Number</div>
-          <div class="f2-pill">📍 GPS</div>
-          <div class="f2-pill">📷 Photo</div>
-          <div class="f2-pill">☑ Select</div>
+          <div class="f2-pill"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Text</div>
+          <div class="f2-pill"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg> Number</div>
+          <div class="f2-pill"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> GPS</div>
+          <div class="f2-pill"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Photo</div>
+          <div class="f2-pill"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Select</div>
         </div>
         <div class="f2-field-card s1 a">
-          <div class="f2-field-icon">📝</div>
+          <div class="f2-field-icon"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
           <span>Respondent Name — Text field</span>
         </div>
         <div class="f2-field-card s2 a">
-          <div class="f2-field-icon">🔢</div>
+          <div class="f2-field-icon"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg></div>
           <span>Age — Number (18–99) with validation</span>
         </div>
         <div class="f2-field-card s3 a">
-          <div class="f2-field-icon">📍</div>
+          <div class="f2-field-icon"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
           <span>GPS Location — auto-capture enabled</span>
         </div>
         <svg class="f2-skip-svg a" viewBox="0 0 200 32">
@@ -684,14 +688,14 @@
         <div class="f3-input">Household survey for MGNREGA beneficiaries in Karnataka. Collect work days, wages, bank account linkage, awareness, grievances. Include caste, gender, landholding demographics.</div>
         <div class="f3-status a"><span class="f3-spinner a"></span>Designing question structure and sections…</div>
         <div class="f3-progress"><div class="f3-progress-fill a"></div></div>
-        <div class="f3-result a">✅ Generated: 38 questions · 7 sections · Skip logic applied</div>
+        <div class="f3-result a"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Generated: 38 questions · 7 sections · Skip logic applied</div>
         <div class="f3-sections">
-          <div class="f3-sec a">📋 Consent</div>
-          <div class="f3-sec a">👤 Demographics</div>
-          <div class="f3-sec a">💼 MGNREGA Work</div>
-          <div class="f3-sec a">🏦 Wages & Payments</div>
-          <div class="f3-sec a">📣 Awareness</div>
-          <div class="f3-sec a">⚠️ Grievances</div>
+          <div class="f3-sec a"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2h6a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg> Consent</div>
+          <div class="f3-sec a"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Demographics</div>
+          <div class="f3-sec a"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg> MGNREGA Work</div>
+          <div class="f3-sec a"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg> Wages & Payments</div>
+          <div class="f3-sec a"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg> Awareness</div>
+          <div class="f3-sec a"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg> Grievances</div>
         </div>
       </div>
     </div>
@@ -717,9 +721,9 @@
         <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Platform Import</span></div>
         <div class="f4-grid">
           <div class="f4-sources">
-            <div class="f4-src a" style="animation-delay:0s">📊 XLSForm</div>
-            <div class="f4-src a" style="animation-delay:-2s">🔵 KoboToolbox</div>
-            <div class="f4-src a" style="animation-delay:-4s">🟠 SurveyCTO</div>
+            <div class="f4-src a" style="animation-delay:0s"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> XLSForm</div>
+            <div class="f4-src a" style="animation-delay:-2s"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/></svg> KoboToolbox</div>
+            <div class="f4-src a" style="animation-delay:-4s"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/></svg> SurveyCTO</div>
           </div>
           <div style="display:flex;align-items:center;justify-content:center">
             <svg class="f4-arrow-svg a" viewBox="0 0 48 80">
@@ -734,7 +738,7 @@
           </div>
         </div>
         <div class="f4-target" style="margin-top:12px">
-          <div class="f4-tgt">✅ 1 form imported — 47 questions, skip logic preserved</div>
+          <div class="f4-tgt"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> 1 form imported — 47 questions, skip logic preserved</div>
         </div>
       </div>
     </div>
@@ -818,7 +822,7 @@
         <div class="f6-row r2 a">
           <div><div class="f6-name">Priya Devi</div><div class="f6-loc">Bidar, Karnataka</div></div>
           <div class="f6-gps a"></div>
-          <div class="f6-status s2 a">⚑ Flagged</div>
+          <div class="f6-status s2 a"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg> Flagged</div>
         </div>
         <div class="f6-row r3">
           <div><div class="f6-name">Mohammed Irfan</div><div class="f6-loc">Gulbarga, Karnataka</div></div>
@@ -851,20 +855,20 @@
           <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">WhatsApp Business</span></div>
         </div>
         <div class="f7-header">
-          <div class="f7-avatar">📊</div>
+          <div class="f7-avatar"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
           <div><div class="f7-hname">FieldGovern Alerts</div><div class="f7-hstatus">Official Business Account · Online</div></div>
         </div>
         <div style="padding:0 14px 14px;flex:1;display:flex;flex-direction:column;gap:8px;background:rgba(0,0,0,.15)">
           <div class="f7-bubble">
-            <div class="f7-btext">📊 <strong>Sync Alert</strong><br/>Rajesh Kumar synced 5 forms from Bellary, Karnataka</div>
+            <div class="f7-btext"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> <strong>Sync Alert</strong><br/>Rajesh Kumar synced 5 forms from Bellary, Karnataka</div>
             <div class="f7-btime">11:24 AM ✓✓</div>
           </div>
           <div class="f7-bubble">
-            <div class="f7-btext">⚠️ <strong>QC Alert</strong><br/>GPS mismatch detected on submission #842 — expected Gulbarga, recorded Bidar</div>
+            <div class="f7-btext"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg> <strong>QC Alert</strong><br/>GPS mismatch detected on submission #842 — expected Gulbarga, recorded Bidar</div>
             <div class="f7-btime">11:31 AM ✓✓</div>
           </div>
           <div class="f7-bubble">
-            <div class="f7-btext">✅ <strong>Assignment Complete</strong><br/>Block 4 survey completed — 23/23 households done</div>
+            <div class="f7-btext"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> <strong>Assignment Complete</strong><br/>Block 4 survey completed — 23/23 households done</div>
             <div class="f7-btime">12:47 PM ✓✓</div>
           </div>
         </div>
@@ -891,7 +895,7 @@
       <div class="feat-screen">
         <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Google Sheets — Live</span></div>
         <div class="f8-sheetbar">
-          <span class="f8-sheeticon">🟢</span>
+          <span class="f8-sheeticon"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/></svg></span>
           <span class="f8-sheettitle">MGNREGA Survey 2025</span>
           <span class="f8-counter">Total: <span id="sheetCount">847</span> rows</span>
         </div>
@@ -915,7 +919,7 @@
      CATEGORY 3: AI INTELLIGENCE
 ═══════════════════════════════════════════════ -->
 <div class="cat-heading reveal" style="background:var(--dark);padding-bottom:8px">
-  <div class="cat-tag" style="background:rgba(124,58,237,.15);border-color:rgba(124,58,237,.3);color:#a78bfa">🤖 AI Intelligence</div>
+  <div class="cat-tag" style="background:rgba(124,58,237,.15);border-color:rgba(124,58,237,.3);color:#a78bfa"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg> AI Intelligence</div>
   <h2 style="color:white">AI that understands field research</h2>
   <p style="color:rgba(255,255,255,.5)">From generating forms to writing final reports — bring your own API key and let AI do the heavy lifting.</p>
 </div>
@@ -937,7 +941,7 @@
     <div class="feat-visual">
       <div class="feat-screen">
         <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">AI Report Writer</span></div>
-        <div class="f9-model a">🤖 claude-sonnet-4-6 · 847 submissions</div>
+        <div class="f9-model a"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg> claude-sonnet-4-6 · 847 submissions</div>
         <div class="f9-generating">
           <div class="f9-dot a"></div>
           <div class="f9-dot a"></div>
@@ -971,7 +975,7 @@
     <div class="feat-visual">
       <div class="feat-screen">
         <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Smart Builder — Column Picker</span></div>
-        <div class="sb-search">🔍  Search columns… district, gender, age</div>
+        <div class="sb-search"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>  Search columns… district, gender, age</div>
         <div class="sb-col checked a"><div class="sb-chk a">✓</div><span>district_name</span><span class="sb-type">select</span></div>
         <div class="sb-col checked a"><div class="sb-chk a">✓</div><span>gender</span><span class="sb-type">select</span></div>
         <div class="sb-col a"><div class="sb-chk a"></div><span>beneficiary_age</span><span class="sb-type">number</span></div>
@@ -1071,12 +1075,12 @@
           <span class="f10-badge ok">847/847</span>
         </div>
         <div class="f10-row a">
-          <div class="f10-icon warn">⚑</div>
+          <div class="f10-icon warn"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></div>
           <span class="f10-text">Back-checks assigned</span>
           <span class="f10-badge warn">23 records</span>
         </div>
         <div class="f10-row a">
-          <div class="f10-icon warn">⚠</div>
+          <div class="f10-icon warn"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg></div>
           <span class="f10-text">Statistical outliers flagged</span>
           <span class="f10-badge warn">4 records</span>
         </div>
@@ -1108,7 +1112,7 @@
       <div class="feat-screen">
         <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Compliance Dashboard</span></div>
         <div style="text-align:center;margin-bottom:4px">
-          <span class="f11-shield a">🛡️</span>
+          <span class="f11-shield a"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
           <div class="f11-badge">DPDP 2023 Compliant · Audit Active</div>
         </div>
         <div class="f11-consent">
@@ -1165,7 +1169,7 @@
 <!-- CTA -->
 <div class="cta-section">
   <div style="max-width:600px;margin:0 auto">
-    <div class="section-tag" style="margin-bottom:16px">🚀 Ready to start?</div>
+    <div class="section-tag" style="margin-bottom:16px"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Ready to start?</div>
     <h2>Replace SurveyCTO in one sprint.</h2>
     <p>Full platform access, free for 30 days. No credit card required. Import your existing forms in minutes.</p>
     <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">

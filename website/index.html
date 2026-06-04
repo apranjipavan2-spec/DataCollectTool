@@ -449,6 +449,10 @@
       .demo-role-grid{grid-template-columns:1fr 1fr}
       .faq-list{margin-top:24px;grid-template-columns:1fr}
     }
+      .ei{display:inline-block;width:1em;height:1em;vertical-align:-0.14em;stroke:currentColor;stroke-width:1.85;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;transition:transform .25s ease}
+    .ei:hover{transform:scale(1.18) rotate(-3deg)}
+    a:hover .ei,button:hover .ei,[class*='card']:hover .ei{transform:scale(1.15)}
+    @media(prefers-reduced-motion:reduce){.ei{transition:none}}
   </style>
   <script defer data-domain="fieldgovern.com" src="https://plausible.io/js/script.js"></script>
 </head>
@@ -478,16 +482,16 @@
 <!-- Mobile navigation menu -->
 <div id="mobileMenu" role="navigation">
   <a href="#features">✦ Features</a>
-  <a href="#how-it-works">⚙️ How It Works</a>
-  <a href="#compare">📊 Compare</a>
+  <a href="#how-it-works"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> How It Works</a>
+  <a href="#compare"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Compare</a>
   <a href="surveycto-alternative.html" style="padding-left:28px;font-size:0.92rem">› vs SurveyCTO</a>
   <a href="kobotoolbox-alternative.html" style="padding-left:28px;font-size:0.92rem">› vs KoboToolbox</a>
   <a href="odk-alternative.html" style="padding-left:28px;font-size:0.92rem">› vs ODK</a>
   <a href="commcare-alternative.html" style="padding-left:28px;font-size:0.92rem">› vs CommCare</a>
-  <a href="pricing.html">💰 Pricing</a>
-  <a href="about.html">🏛️ About Us</a>
-  <a href="about.html#contact">✉️ Contact</a>
-  <a href="demo.html" style="color:var(--brand);font-weight:700">🚀 Try Free Demo</a>
+  <a href="pricing.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Pricing</a>
+  <a href="about.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg> About Us</a>
+  <a href="about.html#contact"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Contact</a>
+  <a href="demo.html" style="color:var(--brand);font-weight:700"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Try Free Demo</a>
 </div>
 
 <section class="hero">

@@ -255,6 +255,10 @@
       .grid-2, .grid-3 { grid-template-columns: 1fr; }
       .hero { padding: 140px 20px 80px; }
     }
+      .ei{display:inline-block;width:1em;height:1em;vertical-align:-0.14em;stroke:currentColor;stroke-width:1.85;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;transition:transform .25s ease}
+    .ei:hover{transform:scale(1.18) rotate(-3deg)}
+    a:hover .ei,button:hover .ei,[class*='card']:hover .ei{transform:scale(1.15)}
+    @media(prefers-reduced-motion:reduce){.ei{transition:none}}
   </style>
   <script type="application/ld+json">
   {
@@ -300,17 +304,17 @@
 <!-- Mobile navigation menu -->
 <div id="mobileMenu" role="navigation">
   <a href="features.html">✦ Features</a>
-  <a href="integrations.html">🔗 Integrations</a>
-  <a href="use-cases.html">🏘️ Use Cases</a>
-  <a href="compare.html">📊 Compare</a>
-  <a href="security.html">🔒 Security</a>
-  <a href="pricing.html">💰 Pricing</a>
-  <a href="about.html">🏛️ About Us</a>
-  <a href="demo.html" style="color:var(--primary);font-weight:700">🚀 Try Free Demo</a>
+  <a href="integrations.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Integrations</a>
+  <a href="use-cases.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Use Cases</a>
+  <a href="compare.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Compare</a>
+  <a href="security.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Security</a>
+  <a href="pricing.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Pricing</a>
+  <a href="about.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg> About Us</a>
+  <a href="demo.html" style="color:var(--primary);font-weight:700"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Try Free Demo</a>
 </div>
 
 <header class="hero">
-  <div class="badge fade-up">🏛️ Our Story</div>
+  <div class="badge fade-up"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg> Our Story</div>
   <h1 class="fade-up delay-100">Built by researchers,<br><span class="text-gradient">for researchers.</span></h1>
   <p class="fade-up delay-200">FieldGovern was born from firsthand frustration with expensive, unreliable tools that break in the field. We set out to build the platform India's research teams deserve — affordable, offline-first, and natively India-ready.</p>
 </header>
@@ -330,12 +334,12 @@
         <p style="font-size: 0.9rem; color: var(--slate-600);">Built for Indian networks, languages, and budget constraints.</p>
       </div>
       <div class="glass-card fade-up delay-200" style="padding: 32px;">
-        <div class="feature-icon">🔒</div>
+        <div class="feature-icon"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
         <h3>Sovereignty</h3>
         <p style="font-size: 0.9rem; color: var(--slate-600);">Multi-tenant isolation enforced at the database layer.</p>
       </div>
       <div class="glass-card fade-up delay-300" style="grid-column: span 2; padding: 32px; display: flex; align-items: center; gap: 24px;">
-        <div class="feature-icon" style="margin: 0; flex-shrink: 0;">📵</div>
+        <div class="feature-icon" style="margin: 0; flex-shrink: 0;"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12" y2="20"/></svg></div>
         <div>
           <h3>True offline-first</h3>
           <p style="font-size: 0.9rem; color: var(--slate-600);">Collect data in zero-connectivity. Syncs automatically. No lost submissions, ever.</p>
@@ -347,7 +351,7 @@
 
 <section class="container partner-section">
   <div class="partner-box fade-up">
-    <div class="partner-icon">📊</div>
+    <div class="partner-icon"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
     <div class="partner-content">
       <div class="badge" style="background: rgba(255,255,255,0.1); border:none; color:white;">Strategic Growth Partner</div>
       <h2>Strategic Partnership with Dataworx</h2>
@@ -407,7 +411,7 @@
         <p class="section-desc" style="margin-bottom: 40px;">Have questions about implementation, data security, or a custom enterprise quote? We aim to respond within one business day.</p>
         
         <div class="contact-item">
-          <div class="contact-icon">📧</div>
+          <div class="contact-icon"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div>
           <div class="contact-text">
             <h4>General Inquiries</h4>
             <a href="mailto:pallavi@dataworx.co.in">pallavi@dataworx.co.in</a>
@@ -416,7 +420,7 @@
         </div>
         
         <div class="contact-item">
-          <div class="contact-icon">🤝</div>
+          <div class="contact-icon"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
           <div class="contact-text">
             <h4>Strategic Partnership</h4>
             <a href="mailto:pallavi_ceo@fieldgovern.com">pallavi_ceo@fieldgovern.com</a>
