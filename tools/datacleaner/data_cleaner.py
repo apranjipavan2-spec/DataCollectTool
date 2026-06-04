@@ -4,10 +4,11 @@ Run:  python data_cleaner.py
 Open:  http://localhost:5050
 """
 
-import os, json, io, copy, math, pathlib
+import os, json, io, copy, math, pathlib, secrets
 import threading, time, signal, sys
 import requests as _requests
 from flask import Flask, render_template, request, jsonify, send_file, g
+from werkzeug.local import LocalProxy
 import pandas as pd
 import numpy as np
 import pickle
@@ -24,54 +25,106 @@ app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB max upload
 COPIES_DIR = pathlib.Path(__file__).resolve().parent / "working_copies"
 COPIES_DIR.mkdir(exist_ok=True)
 
-STATE_LOCK = threading.Lock()
-STATE_DIRTY = False
+# ── Per-session in-memory state ───────────────────────────────────────────────
+# Each browser gets its own isolated state keyed by a `cleaner_sid` cookie, so
+# one user's loaded data is NEVER visible to another. State is held in memory and
+# persisted to disk per-session, so a page refresh survives a server restart.
+SESSIONS = {}            # sid -> state dict
+SESSION_LOCKS = {}       # sid -> threading.Lock (serialises a session's own requests)
+SESSION_DIRTY = set()    # sids whose state needs saving
+SESSION_SEEN = {}        # sid -> last-access epoch (for idle eviction)
+REGISTRY_LOCK = threading.Lock()
+SESSION_TTL = 12 * 3600  # drop idle sessions from memory after 12h
 
-# ── In-memory state ──────────────────────────────────────────────────────────
-DATA = {
-    "df": None,           # current DataFrame
-    "original_df": None,  # snapshot for modification tracking on export
-    "filename": None,     # original filename
-    "copy_path": None,    # path to the working copy
-    "sheet_name": None,   # active sheet name for Excel files
-    "history": [],        # list of (description, DataFrame-copy) for undo
-    "redo_stack": [],     # list of (description, DataFrame-copy) for redo
-    "max_history": 20,
-    "column_types": {},   # col_name -> type_name
-    "active_filters": {},  # col_name -> {type, val1, val2}
-}
+def _new_state():
+    return {
+        "df": None,           # current DataFrame
+        "original_df": None,  # snapshot for modification tracking on export
+        "filename": None,     # original filename
+        "copy_path": None,    # path to the working copy
+        "sheet_name": None,   # active sheet name for Excel files
+        "history": [],        # list of (description, DataFrame-copy) for undo
+        "redo_stack": [],     # list of (description, DataFrame-copy) for redo
+        "max_history": 20,
+        "column_types": {},   # col_name -> type_name
+        "active_filters": {}, # col_name -> {type, val1, val2}
+    }
 
-def mark_state_dirty():
-    global STATE_DIRTY
-    STATE_DIRTY = True
+_PERSIST_KEYS = ("df", "original_df", "filename", "copy_path",
+                 "sheet_name", "column_types", "active_filters")
+
+def _state_path(sid):
+    return COPIES_DIR / f"state_{sid}.pkl"
+
+def _load_state_for(sid):
+    """Restore a single session's state from disk, if present."""
+    p = _state_path(sid)
+    if p.exists():
+        try:
+            with open(p, "rb") as f:
+                saved = pickle.load(f)
+            st = _new_state()
+            st.update(saved)
+            return st
+        except Exception as e:
+            print(f"Error loading state for {sid}: {e}")
+    return None
+
+def get_state(sid=None):
+    """Return the state dict for the given (or current-request) session."""
+    if sid is None:
+        sid = getattr(g, "sid", None)
+    if sid is None:
+        raise RuntimeError("get_state() called without a session id")
+    with REGISTRY_LOCK:
+        st = SESSIONS.get(sid)
+        if st is None:
+            st = _load_state_for(sid) or _new_state()
+            SESSIONS[sid] = st
+            SESSION_LOCKS[sid] = threading.Lock()
+        SESSION_SEEN[sid] = time.time()
+        return st
+
+# Drop-in proxy: existing `DATA[...]` access resolves to the current session.
+DATA = LocalProxy(lambda: get_state())
+
+def mark_state_dirty(sid=None):
+    sid = sid or getattr(g, "sid", None)
+    if sid is not None:
+        SESSION_DIRTY.add(sid)
+
+def _save_state():
+    """Legacy helper — marks the current session dirty."""
+    mark_state_dirty()
 
 def _save_state_loop():
-    """Background thread that periodically saves state to disk if needed."""
-    state_path = COPIES_DIR / "app_state.pkl"
-    tmp_path = COPIES_DIR / "app_state_tmp.pkl"
+    """Background thread: persist dirty sessions and evict idle ones."""
     while True:
         time.sleep(2.0)
-        global STATE_DIRTY
-        if STATE_DIRTY:
-            with STATE_LOCK:
-                if not STATE_DIRTY:
+        if SESSION_DIRTY:
+            with REGISTRY_LOCK:
+                dirty = list(SESSION_DIRTY)
+                SESSION_DIRTY.clear()
+            for sid in dirty:
+                st = SESSIONS.get(sid)
+                if st is None:
                     continue
                 try:
-                    to_save = {
-                        "df": DATA["df"],
-                        "original_df": DATA["original_df"],
-                        "filename": DATA["filename"],
-                        "copy_path": DATA["copy_path"],
-                        "sheet_name": DATA.get("sheet_name"),
-                        "column_types": DATA["column_types"],
-                        "active_filters": DATA["active_filters"]
-                    }
+                    to_save = {k: st.get(k) for k in _PERSIST_KEYS}
+                    tmp_path = COPIES_DIR / f"state_{sid}_tmp.pkl"
                     with open(tmp_path, "wb") as f:
                         pickle.dump(to_save, f)
-                    os.replace(tmp_path, state_path)
-                    STATE_DIRTY = False
+                    os.replace(tmp_path, _state_path(sid))
                 except Exception as e:
-                    print(f"Error saving state: {e}")
+                    print(f"Error saving state for {sid}: {e}")
+        # Evict idle sessions from memory (disk copy kept for later restore)
+        now = time.time()
+        with REGISTRY_LOCK:
+            stale = [s for s, ts in SESSION_SEEN.items() if now - ts > SESSION_TTL]
+            for sid in stale:
+                SESSIONS.pop(sid, None)
+                SESSION_LOCKS.pop(sid, None)
+                SESSION_SEEN.pop(sid, None)
 
 threading.Thread(target=_save_state_loop, daemon=True).start()
 
@@ -81,22 +134,6 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
-
-def _save_state():
-    """Legacy function call — just marks dirty now."""
-    mark_state_dirty()
-
-def _load_state():
-    """Load state from disk on startup."""
-    state_path = COPIES_DIR / "app_state.pkl"
-    if state_path.exists():
-        try:
-            with open(state_path, "rb") as f:
-                saved = pickle.load(f)
-                DATA.update(saved)
-                print(f"Restored state from {state_path}")
-        except Exception as e:
-            print(f"Error loading state: {e}")
 
 def _push_undo(desc: str):
     """Snapshot current df for undo; clears redo stack."""
@@ -156,17 +193,34 @@ def _get_filtered_mask(df, current_col):
 
 @app.before_request
 def acquire_lock():
+    # Identify (or create) the per-browser session.
+    sid = request.cookies.get("cleaner_sid")
+    if not sid:
+        sid = secrets.token_hex(16)
+        g.new_sid = True
+    g.sid = sid
+    get_state(sid)  # ensure the session and its lock exist
     if request.path.startswith("/api/") and request.path != "/api/export":
-        STATE_LOCK.acquire()
-        g.lock_acquired = True
+        lock = SESSION_LOCKS.get(sid)
+        if lock is not None:
+            lock.acquire()
+            g.lock_acquired = True
+
+@app.after_request
+def set_session_cookie(resp):
+    if getattr(g, "new_sid", False):
+        resp.set_cookie("cleaner_sid", g.sid, max_age=30 * 24 * 3600,
+                        httponly=True, samesite="Lax", path="/")
+    return resp
 
 @app.teardown_request
 def release_lock(exception=None):
     if getattr(g, 'lock_acquired', False):
-        # Automatically mark state dirty at the end of every API request
-        # if the request was successful and changed data
+        # Mark this session dirty at the end of every mutating API request
         mark_state_dirty()
-        STATE_LOCK.release()
+        lock = SESSION_LOCKS.get(getattr(g, "sid", None))
+        if lock is not None:
+            lock.release()
 
 @app.route("/")
 def index():
@@ -1700,7 +1754,7 @@ def load_from_fg():
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    _load_state()  # Try to restore session on startup
+    # Per-session state is now restored lazily on first request (see get_state)
     PORT = int(os.environ.get("PORT", 5050))
     print(f"\n  Data Cleaner running at http://localhost:{PORT}\n")
     app.run(debug=False, use_reloader=False, host="0.0.0.0", port=PORT)

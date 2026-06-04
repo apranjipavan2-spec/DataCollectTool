@@ -2103,11 +2103,11 @@ async function fgLoadData(programId, questionnaireId) {
     }
   });
 
-  // Auto-select + load if program_id was in URL
+  // Pre-select the program if it was in the URL, but DO NOT auto-load —
+  // the user must click "Load Data →" to fetch submissions.
   if (_fgProgId) {
     progSel.value = _fgProgId;
     progSel.dispatchEvent(new Event('change'));
-    setTimeout(() => fgLoadData(_fgProgId, null), 500);
   }
 })();
 </script>
