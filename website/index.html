@@ -188,21 +188,36 @@
     .proof-item{font-size:0.88rem;font-weight:600;color:var(--text2);display:flex;align-items:center;gap:8px;opacity:0.7;transition:opacity 0.2s}
     .proof-item:hover{opacity:1}
     /* PROBLEM */
-    /* Paired pain → fix list (each fact stated once) */
-    .pf-list{display:flex;flex-direction:column;gap:14px;margin-top:44px;max-width:1000px;margin-left:auto;margin-right:auto}
-    .pf-row{display:grid;grid-template-columns:1fr 28px 1fr;gap:16px;align-items:stretch}
-    .pf-pain,.pf-fix{display:flex;gap:12px;align-items:flex-start;padding:15px 18px;border-radius:14px;border:1px solid var(--border);transition:transform .25s ease}
-    .pf-pain{background:#fef2f2;border-color:#fecaca}
-    .pf-fix{background:linear-gradient(135deg,#eff9ff,#f5f3ff);border-color:rgba(14,165,233,0.28)}
-    .pf-fix:hover{transform:translateY(-2px)}
-    .pf-ico{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-    .pf-pain .pf-ico{background:#fee2e2;color:#dc2626}
-    .pf-fix .pf-ico{background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff}
-    .pf-ico svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
-    .pf-row b{display:block;font-size:0.9rem;color:var(--text);margin-bottom:2px;line-height:1.35}
-    .pf-row span{font-size:0.8rem;color:var(--text2);line-height:1.5}
-    .pf-arrow{display:flex;align-items:center;justify-content:center;color:var(--text3);font-weight:800;font-size:1.1rem}
-    @media(max-width:760px){.pf-row{grid-template-columns:1fr;gap:8px}.pf-arrow{transform:rotate(90deg)}}
+    /* Problem → Others → FieldGovern comparison */
+    .ps-grid{max-width:1080px;margin:38px auto 0;border:1px solid var(--border);border-radius:18px;overflow:hidden;box-shadow:0 12px 44px rgba(15,23,42,.06)}
+    .ps-head,.ps-row{display:grid;grid-template-columns:1fr 1.05fr 1.05fr}
+    .ps-head{background:var(--bg2);border-bottom:2px solid var(--border)}
+    .ps-head>div{padding:13px 18px;font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:7px}
+    .ps-head .h-others{color:#b91c1c;border-left:1px solid var(--border)}
+    .ps-head .h-fg{color:var(--brand-dark);background:linear-gradient(180deg,rgba(14,165,233,.10),rgba(124,58,237,.04));border-left:1px solid var(--border)}
+    .ps-head svg{width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .ps-row{border-bottom:1px solid var(--border)}
+    .ps-row:last-child{border-bottom:none}
+    .ps-row>div{padding:16px 18px;border-left:1px solid var(--border)}
+    .ps-row>div:first-child{border-left:none}
+    .ps-prob b{display:block;font-size:.92rem;font-weight:800;color:var(--text);margin-bottom:3px;line-height:1.3}
+    .ps-prob span{font-size:.79rem;color:var(--text3);line-height:1.5}
+    .ps-others{background:#fef4f4}
+    .ps-fg{background:linear-gradient(180deg,rgba(14,165,233,.05),rgba(124,58,237,.035))}
+    .ps-cell{display:flex;gap:9px;align-items:flex-start;font-size:.82rem;line-height:1.45;color:var(--text2)}
+    .ps-fg .ps-cell{color:var(--text)}
+    .ps-cell .ic{flex-shrink:0;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.7rem;margin-top:1px}
+    .ps-others .ic{background:#fee2e2;color:#dc2626}
+    .ps-fg .ic{background:#dcfce7;color:#15803d}
+    .ps-fg .ps-cell b{font-weight:800;color:var(--brand-dark)}
+    @media(max-width:760px){
+      .ps-head{display:none}
+      .ps-row{grid-template-columns:1fr}
+      .ps-row>div{border-left:none;border-top:1px solid var(--border)}
+      .ps-row>div:first-child{border-top:none}
+      .ps-others::before{content:'The usual tools';display:block;font-size:.6rem;font-weight:800;color:#b91c1c;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+      .ps-fg::before{content:'✦ FieldGovern';display:block;font-size:.6rem;font-weight:800;color:var(--brand-dark);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+    }
     .problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;margin-top:48px}
     .problem-list{display:flex;flex-direction:column;gap:16px}
     .problem-item{display:flex;gap:14px;align-items:flex-start;padding:16px;border-radius:12px;background:var(--bg2);border:1px solid var(--border);transition:all 0.3s}
@@ -706,63 +721,38 @@
     <div class="reveal" style="max-width:640px">
       <div class="section-tag"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg> The Problem</div>
       <h2 class="section-title">Field data collection is broken in India</h2>
-      <p class="section-sub">Tools built for somewhere else — too costly, too fragile offline. Here's what breaks, and how FieldGovern fixes each one.</p>
+      <p class="section-sub">Tools built for somewhere else — too costly, too fragile offline. Here's what breaks, how the usual tools handle it, and how FieldGovern fixes each one.</p>
     </div>
-    <div class="pf-list">
-      <div class="pf-row reveal delay-1">
-        <div class="pf-pain">
-          <div class="pf-ico"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
-          <div><b>Western tools cost $225–630/mo</b><span>Out of reach for most Indian research teams and NGOs.</span></div>
-        </div>
-        <div class="pf-arrow">→</div>
-        <div class="pf-fix">
-          <div class="pf-ico"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
-          <div><b>From ₹6,999/mo — up to 70% less</b><span>Same capability, fraction of the cost. Free forever for students.</span></div>
-        </div>
+    <div class="ps-grid reveal">
+      <div class="ps-head">
+        <div class="h-prob">The problem</div>
+        <div class="h-others"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> SurveyCTO · Kobo · ODK · Paper</div>
+        <div class="h-fg"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z"/></svg> FieldGovern</div>
       </div>
-      <div class="pf-row reveal delay-2">
-        <div class="pf-pain">
-          <div class="pf-ico"><svg viewBox="0 0 24 24"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12" y2="20"/></svg></div>
-          <div><b>Apps crash offline, data lost</b><span>KoboToolbox & ODK drop submissions mid-survey when signal goes.</span></div>
-        </div>
-        <div class="pf-arrow">→</div>
-        <div class="pf-fix">
-          <div class="pf-ico"><svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12" y2="20"/></svg></div>
-          <div><b>True offline-first PWA</b><span>Collect with zero internet; auto-syncs when you're back online. No install.</span></div>
-        </div>
+      <div class="ps-row reveal delay-1">
+        <div class="ps-prob"><b>Too costly</b><span>Premium tools run $225–630/mo — out of reach for Indian teams.</span></div>
+        <div class="ps-others"><div class="ps-cell"><span class="ic">✕</span><span>SurveyCTO is priciest; Kobo's paid tiers add up. Still need an analyst &amp; report writer.</span></div></div>
+        <div class="ps-fg"><div class="ps-cell"><span class="ic">✓</span><span><b>From ₹6,999/mo — up to 70% less.</b> Free forever to start. Cleaning + analysis + reports bundled.</span></div></div>
       </div>
-      <div class="pf-row reveal delay-3">
-        <div class="pf-pain">
-          <div class="pf-ico"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
-          <div><b>5MB photos fail to upload</b><span>Field photos stall on slow 2G connections.</span></div>
-        </div>
-        <div class="pf-arrow">→</div>
-        <div class="pf-fix">
-          <div class="pf-ico"><svg viewBox="0 0 24 24"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg></div>
-          <div><b>Auto compression: 5MB → 200KB</b><span>96% smaller — uploads fast even on weak connections.</span></div>
-        </div>
+      <div class="ps-row reveal delay-2">
+        <div class="ps-prob"><b>Fragile offline</b><span>Data lost mid-survey when the signal drops.</span></div>
+        <div class="ps-others"><div class="ps-cell"><span class="ic">✕</span><span>Kobo &amp; ODK rely on an installed Android app that can drop submissions offline.</span></div></div>
+        <div class="ps-fg"><div class="ps-cell"><span class="ic">✓</span><span><b>True offline-first PWA.</b> Collect with zero internet, auto-sync on reconnect — no install.</span></div></div>
       </div>
-      <div class="pf-row reveal delay-4">
-        <div class="pf-pain">
-          <div class="pf-ico"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
-          <div><b>Paper & manual entry delays results</b><span>Re-keying pushes analysis back by days or weeks.</span></div>
-        </div>
-        <div class="pf-arrow">→</div>
-        <div class="pf-fix">
-          <div class="pf-ico"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
-          <div><b>Live dashboard, results in days</b><span>Supervisors see data the moment it syncs — no re-keying.</span></div>
-        </div>
+      <div class="ps-row reveal delay-3">
+        <div class="ps-prob"><b>Media stalls on 2G</b><span>5 MB photos fail to upload on weak connections.</span></div>
+        <div class="ps-others"><div class="ps-cell"><span class="ic">✕</span><span>SurveyCTO, Kobo &amp; ODK store photos uncompressed — slow, failed uploads.</span></div></div>
+        <div class="ps-fg"><div class="ps-cell"><span class="ic">✓</span><span><b>Auto-compress 5 MB → 200 KB</b> (96% smaller). Uploads fast even on 2G.</span></div></div>
       </div>
-      <div class="pf-row reveal delay-5">
-        <div class="pf-pain">
-          <div class="pf-ico"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
-          <div><b>No visibility, unreliable hosting</b><span>Supervisors can't tell if data was collected; servers you can't count on.</span></div>
-        </div>
-        <div class="pf-arrow">→</div>
-        <div class="pf-fix">
-          <div class="pf-ico"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="8" rx="2"/><rect x="2" y="13" width="20" height="8" rx="2"/><line x1="6" y1="7" x2="6" y2="7"/><line x1="6" y1="17" x2="6" y2="17"/></svg></div>
-          <div><b>Always-on 24×7 India-hosted servers</b><span>100% managed infrastructure, running round the clock. Live field monitoring built in.</span></div>
-        </div>
+      <div class="ps-row reveal delay-4">
+        <div class="ps-prob"><b>Slow to insight</b><span>Analysis lags days/weeks after fieldwork ends.</span></div>
+        <div class="ps-others"><div class="ps-cell"><span class="ic">✕</span><span>Collect-only — export to Stata/R/SPSS and hire an analyst to clean &amp; report.</span></div></div>
+        <div class="ps-fg"><div class="ps-cell"><span class="ic">✓</span><span><b>Built-in AI cleaning, cross-tabs &amp; reports.</b> Live dashboard — results in days.</span></div></div>
+      </div>
+      <div class="ps-row reveal delay-5">
+        <div class="ps-prob"><b>No oversight, foreign servers</b><span>Can't tell if data was collected; data hosted abroad.</span></div>
+        <div class="ps-others"><div class="ps-cell"><span class="ic">✕</span><span>US/EU hosting, limited live monitoring — a compliance &amp; visibility gap in India.</span></div></div>
+        <div class="ps-fg"><div class="ps-cell"><span class="ic">✓</span><span><b>24×7 India-hosted, DPDP-aligned.</b> Live field monitoring &amp; audio/timing QC built in.</span></div></div>
       </div>
     </div>
   </div>
