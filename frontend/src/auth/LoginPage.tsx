@@ -163,7 +163,9 @@ export default function LoginPage() {
     if (!validate()) return
     setLoading(true); setError('')
     try {
-      const { data } = await api.post('/auth/login', { phone: normalizePhone(phone), password })
+      const isEmail = phone.includes('@')
+      const identifier = isEmail ? phone.trim() : normalizePhone(phone)
+      const { data } = await api.post('/auth/login', { identifier, password })
       if (data['2fa_required']) {
         setPendingPhone(data.phone)
         setMaskedContact(data.masked_contact)
@@ -346,15 +348,27 @@ export default function LoginPage() {
                 <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#1e293b' }}>Welcome back</h1>
               </div>
               <p className="text-sm" style={{ color: '#64748b' }}>Sign in to continue to FieldGovern</p>
-              <button
-                onClick={() => navigate('/pricing')}
-                className="mt-2 text-xs font-medium transition-colors"
-                style={{ color: '#6366f1' }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#4f46e5')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#6366f1')}
-              >
-                New here? View pricing plans
-              </button>
+              <div className="flex items-center justify-center gap-3 mt-2">
+                <button
+                  onClick={() => navigate('/register')}
+                  className="text-xs font-semibold transition-colors"
+                  style={{ color: '#6366f1' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#4f46e5')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#6366f1')}
+                >
+                  Request a demo account
+                </button>
+                <span style={{ color: '#e2e8f0' }}>·</span>
+                <button
+                  onClick={() => navigate('/pricing')}
+                  className="text-xs font-medium transition-colors"
+                  style={{ color: '#94a3b8' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#64748b')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#94a3b8')}
+                >
+                  View plans
+                </button>
+              </div>
             </div>
 
             {/* Error */}
@@ -429,16 +443,16 @@ export default function LoginPage() {
               {/* Phone */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#64748b' }}>
-                  Mobile Number
+                  Phone or Email
                 </label>
                 <div className="relative">
                   <div className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: '#94a3b8' }}>
                     <FeatureIcon name="phone" className="w-4 h-4" />
                   </div>
                   <input
-                    type="tel"
-                    inputMode="numeric"
-                    placeholder="98765 43210"
+                    type="text"
+                    inputMode="text"
+                    placeholder="Phone number or email"
                     value={phone}
                     autoFocus
                     onChange={e => { setPhone(e.target.value); setPhoneErr(''); setError('') }}

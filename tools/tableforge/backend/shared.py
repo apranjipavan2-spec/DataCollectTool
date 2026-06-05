@@ -17,7 +17,10 @@ custom_bins: dict = {}     # dataset_id -> [bin_defs]
 audit_logs: dict = {}      # dataset_id -> [log_entries]
 annotations: dict = {}     # dataset_id -> {table_id -> [{row, col, text, color}]}
 upload_progress: dict = {}  # dataset_id -> {percent, rows_read, total_estimated, status}
-column_type_overrides: dict = {}  # dataset_id -> {col_name: "text"|"numeric"|"multi_choice"|"date"}
+column_type_overrides: dict = {}  # dataset_id -> {sheet_name: {col_name: "text"|"numeric"|"multi_choice"|"date"|"boolean"}}
+# Survey-analysis metadata layer (Phase 0)
+column_roles: dict = {}    # dataset_id -> {col_name: ColumnRole dict}
+study_designs: dict = {}   # dataset_id -> StudyDesign dict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECTS_DIR = BASE_DIR / "projects"
@@ -48,26 +51,40 @@ def is_super_admin(role: Optional[str]) -> bool:
 
 
 def sanitize_for_json(obj):
-    """Recursively replace NaN/Infinity with None in nested structures."""
+    """Recursively convert any value to a JSON-safe primitive.
+
+    The final fallback explicitly converts unknown types (openpyxl CellErrorValue,
+    datetime, custom objects, etc.) to string so React never receives an object
+    as a JSX child — which would throw React error #310.
+    """
+    import datetime as _dt
     if isinstance(obj, dict):
         return {k: sanitize_for_json(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [sanitize_for_json(v) for v in obj]
+    if isinstance(obj, bool):          # must come before int — bool is a subclass of int
+        return obj
+    if isinstance(obj, (np.bool_,)):
+        return bool(obj)
+    if isinstance(obj, (int,)):
+        return obj
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
     if isinstance(obj, float):
         if np.isnan(obj) or np.isinf(obj):
             return None
         return obj
-    if isinstance(obj, (np.integer,)):
-        return int(obj)
     if isinstance(obj, (np.floating,)):
         if np.isnan(obj) or np.isinf(obj):
             return None
         return float(obj)
-    if isinstance(obj, (np.bool_,)):
-        return bool(obj)
     if isinstance(obj, pd.Timestamp):
         if pd.isna(obj):
             return None
+        return obj.isoformat()
+    if isinstance(obj, _dt.datetime):
+        return obj.isoformat()
+    if isinstance(obj, _dt.date):
         return obj.isoformat()
     if isinstance(obj, pd.Period):
         return str(obj)
@@ -79,9 +96,51 @@ def sanitize_for_json(obj):
         obj = obj.replace('(nan%)', '(0%)').replace('(nan)', '(0)')
         obj = obj.replace('(inf%)', '(0%)').replace('(-inf%)', '(0%)')
         return obj
-    if pd.isna(obj) if not isinstance(obj, (str, list, dict)) else False:
+    if obj is None:
         return None
-    return obj
+    # Handle numpy/pandas NA sentinels
+    try:
+        if pd.isna(obj):
+            return None
+    except (TypeError, ValueError):
+        pass
+    # Unknown type (openpyxl CellErrorValue, custom object, etc.) — stringify
+    # rather than letting the raw object reach the React frontend.
+    return str(obj)
+
+
+def get_active_sheet(dataset_id: str) -> str:
+    """Return the currently loaded sheet name for a dataset.
+
+    Falls back to the first sheet, or '__default__' for CSV/TSV datasets
+    that have no real sheets. Always safe to call.
+    """
+    ds = datasets.get(dataset_id)
+    if not ds:
+        return "__default__"
+    name = ds.get("active_sheet")
+    if name:
+        return str(name)
+    sheets = ds.get("sheets") or []
+    return str(sheets[0]) if sheets else "__default__"
+
+
+def get_overrides(dataset_id: str, sheet: Optional[str] = None) -> dict:
+    """Get the override dict for a given (or current) sheet. Always returns a dict."""
+    if dataset_id not in column_type_overrides:
+        column_type_overrides[dataset_id] = {}
+    sheet_name = sheet or get_active_sheet(dataset_id)
+    bucket = column_type_overrides[dataset_id]
+    # Self-heal: legacy flat layout {col: type} -> migrate to {sheet: {col: type}}.
+    if bucket and not any(isinstance(v, dict) for v in bucket.values()):
+        column_type_overrides[dataset_id] = {sheet_name: dict(bucket)}
+        bucket = column_type_overrides[dataset_id]
+    return bucket.setdefault(sheet_name, {})
+
+
+def set_override(dataset_id: str, column: str, new_type: str, sheet: Optional[str] = None) -> None:
+    overrides = get_overrides(dataset_id, sheet)
+    overrides[column] = new_type
 
 
 def add_audit_log(dataset_id: str, action: str, details: str = ""):
@@ -95,7 +154,13 @@ def add_audit_log(dataset_id: str, action: str, details: str = ""):
 
 
 def _is_multi_choice(series: pd.Series) -> bool:
-    """Detect if a column contains multi-choice comma-separated values."""
+    """Detect if a column contains multi-choice comma-separated values.
+
+    A value qualifies as multi-choice only when:
+    - It has ≥2 comma-separated parts, each ≤20 chars (excludes "Smith, John")
+    - At least 10% of the sample rows match (avoids false positives from a
+      single address or sentence that happens to contain a comma).
+    """
     non_null = series.dropna().astype(str)
     non_null = non_null[~non_null.isin(['nan', 'NaN', 'None', ''])]
     if len(non_null) == 0:
@@ -109,13 +174,29 @@ def _is_multi_choice(series: pd.Series) -> bool:
         val = val.strip()
         if ',' in val:
             parts = [p.strip() for p in val.split(',')]
-            if all(len(p) <= 20 and len(p) > 0 for p in parts):
+            # Require ≥2 parts, each short enough to be a code/label not a sentence.
+            if len(parts) >= 2 and all(0 < len(p) <= 20 for p in parts):
                 multi_count += 1
-    return multi_count >= 2 or (multi_count >= 1 and multi_count > len(sample) * 0.02)
+    # Require at least 10% of sample to be multi-choice style.
+    return multi_count >= 2 and multi_count >= len(sample) * 0.10
+
+
+def _strip_formula_cells(df: pd.DataFrame) -> None:
+    """Replace Excel formula strings (cells starting with '=') with NaN in-place.
+    Happens when openpyxl reads a workbook whose formula cache is empty."""
+    for col in df.columns:
+        if df[col].dtype == object:
+            mask = df[col].astype(str).str.match(r'^\s*=')
+            if mask.any():
+                df.loc[mask, col] = np.nan
 
 
 def _detect_columns(df: pd.DataFrame) -> list:
-    """Detect column types and return metadata."""
+    """Detect column types and return metadata.
+
+    Mixed-type columns (e.g. mostly numbers but some text labels) are treated
+    as numeric when ≥50 % of non-null values parse as numbers; the rest become NaN.
+    """
     columns = []
     for col in df.columns:
         dtype = str(df[col].dtype)
@@ -127,21 +208,47 @@ def _detect_columns(df: pd.DataFrame) -> list:
         elif "bool" in dtype:
             col_type = "boolean"
         else:
-            if df[col].dropna().shape[0] > 0:
+            non_null = df[col].dropna()
+            if len(non_null) > 0:
+                # Boolean-string detection runs FIRST: a column of "Yes"/"No" or "0"/"1"
+                # would otherwise be coerced to numeric (1.0/0.0) or stay as opaque text.
+                _bool_vocab = {'true', 'false', 'yes', 'no', 'y', 'n', '0', '1', 't', 'f'}
+                _normalized = non_null.astype(str).str.strip().str.lower()
+                _unique = set(_normalized.unique())
+                if 1 <= len(_unique) <= 2 and _unique.issubset(_bool_vocab):
+                    col_type = "boolean"
+                    columns.append({"name": col, "type": col_type,
+                                    "sample_values": [str(v) for v in non_null.head(10).tolist()],
+                                    "stats": {"nulls": int(df[col].isna().sum()),
+                                              "unique": int(df[col].nunique())}})
+                    continue
                 is_multi = _is_multi_choice(df[col])
                 if is_multi:
                     col_type = "multi_choice"
                 else:
-                    try:
-                        pd.to_numeric(df[col].dropna().head(20))
-                        col_type = "numeric"
-                        df[col] = pd.to_numeric(df[col], errors="coerce")
-                    except (ValueError, TypeError):
-                        _samp = df[col].dropna().head(20).astype(str)
-                        if _samp.str.contains(r'[-/:]', regex=True).any():
+                    # Coerce to numeric and measure coverage — tolerates mixed cols.
+                    num_coerced = pd.to_numeric(non_null, errors="coerce")
+                    numeric_ratio = num_coerced.notna().sum() / len(num_coerced)
+                    if numeric_ratio >= 0.5:
+                        # Guard: don't coerce columns whose values have leading zeros
+                        # (ID codes like "001", "002" must stay as text).
+                        has_leading_zeros = non_null.astype(str).str.match(r'^0\d').any()
+                        if has_leading_zeros:
+                            col_type = "text"
+                        else:
+                            col_type = "numeric"
+                            df[col] = pd.to_numeric(df[col], errors="coerce")
+                    else:
+                        # Date check — require values that look like real date patterns,
+                        # not phone numbers (555-1234) or IPs (192.168.1.1).
+                        # Pattern: digit(s) separator digit(s) separator digit(s).
+                        _samp = non_null.head(20).astype(str)
+                        _date_re = r'^\d{1,4}[-/]\d{1,2}[-/]\d{1,4}'
+                        if _samp.str.match(_date_re).any():
                             try:
-                                pd.to_datetime(_samp)
+                                pd.to_datetime(_samp[_samp.str.match(_date_re)])
                                 col_type = "date"
+                                df[col] = pd.to_datetime(df[col], errors="coerce")
                             except (ValueError, TypeError):
                                 col_type = "text"
                         else:
@@ -151,14 +258,16 @@ def _detect_columns(df: pd.DataFrame) -> list:
         sample_values = df[col].dropna().head(10).tolist()
         stats = {}
         if col_type == "numeric":
+            # Recompute after coercion so nulls count reflects coerced NaNs.
             try:
-                num_series = pd.to_numeric(df[col], errors="coerce") if df[col].dtype == object else df[col]
+                num_series = df[col] if "float" in str(df[col].dtype) or "int" in str(df[col].dtype) \
+                    else pd.to_numeric(df[col], errors="coerce")
                 stats = {"min": float(num_series.min()) if not pd.isna(num_series.min()) else None,
                          "max": float(num_series.max()) if not pd.isna(num_series.max()) else None,
                          "mean": float(num_series.mean()) if not pd.isna(num_series.mean()) else None}
             except Exception:
                 stats = {"min": None, "max": None, "mean": None}
-        stats["nulls"] = int(df[col].isna().sum())
+        stats["nulls"] = int(df[col].isna().sum())  # post-coercion count
         stats["unique"] = int(df[col].nunique())
         if is_multi:
             all_vals = []

@@ -5,6 +5,7 @@ import api from '@/lib/api'
 import ThemeToggle from '@/components/ThemeToggle'
 import { useSubscription } from '@/lib/SubscriptionContext'
 import { useTheme } from '@/lib/ThemeContext'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface TopNavProps {
   title?: string
@@ -58,7 +59,7 @@ function NotifRow({ item, onClick }: { item: InboxItem; onClick: (i: InboxItem) 
     >
       <div className="flex gap-3 items-start">
         <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 mt-0.5 ${unread ? (TYPE_ICON_BG[item.type] || 'bg-catalan-primary/10') : 'bg-catalan-bg'}`}>
-          {TYPE_ICON[item.type] || '🔔'}
+          <EmojiIcon e={TYPE_ICON[item.type] || '🔔'} />
         </div>
         <div className="flex-1 min-w-0">
           <div className={`text-sm leading-snug ${unread ? 'font-semibold text-catalan-text' : 'font-medium text-catalan-textMuted'}`}>
@@ -176,7 +177,7 @@ function NotificationBell() {
         style={open ? ts.bellActive : undefined}
         aria-label="Notifications"
       >
-        <span className="text-xl group-hover:scale-110 inline-block transition-transform duration-200">🔔</span>
+        <span className="text-xl group-hover:scale-110 inline-block transition-transform duration-200"><EmojiIcon e="🔔" /></span>
         {unread > 0 && (
           <span className="absolute -top-0.5 -right-0.5 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1"
             style={{ background: 'linear-gradient(135deg, #ef4444, #f97316)', boxShadow: '0 2px 8px rgba(239,68,68,0.4)' }}>
@@ -223,7 +224,7 @@ function NotificationBell() {
               </div>
             ) : items.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                <span className="text-4xl mb-3 opacity-20">🔔</span>
+                <span className="text-4xl mb-3 opacity-20"><EmojiIcon e="🔔" /></span>
                 <p className="text-sm font-medium text-catalan-text mb-1">All caught up</p>
                 <p className="text-xs text-catalan-textMuted leading-relaxed">
                   Notifications about submissions, payments, and assignments will appear here.
@@ -403,14 +404,14 @@ const TopNav: React.FC<TopNavProps> = ({ title, titleNode, breadcrumbs, rightCon
                 <div className="py-1">
                   <button onClick={() => { setShowUserMenu(false); navigate('/profile') }}
                     className="w-full text-left px-4 py-2.5 hover:bg-catalan-hover text-sm text-catalan-text transition-colors flex items-center gap-2.5 group">
-                    <span className="text-base group-hover:scale-110 inline-block transition-transform">👤</span> My Profile
+                    <span className="text-base group-hover:scale-110 inline-block transition-transform"><EmojiIcon e="👤" /></span> My Profile
                   </button>
 
                   <div className="px-3 py-2"><ThemeToggle /></div>
 
                   <button onClick={() => { setShowUserMenu(false); navigate('/admin/org') }}
                     className="w-full text-left px-4 py-2.5 hover:bg-catalan-hover text-sm text-catalan-text transition-colors flex items-center gap-2.5 group">
-                    <span className="text-base group-hover:scale-110 inline-block transition-transform">⚙️</span> Organization
+                    <span className="text-base group-hover:scale-110 inline-block transition-transform"><EmojiIcon e="⚙️" /></span> Organization
                   </button>
                 </div>
 
@@ -418,7 +419,7 @@ const TopNav: React.FC<TopNavProps> = ({ title, titleNode, breadcrumbs, rightCon
                   {!showLogoutConfirm ? (
                     <button onClick={() => setShowLogoutConfirm(true)}
                       className="w-full text-left px-4 py-2.5 hover:bg-catalan-error/10 text-sm text-catalan-error transition-colors flex items-center gap-2.5 group">
-                      <span className="text-base group-hover:scale-110 inline-block transition-transform">🚪</span> Log Out
+                      <span className="text-base group-hover:scale-110 inline-block transition-transform"><EmojiIcon e="🚪" /></span> Log Out
                     </button>
                   ) : (
                     <div className="px-4 py-3" style={{ background: 'rgba(239,68,68,0.06)' }}>

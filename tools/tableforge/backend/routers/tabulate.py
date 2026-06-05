@@ -6,9 +6,155 @@ import numpy as np
 import traceback
 
 from ..shared import (
-    datasets, custom_metrics, custom_bins, column_type_overrides,
+    datasets, custom_metrics, custom_bins, column_type_overrides, study_designs,
     sanitize_for_json, _is_multi_choice, _col_is_text, apply_metrics_and_bins
 )
+
+
+def _get_weight_col(dataset_id: str) -> Optional[str]:
+    sd = study_designs.get(dataset_id) or {}
+    wc = sd.get("weight_col")
+    return wc if isinstance(wc, str) and wc else None
+
+
+def _make_weighted_aggs(w_series: pd.Series) -> dict:
+    """Closure-based weighted agg callables compatible with pivot_table/groupby.
+
+    The Series passed to each callable preserves its original index, so we can
+    look up the corresponding weights even after groupby slicing.
+    """
+    w = w_series
+
+    def _slice(x):
+        if len(x) == 0:
+            return None, None
+        wi = w.reindex(x.index)
+        m = x.notna() & wi.notna() & (wi > 0)
+        if not m.any():
+            return None, None
+        return x[m], wi[m]
+
+    def wmean(x):
+        xv, wv = _slice(x)
+        if xv is None:
+            return np.nan
+        try:
+            return float(np.average(xv.astype(float), weights=wv.astype(float)))
+        except (ValueError, TypeError):
+            return np.nan
+
+    def wcount(x):
+        xv, wv = _slice(x)
+        if xv is None:
+            return 0.0
+        return float(wv.astype(float).sum())
+
+    def wsum(x):
+        xv, wv = _slice(x)
+        if xv is None:
+            return np.nan
+        try:
+            return float((xv.astype(float) * wv.astype(float)).sum())
+        except (ValueError, TypeError):
+            return np.nan
+
+    def wmedian(x):
+        xv, wv = _slice(x)
+        if xv is None:
+            return np.nan
+        try:
+            vals = xv.astype(float).values
+            ws = wv.astype(float).values
+            order = np.argsort(vals)
+            vals_s = vals[order]
+            ws_s = ws[order]
+            c = np.cumsum(ws_s)
+            cutoff = c[-1] / 2.0
+            idx = int(np.searchsorted(c, cutoff))
+            return float(vals_s[min(idx, len(vals_s) - 1)])
+        except (ValueError, TypeError):
+            return np.nan
+
+    def wstd(x):
+        xv, wv = _slice(x)
+        if xv is None or len(xv) < 2:
+            return np.nan
+        try:
+            vals = xv.astype(float).values
+            ws = wv.astype(float).values
+            wmean_v = float(np.average(vals, weights=ws))
+            var = float(np.average((vals - wmean_v) ** 2, weights=ws))
+            return float(np.sqrt(var))
+        except (ValueError, TypeError):
+            return np.nan
+
+    def wvar(x):
+        s = wstd(x)
+        return s * s if not (s is None or np.isnan(s)) else np.nan
+
+    return {
+        "mean": wmean,
+        "count": wcount,
+        "sum": wsum,
+        "median": wmedian,
+        "std": wstd,
+        "var": wvar,
+    }
+
+
+def _compute_net_row(df: pd.DataFrame, row_col: str, members: list, values: list[dict],
+                     value_labels: list[str], w_aggs: dict | None) -> dict:
+    """Aggregate a subset of df (where row_col ∈ members) using the same aggs as the table's values.
+    Returns a dict mapping value labels → aggregated value.
+    """
+    if not members or row_col not in df.columns:
+        return {}
+    members_s = [str(m) for m in members]
+    sub = df[df[row_col].astype(str).isin(members_s)]
+    if sub.empty:
+        return {lbl: 0 for lbl in value_labels}
+    out: dict = {}
+    for v, lbl in zip(values, value_labels):
+        field = v.get("field", "")
+        agg = v.get("agg", "sum")
+        if field == "*":
+            field = row_col
+            agg = "count"
+        if field not in sub.columns:
+            out[lbl] = None
+            continue
+        if w_aggs and agg in w_aggs:
+            try:
+                out[lbl] = w_aggs[agg](sub[field])
+            except Exception:
+                out[lbl] = None
+            continue
+        try:
+            col = pd.to_numeric(sub[field], errors="coerce")
+            if agg in ("sum", "running_total", "cumulative_sum"):
+                out[lbl] = float(col.sum())
+            elif agg == "count":
+                out[lbl] = int(sub[field].notna().sum())
+            elif agg == "count_distinct":
+                out[lbl] = int(sub[field].nunique(dropna=True))
+            elif agg in ("average", "mean"):
+                out[lbl] = float(col.mean()) if col.notna().any() else None
+            elif agg == "median":
+                out[lbl] = float(col.median()) if col.notna().any() else None
+            elif agg == "min":
+                out[lbl] = float(col.min()) if col.notna().any() else None
+            elif agg == "max":
+                out[lbl] = float(col.max()) if col.notna().any() else None
+            elif agg == "std":
+                out[lbl] = float(col.std(ddof=1)) if col.notna().sum() > 1 else None
+            elif agg == "var":
+                out[lbl] = float(col.var(ddof=1)) if col.notna().sum() > 1 else None
+            else:
+                out[lbl] = float(col.sum())
+        except Exception:
+            out[lbl] = None
+    return out
+
 
 router = APIRouter()
 
@@ -25,6 +171,7 @@ class TableConfig(BaseModel):
     grand_total: bool = True
     grand_total_rows: Optional[bool] = None    # None = follow grand_total
     grand_total_columns: Optional[bool] = None # None = follow grand_total
+    grand_total_combined: bool = False         # Club all values into single Grand Total column
     sort_by: Optional[str] = None
     sort_order: str = "asc"
     multi_sort: list[dict] = []     # [{field, order}] for multi-key sorting
@@ -33,6 +180,12 @@ class TableConfig(BaseModel):
     date_groupings: dict = {}       # {col_name: "year"|"quarter"|"month"|"week"|"day"}
     blank_suppress: bool = False    # hide rows where all value cols are 0/blank
     hide_subgroup: bool = False     # hide detail rows, show only subtotals/grand totals
+    # NET rows: e.g., NET Agree = sum of {"Strongly Agree","Agree"} for a Likert row variable
+    # [{label, members, position?}] position ∈ {"end","after_last_member","before_first_member"}
+    net_rows: list[dict] = []
+    # Table chains: optional upstream table whose tabulated result feeds this table
+    source_table_id: Optional[str] = None
+    upstream_chain: Optional[list[dict]] = None  # [{rows, columns, values, filters, ...}] of the source table
 
 
 AGG_MAP = {
@@ -65,7 +218,8 @@ async def tabulate(config: TableConfig):
         # Check user-set type overrides first, then auto-detect
         multi_choice_cols = []
         all_used_cols = list(set(config.rows + config.columns + list(config.filters.keys())))
-        _type_overrides = column_type_overrides.get(config.dataset_id, {})
+        from ..shared import get_overrides as _get_overrides
+        _type_overrides = _get_overrides(config.dataset_id)
         for col_name in all_used_cols:
             override = _type_overrides.get(col_name)
             if override == "multi_choice":
@@ -139,6 +293,16 @@ async def tabulate(config: TableConfig):
                 if _nat_mask.any():
                     df.loc[_nat_mask, _gc] = "(blank)"
 
+        # Resolve survey weights once (used in both groupby and pivot paths)
+        _weight_col = _get_weight_col(config.dataset_id)
+        _w_aggs = None
+        _is_weighted_run = False
+        if _weight_col and _weight_col in df.columns:
+            _w_numeric = pd.to_numeric(df[_weight_col], errors="coerce")
+            if _w_numeric.notna().sum() > 0:
+                _w_aggs = _make_weighted_aggs(_w_numeric)
+                _is_weighted_run = True
+
         # Simple case: rows only (no column pivoting)
         if config.rows and not config.columns:
             agg_dict = {}
@@ -173,9 +337,12 @@ async def tabulate(config: TableConfig):
                     agg = "count"
 
                 if agg in AGG_MAP:
-                    agg_dict[safe_field] = AGG_MAP[agg]
+                    if _w_aggs and agg in _w_aggs:
+                        agg_dict[safe_field] = _w_aggs[agg]
+                    else:
+                        agg_dict[safe_field] = AGG_MAP[agg]
                 else:
-                    agg_dict[safe_field] = "sum"
+                    agg_dict[safe_field] = _w_aggs["sum"] if _w_aggs else "sum"
 
                 # Queue show_as post-calculation
                 if show_as and show_as != "normal":
@@ -520,6 +687,15 @@ async def tabulate(config: TableConfig):
                     total_row["__note__"] = f"* Multiple responses: {', '.join(multi_choice_cols)}. Total responses may exceed {original_row_count} respondents."
                 result = pd.concat([result, pd.DataFrame([total_row])], ignore_index=True)
 
+            # Column total (last column) — sum across all value columns per row
+            want_col_total = config.grand_total_columns if config.grand_total_columns is not None else config.grand_total
+            if want_col_total and len(config.values) > 1:
+                value_cols = [v.get("label", f"{v.get('agg','sum').title()} of {v['field']}") for v in config.values]
+                existing_vcols = [c for c in value_cols if c in result.columns]
+                if existing_vcols:
+                    numeric_part = result[existing_vcols].apply(pd.to_numeric, errors="coerce").fillna(0)
+                    result["Grand Total"] = numeric_part.sum(axis=1)
+
             # Blank suppression
             if config.blank_suppress:
                 value_cols = [v.get("label", f"{v.get('agg','sum').title()} of {v['field']}") for v in config.values]
@@ -546,6 +722,69 @@ async def tabulate(config: TableConfig):
                 note = notes[0] if notes else None
                 result = result.drop(columns=["__note__"])
 
+            # NET rows: insert aggregated rows for user-defined member groups
+            if config.net_rows and config.rows:
+                row_col = config.rows[0]
+                non_value_cols = [c for c in result.columns if c not in value_labels]
+                for net in config.net_rows:
+                    label = (net.get("label") or "").strip()
+                    members = net.get("members") or []
+                    pos = net.get("position", "after_last_member")
+                    if not label or not members:
+                        continue
+                    net_values = _compute_net_row(df, row_col, members, config.values, value_labels, _w_aggs)
+                    new_row = {c: "" for c in result.columns}
+                    new_row[row_col] = f"NET {label}"
+                    for lbl, val in net_values.items():
+                        if lbl in result.columns:
+                            new_row[lbl] = val
+                    members_s = [str(m) for m in members]
+                    matches = result[result[row_col].astype(str).isin(members_s)].index.tolist()
+                    if pos == "before_first_member" and matches:
+                        insert_at = matches[0]
+                    elif pos == "end":
+                        gt_mask = result[row_col].astype(str) == "Grand Total"
+                        insert_at = (gt_mask.idxmax() if gt_mask.any() else len(result))
+                    else:  # after_last_member
+                        insert_at = (matches[-1] + 1) if matches else len(result)
+                    upper = result.iloc[:insert_at]
+                    lower = result.iloc[insert_at:]
+                    result = pd.concat([upper, pd.DataFrame([new_row]), lower], ignore_index=True)
+
+            # Effective-N suppression: per-value field, replace cells with "*" when N < threshold
+            _suppress_count = 0
+            _any_suppress = any((v.get("suppress_below_n") or 0) > 0 for v in config.values)
+            if _any_suppress and config.rows:
+                try:
+                    if _is_weighted_run:
+                        _w_num = pd.to_numeric(df[_weight_col], errors="coerce").fillna(0)
+                        _df_w = df.assign(__w__=_w_num)
+                        _grp = _df_w.groupby(config.rows, dropna=False)
+                        _sum_w = _grp["__w__"].sum()
+                        _sum_w2 = _grp["__w__"].apply(lambda s: (s ** 2).sum())
+                        _n_series = ((_sum_w * _sum_w) / _sum_w2.replace(0, np.nan)).fillna(0)
+                    else:
+                        _n_series = df.groupby(config.rows, dropna=False).size()
+                    _n_df = _n_series.reset_index(name="__N__")
+                    _result_keyed = result.merge(_n_df, on=list(config.rows), how="left")
+                    _n_col = _result_keyed["__N__"].fillna(0)
+                    for v, lbl in zip(config.values, value_labels):
+                        thr = int(v.get("suppress_below_n") or 0)
+                        if thr <= 0 or lbl not in result.columns:
+                            continue
+                        row_label_str = result[config.rows[0]].astype(str)
+                        mask = (
+                            (_n_col < thr)
+                            & (row_label_str != "Grand Total")
+                            & (~row_label_str.str.startswith("NET "))
+                        )
+                        if mask.any():
+                            _suppress_count += int(mask.sum())
+                            result[lbl] = result[lbl].astype(object)
+                            result.loc[mask, lbl] = "*"
+                except Exception:
+                    pass
+
             headers = list(result.columns)
             rows = sanitize_for_json(result.fillna(config.missing_data).values.tolist())
             resp = {"headers": headers, "rows": rows, "row_count": len(rows), "col_count": len(headers)}
@@ -553,27 +792,16 @@ async def tabulate(config: TableConfig):
                 resp["multi_response_note"] = note or f"* Multiple responses: {', '.join(multi_choice_cols)}. Total responses ({len(df)}) may exceed {original_row_count} respondents."
                 resp["original_respondents"] = original_row_count
                 resp["total_responses"] = len(df)
+            if _is_weighted_run:
+                resp["weighted"] = True
+                resp["weight_col"] = _weight_col
+            if _suppress_count > 0:
+                resp["suppress_count"] = _suppress_count
+                resp["suppress_basis"] = "effective" if _is_weighted_run else "raw"
             return resp
 
         # Pivot table case
         elif config.rows and config.columns:
-            val_field = config.values[0]["field"]
-            _raw_agg = config.values[0].get("agg", "sum")
-            # Handle '*' (row count) — use first row field as proxy with count agg
-            if val_field == "*":
-                val_field = config.rows[0]
-                _raw_agg = "count"
-            # Auto-downgrade numeric agg to 'count' for text/multi-choice value columns
-            if _raw_agg in NUMERIC_ONLY_AGGS and _col_is_text(df, val_field):
-                _raw_agg = "count"
-            agg_func = AGG_MAP.get(_raw_agg, "sum")
-
-            # Pandas pivot_table fails if val_field is in rows or columns
-            temp_val_field = val_field
-            if val_field in config.rows or val_field in config.columns:
-                temp_val_field = f"__temp_{val_field}__"
-                df[temp_val_field] = df[val_field]
-
             # Handle same field in both rows and columns — create temp copy for columns
             temp_cols = list(config.columns)
             temp_col_renames = {}
@@ -595,43 +823,105 @@ async def tabulate(config: TableConfig):
                     if _nat_mask.any():
                         df.loc[_nat_mask, _pc] = "(blank)"
 
-            pivot = pd.pivot_table(
-                df,
-                values=temp_val_field,
-                index=config.rows,
-                columns=temp_cols,
-                aggfunc=agg_func,
-                fill_value=0 if config.missing_data == "0" else None,
-                margins=need_margins,
-                margins_name="Grand Total",
-                dropna=False,
-            )
+            # Build per-value pivots (supports multiple value fields with independent aggs)
+            _pv_pivots = []
+            _pv_cfgs = []
+            _pv_temp_cleanup = []
 
-            # Selectively remove row or column grand totals
-            if need_margins:
-                if not want_row_total_pivot:
-                    # Remove the Grand Total row (last row added by margins)
-                    if "Grand Total" in pivot.index.get_level_values(-1).astype(str).tolist():
-                        pivot = pivot.drop("Grand Total", axis=0, errors="ignore")
-                if not want_col_total_pivot:
-                    # Remove the Grand Total column
-                    if isinstance(pivot.columns, pd.MultiIndex):
-                        cols_to_drop = [c for c in pivot.columns if "Grand Total" in [str(x) for x in c]]
-                        if cols_to_drop:
-                            pivot = pivot.drop(columns=cols_to_drop, errors="ignore")
-                    else:
-                        if "Grand Total" in pivot.columns.astype(str).tolist():
-                            pivot = pivot.drop(columns=["Grand Total"], errors="ignore")
+            for _vi, _v in enumerate(config.values):
+                _vf = _v["field"]
+                _va = _v.get("agg", "sum")
+                if _vf == "*":
+                    _vf = config.rows[0]
+                    _va = "count"
+                if _va in NUMERIC_ONLY_AGGS and _col_is_text(df, _vf):
+                    _va = "count"
+                if _w_aggs and _va in _w_aggs:
+                    _af = _w_aggs[_va]
+                else:
+                    _af = AGG_MAP.get(_va, "sum")
+                _vl = _v.get("label", f"{_va.title()} of {_vf}")
 
-            if temp_val_field != val_field:
-                df.drop(columns=[temp_val_field], inplace=True, errors="ignore")
+                _tvf = _vf
+                if _vf in config.rows or _vf in config.columns:
+                    _tvf = f"__temp_{_vf}_{_vi}__"
+                    df[_tvf] = df[_vf]
+                    _pv_temp_cleanup.append(_tvf)
+
+                _p = pd.pivot_table(
+                    df, values=_tvf, index=config.rows, columns=temp_cols,
+                    aggfunc=_af,
+                    fill_value=0 if config.missing_data == "0" else None,
+                    margins=need_margins, margins_name="Grand Total", dropna=False,
+                )
+
+                # Selectively remove row or column grand totals
+                if need_margins:
+                    if not want_row_total_pivot:
+                        if "Grand Total" in _p.index.get_level_values(-1).astype(str).tolist():
+                            _p = _p.drop("Grand Total", axis=0, errors="ignore")
+                    if not want_col_total_pivot:
+                        if isinstance(_p.columns, pd.MultiIndex):
+                            _cd = [c for c in _p.columns if "Grand Total" in [str(x) for x in c]]
+                            if _cd:
+                                _p = _p.drop(columns=_cd, errors="ignore")
+                        else:
+                            if "Grand Total" in _p.columns.astype(str).tolist():
+                                _p = _p.drop(columns=["Grand Total"], errors="ignore")
+
+                _pv_pivots.append(_p)
+                _pv_cfgs.append({
+                    "label": _vl, "show_as": _v.get("show_as", "normal"),
+                    "combo_show_as": _v.get("combo_show_as", "normal"),
+                    "decimals": _v.get("decimals", 2), "agg": _va,
+                })
+
+            for _tf in _pv_temp_cleanup:
+                df.drop(columns=[_tf], inplace=True, errors="ignore")
             for temp_name in temp_col_renames:
                 df.drop(columns=[temp_name], inplace=True, errors="ignore")
 
+            # Merge per-value pivots into combined pivot
+            _is_multi_val = len(_pv_pivots) > 1
+            if not _is_multi_val:
+                pivot = _pv_pivots[0]
+            else:
+                _ref = _pv_pivots[0]
+                _ref_cols = _ref.columns
+                _data = {}
+                _col_tuples = []
+                if isinstance(_ref_cols, pd.MultiIndex):
+                    for _ct in _ref_cols:
+                        for _p, _vc in zip(_pv_pivots, _pv_cfgs):
+                            _nk = tuple(str(c) for c in _ct) + (_vc["label"],)
+                            _fk = " | ".join(_nk)
+                            _data[_fk] = _p[_ct].values if _ct in _p.columns else np.zeros(len(_ref))
+                            _col_tuples.append(_nk)
+                else:
+                    for _cv in _ref_cols:
+                        for _p, _vc in zip(_pv_pivots, _pv_cfgs):
+                            _nk = (str(_cv), _vc["label"])
+                            _fk = f"{_cv} | {_vc['label']}"
+                            _data[_fk] = _p[_cv].values if _cv in _p.columns else np.zeros(len(_ref))
+                            _col_tuples.append(_nk)
+                pivot = pd.DataFrame(_data, index=_ref.index)
+                pivot.columns = pd.MultiIndex.from_tuples(_col_tuples)
+
+                # Combined Grand Total: replace per-value GT sub-columns with single summed column
+                if config.grand_total_combined and want_col_total_pivot:
+                    gt_cols = [c for c in pivot.columns if str(c[0]) == "Grand Total"]
+                    if gt_cols:
+                        pivot[("Grand Total", "Total")] = pivot[gt_cols].sum(axis=1)
+                        pivot = pivot.drop(columns=gt_cols)
+                        # Re-sort columns: non-GT first, then the combined GT at the end
+                        non_gt = [c for c in pivot.columns if str(c[0]) != "Grand Total"]
+                        gt_new = [c for c in pivot.columns if str(c[0]) == "Grand Total"]
+                        pivot = pivot[non_gt + gt_new]
+
             column_groups = None
             if isinstance(pivot.columns, pd.MultiIndex):
-                # Insert column-group subtotals before flattening
-                if config.subtotals:
+                # Insert column-group subtotals before flattening (skip for multi-value — summing across measures is meaningless)
+                if config.subtotals and not _is_multi_val:
                     from collections import OrderedDict
                     top_level_values = list(OrderedDict.fromkeys(
                         str(col[0]) for col in pivot.columns if str(col[0]) != "Grand Total"
@@ -707,8 +997,10 @@ async def tabulate(config: TableConfig):
             if v0.get("agg", "sum") in PERCENT_AGGS:
                 show_as = v0["agg"]
 
-            def apply_pivot_show_as(pivot_df, sa, decimal_places):
+            def apply_pivot_show_as(pivot_df, sa, decimal_places, col_filter=None):
                 numeric_cols = pivot_df.select_dtypes(include=[np.number]).columns
+                if col_filter:
+                    numeric_cols = pd.Index([c for c in numeric_cols if any(str(c).endswith(lbl) for lbl in col_filter)])
                 # Exclude Grand Total and Subtotal columns from percentage calculations
                 data_cols = [c for c in numeric_cols if not str(c).startswith("Grand Total") and "| Subtotal" not in str(c)]
                 has_margin_col = any(str(c).startswith("Grand Total") for c in numeric_cols)
@@ -829,37 +1121,61 @@ async def tabulate(config: TableConfig):
                                 pivot_df[c] = (pivot_df[c] / grand * 100).round(decimal_places)
                 return pivot_df
 
-            if combo_show_as and combo_show_as != "normal":
-                # Store original values, compute %, then combine
-                orig_pivot = pivot.copy()
-                apply_pivot_show_as(pivot, combo_show_as, dec)
+            def _apply_combo(target_df, orig_df, sa, decimal_places, col_filter=None):
+                apply_pivot_show_as(target_df, sa, decimal_places, col_filter=col_filter)
                 missing_fill = config.missing_data if config.missing_data else ""
-                numeric_cols = orig_pivot.select_dtypes(include=[np.number]).columns
-                for c in numeric_cols:
+                ncols = orig_df.select_dtypes(include=[np.number]).columns
+                if col_filter:
+                    ncols = pd.Index([c for c in ncols if any(str(c).endswith(lbl) for lbl in col_filter)])
+                for c in ncols:
                     combined = []
-                    for ov, pv in zip(orig_pivot[c], pivot[c]):
+                    for ov, pv in zip(orig_df[c], target_df[c]):
                         try:
                             ov_na = (isinstance(ov, float) and (pd.isna(ov) or np.isinf(ov))) if not isinstance(ov, str) else False
                             pv_na = (isinstance(pv, float) and (pd.isna(pv) or np.isinf(pv))) if not isinstance(pv, str) else ("nan" in str(pv).lower())
                             if ov_na:
                                 combined.append(missing_fill)
                             elif pv_na:
-                                ov_s = f"{ov:,.{dec}f}" if isinstance(ov, (int, float)) else str(ov)
+                                ov_s = f"{ov:,.{decimal_places}f}" if isinstance(ov, (int, float)) else str(ov)
                                 combined.append(f"{ov_s}\n({missing_fill or '0'}%)")
                             else:
-                                ov_s = f"{ov:,.{dec}f}" if isinstance(ov, (int, float)) else str(ov)
-                                pv_s = f"{pv:.{dec}f}%" if isinstance(pv, (int, float)) else str(pv)
+                                ov_s = f"{ov:,.{decimal_places}f}" if isinstance(ov, (int, float)) else str(ov)
+                                pv_s = f"{pv:.{decimal_places}f}%" if isinstance(pv, (int, float)) else str(pv)
                                 combined.append(f"{ov_s}\n({pv_s})")
                         except (ValueError, TypeError):
                             combined.append(missing_fill if ov_na else str(ov))
-                    pivot[c] = combined
-            elif show_as and show_as != "normal":
-                apply_pivot_show_as(pivot, show_as, dec)
+                    target_df[c] = combined
 
-            # Apply decimal rounding to all numeric columns
-            if dec is not None:
-                for c in pivot.select_dtypes(include=[np.number]).columns:
-                    pivot[c] = pivot[c].round(int(dec))
+            if _is_multi_val:
+                # Per-value show_as / combo / rounding
+                for _vc in _pv_cfgs:
+                    _sa = _vc.get("show_as", "normal")
+                    _csa = _vc.get("combo_show_as", "normal")
+                    _dec = _vc.get("decimals", 2)
+                    _lbl = _vc["label"]
+                    # Legacy compat
+                    if _vc.get("agg", "sum") in PERCENT_AGGS:
+                        _sa = _vc["agg"]
+                    _cf = [_lbl]
+                    if _csa and _csa != "normal":
+                        orig_pivot = pivot.copy()
+                        _apply_combo(pivot, orig_pivot, _csa, _dec, col_filter=_cf)
+                    elif _sa and _sa != "normal":
+                        apply_pivot_show_as(pivot, _sa, _dec, col_filter=_cf)
+                    if _dec is not None:
+                        val_cols = [c for c in pivot.select_dtypes(include=[np.number]).columns if str(c).endswith(_lbl)]
+                        for c in val_cols:
+                            pivot[c] = pivot[c].round(int(_dec))
+            else:
+                if combo_show_as and combo_show_as != "normal":
+                    orig_pivot = pivot.copy()
+                    _apply_combo(pivot, orig_pivot, combo_show_as, dec)
+                elif show_as and show_as != "normal":
+                    apply_pivot_show_as(pivot, show_as, dec)
+                # Apply decimal rounding to all numeric columns
+                if dec is not None:
+                    for c in pivot.select_dtypes(include=[np.number]).columns:
+                        pivot[c] = pivot[c].round(int(dec))
 
             # Hide subtotal rows in pivot — remove "Subtotal" rows but keep detail and grand total
             if config.hide_subgroup and config.subtotals and len(config.rows) >= 1:
@@ -905,6 +1221,130 @@ async def tabulate(config: TableConfig):
                             "has_multi_level": len(set(top_labels)) > 1,
                         }
 
+            # NET rows for pivot: insert aggregated rows for member groups
+            if config.net_rows and config.rows:
+                row_col = config.rows[0]
+                # Compute net cells per pivot column: for each non-row column, aggregate matching df rows
+                non_row_pivot_cols = [c for c in pivot.columns if c not in config.rows]
+                for net in config.net_rows:
+                    label = (net.get("label") or "").strip()
+                    members = net.get("members") or []
+                    pos = net.get("position", "after_last_member")
+                    if not label or not members:
+                        continue
+                    members_s = [str(m) for m in members]
+                    sub = df[df[row_col].astype(str).isin(members_s)]
+                    new_row: dict = {c: "" for c in pivot.columns}
+                    new_row[row_col] = f"NET {label}"
+                    if not sub.empty:
+                        # For each non-row pivot column, find the value field + column key
+                        for v, vl in zip(config.values, value_labels):
+                            field = v.get("field", row_col if v.get("field") == "*" else v["field"])
+                            agg = v.get("agg", "sum") if v.get("field") != "*" else "count"
+                            for c in non_row_pivot_cols:
+                                if str(c).startswith("Grand Total"):
+                                    continue
+                                # Column name patterns:  "<colvalue>" or "<vl> | <colvalue>" (multi-value)
+                                col_key = str(c)
+                                if " | " in col_key:
+                                    if not col_key.startswith(f"{vl} | "):
+                                        continue
+                                    col_key = col_key.split(" | ", 1)[1]
+                                # Match df rows where the temp_col == col_key (using temp_cols for renamed cols)
+                                if not temp_cols:
+                                    continue
+                                tc = temp_cols[0]
+                                if tc not in sub.columns:
+                                    continue
+                                sub2 = sub[sub[tc].astype(str) == col_key]
+                                if sub2.empty:
+                                    new_row[c] = 0
+                                    continue
+                                try:
+                                    if _w_aggs and agg in _w_aggs:
+                                        new_row[c] = _w_aggs[agg](sub2[field])
+                                    else:
+                                        col_n = pd.to_numeric(sub2[field], errors="coerce")
+                                        if agg in ("sum", "running_total", "cumulative_sum"):
+                                            new_row[c] = float(col_n.sum())
+                                        elif agg == "count":
+                                            new_row[c] = int(sub2[field].notna().sum())
+                                        elif agg in ("average", "mean"):
+                                            new_row[c] = float(col_n.mean()) if col_n.notna().any() else None
+                                        elif agg == "median":
+                                            new_row[c] = float(col_n.median()) if col_n.notna().any() else None
+                                        elif agg == "min":
+                                            new_row[c] = float(col_n.min()) if col_n.notna().any() else None
+                                        elif agg == "max":
+                                            new_row[c] = float(col_n.max()) if col_n.notna().any() else None
+                                        else:
+                                            new_row[c] = float(col_n.sum())
+                                except Exception:
+                                    new_row[c] = None
+                    matches = pivot[pivot[row_col].astype(str).isin(members_s)].index.tolist()
+                    if pos == "before_first_member" and matches:
+                        insert_at = matches[0]
+                    elif pos == "end":
+                        gt_mask = pivot[row_col].astype(str) == "Grand Total"
+                        insert_at = int(gt_mask.idxmax()) if gt_mask.any() else len(pivot)
+                    else:
+                        insert_at = (matches[-1] + 1) if matches else len(pivot)
+                    upper = pivot.iloc[:insert_at]
+                    lower = pivot.iloc[insert_at:]
+                    pivot = pd.concat([upper, pd.DataFrame([new_row]), lower], ignore_index=True)
+
+            # Effective-N suppression for pivot: per-cell N
+            _suppress_count_pv = 0
+            _any_suppress_pv = any((v.get("suppress_below_n") or 0) > 0 for v in config.values)
+            if _any_suppress_pv and config.rows and config.columns:
+                try:
+                    if _is_weighted_run:
+                        _w_num = pd.to_numeric(df[_weight_col], errors="coerce").fillna(0)
+                        _df_w = df.assign(__w__=_w_num)
+                        _sum_w_p = _df_w.pivot_table(index=config.rows, columns=temp_cols, values="__w__", aggfunc="sum", fill_value=0)
+                        _sum_w2_p = _df_w.assign(__w2__=lambda d: d["__w__"] ** 2).pivot_table(
+                            index=config.rows, columns=temp_cols, values="__w2__", aggfunc="sum", fill_value=0)
+                        _n_p = (_sum_w_p * _sum_w_p) / _sum_w2_p.replace(0, np.nan)
+                        _n_p = _n_p.fillna(0)
+                    else:
+                        _n_p = df.pivot_table(index=config.rows, columns=temp_cols, values=config.rows[0],
+                                              aggfunc="size", fill_value=0)
+                    # Find max threshold across value fields (apply most restrictive uniformly)
+                    thresholds = [int(v.get("suppress_below_n") or 0) for v in config.values]
+                    thr = max(thresholds) if thresholds else 0
+                    if thr > 0:
+                        # Flatten n-pivot column labels to match pivot's columns
+                        _n_flat = _n_p.reset_index()
+                        # Identify which result columns to mask (everything not in row keys / not Grand Total)
+                        for col in pivot.columns:
+                            if col in config.rows:
+                                continue
+                            if str(col).startswith("Grand Total"):
+                                continue
+                            # Try to find matching n column
+                            n_col = None
+                            if col in _n_flat.columns:
+                                n_col = _n_flat[col]
+                            else:
+                                # Strip prefixes like "label | " for multi-value pivots
+                                stripped = str(col).split(" | ")[-1]
+                                if stripped in _n_flat.columns:
+                                    n_col = _n_flat[stripped]
+                            if n_col is None or len(n_col) != len(pivot):
+                                continue
+                            row_lbl_str = pivot[config.rows[0]].astype(str)
+                            mask = (
+                                (n_col.values < thr)
+                                & (row_lbl_str != "Grand Total")
+                                & (~row_lbl_str.str.startswith("NET "))
+                            )
+                            if mask.any():
+                                _suppress_count_pv += int(mask.sum())
+                                pivot[col] = pivot[col].astype(object)
+                                pivot.loc[mask, col] = "*"
+                except Exception:
+                    pass
+
             headers = [str(c) for c in pivot.columns]
             rows = sanitize_for_json(pivot.fillna(config.missing_data).values.tolist())
             result_obj = {"headers": headers, "rows": rows, "row_count": len(rows), "col_count": len(headers)}
@@ -914,6 +1354,12 @@ async def tabulate(config: TableConfig):
                 result_obj["multi_response_note"] = f"* Multiple responses: {', '.join(multi_choice_cols)}. Total responses ({len(df)}) may exceed {original_row_count} respondents."
                 result_obj["original_respondents"] = original_row_count
                 result_obj["total_responses"] = len(df)
+            if _is_weighted_run:
+                result_obj["weighted"] = True
+                result_obj["weight_col"] = _weight_col
+            if _suppress_count_pv > 0:
+                result_obj["suppress_count"] = _suppress_count_pv
+                result_obj["suppress_basis"] = "effective" if _is_weighted_run else "raw"
             return result_obj
 
         # Only values, no grouping

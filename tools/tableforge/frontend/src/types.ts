@@ -41,6 +41,7 @@ export interface ValueField {
   show_n?: boolean;           // Show sample size
   missing_indicator?: string; // Custom missing data symbol e.g. "—", "n/a", "."
   change_arrows?: boolean;    // Show ▲/▼ arrows for positive/negative change
+  suppress_below_n?: number;  // Replace cell with "*" when N (effective if weighted) < threshold (DHS-style low-base suppression)
 }
 
 export interface NumberFormat {
@@ -113,6 +114,7 @@ export interface TableConfig {
   grand_total: boolean;
   grand_total_rows?: boolean;
   grand_total_columns?: boolean;
+  grand_total_combined?: boolean;
   subtotals: boolean;
   subtotals_position?: 'top' | 'bottom';
   subtotal_pct_base?: 'subtotal' | 'grand_total';
@@ -153,12 +155,31 @@ export interface TableConfig {
   table_number?: string;
   // Advanced formatting
   frozen_first_col?: boolean;
+  frozen_header?: boolean;          // sticky header row
   header_word_wrap?: boolean;
   zoom_level?: number;  // 50, 75, 100, 125, 150, 200
+  // Phase-2 table customisation
+  merge_row_labels?: boolean;       // collapse consecutive identical row labels
+  sparkline_columns?: string[];     // value fields to render as inline mini-bars
+  pinned_row_keys?: string[];       // first-column values pinned to top of table
+  page_break_before?: boolean;      // force Word page break before this table
+  auto_footnote_markers?: boolean;  // auto-attach footnote markers to suppressed/flagged cells
   // Footnotes system
   footnotes?: { marker: string; text: string }[];
   footnote_style?: 'numeric' | 'alpha' | 'symbol' | 'custom';  // 1,2,3 / a,b,c / *,†,‡ / custom
   _autoTitle?: boolean;  // true = auto-generate title from config; false = user manually edited
+  _statResult?: boolean; // true = result was injected from a stat test, skip pivot tabulation
+  _statResultData?: { headers: string[]; rows: any[][] }; // persisted stat result, rehydrated into results map on project load
+  _statConfig?: {
+    statType: string;
+    columns: string[];
+    alpha: number;
+    analysisFilters: Record<string, string[]>;
+    useProjectFilter: boolean;
+    columnsMeta?: Array<{ name: string; type: string; role?: string }>;
+    datasetId?: string;
+    computedAt?: string;
+  };
   bg_color?: string;           // Values area background color
   header_bg_color?: string;    // Header row background color
   header_text_color?: string;  // Header text color
@@ -173,6 +194,10 @@ export interface TableConfig {
     showGrid?: boolean;
     showLabels?: boolean;
     showLegend?: boolean;
+    // Pre-built stat chart (heatmap / box / bar from statistical tests).
+    // When set, InlineChartPreview renders <Chart kind=... data=... /> directly
+    // instead of building the chart from tabulated rows via ChartCanvas.
+    statChart?: { kind: 'bar' | 'box' | 'heatmap' | 'stackedBar'; data: any; title?: string; height?: number };
     [key: string]: any;
   };
   _lastValueConfig?: Partial<ValueField>;
@@ -181,6 +206,35 @@ export interface TableConfig {
   header_align?: 'left' | 'center' | 'right';       // Header row alignment
   row_label_align?: 'left' | 'center' | 'right';    // Row labels alignment
   hide_subgroup?: boolean;
+  // Pin/star: surface frequently used tables at top of strip
+  pinned?: boolean;
+  // Table chains: this table's input is the result of another table
+  source_table_id?: string;
+  // NET rows (Q/SPSS convention): aggregated rows summing member categories
+  net_rows?: NetRow[];
+  // Section assignment for nav grouping
+  section_id?: string;
+}
+
+export interface TableSection {
+  id: string;
+  name: string;
+  color?: string;
+  collapsed?: boolean;
+  order: number;
+}
+
+export interface NumberingConfig {
+  style: 'arabic' | 'decimal' | 'alpha' | 'roman';
+  scope: 'continuous' | 'per_section';
+  prefix?: string;
+  suffix?: string;
+}
+
+export interface NetRow {
+  label: string;             // e.g. "Agree" → renders as "NET Agree"
+  members: string[];         // e.g. ["Strongly Agree", "Agree"]
+  position?: 'after_last_member' | 'before_first_member' | 'end';
 }
 
 export interface ColumnGroup {
@@ -202,6 +256,10 @@ export interface TableResult {
   multi_response_note?: string;
   original_respondents?: number;
   total_responses?: number;
+  weighted?: boolean;
+  weight_col?: string;
+  suppress_count?: number;
+  suppress_basis?: 'effective' | 'raw';
 }
 
 export type DropZoneType = 'rows' | 'columns' | 'values' | 'filters';
@@ -261,4 +319,53 @@ export interface QualityReport {
   }[];
   duplicate_rows: number;
   total_rows: number;
+}
+
+// ── Survey Analysis Studio: metadata layer (Phase 0) ─────────────────────────
+
+export type ColumnRoleKind =
+  | 'treatment' | 'outcome' | 'demographic' | 'mediator' | 'moderator'
+  | 'geographic' | 'panel_wave' | 'observer_rated' | 'qualitative' | 'weight'
+  | 'id' | 'attention_check' | 'meta_time' | 'other';
+
+export type ColumnScale =
+  | 'nominal' | 'ordinal' | 'interval' | 'ratio'
+  | 'likert' | 'binary' | 'count' | 'multi_response';
+
+export type StudyDesignType =
+  | 'cross_sectional' | 'pre_post' | 'quasi_experimental' | 'panel' | 'rcs';
+
+export interface ColumnRole {
+  role?: ColumnRoleKind | string | null;
+  scale?: ColumnScale | string | null;
+  value_labels?: Record<string, string>;
+  units?: string | null;
+  paired_with?: string | null;
+  mr_set_id?: string | null;
+  benchmark_link?: string | null;
+  notes?: string | null;
+}
+
+export interface PrePostPair {
+  pre: string;
+  post: string;
+}
+
+export interface StudyDesign {
+  design_type?: StudyDesignType | string | null;
+  treatment_col?: string | null;
+  treatment_value?: string | null;
+  weight_col?: string | null;
+  cluster_col?: string | null;
+  panel_id_col?: string | null;
+  panel_wave_col?: string | null;
+  pre_post_pairs?: PrePostPair[];
+  strata?: string[];
+  notes?: string | null;
+}
+
+export interface AutoDetectResult {
+  suggested_roles: Record<string, ColumnRole>;
+  suggested_design: StudyDesign;
+  column_count: number;
 }

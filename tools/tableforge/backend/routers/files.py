@@ -100,7 +100,8 @@ async def load_server_file(file_id: str):
     import pandas as pd
     from ..shared import (datasets, custom_metrics, custom_bins, audit_logs,
                           annotations, column_type_overrides, CACHE_DIR,
-                          sanitize_for_json, add_audit_log, _is_multi_choice)
+                          sanitize_for_json, add_audit_log, _is_multi_choice,
+                          _detect_columns, _strip_formula_cells)
 
     manifest = _load_manifest()
     entry = next((f for f in manifest if f["id"] == file_id), None)
@@ -122,9 +123,13 @@ async def load_server_file(file_id: str):
 
     try:
         if ext in ("xlsx", "xls"):
-            xls = pd.ExcelFile(cache_path, engine="openpyxl" if ext == "xlsx" else "xlrd")
+            _eng = "openpyxl" if ext == "xlsx" else "xlrd"
+            _ekw = {"data_only": True} if ext == "xlsx" else {}
+            xls = pd.ExcelFile(cache_path, engine=_eng)
             sheets = xls.sheet_names
-            df = pd.read_excel(xls, sheet_name=sheets[0])
+            df = pd.read_excel(cache_path, sheet_name=sheets[0],
+                               engine=_eng, engine_kwargs=_ekw)
+            _strip_formula_cells(df)
         elif ext in ("csv", "tsv"):
             sep = "\t" if ext == "tsv" else ","
             df = None
@@ -144,70 +149,12 @@ async def load_server_file(file_id: str):
     except Exception as e:
         raise HTTPException(400, f"Failed to read file: {str(e)}")
 
-    # Detect columns
-    import numpy as np
-    columns = []
-    for col in df.columns:
-        dtype = str(df[col].dtype)
-        if "int" in dtype or "float" in dtype:
-            col_type = "numeric"
-        elif "datetime" in dtype:
-            col_type = "date"
-        elif "bool" in dtype:
-            col_type = "boolean"
-        else:
-            is_mc = False
-            if df[col].dropna().shape[0] > 0:
-                try:
-                    is_mc = _is_multi_choice(df[col])
-                except Exception:
-                    pass
-                if is_mc:
-                    col_type = "multi_choice"
-                else:
-                    try:
-                        pd.to_numeric(df[col].dropna().head(20))
-                        col_type = "numeric"
-                        df[col] = pd.to_numeric(df[col], errors="coerce")
-                    except (ValueError, TypeError):
-                        sample_str = df[col].dropna().head(20).astype(str)
-                        if sample_str.str.contains(r'[-/:]', regex=True).any():
-                            try:
-                                pd.to_datetime(sample_str)
-                                col_type = "date"
-                                df[col] = pd.to_datetime(df[col], errors="coerce")
-                            except (ValueError, TypeError):
-                                col_type = "text"
-                        else:
-                            col_type = "text"
-            else:
-                col_type = "text"
+    # Detect column types (modifies df in-place for numeric coercion)
+    columns = _detect_columns(df)
 
-        sample_values = df[col].dropna().head(10).tolist()
-        stats = {}
-        if col_type == "numeric":
-            stats = {
-                "min": float(df[col].min()) if not pd.isna(df[col].min()) else None,
-                "max": float(df[col].max()) if not pd.isna(df[col].max()) else None,
-                "mean": float(df[col].mean()) if not pd.isna(df[col].mean()) else None,
-            }
-        stats["nulls"] = int(df[col].isna().sum())
-        stats["unique"] = int(df[col].nunique())
-        if col_type == "multi_choice":
-            all_mc = []
-            for mv in df[col].dropna().astype(str):
-                all_mc.extend([p.strip() for p in mv.split(',') if p.strip()])
-            stats["unique_responses"] = len(set(all_mc))
-            stats["total_responses"] = len(all_mc)
-            stats["is_multi_choice"] = True
-
-        columns.append({
-            "name": col, "type": col_type,
-            "sample_values": [str(v) for v in sample_values],
-            "stats": sanitize_for_json(stats),
-        })
-
-    datasets[dataset_id] = {"df": df, "filename": filename, "sheets": sheets, "server_file_id": file_id}
+    datasets[dataset_id] = {"df": df, "filename": filename, "sheets": sheets,
+                            "active_sheet": sheets[0] if sheets else "__default__",
+                            "server_file_id": file_id}
     custom_metrics[dataset_id] = []
     custom_bins[dataset_id] = []
     audit_logs[dataset_id] = []

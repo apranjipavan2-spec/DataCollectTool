@@ -125,6 +125,7 @@ def run_scheduled_reports(db: Session) -> dict:
             cfg = cfg_row.config if cfg_row else {}
 
             # Generate report markdown
+            cfg = ai_service.with_log(cfg, tenant_id=sr.tenant_id, user_id=sr.created_by, feature="scheduled_report")
             report_md = asyncio.run(ai_service.generate_styled_report(
                 cfg=cfg,
                 style=sr.style or "field_survey",

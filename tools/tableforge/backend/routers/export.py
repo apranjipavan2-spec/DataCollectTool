@@ -42,10 +42,110 @@ async def export_tables(config: ExportConfig):
         return await export_csv(config)
     elif config.format == "pdf":
         return await export_pdf(config)
+    elif config.format == "pptx":
+        return await export_pptx(config)
     elif config.format == "python":
         return await export_python_script(config)
     else:
         raise HTTPException(400, f"Unsupported format: {config.format}")
+
+
+async def export_pptx(config: ExportConfig):
+    """One slide per table. Requires python-pptx."""
+    try:
+        from pptx import Presentation
+        from pptx.util import Inches, Pt
+        from pptx.dml.color import RGBColor
+    except ImportError:
+        raise HTTPException(500, "python-pptx not installed. pip install python-pptx")
+
+    prs = Presentation()
+    prs.slide_width = Inches(13.33)
+    prs.slide_height = Inches(7.5)
+
+    opts = config.options or {}
+    cover_title = opts.get("cover_title") or config.filename
+
+    # Cover slide
+    if opts.get("cover_page", True):
+        cover = prs.slides.add_slide(prs.slide_layouts[5])  # title only
+        title = cover.shapes.title
+        title.text = cover_title
+        if opts.get("cover_subtitle"):
+            tb = cover.shapes.add_textbox(Inches(1), Inches(3), Inches(11), Inches(1))
+            tf = tb.text_frame
+            tf.text = opts["cover_subtitle"]
+            for p in tf.paragraphs:
+                p.font.size = Pt(18)
+                p.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+
+    for tbl in config.tables:
+        slide = prs.slides.add_slide(prs.slide_layouts[5])
+        # Title
+        title_text = tbl.get("title") or tbl.get("name") or "Table"
+        slide.shapes.title.text = title_text
+        if tbl.get("subtitle"):
+            sub = slide.shapes.add_textbox(Inches(0.5), Inches(1.1), Inches(12), Inches(0.4))
+            sub.text_frame.text = tbl["subtitle"]
+            for p in sub.text_frame.paragraphs:
+                p.font.size = Pt(14)
+                p.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+
+        headers = tbl.get("headers") or []
+        rows = tbl.get("rows") or []
+        n_cols = len(headers)
+        n_rows = len(rows) + 1
+        if n_cols == 0 or n_rows == 1:
+            continue
+
+        # Cap to fit on slide
+        max_rows = 18
+        truncated = False
+        if len(rows) > max_rows:
+            rows = rows[:max_rows]
+            n_rows = max_rows + 1
+            truncated = True
+
+        left, top = Inches(0.5), Inches(1.6)
+        width, height = Inches(12.3), Inches(0.4 * n_rows)
+        shape = slide.shapes.add_table(n_rows, n_cols, left, top, width, height)
+        table = shape.table
+
+        # Header row
+        for j, h in enumerate(headers):
+            cell = table.cell(0, j)
+            cell.text = str(h)
+            for p in cell.text_frame.paragraphs:
+                for r in p.runs:
+                    r.font.size = Pt(11)
+                    r.font.bold = True
+                    r.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = RGBColor(0x2A, 0x4A, 0x7B)
+
+        # Data rows
+        for i, row in enumerate(rows, start=1):
+            for j in range(n_cols):
+                cell = table.cell(i, j)
+                val = row[j] if j < len(row) else ""
+                cell.text = str(val) if val is not None else ""
+                for p in cell.text_frame.paragraphs:
+                    for r in p.runs:
+                        r.font.size = Pt(10)
+
+        if truncated:
+            note = slide.shapes.add_textbox(Inches(0.5), Inches(6.9), Inches(12), Inches(0.4))
+            note.text_frame.text = f"(showing first {max_rows} rows of {len(tbl.get('rows') or [])})"
+            for p in note.text_frame.paragraphs:
+                p.font.size = Pt(10)
+                p.font.italic = True
+                p.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
+
+    fname = f"{config.filename}.pptx"
+    output_path = EXPORTS_DIR / fname
+    prs.save(str(output_path))
+    add_audit_log(config.dataset_id, "export_pptx", f"Exported {len(config.tables)} tables to PowerPoint")
+    return {"path": str(output_path), "message": f"PowerPoint exported to {fname}", "download_filename": fname}
 
 
 def _is_total_row(row):
@@ -450,6 +550,47 @@ async def export_word(config: ExportConfig):
     portrait_usable_cm = 21.0 - 2.54
     landscape_usable_cm = 29.7 - 2.54
 
+    def _embed_chart_if_present(t_data, is_landscape):
+        """If the table carries a chart_image (base64 PNG), embed it after the table.
+        The chart_title is rendered as a separate, editable Word paragraph above
+        the image so the user can tweak the caption directly in Word."""
+        chart_b64 = t_data.get("chart_image")
+        if not chart_b64:
+            return
+        chart_title = t_data.get("chart_title") or ""
+        try:
+            import base64 as _b64
+            img_bytes = _b64.b64decode(chart_b64)
+        except Exception as decode_err:
+            warn = doc.add_paragraph()
+            wr = warn.add_run(f"[Chart image could not be decoded: {decode_err}]")
+            wr.font.size = Pt(8); wr.italic = True
+            wr.font.color.rgb = RGBColor(0xAA, 0x33, 0x33)
+            return
+        if chart_title:
+            cp = doc.add_paragraph()
+            cp.paragraph_format.space_before = Pt(8)
+            cp.paragraph_format.space_after = Pt(3)
+            cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            cr = cp.add_run(chart_title)
+            cr.bold = True
+            cr.font.size = Pt(11)
+            cr.font.name = BODY_FONT
+            cr.font.color.rgb = RGBColor(0x22, 0x22, 0x22)
+        max_cm = (landscape_usable_cm if is_landscape else portrait_usable_cm) * 0.9
+        target_cm = min(max_cm, 16.0)
+        try:
+            pic_p = doc.add_paragraph()
+            pic_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            pic_p.paragraph_format.space_after = Pt(6)
+            run = pic_p.add_run()
+            run.add_picture(io.BytesIO(img_bytes), width=Cm(target_cm))
+        except Exception as embed_err:
+            warn = doc.add_paragraph()
+            wr = warn.add_run(f"[Chart could not be embedded: {embed_err}]")
+            wr.font.size = Pt(8); wr.italic = True
+            wr.font.color.rgb = RGBColor(0xAA, 0x33, 0x33)
+
     # Cover page — use first section for it
     if opts.get("cover_page"):
         _setup_section(doc.sections[0], landscape=False)
@@ -479,6 +620,9 @@ async def export_word(config: ExportConfig):
             _setup_section(section, table_landscape)
             _setup_header_footer(section)
         else:
+            # Honour per-table "Page Break Before" before starting a new section.
+            if t.get("page_break_before"):
+                doc.add_page_break()
             doc.add_section()
             section = doc.sections[-1]
             _setup_section(section, table_landscape)
@@ -545,6 +689,11 @@ async def export_word(config: ExportConfig):
             run.font.color.rgb = RGBColor(100, 100, 100)
 
         if not headers:
+            # Chart-only item: no table to render, but still embed the chart
+            # (e.g. the user picked a chart in the export dialog without its
+            # source table). Falls through silently if no chart_image is set.
+            if t.get("chart_image"):
+                _embed_chart_if_present(t, table_landscape)
             continue
 
         styled_html = t.get("styled_html", "")
@@ -649,6 +798,7 @@ async def export_word(config: ExportConfig):
                     run.font.name = BODY_FONT
                     run.font.color.rgb = RGBColor(0x44, 0x44, 0x44)
 
+            _embed_chart_if_present(t, table_landscape)
             continue
 
         header_row_count = 2 if has_multi_level else 1
@@ -840,6 +990,8 @@ async def export_word(config: ExportConfig):
                 run.font.size = Pt(10)
                 run.font.name = BODY_FONT
                 run.font.color.rgb = RGBColor(0x44, 0x44, 0x44)
+
+        _embed_chart_if_present(t, table_landscape)
 
     doc.save(output_path)
     fname = output_path.name
@@ -1099,6 +1251,7 @@ async def download_export(filename: str):
         ".csv": "text/csv",
         ".pdf": "application/pdf",
         ".py": "text/x-python",
+        ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     }
     ext = filepath.suffix
     return FileResponse(filepath, media_type=media_types.get(ext, "application/octet-stream"), filename=filename)

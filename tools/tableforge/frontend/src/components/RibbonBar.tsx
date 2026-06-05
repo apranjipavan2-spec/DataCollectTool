@@ -12,6 +12,7 @@ interface Props {
   columns?: ColumnInfo[];
   onColumnTypeChange?: (column: string, newType: string) => void;
   projectFilterCount?: number;   // number of active project-level filters
+  onAskAI?: (query: string) => void;  // #15 Talk-to-your-data: NL query → smart-build modal
 }
 
 type TabKey = 'home' | 'insert' | 'data' | 'statistics' | 'format' | 'view' | 'ai-smart';
@@ -192,13 +193,13 @@ function TemplateDropdown({ table, onAction, disabled }: { table: TableConfig | 
 }
 
 // ── Root component ─────────────────────────────────────────
-export function RibbonBar({ table, dataset, onAction, onUpdate, theme, activeTab: externalTab, columns, onColumnTypeChange, projectFilterCount = 0 }: Props) {
+export function RibbonBar({ table, dataset, onAction, onUpdate, theme, activeTab: externalTab, columns, onColumnTypeChange, projectFilterCount = 0, onAskAI }: Props) {
   const [internalTab, setInternalTab] = useState<TabKey>('home');
   const activeTab = (externalTab as TabKey) || internalTab;
 
   return (
     <div className="ribbon-content">
-      {activeTab === 'home'       && <HomeRibbon      table={table} dataset={dataset} onAction={onAction} onUpdate={onUpdate} projectFilterCount={projectFilterCount} />}
+      {activeTab === 'home'       && <HomeRibbon      table={table} dataset={dataset} onAction={onAction} onUpdate={onUpdate} projectFilterCount={projectFilterCount} onAskAI={onAskAI} />}
       {activeTab === 'insert'     && <InsertRibbon    dataset={dataset} onAction={onAction} />}
       {activeTab === 'data'       && <DataRibbon      dataset={dataset} onAction={onAction} />}
       {activeTab === 'statistics' && <StatisticsRibbon dataset={dataset} onAction={onAction} />}
@@ -386,15 +387,24 @@ function ImportDropdownBtn({ onAction }: { onAction: (action: string) => void })
 }
 
 // ── HOME ───────────────────────────────────────────────────
-function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0 }: {
+function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0, onAskAI }: {
   table: TableConfig | null; dataset: boolean;
   onAction: (action: string) => void; onUpdate: (update: Partial<TableConfig>) => void;
   projectFilterCount?: number;
+  onAskAI?: (query: string) => void;
 }) {
   const [openDrop, setOpenDrop] = useState<string | null>(null);
+  const [askQuery, setAskQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const t = table;
   const dis = !t;
+
+  const submitAsk = () => {
+    const q = askQuery.trim();
+    if (!q || !onAskAI) return;
+    onAskAI(q);
+    setAskQuery('');
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -408,6 +418,29 @@ function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0
 
   return (
     <div ref={containerRef} style={{ display: 'contents' }}>
+      <RGroup label="Ask AI">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <input
+            type="text"
+            value={askQuery}
+            onChange={e => setAskQuery(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') submitAsk(); }}
+            placeholder="Ask: e.g., avg income by district…"
+            disabled={!dataset}
+            className="ribbon-ask-input"
+            style={{
+              fontSize: 12, padding: '6px 10px', minWidth: 220, height: 30,
+              background: 'rgba(15,23,42,0.6)', color: 'inherit',
+              border: '1px solid rgba(168,85,247,0.45)', borderRadius: 4,
+            }}
+            title="Talk to your data — AI designs a table from your question"
+          />
+          <button className="ribbon-btn" onClick={submitAsk} disabled={!dataset || !askQuery.trim()} title="Build table from question">
+            <span className="ribbon-btn-icon">💬</span>
+            <span className="ribbon-btn-label">Ask</span>
+          </button>
+        </div>
+      </RGroup>
       <RGroup label="File">
         <ImportDropdownBtn onAction={onAction} />
         <RBtn icon="💾" label="Save"    onClick={() => onAction('save')}   disabled={!dataset} />
@@ -436,6 +469,7 @@ function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0
               <FToggle label="Grand Totals (All)"       checked={t.grand_total}    onChange={v => onUpdate({ grand_total: v, grand_total_rows: v, grand_total_columns: v })} />
               <FToggle label="Row Total (bottom row)"    checked={t.grand_total_rows ?? t.grand_total}  onChange={v => onUpdate({ grand_total_rows: v, grand_total: v && (t.grand_total_columns ?? t.grand_total) })} />
               <FToggle label="Column Total (last column)" checked={t.grand_total_columns ?? t.grand_total} onChange={v => onUpdate({ grand_total_columns: v, grand_total: v && (t.grand_total_rows ?? t.grand_total) })} />
+              <FToggle label="Combined Grand Total" checked={!!t.grand_total_combined} onChange={v => onUpdate({ grand_total_combined: v })} />
               <FToggle label="Subtotals (hierarchical)" checked={t.subtotals}      onChange={v => onUpdate({ subtotals: v })} />
             </div>
             {t.subtotals && (
@@ -536,6 +570,7 @@ function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0
             </span>
           )}
         </div>
+        <RBtn icon="↻" label="Refresh Stats" onClick={() => onAction('refresh_stat_tables')} disabled={!dataset} />
       </RGroup>
       <RGroup label="Number">
         <select className="ribbon-select" disabled={!dataset}
@@ -602,6 +637,8 @@ function DataRibbon({ dataset, onAction }: { dataset: boolean; onAction: (action
       </RGroup>
       <RGroup label="Quality & Clean">
         <RBtn icon="🔍" label="Quality & Clean" onClick={() => onAction('quality')} disabled={!dataset} />
+        <RBtn icon="🧹" label="Open in Cleaner" onClick={() => onAction('clean_open')} disabled={!dataset} />
+        <RBtn icon="🚨" label="Anomalies" onClick={() => onAction('anomalies')} disabled={!dataset} />
         <RBtn icon="📝" label="Audit"   onClick={() => onAction('audit')}   disabled={!dataset} />
       </RGroup>
       <RGroup label="Text Clean">
@@ -618,27 +655,134 @@ function DataRibbon({ dataset, onAction }: { dataset: boolean; onAction: (action
 }
 
 // ── STATISTICS ─────────────────────────────────────────────
+type StatMenuItem = { icon: string; label: string; action: string; alwaysEnabled?: boolean };
+
+const STAT_MENUS: { key: string; icon: string; label: string; items: StatMenuItem[] }[] = [
+  { key: 'survey_design', icon: '🧭', label: 'Survey Design', items: [
+    { icon: '🏷️', label: 'Variables',         action: 'variable_metadata' },
+    { icon: '🧭', label: 'Study Design',      action: 'study_design' },
+    { icon: '💡', label: 'Suggest Crosstabs', action: 'survey_insights' },
+    { icon: '🎮', label: 'Play Mode',         action: 'play_mode' },
+  ]},
+  { key: 'data_quality', icon: '🩺', label: 'Data Quality', items: [
+    { icon: '🩺', label: 'SDQ Checks', action: 'survey_quality' },
+  ]},
+  { key: 'survey_analyses', icon: '📊', label: 'Survey Analyses', items: [
+    { icon: '⚡',  label: 'Run Full',    action: 'auto_analyze' },
+    { icon: '📊', label: 'Likert',      action: 'likert' },
+    { icon: '☑️', label: 'Multi-Resp',  action: 'multi_response' },
+    { icon: '👁️', label: 'Observer',    action: 'observer' },
+    { icon: '💬', label: 'Verbatims',   action: 'verbatim' },
+  ]},
+  { key: 'impact', icon: '🎯', label: 'Impact / Driver', items: [
+    { icon: '⚖️', label: 'Balance',  action: 'balance' },
+    { icon: '🎯', label: 'Drivers',  action: 'driver' },
+    { icon: '🔮', label: 'Clusters', action: 'cluster' },
+    { icon: '🗺', label: 'Geo',      action: 'geo_summary' },
+  ]},
+  { key: 'descriptive', icon: '📋', label: 'Descriptive', items: [
+    { icon: '📋', label: 'Summary',   action: 'stat_descriptive' },
+    { icon: '📊', label: 'Frequency', action: 'stat_frequency' },
+  ]},
+  { key: 'relationships', icon: '📐', label: 'Relationships', items: [
+    { icon: '📐', label: 'Correlation', action: 'stat_correlation' },
+    { icon: '📈', label: 'Regression',  action: 'stat_regression' },
+    { icon: 'V',  label: "Cramér's V",  action: 'stat_cramers_matrix' },
+  ]},
+  { key: 'hypothesis', icon: '𝑡', label: 'Hypothesis Tests', items: [
+    { icon: '𝑡',  label: 't-Test',    action: 'stat_ttest' },
+    { icon: 'F',  label: 'ANOVA',     action: 'stat_anova' },
+    { icon: 'χ²', label: 'Cross-tab', action: 'stat_crosstab' },
+  ]},
+  { key: 'paired', icon: '↔', label: 'Paired / Pre-Post', items: [
+    { icon: '↔', label: 'Paired t', action: 'stat_paired_ttest' },
+    { icon: 'W', label: 'Wilcoxon', action: 'stat_wilcoxon' },
+    { icon: '±', label: 'McNemar',  action: 'stat_mcnemar' },
+  ]},
+  { key: 'nonparam', icon: 'K', label: 'Non-parametric', items: [
+    { icon: 'K',  label: 'Kruskal',  action: 'stat_kruskal' },
+    { icon: 'Fr', label: 'Friedman', action: 'stat_friedman' },
+    { icon: 'ρ',  label: 'Spearman', action: 'stat_spearman' },
+    { icon: 'τ',  label: 'Kendall',  action: 'stat_kendall' },
+  ]},
+  { key: 'models', icon: '📐', label: 'Models', items: [
+    { icon: '📐', label: 'Multi-Reg',   action: 'stat_multiple_regression' },
+    { icon: 'OR', label: 'Logistic',    action: 'stat_logistic_regression' },
+    { icon: 'MN', label: 'Multinomial', action: 'stat_multinomial_logistic' },
+    { icon: '⇄',  label: 'Post-hoc',    action: 'stat_posthoc' },
+    { icon: 'α',  label: 'Reliability', action: 'stat_reliability' },
+  ]},
+  { key: 'distribution', icon: '📉', label: 'Distribution', items: [
+    { icon: '📉', label: 'Normality', action: 'stat_normality' },
+    { icon: '⚠',  label: 'Outliers',  action: 'stat_outlier' },
+  ]},
+  { key: 'advanced', icon: '⚡', label: 'Advanced Analysis', items: [
+    { icon: '📐', label: 'DiD',        action: 'causal_did' },
+    { icon: '≈',  label: 'PSM',        action: 'causal_psm' },
+    { icon: '🏘', label: 'Mixed LM',   action: 'causal_mixed_lm' },
+    { icon: '⚡', label: 'Power',      action: 'power_planner', alwaysEnabled: true },
+    { icon: '📖', label: 'Codebook',   action: 'export_codebook' },
+    { icon: '✨', label: 'AI Summary', action: 'exec_summary' },
+  ]},
+];
+
 function StatisticsRibbon({ dataset, onAction }: { dataset: boolean; onAction: (action: string) => void }) {
+  const [openDrop, setOpenDrop] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpenDrop(null);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const tog = (name: string) => setOpenDrop(o => o === name ? null : name);
+  const pick = (action: string) => { onAction(action); setOpenDrop(null); };
+
   return (
-    <>
-      <RGroup label="Descriptive">
-        <RBtn icon="📋" label="Summary"   onClick={() => onAction('stat_descriptive')} disabled={!dataset} />
-        <RBtn icon="📊" label="Frequency" onClick={() => onAction('stat_frequency')}   disabled={!dataset} />
+    <div ref={containerRef} style={{ display: 'contents' }}>
+      <RGroup label="Help">
+        <RBtn icon="📖" label="Guide" onClick={() => onAction('stat_guide')} />
       </RGroup>
-      <RGroup label="Relationships">
-        <RBtn icon="📐" label="Correlation" onClick={() => onAction('stat_correlation')} disabled={!dataset} />
-        <RBtn icon="📈" label="Regression"  onClick={() => onAction('stat_regression')}  disabled={!dataset} />
-      </RGroup>
-      <RGroup label="Hypothesis Tests">
-        <RBtn icon="𝑡"  label="t-Test"   onClick={() => onAction('stat_ttest')}   disabled={!dataset} />
-        <RBtn icon="F"  label="ANOVA"    onClick={() => onAction('stat_anova')}   disabled={!dataset} />
-        <RBtn icon="χ²" label="Cross-tab" onClick={() => onAction('stat_crosstab')} disabled={!dataset} />
-      </RGroup>
-      <RGroup label="Distribution">
-        <RBtn icon="📉" label="Normality" onClick={() => onAction('stat_normality')} disabled={!dataset} />
-        <RBtn icon="⚠"  label="Outliers"  onClick={() => onAction('stat_outlier')}   disabled={!dataset} />
-      </RGroup>
-    </>
+      {STAT_MENUS.map(menu => {
+        const groupDisabled = !dataset && !menu.items.some(i => i.alwaysEnabled);
+        const isOpen = openDrop === menu.key;
+        return (
+          <RGroup key={menu.key} label={menu.label} style={{ position: 'relative' }}>
+            <button
+              className={`ribbon-btn fdrop-btn ${isOpen ? 'active' : ''}`}
+              onClick={() => tog(menu.key)}
+              disabled={groupDisabled}
+              title={menu.label}
+            >
+              <span className="ribbon-btn-icon">{menu.icon}</span>
+              <span className="ribbon-btn-label">{menu.label} ▾</span>
+            </button>
+            {isOpen && (
+              <div className="fdrop-panel rmenu-panel" style={{ width: 220 }}>
+                {menu.items.map(it => {
+                  const itemDisabled = !dataset && !it.alwaysEnabled;
+                  return (
+                    <button
+                      key={it.action}
+                      className="rmenu-item"
+                      onClick={() => pick(it.action)}
+                      disabled={itemDisabled}
+                      title={it.label}
+                    >
+                      <span className="rmenu-item-icon">{it.icon}</span>
+                      <span className="rmenu-item-label">{it.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </RGroup>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1202,6 +1346,7 @@ function FormatRibbon({ table, onUpdate, columns = [], onColumnTypeChange }: {
                         <option value="numeric">Numeric</option>
                         <option value="multi_choice">Multi-Choice</option>
                         <option value="date">Date</option>
+                        <option value="boolean">Boolean</option>
                       </select>
                     </div>
                   );

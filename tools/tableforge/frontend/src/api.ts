@@ -52,11 +52,12 @@ export async function tabulate(config: {
   dataset_id: string;
   rows: string[];
   columns: string[];
-  values: { field: string; agg: string; label?: string }[];
+  values: { field: string; agg: string; label?: string; suppress_below_n?: number; [key: string]: any }[];
   filters: Record<string, string[]>;
   grand_total: boolean;
   grand_total_rows?: boolean;
   grand_total_columns?: boolean;
+  grand_total_combined?: boolean;
   subtotals: boolean;
   subtotal_pct_base?: string;
   missing_data: string;
@@ -66,6 +67,7 @@ export async function tabulate(config: {
   date_groupings?: Record<string, string>;
   blank_suppress?: boolean;
   hide_subgroup?: boolean;
+  net_rows?: { label: string; members: string[]; position?: 'after_last_member' | 'before_first_member' | 'end' }[];
 }) {
   const res = await fetch(`${API_BASE}/tabulate`, {
     method: 'POST',
@@ -101,6 +103,39 @@ export async function changeColumnType(datasetId: string, column: string, newTyp
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ dataset_id: datasetId, column, new_type: newType }),
   });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function dryRunColumnType(datasetId: string, column: string, newType: string):
+  Promise<{ dry_run: true; column: string; new_type: string; total: number; non_null: number; fail_count: number; samples: string[]; failing_cells?: { row: number; value: string }[] }> {
+  const res = await fetch(`${API_BASE}/dataset/column_type`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, column, new_type: newType, dry_run: true }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function detectAnomalies(
+  datasetId: string,
+  method: 'zscore' | 'mad' = 'zscore',
+  threshold: number = 3.0,
+): Promise<{
+  columns: Record<string, { indices: number[]; values: (number | null)[]; scores: (number | null)[]; count: number; total: number; method: string; threshold: number }>;
+  method: string;
+  threshold: number;
+}> {
+  const url = `${API_BASE}/dataset/${datasetId}/anomalies?method=${method}&threshold=${threshold}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function getColumnTypeHints(datasetId: string):
+  Promise<{ hints: { column: string; suggested_type: 'numeric' | 'date'; success_rate: number; fail_count: number; samples: string[] }[] }> {
+  const res = await fetch(`${API_BASE}/dataset/${datasetId}/type_hints`);
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 }
@@ -219,6 +254,29 @@ export async function rollbackProject(path: string, versionIndex: number) {
     headers: { 'Content-Type': 'application/json', ...getUserHeaders() },
     body: JSON.stringify({ path, version_index: versionIndex }),
   });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function getProjectVersions(path: string):
+  Promise<{ versions: { saved_at: string; tables: any[]; annotationsMap?: any }[] }> {
+  const url = `${API_BASE}/project/versions?path=${encodeURIComponent(path)}`;
+  const res = await fetch(url, { headers: getUserHeaders() });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function diffProjectVersions(path: string, left: number, right: number):
+  Promise<{
+    left: { index: number; saved_at: string };
+    right: { index: number; saved_at: string };
+    added: { id: string; name: string }[];
+    removed: { id: string; name: string }[];
+    changed: { id: string; name: string; changes: { field: string; before: any; after: any }[] }[];
+    summary: { added: number; removed: number; changed: number; total_left: number; total_right: number };
+  }> {
+  const url = `${API_BASE}/project/diff?path=${encodeURIComponent(path)}&left=${left}&right=${right}`;
+  const res = await fetch(url, { headers: getUserHeaders() });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 }
@@ -395,9 +453,26 @@ export async function modifyDataset(config: {
   return res.json();
 }
 
-// Module A: Multi-Sheet Union
-export async function unionSheets(datasetId: string, sheetNames: string[]) {
+// Module A: Multi-Sheet Union (concat / join_inner / join_outer)
+export async function unionSheets(
+  datasetId: string,
+  sheetNames: string[],
+  mode: 'concat' | 'join_inner' | 'join_outer' = 'concat',
+  joinOn?: string[],
+) {
   const res = await fetch(`${API_BASE}/upload/union`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, sheet_names: sheetNames, mode, join_on: joinOn }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+// Module A: Per-sheet columns + auto-detected common columns
+export async function sheetsInfo(datasetId: string, sheetNames: string[]):
+  Promise<{ per_sheet: Record<string, string[]>; common_columns: string[] }> {
+  const res = await fetch(`${API_BASE}/upload/sheets_info`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ dataset_id: datasetId, sheet_names: sheetNames }),
@@ -411,6 +486,253 @@ export async function refreshDataset(datasetId: string) {
   const res = await fetch(`${API_BASE}/dataset/${datasetId}/refresh`, { method: 'POST' });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
+}
+
+// ── Survey Analysis Studio: metadata layer (Phase 0) ────────────────────────
+import type { ColumnRole, StudyDesign, AutoDetectResult } from './types';
+
+export async function getColumnRoles(datasetId: string): Promise<{ roles: Record<string, ColumnRole> }> {
+  const res = await fetch(`${API_BASE}/metadata/column/${datasetId}`);
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function setColumnRole(datasetId: string, column: string, role: ColumnRole) {
+  const res = await fetch(`${API_BASE}/metadata/column/set`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, column, role }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function bulkSetColumnRoles(datasetId: string, roles: Record<string, ColumnRole>) {
+  const res = await fetch(`${API_BASE}/metadata/column/bulk_set`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, roles }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function deleteColumnRole(datasetId: string, column: string) {
+  const res = await fetch(`${API_BASE}/metadata/column/${datasetId}/${encodeURIComponent(column)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function saveStudyDesign(datasetId: string, design: StudyDesign) {
+  const res = await fetch(`${API_BASE}/metadata/study_design/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, design }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function getStudyDesign(datasetId: string): Promise<{ design: StudyDesign }> {
+  const res = await fetch(`${API_BASE}/metadata/study_design/${datasetId}`);
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function autoDetectRoles(datasetId: string): Promise<AutoDetectResult> {
+  const res = await fetch(`${API_BASE}/metadata/auto_detect_roles`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+// ── Phase 2 — Likert / Multi-Response / Observer ─────────────────────────────
+
+async function postStat<T = any>(path: string, body: any): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export const likertApi = {
+  summary: (b: any) => postStat('/likert/summary', b),
+  composite: (b: any) => postStat('/likert/composite', b),
+  compare: (b: any) => postStat('/likert/compare', b),
+  factor: (b: any) => postStat('/likert/factor', b),
+};
+
+export const mrApi = {
+  frequencies: (b: any) => postStat('/mr/frequencies', b),
+  cooccurrence: (b: any) => postStat('/mr/cooccurrence', b),
+  byGroup: (b: any) => postStat('/mr/by_group', b),
+  exclusive: (b: any) => postStat('/mr/exclusive', b),
+};
+
+export const observerApi = {
+  concordance: (b: any) => postStat('/observer/concordance', b),
+  discrepancies: (b: any) => postStat('/observer/discrepancies', b),
+};
+
+export const sdqApi = {
+  straightLining: (b: any) => postStat('/sdq/straight_lining', b),
+  responseTime: (b: any) => postStat('/sdq/response_time', b),
+  duplicates: (b: any) => postStat('/sdq/duplicates', b),
+  missingness: (b: any) => postStat('/sdq/missingness', b),
+  attentionChecks: (b: any) => postStat('/sdq/attention_checks', b),
+  overview: (b: any) => postStat('/sdq/overview', b),
+};
+
+// ── Batch C/D/E — Balance, Geo, Driver, Cluster, Verbatim ────────────────────
+
+export const balanceApi = {
+  table: (b: any) => postStat('/balance/table', b),
+};
+
+export const geoApi = {
+  aggregate: (b: any) => postStat('/geo/aggregate', b),
+};
+
+export const driverApi = {
+  importance: (b: any) => postStat('/driver/importance', b),
+};
+
+export const clusterApi = {
+  kmeans: (b: any) => postStat('/cluster/kmeans', b),
+};
+
+export const verbatimApi = {
+  list: (b: any) => postStat('/verbatim/list', b),
+  setCodes: (b: any) => postStat('/verbatim/codes/set', b),
+  getCodes: async (datasetId: string) => {
+    const res = await fetch(`${API_BASE}/verbatim/codes/${datasetId}`);
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json();
+  },
+  savePalette: (b: any) => postStat('/verbatim/palette/save', b),
+  kappa: (b: any) => postStat('/verbatim/kappa', b),
+};
+
+// ── Cleaner handoff (TableForge ↔ datacleaner) ───────────────────────────────
+
+export const cleanerApi = {
+  /** Create a one-shot handoff token so the cleaner can pull + push this dataset. */
+  handoff: async (datasetId: string, focusCol?: string): Promise<{ handoff_id: string; focus_col: string | null; ttl_seconds: number }> => {
+    const res = await fetch(`${API_BASE}/cleaner/handoff`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dataset_id: datasetId, focus_col: focusCol || null }),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json();
+  },
+  /** Polled fallback in case the cleaner's postMessage doesn't reach us (e.g. cross-origin restrictions). */
+  status: async (handoffId: string) => {
+    const res = await fetch(`${API_BASE}/cleaner/handoff/${handoffId}`);
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<{
+      completed: boolean;
+      completed_at: number | null;
+      dataset_id: string;
+      result: { row_count: number; columns: any[]; preview: any[] } | null;
+    }>;
+  },
+  revoke: async (handoffId: string) => {
+    await fetch(`${API_BASE}/cleaner/handoff/${handoffId}`, { method: 'DELETE' }).catch(() => {});
+  },
+};
+
+/** Resolve the cleaner's base URL. Override via VITE_CLEANER_URL.
+ * In production we assume the cleaner is co-deployed at /cleaner/ on the same origin.
+ * In dev (Vite at :5173) we point at the cleaner's standalone port :5050.
+ */
+export function getCleanerBaseUrl(): string {
+  const envUrl = (import.meta as any).env?.VITE_CLEANER_URL as string | undefined;
+  if (envUrl) return envUrl.replace(/\/$/, '');
+  if (typeof window !== 'undefined') {
+    if (window.location.port === '5173') return 'http://localhost:5050';
+    return `${window.location.origin}/cleaner`;
+  }
+  return '';
+}
+
+/** Build the cleaner URL with TF handoff params + optional column focus. */
+export function buildCleanerUrl(handoffId: string, focusCol?: string): string {
+  const base = getCleanerBaseUrl();
+  const tfBase = API_BASE.replace(/\/api$/, '');
+  const tfUrl = (typeof window !== 'undefined' ? window.location.origin : '') + tfBase;
+  const params = new URLSearchParams({ tf_url: tfUrl, handoff_id: handoffId });
+  if (focusCol) params.set('focus_col', focusCol);
+  return `${base}/?${params.toString()}`;
+}
+
+// ── Phase 3 — Auto-Analyze battery ───────────────────────────────────────────
+
+export interface AutoAnalyzeConfig {
+  dataset_id: string;
+  outcome_cols: string[];
+  predictor_cols?: string[];
+  correction?: 'fdr_bh' | 'bonferroni' | 'holm' | 'none';
+  use_design?: boolean;
+  filters?: Record<string, string[]>;
+}
+
+export async function planBattery(config: AutoAnalyzeConfig) {
+  return postStat('/analyze/plan', config);
+}
+
+export interface BatteryProgress {
+  step: 'start' | 'progress' | 'done';
+  idx?: number;
+  total?: number;
+  label?: string;
+  kind?: string;
+  p_raw?: number | null;
+  error?: string;
+  skipped?: boolean;
+  results?: any[];
+  correction?: string;
+  design_used?: boolean;
+}
+
+/** SSE-streamed auto-battery executor. `onEvent` fires for every event. */
+export async function runAutoBattery(
+  config: AutoAnalyzeConfig,
+  onEvent: (e: BatteryProgress) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/analyze/auto-battery`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+    signal,
+  });
+  if (!res.ok || !res.body) throw new Error(await parseError(res));
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split('\n\n');
+    buf = lines.pop() || '';
+    for (const block of lines) {
+      const line = block.trim();
+      if (!line.startsWith('data:')) continue;
+      try {
+        const event = JSON.parse(line.slice(5).trim());
+        onEvent(event);
+      } catch { /* ignore parse error on partial frame */ }
+    }
+  }
 }
 
 // Export download (binary)
@@ -427,4 +749,28 @@ export async function downloadExport(config: {
   });
   if (!res.ok) throw new Error(await parseError(res));
   return res;
+}
+
+// #14 Survey-aware mode — crosstab suggestions driven by auto-detected column roles.
+export interface SurveySuggestion {
+  title: string;
+  description: string;
+  rationale: string;
+  kind: string;
+  rows: string[];
+  columns: string[];
+  value_field: string;
+  aggregation: string;
+  show_as: string | null;
+}
+
+export async function suggestSurveyCrosstabs(datasetId: string, maxSuggestions = 20):
+  Promise<{ suggestions: SurveySuggestion[]; detected: Record<string, any>; roles_count: number }> {
+  const res = await fetch(`${API_BASE}/survey/suggest_crosstabs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_id: datasetId, max_suggestions: maxSuggestions }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
 }

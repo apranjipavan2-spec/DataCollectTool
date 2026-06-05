@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface OrgSubscription {
   tenant_id: string
@@ -246,14 +247,14 @@ export default function AdminPayments() {
                     {f}
                   </button>
                 ))}
-                <button onClick={load} className={`${btnSe} ml-auto mb-1`}>↻ Refresh</button>
+                <button onClick={load} className={`${btnSe} ml-auto mb-1`}><EmojiIcon e="↻" /> Refresh</button>
               </div>
 
               {loading && <div className="text-catalan-textMuted text-sm text-center py-12">Loading…</div>}
 
               {!loading && requests.length === 0 && (
                 <div className="text-center py-20 text-catalan-textMuted">
-                  <div className="text-4xl mb-3">📭</div>
+                  <div className="text-4xl mb-3"><EmojiIcon e="📭" /></div>
                   <p className="text-sm">No {filter !== 'all' ? filter : ''} payment requests</p>
                 </div>
               )}
@@ -325,7 +326,7 @@ export default function AdminPayments() {
             <>
               <div className="flex justify-between items-center mb-4">
                 <span className="text-sm text-catalan-textMuted">{orgs.length} organisation{orgs.length !== 1 ? 's' : ''}</span>
-                <button onClick={loadOrgs} className={btnSe}>↻ Refresh</button>
+                <button onClick={loadOrgs} className={btnSe}><EmojiIcon e="↻" /> Refresh</button>
               </div>
 
               {orgsLoading && <div className="text-catalan-textMuted text-sm text-center py-12">Loading…</div>}

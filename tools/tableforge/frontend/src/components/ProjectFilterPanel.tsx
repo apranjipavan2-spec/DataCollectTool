@@ -1,6 +1,118 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ColumnInfo } from '../types';
 import { getColumnValues } from '../api';
+
+function ColumnPicker({ options, value, onChange, autoFocus, indexLookup }: {
+  options: ColumnInfo[];
+  value: string;
+  onChange: (v: string) => void;
+  autoFocus?: boolean;
+  indexLookup: Record<string, number>;   // column name → 1-based column number
+}) {
+  const [open, setOpen] = useState(!!autoFocus);
+  const [search, setSearch] = useState('');
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const q = search.trim().toLowerCase();
+  // Match by column name OR by exact column number (e.g. "5" → column #5)
+  const filtered = q
+    ? options.filter(o => {
+        const idx = indexLookup[o.name];
+        return o.name.toLowerCase().includes(q) || (idx !== undefined && String(idx) === q);
+      })
+    : options;
+
+  const displayValue = value
+    ? (indexLookup[value] !== undefined ? `[${indexLookup[value]}] ${value}` : value)
+    : '';
+
+  return (
+    <div ref={ref} style={{ position: 'relative', width: '100%' }}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%', textAlign: 'left',
+          background: 'var(--surface)', color: value ? 'var(--text)' : 'var(--text-dim)',
+          border: '1px solid var(--border)', borderRadius: 4,
+          padding: '5px 26px 5px 8px', fontSize: 12,
+          cursor: 'pointer', position: 'relative',
+          whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.35,
+        }}>
+        {displayValue || '— pick column (name or #) —'}
+        <span style={{ position: 'absolute', right: 8, top: 6, fontSize: 9, color: 'var(--text-dim)' }}>▾</span>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0,
+          background: 'var(--bg-card, #1a1d24)', color: 'var(--text)',
+          border: '1px solid var(--border)', borderRadius: 4,
+          boxShadow: '0 6px 20px rgba(0,0,0,0.45)',
+          zIndex: 60, maxHeight: 280, display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{ padding: 6, borderBottom: '1px solid var(--border)' }}>
+            <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search by name or column number…"
+              style={{
+                width: '100%', background: 'var(--surface)', color: 'var(--text)',
+                border: '1px solid var(--border)', borderRadius: 3,
+                padding: '4px 6px', fontSize: 11,
+              }} />
+          </div>
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {filtered.length === 0 && (
+              <div style={{ padding: 10, fontSize: 11, color: 'var(--text-dim)', textAlign: 'center' }}>
+                No matching columns
+              </div>
+            )}
+            {filtered.map(c => {
+              const selected = c.name === value;
+              const idx = indexLookup[c.name];
+              return (
+                <div key={c.name}
+                  onClick={() => { onChange(c.name); setOpen(false); setSearch(''); }}
+                  title={`${idx !== undefined ? `Column #${idx} · ` : ''}${c.name}`}
+                  style={{
+                    padding: '6px 10px', fontSize: 12, cursor: 'pointer',
+                    whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.4,
+                    background: selected ? 'rgba(59,130,246,0.18)' : 'transparent',
+                    color: selected ? 'var(--primary)' : 'var(--text)',
+                    borderBottom: '1px solid rgba(255,255,255,0.04)',
+                    display: 'flex', gap: 8, alignItems: 'flex-start',
+                  }}
+                  onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.05)'; }}
+                  onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}>
+                  {idx !== undefined && (
+                    <span style={{
+                      flexShrink: 0, fontSize: 10, fontFamily: 'monospace',
+                      color: 'var(--text-dim)', minWidth: 28, textAlign: 'right',
+                      padding: '1px 0',
+                    }}>
+                      #{idx}
+                    </span>
+                  )}
+                  <span style={{ flex: 1 }}>{c.name}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   filters: Record<string, string[]>;   // current project-level filters
@@ -78,9 +190,16 @@ export function ProjectFilterPanel({ filters, datasetId, allColumns, onChange, o
   const availableToAdd = allColumns.filter(c => !(c.name in filters));
   const activeFilterCount = Object.values(filters).filter(v => v.length > 0).length;
 
+  // 1-based column number lookup so users can pick / search by column position
+  const indexLookup = React.useMemo(() => {
+    const m: Record<string, number> = {};
+    allColumns.forEach((c, i) => { m[c.name] = i + 1; });
+    return m;
+  }, [allColumns]);
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="filter-dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
+      <div className="filter-dialog" onClick={e => e.stopPropagation()}>
 
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className="filter-dialog-header">
@@ -121,11 +240,21 @@ export function ProjectFilterPanel({ filters, datasetId, allColumns, onChange, o
             {filterFields.map(field => {
               const selected = (filters[field] || []).length;
               const total = (availableValues[field] || []).length;
+              const colNum = indexLookup[field];
               return (
                 <button key={field}
                   className={`filter-field-btn ${expandedField === field ? 'active' : ''}`}
                   onClick={() => setExpandedField(field)}>
-                  <span className="filter-field-name" title={field}>{field}</span>
+                  {colNum !== undefined && (
+                    <span style={{
+                      flexShrink: 0, fontSize: 10, fontFamily: 'monospace',
+                      color: 'var(--text-dim)', minWidth: 30, textAlign: 'right',
+                      marginRight: 6,
+                    }}>
+                      #{colNum}
+                    </span>
+                  )}
+                  <span className="filter-field-name" title={colNum !== undefined ? `Column #${colNum} · ${field}` : field}>{field}</span>
                   <span className="filter-field-badge">
                     {selected > 0 ? `${selected}/${total}` : 'All'}
                   </span>
@@ -150,14 +279,9 @@ export function ProjectFilterPanel({ filters, datasetId, allColumns, onChange, o
             {availableToAdd.length > 0 && (
               addingField ? (
                 <div className="filter-add-field">
-                  <select autoFocus value={pickField}
-                    onChange={e => setPickField(e.target.value)}
-                    className="filter-field-select">
-                    <option value="">— pick column —</option>
-                    {availableToAdd.map(c => (
-                      <option key={c.name} value={c.name}>{c.name}</option>
-                    ))}
-                  </select>
+                  <ColumnPicker autoFocus options={availableToAdd}
+                    value={pickField} onChange={setPickField}
+                    indexLookup={indexLookup} />
                   <div className="filter-add-btns">
                     <button className="btn-primary" style={{ fontSize: 11, padding: '3px 10px' }}
                       disabled={!pickField} onClick={() => addField(pickField)}>

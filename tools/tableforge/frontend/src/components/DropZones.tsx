@@ -90,6 +90,11 @@ export function DropZones({ table, columns, draggedField, onDrop, onRemove, onAg
     return table[zone];
   };
 
+  const getColNumber = (field: string): number => {
+    const i = columns.findIndex(c => c.name === field);
+    return i >= 0 ? i + 1 : -1;
+  };
+
   const handleContextMenu = (e: React.MouseEvent, zone: DropZoneType, field: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -207,7 +212,22 @@ export function DropZones({ table, columns, draggedField, onDrop, onRemove, onAg
                       onContextMenu={e => handleContextMenu(e, key, field)}
                     >
                       <span className="chip-drag-handle" title="Drag to reorder">⠿</span>
-                      <span className="chip-name">{field}</span>
+                      {getColNumber(field) > 0 && (
+                        <span
+                          title={`Column #${getColNumber(field)}`}
+                          style={{
+                            background: 'rgba(255,255,255,0.08)',
+                            color: 'var(--text-dim)',
+                            fontSize: 10,
+                            fontWeight: 600,
+                            padding: '1px 5px',
+                            borderRadius: 3,
+                            marginRight: 4,
+                            fontFamily: 'monospace',
+                          }}
+                        >{getColNumber(field)}</span>
+                      )}
+                      <span className="chip-name" title={field}>{field}</span>
                       {valConfig && (
                         <>
                           <select className="agg-select" value={valConfig.agg}
@@ -304,6 +324,17 @@ export function DropZones({ table, columns, draggedField, onDrop, onRemove, onAg
                               onChange={e => onValueFieldUpdate(field, { show_n: e.target.checked })} /> Show N (sample size)</label>
                             <label className="vsp-check"><input type="checkbox" checked={valConfig.change_arrows ?? false}
                               onChange={e => onValueFieldUpdate(field, { change_arrows: e.target.checked })} /> Change direction arrows ▲▼</label>
+                          </div>
+
+                          <div className="vsp-section" style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 4 }}>
+                            <label className="vsp-label" style={{ fontWeight: 600 }}>Low-base suppression (DHS-style)</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 12, color: 'var(--muted)' }}>Hide cells where N &lt;</span>
+                              <input type="number" min={0} step={1} className="vsp-select vsp-small" style={{ width: 70 }}
+                                value={valConfig.suppress_below_n ?? 0}
+                                onChange={e => onValueFieldUpdate(field, { suppress_below_n: Math.max(0, parseInt(e.target.value || '0', 10) || 0) })} />
+                              <span style={{ fontSize: 12, color: 'var(--muted)' }}>(0 = off · uses N<sub>eff</sub> when weighted)</span>
+                            </div>
                           </div>
 
                           <div className="vsp-section">

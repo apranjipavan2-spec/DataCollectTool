@@ -7,6 +7,7 @@ import {
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import api from '@/lib/api'
+import EmojiIcon from '@/components/EmojiIcon'
 
 const COLORS = {
   primary: '#0ea5e9',
@@ -138,7 +139,7 @@ export default function AnalyticsTab({ forms }: { forms: Form[] }) {
 
       {!selectedForm ? (
         <div className="text-center py-16 text-catalan-textMuted">
-          <div className="text-4xl mb-2">📊</div>
+          <div className="text-4xl mb-2"><EmojiIcon e="📊" /></div>
           <p className="text-sm">Select a form to view analytics</p>
         </div>
       ) : (

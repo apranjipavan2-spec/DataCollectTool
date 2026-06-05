@@ -13,6 +13,7 @@
 
 import React, { Component } from 'react'
 import * as Sentry from '@sentry/react'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface Props {
   children: React.ReactNode
@@ -68,7 +69,7 @@ function DefaultErrorUI({
     <div className="min-h-screen bg-catalan-bg flex items-center justify-center p-6">
       <div className="max-w-lg w-full bg-catalan-surface border border-catalan-border rounded-2xl p-8 text-center space-y-5">
 
-        <div className="text-6xl">⚠️</div>
+        <div className="text-6xl"><EmojiIcon e="⚠" /></div>
 
         <div>
           <h1 className="text-xl font-bold text-catalan-text mb-2">Something went wrong</h1>

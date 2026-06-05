@@ -1,6 +1,11 @@
-# FieldGovern - Offline-First Field Data Collection SaaS
+# FieldGovern
 
-**FieldGovern** is a B2B SaaS platform for offline field data collection in India. It competes with SurveyCTO at just **₹18,000/month** (~$215) with better UX and true offline capability.
+👉 **Official website: [fieldgovern.com](https://www.fieldgovern.com)**
+👉 **Live demo: [fieldgovern.com/demo.html](https://www.fieldgovern.com/demo.html)**
+👉 **Pricing: [fieldgovern.com/pricing.html](https://www.fieldgovern.com/pricing.html)**
+👉 **SurveyCTO alternative: [fieldgovern.com/surveycto-alternative.html](https://www.fieldgovern.com/surveycto-alternative.html)**
+
+**FieldGovern** is India's most affordable offline-first field data collection and analysis platform — a B2B SaaS built for NGOs, researchers, government programs, and market research teams. It competes with SurveyCTO at roughly **1/3 the cost**, billed in INR with UPI, with true offline collection and AI-powered analysis and report writing.
 
 ## 🎯 Quick Facts
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import EmojiIcon from '@/components/EmojiIcon'
 
 export default function UpgradeModal() {
   const [msg, setMsg] = useState<string | null>(null)
@@ -24,7 +25,7 @@ export default function UpgradeModal() {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
       <div className="bg-catalan-surface border border-catalan-border rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center">
-        <div className="text-4xl mb-3">🚀</div>
+        <div className="text-4xl mb-3"><EmojiIcon e="🚀" /></div>
         <h2 className="text-base font-bold text-catalan-text mb-2">Upgrade your plan</h2>
         <p className="text-sm text-catalan-textMuted mb-6">{msg}</p>
         <div className="flex gap-3">

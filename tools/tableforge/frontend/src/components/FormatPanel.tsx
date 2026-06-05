@@ -307,8 +307,16 @@ export function FormatPanel({ table, onUpdate }: Props) {
             <Section title="Table Display" icon="🖥">
               <Toggle label="Freeze First Column" checked={table.frozen_first_col ?? false}
                 onChange={v => onUpdate({ frozen_first_col: v })} />
+              <Toggle label="Freeze Header Row (sticky)" checked={table.frozen_header ?? false}
+                onChange={v => onUpdate({ frozen_header: v })} />
               <Toggle label="Header Word Wrap" checked={table.header_word_wrap ?? false}
                 onChange={v => onUpdate({ header_word_wrap: v })} />
+              <Toggle label="Merge Consecutive Row Labels" checked={table.merge_row_labels ?? false}
+                onChange={v => onUpdate({ merge_row_labels: v })} />
+              <Toggle label="Auto Footnote Markers (*/**/***)" checked={table.auto_footnote_markers ?? false}
+                onChange={v => onUpdate({ auto_footnote_markers: v })} />
+              <Toggle label="Page Break Before (Word export)" checked={table.page_break_before ?? false}
+                onChange={v => onUpdate({ page_break_before: v })} />
               <Toggle label="Show Serial Numbers" checked={table.serial_number ?? false}
                 onChange={v => onUpdate({ serial_number: v })} />
               {table.serial_number && (
@@ -327,6 +335,38 @@ export function FormatPanel({ table, onUpdate }: Props) {
                     <option key={z} value={z}>{z}%</option>
                   ))}
                 </select>
+              </Field>
+              {/* Sparkline columns: multi-select among value fields */}
+              {table.values.length > 0 && (
+                <Field label="Sparkline columns (inline mini-bars)">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 120, overflowY: 'auto' }}>
+                    {table.values.map(v => {
+                      const name = v.label || v.field;
+                      const selected = (table.sparkline_columns || []).includes(name);
+                      return (
+                        <label key={name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                          <input type="checkbox" checked={selected}
+                            onChange={e => {
+                              const list = new Set(table.sparkline_columns || []);
+                              if (e.target.checked) list.add(name); else list.delete(name);
+                              onUpdate({ sparkline_columns: Array.from(list) });
+                            }} />
+                          {name}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </Field>
+              )}
+              {/* Pinned rows (comma list of first-column values) */}
+              <Field label="Pin rows to top (comma-separated)">
+                <input type="text" className="fp-input"
+                  value={(table.pinned_row_keys || []).join(', ')}
+                  placeholder="e.g. Total, Q1, Q2"
+                  onChange={e => {
+                    const list = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                    onUpdate({ pinned_row_keys: list });
+                  }} />
               </Field>
             </Section>
 
@@ -684,6 +724,57 @@ export function FormatPanel({ table, onUpdate }: Props) {
                         placeholder="Category A&#10;Category B&#10;Category C" />
                     </Field>
                   ))}
+                </>
+              )}
+            </Section>
+
+            {/* NET Rows */}
+            <Section title="NET Rows (calculated)" icon="∑" defaultOpen={false}>
+              {table.rows.length === 0 ? (
+                <p className="fp-hint">Add a row field first</p>
+              ) : (
+                <>
+                  <p className="fp-hint">
+                    NET rows re-aggregate selected categories of <strong>{table.rows[0]}</strong> using the same metric
+                    (e.g. NET Agree = Strongly Agree + Agree).
+                  </p>
+                  {(table.net_rows || []).map((nr, i) => (
+                    <div key={i} className="fp-sort-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4, padding: 6, border: '1px solid var(--border, #333)', borderRadius: 4, marginBottom: 6 }}>
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <input type="text" value={nr.label} className="fp-input" style={{ flex: 1 }} placeholder="Agree"
+                          onChange={e => {
+                            const arr = [...(table.net_rows || [])];
+                            arr[i] = { ...arr[i], label: e.target.value };
+                            onUpdate({ net_rows: arr });
+                          }} />
+                        <select value={nr.position || 'after_last_member'} className="fp-select" style={{ flex: 1 }}
+                          onChange={e => {
+                            const arr = [...(table.net_rows || [])];
+                            arr[i] = { ...arr[i], position: e.target.value as any };
+                            onUpdate({ net_rows: arr });
+                          }}>
+                          <option value="after_last_member">After last member</option>
+                          <option value="before_first_member">Before first member</option>
+                          <option value="end">End of table</option>
+                        </select>
+                        <button className="fp-btn-icon" onClick={() => {
+                          onUpdate({ net_rows: (table.net_rows || []).filter((_, j) => j !== i) });
+                        }}>✕</button>
+                      </div>
+                      <textarea rows={3} className="fp-textarea"
+                        value={(nr.members || []).join('\n')}
+                        onChange={e => {
+                          const vals = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
+                          const arr = [...(table.net_rows || [])];
+                          arr[i] = { ...arr[i], members: vals };
+                          onUpdate({ net_rows: arr });
+                        }}
+                        placeholder="Strongly Agree&#10;Agree" />
+                    </div>
+                  ))}
+                  <button className="fp-btn-sm fp-btn-ghost" onClick={() => {
+                    onUpdate({ net_rows: [...(table.net_rows || []), { label: '', members: [], position: 'after_last_member' as const }] });
+                  }}>+ Add NET Row</button>
                 </>
               )}
             </Section>

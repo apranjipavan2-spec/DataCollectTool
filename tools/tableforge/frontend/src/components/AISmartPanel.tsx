@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TableConfig, DatasetMeta, TableResult } from '../types';
 import { API_BASE } from '../api';
+import { BatchRenameModal } from './BatchRenameModal';
 
 interface Props {
   mode: 'polish' | 'interpret' | 'refine' | 'suggest' | 'smart-build' | 'auto-generate' | 'report' | 'config';
@@ -10,6 +11,7 @@ interface Props {
   dataset: DatasetMeta | null;
   result: TableResult | null;
   interpretation?: string;
+  projectFilters?: Record<string, string[]>;
   onClose: () => void;
   onApplyPolish?: (title: string, subtitle: string, renames: Record<string, string>) => void;
   onApplyPolishAll?: (updates: { tableId: string; title: string; subtitle: string; renames: Record<string, string> }[]) => void;
@@ -18,6 +20,7 @@ interface Props {
   onApplySuggestion?: (tables: any[]) => void;
   onApplySmartBuild?: (config: any) => void;
   columnDescriptions?: Record<string, string>;
+  prefillQuery?: { query: string; autoSubmit?: boolean };
 }
 
 const FOCUS_TEMPLATES = [
@@ -40,10 +43,11 @@ const REPORT_STYLES = [
   { key: 'executive', label: 'Executive Summary' },
 ];
 
-export function AISmartPanel({ mode, table, tables, allResults, dataset, result, interpretation, onClose, onApplyPolish, onApplyPolishAll, onApplyInterpretation, onApplyInterpretationAll, onApplySuggestion, onApplySmartBuild, columnDescriptions = {} }: Props) {
+export function AISmartPanel({ mode, table, tables, allResults, dataset, result, interpretation, projectFilters = {}, onClose, onApplyPolish, onApplyPolishAll, onApplyInterpretation, onApplyInterpretationAll, onApplySuggestion, onApplySmartBuild, columnDescriptions = {}, prefillQuery }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [aiResult, setAiResult] = useState<any>(null);
+  const [showBatchRename, setShowBatchRename] = useState(false);
 
   // Scope: single table or all tables
   const [scope, setScope] = useState<'single' | 'all'>('single');
@@ -93,33 +97,44 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
     }
   }, [mode]);
 
+  // #15 Talk-to-your-data: prefill query + sub-mode when opened from ribbon Ask AI bar.
+  const prefillFiredRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (mode !== 'smart-build' || !prefillQuery) return;
+    const sig = `${prefillQuery.query}|${prefillQuery.autoSubmit ? '1' : '0'}`;
+    if (prefillFiredRef.current === sig) return;
+    prefillFiredRef.current = sig;
+    setQuery(prefillQuery.query);
+    setBuildSubMode('ask');
+    if (prefillQuery.autoSubmit) {
+      setTimeout(() => { handleSmartBuild(); }, 0);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, prefillQuery]);
+
   const handlePolish = async () => {
-    if (!dataset) return;
+    if (!dataset || !table) return;
     setLoading(true); setError('');
     try {
-      const targetTables = scope === 'all' ? tables : (table ? [table] : []);
-      const allPolishResults: any[] = [];
-      for (const t of targetTables) {
-        const r = allResults.get(t.id);
-        if (!r) continue;
-        const res = await fetch(`${API_BASE}/ai/polish`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            dataset_id: dataset.dataset_id,
-            table_title: t.title || t.name,
-            rows: t.rows,
-            columns: t.columns,
-            values: t.values,
-            headers: r.headers,
-            sample_rows: r.rows.slice(0, 15),
-          }),
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        allPolishResults.push({ tableId: t.id, tableName: t.title || t.name, ...data });
-      }
-      setAiResult(scope === 'all' ? { allTables: allPolishResults } : allPolishResults[0]);
+      const r = allResults.get(table.id);
+      if (!r) throw new Error('Table result not found');
+      const res = await fetch(`${API_BASE}/ai/polish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dataset_id: dataset.dataset_id,
+          table_title: table.title || table.name,
+          rows: table.rows,
+          columns: table.columns,
+          values: table.values,
+          headers: r.headers,
+          sample_rows: r.rows.slice(0, 15),
+          table_filters: table.filters || {},
+          project_filters: projectFilters,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setAiResult(await res.json());
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   };
@@ -321,42 +336,15 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
         return (
           <div className="ai-panel-body">
             <p className="ai-desc">AI will analyze your table and suggest a clean title, subtitle, and column labels.</p>
-            {tables.length > 1 && !aiResult && (
-              <div className="ai-scope-select" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                <button className={`fdrop-token ${scope === 'single' ? 'active' : ''}`}
-                  style={{ padding: '4px 12px', background: scope === 'single' ? 'rgba(59,130,246,0.3)' : undefined }}
-                  onClick={() => setScope('single')}>Current Table</button>
-                <button className={`fdrop-token ${scope === 'all' ? 'active' : ''}`}
-                  style={{ padding: '4px 12px', background: scope === 'all' ? 'rgba(59,130,246,0.3)' : undefined }}
-                  onClick={() => setScope('all')}>All Tables ({tables.length})</button>
-              </div>
-            )}
-            {!aiResult && <button className="btn-primary" onClick={handlePolish} disabled={loading}>{loading ? 'Generating...' : '✨ Polish Title & Headers'}</button>}
-            {aiResult?.allTables ? (
-              <div className="ai-result">
-                {aiResult.allTables.map((tr: any, idx: number) => (
-                  <div key={tr.tableId} style={{ marginBottom: 16, padding: 10, background: 'rgba(0,0,0,0.1)', borderRadius: 6 }}>
-                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Table {idx + 1}: {tr.tableName}</div>
-                    <div className="ai-result-field"><label>Title:</label><strong>{tr.title}</strong></div>
-                    <div className="ai-result-field"><label>Subtitle:</label><em>{tr.subtitle}</em></div>
-                    {tr.column_labels && Object.keys(tr.column_labels).length > 0 && (
-                      <div className="ai-result-field">
-                        <label>Column Labels:</label>
-                        <div className="ai-labels-grid">
-                          {Object.entries(tr.column_labels).map(([k, v]) => (
-                            <div key={k} className="ai-label-row"><span className="ai-label-key">{k}</span><span>→</span><span className="ai-label-val">{v as string}</span></div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                <button className="btn-primary" style={{ marginTop: 12 }} onClick={() => {
-                  onApplyPolishAll?.(aiResult.allTables.map((tr: any) => ({ tableId: tr.tableId, title: tr.title, subtitle: tr.subtitle, renames: tr.column_labels || {} })));
-                  onClose();
-                }}>Apply All Changes</button>
-              </div>
-            ) : aiResult && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              {!aiResult && <button className="btn-primary" onClick={handlePolish} disabled={loading} style={{ flex: 1 }}>{loading ? 'Generating...' : '✨ Polish Title & Headers'}</button>}
+              {tables.length > 1 && !showBatchRename && (
+                <button className="btn-primary" onClick={() => setShowBatchRename(true)} style={{ flex: 1 }}>
+                  ✨ Batch Rename All {tables.length}
+                </button>
+              )}
+            </div>
+            {aiResult && (
               <div className="ai-result">
                 <div className="ai-result-field"><label>Title:</label><strong>{aiResult.title}</strong></div>
                 <div className="ai-result-field"><label>Subtitle:</label><em>{aiResult.subtitle}</em></div>
@@ -375,6 +363,32 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
                   onClose();
                 }}>Apply Changes</button>
               </div>
+            )}
+            {showBatchRename && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>✨ Batch AI Rename</div>
+                  <button onClick={() => setShowBatchRename(false)} style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: 18,
+                    cursor: 'pointer',
+                    color: 'var(--text-dim)',
+                  }}>✕</button>
+                </div>
+                <BatchRenameModal
+                  tables={tables}
+                  allResults={allResults}
+                  dataset={dataset}
+                  projectFilters={projectFilters}
+                  onClose={() => setShowBatchRename(false)}
+                  onApplyAll={(updates) => {
+                    onApplyPolishAll?.(updates);
+                    setShowBatchRename(false);
+                  }}
+                  onRollback={() => setShowBatchRename(false)}
+                />
+              </>
             )}
           </div>
         );

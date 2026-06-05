@@ -48,18 +48,22 @@ export function ColumnCreator({ datasetId, columns, onCreated, onClose, onOpenLi
   const [previewing, setPreviewing] = useState(false);
   const [selectedAICols, setSelectedAICols] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
+  const refreshExistingCols = () => {
     Promise.all([
-      fetch(`${API_BASE}/metrics/${datasetId}`).then(r => r.json()).catch(() => []),
-      fetch(`${API_BASE}/bins/${datasetId}`).then(r => r.json()).catch(() => []),
-    ]).then(([metrics, bins]) => {
+      fetch(`${API_BASE}/metrics/${datasetId}`).then(r => r.json()).catch(() => ({ metrics: [] })),
+      fetch(`${API_BASE}/bins/${datasetId}`).then(r => r.json()).catch(() => ({ bins: [] })),
+    ]).then(([metricsRes, binsRes]) => {
+      const metricList: any[] = metricsRes.metrics || [];
+      const binList: any[] = binsRes.bins || [];
       const cols: ExistingColumn[] = [
-        ...(metrics || []).map((m: any) => ({ name: m.name || m, type: 'metric' as const })),
-        ...(bins || []).map((b: any) => ({ name: b.name || b, type: 'bin' as const })),
+        ...metricList.map((m: any) => ({ name: m.name || m, type: 'metric' as const })),
+        ...binList.map((b: any) => ({ name: b.name || b, type: 'bin' as const })),
       ];
       setExistingCols(cols);
     });
-  }, [datasetId]);
+  };
+
+  useEffect(() => { refreshExistingCols(); }, [datasetId]);
 
   const handleAIGenerate = async () => {
     if (!description.trim()) return;
@@ -110,6 +114,7 @@ export function ColumnCreator({ datasetId, columns, onCreated, onClose, onOpenLi
         await createBin(datasetId, { ...def, dataset_id: datasetId });
       }
       onCreated(def.name);
+      refreshExistingCols();
     } catch (e: any) { setError(e.message); }
     finally { setApplying(false); }
   };
@@ -119,7 +124,7 @@ export function ColumnCreator({ datasetId, columns, onCreated, onClose, onOpenLi
       const endpoint = type === 'metric' ? 'metrics' : 'bins';
       await fetch(`${API_BASE}/${endpoint}/${datasetId}/${encodeURIComponent(name)}`, { method: 'DELETE' });
       setExistingCols(prev => prev.filter(c => !(c.name === name && c.type === type)));
-      onCreated('');
+      onCreated(name);
     } catch (e: any) { setError(e.message); }
   };
 
@@ -403,12 +408,12 @@ export function ColumnCreator({ datasetId, columns, onCreated, onClose, onOpenLi
               {tab === 'ai' && renderAITab()}
               {tab === 'metric' && (
                 <MetricBuilder datasetId={datasetId} columns={columns} embedded
-                  onCreated={(name) => { onCreated(name); setExistingCols(prev => [...prev, { name, type: 'metric' }]); }}
+                  onCreated={(name) => { onCreated(name); refreshExistingCols(); }}
                   onClose={onClose} onOpenLibrary={onOpenLibrary} />
               )}
               {tab === 'bin' && (
                 <BinCreator datasetId={datasetId} columns={columns} embedded
-                  onCreated={(name) => { onCreated(name); setExistingCols(prev => [...prev, { name, type: 'bin' }]); }}
+                  onCreated={(name) => { onCreated(name); refreshExistingCols(); }}
                   onClose={onClose} />
               )}
             </div>

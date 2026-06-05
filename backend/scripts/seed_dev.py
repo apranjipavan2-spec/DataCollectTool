@@ -122,6 +122,37 @@ _PATCHES = [
     "ALTER TABLE shared_files ADD COLUMN IF NOT EXISTS folder VARCHAR DEFAULT ''",
     "ALTER TABLE shared_files ADD COLUMN IF NOT EXISTS display_name VARCHAR DEFAULT ''",
     "ALTER TABLE user_tool_projects ADD COLUMN IF NOT EXISTS shared_with_tenants UUID[] DEFAULT '{}'",
+    # 0039 — AI usage logs (per-user AI API call tracking)
+    """CREATE TABLE IF NOT EXISTS ai_usage_logs (
+        id            BIGSERIAL PRIMARY KEY,
+        tenant_id     UUID        NOT NULL,
+        user_id       UUID,
+        feature       VARCHAR(64) NOT NULL,
+        provider      VARCHAR(32) NOT NULL,
+        model         VARCHAR(64),
+        tokens_in     INTEGER     DEFAULT 0,
+        tokens_out    INTEGER     DEFAULT 0,
+        success       BOOLEAN     DEFAULT TRUE,
+        error         TEXT,
+        created_at    TIMESTAMPTZ DEFAULT now()
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_ai_usage_tenant_created ON ai_usage_logs(tenant_id, created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_ai_usage_user_created ON ai_usage_logs(user_id, created_at DESC)",
+    # 0041 — shared_files.tenant_id + RLS on programs/user_tool_projects/shared_files.
+    # Add the column and backfill so fresh databases match migrated ones; the RLS
+    # policies themselves are applied by alembic upgrade.
+    "ALTER TABLE shared_files ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    """UPDATE shared_files f SET tenant_id = u.tenant_id
+       FROM   users u WHERE u.id = f.uploaded_by AND f.tenant_id IS NULL""",
+    # 0042 — partial unique indexes on active users (phone, email). Seed data is
+    # already conflict-free; including the indexes here keeps fresh databases
+    # consistent with migrated ones.
+    """CREATE UNIQUE INDEX IF NOT EXISTS uq_users_active_phone
+       ON users (phone)
+       WHERE is_active = TRUE AND phone NOT LIKE 'reg_%'""",
+    """CREATE UNIQUE INDEX IF NOT EXISTS uq_users_active_email
+       ON users (lower(email))
+       WHERE is_active = TRUE AND email IS NOT NULL AND email <> ''""",
 ]
 
 from sqlalchemy import text as _text

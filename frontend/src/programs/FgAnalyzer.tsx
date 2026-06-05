@@ -10,10 +10,12 @@ import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
 import LineChart from '@/components/charts/LineChart'
 import BarChart from '@/components/charts/BarChart'
+import { BatchRenameModal } from './BatchRenameModal'
 import {
   loadTabulations, loadTabulationsCache, saveTabulation, deleteTabulation,
   saveAnalyzerToolProject, getLastProgram, setLastProgram, type SavedTabulation,
 } from '@/lib/fgStorage'
+import EmojiIcon from '@/components/EmojiIcon'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -308,16 +310,16 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
         </div>
         <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
           <button onClick={() => submitFeedback('up')}
-            className={`px-2 py-1.5 text-sm rounded-lg border transition-colors ${feedback === 'up' ? 'border-green-500 text-green-400 bg-green-500/10' : 'border-catalan-border text-catalan-textMuted hover:text-catalan-text'}`}>👍</button>
+            className={`px-2 py-1.5 text-sm rounded-lg border transition-colors ${feedback === 'up' ? 'border-green-500 text-green-400 bg-green-500/10' : 'border-catalan-border text-catalan-textMuted hover:text-catalan-text'}`}><EmojiIcon e="👍" /></button>
           <button onClick={() => submitFeedback('down')}
-            className={`px-2 py-1.5 text-sm rounded-lg border transition-colors ${feedback === 'down' ? 'border-catalan-error text-catalan-error bg-catalan-error/10' : 'border-catalan-border text-catalan-textMuted hover:text-catalan-text'}`}>👎</button>
+            className={`px-2 py-1.5 text-sm rounded-lg border transition-colors ${feedback === 'down' ? 'border-catalan-error text-catalan-error bg-catalan-error/10' : 'border-catalan-border text-catalan-textMuted hover:text-catalan-text'}`}><EmojiIcon e="👎" /></button>
           <button onClick={copyCSV} className={btnSe}>CSV</button>
           <button onClick={runPolish} disabled={polishing} className={btnSe}>
-            {polishing ? '✨…' : '✨ Rename'}
+            <EmojiIcon e="✨" /> {polishing ? '…' : 'Rename'}
           </button>
           <button onClick={() => setShowInterpret(s => !s)}
             className={`${btnSe} ${showInterpret ? 'border-catalan-primary/60 text-catalan-primary' : ''}`}>
-            {interpretation ? '📝 Edit Interpretation' : '📝 Interpret'}
+            <EmojiIcon e="📝" /> {interpretation ? 'Edit Interpretation' : 'Interpret'}
           </button>
           <button onClick={() => setExpanded(e => !e)} className={btnSe}>{expanded ? 'Hide' : 'Expand'}</button>
           <button onClick={onDelete} className="px-2 py-1.5 text-sm border border-catalan-error/30 text-catalan-error rounded-lg hover:bg-catalan-error/10">✕</button>
@@ -343,7 +345,7 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
                 {Object.entries(editColLabels).map(([raw, clean]) => (
                   <div key={raw} className="flex items-center gap-2">
                     <span className="text-xs text-catalan-textMuted font-mono shrink-0 max-w-[110px] truncate" title={raw}>{raw}</span>
-                    <span className="text-xs text-catalan-textMuted">→</span>
+                    <span className="text-xs text-catalan-textMuted"><EmojiIcon e="→" /></span>
                     <input className={`${inp} flex-1 py-1 text-xs`} value={clean}
                       onChange={e => setEditColLabels(p => ({ ...p, [raw]: e.target.value }))} />
                   </div>
@@ -430,7 +432,7 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
           </div>
 
           <button onClick={runInterpret} disabled={interpreting} className={btnPr}>
-            {interpreting ? '✨ Generating…' : interpretation ? '✨ Refine & Compare' : '✨ Generate Interpretation'}
+            <EmojiIcon e="✨" /> {interpreting ? 'Generating…' : interpretation ? 'Refine & Compare' : 'Generate Interpretation'}
           </button>
 
           {/* Side-by-side compare when re-generating */}
@@ -572,6 +574,10 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
   const [manualTitle, setManualTitle] = useState('')
   const [manualRunning, setManualRunning] = useState(false)
 
+  // Batch rename state
+  const [showBatchRename, setShowBatchRename] = useState(false)
+  const [hasBatchSnapshot, setHasBatchSnapshot] = useState(!!localStorage.getItem(`fg_batch_rename_${programId}`))
+
   const reload = useCallback(async () => {
     setSaved(loadTabulationsCache(programId))
     const fresh = await loadTabulations(programId)
@@ -649,6 +655,25 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
 
   const toggleSmartCol = (id: string) =>
     setSmartColIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+
+  const handleUndoBatch = async () => {
+    const raw = localStorage.getItem(`fg_batch_rename_${programId}`)
+    if (!raw) {
+      toast.error('No snapshot found')
+      return
+    }
+    try {
+      const { tables } = JSON.parse(raw)
+      await api.post(`/fg/programs/${programId}/analysis/tabulations/batch-update`, { tabulations: tables })
+      setSaved(tables)
+      localStorage.removeItem(`fg_batch_rename_${programId}`)
+      setHasBatchSnapshot(false)
+      toast.success('Batch rename undone')
+    } catch (e: any) {
+      toast.error('Undo failed')
+    }
+  }
+
   useEffect(() => { reload() }, [reload])
   useEffect(() => { if (cols.length && !groupby) setGroupby(cols[0].id) }, [cols])
 
@@ -943,7 +968,7 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                 smartMode === mode ? 'bg-catalan-surface text-catalan-text shadow-sm' : 'text-catalan-textMuted hover:text-catalan-text'
               }`}>
-              {mode === 'columns' ? '📊 Column Picker' : '💬 Ask a Question'}
+              {mode === 'columns' ? <><EmojiIcon e="📊" /> Column Picker</> : <><EmojiIcon e="💬" /> Ask a Question</>}
             </button>
           ))}
         </div>
@@ -1010,7 +1035,7 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
           disabled={smartBuilding || !cols.length}
           className={`${btnPr} mt-4`}
         >
-          {smartBuilding ? '✨ Analysing data…' : '✨ Smart Build'}
+          <EmojiIcon e="✨" /> {smartBuilding ? 'Analysing data…' : 'Smart Build'}
         </button>
 
         {/* Suggestion result */}
@@ -1042,7 +1067,7 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
               <button onClick={runSmartSuggestion} disabled={smartRunning} className={btnPr}>
                 {smartRunning ? 'Building…' : '▶ Build This Table'}
               </button>
-              <button onClick={callSmartBuild} disabled={smartBuilding} className={btnSe}>↻ Try Again</button>
+              <button onClick={callSmartBuild} disabled={smartBuilding} className={btnSe}><EmojiIcon e="↻" /> Try Again</button>
             </div>
           </div>
         )}
@@ -1069,7 +1094,7 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
           )}
           <div className="flex gap-2">
             <button onClick={callSuggest} disabled={aiLoading || !cols.length} className={btnPr}>
-              {aiLoading ? '✨ Thinking…' : '✨ AI Suggest'}
+              <EmojiIcon e="✨" /> {aiLoading ? 'Thinking…' : 'AI Suggest'}
             </button>
             {suggestions.length > 1 && (
               <button onClick={runAllSuggestions} disabled={runningIdx !== null} className={btnSe}>
@@ -1161,11 +1186,29 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className={`${sh} mb-0`}>Saved Tables & Charts ({saved.length})</div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               {lastRefreshedAt && (
                 <span className="text-xs text-catalan-textMuted">
                   Data as of {lastRefreshedAt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} — auto-refreshes every 30 min
                 </span>
+              )}
+              {saved.length > 1 && (
+                <button
+                  onClick={() => setShowBatchRename(true)}
+                  className={btnSe}
+                  title="Rename all tables with AI"
+                >
+                  <EmojiIcon e="✨" /> Batch Rename ({saved.length})
+                </button>
+              )}
+              {hasBatchSnapshot && (
+                <button
+                  onClick={handleUndoBatch}
+                  className="text-xs text-catalan-error hover:underline"
+                  title="Undo the last batch rename"
+                >
+                  Undo Batch Rename
+                </button>
               )}
               <button
                 onClick={refreshTableData}
@@ -1308,6 +1351,22 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
         />
         {autoError && <p className="text-xs text-catalan-error mt-2">{autoError}</p>}
       </Modal>
+
+      {/* Batch Rename Modal */}
+      {showBatchRename && (
+        <BatchRenameModal
+          saved={saved}
+          programId={programId}
+          programName={programName}
+          cols={cols}
+          onClose={() => setShowBatchRename(false)}
+          onComplete={(updated) => {
+            setSaved(updated)
+            setShowBatchRename(false)
+            setHasBatchSnapshot(true)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -1330,7 +1389,7 @@ function PanelStudyTab({ programId }: { programId: string }) {
   if (!attrition?.is_panel_study) {
     return (
       <div className={`${card} text-center py-10`}>
-        <div className="text-3xl mb-2">🔗</div>
+        <div className="text-3xl mb-2"><EmojiIcon e="🔗" /></div>
         <div className="text-sm font-medium text-catalan-text mb-1">Panel Study not enabled</div>
         <div className="text-xs text-catalan-textMuted">Enable panel mode and assign waves in <strong>Programs → Setup</strong>.</div>
       </div>
@@ -1340,7 +1399,7 @@ function PanelStudyTab({ programId }: { programId: string }) {
   if ((attrition.waves?.length ?? 0) < 2) {
     return (
       <div className={`${card} text-center py-10`}>
-        <div className="text-3xl mb-2">📊</div>
+        <div className="text-3xl mb-2"><EmojiIcon e="📊" /></div>
         <div className="text-sm font-medium text-catalan-text mb-1">Not enough waves yet</div>
         <div className="text-xs text-catalan-textMuted">Assign at least 2 waves with data in <strong>Programs → Setup</strong> to see the attrition report.</div>
       </div>
@@ -1702,7 +1761,7 @@ export default function FgAnalyzer() {
           <div className="w-full p-6">
             {!programId && (
               <div className="flex flex-col items-center justify-center h-64 text-catalan-textMuted">
-                <div className="text-5xl mb-4">🔬</div>
+                <div className="text-5xl mb-4"><EmojiIcon e="🔬" /></div>
                 <p className="text-sm font-medium">Select a program from the dropdown above to begin analysis</p>
               </div>
             )}
@@ -1727,7 +1786,10 @@ export default function FgAnalyzer() {
                 <button
                   onClick={() => {
                     const token = localStorage.getItem('fp_token')
-                    window.location.href = `${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}`
+                    const u = getStoredUser()
+                    const userId = u?.id ? `&user_id=${encodeURIComponent(u.id)}` : ''
+                    const userRole = u?.role ? `&user_role=${encodeURIComponent(u.role)}` : ''
+                    window.location.href = `${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}${userId}${userRole}`
                   }}
                   className="shrink-0 px-5 py-2.5 bg-catalan-primary text-catalan-bg rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity whitespace-nowrap"
                 >
@@ -1771,7 +1833,7 @@ export default function FgAnalyzer() {
                             disabled={colDataLoading}
                             className={`${card} flex flex-col items-start gap-3 text-left hover:border-catalan-primary/50 hover:bg-catalan-primary/5 transition-all disabled:opacity-40 cursor-pointer`}
                           >
-                            <div className="text-2xl">🤖</div>
+                            <div className="text-2xl"><EmojiIcon e="🤖" /></div>
                             <div>
                               <div className="text-sm font-semibold text-catalan-text mb-1">
                                 {colDataLoading ? 'Loading…' : 'Build with AI'}
@@ -1784,11 +1846,14 @@ export default function FgAnalyzer() {
                           <button
                             onClick={() => {
                               const token = localStorage.getItem('fp_token')
-                              window.location.href = `${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}`
+                              const u = getStoredUser()
+                              const userId = u?.id ? `&user_id=${encodeURIComponent(u.id)}` : ''
+                              const userRole = u?.role ? `&user_role=${encodeURIComponent(u.role)}` : ''
+                              window.location.href = `${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&program_id=${programId}&token=${token}${userId}${userRole}`
                             }}
                             className={`${card} flex flex-col items-start gap-3 text-left hover:border-catalan-primary/50 hover:bg-catalan-primary/5 transition-all cursor-pointer`}
                           >
-                            <div className="text-2xl">✏️</div>
+                            <div className="text-2xl"><EmojiIcon e="✏️" /></div>
                             <div>
                               <div className="text-sm font-semibold text-catalan-text mb-1">Build Manually</div>
                               <p className="text-xs text-catalan-textMuted leading-relaxed">

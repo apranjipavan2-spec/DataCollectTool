@@ -70,6 +70,10 @@ class Settings(BaseSettings):
     # MSG91 — WhatsApp notifications (optional; stored per-tenant too but global fallback)
     MSG91_AUTH_KEY: str = ""
 
+    # Razorpay — self-serve payment gateway (optional; falls back to manual UPI)
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: str = ""
+
     # Stored as plain str so pydantic-settings never tries JSON-list parsing on it.
     # Parsed into a list by the cors_origins property below.
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:4173,https://app.fieldgovern.com"

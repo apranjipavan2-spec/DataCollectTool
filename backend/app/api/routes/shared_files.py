@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List
 from sqlalchemy import or_
-from app.core.deps import get_current_user, require_master_admin, get_db
+from app.core.deps import get_current_user, get_db
 from app.models.shared_file import SharedFile
 
 router = APIRouter(prefix="/shared-files", tags=["shared-files"])
@@ -60,6 +60,7 @@ async def upload_shared_file(
 
     record = SharedFile(
         id=file_id,
+        tenant_id=user["tenant_id"],
         uploaded_by=user["sub"],
         filename=disk_filename,
         original_filename=original_name,
@@ -84,18 +85,15 @@ async def upload_shared_file(
 
 @router.get("/folders")
 def list_folders(user=Depends(get_current_user), db: Session = Depends(get_db)):
-    """List distinct folder names from the user's files."""
-    if user.get("role") == "master_admin":
-        rows = db.query(SharedFile.folder).distinct().all()
-    else:
-        user_id = user["sub"]
-        tenant_id = user["tenant_id"]
-        rows = db.query(SharedFile.folder).filter(
-            or_(
-                SharedFile.shared_with_tenants.any(tenant_id),
-                SharedFile.uploaded_by == user_id,
-            )
-        ).distinct().all()
+    """List distinct folder names — files the caller uploaded or that are shared with their tenant."""
+    user_id = user["sub"]
+    tenant_id = user["tenant_id"]
+    rows = db.query(SharedFile.folder).filter(
+        or_(
+            SharedFile.shared_with_tenants.any(tenant_id),
+            SharedFile.uploaded_by == user_id,
+        )
+    ).distinct().all()
     return [r[0] for r in rows if r[0]]
 
 
@@ -113,18 +111,15 @@ def create_folder(body: CreateFolderRequest, user=Depends(get_current_user), db:
 
 @router.get("/")
 def list_shared_files(folder: str = "", user=Depends(get_current_user), db: Session = Depends(get_db)):
-    """List files. master_admin sees all; others see files shared with their tenant."""
-    if user.get("role") == "master_admin":
-        rows = db.query(SharedFile).order_by(SharedFile.created_at.desc()).all()
-    else:
-        tenant_id = user["tenant_id"]
-        user_id = user["sub"]
-        rows = db.query(SharedFile).filter(
-            or_(
-                SharedFile.shared_with_tenants.any(tenant_id),
-                SharedFile.uploaded_by == user_id,
-            )
-        ).order_by(SharedFile.created_at.desc()).all()
+    """List files the caller uploaded or that are shared with their tenant."""
+    tenant_id = user["tenant_id"]
+    user_id = user["sub"]
+    rows = db.query(SharedFile).filter(
+        or_(
+            SharedFile.shared_with_tenants.any(tenant_id),
+            SharedFile.uploaded_by == user_id,
+        )
+    ).order_by(SharedFile.created_at.desc()).all()
 
     if folder:
         rows = [r for r in rows if (r.folder or "") == folder]
@@ -147,15 +142,14 @@ def list_shared_files(folder: str = "", user=Depends(get_current_user), db: Sess
 
 @router.get("/{file_id}/download")
 def download_shared_file(file_id: str, user=Depends(get_current_user), db: Session = Depends(get_db)):
-    """Download a shared file. master_admin can download all; others only if shared."""
+    """Download a shared file. Must be the uploader or have the tenant listed in shared_with_tenants."""
     record = db.query(SharedFile).filter(SharedFile.id == file_id).first()
     if not record:
         raise HTTPException(404, "File not found")
 
-    if user.get("role") != "master_admin":
-        tenant_id = user["tenant_id"]
-        if tenant_id not in (record.shared_with_tenants or []):
-            raise HTTPException(403, "Access denied")
+    tenant_id = user["tenant_id"]
+    if str(record.uploaded_by) != user["sub"] and tenant_id not in (record.shared_with_tenants or []):
+        raise HTTPException(403, "Access denied")
 
     from fastapi.responses import FileResponse
     if not os.path.exists(record.disk_path):
@@ -172,12 +166,8 @@ def rename_shared_file(file_id: str, body: RenameRequest, user=Depends(get_curre
     record = db.query(SharedFile).filter(SharedFile.id == file_id).first()
     if not record:
         raise HTTPException(404, "File not found")
-    if user.get("role") == "master_admin":
-        pass
-    elif user.get("role") == "org_admin" and str(record.uploaded_by) == user["sub"]:
-        pass
-    else:
-        raise HTTPException(403, "Only admins can rename files")
+    if str(record.uploaded_by) != user["sub"]:
+        raise HTTPException(403, "Only the uploader can rename a file")
     record.display_name = body.new_name.strip()
     db.commit()
     return {"id": str(record.id), "display_name": record.display_name}
@@ -190,10 +180,9 @@ def get_csv_data(file_id: str, user=Depends(get_current_user), db: Session = Dep
     if not record:
         raise HTTPException(404, "File not found")
 
-    if user.get("role") != "master_admin":
-        tenant_id = user["tenant_id"]
-        if str(record.uploaded_by) != user["sub"] and tenant_id not in (record.shared_with_tenants or []):
-            raise HTTPException(403, "Access denied")
+    tenant_id = user["tenant_id"]
+    if str(record.uploaded_by) != user["sub"] and tenant_id not in (record.shared_with_tenants or []):
+        raise HTTPException(403, "Access denied")
 
     if not os.path.exists(record.disk_path):
         raise HTTPException(404, "File missing from storage")
@@ -214,13 +203,15 @@ def get_csv_data(file_id: str, user=Depends(get_current_user), db: Session = Dep
 def update_sharing(
     file_id: str,
     tenant_ids: List[str],
-    user=Depends(require_master_admin),
+    user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Update which tenants a file is shared with (master_admin only)."""
+    """Update which tenants a file is shared with. Only the uploader can change sharing."""
     record = db.query(SharedFile).filter(SharedFile.id == file_id).first()
     if not record:
         raise HTTPException(404, "File not found")
+    if str(record.uploaded_by) != user["sub"]:
+        raise HTTPException(403, "Only the uploader can change sharing")
     record.shared_with_tenants = tenant_ids
     db.commit()
     return {"id": str(record.id), "shared_with": tenant_ids}
@@ -228,16 +219,12 @@ def update_sharing(
 
 @router.delete("/{file_id}")
 def delete_shared_file(file_id: str, user=Depends(get_current_user), db: Session = Depends(get_db)):
-    """Delete a shared file (master_admin or org_admin for own uploads)."""
+    """Delete a shared file. Only the uploader can delete."""
     record = db.query(SharedFile).filter(SharedFile.id == file_id).first()
     if not record:
         raise HTTPException(404, "File not found")
-    if user.get("role") == "master_admin":
-        pass  # can delete anything
-    elif user.get("role") == "org_admin" and str(record.uploaded_by) == user["sub"]:
-        pass  # can delete own uploads
-    else:
-        raise HTTPException(403, "Only admins can delete files")
+    if str(record.uploaded_by) != user["sub"]:
+        raise HTTPException(403, "Only the uploader can delete this file")
     if os.path.exists(record.disk_path):
         os.remove(record.disk_path)
     db.delete(record)

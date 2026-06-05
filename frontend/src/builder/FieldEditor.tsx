@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import type { FormField, FormSection, FieldOption, FieldType } from '@/types/form'
 import { evalFormula } from '@/lib/formUtils'
 import SkipLogicEditor from './SkipLogicEditor'
+import EmojiIcon from '@/components/EmojiIcon'
 
 const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'text',            label: 'Text' },
@@ -857,7 +858,7 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
           </div>
           {field.skipLogic && (
             <div className="flex items-center gap-2 mb-2 px-2.5 py-1.5 bg-catalan-warning/10 border border-catalan-warning/20 rounded-lg">
-              <span className="text-catalan-warning text-xs">⚡</span>
+              <span className="text-catalan-warning text-xs"><EmojiIcon e="⚡" /></span>
               <span className="text-xs text-catalan-warning">
                 This field is conditionally {field.skipLogic.action === 'show' ? 'shown' : 'skipped'}.
               </span>

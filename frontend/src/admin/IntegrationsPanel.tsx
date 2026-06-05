@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react'
 import api from '@/lib/api'
 import type { FormListItem, ProgramListItem } from '@/types/api'
+import EmojiIcon from '@/components/EmojiIcon'
 
 const ALL_EVENTS = [
   { id: 'submission.created',  label: 'New submission synced' },
@@ -126,7 +127,7 @@ function AlertsSection() {
       <div className="border border-catalan-border rounded-xl p-5 space-y-4">
         <div className="flex items-start justify-between">
           <div>
-            <h4 className="font-semibold text-catalan-text">✈️ Telegram</h4>
+            <h4 className="font-semibold text-catalan-text"><EmojiIcon e="✈" /> Telegram</h4>
             <p className="text-xs text-catalan-textMuted mt-0.5">Free, instant, no approval needed.</p>
           </div>
           <Toggle checked={tgEnabled} onChange={setTgEnabled} label={tgEnabled ? 'Enabled' : 'Disabled'} />
@@ -174,7 +175,7 @@ function AlertsSection() {
       <div className="border border-catalan-border rounded-xl p-5 space-y-4">
         <div className="flex items-start justify-between">
           <div>
-            <h4 className="font-semibold text-catalan-text">🟢 WhatsApp</h4>
+            <h4 className="font-semibold text-catalan-text"><EmojiIcon e="🟢" /> WhatsApp</h4>
             <p className="text-xs text-catalan-textMuted mt-0.5">Powered by MSG91 WABA. Requires Meta approval.</p>
           </div>
           <Toggle checked={waEnabled} onChange={setWaEnabled} label={waEnabled ? 'Enabled' : 'Disabled'} />
@@ -211,7 +212,7 @@ function AlertsSection() {
           className="px-5 py-2 rounded-lg bg-catalan-primary text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity">
           {saving ? 'Saving…' : 'Save Alert Settings'}
         </button>
-        {saved && <span className="text-green-600 text-sm">✅ Saved</span>}
+        {saved && <span className="text-green-600 text-sm"><EmojiIcon e="✅" /> Saved</span>}
         {error && <span className="text-red-500 text-sm">{error}</span>}
       </div>
     </div>
@@ -285,7 +286,7 @@ function WebhooksSection() {
   return (
     <div className="space-y-5">
       <div>
-        <h4 className="font-semibold text-catalan-text">🔗 Webhooks</h4>
+        <h4 className="font-semibold text-catalan-text"><EmojiIcon e="🔗" /> Webhooks</h4>
         <p className="text-xs text-catalan-textMuted mt-0.5">Push real-time event payloads to your own endpoints (HMAC-signed).</p>
       </div>
 
@@ -361,7 +362,7 @@ function WebhooksSection() {
               </div>
               {testResult?.id === wh.id && (
                 <div className={`mt-2 text-xs px-2.5 py-1.5 rounded ${testResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-                  {testResult.success ? `✓ Succeeded (HTTP ${testResult.status_code})` : `⚠ Failed (HTTP ${testResult.status_code ?? 'error'})`}
+                  {testResult.success ? `✓ Succeeded (HTTP ${testResult.status_code})` : `Failed (HTTP ${testResult.status_code ?? 'error'})`}
                 </div>
               )}
             </div>
@@ -416,7 +417,7 @@ function SheetsSection() {
   return (
     <div className="space-y-4">
       <div>
-        <h4 className="font-semibold text-catalan-text">📊 Google Sheets Live Sync</h4>
+        <h4 className="font-semibold text-catalan-text"><EmojiIcon e="📊" /> Google Sheets Live Sync</h4>
         <p className="text-xs text-catalan-textMuted mt-0.5">
           Every new submission is appended as a row to your Google Sheet automatically.
         </p>
@@ -458,7 +459,7 @@ function SheetsSection() {
                   className="px-3 py-1.5 rounded-lg bg-catalan-primary text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50">
                   {saving === form.id ? '…' : 'Save'}
                 </button>
-                {saved === form.id && <span className="text-green-600 text-xs">✅ Saved</span>}
+                {saved === form.id && <span className="text-green-600 text-xs"><EmojiIcon e="✅" /> Saved</span>}
               </div>
             </div>
           )
@@ -483,7 +484,7 @@ function ConsentReportsSection() {
   return (
     <div className="space-y-4">
       <div>
-        <h4 className="font-semibold text-catalan-text">📑 Consent Reports</h4>
+        <h4 className="font-semibold text-catalan-text"><EmojiIcon e="📑" /> Consent Reports</h4>
         <p className="text-xs text-catalan-textMuted mt-0.5">
           Download DPDP consent audit records. Includes submission ID, enumerator phone, consent flag and timestamp.
         </p>
@@ -498,7 +499,7 @@ function ConsentReportsSection() {
               <span className="text-sm text-catalan-text">{f.title}</span>
               <a href={`/api/v1/export/consent-report?form_id=${f.id}`} target="_blank" rel="noopener noreferrer"
                 className="text-xs px-2.5 py-1 rounded border border-catalan-primary/30 text-catalan-primary hover:bg-catalan-primary/10 transition-colors">
-                📥 Download CSV
+                <EmojiIcon e="📥" /> Download CSV
               </a>
             </div>
           ))}
@@ -587,7 +588,7 @@ function OrgSettingsSection() {
   return (
     <div className="space-y-7">
       <div>
-        <h4 className="font-semibold text-catalan-text">⚙️ Enumerator Edit Access</h4>
+        <h4 className="font-semibold text-catalan-text"><EmojiIcon e="⚙" /> Enumerator Edit Access</h4>
         <p className="text-xs text-catalan-textMuted mt-0.5">
           Control whether enumerators can edit their own previously submitted records. Set an org-wide default, then override per form or per program. Form-level overrides take priority.
         </p>
@@ -685,11 +686,11 @@ export default function IntegrationsPanel() {
     <div className="space-y-6">
       <div className="flex gap-3 flex-wrap">
         {([
-          ['alerts',   '🔔 Alerts'],
-          ['webhooks', '🔗 Webhooks'],
-          ['sheets',   '📊 Google Sheets'],
-          ['consent',  '📑 Consent Reports'],
-          ['access',   '⚙️ Form Access'],
+          ['alerts',   'Alerts'],
+          ['webhooks', 'Webhooks'],
+          ['sheets',   'Google Sheets'],
+          ['consent',  'Consent Reports'],
+          ['access',   'Form Access'],
         ] as const).map(([id, label]) => (
           <button key={id} onClick={() => setSection(id)}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import api from '@/lib/api'
 import { Button, Card } from '@/components/ui'
+import EmojiIcon from '@/components/EmojiIcon'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -228,7 +229,7 @@ export default function VersionHistoryPanel({ formId, currentVersion, onClose }:
                             ) : versionSchema ? (
                               <div className="space-y-2">
                                 <div className="flex items-center gap-2 text-catalan-textMuted">
-                                  <span>📋</span>
+                                  <span><EmojiIcon e="📋" /></span>
                                   <span>
                                     {countFields(versionSchema)} field{countFields(versionSchema) !== 1 ? 's' : ''}
                                     {' · '}
@@ -269,7 +270,7 @@ export default function VersionHistoryPanel({ formId, currentVersion, onClose }:
                       ))}
                     </select>
                   </div>
-                  <span className="text-catalan-textMuted text-sm pb-1.5">→</span>
+                  <span className="text-catalan-textMuted text-sm pb-1.5"><EmojiIcon e="→" /></span>
                   <div className="flex-1 min-w-[100px]">
                     <label className="block text-xs text-catalan-textMuted mb-1">To</label>
                     <select
@@ -322,12 +323,12 @@ export default function VersionHistoryPanel({ formId, currentVersion, onClose }:
                           )}
                           {Object.keys(diffResult.diff.renamed).length > 0 && (
                             <span className="text-xs font-medium text-catalan-warning bg-catalan-warning/10 px-2 py-1 rounded-lg">
-                              ↔ {Object.keys(diffResult.diff.renamed).length} renamed
+                              <EmojiIcon e="↔" /> {Object.keys(diffResult.diff.renamed).length} renamed
                             </span>
                           )}
                           {diffResult.diff.type_changes.length > 0 && (
                             <span className="text-xs font-medium text-catalan-warning bg-catalan-warning/10 px-2 py-1 rounded-lg">
-                              ⚡ {diffResult.diff.type_changes.length} type change{diffResult.diff.type_changes.length !== 1 ? 's' : ''}
+                              <EmojiIcon e="⚡" /> {diffResult.diff.type_changes.length} type change{diffResult.diff.type_changes.length !== 1 ? 's' : ''}
                             </span>
                           )}
                         </div>
@@ -350,16 +351,16 @@ export default function VersionHistoryPanel({ formId, currentVersion, onClose }:
                           ))}
                           {Object.entries(diffResult.diff.renamed).map(([oldK, newK]) => (
                             <div key={`ren-${oldK}`} className="px-3 py-2 flex items-center gap-2">
-                              <span className="text-catalan-warning font-medium w-4">↔</span>
+                              <span className="text-catalan-warning font-medium w-4"><EmojiIcon e="↔" /></span>
                               <span className="text-catalan-textMuted font-mono">{oldK}</span>
-                              <span className="text-catalan-textMuted">→</span>
+                              <span className="text-catalan-textMuted"><EmojiIcon e="→" /></span>
                               <span className="text-catalan-text font-mono">{newK}</span>
                               <span className="text-catalan-textMuted ml-auto">renamed</span>
                             </div>
                           ))}
                           {diffResult.diff.type_changes.map(tc => (
                             <div key={`tc-${tc.key}`} className="px-3 py-2 flex items-center gap-2">
-                              <span className="text-catalan-warning font-medium w-4">⚡</span>
+                              <span className="text-catalan-warning font-medium w-4"><EmojiIcon e="⚡" /></span>
                               <span className="text-catalan-text font-mono">{tc.key}</span>
                               <span className="text-catalan-textMuted">{tc.old_type} → {tc.new_type}</span>
                             </div>

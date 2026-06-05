@@ -77,6 +77,8 @@ export function TopBar({ onFileUpload, dataset, onAction, onToggleTheme, theme, 
     {
       label: 'Tools',
       items: [
+        { label: 'Open in Cleaner', icon: '🧹', action: 'clean_open', disabled: !dataset },
+        { divider: true },
         { label: 'Transpose Table', icon: '⇄', action: 'transpose', disabled: !dataset },
         { label: 'Duplicate Table', icon: '⧉', action: 'duplicate', disabled: !dataset },
         { label: 'Compare Tables', icon: '⊞', action: 'table_compare', disabled: !dataset },

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api, { getStoredUser } from '@/lib/api'
+import EmojiIcon from '@/components/EmojiIcon'
 
 const PROVIDERS = [
   { id: 'openai',    label: 'OpenAI',    icon: '🟢', placeholder: 'sk-…',     defaultModel: 'gpt-4o',               models: ['gpt-4o','gpt-4o-mini','gpt-4-turbo','gpt-3.5-turbo'] },
@@ -32,11 +33,11 @@ export default function AiConfigPanel() {
     const configured = config?.configured
     const active = config?.active_provider
     return (
-      <div className="max-w-lg space-y-4">
+      <div className="max-w-3xl space-y-4">
         <div className={`flex items-center gap-3 p-4 rounded-xl border ${
           configured ? 'bg-green-500/10 border-green-500/30' : 'bg-catalan-warning/10 border-catalan-warning/30'
         }`}>
-          <span className="text-2xl">{configured ? '✅' : '⚠️'}</span>
+          <span className="text-2xl">{configured ? <EmojiIcon e="✅" /> : <EmojiIcon e="⚠" />}</span>
           <div>
             <div className="text-sm font-semibold text-catalan-text">
               {configured ? `AI Enabled — ${active}` : 'AI Not Configured'}
@@ -48,11 +49,164 @@ export default function AiConfigPanel() {
             </div>
           </div>
         </div>
+        <AiUsagePanel />
       </div>
     )
   }
 
-  return <MasterAiConfig initial={config} onUpdated={setConfig} />
+  return (
+    <div className="space-y-8">
+      <MasterAiConfig initial={config} onUpdated={setConfig} />
+      <AiUsagePanel />
+    </div>
+  )
+}
+
+// ── Usage tracking panel ──────────────────────────────────────────────────
+
+interface UsageUserRow {
+  user_id: string | null
+  user_name: string
+  user_email: string | null
+  tenant_id: string
+  calls: number
+  tokens_in: number
+  tokens_out: number
+  errors: number
+  last_call: string | null
+}
+interface UsageFeatureRow { feature: string; calls: number; tokens_in: number; tokens_out: number }
+interface UsageData { days: number; scope: string; per_user: UsageUserRow[]; by_feature: UsageFeatureRow[] }
+
+function AiUsagePanel() {
+  const [days, setDays] = useState(30)
+  const [data, setData] = useState<UsageData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    api.get('/ai/usage', { params: { days } })
+      .then(({ data }) => setData(data))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false))
+  }, [days])
+
+  const fmt = (n: number) => n.toLocaleString()
+  const fmtDate = (s: string | null) => s ? new Date(s).toLocaleString() : '—'
+
+  const totals = data?.per_user.reduce(
+    (a, r) => ({ calls: a.calls + r.calls, tokens_in: a.tokens_in + r.tokens_in, tokens_out: a.tokens_out + r.tokens_out, errors: a.errors + r.errors }),
+    { calls: 0, tokens_in: 0, tokens_out: 0, errors: 0 }
+  )
+
+  return (
+    <div className="max-w-3xl space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-sm font-semibold text-catalan-text"><EmojiIcon e="📊" /> AI Usage</div>
+          <div className="text-xs text-catalan-textMuted">
+            {data?.scope === 'global' ? 'All tenants' : 'Your organisation'} · last {days} days
+          </div>
+        </div>
+        <select className="border border-catalan-border rounded-lg px-3 py-1.5 text-sm bg-catalan-bg text-catalan-text"
+          value={days} onChange={e => setDays(Number(e.target.value))}>
+          <option value={7}>Last 7 days</option>
+          <option value={30}>Last 30 days</option>
+          <option value={90}>Last 90 days</option>
+          <option value={365}>Last 365 days</option>
+        </select>
+      </div>
+
+      {loading ? (
+        <div className="text-catalan-textMuted text-sm p-4">Loading…</div>
+      ) : !data || data.per_user.length === 0 ? (
+        <div className="p-4 rounded-xl border border-catalan-border bg-catalan-bg text-sm text-catalan-textMuted">
+          No AI usage recorded in this window yet.
+        </div>
+      ) : (
+        <>
+          {totals && (
+            <div className="grid grid-cols-4 gap-3">
+              <Stat label="Total calls" value={fmt(totals.calls)} />
+              <Stat label="Tokens in" value={fmt(totals.tokens_in)} />
+              <Stat label="Tokens out" value={fmt(totals.tokens_out)} />
+              <Stat label="Errors" value={fmt(totals.errors)} tone={totals.errors > 0 ? 'warn' : undefined} />
+            </div>
+          )}
+
+          <div className="rounded-xl border border-catalan-border overflow-hidden">
+            <div className="px-4 py-2 bg-catalan-primary/5 text-xs font-semibold text-catalan-text uppercase tracking-wide">
+              Per User
+            </div>
+            <table className="w-full text-sm">
+              <thead className="text-xs text-catalan-textMuted">
+                <tr className="border-b border-catalan-border">
+                  <th className="text-left px-4 py-2">User</th>
+                  <th className="text-right px-4 py-2">Calls</th>
+                  <th className="text-right px-4 py-2">Tokens in</th>
+                  <th className="text-right px-4 py-2">Tokens out</th>
+                  <th className="text-right px-4 py-2">Errors</th>
+                  <th className="text-left px-4 py-2">Last call</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.per_user.map((r, i) => (
+                  <tr key={`${r.user_id}-${i}`} className="border-b border-catalan-border/50 last:border-0">
+                    <td className="px-4 py-2 text-catalan-text">
+                      <div className="font-medium">{r.user_name}</div>
+                      {r.user_email && <div className="text-xs text-catalan-textMuted">{r.user_email}</div>}
+                    </td>
+                    <td className="px-4 py-2 text-right font-mono text-catalan-text">{fmt(r.calls)}</td>
+                    <td className="px-4 py-2 text-right font-mono text-catalan-textMuted">{fmt(r.tokens_in)}</td>
+                    <td className="px-4 py-2 text-right font-mono text-catalan-textMuted">{fmt(r.tokens_out)}</td>
+                    <td className={`px-4 py-2 text-right font-mono ${r.errors > 0 ? 'text-catalan-error' : 'text-catalan-textMuted'}`}>{fmt(r.errors)}</td>
+                    <td className="px-4 py-2 text-xs text-catalan-textMuted">{fmtDate(r.last_call)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {data.by_feature.length > 0 && (
+            <div className="rounded-xl border border-catalan-border overflow-hidden">
+              <div className="px-4 py-2 bg-catalan-primary/5 text-xs font-semibold text-catalan-text uppercase tracking-wide">
+                By Feature
+              </div>
+              <table className="w-full text-sm">
+                <thead className="text-xs text-catalan-textMuted">
+                  <tr className="border-b border-catalan-border">
+                    <th className="text-left px-4 py-2">Feature</th>
+                    <th className="text-right px-4 py-2">Calls</th>
+                    <th className="text-right px-4 py-2">Tokens in</th>
+                    <th className="text-right px-4 py-2">Tokens out</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.by_feature.map((f, i) => (
+                    <tr key={`${f.feature}-${i}`} className="border-b border-catalan-border/50 last:border-0">
+                      <td className="px-4 py-2 text-catalan-text font-mono text-xs">{f.feature}</td>
+                      <td className="px-4 py-2 text-right font-mono text-catalan-text">{fmt(f.calls)}</td>
+                      <td className="px-4 py-2 text-right font-mono text-catalan-textMuted">{fmt(f.tokens_in)}</td>
+                      <td className="px-4 py-2 text-right font-mono text-catalan-textMuted">{fmt(f.tokens_out)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: 'warn' }) {
+  return (
+    <div className={`p-3 rounded-xl border ${tone === 'warn' ? 'border-catalan-warning/30 bg-catalan-warning/5' : 'border-catalan-border bg-catalan-bg'}`}>
+      <div className="text-xs text-catalan-textMuted">{label}</div>
+      <div className={`text-lg font-semibold ${tone === 'warn' ? 'text-catalan-warning' : 'text-catalan-text'}`}>{value}</div>
+    </div>
+  )
 }
 
 function MasterAiConfig({ initial, onUpdated }: { initial: ConfigData | null; onUpdated: (c: ConfigData) => void }) {
@@ -107,7 +261,7 @@ function MasterAiConfig({ initial, onUpdated }: { initial: ConfigData | null; on
   return (
     <div className="max-w-2xl space-y-6">
       <div className="p-4 rounded-xl bg-catalan-primary/5 border border-catalan-primary/20">
-        <div className="text-sm font-semibold text-catalan-text mb-1">🌐 Global AI Keys</div>
+        <div className="text-sm font-semibold text-catalan-text mb-1"><EmojiIcon e="🌐" /> Global AI Keys</div>
         <div className="text-xs text-catalan-textMuted">
           Configure one or more AI providers. Select the <strong>active provider</strong> that will be used for all AI features.
           Keys are stored encrypted and never exposed to org admins.
@@ -125,7 +279,7 @@ function MasterAiConfig({ initial, onUpdated }: { initial: ConfigData | null; on
                   ? 'border-catalan-primary bg-catalan-primary/10 text-catalan-primary'
                   : 'border-catalan-border text-catalan-textMuted hover:border-catalan-primary/40'
               }`}>
-              <span>{p.icon}</span>
+              <span><EmojiIcon e={p.icon} /></span>
               <span>{p.label}</span>
               {configured[p.id] && <span className="text-green-500 text-xs">●</span>}
             </button>
@@ -143,14 +297,14 @@ function MasterAiConfig({ initial, onUpdated }: { initial: ConfigData | null; on
           }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-lg">{p.icon}</span>
+                <span className="text-lg"><EmojiIcon e={p.icon} /></span>
                 <span className="font-semibold text-catalan-text">{p.label}</span>
                 {activeProvider === pid && (
                   <span className="text-xs bg-catalan-primary/15 text-catalan-primary px-2 py-0.5 rounded-full font-medium">Active</span>
                 )}
               </div>
               <span className={`text-xs font-semibold ${configured[pid] ? 'text-green-500' : 'text-catalan-textMuted'}`}>
-                {configured[pid] ? '✅ Configured' : '○ Not set'}
+                {configured[pid] ? <><EmojiIcon e="✅" /> Configured</> : '○ Not set'}
               </span>
             </div>
 

@@ -20,6 +20,7 @@ import { Button, Alert, SkeletonBlock } from '@/components/ui'
 import { getNavItems } from '@/lib/navigation'
 import api, { getStoredUser } from '@/lib/api'
 import { useToast } from '@/lib/ToastContext'
+import EmojiIcon from '@/components/EmojiIcon'
 
 const FIELD_TYPE_ICONS: Record<string, string> = {
   text: '𝐓', number: '#', decimal: '.1', single_choice: '◉', multiple_choice: '☑',
@@ -448,9 +449,9 @@ export default function FormBuilder() {
           } ${isDragging ? 'opacity-40' : ''}`}
         >
           <span className="text-catalan-textMuted/40 text-xs cursor-grab active:cursor-grabbing flex-shrink-0 select-none">⠿</span>
-          <span className="text-catalan-textMuted text-xs w-4 text-center flex-shrink-0">{FIELD_TYPE_ICONS[field.type] ?? '?'}</span>
+          <span className="text-catalan-textMuted text-xs w-4 text-center flex-shrink-0"><EmojiIcon e={FIELD_TYPE_ICONS[field.type] ?? '?'} /></span>
           <span className={`flex-1 text-xs leading-snug break-words min-w-0 ${field.label ? 'text-catalan-text' : 'text-catalan-error/80'}`}>
-            {field.label || '⚠ label missing'}
+            {field.label || 'label missing'}
           </span>
           <button
             onClick={e => { e.stopPropagation(); requestDeleteField(sectionId, field.id, field.label || 'this field') }}
@@ -545,7 +546,7 @@ export default function FormBuilder() {
               title="This section has a visibility condition — click section to edit"
               className="flex-shrink-0 text-catalan-warning text-xs px-0.5"
             >
-              ⚡
+              <EmojiIcon e="⚡" />
             </span>
           )}
 
@@ -634,7 +635,7 @@ export default function FormBuilder() {
         <TopNav breadcrumbs={[{ label: 'Dashboard', path: '/' }, { label: schema.title.trim() || 'Form Builder' }]} />
 
         <div className="md:hidden flex items-center gap-2 px-4 py-2 bg-catalan-warning/10 border-b border-catalan-warning/30 text-xs text-catalan-warning">
-          <span>⚠</span><span>Form Builder works best on a larger screen.</span>
+          <span><EmojiIcon e="⚠" /></span><span>Form Builder works best on a larger screen.</span>
         </div>
 
         <div className="flex-1 flex overflow-hidden relative">
@@ -657,7 +658,7 @@ export default function FormBuilder() {
             {draft && (
               <div className="px-3 pt-2.5 pb-2 bg-catalan-warning/10 border-b border-catalan-warning/30 flex-shrink-0">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-catalan-warning text-sm">📄</span>
+                  <span className="text-catalan-warning text-sm"><EmojiIcon e="📄" /></span>
                   <span className="text-xs font-medium text-catalan-warning">Unsaved draft found</span>
                 </div>
                 <p className="text-xs text-catalan-textMuted mb-2 leading-snug">
@@ -706,7 +707,7 @@ export default function FormBuilder() {
                 onClick={() => setShowAiBuilder(true)}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-gradient-to-r from-catalan-primary to-purple-600 text-white text-xs font-semibold hover:opacity-90 transition-opacity shadow-sm"
               >
-                <span>🤖</span> Generate Form with AI
+                <span><EmojiIcon e="🤖" /></span> Generate Form with AI
               </button>
 
               <div className="flex items-center gap-1.5 mb-1" data-help-id="import-excel-btn">
@@ -718,7 +719,7 @@ export default function FormBuilder() {
                 disabled={importingExcel}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-dashed border-catalan-primary/50 text-catalan-primary text-xs font-medium hover:bg-catalan-primary/10 hover:border-catalan-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {importingExcel ? <><span className="animate-spin">⟳</span><span>Importing…</span></> : <><span>📊</span><span>Import from Excel</span></>}
+                {importingExcel ? <><span className="animate-spin">⟳</span><span>Importing…</span></> : <><span><EmojiIcon e="📊" /></span><span>Import from Excel</span></>}
               </button>
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleImportExcel(f) }} />
@@ -750,7 +751,7 @@ export default function FormBuilder() {
             {/* Top Bar */}
             <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-catalan-border bg-catalan-surface flex-shrink-0">
               <div className="flex items-center gap-2">
-                <button onClick={() => setShowLeftPanel(!showLeftPanel)} className="md:hidden p-1.5 rounded bg-catalan-hover text-catalan-primary text-sm">☰</button>
+                <button onClick={() => setShowLeftPanel(!showLeftPanel)} className="md:hidden p-1.5 rounded bg-catalan-hover text-catalan-primary text-sm"><EmojiIcon e="☰" /></button>
                 <span className="text-sm text-catalan-textMuted truncate">
                   {currentField
                     ? `${currentSection?.title} › ${currentField.label || 'Untitled field'}`
@@ -760,13 +761,13 @@ export default function FormBuilder() {
               <div className="flex gap-3 items-center flex-wrap">
                 {formLoadError && (
                   <div className="flex items-center gap-1.5 text-xs text-catalan-error bg-catalan-error/10 border border-catalan-error/30 rounded-lg px-2.5 py-1">
-                    <span>⚠</span><span>{formLoadError}</span>
+                    <span><EmojiIcon e="⚠" /></span><span>{formLoadError}</span>
                     <button onClick={() => setFormLoadError('')} className="ml-1 text-catalan-error/60 hover:text-catalan-error">×</button>
                   </div>
                 )}
                 {validationErrors.length > 0 && validationErrors.map((e, i) => (
                   <div key={i} className="flex items-center gap-1.5 text-xs text-catalan-error bg-catalan-error/10 border border-catalan-error/30 rounded-lg px-2.5 py-1">
-                    <span>⚠</span><span>{e}</span>
+                    <span><EmojiIcon e="⚠" /></span><span>{e}</span>
                     <button onClick={() => setValidationErrors([])} className="ml-1 text-catalan-error/60 hover:text-catalan-error leading-none">×</button>
                   </div>
                 ))}
@@ -923,7 +924,7 @@ function SectionEditor({ section, schema, onTitleChange, onSkipLogicChange, onAd
           {/* Active condition banner with clear remove button */}
           {hasCondition && (
             <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-catalan-warning/10 border border-catalan-warning/30 rounded-xl">
-              <span className="text-catalan-warning">⚡</span>
+              <span className="text-catalan-warning"><EmojiIcon e="⚡" /></span>
               <span className="flex-1 text-xs text-catalan-warning font-medium">
                 Visibility condition is active — this section is conditionally shown.
               </span>
@@ -940,7 +941,7 @@ function SectionEditor({ section, schema, onTitleChange, onSkipLogicChange, onAd
           {prevFields.length === 0 ? (
             /* First section — nothing precedes it */
             <div className="flex items-start gap-3 p-4 bg-catalan-hover border border-catalan-border rounded-xl">
-              <span className="text-2xl flex-shrink-0">📋</span>
+              <span className="text-2xl flex-shrink-0"><EmojiIcon e="📋" /></span>
               <div>
                 <p className="text-sm font-medium text-catalan-text mb-0.5">No preceding questions</p>
                 <p className="text-xs text-catalan-textMuted">This is the first section, so there are no earlier questions to base a condition on. Move it after another section if you need conditional visibility.</p>
@@ -1004,11 +1005,13 @@ function SectionEditor({ section, schema, onTitleChange, onSkipLogicChange, onAd
 function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange: (s: FormSchema) => void }) {
   const [randOpen, setRandOpen] = React.useState(false)
   const [geoOpen, setGeoOpen] = React.useState(false)
+  const [auditOpen, setAuditOpen] = React.useState(false)
   const [validationOpen, setValidationOpen] = React.useState(false)
   const [locating, setLocating] = React.useState(false)
 
   const rand = schema.settings?.randomization ?? {}
   const geo = schema.settings?.geofence ?? {}
+  const aud = (schema.settings?.audio_audit ?? {}) as { enabled?: boolean }
   const validationRules: Array<{ field_id: string; operator: string; value: string; message: string }> =
     (schema.settings?.validation_rules as typeof validationRules | undefined) ?? []
   const allFields = getAllFieldsInOrder(schema.sections)
@@ -1031,6 +1034,9 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
   const updateGeo = (patch: Record<string, unknown>) =>
     onChange({ ...schema, settings: { ...schema.settings, geofence: { ...geo, ...patch } } })
 
+  const updateAudit = (patch: Record<string, unknown>) =>
+    onChange({ ...schema, settings: { ...schema.settings, audio_audit: { ...aud, ...patch } } })
+
   const useMyLocation = () => {
     setLocating(true)
     navigator.geolocation.getCurrentPosition(
@@ -1047,7 +1053,7 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
     <div className="h-full overflow-y-auto">
       <div className="p-5 sm:p-6 max-w-3xl w-full">
         <div className="flex items-center gap-3 mb-6 pb-4 border-b border-catalan-border">
-          <div className="w-9 h-9 rounded-xl bg-catalan-primary/10 flex items-center justify-center text-catalan-primary font-bold flex-shrink-0 text-base">⚙</div>
+          <div className="w-9 h-9 rounded-xl bg-catalan-primary/10 flex items-center justify-center text-catalan-primary font-bold flex-shrink-0 text-base"><EmojiIcon e="⚙" /></div>
           <div>
             <div className="text-xs text-catalan-textMuted mb-0.5">Form-level settings</div>
             <div className="text-base font-semibold text-catalan-text">Form Settings</div>
@@ -1073,7 +1079,7 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
             onClick={() => setValidationOpen(o => !o)}
             className="w-full flex items-center justify-between px-4 py-3 bg-catalan-surface hover:bg-catalan-hover transition-colors text-left"
           >
-            <span className="font-medium text-catalan-text text-sm">✅ Validation Rules {validationRules.length > 0 && <span className="ml-1 text-xs bg-catalan-primary/20 text-catalan-primary px-1.5 py-0.5 rounded-full">{validationRules.length}</span>}</span>
+            <span className="font-medium text-catalan-text text-sm"><EmojiIcon e="✅" /> Validation Rules {validationRules.length > 0 && <span className="ml-1 text-xs bg-catalan-primary/20 text-catalan-primary px-1.5 py-0.5 rounded-full">{validationRules.length}</span>}</span>
             <span className="text-catalan-textMuted text-xs">{validationOpen ? '▲' : '▼'}</span>
           </button>
           {validationOpen && (
@@ -1162,7 +1168,7 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
             onClick={() => setRandOpen(o => !o)}
             className="w-full flex items-center justify-between px-4 py-3 bg-catalan-surface hover:bg-catalan-hover transition-colors text-left"
           >
-            <span className="font-medium text-catalan-text text-sm">📊 Randomization / Arm Assignment</span>
+            <span className="font-medium text-catalan-text text-sm"><EmojiIcon e="📊" /> Randomization / Arm Assignment</span>
             <span className="text-catalan-textMuted text-xs">{randOpen ? '▲' : '▼'}</span>
           </button>
           {randOpen && (
@@ -1198,7 +1204,7 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
             onClick={() => setGeoOpen(o => !o)}
             className="w-full flex items-center justify-between px-4 py-3 bg-catalan-surface hover:bg-catalan-hover transition-colors text-left"
           >
-            <span className="font-medium text-catalan-text text-sm">🗺 Geofencing</span>
+            <span className="font-medium text-catalan-text text-sm"><EmojiIcon e="🗺" /> Geofencing</span>
             <span className="text-catalan-textMuted text-xs">{geoOpen ? '▲' : '▼'}</span>
           </button>
           {geoOpen && (
@@ -1253,10 +1259,39 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
                     disabled={locating}
                     className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-catalan-primary/40 text-catalan-primary hover:bg-catalan-primary/10 transition-colors disabled:opacity-50"
                   >
-                    {locating ? '⏳ Getting location…' : '📍 Use my location'}
+                    {locating ? <><EmojiIcon e="⏳" /> Getting location…</> : <><EmojiIcon e="📍" /> Use my location</>}
                   </button>
                 </>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* Audio audit (QC) */}
+        <div className="mb-4 border border-catalan-border rounded-xl overflow-hidden">
+          <button
+            onClick={() => setAuditOpen(o => !o)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-catalan-surface hover:bg-catalan-hover transition-colors text-left"
+          >
+            <span className="font-medium text-catalan-text text-sm"><EmojiIcon e="🎙" /> Audio audit (QC)</span>
+            <span className="text-catalan-textMuted text-xs">{auditOpen ? '▲' : '▼'}</span>
+          </button>
+          {auditOpen && (
+            <div className="p-4 border-t border-catalan-border space-y-3 bg-catalan-hover/30">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!aud.enabled}
+                  onChange={e => updateAudit({ enabled: e.target.checked })}
+                  className="w-4 h-4 accent-catalan-primary"
+                />
+                <span className="text-sm text-catalan-text">Record a compressed audio audit of each interview</span>
+              </label>
+              <p className="text-xs text-catalan-textMuted leading-relaxed">
+                Captures the interview audio in the background (low-bitrate, compressed) so supervisors can spot-check
+                for quality, fabrication, or rushed interviews. Recording starts when the form opens and stops at submit.
+                Make sure your consent script informs respondents that audio may be recorded.
+              </p>
             </div>
           )}
         </div>

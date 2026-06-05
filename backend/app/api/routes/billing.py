@@ -613,3 +613,115 @@ def check_feature(tenant_id, feature: str, db: Session):
     plan = get_org_plan(tenant_id, db)
     if plan is None or not getattr(plan, feature, False):
         raise HTTPException(403, f"Feature '{feature}' is not available on your current plan. Please upgrade.")
+
+
+# ── Reseller / Partner Program ────────────────────────────────────────────────
+
+import secrets as _secrets
+import uuid as _uuid_mod
+
+
+class ResellerApproveIn(BaseModel):
+    tenant_id: str
+    commission_rate: float = 20.0
+
+
+class ResellerRegisterIn(BaseModel):
+    organisation: str
+    contact_name: str
+    contact_email: str
+    contact_phone: str
+
+
+@router.post("/reseller/register-interest")
+def reseller_register_interest(body: ResellerRegisterIn, db: Session = Depends(get_db)):
+    """Anyone can submit reseller interest — stored as a notification for master_admin."""
+    _notify_master_admins(
+        db,
+        title=f"New reseller application: {body.organisation}",
+        body=f"{body.contact_name} ({body.contact_email}, {body.contact_phone}) wants to become a FieldGovern reseller.",
+        link="/admin/billing",
+    )
+    return {"message": "Application received. Our team will reach out within 2 business days."}
+
+
+@router.post("/admin/reseller/approve")
+def admin_approve_reseller(
+    body: ResellerApproveIn,
+    user=Depends(require_role("master_admin")),
+    db: Session = Depends(get_db),
+):
+    """Approve a tenant as a reseller and assign them a unique reseller_code."""
+    try:
+        tid = _uuid_mod.UUID(body.tenant_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid tenant_id")
+    tenant = db.query(Tenant).filter(Tenant.id == tid).first()
+    if not tenant:
+        raise HTTPException(404, "Tenant not found")
+    if not tenant.reseller_code:
+        # Generate a short, memorable code from org name + random suffix
+        slug = "".join(c for c in tenant.name.lower() if c.isalnum())[:8]
+        tenant.reseller_code = slug + _secrets.token_hex(3).upper()
+    tenant.is_reseller = True
+    tenant.commission_rate = body.commission_rate
+    db.commit()
+    _notify_org_admins(
+        db, tid,
+        title="You're now a FieldGovern Reseller!",
+        body=f"Your reseller code is {tenant.reseller_code}. Share it with clients — you earn {body.commission_rate}% commission on every subscription.",
+        link="/subscription",
+    )
+    return {"reseller_code": tenant.reseller_code, "commission_rate": tenant.commission_rate}
+
+
+@router.get("/admin/reseller/all")
+def admin_list_resellers(
+    user=Depends(require_role("master_admin")),
+    db: Session = Depends(get_db),
+):
+    """List all resellers and how many tenants have been referred by each."""
+    resellers = db.query(Tenant).filter(Tenant.is_reseller == True).all()
+    result = []
+    for r in resellers:
+        referrals = db.query(Tenant).filter(
+            Tenant.referred_by_reseller_code == r.reseller_code
+        ).count()
+        result.append({
+            "tenant_id": str(r.id),
+            "name": r.name,
+            "reseller_code": r.reseller_code,
+            "commission_rate": float(r.commission_rate or 20),
+            "referral_count": referrals,
+        })
+    return result
+
+
+@router.get("/reseller/my-stats")
+def reseller_stats(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Reseller's own dashboard — referral count and commission estimate."""
+    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+    if not tenant or not tenant.is_reseller:
+        raise HTTPException(403, "Not a registered reseller")
+    referrals = db.query(Tenant).filter(
+        Tenant.referred_by_reseller_code == tenant.reseller_code
+    ).all()
+    referred_active = 0
+    monthly_value = 0
+    for ref in referrals:
+        sub = db.query(Subscription).filter(
+            Subscription.tenant_id == ref.id,
+            Subscription.status == "active",
+        ).first()
+        if sub:
+            referred_active += 1
+            plan = db.query(Plan).filter(Plan.id == sub.plan_id).first()
+            if plan:
+                monthly_value += int(plan.price_inr_monthly * float(tenant.commission_rate or 20) / 100)
+    return {
+        "reseller_code": tenant.reseller_code,
+        "commission_rate": float(tenant.commission_rate or 20),
+        "total_referrals": len(referrals),
+        "active_referrals": referred_active,
+        "estimated_monthly_commission_inr": monthly_value,
+    }

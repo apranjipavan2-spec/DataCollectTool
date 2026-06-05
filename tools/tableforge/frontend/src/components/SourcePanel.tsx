@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ColumnInfo, TableConfig, TableResult } from '../types';
+import { ColumnInfo, ColumnRole, TableConfig, TableResult, TableSection, NumberingConfig } from '../types';
 
 interface Props {
   columns: ColumnInfo[];
@@ -11,6 +11,7 @@ interface Props {
   usedColumns?: { rows: string[]; columns: string[]; values: string[] };
   columnDescriptions?: Record<string, string>;
   onColumnDescriptionChange?: (column: string, description: string) => void;
+  columnRoles?: Record<string, ColumnRole>;
   // Table list props
   tables?: TableConfig[];
   activeTableIdx?: number;
@@ -24,6 +25,15 @@ interface Props {
   onDeleteTable?: (idx: number) => void;
   onDeleteTables?: (indices: number[]) => void;
   onReorderTables?: (fromIdx: number, toIdx: number) => void;
+  onTogglePin?: (idx: number) => void;
+  onOpenChartFor?: (idx: number) => void;
+  // Sections + numbering
+  sections?: TableSection[];
+  onSectionsChange?: (sections: TableSection[]) => void;
+  onAssignSection?: (tableIdx: number, sectionId: string | undefined) => void;
+  numberingConfig?: NumberingConfig;
+  onNumberingConfigChange?: (cfg: NumberingConfig) => void;
+  onApplyNumbering?: () => void;
 }
 
 const typeIcons: Record<string, string> = {
@@ -61,12 +71,25 @@ function HighlightText({ text, search }: { text: string; search: string }) {
   );
 }
 
+const ROLE_BADGE_STYLES: Record<string, { label: string; color: string }> = {
+  outcome:        { label: 'O',   color: '#ef4444' },
+  treatment:      { label: 'T',   color: '#a855f7' },
+  demographic:    { label: 'D',   color: '#22c55e' },
+  geographic:     { label: 'Geo', color: '#0ea5e9' },
+  observer_rated: { label: 'Obs', color: '#f59e0b' },
+  qualitative:    { label: 'Q',   color: '#ec4899' },
+  weight:         { label: 'Wt',  color: '#94a3b8' },
+  id:             { label: 'ID',  color: '#64748b' },
+};
+
 export function SourcePanel({
   columns, onDragStart, onDragEnd, onMultiDrop, metricNames = [], binNames = [],
-  usedColumns, columnDescriptions = {}, onColumnDescriptionChange,
+  usedColumns, columnDescriptions = {}, onColumnDescriptionChange, columnRoles = {},
   tables = [], activeTableIdx = 0, results, error,
   onTableSelect, onAddTable, onDuplicateTable, onDuplicateTables, onRenameTable, onDeleteTable, onDeleteTables,
-  onReorderTables,
+  onReorderTables, onTogglePin, onOpenChartFor,
+  sections = [], onSectionsChange, onAssignSection,
+  numberingConfig, onNumberingConfigChange, onApplyNumbering,
 }: Props) {
   const [search, setSearch] = useState('');
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
@@ -76,6 +99,8 @@ export function SourcePanel({
   const [editingDesc, setEditingDesc] = useState<string | null>(null);
   const [descDraft, setDescDraft] = useState('');
   const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set());
+  const [showNumberingModal, setShowNumberingModal] = useState(false);
+  const [renamingSection, setRenamingSection] = useState<string | null>(null);
 
   // Resizable sidebars
   const [tablesWidth, setTablesWidth] = useState(170);
@@ -198,6 +223,19 @@ export function SourcePanel({
         )}
         {metricNames.includes(col.name) && <span className="col-badge col-metric-badge" title="Has metric">f</span>}
         {binNames.includes(col.name) && <span className="col-badge col-bin-badge" title="Has bin">+</span>}
+        {(() => {
+          const role = columnRoles[col.name]?.role;
+          const badge = role ? ROLE_BADGE_STYLES[role] : null;
+          if (!badge) return null;
+          return (
+            <span title={`Role: ${role}`} style={{
+              display: 'inline-block', minWidth: 16, padding: '0 4px',
+              marginLeft: 3, fontSize: 9, lineHeight: '14px',
+              borderRadius: 3, background: badge.color, color: '#fff',
+              textAlign: 'center', fontWeight: 600,
+            }}>{badge.label}</span>
+          );
+        })()}
         {selected.has(col.name) && <span className="col-selected-check">✓</span>}
         {hoveredCol === col.name && !selected.has(col.name) && editingDesc !== col.name && (
           <div className="col-tooltip">
@@ -241,9 +279,11 @@ export function SourcePanel({
     );
   };
 
-  const filteredTables = tables.filter(t =>
-    (t.title || t.name).toLowerCase().includes(tableSearch.toLowerCase())
-  );
+  const filteredTables = tables
+    .filter(t => (t.title || t.name).toLowerCase().includes(tableSearch.toLowerCase()))
+    // Pinned tables float to the top (stable: preserves underlying order within each group)
+    .slice()
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
   const toggleTableSelect = (id: string, e: React.MouseEvent) => {
     if (e.ctrlKey || e.metaKey) {
@@ -302,19 +342,37 @@ export function SourcePanel({
   const renderTablesView = () => (
     <>
       <div className="panel-header" style={{ paddingBottom: 6 }}>
-        <h3 style={{ marginBottom: 6 }}>Tables <span style={{ fontSize: 10, fontWeight: 400, opacity: 0.6 }}>({tables.length})</span></h3>
-        <input
-          type="text"
-          placeholder="Search…"
-          value={tableSearch}
-          onChange={e => setTableSearch(e.target.value)}
-          className="search-input"
-          style={{ fontSize: 11 }}
-        />
+        <h3 style={{ marginBottom: 6 }}>Tables &amp; Charts <span style={{ fontSize: 10, fontWeight: 400, opacity: 0.6 }}>({tables.length})</span></h3>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'stretch' }}>
+          <input
+            type="text"
+            placeholder="Search…"
+            value={tableSearch}
+            onChange={e => setTableSearch(e.target.value)}
+            className="search-input"
+            style={{ fontSize: 11, flex: 1 }}
+          />
+          <button
+            onClick={onAddTable}
+            title="Add new table"
+            style={{
+              padding: '0 10px',
+              background: 'var(--primary, #3b82f6)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontSize: 16,
+              fontWeight: 600,
+              lineHeight: 1,
+              flexShrink: 0,
+            }}
+          >+</button>
+        </div>
       </div>
 
       {/* Multi-select action bar */}
-      {selectedTables.size > 0 ? (
+      {selectedTables.size > 0 && (
         <div className="table-multi-bar">
           <span className="table-multi-count">{selectedTables.size} selected</span>
           <button className="table-multi-btn" onClick={handleBulkDuplicate} title="Duplicate selected">⧉ Dup</button>
@@ -322,15 +380,85 @@ export function SourcePanel({
           <button className="table-multi-btn" onClick={selectAllTables} title="Select all">All</button>
           <button className="table-multi-clear" onClick={() => setSelectedTables(new Set())} title="Clear selection">✕</button>
         </div>
-      ) : (
-        <div className="table-list-actions">
-          <button className="table-list-add-btn" onClick={onAddTable} title="Add new table">+ New Table</button>
-        </div>
       )}
 
+      {/* Section + numbering toolbar */}
+      <div style={{ display: 'flex', gap: 4, padding: '4px 12px', borderBottom: '1px solid var(--border)' }}>
+        <button
+          onClick={() => {
+            const name = prompt('New section name:', `Section ${sections.length + 1}`);
+            if (!name?.trim()) return;
+            const id = `sec_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+            onSectionsChange?.([...sections, { id, name: name.trim(), order: sections.length }]);
+          }}
+          title="Create a new section"
+          style={{ flex: 1, padding: '3px 6px', background: 'rgba(168,85,247,0.15)', color: '#c4b5fd', border: '1px solid rgba(168,85,247,0.3)', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+        >+ Section</button>
+        <button
+          onClick={() => setShowNumberingModal(true)}
+          title="Apply table numbering"
+          style={{ flex: 1, padding: '3px 6px', background: 'rgba(59,130,246,0.15)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+        >№ Numbering</button>
+      </div>
       <div className="panel-hint" style={{ padding: '2px 12px', fontSize: 10 }}>
         Ctrl+Click to multi-select · Shift+Click for range
       </div>
+      {showNumberingModal && numberingConfig && onNumberingConfigChange && (
+        <div className="modal-overlay" onClick={() => setShowNumberingModal(false)}>
+          <div className="modal modal-sm" onClick={e => e.stopPropagation()} style={{ width: 380 }}>
+            <div className="modal-header">
+              <h2>Table Numbering</h2>
+              <button className="modal-close" onClick={() => setShowNumberingModal(false)}>×</button>
+            </div>
+            <div className="modal-body" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>Style</label>
+                <select value={numberingConfig.style} onChange={e => onNumberingConfigChange({ ...numberingConfig, style: e.target.value as any })}
+                  style={{ width: '100%' }}>
+                  <option value="arabic">1, 2, 3, ...</option>
+                  <option value="decimal">1.1, 1.2, 2.1 (per-section sub-numbers)</option>
+                  <option value="alpha">A, B, C, ...</option>
+                  <option value="roman">I, II, III, ...</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>Scope</label>
+                <select value={numberingConfig.scope} onChange={e => onNumberingConfigChange({ ...numberingConfig, scope: e.target.value as any })}
+                  style={{ width: '100%' }}>
+                  <option value="continuous">Continuous across all tables</option>
+                  <option value="per_section">Restart in each section</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>Prefix</label>
+                  <input type="text" value={numberingConfig.prefix || ''} onChange={e => onNumberingConfigChange({ ...numberingConfig, prefix: e.target.value })}
+                    placeholder="Table " style={{ width: '100%' }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>Suffix</label>
+                  <input type="text" value={numberingConfig.suffix || ''} onChange={e => onNumberingConfigChange({ ...numberingConfig, suffix: e.target.value })}
+                    placeholder=": " style={{ width: '100%' }} />
+                </div>
+              </div>
+              <div style={{ padding: 8, background: 'rgba(59,130,246,0.08)', borderRadius: 4, fontSize: 11, color: 'var(--text-dim)' }}>
+                Preview: <strong style={{ color: 'var(--text)' }}>
+                  {(numberingConfig.prefix || '')}
+                  {numberingConfig.style === 'arabic' && '1'}
+                  {numberingConfig.style === 'decimal' && (numberingConfig.scope === 'per_section' ? '1.1' : '1')}
+                  {numberingConfig.style === 'alpha' && 'A'}
+                  {numberingConfig.style === 'roman' && 'I'}
+                  {(numberingConfig.suffix || '')}
+                </strong> Sample Title
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowNumberingModal(false)}>Cancel</button>
+              <button className="btn-primary" onClick={() => { onApplyNumbering?.(); setShowNumberingModal(false); }}>Apply to all tables</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="column-list table-nav-list">
         {/* Dashboard item */}
@@ -342,18 +470,106 @@ export function SourcePanel({
           <span className="table-nav-name">Dashboard</span>
         </div>
 
-        {filteredTables.map(t => {
-          const realIdx = tables.indexOf(t);
-          const hasResult = results?.has(t.id);
-          const hasError = error && realIdx === activeTableIdx;
-          const isEmpty = t.values.length === 0 && t.rows.length === 0 && t.columns.length === 0;
-          const hasData = t.values.length > 0;
-          const isSelected = selectedTables.has(t.id);
+        {(() => {
+          // Group filteredTables by section_id. Order: unsectioned first, then sections in `order`.
+          const sorted = [...sections].sort((a, b) => a.order - b.order);
+          const groups: { section: TableSection | null; items: TableConfig[] }[] = [];
+          const unsec = filteredTables.filter(t => !t.section_id || !sorted.find(s => s.id === t.section_id));
+          if (unsec.length) groups.push({ section: null, items: unsec });
+          sorted.forEach(sec => {
+            const inSec = filteredTables.filter(t => t.section_id === sec.id);
+            // Always render section header (so user can drop into empty sections / see they exist)
+            groups.push({ section: sec, items: inSec });
+          });
 
-          const isDragOver = tableDragOverIdx === realIdx && tableDragIdx !== realIdx;
-          return (
-            <div key={t.id}
-              className={`table-nav-item ${realIdx === activeTableIdx ? 'active' : ''} ${hasError ? 'table-nav-error' : ''} ${isEmpty ? 'table-nav-empty' : ''} ${isSelected ? 'table-nav-selected' : ''} ${isDragOver ? 'table-nav-drag-over' : ''}`}
+          return groups.map(g => {
+            const collapsed = g.section?.collapsed;
+            return (
+              <React.Fragment key={g.section?.id || '__unsectioned__'}>
+                {g.section && (
+                  <div
+                    className="table-nav-section-header"
+                    onDragOver={e => { e.preventDefault(); }}
+                    onDrop={e => {
+                      e.preventDefault();
+                      if (tableDragIdx !== null && g.section) {
+                        onAssignSection?.(tableDragIdx, g.section.id);
+                      }
+                      setTableDragIdx(null); setTableDragOverIdx(null);
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      padding: '4px 8px', marginTop: 4,
+                      background: 'rgba(168,85,247,0.08)',
+                      borderTop: '1px solid rgba(168,85,247,0.25)',
+                      borderBottom: '1px solid rgba(168,85,247,0.15)',
+                      fontSize: 10, fontWeight: 600, color: '#c4b5fd',
+                      textTransform: 'uppercase', letterSpacing: 0.5,
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => {
+                      onSectionsChange?.(sections.map(s => s.id === g.section!.id ? { ...s, collapsed: !s.collapsed } : s));
+                    }}
+                    title="Click to collapse · Drop a table here to move it in"
+                  >
+                    <span style={{ fontSize: 8 }}>{collapsed ? '▶' : '▼'}</span>
+                    {renamingSection === g.section.id ? (
+                      <input
+                        autoFocus
+                        defaultValue={g.section.name}
+                        onClick={e => e.stopPropagation()}
+                        onBlur={e => {
+                          const v = e.target.value.trim();
+                          if (v) onSectionsChange?.(sections.map(s => s.id === g.section!.id ? { ...s, name: v } : s));
+                          setRenamingSection(null);
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                          if (e.key === 'Escape') setRenamingSection(null);
+                        }}
+                        style={{ flex: 1, fontSize: 10, padding: '1px 4px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(168,85,247,0.4)', borderRadius: 2, color: 'inherit', textTransform: 'none', letterSpacing: 0 }}
+                      />
+                    ) : (
+                      <span style={{ flex: 1 }} onDoubleClick={e => { e.stopPropagation(); setRenamingSection(g.section!.id); }}>
+                        {g.section.name} <span style={{ opacity: 0.6 }}>({g.items.length})</span>
+                      </span>
+                    )}
+                    <span
+                      title="Rename section"
+                      onClick={e => { e.stopPropagation(); setRenamingSection(g.section!.id); }}
+                      style={{ cursor: 'pointer', opacity: 0.6, padding: '0 3px' }}
+                    >✎</span>
+                    <span
+                      title="Delete section (tables move back to Unsectioned)"
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (!confirm(`Delete section "${g.section!.name}"? Tables will move to Unsectioned.`)) return;
+                        // Unassign all tables in section
+                        g.items.forEach(t => {
+                          const idx = tables.indexOf(t);
+                          if (idx >= 0) onAssignSection?.(idx, undefined);
+                        });
+                        onSectionsChange?.(sections.filter(s => s.id !== g.section!.id));
+                      }}
+                      style={{ cursor: 'pointer', opacity: 0.6, padding: '0 3px', color: '#ef4444' }}
+                    >×</span>
+                  </div>
+                )}
+                {(!collapsed) && g.items.map(t => {
+                  const realIdx = tables.indexOf(t);
+                  const hasResult = results?.has(t.id);
+                  const hasError = error && realIdx === activeTableIdx;
+                  const isEmpty = t.values.length === 0 && t.rows.length === 0 && t.columns.length === 0;
+                  const hasData = t.values.length > 0;
+                  const isSelected = selectedTables.has(t.id);
+                  const isDragOver = tableDragOverIdx === realIdx && tableDragIdx !== realIdx;
+                  const hasChart = !!t.chartConfig;
+                  const chartOnly = !!t.chartConfig?.chart_only;
+                  return (
+                    <React.Fragment key={t.id}>
+            <div
+              className={`table-nav-item ${realIdx === activeTableIdx ? 'active' : ''} ${hasError ? 'table-nav-error' : ''} ${isEmpty ? 'table-nav-empty' : ''} ${isSelected ? 'table-nav-selected' : ''} ${isDragOver ? 'table-nav-drag-over' : ''} ${hasChart ? 'table-nav-charted' : ''}`}
+              style={hasChart ? { borderLeft: `3px solid ${chartOnly ? '#a78bfa' : '#22c55e'}` } : undefined}
               draggable
               onDragStart={e => {
                 setTableDragIdx(realIdx);
@@ -382,7 +598,20 @@ export function SourcePanel({
                 const newName = prompt('Rename table:', t.name);
                 if (newName && newName.trim()) onRenameTable?.(realIdx, newName.trim());
               }}
-              title={t.title || t.name}
+              onContextMenu={e => {
+                if (!onAssignSection || sections.length === 0) return;
+                e.preventDefault();
+                const choices = ['(none — unsectioned)', ...sections.sort((a, b) => a.order - b.order).map(s => s.name)];
+                const numbered = choices.map((c, i) => `${i}: ${c}`).join('\n');
+                const ans = prompt(`Move "${t.title || t.name}" to section:\n${numbered}\n\nEnter number:`, '0');
+                if (ans === null) return;
+                const n = parseInt(ans, 10);
+                if (isNaN(n) || n < 0 || n >= choices.length) return;
+                const sortedSecs = [...sections].sort((a, b) => a.order - b.order);
+                const sid = n === 0 ? undefined : sortedSecs[n - 1].id;
+                onAssignSection(realIdx, sid);
+              }}
+              title={`${t.title || t.name}\nRight-click to move to a section`}
             >
               {selectedTables.size > 0 && (
                 <span className={`table-nav-check ${isSelected ? 'checked' : ''}`}>
@@ -391,20 +620,76 @@ export function SourcePanel({
               )}
               <span className="table-nav-drag-grip" title="Drag to reorder">⠿</span>
               <span className="table-nav-num">{realIdx + 1}</span>
+              <span
+                className={`table-nav-pin ${t.pinned ? 'pinned' : ''}`}
+                title={t.pinned ? 'Unpin table' : 'Pin to top'}
+                onClick={e => { e.stopPropagation(); onTogglePin?.(realIdx); }}
+              >
+                {t.pinned ? '★' : '☆'}
+              </span>
               <span className="table-nav-name">
+                {t.table_number && (
+                  <span style={{ color: '#93c5fd', fontWeight: 600, marginRight: 4 }}>{t.table_number}</span>
+                )}
                 <HighlightText text={t.title || t.name} search={tableSearch} />
               </span>
               <span className="table-nav-meta">
+                {t.source_table_id && <span className="table-nav-badge chain-badge" title="Derived from another table">⛓</span>}
                 {hasError && <span className="table-nav-badge error-badge">!</span>}
                 {hasData && !hasError && hasResult && <span className="table-nav-badge ok-badge">✓</span>}
                 {isEmpty && <span className="table-nav-badge empty-badge">-</span>}
+                {onOpenChartFor && hasResult && (
+                  <span
+                    className="table-nav-badge"
+                    title={
+                      chartOnly ? 'Chart only (table hidden) — click to edit'
+                      : hasChart ? 'Chart attached — click to edit'
+                      : 'No chart — click to create'
+                    }
+                    style={{
+                      cursor: 'pointer',
+                      background: chartOnly ? '#a78bfa' : hasChart ? '#22c55e' : '#475569',
+                      color: '#fff',
+                      fontWeight: hasChart ? 700 : 400,
+                      padding: hasChart ? '1px 6px' : undefined,
+                    }}
+                    onClick={e => { e.stopPropagation(); onOpenChartFor(realIdx); }}
+                  >{chartOnly ? '📊 only' : hasChart ? '📊 ✓' : '📊'}</span>
+                )}
               </span>
             </div>
-          );
-        })}
+            {hasChart && (
+              <div
+                className={`table-nav-item ${realIdx === activeTableIdx ? 'active' : ''}`}
+                onClick={e => {
+                  e.stopPropagation();
+                  onTableSelect?.(realIdx);
+                  onOpenChartFor?.(realIdx);
+                }}
+                title="Open chart in builder"
+                style={{
+                  paddingLeft: 36,
+                  background: 'rgba(59,130,246,0.04)',
+                  borderLeft: `3px solid ${chartOnly ? '#a78bfa' : '#22c55e'}`,
+                  fontSize: 11,
+                }}
+              >
+                <span style={{ fontSize: 12 }}>📈</span>
+                <span className="table-nav-name" style={{ color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                  {t.chartConfig?.chartTitle || `${t.chartConfig?.type || 'Chart'} chart`}
+                </span>
+              </div>
+            )}
+                    </React.Fragment>
+                  );
+                })}
+              </React.Fragment>
+            );
+          });
+        })()}
       </div>
       <div className="panel-hint" style={{ marginTop: 4 }}>
-        {tables.length} table(s) · Double-click to rename
+        {tables.length} table(s) · Drag to a section to assign · Double-click to rename
       </div>
     </>
   );

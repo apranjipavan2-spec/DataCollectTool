@@ -3,6 +3,7 @@ import api from '@/lib/api'
 import AiProgressBar from '@/components/AiProgressBar'
 import type { AiJob } from '@/lib/useAiJob'
 import type { FormListItem } from '@/types/api'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface Props {
   onClose: () => void
@@ -10,14 +11,14 @@ interface Props {
 }
 
 const STUDY_TYPES = [
-  { value: 'field_survey',     label: '📊 Field Survey / Household Survey' },
-  { value: 'health_assessment',label: '🏥 Health / WASH / Nutrition Assessment' },
-  { value: 'agriculture',      label: '🌾 Agricultural / Livelihood Survey' },
-  { value: 'government_program', label: '🏛️ Government Program Monitoring (MGNREGA, PMAY, etc.)' },
-  { value: 'rct_baseline',     label: '🔬 RCT Baseline / Endline' },
-  { value: 'ngo_monitoring',   label: '🌍 NGO M&E / Impact Assessment' },
-  { value: 'education',        label: '📚 Education / School Survey' },
-  { value: 'custom',           label: '✏️ Custom / Other' },
+  { value: 'field_survey',     label: 'Field Survey / Household Survey' },
+  { value: 'health_assessment',label: 'Health / WASH / Nutrition Assessment' },
+  { value: 'agriculture',      label: 'Agricultural / Livelihood Survey' },
+  { value: 'government_program', label: 'Government Program Monitoring (MGNREGA, PMAY, etc.)' },
+  { value: 'rct_baseline',     label: 'RCT Baseline / Endline' },
+  { value: 'ngo_monitoring',   label: 'NGO M&E / Impact Assessment' },
+  { value: 'education',        label: 'Education / School Survey' },
+  { value: 'custom',           label: 'Custom / Other' },
 ]
 
 const LOADING_MSGS = [
@@ -137,7 +138,7 @@ export default function AiFormBuilderModal({ onClose, onFormGenerated }: Props) 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-catalan-border">
           <div>
-            <h2 className="text-lg font-bold text-catalan-text">🤖 AI Form Builder</h2>
+            <h2 className="text-lg font-bold text-catalan-text"><EmojiIcon e="🤖" /> AI Form Builder</h2>
             <p className="text-xs text-catalan-textMuted mt-0.5">Describe your study — AI will design a complete, field-ready form</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg bg-catalan-hover text-catalan-textMuted hover:text-catalan-error transition-colors flex items-center justify-center text-lg">&times;</button>
@@ -232,7 +233,7 @@ Examples:
               <div className="flex items-center gap-4">
                 <div className="relative shrink-0">
                   <div className="w-14 h-14 rounded-full border-4 border-catalan-primary/20 border-t-catalan-primary animate-spin" />
-                  <div className="absolute inset-0 flex items-center justify-center text-2xl">🤖</div>
+                  <div className="absolute inset-0 flex items-center justify-center text-2xl"><EmojiIcon e="🤖" /></div>
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-catalan-text">Building your form…</h3>
@@ -246,7 +247,7 @@ Examples:
           {/* STEP: Done */}
           {step === 'done' && (
             <div className="flex flex-col items-center justify-center py-10 space-y-5 text-center">
-              <div className="text-6xl">✅</div>
+              <div className="text-6xl"><EmojiIcon e="✅" /></div>
               <div>
                 <h3 className="text-xl font-bold text-catalan-success mb-2">Form Generated!</h3>
                 <p className="text-sm text-catalan-textMuted">
@@ -276,7 +277,7 @@ Examples:
           {/* STEP: Error */}
           {step === 'error' && (
             <div className="flex flex-col items-center justify-center py-10 space-y-5 text-center">
-              <div className="text-5xl">⚠️</div>
+              <div className="text-5xl"><EmojiIcon e="⚠" /></div>
               <div>
                 <h3 className="text-lg font-bold text-catalan-error mb-2">Generation Failed</h3>
                 <p className="text-sm text-catalan-textMuted max-w-sm">{error}</p>
@@ -305,7 +306,7 @@ Examples:
               disabled={objectives.trim().length < 30}
               className="px-5 py-2.5 bg-catalan-primary text-catalan-bg rounded-xl font-semibold text-sm hover:opacity-90 disabled:opacity-40 transition-opacity flex items-center gap-2"
             >
-              <span>🤖</span> Generate Form
+              <span><EmojiIcon e="🤖" /></span> Generate Form
               {objectives.trim().length < 30 && <span className="text-catalan-bg/60 text-xs">(describe more)</span>}
             </button>
           </div>

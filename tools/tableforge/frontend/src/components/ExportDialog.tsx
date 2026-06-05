@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { TableResult, TableConfig, NumberFormat } from '../types';
 import { API_BASE } from '../api';
+import { ChartCanvas } from './ChartCanvas';
+import { buildChartExportSvg, svgXmlToPngDataUrl, figTitleFromTable, ChartType, LegendPos, W_DEFAULT, H_DEFAULT } from './chartUtils';
 
 function formatCell(cell: any): string {
   if (cell == null) return '';
@@ -123,10 +125,29 @@ function buildExportHtml(t: TableConfig, res: TableResult, fmtRows: string[][]):
     html += '</tr><tr>';
     for (let i = 0; i < nRowCols; i++) html += `<th style="${thStyle(allHeaders[i])}"></th>`;
     const bottomLabels = cg!.bottom.map((b: string) => String(b));
+    // Build per-leaf parent label so we can strip any duplicated parent prefix from
+    // joined-header renames (e.g. AI Polish wrote "Beneficiary - Degree/Diploma";
+    // the top row already shows "Beneficiary" merged, so leaf row should drop the prefix).
+    const parentByLeafIdx: string[] = [];
+    for (const g of cg!.top) {
+      for (let k = 0; k < g.colspan; k++) parentByLeafIdx.push(String(g.label));
+    }
+    const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     for (let i = 0; i < bottomLabels.length; i++) {
+      const leaf = bottomLabels[i];
       const colIdx = (t.rows?.length || 0) + i;
-      const colName = dispHeaders[colIdx] || bottomLabels[i];
-      html += `<th style="${thStyle(colName)}">${bottomLabels[i]}</th>`;
+      const fullHeader = res.headers[colIdx];
+      const leafRename = renames[leaf];
+      const joinedRename = renames[fullHeader];
+      const parent = parentByLeafIdx[i];
+      let cleanedJoined = joinedRename;
+      if (joinedRename && parent) {
+        const re = new RegExp('^' + escapeRe(parent) + '\\s*[-|:]?\\s*', 'i');
+        const stripped = joinedRename.replace(re, '').trim();
+        if (stripped.length > 0) cleanedJoined = stripped;
+      }
+      const labelOut = leafRename || cleanedJoined || leaf;
+      html += `<th style="${thStyle(labelOut)}">${labelOut}</th>`;
     }
     html += '</tr>';
   } else {
@@ -175,6 +196,11 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
   const [format, setFormat] = useState('docx');
   const [filename, setFilename] = useState('TableForge_Export');
   const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set(tables.map(t => t.id)));
+  // Charts are tracked independently from tables — a user can include a chart
+  // without its source table, or include the table without the chart.
+  const [selectedCharts, setSelectedCharts] = useState<Set<string>>(
+    new Set(tables.filter(t => t.chartConfig && t.chartConfig.xField && (t.chartConfig.yFields?.length || 0) > 0).map(t => t.id))
+  );
   const [exporting, setExporting] = useState(false);
   const [resultMsg, setResultMsg] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -185,19 +211,112 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
     include_raw_data: false, landscape: false, formula_export: false,
   });
 
+  // Off-screen ChartCanvas refs so we can serialize SVGs to PNG for Word/PPTX export.
+  // One ref per table id; populated when the hidden <ChartCanvas> below mounts.
+  const chartRefs = useRef<Record<string, SVGSVGElement | null>>({});
+
+  // For each selected table that has a chartConfig + result, render the chart
+  // to a PNG (base64) and return { chart_image, chart_title } for the payload.
+  // Title is sent SEPARATELY so the Word doc can place it as an editable paragraph
+  // above the image (per user request: image = chart, title = editable text).
+  // Word export needs a chart wide enough to render crisply at print scale.
+  // The off-screen ChartCanvas (below) honours this same floor so the SVG
+  // we serialize already has the right intrinsic dimensions.
+  const DOCX_MIN_WIDTH = 1000;
+  function exportSize(cc: any) {
+    const rawWidth = (typeof cc?.chartWidth === 'number' && cc.chartWidth > 0) ? cc.chartWidth : W_DEFAULT;
+    const rawHeight = (typeof cc?.chartHeight === 'number' && cc.chartHeight > 0) ? cc.chartHeight : H_DEFAULT;
+    const width = Math.max(rawWidth, DOCX_MIN_WIDTH);
+    const height = width > rawWidth ? Math.round(rawHeight * (width / rawWidth)) : rawHeight;
+    return { width, height };
+  }
+
+  async function renderChartFor(t: TableConfig): Promise<{ chart_image?: string; chart_title?: string }> {
+    const cc = t.chartConfig;
+    const res = results.get(t.id);
+    if (!cc || !cc.xField || !res) return {};
+    if (!cc.yFields || cc.yFields.length === 0) return {};
+    const svg = chartRefs.current[t.id];
+    if (!svg) return {};
+    const savedTitle = ((cc.chartTitle as string) || '').trim();
+    const title = savedTitle || figTitleFromTable(t) || `Fig: ${t.title || t.name || 'Chart'}`;
+    const { width, height } = exportSize(cc);
+    const titleFs = (typeof cc.titleFontSize === 'number' && cc.titleFontSize > 0) ? cc.titleFontSize : 14;
+    const { xml, totalHeight } = buildChartExportSvg({
+      svgElement: svg,
+      title: '',  // image carries chart only; title is sent separately for Word editability
+      titleFontSize: titleFs,
+      width,
+      height,
+      titleColor: (cc.titleColor as string) || undefined,
+      fontFamily: (cc.fontFamily as string) || undefined,
+      titleAlign: cc.titleAlign,
+      titleBold: cc.titleBold,
+      titleItalic: cc.titleItalic,
+    });
+    try {
+      const dataUrl = await svgXmlToPngDataUrl(xml, width, totalHeight, 2);
+      const base64 = dataUrl.split(',')[1] || '';
+      return { chart_image: base64, chart_title: title };
+    } catch (err) {
+      console.error('Chart PNG render failed for table', t.id, err);
+      return {};
+    }
+  }
+
   const toggleTable = (id: string) => {
     const next = new Set(selectedTables);
     if (next.has(id)) next.delete(id); else next.add(id);
     setSelectedTables(next);
   };
 
+  const toggleChart = (id: string) => {
+    const next = new Set(selectedCharts);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelectedCharts(next);
+  };
+
+  // Tables that have a chart configured AND a data result — eligible for the
+  // separate "Charts / Figures to Export" picker.
+  const chartTables = tables.filter(t => {
+    const cc = t.chartConfig;
+    if (!cc || !cc.xField || !(cc.yFields?.length)) return false;
+    const res = results.get(t.id);
+    return !!(res && res.rows.length > 0);
+  });
+
   const handleExport = async () => {
     setExporting(true);
     setError('');
     setResultMsg(null);
     try {
-      const exportData = tables
-        .filter(t => selectedTables.has(t.id))
+      const selectedT = tables.filter(t => selectedTables.has(t.id));
+      // Charts honour `selectedCharts` independently — and only the docx
+      // pipeline knows how to embed images today.
+      const formatEmbedsCharts = format === 'docx';
+      const chartFieldsByTable: Record<string, { chart_image?: string; chart_title?: string }> = {};
+      const chartOnlyIds: string[] = [];
+      if (formatEmbedsCharts) {
+        const chartTargets = tables.filter(t =>
+          selectedCharts.has(t.id) &&
+          t.chartConfig && t.chartConfig.xField &&
+          (t.chartConfig.yFields?.length || 0) > 0
+        );
+        for (let i = 0; i < chartTargets.length; i++) {
+          const t = chartTargets[i];
+          setResultMsg(`Rendering chart ${i + 1} of ${chartTargets.length}: ${t.title || t.name}`);
+          chartFieldsByTable[t.id] = await renderChartFor(t);
+          if (!selectedTables.has(t.id) && chartFieldsByTable[t.id]?.chart_image) {
+            chartOnlyIds.push(t.id);
+          }
+        }
+      }
+      if (selectedT.length > 0 || chartOnlyIds.length > 0) {
+        const totalItems = selectedT.length + chartOnlyIds.length;
+        setResultMsg(`Packaging ${totalItems} item${totalItems !== 1 ? 's' : ''} for ${format.toUpperCase()} export…`);
+      }
+
+      const exportData = selectedT
         .map(t => {
           const res = results.get(t.id);
           if (!res) return null;
@@ -268,12 +387,57 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
               suffix: v.number_format?.suffix || '',
               currency_symbol: v.number_format?.currency_symbol || '$',
             })),
+            ...(chartFieldsByTable[t.id] || {}),
           };
         })
         .filter(t => t && t.headers.length > 0);
 
+      // Append chart-only items (chart picked but its table NOT picked).
+      // Backend treats empty headers + chart_image as "embed only the chart".
+      for (const id of chartOnlyIds) {
+        const t = tables.find(x => x.id === id);
+        const chartFields = chartFieldsByTable[id];
+        if (!t || !chartFields?.chart_image) continue;
+        exportData.push({
+          name: t.name,
+          headers: [],
+          rows: [],
+          formatted_rows: [],
+          styled_html: '',
+          title: '',  // chart-only: don't repeat the table title
+          subtitle: '',
+          footnote: '',
+          annotations: [],
+          interpretation: '',
+          num_row_fields: 0,
+          column_groups: undefined,
+          cell_align: 'right',
+          header_align: 'center',
+          row_label_align: 'left',
+          column_widths: {},
+          row_height: 0,
+          serial_number: false,
+          zebra: false,
+          zebra_color: '',
+          title_color: '',
+          title_bold: false,
+          title_italic: false,
+          title_size: 18,
+          title_align: 'left',
+          header_bg_color: '',
+          header_text_color: '',
+          total_bg_color: '',
+          bg_color: '',
+          row_bg_color: '',
+          header_formats: [],
+          footnotes: [],
+          value_formats: [],
+          ...chartFields,
+        } as any);
+      }
+
       if (exportData.length === 0) {
-        setError('No tables with data to export');
+        setError('No tables or charts selected for export');
         setExporting(false);
         return;
       }
@@ -303,8 +467,29 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
 
   const handleBatchExport = async () => {
     setExporting(true); setError(''); setResultMsg(null);
-    const exportData = tables
-      .filter(t => selectedTables.has(t.id))
+    const selectedT = tables.filter(t => selectedTables.has(t.id));
+    const chartFieldsByTable: Record<string, { chart_image?: string; chart_title?: string }> = {};
+    const chartOnlyIds: string[] = [];
+    // Honour the independent Charts/Figures picker — render every selected chart,
+    // attach to its table if also selected, else queue as a chart-only item.
+    const chartTargets = tables.filter(t =>
+      selectedCharts.has(t.id) &&
+      t.chartConfig && t.chartConfig.xField &&
+      (t.chartConfig.yFields?.length || 0) > 0
+    );
+    for (let i = 0; i < chartTargets.length; i++) {
+      const t = chartTargets[i];
+      setResultMsg(`Rendering chart ${i + 1} of ${chartTargets.length}: ${t.title || t.name}`);
+      chartFieldsByTable[t.id] = await renderChartFor(t);
+      if (!selectedTables.has(t.id) && chartFieldsByTable[t.id]?.chart_image) {
+        chartOnlyIds.push(t.id);
+      }
+    }
+    const totalItems = selectedT.length + chartOnlyIds.length;
+    if (totalItems > 0) {
+      setResultMsg(`Packaging ${totalItems} item${totalItems !== 1 ? 's' : ''} for batch (Excel + Word) export…`);
+    }
+    const exportData = selectedT
       .map(t => {
         const res = results.get(t.id);
         if (!res) return null;
@@ -373,11 +558,39 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
             suffix: v.number_format?.suffix || '',
             currency_symbol: v.number_format?.currency_symbol || '$',
           })),
+          ...(chartFieldsByTable[t.id] || {}),
         };
       })
       .filter(t => t && t.headers.length > 0);
 
-    if (exportData.length === 0) { setError('No tables with data'); setExporting(false); return; }
+    for (const id of chartOnlyIds) {
+      const t = tables.find(x => x.id === id);
+      const chartFields = chartFieldsByTable[id];
+      if (!t || !chartFields?.chart_image) continue;
+      exportData.push({
+        name: t.name,
+        headers: [],
+        rows: [],
+        formatted_rows: [],
+        styled_html: '',
+        title: '', subtitle: '', footnote: '',
+        header_renames: {},
+        annotations: [], interpretation: '',
+        num_row_fields: 0,
+        column_groups: undefined,
+        cell_align: 'right', header_align: 'center', row_label_align: 'left',
+        column_widths: {}, row_height: 0,
+        serial_number: false,
+        zebra: false, zebra_color: '',
+        title_color: '', title_bold: false, title_italic: false, title_size: 18, title_align: 'left',
+        header_bg_color: '', header_text_color: '', total_bg_color: '',
+        bg_color: '', row_bg_color: '',
+        header_formats: [], footnotes: [], value_formats: [],
+        ...chartFields,
+      } as any);
+    }
+
+    if (exportData.length === 0) { setError('No tables or charts selected'); setExporting(false); return; }
 
     try {
       const [xlsxRes, docxRes] = await Promise.all([
@@ -526,6 +739,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
     { value: 'xlsx', label: 'Excel (.xlsx)', icon: '📊' },
     { value: 'csv', label: 'CSV (.csv)', icon: '📋' },
     { value: 'pdf', label: 'PDF (.pdf)', icon: '📕' },
+    { value: 'pptx', label: 'PowerPoint (.pptx)', icon: '📽' },
     { value: 'python', label: 'Python Script', icon: '🐍' },
   ];
 
@@ -570,20 +784,133 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
               </div>
             </div>
             <div className="table-select-list">
-              {tables.map(t => {
+              {tables.map((t, i) => {
                 const res = results.get(t.id);
                 const hasData = res && res.rows.length > 0;
+                const cc = t.chartConfig;
+                const hasChart = !!(cc && cc.xField && cc.yFields && cc.yFields.length > 0);
+                const isSelected = selectedTables.has(t.id);
                 return (
                   <label key={t.id} className={`table-select-item ${!hasData ? 'disabled' : ''}`}>
-                    <input type="checkbox" checked={selectedTables.has(t.id)}
+                    <input type="checkbox" checked={isSelected}
                       onChange={() => toggleTable(t.id)} disabled={!hasData} />
-                    <span>{t.name}</span>
+                    <span className="exp-table-num">#{i + 1}</span>
+                    {t.pinned && <span title="Pinned" style={{ color: '#f59e0b', marginRight: 4 }}>★</span>}
+                    {hasChart && (
+                      <span title={format === 'docx'
+                        ? 'Chart attached — pick it below to embed in Word'
+                        : 'Chart attached — only embedded in Word (.docx) exports'}
+                        style={{ color: '#60a5fa', marginRight: 4, fontSize: 12 }}>📊</span>
+                    )}
+                    <span>{t.title || t.name}</span>
                     <span className="table-info">{hasData ? `${res!.row_count} rows` : 'No data'}</span>
                   </label>
                 );
               })}
             </div>
           </div>
+
+          {/* Charts / Figures to Export — only for formats that embed charts (docx).
+              Lists every table that has a chart configured AND a result; the user
+              picks each chart independently of its source table. */}
+          {format === 'docx' && chartTables.length > 0 && (
+            <div className="form-group">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label>Charts / Figures to Export</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn-secondary" style={{ padding: '2px 10px', fontSize: 11 }}
+                    onClick={() => setSelectedCharts(new Set(chartTables.map(t => t.id)))}>
+                    Select All
+                  </button>
+                  <button className="btn-secondary" style={{ padding: '2px 10px', fontSize: 11 }}
+                    onClick={() => setSelectedCharts(new Set())}>
+                    Deselect All
+                  </button>
+                </div>
+              </div>
+              <div className="table-select-list">
+                {chartTables.map((t, i) => {
+                  const cc = t.chartConfig!;
+                  const res = results.get(t.id)!;
+                  const isSelected = selectedCharts.has(t.id);
+                  const thumbTitle = ((cc.chartTitle as string) || '').trim() || figTitleFromTable(t) || `Fig: ${t.title || t.name || 'Chart'}`;
+                  const tableSelected = selectedTables.has(t.id);
+                  return (
+                    <div key={t.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                      <label className="table-select-item">
+                        <input type="checkbox" checked={isSelected}
+                          onChange={() => toggleChart(t.id)} />
+                        <span className="exp-table-num">📊 {i + 1}</span>
+                        <span>{thumbTitle}</span>
+                        {!tableSelected && isSelected && (
+                          <span className="table-info" style={{ color: '#f59e0b' }}>Chart-only (table not selected)</span>
+                        )}
+                      </label>
+                      {isSelected && (
+                        <div style={{
+                          margin: '4px 0 8px 28px',
+                          padding: 8,
+                          background: 'rgba(59,130,246,0.06)',
+                          border: '1px solid rgba(59,130,246,0.2)',
+                          borderRadius: 6,
+                        }}>
+                          <div style={{
+                            fontSize: 11, color: 'var(--text-dim)', marginBottom: 4,
+                            textAlign: 'center', fontWeight: 600,
+                          }}>
+                            Will embed in Word: <span style={{ color: '#60a5fa' }}>{thumbTitle}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
+                            <ChartCanvas
+                              result={res}
+                              config={{
+                                type: (cc.type as ChartType) || 'bar',
+                                xField: cc.xField as string,
+                                yFields: (cc.yFields as string[]) || [],
+                                paletteName: cc.palette as string | undefined,
+                                showGrid: cc.showGrid as boolean | undefined,
+                                showLabels: cc.showLabels as boolean | undefined,
+                                showLegend: (cc.showLegend as LegendPos | undefined),
+                                xAxisLabel: cc.xAxisLabel as string | undefined,
+                                yAxisLabel: cc.yAxisLabel as string | undefined,
+                                labelFontSize: (cc.labelFontSize as number | undefined) || 9,
+                                barOpacity: cc.barOpacity as number | undefined,
+                                xLabelRotation: cc.xLabelRotation as number | 'auto' | undefined,
+                                yLabelRotation: cc.yLabelRotation as number | undefined,
+                                valueLabelSplit: cc.valueLabelSplit as boolean | undefined,
+                                fontFamily: cc.fontFamily as string | undefined,
+                                axisColor: cc.axisColor as string | undefined,
+                                gridColor: cc.gridColor as string | undefined,
+                                tickColor: cc.tickColor as string | undefined,
+                                axisLabelColor: cc.axisLabelColor as string | undefined,
+                                dataLabelColor: cc.dataLabelColor as string | undefined,
+                                singleColor: cc.singleColor as string | undefined,
+                                seriesColors: cc.seriesColors as Record<number, string> | undefined,
+                                referenceLines: cc.referenceLines,
+                                categorySort: cc.categorySort,
+                                topN: cc.topN,
+                                topNOther: cc.topNOther,
+                                stacked100: cc.stacked100,
+                                labelPosition: cc.labelPosition,
+                                trendline: cc.trendline,
+                                patternFills: cc.patternFills,
+                                conditionalColor: cc.conditionalColor,
+                                lightMode: cc.lightMode,
+                              }}
+                              width={420}
+                              height={180}
+                              interactive={false}
+                              style={{ maxWidth: '100%' }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Advanced Options */}
           <div className="advanced-toggle" onClick={() => setShowAdvanced(!showAdvanced)}>
@@ -679,10 +1006,76 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
             📋 Copy to Clipboard
           </button>
           <button className="btn-secondary" onClick={onClose}>Close</button>
-          <button className="btn-primary" onClick={handleExport} disabled={exporting || selectedTables.size === 0}>
-            {exporting ? 'Exporting...' : `↓ Export ${selectedTables.size} Table(s)`}
+          <button className="btn-primary" onClick={handleExport}
+            disabled={exporting || (selectedTables.size === 0 && !(format === 'docx' && selectedCharts.size > 0))}>
+            {exporting ? 'Exporting...' : (() => {
+              const tParts: string[] = [];
+              if (selectedTables.size > 0) tParts.push(`${selectedTables.size} Table${selectedTables.size === 1 ? '' : 's'}`);
+              if (format === 'docx' && selectedCharts.size > 0) tParts.push(`${selectedCharts.size} Chart${selectedCharts.size === 1 ? '' : 's'}`);
+              return `↓ Export ${tParts.join(' + ') || '0'}`;
+            })()}
           </button>
         </div>
+      </div>
+
+      {/* Off-screen ChartCanvas instances for tables with a configured chart.
+          We serialize these SVGs to PNG when the user hits Export. They are
+          positioned off-screen but still in the layout tree so refs populate. */}
+      <div aria-hidden="true" style={{
+        position: 'fixed', left: -100000, top: -100000,
+        pointerEvents: 'none', visibility: 'hidden',
+      }}>
+        {tables.filter(t => selectedCharts.has(t.id) && t.chartConfig && t.chartConfig.xField).map(t => {
+          const cc = t.chartConfig!;
+          const res = results.get(t.id);
+          if (!res) return null;
+          const { width, height } = exportSize(cc);
+          const canvasConfig = {
+            type: (cc.type as ChartType) || 'bar',
+            xField: cc.xField as string,
+            yFields: (cc.yFields as string[]) || [],
+            paletteName: cc.palette as string | undefined,
+            showGrid: cc.showGrid as boolean | undefined,
+            showLabels: cc.showLabels as boolean | undefined,
+            showLegend: (cc.showLegend as LegendPos | undefined),
+            xAxisLabel: cc.xAxisLabel as string | undefined,
+            yAxisLabel: cc.yAxisLabel as string | undefined,
+            labelFontSize: cc.labelFontSize as number | undefined,
+            barOpacity: cc.barOpacity as number | undefined,
+            xLabelRotation: cc.xLabelRotation as number | 'auto' | undefined,
+            yLabelRotation: cc.yLabelRotation as number | undefined,
+            valueLabelSplit: cc.valueLabelSplit as boolean | undefined,
+            fontFamily: cc.fontFamily as string | undefined,
+            axisColor: cc.axisColor as string | undefined,
+            gridColor: cc.gridColor as string | undefined,
+            tickColor: cc.tickColor as string | undefined,
+            axisLabelColor: cc.axisLabelColor as string | undefined,
+            dataLabelColor: cc.dataLabelColor as string | undefined,
+            singleColor: cc.singleColor as string | undefined,
+            seriesColors: cc.seriesColors as Record<number, string> | undefined,
+            referenceLines: cc.referenceLines,
+            categorySort: cc.categorySort,
+            topN: cc.topN,
+            topNOther: cc.topNOther,
+            stacked100: cc.stacked100,
+            labelPosition: cc.labelPosition,
+            trendline: cc.trendline,
+            patternFills: cc.patternFills,
+            conditionalColor: cc.conditionalColor,
+            lightMode: cc.lightMode,
+          };
+          return (
+            <ChartCanvas
+              key={t.id}
+              ref={el => { chartRefs.current[t.id] = el; }}
+              result={res}
+              config={canvasConfig}
+              width={width}
+              height={height}
+              interactive={false}
+            />
+          );
+        })}
       </div>
     </div>
   );

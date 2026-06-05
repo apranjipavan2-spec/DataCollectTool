@@ -1,6 +1,7 @@
 import React, { useState, lazy, Suspense } from 'react'
 import type { FormField } from '@/types/form'
 import { labelCls, hintCls, captureButtonCls, fieldErrorCls, requiredCls } from './styles'
+import EmojiIcon from '@/components/EmojiIcon'
 
 const MiniMap = lazy(() => import('./MiniMap'))
 
@@ -37,7 +38,7 @@ export default function GpsField({ field, value, onChange }: Props) {
       {field.hint && <div className={hintCls}>{field.hint}</div>}
 
       <button onClick={capture} disabled={loading} className={captureButtonCls}>
-        <span className="text-3xl">📍</span>
+        <span className="text-3xl"><EmojiIcon e="📍" /></span>
         <span>{loading ? 'Getting location…' : value ? 'Retake GPS' : 'Capture GPS'}</span>
       </button>
 

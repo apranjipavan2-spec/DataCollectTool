@@ -10,6 +10,7 @@ from pydantic import BaseModel
 import pandas as pd
 
 from ..shared import (datasets, custom_metrics, audit_logs, annotations,
+                      column_roles, study_designs,
                       PROJECTS_DIR, CACHE_DIR, EXPORTS_DIR,
                       sanitize_for_json, add_audit_log, get_user_projects_dir, is_super_admin)
 
@@ -80,6 +81,17 @@ async def save_project(project: ProjectData, x_user_id: Optional[str] = Header(N
         else:
             source_file = fe_sf
 
+    # Survey-analysis metadata: pull from in-memory state if not already in config
+    metadata_block = project.config.get("metadata") or {}
+    if dataset_id:
+        if "column_roles" not in metadata_block and dataset_id in column_roles:
+            metadata_block["column_roles"] = column_roles[dataset_id]
+        if "study_design" not in metadata_block and dataset_id in study_designs:
+            metadata_block["study_design"] = study_designs[dataset_id]
+    config_to_save = {**project.config}
+    if metadata_block:
+        config_to_save["metadata"] = metadata_block
+
     data = {
         "meta": {
             "name": project.name,
@@ -90,7 +102,7 @@ async def save_project(project: ProjectData, x_user_id: Optional[str] = Header(N
             "source_file": source_file,
         },
         "versions": existing_versions,
-        **project.config,
+        **config_to_save,
     }
 
     if project.password:
@@ -133,8 +145,9 @@ async def list_projects(x_user_id: Optional[str] = Header(None), x_user_role: Op
     elif x_user_id:
         user_dir = get_user_projects_dir(x_user_id)
         scan_dir(user_dir)
-    else:
-        scan_dir(PROJECTS_DIR)
+    # No x_user_id and not super_admin → return empty rather than scanning
+    # the root, which previously leaked super_admin's projects to every
+    # caller that omitted the X-User-Id header.
 
     return {"projects": sorted(projects, key=lambda p: p.get("created", ""), reverse=True), "projects_dir": str(PROJECTS_DIR)}
 
@@ -149,7 +162,9 @@ async def rename_project(req: ProjectRenameRequest, x_user_id: Optional[str] = H
     p = Path(req.path)
     if not p.exists():
         raise HTTPException(404, "Project not found")
-    if x_user_id and not is_super_admin(x_user_role):
+    if not is_super_admin(x_user_role):
+        if not x_user_id:
+            raise HTTPException(401, "Authentication required")
         user_dir = get_user_projects_dir(x_user_id)
         if not str(p.resolve()).startswith(str(user_dir.resolve())):
             raise HTTPException(403, "Access denied")
@@ -181,7 +196,9 @@ async def delete_project(req: ProjectDeleteRequest, x_user_id: Optional[str] = H
     p = Path(req.path)
     if not p.exists():
         raise HTTPException(404, "Project not found")
-    if x_user_id and not is_super_admin(x_user_role):
+    if not is_super_admin(x_user_role):
+        if not x_user_id:
+            raise HTTPException(401, "Authentication required")
         user_dir = get_user_projects_dir(x_user_id)
         if not str(p.resolve()).startswith(str(user_dir.resolve())):
             raise HTTPException(403, "Access denied")
@@ -199,6 +216,69 @@ async def get_project_versions(path: str):
         raise HTTPException(404, "Project not found")
     data = json.loads(p.read_text())
     return {"versions": data.get("versions", [])}
+
+
+def _snapshot_for_index(data: dict, idx: int) -> dict:
+    """idx == -1 means current; otherwise an index into versions[]."""
+    if idx == -1:
+        return {"tables": data.get("tables", []), "saved_at": data.get("meta", {}).get("created", "")}
+    versions = data.get("versions", [])
+    if idx < 0 or idx >= len(versions):
+        raise HTTPException(400, f"Invalid version index: {idx}")
+    v = versions[idx]
+    return {"tables": v.get("tables", []), "saved_at": v.get("saved_at", "")}
+
+
+def _diff_tables(left: list, right: list) -> dict:
+    """Return added/removed/changed tables between two snapshots (left=base, right=compare)."""
+    by_id_l = {t.get("id"): t for t in left}
+    by_id_r = {t.get("id"): t for t in right}
+    added = [{"id": tid, "name": by_id_r[tid].get("title") or by_id_r[tid].get("name", tid)}
+             for tid in by_id_r.keys() - by_id_l.keys()]
+    removed = [{"id": tid, "name": by_id_l[tid].get("title") or by_id_l[tid].get("name", tid)}
+               for tid in by_id_l.keys() - by_id_r.keys()]
+    changed = []
+    for tid in by_id_l.keys() & by_id_r.keys():
+        l = by_id_l[tid]
+        r = by_id_r[tid]
+        field_changes = []
+        for key in ("title", "subtitle", "name", "rows", "columns", "values", "filters", "header_renames",
+                    "subtotals", "grand_total", "sort_by", "sort_order", "blank_suppress",
+                    "conditional_formats", "pinned"):
+            lv = l.get(key)
+            rv = r.get(key)
+            if lv != rv:
+                field_changes.append({"field": key, "before": lv, "after": rv})
+        if field_changes:
+            changed.append({
+                "id": tid,
+                "name": r.get("title") or r.get("name", tid),
+                "changes": field_changes,
+            })
+    return {"added": added, "removed": removed, "changed": changed,
+            "summary": {"added": len(added), "removed": len(removed), "changed": len(changed),
+                        "total_left": len(left), "total_right": len(right)}}
+
+
+@router.get("/api/project/diff")
+async def diff_project_versions(path: str, left: int = -1, right: int = -1):
+    """Compare two versions of the same project.
+    Indices into versions[]; use -1 for 'current'.
+    """
+    p = Path(path)
+    if not p.exists():
+        raise HTTPException(404, "Project not found")
+    data = json.loads(p.read_text())
+    if data.get("encrypted"):
+        raise HTTPException(400, "Diff not supported on encrypted projects")
+    snap_l = _snapshot_for_index(data, left)
+    snap_r = _snapshot_for_index(data, right)
+    diff = _diff_tables(snap_l["tables"], snap_r["tables"])
+    return {
+        "left": {"index": left, "saved_at": snap_l["saved_at"]},
+        "right": {"index": right, "saved_at": snap_r["saved_at"]},
+        **diff,
+    }
 
 
 class RollbackRequest(BaseModel):
@@ -248,7 +328,9 @@ async def load_project(path: str, password: Optional[str] = None, x_user_id: Opt
     p = Path(path)
     if not p.exists():
         raise HTTPException(404, "Project file not found")
-    if x_user_id and not is_super_admin(x_user_role):
+    if not is_super_admin(x_user_role):
+        if not x_user_id:
+            raise HTTPException(401, "Authentication required")
         user_dir = get_user_projects_dir(x_user_id)
         if not str(p.resolve()).startswith(str(user_dir.resolve())):
             raise HTTPException(403, "Access denied: you can only access your own projects")

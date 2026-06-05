@@ -39,6 +39,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
   // Inline header editing
   const [editingHeader, setEditingHeader] = useState<number | null>(null);
   const [editHeaderVal, setEditHeaderVal] = useState('');
+  const editCommittedRef = React.useRef(false);
   // Keyboard navigation
   const [kbCell, setKbCell] = useState<{ r: number; c: number } | null>(null);
   const tableRef = React.useRef<HTMLTableElement>(null);
@@ -78,8 +79,12 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
   const serialMode = tableConfig?.serial_number_mode || 'continuous';
   const footnote = tableConfig?.footnote;
   const headerRenames = tableConfig?.header_renames || {};
-  const tableNumberLabel = tableConfig?.auto_number && tableConfig.table_number
-    ? `${tableConfig.table_number_prefix || 'Table'} ${tableConfig.table_number}: `
+  // If table_number is set and the prefix is empty (Apply-Numbering path bakes prefix/suffix in),
+  // use table_number as-is. Otherwise compose `${prefix} ${number}: ` (legacy auto_number path).
+  const tableNumberLabel = tableConfig?.table_number
+    ? (tableConfig.table_number_prefix
+        ? `${tableConfig.table_number_prefix} ${tableConfig.table_number}: `
+        : tableConfig.table_number)
     : '';
   const titleBold = tableConfig?.title_bold ?? true;
   const titleItalic = tableConfig?.title_italic ?? false;
@@ -152,6 +157,18 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
       })
     );
     displayRows = [...filtered, ...totalRow];
+  }
+
+  // Pin specific rows to the top (by first-column value). Grand Total stays last.
+  const pinnedKeys = tableConfig?.pinned_row_keys || [];
+  if (pinnedKeys.length > 0 && displayRows.length > 0) {
+    const lastIsTotal = String(displayRows[displayRows.length - 1][0]) === 'Grand Total';
+    const totalRow = lastIsTotal ? [displayRows[displayRows.length - 1]] : [];
+    const body = lastIsTotal ? displayRows.slice(0, -1) : displayRows;
+    const pinSet = new Set(pinnedKeys.map(k => String(k)));
+    const pinned = body.filter(r => pinSet.has(String(r[0])));
+    const rest = body.filter(r => !pinSet.has(String(r[0])));
+    displayRows = [...pinned, ...rest, ...totalRow];
   }
 
   // Keyboard navigation handler
@@ -271,6 +288,37 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
     return appliers;
   }, [tableConfig?.conditional_formats, displayRows, result, headerRenames]);
 
+  // ─── Hooks that USED to live after early returns ───
+  // These MUST run on every render (regardless of loading/error/empty state) so
+  // the hook count stays stable across renders. Moving them below the early
+  // returns triggers React error #310 ("Rendered more hooks than during the
+  // previous render") the first time `result` flips from null to populated.
+  const _sparklineColsForHook = tableConfig?.sparkline_columns || [];
+  const _autoFootForHook = tableConfig?.auto_footnote_markers ?? false;
+  const sparklineColIdx = useMemo(() => {
+    if (!result || _sparklineColsForHook.length === 0) return [] as number[];
+    const renames = tableConfig?.header_renames || {};
+    return _sparklineColsForHook
+      .map(t => result.headers.findIndex(h => (renames[h] || h) === t || h === t))
+      .filter(i => i >= 0);
+  }, [result, _sparklineColsForHook, tableConfig?.header_renames]);
+  const footMarkerByText = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!_autoFootForHook) return m;
+    let next = 1;
+    for (const row of displayRows) {
+      for (const cell of row) {
+        if (typeof cell === 'string') {
+          const trimmed = cell.trim();
+          if (trimmed === '*' || trimmed === '**' || trimmed === '***') {
+            if (!m.has(trimmed)) { m.set(trimmed, next++); }
+          }
+        }
+      }
+    }
+    return m;
+  }, [_autoFootForHook, displayRows]);
+
   if (loading) return <div className="live-preview empty"><div className="loading-spinner">Computing table...</div></div>;
   if (error) return <div className="live-preview empty"><div className="error-msg">{error}</div></div>;
   if (!result || result.rows.length === 0) {
@@ -343,25 +391,42 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
 
   const borderPreset = tableConfig?.border_preset || 'full';
   const frozenCol = tableConfig?.frozen_first_col ?? false;
+  const frozenHeader = tableConfig?.frozen_header ?? false;
   const headerWrap = tableConfig?.header_word_wrap ?? false;
+  const mergeRowLabels = tableConfig?.merge_row_labels ?? false;
+  const autoFootMarkers = _autoFootForHook;
+  // sparklineColIdx + footMarkerByText hoisted above the early returns to keep
+  // hook count stable (see comment near their definitions).
+  const showSparklineCol = sparklineColIdx.length >= 2;
 
   // Column-group separator: track which absolute column indices start a new group
+  // and build a per-column → parent-top-label map (used to strip duplicate parent
+  // prefix from AI/user renames on the leaf row in multi-level headers).
   const groupStartCols = new Set<number>();
+  const topLabelByCol = new Map<number, string>();
   if (result?.column_groups?.has_multi_level) {
     const nRowCols = tableConfig?.rows?.length || 0;
     let offset = nRowCols;
     for (const g of result.column_groups.top) {
       if (offset > nRowCols) groupStartCols.add(offset);
+      for (let k = 0; k < g.colspan; k++) topLabelByCol.set(offset + k, String(g.label));
       offset += g.colspan;
     }
   }
+  const stripParentPrefix = (s: string, parent: string): string => {
+    if (!s || !parent) return s;
+    const esc = parent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp('^' + esc + '\\s*[-|:]?\\s*', 'i');
+    const stripped = s.replace(re, '').trim();
+    return stripped.length > 0 ? stripped : s;
+  };
   const groupBorderStyle = '2px solid var(--border-strong, #475569)';
   const zoomLevel = tableConfig?.zoom_level || 100;
   const zoomClass = zoomLevel !== 100 ? `zoom-${zoomLevel}` : '';
   const footnotes = tableConfig?.footnotes || [];
 
   return (
-    <div className={`live-preview ${zoomClass}`} data-theme-table={theme} data-table-mode={tableMode} data-border={borderPreset} data-frozen-col={frozenCol ? 'true' : 'false'} data-header-wrap={headerWrap ? 'true' : 'false'}>
+    <div className={`live-preview ${zoomClass}`} data-theme-table={theme} data-table-mode={tableMode} data-border={borderPreset} data-frozen-col={frozenCol ? 'true' : 'false'} data-frozen-header={frozenHeader ? 'true' : 'false'} data-header-wrap={headerWrap ? 'true' : 'false'}>
       {(title || tableNumberLabel) && (
         <div className="table-title" style={{
           fontWeight: titleBold ? 700 : 400,
@@ -369,7 +434,16 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
           fontSize: titleSize,
           textAlign: titleAlign as any,
           color: tableConfig?.title_color || undefined,
-        }}>{tableNumberLabel}{title}</div>
+        }}>
+          {tableNumberLabel && (
+            <span className="table-number-badge" style={{
+              color: '#60a5fa',
+              fontWeight: 700,
+              marginRight: tableNumberLabel.trim().endsWith(':') ? 6 : 8,
+            }}>{tableNumberLabel.trim()}</span>
+          )}
+          {title}
+        </div>
       )}
       {subtitle && <div className="table-subtitle">{subtitle}</div>}
       {/* In-table filter bar (Ctrl+F to toggle) */}
@@ -386,9 +460,9 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
             style={{ fontSize: 10, padding: '2px 8px' }}>Clear</button>
         </div>
       )}
-      <div className="result-table-wrap">
+      <div className="result-table-wrap" style={frozenHeader ? { maxHeight: 600, overflow: 'auto' } : undefined}>
         <table className="result-table">
-          <thead>
+          <thead style={frozenHeader ? { position: 'sticky', top: 0, zIndex: 5 } : undefined}>
             {/* Multi-level header row (top level groups) */}
             {result.column_groups?.has_multi_level && (() => {
               const groups = result.column_groups!.top;
@@ -419,15 +493,41 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
               {result.headers.map((h, i) => {
                 // Skip row-dimension headers if they already have rowSpan=2 above
                 if (result.column_groups?.has_multi_level && i < (tableConfig?.rows?.length || 0)) return null;
-                const displayH = result.column_groups?.has_multi_level
-                  ? (result.column_groups.bottom[i - (tableConfig?.rows?.length || 0)] || displayHeaders[i])
+                const bottomLeaf = result.column_groups?.has_multi_level
+                  ? result.column_groups.bottom[i - (tableConfig?.rows?.length || 0)]
+                  : undefined;
+                // For multi-level: prefer leaf-specific rename, then strip the parent
+                // prefix from any joined-header rename (e.g. AI Polish wrote
+                // "Beneficiary - Degree/Diploma" against the flat "Beneficiary | Degree/Diploma";
+                // since the parent label already shows on the top row, we drop the prefix).
+                const parentLabel = topLabelByCol.get(i);
+                const leafRename = bottomLeaf ? headerRenames[bottomLeaf] : undefined;
+                const joinedRenameRaw = headerRenames[h];
+                const joinedRenameClean = parentLabel && joinedRenameRaw
+                  ? stripParentPrefix(joinedRenameRaw, parentLabel)
+                  : joinedRenameRaw;
+                const displayH = bottomLeaf
+                  ? (leafRename || joinedRenameClean || bottomLeaf || displayHeaders[i])
                   : displayHeaders[i];
+                // The key under which the rename is stored — leaf name for multi-level, full header otherwise
+                const renameKey = bottomLeaf || h;
                 const isSubtotalCol = displayH === 'Subtotal';
+                const commitRename = (rawVal: string) => {
+                  if (editCommittedRef.current) return;
+                  editCommittedRef.current = true;
+                  const next = rawVal.trim();
+                  // Commit even when blank — that signals "clear rename and revert to original"
+                  if (next !== displayH) {
+                    onHeaderRename?.(renameKey, next);
+                  }
+                  setEditingHeader(null);
+                };
                 return (
                   <th key={i} onClick={() => handleHeaderClick(i)}
                     onDoubleClick={(e) => {
                       if (onHeaderRename) {
                         e.stopPropagation();
+                        editCommittedRef.current = false;
                         setEditingHeader(i);
                         setEditHeaderVal(displayH);
                       }
@@ -438,23 +538,20 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                         autoFocus
                         value={editHeaderVal}
                         onChange={e => setEditHeaderVal(e.target.value)}
-                        onBlur={() => {
-                          if (editHeaderVal.trim() && editHeaderVal !== displayH) {
-                            onHeaderRename?.(h, editHeaderVal.trim());
-                          }
-                          setEditingHeader(null);
-                        }}
+                        onBlur={() => commitRename(editHeaderVal)}
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
-                            if (editHeaderVal.trim() && editHeaderVal !== displayH) {
-                              onHeaderRename?.(h, editHeaderVal.trim());
-                            }
-                            setEditingHeader(null);
+                            e.preventDefault();
+                            commitRename(editHeaderVal);
                           } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            editCommittedRef.current = true;
                             setEditingHeader(null);
                           }
                         }}
                         onClick={e => e.stopPropagation()}
+                        onDoubleClick={e => e.stopPropagation()}
+                        onMouseDown={e => e.stopPropagation()}
                         style={{
                           background: 'rgba(0,0,0,0.3)', color: 'inherit', border: '1px solid var(--primary)',
                           borderRadius: 3, padding: '2px 6px', fontSize: 'inherit', fontWeight: 'inherit',
@@ -470,6 +567,11 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                   </th>
                 );
               })}
+              {showSparklineCol && (
+                <th style={{ background: tv.headerBg, color: tv.headerColor, borderColor: tv.borderColor, textAlign: 'center', minWidth: 80 }}>
+                  Trend
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -492,8 +594,25 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                     </td>
                   )}
                   {row.map((cell: any, ci: number) => {
+                    // Merge consecutive identical row labels: blank cells in the row-label
+                    // columns when the previous data row had the same value.
+                    let mergedCell: any = cell;
+                    if (mergeRowLabels && !isGrandTotal && !isSubtotal && ci < numRowFields && ri > 0) {
+                      const prev = displayRows[ri - 1];
+                      const prevIsTotal = prev && String(prev[0]) === 'Grand Total';
+                      if (prev && !prevIsTotal && String(prev[ci]) === String(cell)) {
+                        mergedCell = '';
+                      }
+                    }
                     const cfStyle = (!isGrandTotal && cfAppliers.has(ci)) ? cfAppliers.get(ci)!(cell, row) : {};
                     const iconSuffix = (!isGrandTotal) ? getIconSetIcon(ci, cell) : '';
+                    // Auto-footnote marker: any cell text "*" / "**" / "***" gets a
+                    // matching numeric superscript, which we surface in the footnote
+                    // panel below the table.
+                    const cellTextForMark = typeof cell === 'string' ? cell.trim() : '';
+                    const footMark = autoFootMarkers && footMarkerByText.has(cellTextForMark)
+                      ? footMarkerByText.get(cellTextForMark)
+                      : undefined;
                     const ann = getAnnotation(ri, ci);
                     const annStyle: React.CSSProperties = ann ? {
                       ...(ann.highlight ? { background: ann.highlight } : {}),
@@ -528,6 +647,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                         )}
                         {isError && <span className="cell-error-indicator" title="Calculation error">⚠</span>}
                         {isError ? <span style={{ color: '#ef4444', fontSize: 11 }}>{cell}</span> : (() => {
+                          if (mergedCell === '' && cell !== '') return '';
                           const txt = formatCellWithFmt(cell, ci);
                           if (typeof cell === 'string' && cell.includes('\n')) {
                             const parts = String(cell).split('\n');
@@ -535,6 +655,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                           }
                           return txt;
                         })()}{iconSuffix}
+                        {footMark !== undefined && <sup style={{ fontSize: 9, color: '#a78bfa', marginLeft: 2 }}>[{footMark}]</sup>}
                         {isHovered && !ann && (
                           <div className="cell-hover-tooltip">
                             {getCellTooltip(ri, ci, cell)}
@@ -543,6 +664,38 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                       </td>
                     );
                   })}
+                  {showSparklineCol && (() => {
+                    const vals = sparklineColIdx.map(ci => {
+                      const v = row[ci];
+                      return typeof v === 'number' ? v : parseFloat(String(v));
+                    }).filter(v => isFinite(v));
+                    if (vals.length < 2 || isGrandTotal) {
+                      return <td style={{ borderColor: tv.borderColor, textAlign: 'center', opacity: 0.5 }}>—</td>;
+                    }
+                    const sw = 80, sh = 18, pad = 2;
+                    const lo = Math.min(...vals), hi = Math.max(...vals);
+                    const span = hi - lo || 1;
+                    const stepX = (sw - pad * 2) / Math.max(vals.length - 1, 1);
+                    const ptsLine = vals.map((v, i) => {
+                      const x = pad + i * stepX;
+                      const y = sh - pad - ((v - lo) / span) * (sh - pad * 2);
+                      return `${x},${y}`;
+                    }).join(' ');
+                    const barW = Math.max(2, (sw - pad * 2) / vals.length - 1);
+                    return (
+                      <td style={{ borderColor: tv.borderColor, textAlign: 'center', padding: '2px 4px' }}>
+                        <svg width={sw} height={sh} style={{ display: 'block', margin: '0 auto' }} aria-label="row sparkline">
+                          {vals.map((v, i) => {
+                            const x = pad + i * stepX - barW / 2;
+                            const h = ((v - lo) / span) * (sh - pad * 2);
+                            const y = sh - pad - h;
+                            return <rect key={i} x={x} y={y} width={barW} height={Math.max(h, 1)} fill="#3b82f680" rx={1} />;
+                          })}
+                          <polyline points={ptsLine} fill="none" stroke="#3b82f6" strokeWidth={1.2} />
+                        </svg>
+                      </td>
+                    );
+                  })()}
                 </tr>
               );
             })}
@@ -552,6 +705,16 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
       {result.multi_response_note && (
         <div className="table-footnote" style={{ color: '#f59e0b', borderLeft: '3px solid #f59e0b', paddingLeft: 8, marginTop: 6 }}>
           {result.multi_response_note}
+        </div>
+      )}
+      {result.weighted && result.weight_col && (
+        <div className="table-footnote" style={{ color: '#60a5fa', borderLeft: '3px solid #60a5fa', paddingLeft: 8, marginTop: 6 }}>
+          Survey-weighted using <code style={{ fontFamily: 'monospace' }}>{result.weight_col}</code>.
+        </div>
+      )}
+      {typeof result.suppress_count === 'number' && result.suppress_count > 0 && (
+        <div className="table-footnote" style={{ color: '#a78bfa', borderLeft: '3px solid #a78bfa', paddingLeft: 8, marginTop: 6 }}>
+          {result.suppress_count} cell(s) suppressed (*) — N<sub>{result.suppress_basis === 'effective' ? 'eff' : 'raw'}</sub> below threshold.
         </div>
       )}
       {footnote && <div className="table-footnote">{footnote}</div>}

@@ -5,6 +5,7 @@ import api, { getStoredUser } from '@/lib/api'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface Pin {
   id: string; lat: number; lng: number; accuracy: number
@@ -256,7 +257,7 @@ export default function FieldMapPage() {
               {!pinsLoaded && (
                 <div className="absolute inset-0 flex items-center justify-center z-[500] bg-catalan-bg/60 backdrop-blur-sm">
                   <div className="bg-catalan-surface border border-catalan-border rounded-2xl p-8 text-center shadow-xl max-w-sm mx-4">
-                    <div className="text-4xl mb-3">🗺️</div>
+                    <div className="text-4xl mb-3"><EmojiIcon e="🗺" /></div>
                     <div className="text-base font-semibold text-catalan-text mb-1">Field Map</div>
                     {mapSummary && (
                       <div className="text-sm text-catalan-textMuted mb-4">
@@ -287,7 +288,7 @@ export default function FieldMapPage() {
               {pinsLoaded && visible.length === 0 && !loading && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="bg-catalan-surface/90 rounded-xl p-6 text-center shadow">
-                    <div className="text-4xl mb-2">🗺️</div>
+                    <div className="text-4xl mb-2"><EmojiIcon e="🗺" /></div>
                     <div className="text-sm text-catalan-textMuted">No GPS submissions in the selected period</div>
                     <div className="text-xs text-catalan-textMuted mt-1">Try expanding the date range or changing filters</div>
                   </div>
@@ -326,30 +327,30 @@ export default function FieldMapPage() {
                 {/* Meta info */}
                 <div className="px-4 py-3 border-b border-catalan-border space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-catalan-textMuted text-xs">
-                    <span>👤</span>
+                    <span><EmojiIcon e="👤" /></span>
                     <span className="font-medium text-catalan-text">{selected.enumerator}</span>
                     <span className="text-catalan-textMuted/60">Enumerator</span>
                   </div>
                   {selected.received && (
                     <div className="flex items-center gap-2 text-catalan-textMuted text-xs">
-                      <span>🕐</span>
+                      <span><EmojiIcon e="🕐" /></span>
                       <span>{new Date(selected.received).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-2 text-catalan-textMuted text-xs">
-                    <span>📍</span>
+                    <span><EmojiIcon e="📍" /></span>
                     <span className="font-mono">{selected.lat?.toFixed(5)}, {selected.lng?.toFixed(5)}</span>
                     {selected.accuracy && <span className="text-catalan-textMuted/70">(±{selected.accuracy.toFixed(0)}m)</span>}
                   </div>
                   {detail?.flag_note && (
                     <div className="flex items-start gap-2 text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-700">
-                      <span className="flex-shrink-0">🚩</span>
+                      <span className="flex-shrink-0"><EmojiIcon e="🚩" /></span>
                       <span>{detail.flag_note}</span>
                     </div>
                   )}
                   {detail?.backcheck_required && (
                     <div className="text-xs bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 text-blue-700">
-                      🔍 Backcheck required
+                      <EmojiIcon e="🔍" /> Backcheck required
                     </div>
                   )}
                 </div>

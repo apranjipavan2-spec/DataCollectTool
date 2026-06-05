@@ -130,9 +130,36 @@ export function storeUser(user: AuthUser) {
   localStorage.setItem('fp_token', user.access_token)
   if (user.refresh_token) localStorage.setItem('fp_refresh_token', user.refresh_token)
   localStorage.setItem('fp_user', JSON.stringify(user))
+  // Identify user in PostHog so funnels track real people, not anonymous IDs
+  try {
+    const ph = (window as any).posthog
+    if (ph?.identify && user.id) {
+      ph.identify(user.id, { email: user.email, name: user.name, role: user.role })
+    }
+  } catch { /* non-fatal */ }
+}
+
+export interface RegisterData {
+  org_name: string
+  admin_name: string
+  email: string
+  password: string
+  segment: string
+  phone?: string
+}
+
+export async function registerTenant(data: RegisterData) {
+  const res = await api.post('/auth/register', data)
+  return res.data as { message: string }
+}
+
+export async function verifyEmail(token: string): Promise<AuthUser> {
+  const res = await api.get(`/auth/verify-email?token=${encodeURIComponent(token)}`)
+  return res.data as AuthUser
 }
 
 export function logout() {
+  try { (window as any).posthog?.reset?.() } catch { /* non-fatal */ }
   localStorage.removeItem('fp_token')
   localStorage.removeItem('fp_refresh_token')
   localStorage.removeItem('fp_user')

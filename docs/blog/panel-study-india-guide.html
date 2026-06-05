@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SPLVXJJ7GN"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag("js", new Date());
+    gtag("config", "G-SPLVXJJ7GN");
+  </script>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Running a Panel Study in India: Attrition, Tracking, and the Right Tools (2026) — FieldGovern Blog</title>
+  <meta name="description" content="A practical guide to longitudinal panel studies in India — attrition rates from J-PAL research, 5 tracking strategies, wave analysis methods, and a checklist for study design."/>
+  <link rel="canonical" href="https://www.fieldgovern.com/blog/panel-study-india-guide.html"/>
+  <link rel="icon" href="/assets/logo-icon.png" type="image/png"/>
+  <meta name="robots" content="index,follow"/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:url" content="https://www.fieldgovern.com/blog/panel-study-india-guide.html"/>
+  <meta property="og:title" content="Running a Panel Study in India: Attrition, Tracking, and the Right Tools (2026)"/>
+  <meta property="og:description" content="A practical guide to longitudinal panel studies in India — attrition rates from J-PAL research, 5 tracking strategies, wave analysis methods, and a checklist for study design."/>
+  <meta property="og:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
+  <meta property="og:site_name" content="FieldGovern"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="Running a Panel Study in India: Attrition, Tracking, and the Right Tools (2026)"/>
+  <meta name="twitter:description" content="A practical guide to longitudinal panel studies in India — attrition rates from J-PAL research, 5 tracking strategies, wave analysis methods, and a checklist for study design."/>
+  <meta name="twitter:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Running a Panel Study in India: Attrition, Tracking, and the Right Tools (2026)","datePublished":"2026-05-31","dateModified":"2026-05-31","author":{"@type":"Organization","name":"FieldGovern"},"publisher":{"@type":"Organization","name":"FieldGovern","url":"https://www.fieldgovern.com"}}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <script defer data-domain="fieldgovern.com" src="https://plausible.io/js/script.js"></script>
+  <style>
+    :root{--brand:#0ea5e9;--brand-dark:#0369a1;--bg:#ffffff;--bg2:#f8fafc;--bg3:#f1f5f9;--text:#0f172a;--text2:#334155;--text3:#64748b;--border:#e2e8f0}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{font-family:'Inter',sans-serif;color:var(--text);background:var(--bg)}
+    body{overflow-x:hidden;max-width:100vw}
+    a{color:var(--brand)}
+    nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.95);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:0 1.5rem}
+    .nav-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:64px}
+    .nav-logo{font-weight:800;font-size:1.2rem;color:var(--text);text-decoration:none}
+    .hero{background:linear-gradient(135deg,#0369a1 0%,#0ea5e9 100%);color:#fff;padding:4rem 1.5rem 3rem;text-align:center}
+    .hero .tag{display:inline-block;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:.3rem .9rem;font-size:.8rem;font-weight:600;margin-bottom:1rem}
+    .hero h1{font-size:clamp(1.75rem,4vw,2.75rem);font-weight:900;line-height:1.2;max-width:800px;margin:0 auto .75rem}
+    .hero p{opacity:.9;max-width:680px;margin:.5rem auto 0;font-size:1rem}
+    .hero .meta{opacity:.7;font-size:.85rem;margin-top:1rem}
+    article{max-width:780px;margin:0 auto;padding:3rem 1.5rem}
+    article h2{font-size:1.4rem;font-weight:800;margin:2.5rem 0 .75rem;color:var(--text)}
+    article h3{font-size:1.1rem;font-weight:700;margin:1.75rem 0 .5rem;color:var(--text)}
+    article p{color:var(--text2);line-height:1.8;margin-bottom:1rem;font-size:.97rem}
+    article ul,article ol{padding-left:1.5rem;margin-bottom:1rem}
+    article li{color:var(--text2);line-height:1.8;margin-bottom:.4rem;font-size:.97rem}
+    article strong{color:var(--text)}
+    .table-wrap{overflow-x:auto;margin:1.5rem 0}
+    table{width:100%;border-collapse:collapse;font-size:.88rem}
+    th{background:var(--bg3);font-weight:700;text-align:left;padding:.65rem 1rem;border:1px solid var(--border)}
+    td{padding:.6rem 1rem;border:1px solid var(--border);color:var(--text2);vertical-align:top}
+    .cta-box{background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff;border-radius:16px;padding:2.5rem 2rem;text-align:center;margin:3rem 0}
+    .cta-box h2{color:#fff;font-size:1.5rem;margin-bottom:.5rem;margin-top:0}
+    .cta-box p{color:rgba(255,255,255,.85);margin-bottom:1.25rem}
+    .btn{display:inline-block;padding:.8rem 1.75rem;border-radius:8px;font-weight:700;font-size:.9rem;text-decoration:none}
+    .btn-white{background:#fff;color:var(--brand-dark)}
+    .related{background:var(--bg2);border-radius:12px;padding:1.5rem;margin:2rem 0}
+    .related h3{font-size:.95rem;font-weight:700;margin-bottom:.75rem;color:var(--text)}
+    .related ul{list-style:none;padding:0}
+    .related li{margin-bottom:.4rem}
+    .stat-row{display:flex;gap:1rem;flex-wrap:wrap;margin:1.5rem 0}
+    .stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.25rem;flex:1;min-width:160px;text-align:center}
+    .stat-card .num{font-size:1.75rem;font-weight:900;color:var(--brand)}
+    .stat-card .label{font-size:.8rem;color:var(--text3);margin-top:.25rem}
+    .highlight-box{background:var(--bg2);border-left:4px solid var(--brand);border-radius:0 8px 8px 0;padding:1rem 1.25rem;margin:1.5rem 0}
+    .strategy-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin:.75rem 0;display:flex;gap:1rem;align-items:flex-start}
+    .strategy-num{background:var(--brand);color:#fff;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.9rem;flex-shrink:0}
+    .checklist{background:var(--bg2);border-radius:12px;padding:1.5rem;margin:1.5rem 0}
+    .checklist-item{display:flex;align-items:flex-start;gap:.75rem;padding:.5rem 0;border-bottom:1px solid var(--border)}
+    .checklist-item:last-child{border-bottom:none}
+    .check-box{width:18px;height:18px;border:2px solid var(--brand);border-radius:4px;flex-shrink:0;margin-top:.15rem}
+    footer{background:var(--bg3);border-top:1px solid var(--border);padding:2rem 1.5rem;text-align:center;font-size:.85rem;color:var(--text3);margin-top:4rem}
+    @media(max-width:640px){.nav-links{display:none}}
+  </style>
+</head>
+<body>
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="/">FieldGovern</a>
+    <div class="nav-links" style="display:flex;gap:1.5rem;font-size:.9rem">
+      <a href="/blog/">Blog</a>
+      <a href="/features.html">Features</a>
+      <a href="/pricing.html">Pricing</a>
+      <a href="https://app.fieldgovern.com" style="color:var(--brand);font-weight:600">Get Started</a>
+    </div>
+  </div>
+</nav>
+
+<div class="hero">
+  <span class="tag">Research Methods</span>
+  <h1>Running a Panel Study in India: Attrition, Tracking, and the Right Tools (2026)</h1>
+  <p>J-PAL India studies see 15–25% attrition per wave. Here's what causes it, five strategies that actually reduce it, and how to track respondents across waves with modern tools.</p>
+  <div class="meta">By FieldGovern · May 2026 · 9 min read</div>
+</div>
+
+<article>
+
+  <p>Panel studies — also called longitudinal surveys — follow the same respondents across multiple rounds of data collection over time. They are the gold standard for measuring change: whether a beneficiary's income improved after programme participation, whether a child's nutritional status changed across seasons, whether a farmer adopted a new practice and sustained it.</p>
+
+  <p>But running a panel study in India is genuinely hard. Migration is common, phone numbers change, names are recorded differently across waves, and respondents who consented enthusiastically in Wave 1 simply aren't available in Wave 3. This article covers the real challenges, the evidence on what works to reduce attrition, and the practical tools and workflows you need to manage a multi-wave study well.</p>
+
+  <h2>Why Indian Panel Studies Lose Respondents</h2>
+
+  <p>Attrition in panel studies — the loss of respondents between waves — is universal. But India's specific social and economic context creates some particularly challenging patterns:</p>
+
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="num">15–25%</div>
+      <div class="label">Typical attrition per wave in J-PAL India studies (shorter intervals, rural populations)</div>
+    </div>
+    <div class="stat-card">
+      <div class="num">40%+</div>
+      <div class="label">Attrition in studies spanning 3+ years with migrant-prone populations (IHDS-style estimates)</div>
+    </div>
+    <div class="stat-card">
+      <div class="num">~30%</div>
+      <div class="label">Rural Indian households that have at least one seasonal migrant member (NSSO estimates)</div>
+    </div>
+  </div>
+
+  <h3>Migration</h3>
+  <p>Seasonal and circular migration is endemic in India's rural economy. A beneficiary surveyed in their home village in January may be in Surat or Pune from March to November. If your Wave 2 fieldwork falls during the migration season, you will simply miss a substantial portion of your sample — and this missing will not be random (migrants tend to be younger, male, and from poorer households, creating systematic bias).</p>
+
+  <h3>Phone Number Changes</h3>
+  <p>Mobile SIM churn in India is high. Budget SIMs (Jio, BSNL) are cheap and respondents change numbers frequently — sometimes due to phone loss, sometimes deliberately to avoid calls they consider unwanted. A phone number that was valid in Wave 1 has a meaningful probability of being disconnected or reassigned by Wave 3.</p>
+
+  <h3>Name Variations</h3>
+  <p>Indian names are recorded inconsistently across data sources. "Rajesh Kumar Singh" in your Wave 1 data may appear as "R.K. Singh" in a government beneficiary list, "Rajesh Singh" on a ration card, and "Raju" in the local community. Matching the same person across waves using name alone is unreliable and requires fuzzy matching algorithms or manual verification.</p>
+
+  <h3>Multi-Wave Consent Under DPDP</h3>
+  <p>India's DPDP Act adds a layer of complexity: respondents have the right to withdraw consent at any time. In a multi-wave study, your consent process must account for this possibility — and your IRB protocol should specify how you will handle partial-wave data for respondents who withdraw mid-study. Withdrawing consent does not erase the data you have already collected (which was legally collected at the time), but it does mean you cannot collect further data from that individual.</p>
+
+  <h2>The Real Cost of High Attrition</h2>
+
+  <p>Beyond reduced sample size (which can be planned for with oversampling), attrition creates a more insidious problem: <strong>differential attrition</strong>. If the respondents you lose are systematically different from those you retain, your treatment-control comparison is biased even if you started with perfect randomisation.</p>
+
+  <p>Classic example: if respondents in a livelihood programme who found the programme unhelpful are more likely to migrate (and thus be lost to follow-up), your Wave 3 data will over-represent satisfied beneficiaries. Your impact estimate will be inflated — not because the programme worked, but because your sample is now selected on programme satisfaction.</p>
+
+  <p>This is why the J-PAL standard is not just "keep attrition low" but "keep differential attrition low" — meaning attrition rates should be similar across treatment and control arms. Attrition tests (comparing baseline characteristics of attriters vs non-attriters, separately by arm) should be standard in your analysis plan.</p>
+
+  <h2>5 Strategies to Reduce Attrition</h2>
+
+  <div class="strategy-card">
+    <div class="strategy-num">1</div>
+    <div>
+      <strong>GPS-Tagged Last-Known Location</strong>
+      <p style="margin-top:.4rem;color:var(--text2);font-size:.95rem">Capture the GPS coordinates of the respondent's household at every wave, not just Wave 1. If a respondent has moved, the enumerator visits the last known GPS location, asks neighbours, and follows leads. A GPS-pinned address is far more useful than a textual description like "near the primary school" — which may describe dozens of households in a large village.</p>
+    </div>
+  </div>
+
+  <div class="strategy-card">
+    <div class="strategy-num">2</div>
+    <div>
+      <strong>Primary + Alternate Contact Capture</strong>
+      <p style="margin-top:.4rem;color:var(--text2);font-size:.95rem">At enrolment (Wave 1), collect: respondent's mobile number, an alternate household member's mobile number, and a non-household contact (trusted neighbour, village leader, community health worker) who is likely to know the respondent's whereabouts across time. Update all three at each subsequent wave. Studies that collect alternate contacts at baseline track 10–15 percentage points more respondents by Wave 3 compared to studies that collect only the primary number.</p>
+    </div>
+  </div>
+
+  <div class="strategy-card">
+    <div class="strategy-num">3</div>
+    <div>
+      <strong>Community Informant Network</strong>
+      <p style="margin-top:.4rem;color:var(--text2);font-size:.95rem">In each study village, identify 2–3 community informants (ASHA worker, Anganwadi worker, village panchayat secretary) who know the majority of households and are willing to assist with tracking. In advance of each wave, send your informant list of respondents you expect to find in that village. They can flag in advance who has migrated, who has married out, and who has died — saving your enumerators days of fruitless door-to-door effort.</p>
+    </div>
+  </div>
+
+  <div class="strategy-card">
+    <div class="strategy-num">4</div>
+    <div>
+      <strong>Door-to-Door Callback Scheduling</strong>
+      <p style="margin-top:.4rem;color:var(--text2);font-size:.95rem">When a respondent is not found on first visit, the enumerator should not simply record "absent" and move on. Ask a household member when the respondent will be available. Schedule a return visit at a specific time. Studies that implement structured callback protocols (at least 3 attempts at different times of day across different days) find 15–20% more respondents than those that record "absent" after a single visit.</p>
+    </div>
+  </div>
+
+  <div class="strategy-card">
+    <div class="strategy-num">5</div>
+    <div>
+      <strong>Respondent Engagement Between Waves</strong>
+      <p style="margin-top:.4rem;color:var(--text2);font-size:.95rem">Respondents who feel a connection to the study are more likely to participate in subsequent waves. Simple interventions help: send an SMS update about the study between waves ("Thank you for participating — our next visit will be in March"), share anonymised findings with the community after Wave 1 (village-level summaries), and have your field supervisor call a random 10% of respondents between waves just to confirm contact details are still valid. These touchpoints also update phone numbers before they become stale.</p>
+    </div>
+  </div>
+
+  <h2>Tracking Respondents Across Waves Digitally</h2>
+
+  <p>The technical infrastructure for panel tracking is as important as the field strategy. Here is what a robust digital tracking system for a panel study needs:</p>
+
+  <h3>Permanent Respondent IDs</h3>
+  <p>Assign a unique, permanent respondent ID at Wave 1 enrolment. This ID should be independent of any name, phone number, or address — it should never change, even if everything else about the respondent's contact information does. Print this ID on a small card that the respondent keeps. At subsequent waves, the enumerator scans or enters the ID to pull up the respondent's record — avoiding the name-matching problem entirely.</p>
+
+  <h3>Wave Status Tracking</h3>
+  <p>For every respondent in your sample, you need a status for each wave: Interviewed, Absent (will callback), Not found (3+ attempts), Refused, Deceased, Permanently migrated, Withdrawn consent. These statuses should be centrally visible to supervisors in real time — not compiled from enumerator spreadsheets at the end of the field season.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Definition</th>
+          <th>Action Required</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Interviewed</td>
+          <td>Wave survey completed</td>
+          <td>None</td>
+        </tr>
+        <tr>
+          <td>Absent — callback</td>
+          <td>Not available; return time known</td>
+          <td>Schedule callback; flag for supervisor</td>
+        </tr>
+        <tr>
+          <td>Not found</td>
+          <td>3+ attempts; location unknown</td>
+          <td>Activate community informant; check alternate contact</td>
+        </tr>
+        <tr>
+          <td>Refused</td>
+          <td>Declined to participate this wave</td>
+          <td>Record reason; attempt next wave</td>
+        </tr>
+        <tr>
+          <td>Permanently migrated</td>
+          <td>Left the area permanently</td>
+          <td>Decide: track to new location or record as attriter</td>
+        </tr>
+        <tr>
+          <td>Deceased</td>
+          <td>Respondent has died</td>
+          <td>Mark permanently closed; check household member substitution protocol</td>
+        </tr>
+        <tr>
+          <td>Withdrawn consent</td>
+          <td>Respondent has withdrawn DPDP consent</td>
+          <td>Stop collection; retain existing data per protocol</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Wave-by-Wave Comparison Analysis</h3>
+  <p>Once Wave 2 data is collected, you need to run attrition tests before any outcome analysis. The key tests:</p>
+
+  <ol>
+    <li><strong>Attrition rate by arm:</strong> Is the proportion of attriters similar in treatment and control? A statistically significant difference in attrition rates is a red flag for differential attrition bias.</li>
+    <li><strong>Baseline characteristic balance for attriters:</strong> For those who attrited, do baseline characteristics (age, gender, household size, income) differ between treatment and control? Run a joint F-test across all baseline covariates.</li>
+    <li><strong>Lee bounds:</strong> If differential attrition is detected, compute Lee (2009) bounds on your treatment effect estimate. This gives the range of plausible effect sizes under different assumptions about who attrited.</li>
+    <li><strong>Inverse probability weighting:</strong> Create weights based on the predicted probability of attrition for each respondent. Use weighted regressions for outcome analysis to partially correct for attrition bias.</li>
+  </ol>
+
+  <h2>FieldGovern's Panel-Specific Features</h2>
+
+  <p>Most survey tools treat every wave as an independent dataset. FieldGovern treats the <em>respondent</em> as the unit of continuity and builds wave data around them.</p>
+
+  <ul>
+    <li><strong>Respondent Registry:</strong> Every enrolled respondent has a permanent ID and a profile that persists across waves — contact details, GPS location, wave history, consent status, and custom tracking notes from supervisors.</li>
+    <li><strong>Attrition Dashboard:</strong> Real-time view of wave completion status by enumerator, village, and district. Supervisors can see which respondents are pending callback, which have been unreachable for multiple attempts, and which are at risk of permanent attrition.</li>
+    <li><strong>Wave-Over-Wave Retention Report:</strong> Automatically computes retention rates from Wave 1 baseline, with breakdown by demographic subgroup. Flags arms where retention differs significantly.</li>
+    <li><strong>Respondent Timeline:</strong> For each respondent, a chronological view of every interaction — when they were contacted, what was collected, what status they had at each wave, and any notes from field supervisors.</li>
+    <li><strong>Conflict Queue:</strong> When a supervisor edits a respondent record that an enumerator is currently completing in the field, both versions are flagged for review rather than silently overwritten.</li>
+  </ul>
+
+  <h2>Practical Pre-Study Checklist for Panel Researchers</h2>
+
+  <div class="checklist">
+    <div class="checklist-item">
+      <div class="check-box"></div>
+      <div><strong>Oversample at baseline.</strong> Add 20–25% to your target sample size to account for expected attrition. If you need 1,000 respondents at endline, enrol 1,250 at baseline.</div>
+    </div>
+    <div class="checklist-item">
+      <div class="check-box"></div>
+      <div><strong>Assign permanent respondent IDs at enrolment.</strong> Print on a durable card. Photograph the card and store with the baseline record.</div>
+    </div>
+    <div class="checklist-item">
+      <div class="check-box"></div>
+      <div><strong>Collect 3 contact points at baseline.</strong> Respondent mobile, alternate household mobile, non-household community contact. Update at every wave.</div>
+    </div>
+    <div class="checklist-item">
+      <div class="check-box"></div>
+      <div><strong>GPS-tag the household at every wave.</strong> Not just Wave 1. Migration within the village is common; coordinates should be re-captured at each visit.</div>
+    </div>
+    <div class="checklist-item">
+      <div class="check-box"></div>
+      <div><strong>Record a migration contact.</strong> If the respondent has seasonal migration, collect the destination area and a contact number there.</div>
+    </div>
+    <div class="checklist-item">
+      <div class="check-box"></div>
+      <div><strong>Time your fieldwork around migration cycles.</strong> Plan wave timing to overlap with the period when your study population is most likely to be at home (pre-Kharif, Rabi harvest, post-Diwali). Check local agricultural calendars.</div>
+    </div>
+    <div class="checklist-item">
+      <div class="check-box"></div>
+      <div><strong>Pre-register your attrition analysis plan.</strong> On EGAP, AsPredicted, or OSF. Specify the attrition threshold at which you will report concerns, and the correction method (Lee bounds, IPW, or both).</div>
+    </div>
+    <div class="checklist-item">
+      <div class="check-box"></div>
+      <div><strong>Get DPDP-compliant multi-wave consent.</strong> Your Wave 1 consent must explicitly mention that you will return for Wave 2 and Wave 3, and must state the respondent's right to withdraw from future waves without affecting their programme participation.</div>
+    </div>
+    <div class="checklist-item">
+      <div class="check-box"></div>
+      <div><strong>Run attrition tests before outcome analysis.</strong> Do not report impact estimates without first testing for differential attrition and reporting the results, even if the test passes.</div>
+    </div>
+    <div class="checklist-item">
+      <div class="check-box"></div>
+      <div><strong>Choose a survey tool with native panel support.</strong> Don't implement a panel study in a tool that treats every wave as a separate dataset — the merging overhead and error risk are significant.</div>
+    </div>
+  </div>
+
+  <div class="cta-box">
+    <h2>FieldGovern Is Built for Panel Studies</h2>
+    <p>Permanent respondent IDs, attrition dashboards, wave comparison reports, and DPDP-compliant multi-wave consent — all in one platform. Contact us or start a free trial to see how it works for your study design.</p>
+    <a href="https://app.fieldgovern.com" class="btn btn-white">Start Free Trial</a>
+  </div>
+
+  <div class="related">
+    <h3>Related Articles</h3>
+    <ul>
+      <li><a href="surveycto-alternative-india.html">SurveyCTO Alternative in India (2026): Full Comparison + When to Switch</a></li>
+      <li><a href="dpdp-act-2023-field-research.html">DPDP Act 2023 for Field Researchers: Consent, Data Rights, and What You Must Do Now</a></li>
+      <li><a href="offline-data-collection-india.html">Offline Data Collection in India: PWA vs Native App vs Paper</a></li>
+      <li><a href="odk-kobotoolbox-commcare-comparison.html">ODK vs KoboToolbox vs CommCare vs FieldGovern: Honest 2026 Comparison</a></li>
+    </ul>
+  </div>
+</article>
+
+<footer>
+  <p>© 2026 Dataworx · FieldGovern · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · <a href="/dpdp-compliance.html">DPDP</a></p>
+</footer>
+<script defer src="/assets/trial-cta.js"></script>
+</body>
+</html>

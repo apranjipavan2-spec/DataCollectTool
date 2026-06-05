@@ -247,14 +247,10 @@ async def bulk_upload_parse(
     if len(content) > 50 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="File too large (max 50 MB)")
 
-    # Load form — master_admin can access any tenant's form via form_id
-    if user["role"] == "master_admin":
-        form = db.query(FormModel).filter(FormModel.id == form_id).first()
-    else:
-        form = db.query(FormModel).filter(
-            FormModel.id == form_id,
-            FormModel.tenant_id == user["tenant_id"],
-        ).first()
+    form = db.query(FormModel).filter(
+        FormModel.id == form_id,
+        FormModel.tenant_id == user["tenant_id"],
+    ).first()
 
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
@@ -309,13 +305,10 @@ def bulk_upload_apply(
     db: Session = Depends(get_db),
 ):
     """Step 2 — Apply column mapping and create submissions."""
-    if user["role"] == "master_admin":
-        form = db.query(FormModel).filter(FormModel.id == body.form_id).first()
-    else:
-        form = db.query(FormModel).filter(
-            FormModel.id == body.form_id,
-            FormModel.tenant_id == user["tenant_id"],
-        ).first()
+    form = db.query(FormModel).filter(
+        FormModel.id == body.form_id,
+        FormModel.tenant_id == user["tenant_id"],
+    ).first()
 
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
@@ -423,13 +416,10 @@ def download_template(
     db: Session = Depends(get_db),
 ):
     """Download a pre-filled Excel template for a form."""
-    if user["role"] == "master_admin":
-        form = db.query(FormModel).filter(FormModel.id == form_id).first()
-    else:
-        form = db.query(FormModel).filter(
-            FormModel.id == form_id,
-            FormModel.tenant_id == user["tenant_id"],
-        ).first()
+    form = db.query(FormModel).filter(
+        FormModel.id == form_id,
+        FormModel.tenant_id == user["tenant_id"],
+    ).first()
 
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")

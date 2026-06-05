@@ -27,6 +27,25 @@ from .routers import (
     ai,
     fieldgovern,
     files,
+    metadata,
+    inferential,
+    likert,
+    multi_response,
+    observer,
+    auto_analyze,
+    survey_suggest,
+    survey_quality,
+    balance,
+    geo,
+    driver,
+    cluster,
+    verbatim,
+    clean,
+    triangulate,
+    causal,
+    power,
+    codebook,
+    play_mode,
 )
 
 app = FastAPI(title="TableForge", version="2.0")
@@ -54,6 +73,25 @@ app.include_router(stats.router)
 app.include_router(ai.router)
 app.include_router(fieldgovern.router)
 app.include_router(files.router)
+app.include_router(metadata.router)
+app.include_router(inferential.router)
+app.include_router(likert.router)
+app.include_router(multi_response.router)
+app.include_router(observer.router)
+app.include_router(auto_analyze.router)
+app.include_router(survey_suggest.router)
+app.include_router(survey_quality.router)
+app.include_router(balance.router)
+app.include_router(geo.router)
+app.include_router(driver.router)
+app.include_router(cluster.router)
+app.include_router(verbatim.router)
+app.include_router(clean.router)
+app.include_router(triangulate.router)
+app.include_router(causal.router)
+app.include_router(power.router)
+app.include_router(codebook.router)
+app.include_router(play_mode.router)
 
 # Serve frontend static files (production)
 STATIC_DIR = BASE_DIR / "static"

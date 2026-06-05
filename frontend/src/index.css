@@ -109,3 +109,21 @@
     @apply bg-catalan-info/20 text-catalan-info;
   }
 }
+
+/* Monochrome emoji-replacement icons (see EmojiIcon.tsx) */
+.ei {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.14em;
+  stroke: currentColor;
+  stroke-width: 1.85;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+  transition: transform 0.25s ease;
+}
+.ei:hover { transform: scale(1.18) rotate(-3deg); }
+button:hover .ei, a:hover .ei, [role="button"]:hover .ei { transform: scale(1.12); }
+@media (prefers-reduced-motion: reduce) { .ei { transition: none; } }

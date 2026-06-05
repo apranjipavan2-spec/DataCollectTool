@@ -1,10 +1,31 @@
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
 <head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SPLVXJJ7GN"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag("js", new Date());
+    gtag("config", "G-SPLVXJJ7GN");
+  </script>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Security — FieldGovern</title>
   <meta name="description" content="Enterprise-grade security and India-first DPDP 2023 compliance — JWT auth, bcrypt, row-level security, encrypted offline storage, and full audit trails."/>
+  <link rel="canonical" href="https://www.fieldgovern.com/security.html"/>
+  <link rel="icon" href="/assets/logo-icon.png" type="image/png"/>
+  <meta name="robots" content="index,follow"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:url" content="https://www.fieldgovern.com/security.html"/>
+  <meta property="og:title" content="Security &amp; DPDP Compliance — FieldGovern"/>
+  <meta property="og:description" content="DPDP 2023 compliant. JWT, bcrypt, row-level security, encrypted offline storage, audit trails."/>
+  <meta property="og:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
+  <meta property="og:site_name" content="FieldGovern"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="Security &amp; DPDP — FieldGovern"/>
+  <meta name="twitter:description" content="DPDP 2023 compliant. Enterprise-grade security for India's field data."/>
+  <meta name="twitter:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
   <style>
@@ -57,22 +78,22 @@
     #mobileMenu a{display:flex;align-items:center;padding:14px 24px;color:var(--text2);font-weight:500;font-size:0.95rem;text-decoration:none;border-bottom:1px solid var(--border);transition:background 0.15s,color 0.15s}
     #mobileMenu a:last-child{border-bottom:none}
     #mobileMenu a:hover,#mobileMenu a:active{background:var(--bg2);color:var(--brand)}
-    .page-hero{padding:140px 24px 80px;background:linear-gradient(160deg,#f0f9ff 0%,#ffffff 50%,#faf5ff 100%);text-align:center}
-    .page-hero h1{font-size:2.8rem;font-weight:900;color:var(--text);line-height:1.15;margin-bottom:16px}
+    .page-hero{padding:96px 24px 26px;background:linear-gradient(160deg,#f0f9ff 0%,#ffffff 50%,#faf5ff 100%);text-align:center}
+    .page-hero h1{font-size:2.6rem;font-weight:900;color:var(--text);line-height:1.15;margin-bottom:10px}
     .grad-text{background:linear-gradient(135deg,var(--brand),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .page-hero p{font-size:1.1rem;color:var(--text2);line-height:1.7;max-width:580px;margin:0 auto 36px}
-    .section-tag{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(14,165,233,0.1),rgba(124,58,237,0.1));border:1px solid rgba(14,165,233,0.2);border-radius:999px;padding:5px 14px;font-size:0.78rem;font-weight:700;color:var(--brand-dark);letter-spacing:0.04em;text-transform:uppercase;margin-bottom:16px}
-    section{padding:80px 24px}
-    .section-inner{max-width:1100px;margin:0 auto}
-    .section-title{font-size:2rem;font-weight:900;color:var(--text);line-height:1.2;margin-bottom:40px}
-    .security-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:24px}
-    .sec-card{background:white;border:1px solid var(--border);border-radius:16px;padding:32px;transition:all 0.35s cubic-bezier(.16,1,.3,1)}
-    .sec-card:hover{transform:translateY(-4px);box-shadow:0 20px 48px rgba(14,165,233,0.1);border-color:rgba(14,165,233,0.3)}
-    .sec-icon{font-size:2rem;margin-bottom:14px;display:block}
-    .sec-card h3{font-size:1rem;font-weight:800;color:var(--text);margin-bottom:10px}
-    .sec-card ul{list-style:none;display:flex;flex-direction:column;gap:7px}
-    .sec-card li{font-size:0.85rem;color:var(--text2);display:flex;align-items:flex-start;gap:8px;line-height:1.5}
-    .sec-card li::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
+    .page-hero p{font-size:1.05rem;color:var(--text2);line-height:1.6;max-width:680px;margin:0 auto}
+    .section-tag{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(14,165,233,0.1),rgba(124,58,237,0.1));border:1px solid rgba(14,165,233,0.2);border-radius:999px;padding:5px 14px;font-size:0.78rem;font-weight:700;color:var(--brand-dark);letter-spacing:0.04em;text-transform:uppercase;margin-bottom:10px}
+    .section-tag svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+    section{padding:48px 32px}
+    .section-inner{max-width:1080px;margin:0 auto}
+    .section-title{font-size:1.7rem;font-weight:900;color:var(--text);line-height:1.2;margin-bottom:24px}
+    .sec-list{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 64px}
+    .sec-block{padding:18px 0;border-top:1px solid var(--border)}
+    .sec-block h3{font-size:1.05rem;font-weight:800;color:var(--text);margin-bottom:7px;display:flex;align-items:center;gap:9px}
+    .sec-block h3 .sec-icon{width:38px;height:38px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(14,165,233,0.1),rgba(124,58,237,0.1));border:1px solid rgba(14,165,233,0.16);color:var(--brand-dark);flex-shrink:0}
+    .sec-block h3 .sec-icon svg{width:19px;height:19px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .sec-block p{font-size:0.92rem;color:var(--text2);line-height:1.65}
+    .sec-block p b{color:var(--text);font-weight:700}
     /* FAQ */
     .faq-list{display:flex;flex-direction:column;gap:12px;margin-top:40px;max-width:760px;margin-left:auto;margin-right:auto}
     details{background:white;border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:all 0.3s}
@@ -82,7 +103,7 @@
     summary::after{content:'▾';color:var(--brand);transition:transform 0.3s;font-size:0.8rem}
     details[open] summary::after{transform:rotate(180deg)}
     details p{padding:0 22px 18px;font-size:0.86rem;color:var(--text2);line-height:1.7}
-    .cta-section{background:linear-gradient(135deg,#f0f9ff,#faf5ff);text-align:center;padding:80px 24px;border-top:1px solid var(--border)}
+    .cta-section{background:linear-gradient(135deg,#f0f9ff,#faf5ff);text-align:center;padding:48px 24px;border-top:1px solid var(--border)}
     .cta-section h2{font-size:2rem;font-weight:900;color:var(--text);margin-bottom:12px}
     .cta-section p{color:var(--text2);margin-bottom:32px;font-size:1rem}
     footer{background:#0f172a;color:rgba(255,255,255,0.7);padding:60px 24px 32px}
@@ -95,7 +116,7 @@
     .footer-col a:hover{color:white}
     .footer-bottom{border-top:1px solid rgba(255,255,255,0.08);padding-top:24px;display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;color:rgba(255,255,255,0.35);flex-wrap:wrap;gap:12px}
     @media(max-width:1024px){
-      .security-grid{grid-template-columns:1fr}
+      .sec-list{grid-template-columns:1fr;gap:0}
       .footer-grid{grid-template-columns:1fr 1fr}
     }
     @media(max-width:640px){
@@ -106,7 +127,22 @@
       .footer-grid{grid-template-columns:1fr}
       .footer-bottom{flex-direction:column;text-align:center}
     }
+      .ei{display:inline-block;width:1em;height:1em;vertical-align:-0.14em;stroke:currentColor;stroke-width:1.85;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;transition:transform .25s ease}
+    .ei:hover{transform:scale(1.18) rotate(-3deg)}
+    a:hover .ei,button:hover .ei,[class*='card']:hover .ei{transform:scale(1.15)}
+    @media(prefers-reduced-motion:reduce){.ei{transition:none}}
   </style>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.fieldgovern.com/"},
+      {"@type": "ListItem", "position": 2, "name": "Security", "item": "https://www.fieldgovern.com/security.html"}
+    ]
+  }
+  </script>
+  <script defer data-domain="fieldgovern.com" src="https://plausible.io/js/script.js"></script>
 </head>
 <body>
 <nav id="navbar">
@@ -117,9 +153,10 @@
     <li><a href="features.html">Features</a></li>
     <li><a href="integrations.html">Integrations</a></li>
     <li><a href="use-cases.html">Use Cases</a></li>
+    <li><a href="compare.html">Compare</a></li>
+    <li><a href="security.html">Security</a></li>
     <li><a href="pricing.html">Pricing</a></li>
     <li><a href="about.html">About</a></li>
-    <li><a href="about.html#contact">Contact</a></li>
   </ul>
   <div style="display:flex;gap:8px;align-items:center">
     <a href="demo.html" class="btn-outline nav-cta-secondary">Try Demo</a>
@@ -132,94 +169,53 @@
 
 <div id="mobileMenu" role="navigation">
   <a href="features.html">✦ Features</a>
-  <a href="integrations.html">🔗 Integrations</a>
-  <a href="use-cases.html">🏘️ Use Cases</a>
-  <a href="pricing.html">💰 Pricing</a>
-  <a href="about.html">🏛️ About Us</a>
-  <a href="about.html#contact">✉️ Contact</a>
-  <a href="demo.html" style="color:var(--brand);font-weight:700">🚀 Try Free Demo</a>
+  <a href="integrations.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Integrations</a>
+  <a href="use-cases.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Use Cases</a>
+  <a href="compare.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Compare</a>
+  <a href="security.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Security</a>
+  <a href="pricing.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Pricing</a>
+  <a href="about.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg> About Us</a>
+  <a href="demo.html" style="color:var(--brand);font-weight:700"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Try Free Demo</a>
 </div>
 
 <div class="page-hero">
-  <div class="section-tag animate-fade-up">🛡️ Security</div>
+  <div class="section-tag animate-fade-up"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Security</div>
   <h1 class="animate-fade-up delay-1">Enterprise-grade security.<br/><span class="grad-text">India-first compliance.</span></h1>
   <p class="animate-fade-up delay-2">Built from the ground up for DPDP 2023, with JWT auth, bcrypt passwords, row-level tenant isolation, and encrypted offline storage.</p>
 </div>
 
 <section>
   <div class="section-inner">
-    <div class="security-grid">
+    <div class="sec-list">
 
-      <div class="sec-card reveal">
-        <span class="sec-icon">🔐</span>
-        <h3>Authentication</h3>
-        <ul>
-          <li>JWT HS256 tokens with 2-hour expiry</li>
-          <li>Secure refresh token rotation</li>
-          <li>bcrypt password hashing (cost factor 12)</li>
-          <li>API keys bcrypt-hashed before storage</li>
-          <li>30-minute inactivity session timeout for enumerators</li>
-        </ul>
+      <div class="sec-block reveal">
+        <h3><span class="sec-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>Authentication</h3>
+        <p><b>JWT HS256</b> tokens with a 2-hour expiry and secure refresh-token rotation. Passwords are hashed with <b>bcrypt</b> (cost factor 12), API keys are bcrypt-hashed before storage, and enumerator sessions time out after 30 minutes of inactivity.</p>
       </div>
 
-      <div class="sec-card reveal">
-        <span class="sec-icon">🛡️</span>
-        <h3>DPDP 2023 Compliance</h3>
-        <ul>
-          <li>Consent tracking field on every form</li>
-          <li>Purpose declaration field per form</li>
-          <li>Full audit logs for all data changes</li>
-          <li>Data erasure endpoint — anonymizes data_json on request</li>
-          <li>Designed for India's Digital Personal Data Protection Act 2023</li>
-        </ul>
+      <div class="sec-block reveal">
+        <h3><span class="sec-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></span>DPDP 2023 Compliance</h3>
+        <p>Every form carries a <b>consent-tracking field</b> and a purpose declaration, all data changes are written to full audit logs, and a <b>data-erasure endpoint</b> anonymizes <code>data_json</code> on request — built end-to-end for India's Digital Personal Data Protection Act 2023.</p>
       </div>
 
-      <div class="sec-card reveal">
-        <span class="sec-icon">📱</span>
-        <h3>Offline Security</h3>
-        <ul>
-          <li>Data stored in browser OPFS (Chrome/Android) or IndexedDB (Safari/iOS)</li>
-          <li>Not stored in localStorage or plain cookies</li>
-          <li>Local data bound to origin — inaccessible to other sites</li>
-          <li>Sync uses HTTPS with TLS 1.3</li>
-          <li>No sensitive data written to disk unencrypted</li>
-        </ul>
+      <div class="sec-block reveal">
+        <h3><span class="sec-icon"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg></span>Offline Security</h3>
+        <p>Offline data lives in the browser's <b>OPFS</b> (Chrome/Android) or <b>IndexedDB</b> (Safari/iOS) — never in localStorage or plain cookies. It is bound to its origin and inaccessible to other sites, syncs over <b>HTTPS with TLS 1.3</b>, and is never written to disk unencrypted.</p>
       </div>
 
-      <div class="sec-card reveal">
-        <span class="sec-icon">👥</span>
-        <h3>Access Control</h3>
-        <ul>
-          <li>4-tier role hierarchy: master_admin → org_admin → supervisor → enumerator</li>
-          <li>Tenant isolation via SQLAlchemy RLS on every query</li>
-          <li>Enumerators see only their assigned forms</li>
-          <li>Supervisors see only their tenant's submissions</li>
-          <li>No cross-tenant data leakage — enforced at DB layer</li>
-        </ul>
+      <div class="sec-block reveal">
+        <h3><span class="sec-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>Access Control</h3>
+        <p>A 4-tier role hierarchy (<b>master_admin → org_admin → supervisor → enumerator</b>) with tenant isolation enforced by SQLAlchemy row-level security on every query. Enumerators see only their assigned forms, supervisors only their tenant's submissions, and cross-tenant leakage is blocked at the database layer.</p>
       </div>
 
-      <div class="sec-card reveal">
-        <span class="sec-icon">📁</span>
-        <h3>Media Security</h3>
-        <ul>
-          <li>Photos and audio stored on private VPS storage</li>
-          <li>Not on public cloud buckets (no AWS S3 public URLs)</li>
-          <li>Presigned download URLs with short TTL</li>
-          <li>Media filenames include UUID — not guessable</li>
-          <li>Stored outside web root — not directly browseable</li>
-        </ul>
+      <div class="sec-block reveal">
+        <h3><span class="sec-icon"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>Media Security</h3>
+        <p>Photos and audio are stored on <b>private VPS storage</b> — not in public cloud buckets or S3 public URLs. Downloads use <b>presigned URLs with a short TTL</b>, filenames carry a non-guessable UUID, and files sit outside the web root so they can't be browsed directly.</p>
       </div>
 
-      <div class="sec-card reveal">
-        <span class="sec-icon">📋</span>
-        <h3>Audit Trail</h3>
-        <ul>
-          <li>Every status change (flag / approve / reject) is logged</li>
-          <li>Timestamps, actor ID, and previous state recorded</li>
-          <li>Submission history panel visible to supervisors</li>
-          <li>Non-repudiable — log entries are append-only</li>
-          <li>Available for export alongside submission data</li>
-        </ul>
+      <div class="sec-block reveal">
+        <h3><span class="sec-icon"><svg viewBox="0 0 24 24"><path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"/><rect x="9" y="2" width="6" height="6" rx="1"/><line x1="9" y1="14" x2="15" y2="14"/><line x1="9" y1="18" x2="13" y2="18"/></svg></span>Audit Trail</h3>
+        <p>Every status change (flag / approve / reject) is logged with a <b>timestamp, actor ID, and previous state</b>. The submission-history panel is visible to supervisors, entries are <b>append-only and non-repudiable</b>, and the full log exports alongside submission data.</p>
       </div>
 
     </div>
@@ -228,7 +224,7 @@
 
 <section style="background:var(--bg2);border-top:1px solid var(--border)">
   <div class="section-inner">
-    <div class="section-tag" style="display:inline-flex">❓ Security FAQ</div>
+    <div class="section-tag" style="display:inline-flex"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg> Security FAQ</div>
     <h2 class="section-title" style="margin-top:8px">Common security questions</h2>
     <div class="faq-list">
       <details class="reveal">
@@ -268,7 +264,7 @@
     <div class="footer-grid">
       <div class="footer-brand">
         <a href="index.html" class="nav-logo" style="color:white;margin-bottom:12px;display:inline-flex">
-          <img src="assets/logo-wide.png" alt="FieldGovern" style="height:32px;width:auto;margin-bottom:12px;display:block;filter:brightness(0) invert(1)"/>
+          <img src="assets/logo-wide.png" alt="FieldGovern" loading="lazy" decoding="async" style="height:32px;width:auto;margin-bottom:12px;display:block;filter:brightness(0) invert(1)"/>
         </a>
         <p>Offline-first field data collection for India's research teams. Built to replace SurveyCTO at 1/3 the cost.</p>
       </div>
@@ -341,5 +337,6 @@
     document.getElementById('hamburgerBtn').classList.remove('open');
   }, { passive: true });
 </script>
+<script defer src="/assets/trial-cta.js"></script>
 </body>
 </html>

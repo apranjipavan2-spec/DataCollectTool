@@ -421,6 +421,7 @@ input, select, textarea { font-family: inherit; }
       <button class="btn btn-success btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doExport('excel')">⬇ XLS</button>
       <button id="saveToAccountBtn" class="btn btn-primary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; margin-top:4px; display:none;" onclick="doSaveToAccount()" title="Save cleaned data to your FieldGovern account">💾 Save to Account</button>
       <button id="saveToServerBtn" class="btn btn-primary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; margin-top:4px; display:none;" onclick="doSaveToServer()" title="Save cleaned data back to server file (shared with Analyzer)">💾 Save to Server</button>
+      <button id="saveToTableforgeBtn" class="btn btn-primary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; margin-top:4px; display:none; background: linear-gradient(135deg,#a78bfa,#7c3aed);" onclick="doSaveToTableforge()" title="Save cleaned data back to TableForge and return">🧹 Save &amp; Return to TableForge</button>
     </div>
   </div>
 
@@ -1894,6 +1895,72 @@ function toggleSection(sectionId, headerEl) {
 </script>
 
 <script>
+// ── TableForge integration ───────────────────────────────────────────────────
+const _tfParams    = new URLSearchParams(window.location.search);
+const _tfUrl       = _tfParams.get('tf_url');
+const _tfHandoffId = _tfParams.get('handoff_id');
+const _tfFocusCol  = _tfParams.get('focus_col');
+
+async function tfLoadData() {
+  if (!_tfUrl || !_tfHandoffId) return;
+  showLoading('Loading data from TableForge…');
+  try {
+    const res = await fetch(BASE_URL + '/api/load-from-tableforge', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tf_base_url: _tfUrl, handoff_id: _tfHandoffId }),
+    });
+    const data = await res.json();
+    hideLoading();
+    if (data.error) { toast(data.error, 'error'); return; }
+    DATA_FILENAME = data.filename || '';
+    toast(`Loaded from TableForge — ${data.rows} rows, ${data.cols} columns`);
+    const wc = document.getElementById('welcomeCard');
+    if (wc) wc.style.display = 'none';
+    const uploadZone = document.getElementById('uploadZone');
+    if (uploadZone) uploadZone.style.display = 'none';
+    const divider = document.getElementById('uploadDivider');
+    if (divider) divider.style.display = 'none';
+    const saveBtn = document.getElementById('saveToTableforgeBtn');
+    if (saveBtn) saveBtn.style.display = '';
+    await loadInfo();
+    switchTab('explore');
+    const focus = data.focus_col || _tfFocusCol;
+    if (focus && columns.some(c => c.name === focus)) {
+      selectColumn(focus);
+    } else if (columns.length > 0) {
+      selectColumn(columns[0].name);
+    }
+  } catch (e) {
+    hideLoading();
+    toast('Failed to load TableForge data: ' + e, 'error');
+  }
+}
+
+async function doSaveToTableforge() {
+  if (!_tfUrl || !_tfHandoffId) { toast('Not connected to TableForge', 'error'); return; }
+  const btn = document.getElementById('saveToTableforgeBtn');
+  btn.disabled = true; btn.textContent = '💾 Saving…';
+  try {
+    const res = await fetch(BASE_URL + '/api/save-to-tableforge', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tf_base_url: _tfUrl, handoff_id: _tfHandoffId }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Save failed');
+    toast('Saved to TableForge ✓ — returning…');
+    try { window.opener && window.opener.postMessage({ type: 'tf-cleaner-saved', handoff_id: _tfHandoffId, rows: json.rows, cols: json.cols }, '*'); } catch {}
+    setTimeout(() => { try { window.close(); } catch {} }, 700);
+  } catch (e) {
+    toast(e.message || 'Save failed', 'error');
+    btn.disabled = false; btn.textContent = '🧹 Save & Return to TableForge';
+  }
+}
+
+// Auto-load if TF params present (runs before FG-init below; both are independent)
+if (_tfUrl && _tfHandoffId) {
+  window.addEventListener('DOMContentLoaded', () => { tfLoadData(); });
+}
+
 // ── FieldGovern integration ───────────────────────────────────────────────────
 const _fgParams    = new URLSearchParams(window.location.search);
 const _fgUrl       = _fgParams.get('fg_url');
@@ -2036,11 +2103,11 @@ async function fgLoadData(programId, questionnaireId) {
     }
   });
 
-  // Auto-select + load if program_id was in URL
+  // Pre-select the program if it was in the URL, but DO NOT auto-load —
+  // the user must click "Load Data →" to fetch submissions.
   if (_fgProgId) {
     progSel.value = _fgProgId;
     progSel.dispatchEvent(new Event('change'));
-    setTimeout(() => fgLoadData(_fgProgId, null), 500);
   }
 })();
 </script>

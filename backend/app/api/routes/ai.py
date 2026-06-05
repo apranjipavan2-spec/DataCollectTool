@@ -29,6 +29,16 @@ def _get_global_ai_cfg(db: Session) -> dict:
     return cfg
 
 
+def _logged_cfg(db: Session, user: dict, feature: str) -> dict:
+    """Get global AI cfg with usage-log context attached for this user + feature."""
+    return ai_service.with_log(
+        _get_global_ai_cfg(db),
+        tenant_id=user.get("tenant_id"),
+        user_id=user.get("sub"),
+        feature=feature,
+    )
+
+
 # ── AI Config (global — set by master_admin, visible to all) ──────────────
 
 PROVIDER_DEFAULTS = {"openai": "gpt-4o", "anthropic": "claude-sonnet-4-6", "gemini": "gemini-2.0-flash", "deepseek": "deepseek-v4-flash"}
@@ -93,6 +103,89 @@ def update_ai_config(body: dict, user: dict = Depends(require_master), db: Sessi
     return {"ok": True, "active_provider": cfg.get("active_provider")}
 
 
+# ── AI Usage Tracking ─────────────────────────────────────────────────────
+
+@router.get("/usage")
+def get_ai_usage(
+    days: int = 30,
+    feature: str = "",
+    user: dict = Depends(require_org_admin),
+    db: Session = Depends(get_db),
+):
+    """Per-user AI usage totals. master_admin sees all tenants; org_admin sees own tenant only.
+    Query params: days (default 30, max 365), feature (optional filter)."""
+    from sqlalchemy import func as sa_func, case as sa_case
+    from app.models.ai_usage_log import AiUsageLog
+    from app.models.user import User
+    from datetime import datetime, timedelta, timezone
+
+    days = max(1, min(int(days or 30), 365))
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    q = db.query(
+        AiUsageLog.user_id,
+        AiUsageLog.tenant_id,
+        sa_func.count(AiUsageLog.id).label("calls"),
+        sa_func.sum(AiUsageLog.tokens_in).label("tokens_in"),
+        sa_func.sum(AiUsageLog.tokens_out).label("tokens_out"),
+        sa_func.sum(sa_case((AiUsageLog.success == False, 1), else_=0)).label("errors"),
+        sa_func.max(AiUsageLog.created_at).label("last_call"),
+    ).filter(AiUsageLog.created_at >= since)
+
+    if user.get("role") != "master_admin":
+        q = q.filter(AiUsageLog.tenant_id == user["tenant_id"])
+    if feature:
+        q = q.filter(AiUsageLog.feature == feature)
+
+    rows = q.group_by(AiUsageLog.user_id, AiUsageLog.tenant_id).all()
+
+    # Hydrate user/tenant names
+    user_ids = [r.user_id for r in rows if r.user_id]
+    users = {str(u.id): u for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
+
+    result = []
+    for r in rows:
+        u = users.get(str(r.user_id)) if r.user_id else None
+        result.append({
+            "user_id": str(r.user_id) if r.user_id else None,
+            "user_name": (u.name if u else None) or (u.email if u else None) or "(unknown)",
+            "user_email": u.email if u else None,
+            "tenant_id": str(r.tenant_id),
+            "calls": int(r.calls or 0),
+            "tokens_in": int(r.tokens_in or 0),
+            "tokens_out": int(r.tokens_out or 0),
+            "errors": int(r.errors or 0),
+            "last_call": r.last_call.isoformat() if r.last_call else None,
+        })
+    result.sort(key=lambda x: x["calls"], reverse=True)
+
+    # Per-feature breakdown for the same window/scope
+    fq = db.query(
+        AiUsageLog.feature,
+        sa_func.count(AiUsageLog.id).label("calls"),
+        sa_func.sum(AiUsageLog.tokens_in).label("tokens_in"),
+        sa_func.sum(AiUsageLog.tokens_out).label("tokens_out"),
+    ).filter(AiUsageLog.created_at >= since)
+    if user.get("role") != "master_admin":
+        fq = fq.filter(AiUsageLog.tenant_id == user["tenant_id"])
+    by_feature = [
+        {
+            "feature": fr.feature,
+            "calls": int(fr.calls or 0),
+            "tokens_in": int(fr.tokens_in or 0),
+            "tokens_out": int(fr.tokens_out or 0),
+        }
+        for fr in fq.group_by(AiUsageLog.feature).order_by(sa_func.count(AiUsageLog.id).desc()).all()
+    ]
+
+    return {
+        "days": days,
+        "scope": "global" if user.get("role") == "master_admin" else "tenant",
+        "per_user": result,
+        "by_feature": by_feature,
+    }
+
+
 # ── AI Features ───────────────────────────────────────────────────────────
 
 @router.post("/report/{form_id}")
@@ -110,7 +203,7 @@ async def generate_report(
         from app.api.routes.billing import check_feature
         check_feature(user["tenant_id"], "ai_writer", db)
 
-    cfg = _get_global_ai_cfg(db)
+    cfg = _logged_cfg(db, user, "report")
     if not cfg.get("api_key"):
         raise HTTPException(400, "AI not configured. Contact your platform administrator.")
 
@@ -149,9 +242,12 @@ async def generate_report(
         if error  is not None: d["error"]  = error
         rec.data = d; flag_modified(rec, "data"); sess.commit()
 
+    job_tenant_id = str(user["tenant_id"])
+
     async def _run():
-        from app.core.database import SessionLocal
+        from app.core.database import SessionLocal, set_tenant_context
         with SessionLocal() as sess:
+            set_tenant_context(sess, job_tenant_id)
             _upd(sess, "running", f"Loaded {len(sub_data)} submissions — calling AI model…")
             try:
                 report_md = await ai_service.generate_report(cfg, form_title, field_labels, sub_data)
@@ -168,7 +264,7 @@ async def suggest_skip_logic(body: dict, user: dict = Depends(require_org_admin)
     if user.get("role") != "master_admin":
         from app.api.routes.billing import check_feature
         check_feature(user["tenant_id"], "ai_cleaning", db)
-    cfg = _get_global_ai_cfg(db)
+    cfg = _logged_cfg(db, user, "skip_logic")
     try:
         suggestions = await ai_service.suggest_skip_logic(cfg, body.get("question_text", ""), body.get("form_fields", []), body.get("user_description", ""))
     except ValueError as e:
@@ -183,7 +279,7 @@ async def translate_labels(body: dict, user: dict = Depends(require_org_admin), 
     if user.get("role") != "master_admin":
         from app.api.routes.billing import check_feature
         check_feature(user["tenant_id"], "ai_cleaning", db)
-    cfg = _get_global_ai_cfg(db)
+    cfg = _logged_cfg(db, user, "translate")
     try:
         translated = await ai_service.translate_labels(cfg, body.get("labels", []), body.get("target_lang", "Hindi"))
     except ValueError as e:
@@ -198,7 +294,7 @@ async def ai_writer(body: dict, user: dict = Depends(require_supervisor), db: Se
     if user.get("role") != "master_admin":
         from app.api.routes.billing import check_feature
         check_feature(user["tenant_id"], "ai_writer", db)
-    cfg = _get_global_ai_cfg(db)
+    cfg = _logged_cfg(db, user, "writer")
     try:
         report_md = await ai_service.generate_styled_report(
             cfg=cfg,
@@ -277,7 +373,7 @@ async def generate_form(
     import uuid as _uuid
     from app.core.database import SessionLocal
 
-    cfg = _get_global_ai_cfg(db)
+    cfg = _logged_cfg(db, user, "generate_form")
     if not cfg.get("api_key"):
         raise HTTPException(400, "AI not configured. Contact your platform administrator.")
 
@@ -312,9 +408,10 @@ async def generate_form(
     tenant_id = str(user["tenant_id"])
 
     async def _run():
-        from app.core.database import SessionLocal
+        from app.core.database import SessionLocal, set_tenant_context
         with SessionLocal() as sess:
-            form_rec = sess.query(Form).filter(Form.id == form_id).first()
+            set_tenant_context(sess, tenant_id)
+            form_rec = sess.query(Form).filter(Form.id == form_id, Form.tenant_id == tenant_id).first()
             if not form_rec:
                 return
             try:

@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface ToolProject {
   id: string; tool: string; name: string; program_id: string | null
@@ -370,11 +371,11 @@ export default function FileManagerPage() {
                 <div className="flex gap-2">
                   <button onClick={() => { const f = forms.find(x => x.id === subFormFilter)!; downloadFormCsv(f.id, f.title) }}
                     className="px-3 py-1.5 text-xs bg-catalan-primary text-catalan-bg rounded-lg hover:bg-catalan-primaryDark">
-                    ⬇ Form CSV
+                    <EmojiIcon e="⬇" /> Form CSV
                   </button>
                   <button onClick={() => { const f = forms.find(x => x.id === subFormFilter)!; downloadConsentCsv(f.id, f.title) }}
                     className="px-3 py-1.5 text-xs border border-catalan-border rounded-lg text-catalan-text hover:bg-catalan-hover">
-                    ⬇ Consent Report
+                    <EmojiIcon e="⬇" /> Consent Report
                   </button>
                 </div>
               )}
@@ -397,7 +398,7 @@ export default function FileManagerPage() {
                     ? 'bg-catalan-primary/10 text-catalan-primary border border-catalan-primary/20'
                     : 'text-catalan-textMuted hover:bg-catalan-hover'
                 }`}>
-                <span>{f.icon}</span>
+                <span><EmojiIcon e={f.icon} /></span>
                 <span>{f.label}</span>
                 <span className="ml-auto text-xs text-catalan-textMuted">{f.count}</span>
               </button>
@@ -430,7 +431,7 @@ export default function FileManagerPage() {
                       <span className="text-xs font-medium text-catalan-primary">{selectedSubs.size} selected</span>
                       <button onClick={downloadSelectedSubs}
                         className="text-xs px-2 py-1 bg-catalan-primary text-catalan-bg rounded font-medium hover:opacity-90">
-                        ⬇ Download CSV
+                        <EmojiIcon e="⬇" /> Download CSV
                       </button>
                       <button onClick={() => setSelectedSubs(new Set())} className="text-xs text-catalan-textMuted hover:text-catalan-text">✕ Clear</button>
                     </div>
@@ -444,7 +445,7 @@ export default function FileManagerPage() {
                           <button key={f.id} onClick={() => downloadFormCsv(f.id, f.title)}
                             title={`Download all data for "${f.title}"`}
                             className="text-[10px] px-2 py-1 bg-catalan-hover border border-catalan-border rounded text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/40 transition-colors">
-                            ⬇ {f.title.length > 20 ? f.title.slice(0, 20) + '…' : f.title}
+                            <EmojiIcon e="⬇" /> {f.title.length > 20 ? f.title.slice(0, 20) + '…' : f.title}
                           </button>
                         ))}
                       </div>
@@ -456,7 +457,7 @@ export default function FileManagerPage() {
                   <div className="py-16 text-center text-catalan-textMuted text-sm">Loading submissions…</div>
                 ) : submissions.length === 0 ? (
                   <div className="py-16 text-center text-catalan-textMuted text-sm">
-                    <div className="text-5xl mb-3">📝</div>
+                    <div className="text-5xl mb-3"><EmojiIcon e="📝" /></div>
                     <div className="font-medium text-catalan-text mb-1">No submissions found</div>
                     <div className="text-xs">Submissions collected by enumerators will appear here.</div>
                   </div>
@@ -507,7 +508,7 @@ export default function FileManagerPage() {
                         <span>Page {subPage} of {Math.ceil(subTotal / PAGE_SIZE)}</span>
                         <div className="flex gap-2">
                           <button disabled={subPage <= 1} onClick={() => setSubPage(p => p - 1)}
-                            className="px-3 py-1.5 border border-catalan-border rounded-lg text-xs hover:bg-catalan-hover disabled:opacity-40">← Prev</button>
+                            className="px-3 py-1.5 border border-catalan-border rounded-lg text-xs hover:bg-catalan-hover disabled:opacity-40"><EmojiIcon e="←" /> Prev</button>
                           <button disabled={subPage >= Math.ceil(subTotal / PAGE_SIZE)} onClick={() => setSubPage(p => p + 1)}
                             className="px-3 py-1.5 border border-catalan-border rounded-lg text-xs hover:bg-catalan-hover disabled:opacity-40">Next →</button>
                         </div>
@@ -533,7 +534,7 @@ export default function FileManagerPage() {
                       <span className="text-xs font-medium text-catalan-primary">{selectedProjs.size} selected</span>
                       <button onClick={downloadSelectedProjs}
                         className="text-xs px-2 py-1 bg-catalan-primary text-catalan-bg rounded font-medium hover:opacity-90">
-                        ⬇ Download CSV
+                        <EmojiIcon e="⬇" /> Download CSV
                       </button>
                       <button onClick={() => setSelectedProjs(new Set())} className="text-xs text-catalan-textMuted hover:text-catalan-text">✕ Clear</button>
                     </div>
@@ -544,7 +545,7 @@ export default function FileManagerPage() {
                   <div className="py-16 text-center text-catalan-textMuted text-sm">Loading files…</div>
                 ) : visibleProjects.length === 0 ? (
                   <div className="py-16 text-center text-catalan-textMuted text-sm">
-                    <div className="text-5xl mb-3">📂</div>
+                    <div className="text-5xl mb-3"><EmojiIcon e="📂" /></div>
                     <div className="font-medium text-catalan-text mb-1">No saved files yet</div>
                     <div className="text-xs">
                       {section === 'writer'
@@ -577,9 +578,9 @@ export default function FileManagerPage() {
                             writer:   'bg-purple-100 text-purple-700',
                           }
                           const TOOL_LABEL: Record<string, string> = {
-                            analyzer: '📊 Analyzer',
-                            cleaner:  '🧹 Cleaner',
-                            writer:   '✍️ Writer',
+                            analyzer: 'Analyzer',
+                            cleaner:  'Cleaner',
+                            writer:   'Writer',
                           }
                           return (
                             <tr key={proj.id}
@@ -609,7 +610,7 @@ export default function FileManagerPage() {
                                     <a href="/fg/writer" className="text-xs text-catalan-primary hover:underline">Open Writer</a>
                                   )}
                                   {proj.data?.csv_content && (
-                                    <button onClick={() => downloadCsv(proj)} className="text-xs text-catalan-primary hover:underline">⬇ CSV</button>
+                                    <button onClick={() => downloadCsv(proj)} className="text-xs text-catalan-primary hover:underline"><EmojiIcon e="⬇" /> CSV</button>
                                   )}
                                   {canUpload && (
                                     <button onClick={() => openShareModal('project', proj.id, proj.name, proj.shared_with ?? [])}
@@ -799,7 +800,7 @@ export default function FileManagerPage() {
         <button onClick={scrollToTop}
           className="fixed bottom-6 right-6 w-10 h-10 bg-catalan-primary text-catalan-bg rounded-full shadow-lg flex items-center justify-center text-lg hover:opacity-90 transition-opacity z-50"
           title="Back to top">
-          ↑
+          <EmojiIcon e="↑" />
         </button>
       )}
     </div>

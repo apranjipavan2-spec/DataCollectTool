@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import api from '@/lib/api'
 import { Button, Card } from '@/components/ui'
 import { useToast } from '@/lib/ToastContext'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface RosterEntry {
   id: string
@@ -200,7 +201,7 @@ export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: F
     <div className="space-y-4">
       <Card>
         <div className="mb-6 p-4 bg-catalan-hover rounded-lg border border-catalan-border space-y-3">
-          <h3 className="text-sm font-semibold text-catalan-text">📂 Upload Beneficiary CSV</h3>
+          <h3 className="text-sm font-semibold text-catalan-text"><EmojiIcon e="📂" /> Upload Beneficiary CSV</h3>
           <div className="flex flex-wrap gap-3 items-end">
             <div>
               <label className="text-xs text-catalan-textMuted block mb-1">Form *</label>
@@ -229,7 +230,7 @@ export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: F
               onClick={handleTemplateDownload}
               className="text-xs px-3 py-2 rounded-lg border border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50 transition-colors"
             >
-              ⬇ CSV Template
+              <EmojiIcon e="⬇" /> CSV Template
             </button>
           </div>
           {csvResult && (
@@ -241,7 +242,7 @@ export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: F
           <div className="mb-4 p-3 bg-catalan-hover rounded-lg border border-catalan-border">
             <div className="flex flex-wrap gap-3 items-end">
               <div className="flex items-center gap-2 text-xs font-medium text-catalan-textMuted">
-                📍 Location
+                <EmojiIcon e="📍" /> Location
               </div>
               <div>
                 <select
@@ -276,10 +277,10 @@ export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: F
               <div className="mt-3 pt-3 border-t border-catalan-border space-y-1">
                 {locationTree.map(district => (
                   <div key={district.id}>
-                    <div className="text-xs font-semibold text-catalan-text">📍 {district.name}</div>
+                    <div className="text-xs font-semibold text-catalan-text"><EmojiIcon e="📍" /> {district.name}</div>
                     {(Array.isArray(district.children) ? district.children : []).map(taluka => (
                       <div key={taluka.id} className="ml-4">
-                        <div className="text-xs text-catalan-textMuted">↳ {taluka.name}</div>
+                        <div className="text-xs text-catalan-textMuted"><EmojiIcon e="↳" /> {taluka.name}</div>
                         {(Array.isArray(taluka.children) ? taluka.children : []).map(village => (
                           <div key={village.id} className="ml-4 text-xs text-catalan-textMuted/70">· {village.name}</div>
                         ))}

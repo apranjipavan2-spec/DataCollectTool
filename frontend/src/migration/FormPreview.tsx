@@ -1,4 +1,5 @@
 import type { ParsedSchema, ParseWarning } from './MigrationPage'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface Props {
   title: string
@@ -31,14 +32,14 @@ export default function FormPreview({ title, schema, warnings, sectionCount, fie
         </div>
         <div className="flex gap-3">
           <button onClick={onBack} className="px-4 py-2 rounded-lg border border-catalan-border text-catalan-textMuted hover:border-catalan-primary hover:text-catalan-primary transition-colors text-sm font-medium">
-            ← Back
+            <EmojiIcon e="←" /> Back
           </button>
           <button
             onClick={onSave}
             disabled={saving}
             className="px-5 py-2 rounded-lg bg-catalan-primary text-white font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            {saving ? 'Saving…' : '💾 Save as Draft Form'}
+            {saving ? 'Saving…' : <><EmojiIcon e="💾" /> Save as Draft Form</>}
           </button>
         </div>
       </div>
@@ -46,7 +47,7 @@ export default function FormPreview({ title, schema, warnings, sectionCount, fie
       {/* Warnings */}
       {warnings.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <p className="text-amber-800 font-semibold text-sm mb-2">⚠️ {warnings.length} warning{warnings.length !== 1 ? 's' : ''} — review before saving</p>
+          <p className="text-amber-800 font-semibold text-sm mb-2"><EmojiIcon e="⚠" /> {warnings.length} warning{warnings.length !== 1 ? 's' : ''} — review before saving</p>
           <ul className="space-y-1">
             {warnings.map((w, i) => (
               <li key={i} className="text-amber-700 text-xs">• {w}</li>
@@ -66,7 +67,7 @@ export default function FormPreview({ title, schema, warnings, sectionCount, fie
             <div className="divide-y divide-catalan-border">
               {section.fields.map((field, fi) => (
                 <div key={fi} className="px-4 py-2.5 flex items-center gap-3">
-                  <span className="text-base flex-shrink-0">{TYPE_ICON[field.type] || '📋'}</span>
+                  <span className="text-base flex-shrink-0"><EmojiIcon e={TYPE_ICON[field.type] || '📋'} /></span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-catalan-text truncate">{field.label}</p>
                     <p className="text-xs text-catalan-textMuted font-mono">{field.name} · {field.type}</p>
@@ -78,7 +79,7 @@ export default function FormPreview({ title, schema, warnings, sectionCount, fie
                     <span className="text-xs bg-blue-100 text-blue-600 rounded px-1.5 py-0.5 flex-shrink-0">skip logic</span>
                   )}
                   {field.skipLogicRaw && (
-                    <span className="text-xs bg-amber-100 text-amber-600 rounded px-1.5 py-0.5 flex-shrink-0">⚠️ raw logic</span>
+                    <span className="text-xs bg-amber-100 text-amber-600 rounded px-1.5 py-0.5 flex-shrink-0"><EmojiIcon e="⚠" /> raw logic</span>
                   )}
                   {field.type === 'repeat_group' && field.fields && (
                     <span className="text-xs bg-purple-100 text-purple-600 rounded px-1.5 py-0.5 flex-shrink-0">{field.fields.length} sub-fields</span>

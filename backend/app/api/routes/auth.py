@@ -1,9 +1,10 @@
-import random, string, secrets
+import random, string, secrets, uuid as _uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from app.core.database import get_db
 from jose import JWTError, jwt
 from app.core.security import (
@@ -14,7 +15,7 @@ from app.core.config import settings
 from app.core.rate_limit import limiter
 from app.core.deps import get_current_user, require_org_admin
 from app.models.user import User
-from app.services.email import send_password_reset_email
+from app.services.email import send_password_reset_email, send_verification_email
 
 router = APIRouter()
 
@@ -33,8 +34,18 @@ def _mask_email(email: str) -> str:
 
 
 class LoginRequest(BaseModel):
-    phone: str
+    phone: Optional[str] = None
+    identifier: Optional[str] = None  # email or phone — takes priority over phone
     password: str
+
+
+class RegisterRequest(BaseModel):
+    org_name: str
+    admin_name: str
+    email: str
+    password: str
+    segment: str = "ngo"   # ngo | govt | research | corporate
+    phone: Optional[str] = None
 
 
 class SendOTPRequest(BaseModel):
@@ -150,12 +161,22 @@ def google_login(request: Request, body: GoogleLoginIn, db: Session = Depends(ge
 @router.post("/login")
 @limiter.limit("10/minute")
 def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
-    """Authenticate with phone + password. Returns 2fa_required if tenant has 2FA enabled."""
-    user = db.query(User).filter(User.phone == body.phone, User.is_active == True).first()
+    """Authenticate with phone/email + password. Returns 2fa_required if tenant has 2FA enabled."""
+    lookup = body.identifier or body.phone or ""
+    user = db.query(User).filter(
+        or_(User.phone == lookup, User.email == lookup),
+        User.is_active == True,
+    ).first()
     if not user or not user.password_hash:
-        raise HTTPException(status_code=401, detail="Invalid phone or password")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     if not verify_password(body.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid phone or password")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # User-level TOTP 2FA check (takes priority over tenant OTP flow)
+    if getattr(user, "totp_enabled", False) and getattr(user, "totp_secret", None):
+        from app.api.routes.two_factor import issue_2fa_challenge
+        temp_token = issue_2fa_challenge(str(user.id))
+        return {"2fa_required": True, "method": "totp", "temp_token": temp_token}
 
     # Check if tenant has 2FA enabled and plan supports it
     from app.models.tenant import Tenant
@@ -182,6 +203,107 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
             return {"2fa_required": True, "masked_contact": masked, "phone": user.phone}
 
     return _make_token(user)
+
+
+# ── Self-serve registration ──────────────────────────────────────────────
+
+VERIFY_TOKEN_EXPIRE_HOURS = 24
+VALID_SEGMENTS = {"ngo", "govt", "research", "corporate"}
+
+
+@router.post("/register", status_code=201)
+@limiter.limit("5/minute")
+def register(request: Request, body: RegisterRequest, db: Session = Depends(get_db)):
+    """Create a new tenant + org_admin from self-serve signup. Sends email verification."""
+    segment = body.segment if body.segment in VALID_SEGMENTS else "ngo"
+
+    # Validate uniqueness
+    if db.query(User).filter(User.email == body.email).first():
+        raise HTTPException(status_code=409, detail="An account with this email already exists.")
+    if body.phone:
+        if db.query(User).filter(User.phone == body.phone).first():
+            raise HTTPException(status_code=409, detail="An account with this phone number already exists.")
+    if len(body.password) < 6:
+        raise HTTPException(status_code=422, detail="Password must be at least 6 characters.")
+
+    from app.models.tenant import Tenant
+    from app.models.billing import Subscription
+
+    # Create tenant
+    tenant = Tenant(name=body.org_name, plan_tier="free")
+    if hasattr(tenant, "app_name"):
+        tenant.app_name = body.org_name
+    db.add(tenant)
+    db.flush()
+
+    # Generate a unique placeholder phone if none provided
+    phone = body.phone or f"reg_{str(_uuid.uuid4()).replace('-', '')[:16]}"
+
+    # Create org_admin (inactive until email verified)
+    admin = User(
+        tenant_id=tenant.id,
+        phone=phone,
+        name=body.admin_name,
+        email=body.email,
+        role="org_admin",
+        password_hash=hash_password(body.password),
+        is_active=False,
+    )
+    db.add(admin)
+    db.flush()
+
+    # Assign free plan for chosen segment
+    trial_sub = Subscription(
+        tenant_id=tenant.id,
+        plan_id=f"{segment}_free",
+        billing_cycle="monthly",
+        status="trialing",
+        trial_start=datetime.now(timezone.utc),
+        trial_end=datetime.now(timezone.utc) + timedelta(days=30),
+    )
+    db.add(trial_sub)
+    db.commit()
+
+    # Generate + store verification token (reuse otp_hash fields)
+    raw_token = secrets.token_urlsafe(32)
+    admin.otp_hash = hash_otp(raw_token)
+    admin.otp_expires_at = datetime.now(timezone.utc) + timedelta(hours=VERIFY_TOKEN_EXPIRE_HOURS)
+    db.commit()
+
+    send_verification_email(body.email, body.admin_name, raw_token)
+
+    return {"message": "Account created! Check your email to verify and activate it."}
+
+
+@router.get("/verify-email")
+@limiter.limit("20/minute")
+def verify_email(request: Request, token: str, db: Session = Depends(get_db)):
+    """Verify email token, activate user, return auth tokens."""
+    invalid = HTTPException(status_code=400, detail="Verification link is invalid or has expired.")
+
+    # Find inactive users with a pending verification token
+    candidates = db.query(User).filter(
+        User.is_active == False,
+        User.otp_hash.isnot(None),
+        User.otp_expires_at.isnot(None),
+        User.otp_expires_at > datetime.now(timezone.utc),
+    ).all()
+
+    matched = None
+    for u in candidates:
+        if verify_otp(token, u.otp_hash):
+            matched = u
+            break
+
+    if not matched:
+        raise invalid
+
+    matched.is_active = True
+    matched.otp_hash = None
+    matched.otp_expires_at = None
+    db.commit()
+
+    return _make_token(matched)
 
 
 # ── Token refresh ────────────────────────────────────────────────────────

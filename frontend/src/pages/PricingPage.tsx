@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '@/lib/api'
 import { getStoredUser } from '@/lib/api'
+import EmojiIcon from '@/components/EmojiIcon'
 
 interface PlanFeatures {
   ai_cleaning: boolean; ai_writer: boolean; ai_smart_builder: boolean
@@ -180,7 +181,7 @@ export default function PricingPage() {
                     ? `${s.active} shadow-md`
                     : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                 }`}>
-                <span className="text-3xl leading-none">{s.icon}</span>
+                <span className="text-3xl leading-none"><EmojiIcon e={s.icon} /></span>
                 <span className={`text-xs font-semibold text-center leading-snug ${isActive ? s.text : 'text-slate-500'}`}>
                   {s.label}
                 </span>
@@ -270,16 +271,16 @@ export default function PricingPage() {
                   {/* Limits */}
                   <div className="space-y-2.5 text-sm border-t border-slate-100 pt-5 mb-5">
                     <div className="flex items-center gap-2.5 text-slate-700">
-                      <span className="text-base">📊</span>
+                      <span className="text-base"><EmojiIcon e="📊" /></span>
                       <span><b>{plan.submissions_limit?.toLocaleString() ?? 'Unlimited'}</b> submissions / month</span>
                     </div>
                     <div className="flex items-center gap-2.5 text-slate-700">
-                      <span className="text-base">💾</span>
+                      <span className="text-base"><EmojiIcon e="💾" /></span>
                       <span><b>{plan.storage_limit_mb ? `${plan.storage_limit_mb} MB` : 'Unlimited'}</b> storage</span>
                     </div>
                     {plan.asr_minutes_limit ? (
                       <div className="flex items-center gap-2.5 text-slate-700">
-                        <span className="text-base">🎤</span>
+                        <span className="text-base"><EmojiIcon e="🎤" /></span>
                         <span><b>{plan.asr_minutes_limit} min</b> voice transcription / month</span>
                       </div>
                     ) : null}
@@ -303,7 +304,7 @@ export default function PricingPage() {
 
             {/* Enterprise card */}
             <div className="flex flex-col rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-7 justify-center items-center text-center gap-4">
-              <div className="text-4xl">🏗️</div>
+              <div className="text-4xl"><EmojiIcon e="🏗" /></div>
               <div>
                 <h3 className="text-lg font-bold text-slate-900 mb-1">Enterprise</h3>
                 <p className="text-sm text-slate-500">Custom limits · Dedicated infra · White-label · SSO · On-premise available</p>
@@ -354,7 +355,7 @@ export default function PricingPage() {
               { icon: '🔗', title: 'API + Webhooks',         desc: 'Push data to CRM, ERP, Zapier, or n8n in real time with read + write REST API.' },
             ].map(f => (
               <div key={f.title} className="flex gap-4 p-5 rounded-xl border border-slate-100 bg-slate-50 hover:border-slate-200 transition-colors">
-                <span className="text-2xl flex-shrink-0">{f.icon}</span>
+                <span className="text-2xl flex-shrink-0"><EmojiIcon e={f.icon} /></span>
                 <div>
                   <div className="font-semibold text-slate-900 text-sm">{f.title}</div>
                   <div className="text-xs text-slate-500 mt-0.5">{f.desc}</div>

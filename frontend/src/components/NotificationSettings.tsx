@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { subscribeToPush, unsubscribeFromPush } from '@/lib/pushNotifications'
 import { Button } from '@/components/ui'
+import EmojiIcon from '@/components/EmojiIcon'
 
 type PermState = 'default' | 'granted' | 'denied' | 'unsupported'
 
@@ -89,7 +90,7 @@ export default function NotificationSettings() {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-lg bg-catalan-primary/10 flex items-center justify-center text-lg">
-          🔔
+          <EmojiIcon e="🔔" />
         </div>
         <div>
           <h3 className="text-sm font-semibold text-catalan-text">Push Notifications</h3>

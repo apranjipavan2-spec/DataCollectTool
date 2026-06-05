@@ -16,6 +16,7 @@
 import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { getStoredUser, logout } from '@/lib/api'
 import { useState, useEffect } from 'react'
+import EmojiIcon from '@/components/EmojiIcon'
 
 const ADMIN_ROLES = ['master_admin', 'org_admin']
 const SUPERVISOR_ROLES = [...ADMIN_ROLES, 'supervisor']
@@ -89,7 +90,7 @@ export default function Navbar() {
                 fontWeight: active ? 600 : 400,
               }}
             >
-              <span style={{ fontSize: 14 }}>{item.icon}</span>
+              <span style={{ fontSize: 14 }}><EmojiIcon e={item.icon} /></span>
               <span style={navLabel}>{item.label}</span>
             </Link>
           )
@@ -119,7 +120,7 @@ export default function Navbar() {
               </div>
               <div style={menuDivider} />
               <button onClick={logout} style={menuItem}>
-                <span>↪</span> Sign out
+                <span><EmojiIcon e="↪" /></span> Sign out
               </button>
             </div>
           </>

@@ -17,3 +17,5 @@ from app.models.roster import RespondentRoster
 from app.models.user_tool_project import UserToolProject
 from app.models.billing import Plan, Subscription, PaymentRequest, UsageRecord
 from app.models.shared_file import SharedFile
+from app.models.audit_log import AuditLog
+from app.models.ai_usage_log import AiUsageLog

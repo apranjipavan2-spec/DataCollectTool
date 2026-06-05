@@ -1,78 +1,137 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { TableResult, TableConfig } from '../types';
+import { ChartCanvas, ChartCanvasConfig } from './ChartCanvas';
+import { CHART_TYPES, PALETTES, ChartType, LegendPos, classifyColumns, W_DEFAULT, H_DEFAULT, figTitleFromTable, buildChartExportSvg, svgXmlToPngDataUrl } from './chartUtils';
 
 interface Props {
   tables: TableConfig[];
   results: Map<string, TableResult>;
   onClose: () => void;
   onChartChange?: (tableId: string, chartConfig: any) => void;
+  activeTableIdx?: number;
 }
 
-type ChartType = 'bar' | 'bar_h' | 'stacked' | 'grouped' | 'line' | 'area' | 'pie' | 'donut' | 'scatter' | 'waterfall' | 'combo';
-type LegendPos = 'right' | 'bottom' | 'top' | 'none';
-
-const CHART_TYPES: { value: ChartType; label: string; icon: string }[] = [
-  { value: 'bar',      label: 'Bar',         icon: '▐▐▐' },
-  { value: 'bar_h',    label: 'Horizontal',   icon: '≡' },
-  { value: 'stacked',  label: 'Stacked',      icon: '▊' },
-  { value: 'grouped',  label: 'Grouped',      icon: '▐▌' },
-  { value: 'line',     label: 'Line',         icon: '∿' },
-  { value: 'area',     label: 'Area',         icon: '◟◝' },
-  { value: 'combo',    label: 'Combo',        icon: '▐∿' },
-  { value: 'pie',      label: 'Pie',          icon: '◔' },
-  { value: 'donut',    label: 'Donut',        icon: '⊙' },
-  { value: 'scatter',  label: 'Scatter',      icon: '∴' },
-  { value: 'waterfall',label: 'Waterfall',    icon: '⤵' },
+type Tab = 'data' | 'style' | 'axes' | 'colors' | 'advanced' | 'size';
+const ASPECT_PRESETS: { value: string; label: string; ratio: number | null }[] = [
+  { value: 'auto',  label: 'Auto (fit text)', ratio: null },
+  { value: '16:9',  label: '16 : 9 (wide)',   ratio: 16 / 9 },
+  { value: '4:3',   label: '4 : 3 (slide)',   ratio: 4 / 3 },
+  { value: '3:2',   label: '3 : 2',           ratio: 3 / 2 },
+  { value: '1:1',   label: '1 : 1 (square)',  ratio: 1 },
+  { value: 'custom', label: 'Custom',         ratio: null },
 ];
 
-const PALETTES: { name: string; colors: string[] }[] = [
-  { name: 'Blueprint', colors: ['#3b82f6','#60a5fa','#93c5fd','#1d4ed8','#2563eb','#6366f1','#8b5cf6'] },
-  { name: 'Emerald',   colors: ['#10b981','#34d399','#6ee7b7','#059669','#047857','#065f46','#0d9488'] },
-  { name: 'Sunset',    colors: ['#f97316','#fb923c','#fdba74','#ef4444','#f59e0b','#eab308','#84cc16'] },
-  { name: 'Lavender',  colors: ['#8b5cf6','#a78bfa','#c4b5fd','#7c3aed','#6d28d9','#ec4899','#f472b6'] },
-  { name: 'Mono',      colors: ['#e2e8f0','#cbd5e1','#94a3b8','#64748b','#475569','#334155','#1e293b'] },
-  { name: 'Corporate', colors: ['#1e3a5f','#4a90d9','#7ab3ef','#2c5f2d','#97bc62','#d4a017','#c75b12'] },
+// Font family options — value is the CSS font-family stack so the SVG renders
+// it correctly both in-app and after rasterization for Word/PNG.
+const FONT_FAMILIES: { label: string; value: string }[] = [
+  { label: 'Default (inherit)',  value: '' },
+  { label: 'Arial',              value: 'Arial, sans-serif' },
+  { label: 'Helvetica',          value: 'Helvetica, Arial, sans-serif' },
+  { label: 'Inter',              value: 'Inter, system-ui, sans-serif' },
+  { label: 'Segoe UI',           value: '"Segoe UI", Tahoma, sans-serif' },
+  { label: 'Verdana',            value: 'Verdana, Geneva, sans-serif' },
+  { label: 'Tahoma',             value: 'Tahoma, sans-serif' },
+  { label: 'Trebuchet MS',       value: '"Trebuchet MS", sans-serif' },
+  { label: 'Georgia (serif)',    value: 'Georgia, serif' },
+  { label: 'Times New Roman',    value: '"Times New Roman", Times, serif' },
+  { label: 'Cambria (serif)',    value: 'Cambria, Georgia, serif' },
+  { label: 'Courier New (mono)', value: '"Courier New", Courier, monospace' },
 ];
 
-const W = 700, H = 340;
-const ML = 62, MR = 24, MT = 28, MB = 60;
-const PW = W - ML - MR, PH = H - MT - MB;
-
-function nice(v: number, up = true): number {
-  if (v === 0) return 0;
-  const exp = Math.pow(10, Math.floor(Math.log10(Math.abs(v))));
-  const f = v / exp;
-  const nf = up ? Math.ceil(f) : Math.floor(f);
-  return nf * exp;
+// Style preset persistence — list of named style snapshots stored in localStorage.
+// Each preset captures the full set of visual settings: palette, font, all
+// colors, sizes, opacity, title style, value labels, label position,
+// conditional bars, pattern fills, stacked100, trendline, light mode, axis
+// rotations, and per-series colors. Data shape (xField/yFields, chart type,
+// width/height, sort/topN) is NOT included so the same preset works across
+// different tables/charts.
+const PRESET_KEY = 'tableforge_chart_presets';
+interface ChartStylePreset {
+  paletteName?: string;
+  fontFamily?: string;
+  // Colors
+  axisColor?: string;
+  gridColor?: string;
+  tickColor?: string;
+  axisLabelColor?: string;
+  dataLabelColor?: string;
+  titleColor?: string;
+  singleColor?: string;
+  seriesColors?: Record<number, string>;
+  // Sizes / opacity
+  labelFontSize?: number;
+  titleFontSize?: number;
+  barOpacity?: number;
+  // Visibility
+  showGrid?: boolean;
+  showLabels?: boolean;
+  showLegend?: LegendPos;
+  // Title style
+  titleAlign?: 'left' | 'center' | 'right';
+  titleBold?: boolean;
+  titleItalic?: boolean;
+  // Value labels
+  valueLabelSplit?: boolean;
+  labelPosition?: 'inside' | 'outside';
+  // Fills / display modes
+  patternFills?: boolean;
+  stacked100?: boolean;
+  trendline?: boolean;
+  // Conditional bar colour
+  condEnabled?: boolean;
+  condThreshold?: number;
+  condBelow?: string;
+  condAbove?: string;
+  // Axis label rotation
+  xLabelRotation?: number | 'auto';
+  yLabelRotation?: number;
+  // Light/dark mode
+  lightMode?: boolean;
+}
+function loadPresets(): Record<string, ChartStylePreset> {
+  try {
+    const raw = localStorage.getItem(PRESET_KEY);
+    if (!raw) return {};
+    const p = JSON.parse(raw);
+    return (p && typeof p === 'object') ? p : {};
+  } catch { return {}; }
+}
+function savePresets(p: Record<string, ChartStylePreset>) {
+  try { localStorage.setItem(PRESET_KEY, JSON.stringify(p)); } catch { /* quota or disabled */ }
 }
 
-function ticksArr(min: number, max: number, count = 5): number[] {
-  const range = nice(max - min, true) || 1;
-  const step = nice(range / count, true) || 1;
-  const t: number[] = [];
-  const start = Math.floor(min / step) * step;
-  for (let v = start; v <= max + step * 0.01; v += step) t.push(parseFloat(v.toFixed(10)));
-  return t;
+// Global default chart style — saved automatically on every "Save & Close".
+// New charts (no existing chartConfig) inherit this so format carries across tables.
+const DEFAULT_STYLE_KEY = 'tableforge_default_chart_style';
+interface DefaultChartStyle {
+  chartType: string;
+  palette: number;
+  showGrid: boolean; showLabels: boolean; showLegend: LegendPos;
+  labelFontSize: number; titleFontSize: number; barOpacity: number;
+  fontFamily: string; axisColor: string; gridColor: string;
+  tickColor: string; axisLabelColor: string; dataLabelColor: string;
+  titleColor: string; singleColor: string; seriesColors: Record<number, string>;
+  titleAlign: 'left' | 'center' | 'right'; titleBold: boolean; titleItalic: boolean;
+  xLabelRotation: number | 'auto'; yLabelRotation: number; valueLabelSplit: boolean;
+  stacked100: boolean; labelPosition: 'inside' | 'outside'; patternFills: boolean;
+  condEnabled: boolean; condThreshold: number; condBelow: string; condAbove: string;
+  lightMode: boolean;
+}
+function loadDefaultStyle(): DefaultChartStyle | null {
+  try {
+    const raw = localStorage.getItem(DEFAULT_STYLE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as DefaultChartStyle;
+  } catch { return null; }
+}
+function saveDefaultStyle(s: DefaultChartStyle) {
+  try { localStorage.setItem(DEFAULT_STYLE_KEY, JSON.stringify(s)); } catch { /* quota */ }
 }
 
-function fmt(n: number): string {
-  if (Math.abs(n) >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-  if (Math.abs(n) >= 1_000) return (n / 1_000).toFixed(1) + 'K';
-  return Number.isInteger(n) ? String(n) : n.toFixed(2);
-}
-
-function arcPath(cx: number, cy: number, r: number, startAngle: number, endAngle: number, inner = 0): string {
-  const s = { x: cx + r * Math.cos(startAngle), y: cy + r * Math.sin(startAngle) };
-  const e = { x: cx + r * Math.cos(endAngle),   y: cy + r * Math.sin(endAngle) };
-  const large = endAngle - startAngle > Math.PI ? 1 : 0;
-  if (inner === 0) return `M${cx},${cy} L${s.x},${s.y} A${r},${r} 0 ${large},1 ${e.x},${e.y} Z`;
-  const si = { x: cx + inner * Math.cos(startAngle), y: cy + inner * Math.sin(startAngle) };
-  const ei = { x: cx + inner * Math.cos(endAngle),   y: cy + inner * Math.sin(endAngle) };
-  return `M${s.x},${s.y} A${r},${r} 0 ${large},1 ${e.x},${e.y} L${ei.x},${ei.y} A${inner},${inner} 0 ${large},0 ${si.x},${si.y} Z`;
-}
-
-export function ChartBuilder({ tables, results, onClose, onChartChange }: Props) {
-  const [tableIdx, setTableIdx] = useState(0);
+export function ChartBuilder({ tables, results, onClose, onChartChange, activeTableIdx }: Props) {
+  const initialIdx = (typeof activeTableIdx === 'number' && activeTableIdx >= 0 && activeTableIdx < tables.length) ? activeTableIdx : 0;
+  const [tableIdx, setTableIdx] = useState(initialIdx);
+  const [tab, setTab] = useState<Tab>('data');
   const [chartType, setChartType] = useState<ChartType>('bar');
   const [xField, setXField] = useState('');
   const [yFields, setYFields] = useState<string[]>([]);
@@ -80,25 +139,64 @@ export function ChartBuilder({ tables, results, onClose, onChartChange }: Props)
   const [showGrid, setShowGrid] = useState(true);
   const [showLabels, setShowLabels] = useState(false);
   const [showLegend, setShowLegend] = useState<LegendPos>('right');
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
   const [chartTitle, setChartTitle] = useState('');
   const [xAxisLabel, setXAxisLabel] = useState('');
   const [yAxisLabel, setYAxisLabel] = useState('');
   const [labelFontSize, setLabelFontSize] = useState(10);
   const [titleFontSize, setTitleFontSize] = useState(14);
   const [barOpacity, setBarOpacity] = useState(0.9);
+  const [chartOnly, setChartOnly] = useState(false);
+  const [xLabelRotation, setXLabelRotation] = useState<number | 'auto'>('auto');
+  const [yLabelRotation, setYLabelRotation] = useState<number>(0);
+  const [chartWidth, setChartWidth] = useState<number>(W_DEFAULT);
+  const [chartHeight, setChartHeight] = useState<number>(H_DEFAULT);
+  const [aspectPreset, setAspectPreset] = useState<string>('auto');
+  const [valueLabelSplit, setValueLabelSplit] = useState<boolean>(false);
+  // ─── Color & font customisation ──────────────────────────────────────────
+  const [fontFamily, setFontFamily] = useState<string>('');
+  const [axisColor, setAxisColor] = useState<string>('#374151');
+  const [gridColor, setGridColor] = useState<string>('rgba(255,255,255,0.05)');
+  const [tickColor, setTickColor] = useState<string>('#9ca3af');
+  const [axisLabelColor, setAxisLabelColor] = useState<string>('#e4e4e7');
+  const [dataLabelColor, setDataLabelColor] = useState<string>('');  // blank = use series color
+  const [titleColor, setTitleColor] = useState<string>('');          // blank = default fill
+  const [singleColor, setSingleColor] = useState<string>('');        // blank = use palette
+  const [seriesColors, setSeriesColors] = useState<Record<number, string>>({});
+  const [presets, setPresets] = useState<Record<string, ChartStylePreset>>(() => loadPresets());
+  const [presetName, setPresetName] = useState<string>('');
+  const [presetApplyToAll, setPresetApplyToAll] = useState<boolean>(false);
+  // ─── Advanced chart options (title align/bold/italic, ref line, sort/topN,
+  // stacked100, label position, trendline, hatch fills, conditional bars, light mode) ─
+  const [titleAlign, setTitleAlign] = useState<'left' | 'center' | 'right'>('center');
+  const [titleBold, setTitleBold] = useState<boolean>(true);
+  const [titleItalic, setTitleItalic] = useState<boolean>(false);
+  const [refLineValue, setRefLineValue] = useState<string>('');
+  const [refLineLabel, setRefLineLabel] = useState<string>('');
+  const [refLineColor, setRefLineColor] = useState<string>('#f97316');
+  const [categorySort, setCategorySort] = useState<'none' | 'asc' | 'desc'>('none');
+  const [topN, setTopN] = useState<number>(0);
+  const [topNOther, setTopNOther] = useState<boolean>(false);
+  const [stacked100, setStacked100] = useState<boolean>(false);
+  const [labelPosition, setLabelPosition] = useState<'inside' | 'outside'>('outside');
+  const [trendline, setTrendline] = useState<boolean>(false);
+  const [patternFills, setPatternFills] = useState<boolean>(false);
+  const [condEnabled, setCondEnabled] = useState<boolean>(false);
+  const [condThreshold, setCondThreshold] = useState<number>(0);
+  const [condBelow, setCondBelow] = useState<string>('#ef4444');
+  const [condAbove, setCondAbove] = useState<string>('#10b981');
+  const [lightMode, setLightMode] = useState<boolean>(false);
   const svgRef = useRef<SVGSVGElement>(null);
+  const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
 
   const table = tables[tableIdx];
 
-  // Load chart config from table when table changes
   useEffect(() => {
     const cc = table?.chartConfig;
     if (cc) {
       setChartType((cc.type as ChartType) || 'bar');
       setXField(cc.xField || '');
       setYFields(cc.yFields || []);
-      setPalette(PALETTES.findIndex(p => p.name === cc.palette) || 0);
+      setPalette(Math.max(0, PALETTES.findIndex(p => p.name === cc.palette)));
       setShowGrid(cc.showGrid !== false);
       setShowLabels(cc.showLabels || false);
       setShowLegend((cc.showLegend as unknown as LegendPos) || 'right');
@@ -107,48 +205,92 @@ export function ChartBuilder({ tables, results, onClose, onChartChange }: Props)
       setYAxisLabel(cc.yAxisLabel || '');
       setLabelFontSize(cc.labelFontSize || 10);
       setTitleFontSize(cc.titleFontSize || 14);
-      setBarOpacity(cc.barOpacity || 0.9);
+      setBarOpacity(cc.barOpacity ?? 0.9);
+      setChartOnly(!!cc.chart_only);
+      const xRot = cc.xLabelRotation;
+      setXLabelRotation(xRot === undefined || xRot === null ? 'auto' : (xRot === 'auto' ? 'auto' : Number(xRot)));
+      setYLabelRotation(typeof cc.yLabelRotation === 'number' ? cc.yLabelRotation : 0);
+      setChartWidth(typeof cc.chartWidth === 'number' ? cc.chartWidth : W_DEFAULT);
+      setChartHeight(typeof cc.chartHeight === 'number' ? cc.chartHeight : H_DEFAULT);
+      setAspectPreset(typeof cc.aspectPreset === 'string' ? cc.aspectPreset : 'auto');
+      setValueLabelSplit(!!cc.valueLabelSplit);
+      setFontFamily(typeof cc.fontFamily === 'string' ? cc.fontFamily : '');
+      setAxisColor(typeof cc.axisColor === 'string' ? cc.axisColor : '#374151');
+      setGridColor(typeof cc.gridColor === 'string' ? cc.gridColor : 'rgba(255,255,255,0.05)');
+      setTickColor(typeof cc.tickColor === 'string' ? cc.tickColor : '#9ca3af');
+      setAxisLabelColor(typeof cc.axisLabelColor === 'string' ? cc.axisLabelColor : '#e4e4e7');
+      setDataLabelColor(typeof cc.dataLabelColor === 'string' ? cc.dataLabelColor : '');
+      setTitleColor(typeof cc.titleColor === 'string' ? cc.titleColor : '');
+      setSingleColor(typeof cc.singleColor === 'string' ? cc.singleColor : '');
+      setSeriesColors(cc.seriesColors && typeof cc.seriesColors === 'object' ? cc.seriesColors : {});
+      setTitleAlign((cc.titleAlign as any) || 'center');
+      setTitleBold(cc.titleBold !== false);
+      setTitleItalic(!!cc.titleItalic);
+      const rl = Array.isArray(cc.referenceLines) && cc.referenceLines[0];
+      setRefLineValue(rl && isFinite(rl.value) ? String(rl.value) : '');
+      setRefLineLabel(rl?.label || '');
+      setRefLineColor(rl?.color || '#f97316');
+      setCategorySort((cc.categorySort as any) || 'none');
+      setTopN(typeof cc.topN === 'number' ? cc.topN : 0);
+      setTopNOther(!!cc.topNOther);
+      setStacked100(!!cc.stacked100);
+      setLabelPosition((cc.labelPosition as any) || 'outside');
+      setTrendline(!!cc.trendline);
+      setPatternFills(!!cc.patternFills);
+      const cc2 = cc.conditionalColor;
+      setCondEnabled(!!cc2);
+      setCondThreshold(cc2 && isFinite(cc2.threshold) ? cc2.threshold : 0);
+      setCondBelow(cc2?.below || '#ef4444');
+      setCondAbove(cc2?.above || '#10b981');
+      setLightMode(!!cc.lightMode);
+    } else {
+      // New chart — seed with the saved global default style if one exists.
+      const def = loadDefaultStyle();
+      setChartType((def?.chartType as any) || 'bar'); setXField(''); setYFields([]);
+      setPalette(def?.palette ?? 0); setShowGrid(def?.showGrid ?? true); setShowLabels(def?.showLabels ?? false); setShowLegend(def?.showLegend ?? 'right');
+      setChartTitle(''); setXAxisLabel(''); setYAxisLabel('');
+      setLabelFontSize(def?.labelFontSize ?? 10); setTitleFontSize(def?.titleFontSize ?? 14); setBarOpacity(def?.barOpacity ?? 0.9);
+      setChartOnly(false);
+      setXLabelRotation(def?.xLabelRotation ?? 'auto'); setYLabelRotation(def?.yLabelRotation ?? 0);
+      setChartWidth(W_DEFAULT); setChartHeight(H_DEFAULT); setAspectPreset('auto');
+      setValueLabelSplit(def?.valueLabelSplit ?? false);
+      setFontFamily(def?.fontFamily ?? ''); setAxisColor(def?.axisColor ?? '#374151'); setGridColor(def?.gridColor ?? 'rgba(255,255,255,0.05)');
+      setTickColor(def?.tickColor ?? '#9ca3af'); setAxisLabelColor(def?.axisLabelColor ?? '#e4e4e7');
+      setDataLabelColor(def?.dataLabelColor ?? ''); setTitleColor(def?.titleColor ?? ''); setSingleColor(def?.singleColor ?? ''); setSeriesColors(def?.seriesColors ?? {});
+      setTitleAlign(def?.titleAlign ?? 'center'); setTitleBold(def?.titleBold ?? true); setTitleItalic(def?.titleItalic ?? false);
+      setRefLineValue(''); setRefLineLabel(''); setRefLineColor('#f97316');
+      setCategorySort('none'); setTopN(0); setTopNOther(false);
+      setStacked100(def?.stacked100 ?? false); setLabelPosition(def?.labelPosition ?? 'outside');
+      setTrendline(false); setPatternFills(def?.patternFills ?? false);
+      setCondEnabled(def?.condEnabled ?? false); setCondThreshold(def?.condThreshold ?? 0); setCondBelow(def?.condBelow ?? '#ef4444'); setCondAbove(def?.condAbove ?? '#10b981');
+      setLightMode(def?.lightMode ?? false);
     }
   }, [table?.id]);
-  const result = table ? results.get(table.id) : null;
+
+  // When a non-auto/non-custom aspect preset is picked, keep height locked to width / ratio.
+  useEffect(() => {
+    const preset = ASPECT_PRESETS.find(p => p.value === aspectPreset);
+    if (preset && preset.ratio) {
+      setChartHeight(Math.round(chartWidth / preset.ratio));
+    }
+  }, [aspectPreset, chartWidth]);
+
+  const result: TableResult | null = (table ? results.get(table.id) : null) || null;
   const headers = result?.headers || [];
   const rows = useMemo(() => (result?.rows || []).filter(r => String(r[0]) !== 'Grand Total'), [result]);
-
-  const textCols = headers.filter((_, i) => rows.length > 0 && typeof rows[0][i] !== 'number');
-  const numCols  = headers.filter((_, i) => rows.length > 0 && typeof rows[0][i] === 'number');
+  const { textCols, numCols } = useMemo(() => classifyColumns(headers, rows), [headers, rows]);
 
   const effectiveX = xField || textCols[0] || headers[0] || '';
-  const effectiveY = yFields.length > 0 ? yFields : [numCols[0] || headers[1] || ''];
-  const xIdx = headers.indexOf(effectiveX);
-  const yIndices = effectiveY.map(f => headers.indexOf(f)).filter(i => i >= 0);
-  const colors = PALETTES[palette].colors;
-
-  // Multi-series data
-  const multiData = useMemo(() => {
-    if (xIdx < 0 || yIndices.length === 0) return [];
-    return rows.map(r => ({
-      label: String(r[xIdx] ?? ''),
-      values: yIndices.map(yi => Number(r[yi]) || 0),
-    }));
-  }, [rows, xIdx, yIndices]);
-
-  const allValues = multiData.flatMap(d => d.values);
-  const maxVal = allValues.length ? Math.max(...allValues) : 1;
-  const minVal = Math.min(0, allValues.length ? Math.min(...allValues) : 0);
-
-  // For stacked: max is sum of all series per label
-  const stackMax = chartType === 'stacked' || chartType === 'waterfall'
-    ? Math.max(...multiData.map(d => d.values.reduce((s, v) => s + Math.max(v, 0), 0)), 1)
-    : maxVal;
-  const effectiveMax = chartType === 'stacked' ? stackMax : maxVal;
-
-  const yTicks = ticksArr(minVal, effectiveMax);
-  const yMax = Math.max(...yTicks);
-  const yMin = Math.min(...yTicks);
-  const yRange = yMax - yMin || 1;
-
-  const yToSvg = (v: number) => MT + PH - ((v - yMin) / yRange) * PH;
-  const xToSvg = (i: number, n: number) => ML + (i + 0.5) * (PW / n);
+  // Default Y selection: pick all numeric columns except Total/Grand Total
+  // (so a District × Beneficiary/Non-Beneficiary table renders both series).
+  // Caps at 4 to keep the chart readable; user can deselect via the Y picker.
+  const effectiveY = (() => {
+    if (yFields.length > 0) return yFields;
+    const nonTotal = numCols.filter(c => !/\btotal\b/i.test(c));
+    const pool = nonTotal.length > 0 ? nonTotal : numCols;
+    if (pool.length > 0) return pool.slice(0, 4);
+    return headers[1] ? [headers[1]] : [];
+  })();
 
   const toggleYField = (field: string) => {
     setYFields(prev => {
@@ -157,577 +299,852 @@ export function ChartBuilder({ tables, results, onClose, onChartChange }: Props)
     });
   };
 
-  const handleDownload = (format: 'svg' | 'png') => {
+  const refLineParsed = (() => {
+    const v = parseFloat(refLineValue);
+    if (!isFinite(v)) return [];
+    return [{ value: v, label: refLineLabel || undefined, color: refLineColor }];
+  })();
+
+  const buildConfig = (): ChartCanvasConfig => ({
+    type: chartType,
+    xField: effectiveX,
+    yFields: effectiveY,
+    paletteName: PALETTES[palette]?.name,
+    showGrid, showLabels, showLegend,
+    xAxisLabel, yAxisLabel, labelFontSize, barOpacity,
+    xLabelRotation, yLabelRotation,
+    valueLabelSplit,
+    fontFamily: fontFamily || undefined,
+    axisColor, gridColor,
+    tickColor, axisLabelColor,
+    dataLabelColor: dataLabelColor || undefined,
+    singleColor: singleColor || undefined,
+    seriesColors,
+    referenceLines: refLineParsed,
+    categorySort,
+    topN: topN > 0 ? topN : undefined,
+    topNOther,
+    stacked100,
+    labelPosition,
+    trendline,
+    patternFills,
+    conditionalColor: condEnabled
+      ? { threshold: condThreshold, below: condBelow, above: condAbove }
+      : undefined,
+    lightMode,
+  });
+
+  const autoFigTitle = useMemo(() => table ? figTitleFromTable(table) : '', [table?.title, table?.name, table?.table_number]);
+  const effectiveTitle = chartTitle.trim() || autoFigTitle;
+
+  const saveAndClose = () => {
+    if (onChartChange && table) {
+      onChartChange(table.id, {
+        type: chartType,
+        xField: effectiveX,
+        yFields: effectiveY,
+        palette: PALETTES[palette].name,
+        showGrid, showLabels, showLegend,
+        chartTitle, xAxisLabel, yAxisLabel,
+        labelFontSize, titleFontSize, barOpacity,
+        chart_only: chartOnly,
+        xLabelRotation, yLabelRotation,
+        chartWidth, chartHeight, aspectPreset,
+        valueLabelSplit,
+        fontFamily, axisColor, gridColor,
+        tickColor, axisLabelColor, dataLabelColor, titleColor,
+        singleColor, seriesColors,
+        titleAlign, titleBold, titleItalic,
+        referenceLines: refLineParsed,
+        categorySort,
+        topN: topN > 0 ? topN : undefined,
+        topNOther,
+        stacked100,
+        labelPosition,
+        trendline,
+        patternFills,
+        conditionalColor: condEnabled
+          ? { threshold: condThreshold, below: condBelow, above: condAbove }
+          : undefined,
+        lightMode,
+      });
+    }
+    // Persist style as global default so new charts on any table inherit it.
+    saveDefaultStyle({
+      chartType, palette, showGrid, showLabels, showLegend,
+      labelFontSize, titleFontSize, barOpacity,
+      fontFamily, axisColor, gridColor, tickColor, axisLabelColor,
+      dataLabelColor, titleColor, singleColor, seriesColors,
+      titleAlign, titleBold, titleItalic,
+      xLabelRotation, yLabelRotation, valueLabelSplit,
+      stacked100, labelPosition, patternFills,
+      condEnabled, condThreshold, condBelow, condAbove,
+      lightMode,
+    });
+    onClose();
+  };
+
+  const handleDownload = async (format: 'svg' | 'png') => {
     if (!svgRef.current) return;
-    const xml = new XMLSerializer().serializeToString(svgRef.current);
+    // Wrap the chart SVG with the title so it appears in both SVG and PNG downloads.
+    // (The title is rendered as an HTML input outside the SVG in the builder, so
+    // the raw SVG serialization would lose it.)
+    const { xml, totalHeight } = buildChartExportSvg({
+      svgElement: svgRef.current,
+      title: effectiveTitle,
+      titleFontSize,
+      width: chartWidth,
+      height: effectiveHeight,
+      titleColor: titleColor || undefined,
+      fontFamily: fontFamily || undefined,
+      titleAlign, titleBold, titleItalic,
+    });
+    const fileBase = `chart_${table?.name || 'export'}`;
     if (format === 'svg') {
       const blob = new Blob([xml], { type: 'image/svg+xml' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = `chart_${table?.name || 'export'}.svg`; a.click();
+      const a = document.createElement('a'); a.href = url; a.download = `${fileBase}.svg`; a.click();
       URL.revokeObjectURL(url);
     } else {
-      const canvas = document.createElement('canvas');
-      canvas.width = W * 2; canvas.height = H * 2;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      const img = new Image();
-      img.onload = () => {
-        ctx.fillStyle = '#0f1117'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(blob => {
-          if (!blob) return;
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a'); a.href = url; a.download = `chart_${table?.name || 'export'}.png`; a.click();
-          URL.revokeObjectURL(url);
-        });
+      try {
+        const dataUrl = await svgXmlToPngDataUrl(xml, chartWidth, totalHeight, 2);
+        const a = document.createElement('a'); a.href = dataUrl; a.download = `${fileBase}.png`; a.click();
+      } catch (err) {
+        console.error('PNG export failed', err);
+      }
+    }
+  };
+
+  const renderDataTab = () => (
+    <>
+      <div className="form-group">
+        <label>Table</label>
+        <select value={tableIdx} onChange={e => { setTableIdx(+e.target.value); setXField(''); setYFields([]); }}>
+          {tables.map((t, i) => <option key={t.id} value={i}>{t.name}</option>)}
+        </select>
+      </div>
+
+      <div className="form-group">
+        <label>Chart Type</label>
+        <div className="chart-type-grid">
+          {CHART_TYPES.map(ct => (
+            <button key={ct.value} className={`chart-type-btn ${chartType === ct.value ? 'active' : ''}`}
+              onClick={() => setChartType(ct.value)} title={ct.label}>
+              <span className="chart-type-icon">{ct.icon}</span>
+              <span>{ct.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {chartType !== 'scatter' && chartType !== 'heatmap' && chartType !== 'correlation' && (
+        <>
+          <div className="form-group">
+            <label>X Axis / Labels</label>
+            <select value={effectiveX} onChange={e => setXField(e.target.value)}>
+              {headers.map(h => <option key={h} value={h}>{h}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <label style={{ margin: 0 }}>
+                Y Axis / Values {effectiveY.length > 1 && `(${effectiveY.length})`}
+                {numCols.length === 0 && <span style={{ color: '#fbbf24', fontWeight: 400, fontSize: 10, marginLeft: 4 }}>(no numeric cols detected)</span>}
+              </label>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button
+                  type="button"
+                  title="Select all numeric columns (multi-series grouped bars)"
+                  onClick={() => {
+                    const pool = numCols.length ? numCols : headers.slice(1);
+                    const nonTotal = pool.filter(c => !/\btotal\b/i.test(c) && !/grand\s*total/i.test(c));
+                    setYFields(nonTotal.length > 0 ? nonTotal : pool);
+                  }}
+                  style={{
+                    fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                    background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.4)',
+                    color: '#93c5fd', cursor: 'pointer',
+                  }}
+                >Select all (multi-series)</button>
+                {effectiveY.length > 1 && (
+                  <button
+                    type="button"
+                    title="Clear Y selection"
+                    onClick={() => setYFields([])}
+                    style={{
+                      fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                      background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)',
+                      color: 'var(--text-dim)', cursor: 'pointer',
+                    }}
+                  >Clear</button>
+                )}
+              </div>
+            </div>
+            <div style={{ maxHeight: 120, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 4, padding: 4 }}>
+              {(numCols.length ? numCols : headers.slice(1)).map(h => (
+                <label key={h} className="checkbox-label" style={{ fontSize: 11, padding: '2px 4px' }}>
+                  <input type="checkbox" checked={effectiveY.includes(h)} onChange={() => toggleYField(h)} />
+                  {h.length > 25 ? h.slice(0, 25) + '...' : h}
+                </label>
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
+              Tip: tick multiple columns (e.g. Beneficiary <em>and</em> Non-Beneficiary) to render side-by-side grouped bars with a legend.
+            </div>
+          </div>
+        </>
+      )}
+      {(chartType === 'heatmap' || chartType === 'correlation') && (
+        <div className="form-group" style={{ fontSize: 11, color: 'var(--text-dim)', padding: 6, border: '1px dashed var(--border)', borderRadius: 4 }}>
+          Uses the whole table as a matrix. First column = row labels; remaining columns = numeric cells.
+          {chartType === 'correlation' && <div style={{ marginTop: 4 }}>Color scale fixed to −1 → +1 (red → green).</div>}
+        </div>
+      )}
+    </>
+  );
+
+  const renderStyleTab = () => (
+    <>
+      <div className="form-group">
+        <label>Color Palette</label>
+        <div className="palette-grid">
+          {PALETTES.map((p, i) => (
+            <button key={i} className={`palette-btn ${palette === i ? 'active' : ''}`} onClick={() => setPalette(i)} title={p.name}>
+              {p.colors.slice(0, 4).map((c, j) => <span key={j} style={{ background: c, width: 12, height: 12, borderRadius: 2, display: 'inline-block', marginRight: 1 }} />)}
+              <span style={{ fontSize: 10, marginLeft: 6, color: 'var(--text-dim)' }}>{p.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="form-group">
+        <label>Legend</label>
+        <select value={showLegend} onChange={e => setShowLegend(e.target.value as LegendPos)}>
+          <option value="right">Right</option>
+          <option value="left">Left</option>
+          <option value="top">Top</option>
+          <option value="bottom">Bottom</option>
+          <option value="none">Hidden</option>
+        </select>
+      </div>
+
+      <div className="form-group">
+        <label>Bar / Slice Opacity</label>
+        <input type="range" min={0.3} max={1} step={0.05} value={barOpacity}
+          onChange={e => setBarOpacity(+e.target.value)} style={{ width: '100%' }} />
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'right' }}>{Math.round(barOpacity * 100)}%</div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <label className="checkbox-label"><input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} /> Grid lines</label>
+        <label className="checkbox-label"
+          title="Show the table's own cell value above each bar (multi-line like '7\n(88%)' is preserved)">
+          <input type="checkbox" checked={showLabels} onChange={e => setShowLabels(e.target.checked)} /> Value labels (mirror table cells)
+        </label>
+        <label className="checkbox-label"
+          title="When a cell shows 'value (pct%)', render value on line 1 and percent on line 2 above the bar">
+          <input type="checkbox" checked={valueLabelSplit} disabled={!showLabels}
+            onChange={e => setValueLabelSplit(e.target.checked)} /> Split value &amp; % on two lines
+        </label>
+        <label className="checkbox-label" title="Hide the data table and only show this chart in the workspace">
+          <input type="checkbox" checked={chartOnly} onChange={e => setChartOnly(e.target.checked)} /> Show chart only (hide table)
+        </label>
+      </div>
+    </>
+  );
+
+  const renderAxesTab = () => (
+    <>
+      <div className="form-group">
+        <label>X Axis Label</label>
+        <input type="text" value={xAxisLabel} onChange={e => setXAxisLabel(e.target.value)} placeholder="Auto" />
+      </div>
+      <div className="form-group">
+        <label>Y Axis Label</label>
+        <input type="text" value={yAxisLabel} onChange={e => setYAxisLabel(e.target.value)} placeholder="Auto" />
+      </div>
+
+      <div className="form-group" style={{ display: 'flex', gap: 6 }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 10 }}>X Label Angle</label>
+          <select value={String(xLabelRotation)} onChange={e => setXLabelRotation(e.target.value === 'auto' ? 'auto' : Number(e.target.value))} style={{ fontSize: 11 }}>
+            <option value="auto">Auto</option>
+            <option value="0">0° (horizontal)</option>
+            <option value="-30">-30°</option>
+            <option value="-45">-45°</option>
+            <option value="-60">-60°</option>
+            <option value="-90">-90° (vertical)</option>
+          </select>
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 10 }}>Y Tick Angle</label>
+          <select value={String(yLabelRotation)} onChange={e => setYLabelRotation(Number(e.target.value))} style={{ fontSize: 11 }}>
+            <option value="0">0°</option>
+            <option value="-30">-30°</option>
+            <option value="-45">-45°</option>
+            <option value="-90">-90°</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="form-group" style={{ display: 'flex', gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 10 }}>Tick Size</label>
+          <input type="number" value={labelFontSize} min={7} max={16} onChange={e => setLabelFontSize(+e.target.value)} style={{ width: '100%' }} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 10 }}>Title Size</label>
+          <input type="number" value={titleFontSize} min={10} max={24} onChange={e => setTitleFontSize(+e.target.value)} style={{ width: '100%' }} />
+        </div>
+      </div>
+    </>
+  );
+
+  // ─── Preset snapshot helpers ───────────────────────────────────────────
+  // buildStyleSnapshot captures every style-relevant field. applyStyleSnapshot
+  // pushes it into local state. snapshotToChartConfig converts to the keys
+  // chartConfig uses (palette name, conditionalColor object). applyStyleToAllCharts
+  // overlays the snapshot onto every existing chartConfig so a single save can
+  // restyle the whole workbook.
+  const buildStyleSnapshot = (): ChartStylePreset => ({
+    paletteName: PALETTES[palette]?.name || 'Blueprint',
+    fontFamily,
+    axisColor, gridColor, tickColor, axisLabelColor,
+    dataLabelColor, titleColor, singleColor,
+    seriesColors: { ...seriesColors },
+    labelFontSize, titleFontSize, barOpacity,
+    showGrid, showLabels, showLegend,
+    titleAlign, titleBold, titleItalic,
+    valueLabelSplit, labelPosition,
+    patternFills, stacked100, trendline,
+    condEnabled, condThreshold, condBelow, condAbove,
+    xLabelRotation, yLabelRotation,
+    lightMode,
+  });
+  const applyStyleSnapshot = (p: ChartStylePreset) => {
+    if (p.paletteName) {
+      const idx = PALETTES.findIndex(pp => pp.name === p.paletteName);
+      if (idx >= 0) setPalette(idx);
+    }
+    if (p.fontFamily !== undefined) setFontFamily(p.fontFamily);
+    if (p.axisColor !== undefined) setAxisColor(p.axisColor);
+    if (p.gridColor !== undefined) setGridColor(p.gridColor);
+    if (p.tickColor !== undefined) setTickColor(p.tickColor);
+    if (p.axisLabelColor !== undefined) setAxisLabelColor(p.axisLabelColor);
+    if (p.dataLabelColor !== undefined) setDataLabelColor(p.dataLabelColor);
+    if (p.titleColor !== undefined) setTitleColor(p.titleColor);
+    if (p.singleColor !== undefined) setSingleColor(p.singleColor);
+    if (p.seriesColors) setSeriesColors({ ...p.seriesColors });
+    if (typeof p.labelFontSize === 'number') setLabelFontSize(p.labelFontSize);
+    if (typeof p.titleFontSize === 'number') setTitleFontSize(p.titleFontSize);
+    if (typeof p.barOpacity === 'number') setBarOpacity(p.barOpacity);
+    if (typeof p.showGrid === 'boolean') setShowGrid(p.showGrid);
+    if (typeof p.showLabels === 'boolean') setShowLabels(p.showLabels);
+    if (p.showLegend) setShowLegend(p.showLegend);
+    if (p.titleAlign) setTitleAlign(p.titleAlign);
+    if (typeof p.titleBold === 'boolean') setTitleBold(p.titleBold);
+    if (typeof p.titleItalic === 'boolean') setTitleItalic(p.titleItalic);
+    if (typeof p.valueLabelSplit === 'boolean') setValueLabelSplit(p.valueLabelSplit);
+    if (p.labelPosition) setLabelPosition(p.labelPosition);
+    if (typeof p.patternFills === 'boolean') setPatternFills(p.patternFills);
+    if (typeof p.stacked100 === 'boolean') setStacked100(p.stacked100);
+    if (typeof p.trendline === 'boolean') setTrendline(p.trendline);
+    if (typeof p.condEnabled === 'boolean') setCondEnabled(p.condEnabled);
+    if (typeof p.condThreshold === 'number') setCondThreshold(p.condThreshold);
+    if (p.condBelow !== undefined) setCondBelow(p.condBelow);
+    if (p.condAbove !== undefined) setCondAbove(p.condAbove);
+    if (p.xLabelRotation !== undefined) setXLabelRotation(p.xLabelRotation);
+    if (typeof p.yLabelRotation === 'number') setYLabelRotation(p.yLabelRotation);
+    if (typeof p.lightMode === 'boolean') setLightMode(p.lightMode);
+  };
+  const snapshotToChartConfig = (p: ChartStylePreset): Record<string, any> => {
+    const out: Record<string, any> = {};
+    if (p.paletteName) out.palette = p.paletteName;
+    if (p.fontFamily !== undefined) out.fontFamily = p.fontFamily;
+    if (p.axisColor !== undefined) out.axisColor = p.axisColor;
+    if (p.gridColor !== undefined) out.gridColor = p.gridColor;
+    if (p.tickColor !== undefined) out.tickColor = p.tickColor;
+    if (p.axisLabelColor !== undefined) out.axisLabelColor = p.axisLabelColor;
+    if (p.dataLabelColor !== undefined) out.dataLabelColor = p.dataLabelColor;
+    if (p.titleColor !== undefined) out.titleColor = p.titleColor;
+    if (p.singleColor !== undefined) out.singleColor = p.singleColor;
+    if (p.seriesColors) out.seriesColors = { ...p.seriesColors };
+    if (typeof p.labelFontSize === 'number') out.labelFontSize = p.labelFontSize;
+    if (typeof p.titleFontSize === 'number') out.titleFontSize = p.titleFontSize;
+    if (typeof p.barOpacity === 'number') out.barOpacity = p.barOpacity;
+    if (typeof p.showGrid === 'boolean') out.showGrid = p.showGrid;
+    if (typeof p.showLabels === 'boolean') out.showLabels = p.showLabels;
+    if (p.showLegend) out.showLegend = p.showLegend;
+    if (p.titleAlign) out.titleAlign = p.titleAlign;
+    if (typeof p.titleBold === 'boolean') out.titleBold = p.titleBold;
+    if (typeof p.titleItalic === 'boolean') out.titleItalic = p.titleItalic;
+    if (typeof p.valueLabelSplit === 'boolean') out.valueLabelSplit = p.valueLabelSplit;
+    if (p.labelPosition) out.labelPosition = p.labelPosition;
+    if (typeof p.patternFills === 'boolean') out.patternFills = p.patternFills;
+    if (typeof p.stacked100 === 'boolean') out.stacked100 = p.stacked100;
+    if (typeof p.trendline === 'boolean') out.trendline = p.trendline;
+    if (p.xLabelRotation !== undefined) out.xLabelRotation = p.xLabelRotation;
+    if (typeof p.yLabelRotation === 'number') out.yLabelRotation = p.yLabelRotation;
+    if (typeof p.lightMode === 'boolean') out.lightMode = p.lightMode;
+    if (p.condEnabled) {
+      out.conditionalColor = {
+        threshold: p.condThreshold ?? 0,
+        below: p.condBelow ?? '#ef4444',
+        above: p.condAbove ?? '#10b981',
       };
-      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
+    } else if (p.condEnabled === false) {
+      out.conditionalColor = undefined;
     }
+    return out;
+  };
+  const applyStyleToAllCharts = (p: ChartStylePreset): number => {
+    if (!onChartChange) return 0;
+    const overlay = snapshotToChartConfig(p);
+    let count = 0;
+    tables.forEach(t => {
+      if (!t.chartConfig) return;
+      onChartChange(t.id, { ...t.chartConfig, ...overlay });
+      count++;
+    });
+    return count;
   };
 
-  const seriesNames = effectiveY.map(f => headers[headers.indexOf(f)] || f);
-  const barW = multiData.length > 0 ? Math.max(4, Math.min(48, (PW / multiData.length) * 0.72)) : 20;
-  const groupBarW = yIndices.length > 0 ? barW / yIndices.length : barW;
-
-  const renderLegend = () => {
-    if (showLegend === 'none' || seriesNames.length <= 1) return null;
-    if (showLegend === 'right') {
-      return seriesNames.map((name, i) => (
-        <g key={i} transform={`translate(${ML + PW + 8}, ${MT + i * 18})`}>
-          <rect width={10} height={10} fill={colors[i % colors.length]} rx={2} />
-          <text x={14} y={9} fontSize={labelFontSize - 1} fill="#9ca3af">{name.length > 15 ? name.slice(0, 15) + '...' : name}</text>
-        </g>
-      ));
+  // ─── Preset application + persistence ──────────────────────────────────
+  const applyPreset = (name: string) => {
+    const p = presets[name];
+    if (!p) return;
+    applyStyleSnapshot(p);
+  };
+  const applyPresetToAll = (name: string) => {
+    const p = presets[name];
+    if (!p) return;
+    applyStyleSnapshot(p);
+    const n = applyStyleToAllCharts(p);
+    window.alert(`Applied "${name}" to ${n} chart${n === 1 ? '' : 's'}.`);
+  };
+  const saveCurrentAsPreset = () => {
+    const n = presetName.trim();
+    if (!n) return;
+    const snap = buildStyleSnapshot();
+    const next: Record<string, ChartStylePreset> = { ...presets, [n]: snap };
+    setPresets(next);
+    savePresets(next);
+    if (presetApplyToAll) {
+      const c = applyStyleToAllCharts(snap);
+      window.alert(`Saved "${n}" and applied to ${c} chart${c === 1 ? '' : 's'}.`);
     }
-    if (showLegend === 'bottom') {
-      let cx = ML;
-      return seriesNames.map((name, i) => {
-        const x = cx; cx += name.length * 6 + 24;
-        return (
-          <g key={i} transform={`translate(${x}, ${MT + PH + 38})`}>
-            <rect width={8} height={8} fill={colors[i % colors.length]} rx={2} />
-            <text x={12} y={8} fontSize={labelFontSize - 1} fill="#9ca3af">{name}</text>
-          </g>
-        );
-      });
-    }
-    if (showLegend === 'top') {
-      let cx = ML;
-      return seriesNames.map((name, i) => {
-        const x = cx; cx += name.length * 6 + 24;
-        return (
-          <g key={i} transform={`translate(${x}, ${8})`}>
-            <rect width={8} height={8} fill={colors[i % colors.length]} rx={2} />
-            <text x={12} y={8} fontSize={labelFontSize - 1} fill="#9ca3af">{name}</text>
-          </g>
-        );
-      });
-    }
-    return null;
+  };
+  const deletePreset = (name: string) => {
+    if (!presets[name]) return;
+    const next = { ...presets };
+    delete next[name];
+    setPresets(next);
+    savePresets(next);
   };
 
-  const renderChart = () => {
-    if (!multiData.length) return <text x={W / 2} y={H / 2} textAnchor="middle" fill="#64748b" fontSize={14}>No data — select table and fields</text>;
+  // Series-color editor: the indices here track whatever the chart iterates by
+  // (categories for single-series bar/pie, series for stacked/grouped/line),
+  // so we surface the matching labels for the user.
+  const seriesEditorLabels = useMemo<string[]>(() => {
+    const multiSeries = effectiveY.length > 1
+      && ['stacked', 'grouped', 'line', 'area', 'combo'].includes(chartType);
+    if (multiSeries) return effectiveY.slice();
+    return rows.map(r => String(r[0] ?? '')).slice(0, 20);
+  }, [effectiveY, chartType, rows]);
 
-    const axisColor = '#374151';
-    const gridColor = 'rgba(255,255,255,0.05)';
-    const labelColor = '#9ca3af';
+  const paletteColors = PALETTES[palette]?.colors || PALETTES[0].colors;
+  const setSeriesColor = (i: number, c: string) => {
+    setSeriesColors(prev => {
+      const next = { ...prev };
+      if (!c) delete next[i]; else next[i] = c;
+      return next;
+    });
+  };
+  const clearSeriesColors = () => setSeriesColors({});
 
-    const axes = (['bar', 'bar_h', 'stacked', 'grouped', 'line', 'area', 'combo', 'waterfall'].includes(chartType)) && (
-      <g>
-        <line x1={ML} y1={MT} x2={ML} y2={MT + PH} stroke={axisColor} strokeWidth={1} />
-        <line x1={ML} y1={MT + PH} x2={ML + PW} y2={MT + PH} stroke={axisColor} strokeWidth={1} />
-        {yTicks.map((t, i) => {
-          const y = yToSvg(t);
-          return (
-            <g key={i}>
-              {showGrid && <line x1={ML} y1={y} x2={ML + PW} y2={y} stroke={gridColor} strokeWidth={1} strokeDasharray="3,3" />}
-              <text x={ML - 6} y={y + 4} textAnchor="end" fontSize={labelFontSize} fill={labelColor}>{fmt(t)}</text>
-            </g>
-          );
-        })}
-        {chartType !== 'bar_h' && multiData.map((d, i) => {
-          const x = xToSvg(i, multiData.length);
-          return (
-            <text key={i} x={x} y={MT + PH + 14} textAnchor="middle" fontSize={labelFontSize} fill={labelColor}
-              transform={multiData.length > 8 ? `rotate(-35,${x},${MT + PH + 14})` : undefined}>
-              {d.label.length > 12 ? d.label.slice(0, 12) + '...' : d.label}
-            </text>
-          );
-        })}
-        {/* Axis labels */}
-        {(xAxisLabel || effectiveX) && chartType !== 'bar_h' && (
-          <text x={ML + PW / 2} y={MT + PH + (multiData.length > 8 ? 48 : 32)} textAnchor="middle" fontSize={labelFontSize + 1} fill="#e4e4e7" fontWeight={500}>
-            {xAxisLabel || effectiveX}
-          </text>
-        )}
-        {(yAxisLabel || effectiveY[0]) && (
-          <text x={14} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill="#e4e4e7" fontWeight={500}
-            transform={`rotate(-90,14,${MT + PH / 2})`}>
-            {yAxisLabel || effectiveY[0]}
-          </text>
-        )}
-      </g>
-    );
+  const renderColorsTab = () => (
+    <>
+      <div className="form-group">
+        <label>Font family (charts & figures)</label>
+        <select value={fontFamily} onChange={e => setFontFamily(e.target.value)}>
+          {FONT_FAMILIES.map(f => <option key={f.label} value={f.value}>{f.label}</option>)}
+        </select>
+      </div>
 
-    // Bar chart
-    if (chartType === 'bar') {
-      return (
-        <g>
-          {axes}
-          {multiData.map((d, i) => {
-            const x = xToSvg(i, multiData.length) - barW / 2;
-            const v = d.values[0];
-            const y = yToSvg(Math.max(v, 0));
-            const h = Math.abs(yToSvg(Math.min(v, 0)) - yToSvg(Math.max(v, 0)));
-            return (
-              <g key={i}>
-                <rect x={x} y={y} width={barW} height={Math.max(h, 1)} fill={colors[i % colors.length]} rx={2} opacity={barOpacity}
-                  onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, text: `${d.label}\n${fmt(v)}` })}
-                  onMouseLeave={() => setTooltip(null)} style={{ cursor: 'pointer' }}>
-                  <animate attributeName="height" from="0" to={Math.max(h, 1)} dur="0.4s" fill="freeze" />
-                  <animate attributeName="y" from={yToSvg(0)} to={y} dur="0.4s" fill="freeze" />
-                </rect>
-                {showLabels && <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={labelFontSize - 1} fill={colors[i % colors.length]}>{fmt(v)}</text>}
-              </g>
-            );
-          })}
-          {renderLegend()}
-        </g>
-      );
-    }
+      <div className="form-group">
+        <label style={{ display: 'block', marginBottom: 4 }}>Title (export) color</label>
+        <input type="color" value={titleColor || '#1f2937'} onChange={e => setTitleColor(e.target.value)} style={{ width: 60, height: 28, padding: 0, border: '1px solid var(--border)', borderRadius: 4 }} />
+        {titleColor && <button className="btn-small" style={{ marginLeft: 8, fontSize: 10 }} onClick={() => setTitleColor('')}>Reset</button>}
+      </div>
 
-    // Horizontal bar
-    if (chartType === 'bar_h') {
-      const xMax2 = maxVal || 1;
-      const xMin2 = Math.min(0, minVal);
-      const xRange2 = xMax2 - xMin2 || 1;
-      const rowH = Math.max(4, Math.min(36, (PH / multiData.length) * 0.72));
-      const xScale = (v: number) => ML + ((v - xMin2) / xRange2) * PW;
-      return (
-        <g>
-          <line x1={ML} y1={MT} x2={ML} y2={MT + PH} stroke={axisColor} strokeWidth={1} />
-          <line x1={ML} y1={MT + PH} x2={ML + PW} y2={MT + PH} stroke={axisColor} strokeWidth={1} />
-          {multiData.map((d, i) => {
-            const v = d.values[0];
-            const y = MT + i * (PH / multiData.length) + (PH / multiData.length - rowH) / 2;
-            return (
-              <g key={i}>
-                <text x={ML - 6} y={y + rowH / 2 + 4} textAnchor="end" fontSize={labelFontSize} fill={labelColor}>
-                  {d.label.length > 14 ? d.label.slice(0, 14) + '...' : d.label}
-                </text>
-                <rect x={xScale(0)} y={y} width={Math.abs(xScale(v) - xScale(0))} height={rowH}
-                  fill={colors[i % colors.length]} rx={2} opacity={barOpacity}
-                  onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, text: `${d.label}\n${fmt(v)}` })}
-                  onMouseLeave={() => setTooltip(null)} style={{ cursor: 'pointer' }} />
-                {showLabels && <text x={Math.max(xScale(0), xScale(v)) + 4} y={y + rowH / 2 + 4} fontSize={labelFontSize - 1} fill={colors[i % colors.length]}>{fmt(v)}</text>}
-              </g>
-            );
-          })}
-          {renderLegend()}
-        </g>
-      );
-    }
+      <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <label style={{ fontSize: 11 }}>Axis lines
+          <input type="color" value={axisColor} onChange={e => setAxisColor(e.target.value)} style={{ display: 'block', width: '100%', height: 26, padding: 0, marginTop: 2 }} />
+        </label>
+        <label style={{ fontSize: 11 }}>Grid lines
+          <input type="color" value={gridColor.startsWith('rgba') ? '#1f2937' : gridColor} onChange={e => setGridColor(e.target.value)} style={{ display: 'block', width: '100%', height: 26, padding: 0, marginTop: 2 }} />
+        </label>
+        <label style={{ fontSize: 11 }}>Tick & legend text
+          <input type="color" value={tickColor} onChange={e => setTickColor(e.target.value)} style={{ display: 'block', width: '100%', height: 26, padding: 0, marginTop: 2 }} />
+        </label>
+        <label style={{ fontSize: 11 }}>Axis captions
+          <input type="color" value={axisLabelColor} onChange={e => setAxisLabelColor(e.target.value)} style={{ display: 'block', width: '100%', height: 26, padding: 0, marginTop: 2 }} />
+        </label>
+        <label style={{ fontSize: 11 }}>Value labels (override)
+          <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+            <input type="color" value={dataLabelColor || '#ffffff'} onChange={e => setDataLabelColor(e.target.value)} style={{ flex: 1, height: 26, padding: 0 }} />
+            {dataLabelColor && <button className="btn-small" style={{ fontSize: 10 }} onClick={() => setDataLabelColor('')} title="Use bar/series color">×</button>}
+          </div>
+          <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{dataLabelColor ? 'Custom' : 'Uses series colour'}</span>
+        </label>
+        <label style={{ fontSize: 11 }}>Single bar colour
+          <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+            <input type="color" value={singleColor || '#3b82f6'} onChange={e => setSingleColor(e.target.value)} style={{ flex: 1, height: 26, padding: 0 }} />
+            {singleColor && <button className="btn-small" style={{ fontSize: 10 }} onClick={() => setSingleColor('')} title="Use palette">×</button>}
+          </div>
+          <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{singleColor ? 'All bars one color' : 'Uses palette'}</span>
+        </label>
+      </div>
 
-    // Stacked bar
-    if (chartType === 'stacked') {
-      return (
-        <g>
-          {axes}
-          {multiData.map((d, i) => {
-            const x = xToSvg(i, multiData.length) - barW / 2;
-            let cumY = yToSvg(0);
-            return (
-              <g key={i}>
-                {d.values.map((v, si) => {
-                  const h = Math.abs(yToSvg(0) - yToSvg(v));
-                  const y = cumY - h;
-                  cumY = y;
-                  return (
-                    <rect key={si} x={x} y={y} width={barW} height={Math.max(h, 0.5)} fill={colors[si % colors.length]}
-                      rx={si === d.values.length - 1 ? 2 : 0} opacity={barOpacity}
-                      onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, text: `${d.label}\n${seriesNames[si]}: ${fmt(v)}` })}
-                      onMouseLeave={() => setTooltip(null)} style={{ cursor: 'pointer' }} />
-                  );
-                })}
-                {showLabels && <text x={x + barW / 2} y={cumY - 4} textAnchor="middle" fontSize={labelFontSize - 1} fill="#e4e4e7">{fmt(d.values.reduce((s, v) => s + v, 0))}</text>}
-              </g>
-            );
-          })}
-          {renderLegend()}
-        </g>
-      );
-    }
-
-    // Grouped bar
-    if (chartType === 'grouped') {
-      return (
-        <g>
-          {axes}
-          {multiData.map((d, i) => {
-            const baseX = xToSvg(i, multiData.length) - barW / 2;
-            return (
-              <g key={i}>
-                {d.values.map((v, si) => {
-                  const x = baseX + si * groupBarW;
-                  const y = yToSvg(Math.max(v, 0));
-                  const h = Math.abs(yToSvg(0) - y);
-                  return (
-                    <rect key={si} x={x} y={y} width={Math.max(groupBarW - 1, 2)} height={Math.max(h, 1)}
-                      fill={colors[si % colors.length]} rx={1} opacity={barOpacity}
-                      onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, text: `${d.label}\n${seriesNames[si]}: ${fmt(v)}` })}
-                      onMouseLeave={() => setTooltip(null)} style={{ cursor: 'pointer' }} />
-                  );
-                })}
-              </g>
-            );
-          })}
-          {renderLegend()}
-        </g>
-      );
-    }
-
-    // Line / Area
-    if (chartType === 'line' || chartType === 'area') {
-      return (
-        <g>
-          {axes}
-          {yIndices.map((_, si) => {
-            const pts = multiData.map((d, i) => `${xToSvg(i, multiData.length)},${yToSvg(d.values[si])}`).join(' ');
-            const first = xToSvg(0, multiData.length), last = xToSvg(multiData.length - 1, multiData.length);
-            const baseY = yToSvg(0);
-            return (
-              <g key={si}>
-                {chartType === 'area' && <polygon points={`${first},${baseY} ${pts} ${last},${baseY}`} fill={colors[si % colors.length]} opacity={0.12} />}
-                <polyline points={pts} fill="none" stroke={colors[si % colors.length]} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-                {multiData.map((d, i) => (
-                  <circle key={i} cx={xToSvg(i, multiData.length)} cy={yToSvg(d.values[si])} r={3.5}
-                    fill={colors[si % colors.length]} stroke="#0f1117" strokeWidth={1.5}
-                    onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, text: `${d.label}\n${seriesNames[si]}: ${fmt(d.values[si])}` })}
-                    onMouseLeave={() => setTooltip(null)} style={{ cursor: 'pointer' }} />
-                ))}
-                {showLabels && multiData.map((d, i) => (
-                  <text key={i} x={xToSvg(i, multiData.length)} y={yToSvg(d.values[si]) - 8}
-                    textAnchor="middle" fontSize={labelFontSize - 1} fill={colors[si % colors.length]}>{fmt(d.values[si])}</text>
-                ))}
-              </g>
-            );
-          })}
-          {renderLegend()}
-        </g>
-      );
-    }
-
-    // Combo (bars + line)
-    if (chartType === 'combo' && yIndices.length >= 2) {
-      const barSeries = 0;
-      const lineSeries = yIndices.slice(1);
-      return (
-        <g>
-          {axes}
-          {multiData.map((d, i) => {
-            const x = xToSvg(i, multiData.length) - barW / 2;
-            const v = d.values[barSeries];
-            const y = yToSvg(Math.max(v, 0));
-            const h = Math.abs(yToSvg(0) - y);
-            return (
-              <rect key={i} x={x} y={y} width={barW} height={Math.max(h, 1)} fill={colors[0]} rx={2} opacity={barOpacity}
-                onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, text: `${d.label}\n${seriesNames[barSeries]}: ${fmt(v)}` })}
-                onMouseLeave={() => setTooltip(null)} style={{ cursor: 'pointer' }} />
-            );
-          })}
-          {lineSeries.map((_, lsi) => {
-            const si = lsi + 1;
-            const pts = multiData.map((d, i) => `${xToSvg(i, multiData.length)},${yToSvg(d.values[si])}`).join(' ');
-            return (
-              <g key={si}>
-                <polyline points={pts} fill="none" stroke={colors[si % colors.length]} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-                {multiData.map((d, i) => (
-                  <circle key={i} cx={xToSvg(i, multiData.length)} cy={yToSvg(d.values[si])} r={3.5}
-                    fill={colors[si % colors.length]} stroke="#0f1117" strokeWidth={1.5}
-                    onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, text: `${d.label}\n${seriesNames[si]}: ${fmt(d.values[si])}` })}
-                    onMouseLeave={() => setTooltip(null)} style={{ cursor: 'pointer' }} />
-                ))}
-              </g>
-            );
-          })}
-          {renderLegend()}
-        </g>
-      );
-    }
-
-    // Pie / Donut
-    if (chartType === 'pie' || chartType === 'donut') {
-      const total = multiData.reduce((s, d) => s + Math.abs(d.values[0]), 0) || 1;
-      const cx = W / 2 - (showLegend === 'right' ? 40 : 0), cy = H / 2, r = Math.min(PW, PH) / 2 - 10;
-      const inner = chartType === 'donut' ? r * 0.52 : 0;
-      let angle = -Math.PI / 2;
-      return (
-        <g>
-          {multiData.map((d, i) => {
-            const v = Math.abs(d.values[0]);
-            const slice = (v / total) * 2 * Math.PI;
-            const mid = angle + slice / 2;
-            const path = arcPath(cx, cy, r, angle, angle + slice, inner);
-            const labelR = r * 0.72 + (inner > 0 ? inner * 0.3 : 0);
-            const lx = cx + labelR * Math.cos(mid);
-            const ly = cy + labelR * Math.sin(mid);
-            const pct = ((v / total) * 100).toFixed(1);
-            angle += slice;
-            return (
-              <g key={i}>
-                <path d={path} fill={colors[i % colors.length]} opacity={barOpacity} stroke="#0f1117" strokeWidth={1.5}
-                  onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, text: `${d.label}\n${fmt(d.values[0])} (${pct}%)` })}
-                  onMouseLeave={() => setTooltip(null)} style={{ cursor: 'pointer' }} />
-                {slice > 0.25 && showLabels && (
-                  <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fontSize={labelFontSize} fill="#fff" fontWeight={600}>{pct}%</text>
-                )}
-              </g>
-            );
-          })}
-          {chartType === 'donut' && (
-            <>
-              <circle cx={cx} cy={cy} r={inner - 2} fill="#0f1117" />
-              <text x={cx} y={cy - 8} textAnchor="middle" fontSize={11} fill="#9ca3af">Total</text>
-              <text x={cx} y={cy + 10} textAnchor="middle" fontSize={14} fill="#e4e4e7" fontWeight={700}>{fmt(total)}</text>
-            </>
+      <div className="form-group">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <label style={{ margin: 0 }}>
+            {effectiveY.length > 1 && ['stacked','grouped','line','area','combo'].includes(chartType)
+              ? 'Per-series colour (by legend)'
+              : 'Per-category colour'}
+          </label>
+          {Object.keys(seriesColors).length > 0 && (
+            <button className="btn-small" style={{ fontSize: 10 }} onClick={clearSeriesColors}>Clear all</button>
           )}
-          {showLegend !== 'none' && multiData.slice(0, 12).map((d, i) => (
-            <g key={i} transform={showLegend === 'right'
-              ? `translate(${cx + r + 24}, ${MT + i * 18})`
-              : `translate(${ML + i * 80}, ${MT + PH + 20})`}>
-              <rect width={10} height={10} fill={colors[i % colors.length]} rx={2} />
-              <text x={14} y={9} fontSize={labelFontSize - 1} fill="#9ca3af">{d.label.length > 18 ? d.label.slice(0, 18) + '...' : d.label}</text>
-            </g>
-          ))}
-        </g>
-      );
-    }
-
-    // Scatter
-    if (chartType === 'scatter') {
-      const numIdx = headers.reduce((acc: number[], _, i) => { if (rows.length > 0 && typeof rows[0][i] === 'number') acc.push(i); return acc; }, []);
-      const sxIdx = numIdx[0] ?? 0, syIdx = numIdx[1] ?? 1;
-      const sData = rows.map(r => ({ x: Number(r[sxIdx]) || 0, y: Number(r[syIdx]) || 0, label: String(r[0] ?? '') }));
-      const sxVals = sData.map(d => d.x), syVals = sData.map(d => d.y);
-      const sxMin = Math.min(...sxVals), sxMax = Math.max(...sxVals);
-      const syMin2 = Math.min(...syVals), syMax2 = Math.max(...syVals);
-      const sxRange = sxMax - sxMin || 1, syRange2 = syMax2 - syMin2 || 1;
-      const sx = (v: number) => ML + ((v - sxMin) / sxRange) * PW;
-      const sy = (v: number) => MT + PH - ((v - syMin2) / syRange2) * PH;
-      return (
-        <g>
-          <line x1={ML} y1={MT} x2={ML} y2={MT + PH} stroke={axisColor} strokeWidth={1} />
-          <line x1={ML} y1={MT + PH} x2={ML + PW} y2={MT + PH} stroke={axisColor} strokeWidth={1} />
-          {showGrid && [0.25, 0.5, 0.75, 1].map((f, i) => (
-            <g key={i}>
-              <line x1={ML + PW * f} y1={MT} x2={ML + PW * f} y2={MT + PH} stroke={gridColor} strokeWidth={1} strokeDasharray="3,3" />
-              <line x1={ML} y1={MT + PH * (1 - f)} x2={ML + PW} y2={MT + PH * (1 - f)} stroke={gridColor} strokeWidth={1} strokeDasharray="3,3" />
-            </g>
-          ))}
-          <text x={ML + PW / 2} y={MT + PH + 30} textAnchor="middle" fontSize={labelFontSize + 1} fill={labelColor}>{xAxisLabel || headers[sxIdx]}</text>
-          <text x={14} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill={labelColor}
-            transform={`rotate(-90,14,${MT + PH / 2})`}>{yAxisLabel || headers[syIdx]}</text>
-          {sData.map((d, i) => (
-            <circle key={i} cx={sx(d.x)} cy={sy(d.y)} r={5} fill={colors[i % colors.length]} opacity={0.8} stroke="#0f1117" strokeWidth={1}
-              onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, text: `${d.label}\n${headers[sxIdx]}: ${fmt(d.x)}\n${headers[syIdx]}: ${fmt(d.y)}` })}
-              onMouseLeave={() => setTooltip(null)} style={{ cursor: 'pointer' }} />
-          ))}
-        </g>
-      );
-    }
-
-    // Waterfall
-    if (chartType === 'waterfall') {
-      let cum = 0;
-      return (
-        <g>
-          {axes}
-          {multiData.map((d, i) => {
-            const v = d.values[0];
-            const y0 = yToSvg(cum);
-            cum += v;
-            const y1 = yToSvg(cum);
-            const top = Math.min(y0, y1), h = Math.abs(y1 - y0);
-            const isPos = v >= 0;
+        </div>
+        <div style={{ maxHeight: 140, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 4, padding: 4, marginTop: 4 }}>
+          {seriesEditorLabels.length === 0 && (
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>No data series yet — pick X / Y on the Data tab.</div>
+          )}
+          {seriesEditorLabels.map((name, i) => {
+            const fallback = paletteColors[i % paletteColors.length];
+            const cur = seriesColors[i] || singleColor || fallback;
             return (
-              <g key={i}>
-                <rect x={xToSvg(i, multiData.length) - barW / 2} y={top} width={barW} height={Math.max(h, 1)}
-                  fill={isPos ? colors[0] : '#ef4444'} rx={2} opacity={barOpacity}
-                  onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, text: `${d.label}\n${v >= 0 ? '+' : ''}${fmt(v)}\nRunning: ${fmt(cum)}` })}
-                  onMouseLeave={() => setTooltip(null)} style={{ cursor: 'pointer' }} />
-                {i < multiData.length - 1 && (
-                  <line x1={xToSvg(i, multiData.length) + barW / 2} y1={y1}
-                    x2={xToSvg(i + 1, multiData.length) - barW / 2} y2={y1}
-                    stroke="rgba(255,255,255,0.15)" strokeWidth={1} strokeDasharray="3,2" />
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', fontSize: 11 }}>
+                <input type="color" value={cur} onChange={e => setSeriesColor(i, e.target.value)} style={{ width: 28, height: 20, padding: 0, border: '1px solid var(--border)' }} />
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={name}>{name || `Item ${i + 1}`}</span>
+                {seriesColors[i] && (
+                  <button className="btn-small" style={{ fontSize: 10, padding: '0 6px' }} onClick={() => setSeriesColor(i, '')} title="Reset to palette/single">↺</button>
                 )}
-                {showLabels && <text x={xToSvg(i, multiData.length)} y={top - 4} textAnchor="middle" fontSize={labelFontSize - 1} fill={isPos ? colors[0] : '#ef4444'}>{fmt(v)}</text>}
-              </g>
+              </div>
             );
           })}
-          {renderLegend()}
-        </g>
-      );
-    }
+        </div>
+      </div>
 
-    // Fallback for combo with < 2 series
-    if (chartType === 'combo') {
-      return <text x={W / 2} y={H / 2} textAnchor="middle" fill="#64748b" fontSize={12}>Combo chart needs 2+ Y fields selected</text>;
-    }
-    return null;
-  };
+      <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+        <label style={{ fontSize: 11, fontWeight: 600 }}>Style presets</label>
+        <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+          <select value="" onChange={e => { if (e.target.value) applyPreset(e.target.value); }} style={{ flex: 1, fontSize: 11 }}>
+            <option value="">— Load preset —</option>
+            {Object.keys(presets).sort().map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+          <input type="text" value={presetName} onChange={e => setPresetName(e.target.value)}
+            placeholder="Preset name" style={{ flex: 1, fontSize: 11, padding: '4px 6px' }} />
+          <button className="btn-small btn-primary" style={{ fontSize: 11 }}
+            disabled={!presetName.trim()} onClick={saveCurrentAsPreset}>Save</button>
+        </div>
+        <label className="checkbox-label" style={{ fontSize: 10, marginTop: 4 }}
+          title="When saving, also push this style onto every other table that already has a chart">
+          <input type="checkbox" checked={presetApplyToAll}
+            onChange={e => setPresetApplyToAll(e.target.checked)} />
+          Also apply to all existing charts on save
+        </label>
+        {Object.keys(presets).length > 0 && (
+          <div style={{ marginTop: 6, maxHeight: 120, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 4, padding: 4 }}>
+            {Object.keys(presets).sort().map(n => (
+              <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', fontSize: 11 }}>
+                <button className="btn-small" style={{ fontSize: 10, padding: '1px 8px' }} onClick={() => applyPreset(n)}
+                  title="Apply to this chart only">Apply</button>
+                <button className="btn-small" style={{ fontSize: 10, padding: '1px 6px' }} onClick={() => applyPresetToAll(n)}
+                  title="Apply to every chart in the workbook">All</button>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={n}>{n}</span>
+                <button className="btn-small" style={{ fontSize: 10, padding: '1px 6px', color: '#ef4444' }}
+                  onClick={() => deletePreset(n)} title="Delete preset">×</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
+          Presets capture palette, fonts, all colours, sizes, title style, value labels, axis rotations, conditional bars, pattern fills, trendline, and light mode. Stored in this browser only.
+        </div>
+      </div>
+    </>
+  );
+
+  const renderAdvancedTab = () => (
+    <>
+      <div className="form-group">
+        <label style={{ fontSize: 11, fontWeight: 600 }}>Title style</label>
+        <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+          <select value={titleAlign} onChange={e => setTitleAlign(e.target.value as any)} style={{ flex: 1, fontSize: 11 }}>
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
+          </select>
+          <label className="checkbox-label" style={{ fontSize: 11 }}><input type="checkbox" checked={titleBold} onChange={e => setTitleBold(e.target.checked)} /> Bold</label>
+          <label className="checkbox-label" style={{ fontSize: 11 }}><input type="checkbox" checked={titleItalic} onChange={e => setTitleItalic(e.target.checked)} /> Italic</label>
+        </div>
+      </div>
+
+      <div className="form-group">
+        <label style={{ fontSize: 11, fontWeight: 600 }}>Reference / target line</label>
+        <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+          <input type="number" value={refLineValue} onChange={e => setRefLineValue(e.target.value)}
+            placeholder="value" style={{ flex: 1, fontSize: 11 }} />
+          <input type="text" value={refLineLabel} onChange={e => setRefLineLabel(e.target.value)}
+            placeholder="label (e.g. 80% target)" style={{ flex: 2, fontSize: 11 }} />
+          <input type="color" value={refLineColor} onChange={e => setRefLineColor(e.target.value)}
+            style={{ width: 32, height: 24, padding: 0 }} />
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>Leave value empty to hide the line.</div>
+      </div>
+
+      <div className="form-group" style={{ display: 'flex', gap: 6 }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 11 }}>Sort categories</label>
+          <select value={categorySort} onChange={e => setCategorySort(e.target.value as any)} style={{ width: '100%', fontSize: 11 }}>
+            <option value="none">Original order</option>
+            <option value="desc">By value (high → low)</option>
+            <option value="asc">By value (low → high)</option>
+          </select>
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 11 }}>Top N</label>
+          <input type="number" min={0} max={50} value={topN}
+            onChange={e => setTopN(Math.max(0, Math.min(50, +e.target.value || 0)))}
+            placeholder="0 = all" style={{ width: '100%', fontSize: 11 }} />
+        </div>
+      </div>
+      <label className="checkbox-label" style={{ fontSize: 11 }}>
+        <input type="checkbox" checked={topNOther} onChange={e => setTopNOther(e.target.checked)} disabled={topN <= 0} />
+        Roll remaining into "Other" bucket
+      </label>
+
+      <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 8 }}>
+        <label className="checkbox-label" style={{ fontSize: 11 }}>
+          <input type="checkbox" checked={stacked100} onChange={e => setStacked100(e.target.checked)} />
+          Stacked 100% (normalised — only applies to Stacked chart)
+        </label>
+      </div>
+
+      <div className="form-group" style={{ display: 'flex', gap: 6 }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 11 }}>Data label position</label>
+          <select value={labelPosition} onChange={e => setLabelPosition(e.target.value as any)} style={{ width: '100%', fontSize: 11 }}>
+            <option value="outside">Outside bar (above)</option>
+            <option value="inside">Inside bar</option>
+          </select>
+        </div>
+      </div>
+
+      <label className="checkbox-label" style={{ fontSize: 11 }}>
+        <input type="checkbox" checked={trendline} onChange={e => setTrendline(e.target.checked)} />
+        Trendline / linear regression (scatter only)
+      </label>
+
+      <label className="checkbox-label" style={{ fontSize: 11 }}>
+        <input type="checkbox" checked={patternFills} onChange={e => setPatternFills(e.target.checked)} />
+        Hatch / pattern fills (B&W print-safe)
+      </label>
+
+      <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 8 }}>
+        <label className="checkbox-label" style={{ fontSize: 11 }}>
+          <input type="checkbox" checked={condEnabled} onChange={e => setCondEnabled(e.target.checked)} />
+          Colour bars by value (threshold)
+        </label>
+        {condEnabled && (
+          <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
+            <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>If &lt;</span>
+            <input type="number" value={condThreshold} onChange={e => setCondThreshold(+e.target.value || 0)}
+              style={{ width: 60, fontSize: 11 }} />
+            <input type="color" value={condBelow} onChange={e => setCondBelow(e.target.value)}
+              style={{ width: 28, height: 22, padding: 0 }} title="Below threshold" />
+            <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>else</span>
+            <input type="color" value={condAbove} onChange={e => setCondAbove(e.target.value)}
+              style={{ width: 28, height: 22, padding: 0 }} title="At/above threshold" />
+          </div>
+        )}
+      </div>
+
+      <label className="checkbox-label" style={{ fontSize: 11 }}>
+        <input type="checkbox" checked={lightMode} onChange={e => setLightMode(e.target.checked)} />
+        Light-mode preview (white background, dark text — for printed reports)
+      </label>
+
+      <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 8 }}>
+        <button className="btn-small" style={{ fontSize: 11, width: '100%' }}
+          onClick={() => {
+            const n = applyStyleToAllCharts(buildStyleSnapshot());
+            window.alert(`Style applied to ${n} chart${n === 1 ? '' : 's'}.`);
+          }}>
+          Apply this style to all charts
+        </button>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
+          Copies palette, fonts, colours, sizes, title style, value labels, axis rotations, conditional bars, patterns, trendline, and light mode. Leaves Data (X/Y) alone.
+        </div>
+      </div>
+    </>
+  );
+
+  const renderSizeTab = () => (
+    <>
+      <div className="form-group">
+        <label>Aspect Ratio</label>
+        <select value={aspectPreset} onChange={e => setAspectPreset(e.target.value)}>
+          {ASPECT_PRESETS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+        </select>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3 }}>
+          Auto: width fixed, height grows to keep tick labels legible. Use 16:9 / 4:3 for slides; 1:1 for square exports.
+        </div>
+      </div>
+
+      <div className="form-group" style={{ display: 'flex', gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 10 }}>Width (px)</label>
+          <input type="number" min={320} max={2000} step={20} value={chartWidth}
+            onChange={e => setChartWidth(Math.max(320, Math.min(2000, +e.target.value || 320)))} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={{ fontSize: 10 }}>Height (px)</label>
+          <input type="number" min={200} max={1400} step={20} value={chartHeight}
+            disabled={aspectPreset !== 'auto' && aspectPreset !== 'custom'}
+            onChange={e => setChartHeight(Math.max(200, Math.min(1400, +e.target.value || 200)))} />
+        </div>
+      </div>
+
+      <div className="form-group" style={{ display: 'flex', gap: 6 }}>
+        <button className="btn-secondary" style={{ flex: 1, fontSize: 11 }} onClick={() => handleDownload('svg')}>↓ SVG</button>
+        <button className="btn-secondary" style={{ flex: 1, fontSize: 11 }} onClick={() => handleDownload('png')}>↓ PNG</button>
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+        PNG exports at 2× the chosen dimensions for crisp Word/PowerPoint embedding.
+      </div>
+    </>
+  );
+
+  // Auto height for "auto" preset: grow vertically when many x-labels or rotated labels need more room.
+  const effectiveHeight = useMemo(() => {
+    if (aspectPreset !== 'auto') return chartHeight;
+    const n = rows.length;
+    const rotation = typeof xLabelRotation === 'number'
+      ? xLabelRotation
+      : (n > 8 ? -35 : 0);
+    const rotMag = Math.abs(rotation);
+    const extra = rotMag >= 60 ? 60 : rotMag >= 30 ? 30 : 0;
+    return Math.min(900, chartHeight + extra);
+  }, [aspectPreset, chartHeight, rows.length, xLabelRotation]);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal chart-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 980 }}>
+      <div className="modal chart-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Chart Builder</h2>
-          <button className="modal-close" onClick={() => {
-            // Save chart config before closing
-            if (onChartChange && table) {
-              onChartChange(table.id, {
-                type: chartType,
-                xField,
-                yFields,
-                palette: PALETTES[palette].name,
-                showGrid,
-                showLabels,
-                showLegend,
-                chartTitle,
-                xAxisLabel,
-                yAxisLabel,
-                labelFontSize,
-                titleFontSize,
-                barOpacity,
-              });
-            }
-            onClose();
-          }}>x</button>
+          <button className="modal-close" onClick={saveAndClose} title="Save & Close">×</button>
         </div>
         <div className="chart-layout">
-          {/* Controls sidebar */}
-          <div className="chart-controls" style={{ minWidth: 220, maxWidth: 240 }}>
-            <div className="form-group">
-              <label>Table</label>
-              <select value={tableIdx} onChange={e => { setTableIdx(+e.target.value); setXField(''); setYFields([]); }}>
-                {tables.map((t, i) => <option key={t.id} value={i}>{t.name}</option>)}
-              </select>
+          {/* Controls sidebar with tabs */}
+          <div className="chart-controls">
+            <div className="chart-tabs" role="tablist">
+              <button className={`chart-tab ${tab === 'data' ? 'active' : ''}`} onClick={() => setTab('data')}>Data</button>
+              <button className={`chart-tab ${tab === 'style' ? 'active' : ''}`} onClick={() => setTab('style')}>Style</button>
+              <button className={`chart-tab ${tab === 'axes' ? 'active' : ''}`} onClick={() => setTab('axes')}>Axes</button>
+              <button className={`chart-tab ${tab === 'colors' ? 'active' : ''}`} onClick={() => setTab('colors')}>Colors · Fonts</button>
+              <button className={`chart-tab ${tab === 'advanced' ? 'active' : ''}`} onClick={() => setTab('advanced')}>Advanced</button>
+              <button className={`chart-tab ${tab === 'size' ? 'active' : ''}`} onClick={() => setTab('size')}>Size · Export</button>
             </div>
-
-            <div className="form-group">
-              <label>Chart Type</label>
-              <div className="chart-type-grid">
-                {CHART_TYPES.map(ct => (
-                  <button key={ct.value} className={`chart-type-btn ${chartType === ct.value ? 'active' : ''}`}
-                    onClick={() => setChartType(ct.value)} title={ct.label}>
-                    <span className="chart-type-icon">{ct.icon}</span>
-                    <span>{ct.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {chartType !== 'scatter' && (
-              <>
-                <div className="form-group">
-                  <label>X Axis / Labels</label>
-                  <select value={effectiveX} onChange={e => setXField(e.target.value)}>
-                    {headers.map(h => <option key={h} value={h}>{h}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Y Axis / Values {yIndices.length > 1 && `(${yIndices.length})`}</label>
-                  <div style={{ maxHeight: 100, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 4, padding: 4 }}>
-                    {numCols.map(h => (
-                      <label key={h} className="checkbox-label" style={{ fontSize: 11, padding: '2px 4px' }}>
-                        <input type="checkbox" checked={effectiveY.includes(h)} onChange={() => toggleYField(h)} />
-                        {h.length > 25 ? h.slice(0, 25) + '...' : h}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-
-            <div className="form-group">
-              <label>Color Palette</label>
-              <div className="palette-grid">
-                {PALETTES.map((p, i) => (
-                  <button key={i} className={`palette-btn ${palette === i ? 'active' : ''}`} onClick={() => setPalette(i)} title={p.name}>
-                    {p.colors.slice(0, 4).map((c, j) => <span key={j} style={{ background: c, width: 12, height: 12, borderRadius: 2, display: 'inline-block', marginRight: 1 }} />)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Chart Title</label>
-              <input type="text" value={chartTitle} onChange={e => setChartTitle(e.target.value)} placeholder="Optional title" />
-            </div>
-
-            <div className="form-group" style={{ display: 'flex', gap: 6 }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 10 }}>X Label</label>
-                <input type="text" value={xAxisLabel} onChange={e => setXAxisLabel(e.target.value)} placeholder="Auto" style={{ fontSize: 11 }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 10 }}>Y Label</label>
-                <input type="text" value={yAxisLabel} onChange={e => setYAxisLabel(e.target.value)} placeholder="Auto" style={{ fontSize: 11 }} />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Legend</label>
-              <select value={showLegend} onChange={e => setShowLegend(e.target.value as LegendPos)}>
-                <option value="right">Right</option>
-                <option value="bottom">Bottom</option>
-                <option value="top">Top</option>
-                <option value="none">Hidden</option>
-              </select>
-            </div>
-
-            <div className="form-group" style={{ display: 'flex', gap: 8 }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 10 }}>Label Size</label>
-                <input type="number" value={labelFontSize} min={7} max={16} onChange={e => setLabelFontSize(+e.target.value)} style={{ width: '100%' }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 10 }}>Title Size</label>
-                <input type="number" value={titleFontSize} min={10} max={24} onChange={e => setTitleFontSize(+e.target.value)} style={{ width: '100%' }} />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <label className="checkbox-label"><input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} /> Grid Lines</label>
-              <label className="checkbox-label"><input type="checkbox" checked={showLabels} onChange={e => setShowLabels(e.target.checked)} /> Value Labels</label>
-            </div>
-
-            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-              <button className="btn-secondary" style={{ flex: 1, fontSize: 11 }} onClick={() => handleDownload('svg')}>SVG</button>
-              <button className="btn-secondary" style={{ flex: 1, fontSize: 11 }} onClick={() => handleDownload('png')}>PNG</button>
+            <div className="chart-controls-body">
+              {tab === 'data' && renderDataTab()}
+              {tab === 'style' && renderStyleTab()}
+              {tab === 'axes' && renderAxesTab()}
+              {tab === 'colors' && renderColorsTab()}
+              {tab === 'advanced' && renderAdvancedTab()}
+              {tab === 'size' && renderSizeTab()}
             </div>
           </div>
 
           {/* Chart canvas */}
-          <div className="chart-canvas-wrap" style={{ flex: 1 }}>
-            {chartTitle && <div className="chart-title-display" style={{ fontSize: titleFontSize }}>{chartTitle}</div>}
-            <svg ref={svgRef} width={W} height={H} viewBox={`0 0 ${W} ${H}`}
-              style={{ background: '#0f1117', borderRadius: 8, display: 'block', maxWidth: '100%' }}>
-              {renderChart()}
-            </svg>
-            {multiData.length > 0 && (
+          <div className="chart-canvas-wrap" style={{ flex: 1, overflow: 'auto' }}>
+            <input
+              className="chart-title-inline-input"
+              style={{
+                fontSize: titleFontSize,
+                textAlign: titleAlign,
+                fontWeight: titleBold ? 700 : 400,
+                fontStyle: titleItalic ? 'italic' : 'normal',
+                color: titleColor || undefined,
+                fontFamily: fontFamily || undefined,
+              }}
+              value={chartTitle}
+              placeholder={autoFigTitle || 'Click to add chart title (used in Word export)'}
+              onChange={e => setChartTitle(e.target.value)}
+              title="Chart title — appears above the chart and in Word export. Defaults to the table's Fig title."
+            />
+            {!chartTitle && autoFigTitle && (
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -4 }}>
+                Defaulting to: <span style={{ color: '#60a5fa' }}>{autoFigTitle}</span>
+              </div>
+            )}
+            <div className="chart-resize-frame" style={{ position: 'relative', width: chartWidth, maxWidth: '100%', margin: '0 auto' }}>
+              <ChartCanvas ref={svgRef} result={result} config={buildConfig()}
+                width={chartWidth} height={effectiveHeight}
+                style={{ maxWidth: '100%', display: 'block' }} />
+              <div
+                className="chart-resize-handle"
+                title="Drag to resize"
+                onMouseDown={e => {
+                  e.preventDefault();
+                  dragRef.current = { startX: e.clientX, startY: e.clientY, startW: chartWidth, startH: chartHeight };
+                  const preset = ASPECT_PRESETS.find(p => p.value === aspectPreset);
+                  const lockedRatio = preset && preset.ratio ? preset.ratio : null;
+                  const onMove = (ev: MouseEvent) => {
+                    const d = dragRef.current; if (!d) return;
+                    const dw = ev.clientX - d.startX;
+                    const dh = ev.clientY - d.startY;
+                    const newW = Math.max(320, Math.min(2000, d.startW + dw));
+                    const newH = lockedRatio
+                      ? Math.round(newW / lockedRatio)
+                      : Math.max(200, Math.min(1400, d.startH + dh));
+                    setChartWidth(newW);
+                    setChartHeight(newH);
+                  };
+                  const onUp = () => {
+                    dragRef.current = null;
+                    window.removeEventListener('mousemove', onMove);
+                    window.removeEventListener('mouseup', onUp);
+                  };
+                  window.addEventListener('mousemove', onMove);
+                  window.addEventListener('mouseup', onUp);
+                }}
+              />
+            </div>
+            {result && (
               <div className="chart-meta">
-                {multiData.length} data points · {effectiveY.length} series · {effectiveX} vs {effectiveY.join(', ')}
+                {rows.length} data points · {effectiveY.length} series · {effectiveX} vs {effectiveY.join(', ')}
+                {' · '}<span>{chartWidth}×{effectiveHeight}px</span>
+                {' · '}<span style={{ opacity: 0.7 }}>drag ↘ corner to resize</span>
               </div>
             )}
           </div>
         </div>
 
-        {tooltip && (
-          <div className="chart-tooltip" style={{ left: tooltip.x + 12, top: tooltip.y - 8 }}>
-            {tooltip.text.split('\n').map((line, i) => <div key={i}>{line}</div>)}
+        {/* Sticky footer */}
+        <div className="chart-modal-footer">
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+            Title saves with the chart and is used as the figure caption on Word export.
           </div>
-        )}
+          <div className="footer-spacer" />
+          <button className="btn-secondary" onClick={() => handleDownload('svg')} title="Download as SVG">↓ SVG</button>
+          <button className="btn-secondary" onClick={() => handleDownload('png')} title="Download as PNG (2×)">↓ PNG</button>
+          <button className="btn-primary" onClick={saveAndClose}>Save &amp; Close</button>
+        </div>
       </div>
     </div>
   );

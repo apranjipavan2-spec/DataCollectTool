@@ -40,6 +40,16 @@ def _get_global_ai_cfg(db: Session) -> dict:
         return {"provider": active, "api_key": key_cfg.get("api_key", ""), "model": key_cfg.get("model", "")}
     return cfg
 
+
+def _logged_cfg(db: Session, user: dict, feature: str) -> dict:
+    """Wrap _get_global_ai_cfg with usage-log context (writes one ai_usage_logs row per call)."""
+    return ai_service.with_log(
+        _get_global_ai_cfg(db),
+        tenant_id=user.get("tenant_id"),
+        user_id=user.get("sub"),
+        feature=feature,
+    )
+
 router = APIRouter()
 require_supervisor = require_role("org_admin", "supervisor")
 require_org_admin  = require_role("org_admin")
@@ -112,6 +122,8 @@ class PolishRequest(BaseModel):
     rows: list = []
     is_cross_tab: bool = False
     sub_keys: list = []
+    program_context: str = ""
+    field_labels: dict = {}
 
 
 class InterpretRequest(BaseModel):
@@ -333,7 +345,10 @@ def _get_analyzer_data_inner(program_id, user, db):
     enum_ids_set = list({str(s.enumerator_id) for s in subs if s.enumerator_id})
     enum_users = {}
     if enum_ids_set:
-        for u in db.query(User).filter(User.id.in_([_uuid.UUID(eid) for eid in enum_ids_set])).all():
+        for u in db.query(User).filter(
+            User.id.in_([_uuid.UUID(eid) for eid in enum_ids_set]),
+            User.tenant_id == user["tenant_id"],
+        ).all():
             enum_users[str(u.id)] = u.name
     for s in subs:
         eid = str(s.enumerator_id)
@@ -356,7 +371,7 @@ def _get_analyzer_data_inner(program_id, user, db):
     column_headers = []
     seen_cols: set = set()
     for fid in form_ids:
-        form = db.query(Form).filter(Form.id == fid).first()
+        form = db.query(Form).filter(Form.id == fid, Form.tenant_id == user["tenant_id"]).first()
         if form and form.json_schema:
             for section in form.json_schema.get("sections", []):
                 for field in section.get("fields", []):
@@ -380,7 +395,7 @@ def _get_analyzer_data_inner(program_id, user, db):
     violations = sum(1 for s in subs if s.has_violations)
 
     # Sample rows for AI tabulation context (strip internal metadata keys)
-    _internal = {"_gps_lat", "_gps_lng", "_gps_accuracy", "_duplicate_suspect", "_validation_violations"}
+    _internal = {"_gps_lat", "_gps_lng", "_gps_accuracy", "_duplicate_suspect", "_validation_violations", "_started_at", "_duration_sec", "_audio_audit"}
     sample_rows = [
         {k: v for k, v in s.data_json.items() if k not in _internal}
         for s in subs[:8] if s.data_json and isinstance(s.data_json, dict)
@@ -502,7 +517,7 @@ def get_program_summary(
     column_count = 0
     seen_cols: set = set()
     for fid in form_ids:
-        form = db.query(Form).filter(Form.id == fid).first()
+        form = db.query(Form).filter(Form.id == fid, Form.tenant_id == user["tenant_id"]).first()
         if form and form.json_schema:
             for section in form.json_schema.get("sections", []):
                 for field in section.get("fields", []):
@@ -548,7 +563,7 @@ async def suggest_tabulation(
         check_feature(user["tenant_id"], "ai_analyzer", db)
     try:
         result = await ai_service.suggest_tabulation(
-            _get_global_ai_cfg(db),
+            _logged_cfg(db, user, "tabulate_suggest"),
             body.column_headers,
             body.sample_rows,
             body.user_prompt,
@@ -578,7 +593,7 @@ async def smart_build_tabulation(
     ).first()
     if not prog:
         raise HTTPException(404, "Program not found")
-    cfg = _get_global_ai_cfg(db)
+    cfg = _logged_cfg(db, user, "tabulate_smart_build")
     if not cfg.get("api_key"):
         raise HTTPException(400, "AI not configured. Contact your platform administrator.")
     if not body.column_ids and not body.query.strip():
@@ -650,14 +665,16 @@ async def polish_tabulation(
     ).first()
     if not prog:
         raise HTTPException(404, "Program not found")
-    cfg = _get_global_ai_cfg(db)
+    cfg = _logged_cfg(db, user, "tabulate_polish")
     if not cfg.get("api_key"):
         raise HTTPException(400, "AI not configured. Contact your platform administrator.")
     try:
+        program_context = body.program_context or f"{prog.name}{' (' + prog.scheme_name + ')' if prog.scheme_name else ''}"
         result = await ai_service.polish_tabulation(
             cfg=cfg, title=body.title, groupby_field=body.groupby_field,
             value_field=body.value_field, aggregation=body.aggregation,
             rows=body.rows[:30], is_cross_tab=body.is_cross_tab, sub_keys=body.sub_keys,
+            program_context=program_context, field_labels=body.field_labels,
         )
         return result
     except ValueError as e:
@@ -683,7 +700,7 @@ async def interpret_tabulation(
     ).first()
     if not prog:
         raise HTTPException(404, "Program not found")
-    cfg = _get_global_ai_cfg(db)
+    cfg = _logged_cfg(db, user, "tabulate_interpret")
     if not cfg.get("api_key"):
         raise HTTPException(400, "AI not configured. Contact your platform administrator.")
 
@@ -1193,6 +1210,32 @@ def save_tabulation(
     return {"analysis_id": str(rec.id), "table_configs": rec.table_configs}
 
 
+class BatchUpdateRequest(BaseModel):
+    tabulations: list = []
+
+@router.post("/programs/{program_id}/analysis/tabulations/batch-update")
+def batch_update_tabulations(
+    program_id: str,
+    body: BatchUpdateRequest,
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    rec = db.query(ProgramAnalysis).filter(
+        ProgramAnalysis.program_id == program_id,
+        ProgramAnalysis.tenant_id == user["tenant_id"],
+        ProgramAnalysis.source == "manual",
+    ).order_by(ProgramAnalysis.updated_at.desc()).first()
+    if not rec:
+        rec = _get_or_create_manual_analysis(program_id, user["tenant_id"], user["sub"], db)
+
+    update_map = {t.get("id"): t for t in body.tabulations if t.get("id")}
+    new_configs = [update_map.get(c.get("id"), c) for c in (rec.table_configs or [])]
+    rec.table_configs = new_configs
+    rec.updated_at = func.now()
+    db.commit()
+    return {"analysis_id": str(rec.id), "table_configs": rec.table_configs}
+
+
 @router.delete("/programs/{program_id}/analysis/tabulations/{tab_id}")
 def delete_tabulation(
     program_id: str,
@@ -1281,10 +1324,11 @@ def _fail_analysis(db: Session, analysis_id: str, error_text: str) -> None:
 async def _run_ai_generation(
     analysis_id: str, program_id: str, tenant_id: str, user_id: str, objectives: str,
 ) -> None:
-    from app.core.database import SessionLocal
+    from app.core.database import SessionLocal, set_tenant_context
     db = SessionLocal()
     try:
-        prog = db.query(Program).filter(Program.id == program_id).first()
+        set_tenant_context(db, tenant_id)
+        prog = db.query(Program).filter(Program.id == program_id, Program.tenant_id == tenant_id).first()
         if not prog:
             _fail_analysis(db, analysis_id, "Program not found"); return
 
@@ -1307,7 +1351,7 @@ async def _run_ai_generation(
         column_headers: list = []
         seen_cols: set = set()
         for fid in form_ids:
-            form = db.query(Form).filter(Form.id == fid).first()
+            form = db.query(Form).filter(Form.id == fid, Form.tenant_id == tenant_id).first()
             if not (form and form.json_schema): continue
             for section in form.json_schema.get("sections", []):
                 for field in section.get("fields", []):
@@ -1350,7 +1394,7 @@ async def _run_ai_generation(
                 cols_high_missing[col["label"]] = round(missing_ct / total_subs * 100, 1)
         cleaning_summary = {"total": total_subs, "skipped": skipped, "cols_high_missing": cols_high_missing}
 
-        _internal = {"_gps_lat", "_gps_lng", "_gps_accuracy", "_duplicate_suspect", "_validation_violations"}
+        _internal = {"_gps_lat", "_gps_lng", "_gps_accuracy", "_duplicate_suspect", "_validation_violations", "_started_at", "_duration_sec", "_audio_audit"}
         sample_rows = [
             {k: v for k, v in s.data_json.items() if k not in _internal}
             for s in subs[:8] if s.data_json
@@ -1358,7 +1402,7 @@ async def _run_ai_generation(
 
         user_prompt = objectives.strip() or "Suggest the most insightful tabulations for this dataset."
         try:
-            result = await ai_service.suggest_tabulation(_get_global_ai_cfg(db), column_headers, sample_rows, user_prompt)
+            result = await ai_service.suggest_tabulation(_logged_cfg(db, user, "tabulate_auto_suggest"), column_headers, sample_rows, user_prompt)
         except Exception as e:
             _fail_analysis(db, analysis_id, f"AI call failed: {e}"); return
 
@@ -1387,7 +1431,7 @@ async def _run_ai_generation(
                 f"{[c['id'] for c in column_headers[:30]]}. Do NOT guess or invent ids."
             )
             try:
-                retry_result = await ai_service.suggest_tabulation(_get_global_ai_cfg(db), column_headers, sample_rows, strict)
+                retry_result = await ai_service.suggest_tabulation(_logged_cfg(db, user, "tabulate_auto_suggest_retry"), column_headers, sample_rows, strict)
                 valid2 = [c for c in retry_result.get("tables", []) if _is_valid(c)]
                 if len(valid2) > len(valid): valid = valid2
             except Exception as e:
@@ -1811,14 +1855,16 @@ async def generate_program_report(
     start_d = prog.start_date.isoformat() if prog.start_date else "—"
     end_d   = prog.end_date.isoformat()   if prog.end_date   else "—"
     date_range = body.date_range or f"{start_d} to {end_d}"
-    ai_cfg  = _get_global_ai_cfg(db)
+    ai_cfg  = _logged_cfg(db, user, "program_report")
     prog_name = prog.name
 
-    job_id = _create_ai_job(db, str(user["tenant_id"]), str(user["sub"]), f"Writer: {prog_name}", program_id)
+    job_tenant_id = str(user["tenant_id"])
+    job_id = _create_ai_job(db, job_tenant_id, str(user["sub"]), f"Writer: {prog_name}", program_id)
 
     async def _run():
-        from app.core.database import SessionLocal
+        from app.core.database import SessionLocal, set_tenant_context
         with SessionLocal() as sess:
+            set_tenant_context(sess, job_tenant_id)
             _update_ai_job(sess, job_id, "running", "Preparing report context…")
             try:
                 _update_ai_job(sess, job_id, "running", "Calling AI model — this may take 1–3 minutes…")

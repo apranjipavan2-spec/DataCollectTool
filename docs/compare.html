@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SPLVXJJ7GN"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag("js", new Date());
+    gtag("config", "G-SPLVXJJ7GN");
+  </script>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Compare (2026) — FieldGovern vs SurveyCTO, KoboToolbox, ODK, CommCare & Paper</title>
+  <link rel="icon" href="assets/logo-icon.png" type="image/png"/>
+  <meta name="description" content="Honest 2026 comparison: FieldGovern vs SurveyCTO, KoboToolbox, ODK and CommCare — features, pricing and an overall ranking. Plus the real cost of paper/manual data collection vs FieldGovern (printing, data entry, errors, analysis, report writing)."/>
+  <link rel="canonical" href="https://www.fieldgovern.com/compare.html"/>
+  <meta name="robots" content="index,follow"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:url" content="https://www.fieldgovern.com/compare.html"/>
+  <meta property="og:title" content="FieldGovern vs SurveyCTO, KoboToolbox, ODK, CommCare & Paper (2026)"/>
+  <meta property="og:description" content="Feature, pricing and ranking comparison of the top field data tools — plus paper vs digital ROI."/>
+  <meta property="og:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
+  <meta property="og:site_name" content="FieldGovern"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="Compare — FieldGovern vs the alternatives & paper"/>
+  <meta name="twitter:description" content="Ranking, features, pricing and paper-vs-digital ROI. FieldGovern from ₹6,999/mo."/>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.fieldgovern.com/"},
+      {"@type": "ListItem", "position": 2, "name": "Compare", "item": "https://www.fieldgovern.com/compare.html"}
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {"@type": "Question", "name": "Which field data collection tool is best in India in 2026?", "acceptedAnswer": {"@type": "Answer", "text": "For Indian research, NGO, government and corporate teams, FieldGovern ranks first overall because it combines offline-first collection with built-in AI data cleaning, cross-tabulation, panel study and report writing, plus DPDP compliance and UPI billing, at a lower total cost than SurveyCTO. SurveyCTO remains the gold standard for complex global RCTs, KoboToolbox is best for zero-budget NGOs, and ODK is best for technical teams that want to self-host."}},
+      {"@type": "Question", "name": "How much does paper-based data collection really cost?", "acceptedAnswer": {"@type": "Answer", "text": "Paper adds printing, logistics, manual data entry (often 10-15 minutes per form), 5-10% transcription error rates, separate analysis software and analyst time, and weeks of turnaround. For a 5,000-survey study these hidden costs typically run into several lakh rupees and 6-10 weeks, versus a few thousand rupees and days on FieldGovern."}}
+    ]
+  }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    :root{--brand:#0ea5e9;--brand-dark:#0369a1;--accent:#7c3aed;--green:#10b981;--orange:#f59e0b;--red:#ef4444;--bg:#ffffff;--bg2:#f8fafc;--bg3:#f1f5f9;--dark:#0f172a;--text:#0f172a;--text2:#334155;--text3:#64748b;--border:#e2e8f0}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{font-family:'Inter',sans-serif;color:var(--text);background:var(--bg)}
+    body{overflow-x:hidden}
+
+    /* NAV */
+    nav{position:fixed;top:0;width:100%;z-index:100;padding:0 24px;height:68px;display:flex;align-items:center;justify-content:space-between;transition:all .3s}
+    nav.scrolled{background:rgba(255,255,255,.95);backdrop-filter:blur(16px);box-shadow:0 2px 20px rgba(0,0,0,.06);border-bottom:1px solid var(--border)}
+    .nav-logo{display:flex;align-items:center;text-decoration:none}
+    .nav-logo img{height:42px;width:auto}
+    .nav-links{display:flex;align-items:center;gap:28px;list-style:none}
+    .nav-links a{text-decoration:none;color:var(--text2);font-weight:500;font-size:.9rem;transition:color .2s;position:relative}
+    .nav-links a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;background:var(--brand);border-radius:2px;transition:width .3s}
+    .nav-links a:hover,.nav-links a.active{color:var(--brand)}
+    .nav-links a:hover::after,.nav-links a.active::after{width:100%}
+    .btn-primary{background:linear-gradient(135deg,var(--brand),var(--accent));color:white;border:none;border-radius:10px;padding:10px 22px;font-weight:600;font-size:.9rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all .3s;box-shadow:0 4px 16px rgba(14,165,233,.3)}
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(14,165,233,.4)}
+    .btn-outline{border:2px solid var(--brand);color:var(--brand);border-radius:10px;padding:10px 22px;font-weight:600;font-size:.9rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:transparent;transition:all .3s}
+    .btn-outline:hover{background:var(--brand);color:white;transform:translateY(-2px)}
+    .hamburger{display:none;flex-direction:column;justify-content:center;gap:5px;cursor:pointer;width:40px;height:40px;border-radius:9px;border:1.5px solid var(--border);background:white;padding:8px;flex-shrink:0}
+    .hamburger span{display:block;width:100%;height:2px;background:var(--text);border-radius:2px;transition:all .3s}
+    .hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+    .hamburger.open span:nth-child(2){opacity:0}
+    .hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+    #mobileMenu{display:none;position:fixed;top:64px;left:0;right:0;background:white;border-bottom:2px solid var(--border);box-shadow:0 12px 40px rgba(0,0,0,.12);z-index:98;padding:8px 0}
+    #mobileMenu.open{display:block}
+    #mobileMenu a{display:flex;align-items:center;padding:14px 24px;color:var(--text2);font-weight:500;font-size:.95rem;text-decoration:none;border-bottom:1px solid var(--border);transition:background .15s}
+    #mobileMenu a:last-child{border-bottom:none}
+    #mobileMenu a:hover{background:var(--bg2);color:var(--brand)}
+
+    /* HERO */
+    .page-hero{padding:130px 24px 56px;background:linear-gradient(160deg,#f0f9ff 0%,#fff 55%,#faf5ff 100%);text-align:center}
+    .section-tag{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(14,165,233,.1),rgba(124,58,237,.1));border:1px solid rgba(14,165,233,.2);border-radius:999px;padding:5px 14px;font-size:.78rem;font-weight:700;color:var(--brand-dark);letter-spacing:.04em;text-transform:uppercase;margin-bottom:16px}
+    .page-hero h1{font-size:2.7rem;font-weight:900;color:var(--text);line-height:1.15;margin-bottom:16px}
+    .grad-text{background:linear-gradient(135deg,var(--brand),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .page-hero p{font-size:1.05rem;color:var(--text2);line-height:1.7;max-width:620px;margin:0 auto 12px}
+
+    /* SECTION */
+    .section-inner{max-width:1100px;margin:0 auto;padding:64px 24px}
+    .sec-head{text-align:center;margin-bottom:36px}
+    .sec-head h2{font-size:1.9rem;font-weight:900;color:var(--text);margin-bottom:10px;letter-spacing:-.01em}
+    .sec-head p{font-size:1rem;color:var(--text2);max-width:640px;margin:0 auto;line-height:1.6}
+
+    /* RANKING */
+    .rank-wrap{max-width:920px;margin:0 auto;border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.05)}
+    .rank-row{display:flex;align-items:center;gap:14px;padding:16px 18px;border-bottom:1px solid var(--border)}
+    .rank-row:last-child{border-bottom:none}
+    .rank-row.win{background:linear-gradient(135deg,rgba(14,165,233,.08),rgba(124,58,237,.08))}
+    .rank-no{font-weight:900;min-width:38px;font-size:1.2rem;color:var(--text3)}
+    .rank-row.win .rank-no{color:var(--brand);font-size:1.5rem}
+    .rank-body{flex:1;min-width:0}
+    .rank-name{font-weight:700;font-size:.98rem}
+    .rank-row.win .rank-name{font-weight:800;font-size:1.05rem}
+    .rank-name a{color:inherit;text-decoration:none}
+    .rank-badge{font-size:.68rem;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--brand),var(--accent));padding:2px 8px;border-radius:999px;margin-left:6px}
+    .rank-bestfor{font-weight:600;color:var(--text2)}
+    .rank-why{color:var(--text3);font-size:.83rem;margin-top:2px;line-height:1.5}
+    .rank-score{text-align:right;flex-shrink:0}
+    .rank-score .num{font-size:1.2rem;font-weight:800;color:var(--text2)}
+    .rank-row.win .rank-score .num{font-size:1.45rem;color:var(--brand)}
+    .rank-score .den{font-size:.68rem;color:var(--text3)}
+
+    /* RANKING — featured #1 + 2-column grid */
+    .rank-featured{display:flex;align-items:center;gap:16px;border:2px solid var(--brand);border-radius:18px;padding:20px 22px;background:linear-gradient(135deg,rgba(14,165,233,.08),rgba(124,58,237,.08));box-shadow:0 6px 28px rgba(14,165,233,.14);margin-bottom:16px;max-width:920px;margin-left:auto;margin-right:auto}
+    .rank-featured .rank-no{color:var(--brand);font-size:1.7rem;min-width:42px}
+    .rank-featured .rank-name{font-weight:800;font-size:1.15rem}
+    .rank-featured .rank-score .num{font-size:1.6rem;color:var(--brand)}
+    .rank-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:920px;margin:0 auto}
+    .rank-cell{display:flex;align-items:flex-start;gap:12px;border:1px solid var(--border);border-radius:14px;padding:16px 18px;background:white;transition:box-shadow .2s}
+    .rank-cell:hover{box-shadow:0 4px 18px rgba(0,0,0,.06)}
+    .rank-cell .rank-no{font-size:1.15rem;color:var(--text3)}
+
+    /* COST CALCULATOR */
+    .calc-wrap{display:grid;grid-template-columns:1fr 1.15fr;gap:24px;align-items:start;max-width:960px;margin:0 auto}
+    .calc-inputs{border:1px solid var(--border);border-radius:18px;padding:24px;background:white}
+    .calc-field{margin-bottom:16px}
+    .calc-field:last-child{margin-bottom:0}
+    .calc-field label{display:block;font-size:.82rem;font-weight:700;color:var(--text2);margin-bottom:6px}
+    .calc-field label .hint{font-weight:500;color:var(--text3);font-size:.72rem}
+    .calc-field input{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:10px;font-size:1rem;font-family:inherit;color:var(--text);background:#fff;transition:border-color .15s,box-shadow .15s}
+    .calc-field input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(14,165,233,.12)}
+    .calc-toggle{display:flex;gap:6px;background:var(--bg3);border-radius:10px;padding:4px}
+    .ct-btn{flex:1;border:none;background:transparent;border-radius:8px;padding:8px 10px;font-family:inherit;font-size:.76rem;font-weight:700;color:var(--text3);cursor:pointer;transition:all .15s;line-height:1.2}
+    .ct-btn.active{background:white;color:var(--brand-dark);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+    .calc-sub-fields{border-left:2px solid var(--border);padding-left:14px;margin-left:2px}
+    .calc-out{display:flex;flex-direction:column;gap:14px}
+    .calc-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .calc-card{border:1px solid var(--border);border-radius:16px;padding:18px 20px;background:white}
+    .calc-card.paper{border-color:#fecaca;background:#fef2f2}
+    .calc-card.fg{border-color:#bae6fd;background:#f0f9ff}
+    .calc-card h4{font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
+    .calc-card.paper h4{color:#b91c1c}
+    .calc-card.fg h4{color:var(--brand-dark)}
+    .calc-big{font-size:1.65rem;font-weight:900;line-height:1.1;margin-bottom:2px}
+    .calc-card.paper .calc-big{color:#b91c1c}
+    .calc-card.fg .calc-big{color:var(--brand)}
+    .calc-sub{font-size:.74rem;color:var(--text3);margin-bottom:12px}
+    .calc-line{display:flex;justify-content:space-between;gap:8px;font-size:.79rem;padding:5px 0;border-top:1px dashed var(--border);color:var(--text2)}
+    .calc-line span:last-child{font-weight:700;color:var(--text);white-space:nowrap}
+    .calc-verdict{border-radius:18px;padding:18px 24px;background:linear-gradient(135deg,var(--brand),var(--accent));color:white;margin-top:8px}
+    .calc-verdict .cv-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 28px}
+    .calc-verdict .cv-col{display:flex;flex-direction:column;gap:6px;padding:2px 0}
+    .calc-verdict .cv-paper{padding-right:28px;border-right:1px solid rgba(255,255,255,.25)}
+    .calc-verdict .cv-col-head{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;opacity:.82}
+    .calc-verdict .cv-pct{font-size:2.4rem;font-weight:900;line-height:1;letter-spacing:-.01em}
+    .calc-verdict .cv-save{font-size:.92rem;font-weight:700;opacity:.96}
+    .calc-verdict .cv-detail{font-size:.84rem;line-height:1.5;opacity:.93;margin-top:2px}
+    .calc-verdict .cv-detail strong,.calc-verdict .cv-plat-lines strong{background:rgba(255,255,255,.22);padding:2px 8px;border-radius:6px;font-weight:800}
+    .calc-verdict .cv-plat-lines{display:flex;flex-direction:column;gap:8px;font-size:.95rem;font-weight:700}
+    .calc-verdict .cv-btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+    @media(max-width:600px){.calc-verdict .cv-cols{grid-template-columns:1fr;gap:16px}.calc-verdict .cv-paper{padding-right:0;border-right:none;border-bottom:1px solid rgba(255,255,255,.25);padding-bottom:16px}.calc-verdict .cv-btns{justify-content:center}}
+    /* multi-platform ranked comparison */
+    /* Calculator tile — highlighted, distinct from page flow */
+    #calc{max-width:1400px}
+    .calc-tile{position:relative;background:linear-gradient(180deg,#eff9ff 0%,#fff 38%);border:2px solid var(--brand);border-radius:26px;padding:34px 30px 30px;box-shadow:0 24px 70px rgba(14,165,233,.16)}
+    .calc-tile::before{content:'';position:absolute;inset:0;border-radius:26px;padding:2px;background:linear-gradient(135deg,var(--brand),var(--accent));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;opacity:.55}
+    .calc-eyebrow{display:inline-flex;align-items:center;gap:7px;background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;border-radius:999px;padding:6px 16px;font-size:.78rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;box-shadow:0 8px 22px rgba(124,58,237,.28)}
+    @media(max-width:640px){.calc-tile{padding:24px 16px 22px;border-radius:20px}}
+    .calc-rank-head{display:flex;justify-content:space-between;align-items:baseline;font-size:.8rem;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin:0 0 14px;padding-bottom:10px;border-bottom:2px solid var(--border)}
+    .calc-rank{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+    .cr-row{border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:white}
+    .cr-row.win{border-color:var(--brand);background:#f0f9ff}
+    .cr-row.paper{border-color:#fecaca;background:#fef2f2}
+    .cr-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+    .cr-name{font-weight:700;font-size:.9rem}
+    .cr-row.win .cr-name{color:var(--brand-dark)}
+    .cr-tag{font-size:.6rem;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--brand),var(--accent));padding:2px 7px;border-radius:999px;margin-left:6px;text-transform:uppercase;letter-spacing:.03em;vertical-align:middle}
+    .cr-total{font-weight:900;font-size:1.05rem;white-space:nowrap}
+    .cr-row.win .cr-total{color:var(--brand)}
+    .cr-row.paper .cr-total{color:#b91c1c}
+    .cr-bar{height:8px;border-radius:999px;background:var(--bg3);margin:8px 0 6px;overflow:hidden}
+    .cr-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--brand),var(--accent));width:0;transition:width .55s ease}
+    .cr-row.paper .cr-fill{background:#ef4444}
+    .cr-row:not(.win):not(.paper) .cr-fill{background:#94a3b8}
+    .cr-note{font-size:.72rem;color:var(--text3);line-height:1.4}
+    /* full-width side-by-side comparison */
+    .calc-full{width:100%;padding:0 clamp(16px,4vw,48px);margin:0 auto}
+    .calc-grid{display:grid;grid-template-columns:290px minmax(0,1fr);gap:20px;align-items:start}
+    .calc-grid .calc-inputs{position:sticky;top:84px}
+    .calc-right{min-width:0}
+    .calc-matrix{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:0 0 24px}
+    .cmpcol{border:1px solid var(--border);border-radius:14px;padding:18px 16px;background:white;display:flex;flex-direction:column}
+    @keyframes fgCardGlow{0%,100%{box-shadow:0 6px 22px rgba(14,165,233,.12)}50%{box-shadow:0 8px 30px rgba(14,165,233,.34)}}
+    .cmpcol.fg{border:2px solid var(--brand);background:#f0f9ff;animation:fgCardGlow 2.6s ease-in-out infinite}
+    .cmpcol.paper{border-color:#fecaca;background:#fef2f2}
+    .cc-name{font-weight:800;font-size:.88rem;line-height:1.25;min-height:2.6em;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+    .cmpcol.fg .cc-name{color:var(--brand-dark)}
+    .cc-badge{font-size:.55rem;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--brand),var(--accent));padding:2px 6px;border-radius:999px;text-transform:uppercase;letter-spacing:.03em}
+    .cc-total{font-size:1.25rem;font-weight:900;line-height:1.1;margin-top:2px}
+    .cmpcol.fg .cc-total{color:var(--brand)}
+    .cmpcol.paper .cc-total{color:#b91c1c}
+    .cc-sub{font-size:.66rem;color:var(--text3);margin-bottom:8px}
+    .cc-bar{height:6px;border-radius:999px;background:var(--bg3);overflow:hidden;margin-bottom:10px}
+    .cc-bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--brand),var(--accent))}
+    .cmpcol.paper .cc-bar i{background:#ef4444}
+    .cmpcol:not(.fg):not(.paper) .cc-bar i{background:#94a3b8}
+    .cc-lines{list-style:none;margin:0;padding:0;flex:1}
+    .cc-lines li{display:flex;justify-content:space-between;gap:6px;font-size:.72rem;padding:6px 0;border-top:1px dashed var(--border);color:var(--text3)}
+    .cc-lines b{color:var(--text);font-weight:700;text-align:right;white-space:nowrap}
+    .cc-lines b.inc{color:var(--green)}
+    .cc-foot{margin-top:10px;font-size:.66rem;color:var(--text3);line-height:1.45;border-top:1px solid var(--border);padding-top:8px}
+    .cc-extras{list-style:none;margin:10px 0 0;padding:8px 0 0;border-top:1px dashed var(--border);display:flex;flex-direction:column;gap:5px}
+    .cc-extras li{font-size:.7rem;color:var(--brand-dark);font-weight:700;display:flex;gap:6px;align-items:flex-start;line-height:1.3}
+    .cc-extras li::before{content:'✓';color:var(--green);font-weight:900;flex-shrink:0}
+    .cc-extras li.no{color:var(--text3);font-weight:600}
+    .cc-extras li.no::before{content:'✗';color:#dc2626}
+    .calc-inputs-top{border:1px solid var(--border);border-radius:18px;padding:18px;background:var(--bg3);margin-bottom:26px}
+    .calc-fields{display:grid;grid-template-columns:1fr 2.4fr 1fr 1fr 1fr 1fr;gap:12px;align-items:stretch}
+    @media(max-width:1100px){.calc-fields{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:600px){.calc-fields{grid-template-columns:repeat(2,1fr)}}
+    .calc-fields .calc-field{margin-bottom:0;background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;gap:10px;box-shadow:0 1px 2px rgba(15,23,42,.04);transition:border-color .15s,box-shadow .15s}
+    .calc-fields .calc-field:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px rgba(14,165,233,.12)}
+    .calc-fields .calc-field label{margin-bottom:0}
+    .calc-fields .calc-field input,.calc-fields .calc-field select{background:var(--bg2);width:100%;height:38px;padding:0 11px;border:1.5px solid var(--border);border-radius:9px;font-size:1rem;font-family:inherit;color:var(--text)}
+    .calc-fields .calc-field input:focus,.calc-fields .calc-field select:focus{outline:none;border-color:var(--brand)}
+    .calc-fields .calc-field select{cursor:pointer;font-size:.85rem;font-weight:600;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;padding-right:26px}
+    .vol-row{display:flex;gap:8px}
+    .vol-row select{flex:1.3;min-width:0}
+    .vol-row input{flex:1;min-width:0}
+    @media(max-width:760px){.calc-fields{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:440px){.calc-fields{grid-template-columns:1fr}}
+    @media(max-width:900px){
+      .calc-grid{grid-template-columns:1fr}
+      .calc-grid .calc-inputs{position:static}
+      .calc-matrix{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+      .calc-matrix .cmpcol{flex:0 0 210px;scroll-snap-align:start}
+    }
+    .calc-assume{font-size:.72rem;color:var(--text3);line-height:1.6;margin-top:14px;text-align:left;max-width:none}
+    .calc-big,.cv-save{transition:color .2s}
+    @keyframes cvPulse{0%{transform:scale(1)}40%{transform:scale(1.025)}100%{transform:scale(1)}}
+    .calc-verdict.pulse{animation:cvPulse .45s ease}
+    @media(max-width:820px){.calc-wrap{grid-template-columns:1fr}}
+    @media(prefers-reduced-motion:reduce){
+      thead th.highlight{animation:none}
+      .cmp-wrap.animate-fg td.col-fg{animation:none}
+      .calc-verdict.pulse{animation:none}
+      .cmpcol.fg{animation:none}
+    }
+
+    /* TABLES */
+    .cmp-wrap{overflow-x:auto;border-radius:16px;border:1px solid var(--border);box-shadow:0 4px 24px rgba(0,0,0,.05)}
+    table{width:100%;border-collapse:collapse;font-size:.82rem;background:white;table-layout:fixed}
+    thead th{background:var(--bg2);padding:12px 12px;text-align:center;font-weight:800;color:var(--text);border-bottom:2px solid var(--border);font-size:.8rem;width:17%}
+    thead th:first-child{width:32%}
+    .cmp-wrap .tag-better,.cmp-wrap .tag-ok,.cmp-wrap .tag-worse{white-space:normal;line-height:1.35}
+    @media(max-width:720px){.cmp-wrap table{min-width:680px}}
+    thead th.highlight{background:linear-gradient(110deg,rgba(14,165,233,.12),rgba(124,58,237,.22),rgba(14,165,233,.12));background-size:220% 100%;color:var(--brand-dark);animation:fgShimmer 5s linear infinite}
+    @keyframes fgShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    thead th:first-child{text-align:left}
+    tbody td{padding:10px 12px;text-align:center;border-bottom:1px solid var(--border);color:var(--text2)}
+    tbody td:first-child{text-align:left;font-weight:600;color:var(--text)}
+    tbody tr:hover{background:var(--bg2)}
+    .col-fg{background:rgba(14,165,233,.04)}
+    .grp td{text-align:left;font-size:.72rem;font-weight:800;letter-spacing:.08em;padding:10px 16px;text-transform:uppercase}
+    .tag-better{color:#047857;font-weight:700}
+    .tag-ok{color:#b45309}
+    .tag-worse{color:#b91c1c}
+    /* FG column scroll-reveal + glow */
+    @keyframes fgCellIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+    @keyframes fgGlow{0%,100%{box-shadow:inset 3px 0 0 -1px rgba(14,165,233,0)}50%{box-shadow:inset 3px 0 0 0 rgba(14,165,233,.45)}}
+    .cmp-wrap.animate-fg td.col-fg{animation:fgCellIn .5s ease both, fgGlow 1.4s ease 1}
+    .fg-plan{font-weight:800;color:var(--brand-dark)}
+    .fg-meta{font-size:.72rem;color:var(--text3);margin-top:1px}
+    .fg-meta del{opacity:.7}
+
+    /* PAPER */
+    .paper-note{text-align:center;font-size:.78rem;color:var(--text3);margin-top:12px}
+    .roi-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:32px}
+    .roi-card{border:1px solid var(--border);border-radius:16px;padding:22px;text-align:center;background:white}
+    .roi-card .roi-big{font-size:1.8rem;font-weight:900;color:var(--brand);margin-bottom:4px}
+    .roi-card .roi-lbl{font-size:.82rem;color:var(--text3);line-height:1.5}
+
+    /* CTA */
+    .cta-block{background:linear-gradient(135deg,#eff6ff 0%,#f5f3ff 100%);border:1px solid rgba(14,165,233,.15);border-radius:28px;padding:56px 40px;text-align:center;max-width:1100px;margin:0 auto}
+    .cta-block h2{font-size:1.9rem;font-weight:900;color:var(--text);margin-bottom:12px}
+    .cta-block p{font-size:1rem;color:var(--text2);max-width:460px;margin:0 auto 28px}
+    .cta-buttons{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:18px;max-width:680px;margin:0 auto}
+    .cta-buttons>a{flex:1 1 180px;justify-content:center;text-align:center;white-space:nowrap}
+    .wa-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 28px;background:#25d366;color:white;border-radius:12px;font-weight:700;font-size:.92rem;text-decoration:none;transition:all .2s}
+    .wa-btn:hover{background:#1ebe5d;transform:translateY(-2px)}
+
+    /* FOOTER */
+    footer{background:var(--dark);color:rgba(255,255,255,.75);padding:56px 24px 24px}
+    .footer-inner{max-width:1180px;margin:0 auto}
+    .footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;margin-bottom:40px}
+    .footer-brand p{font-size:.85rem;line-height:1.7;color:rgba(255,255,255,.5);margin-top:12px}
+    .footer-logo-box img{height:32px;width:auto;filter:brightness(0) invert(1)}
+    .footer-col h4{font-size:.78rem;font-weight:700;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px}
+    .footer-col ul{list-style:none;display:flex;flex-direction:column;gap:8px}
+    .footer-col a{color:rgba(255,255,255,.6);text-decoration:none;font-size:.85rem;transition:color .2s}
+    .footer-col a:hover{color:white}
+    .footer-bottom{border-top:1px solid rgba(255,255,255,.08);padding-top:20px;display:flex;justify-content:space-between;align-items:center;font-size:.78rem;color:rgba(255,255,255,.3);flex-wrap:wrap;gap:8px}
+
+    @media(max-width:900px){
+      .footer-grid{grid-template-columns:1fr 1fr}
+      .roi-cards{grid-template-columns:1fr}
+    }
+    @media(max-width:640px){
+      .nav-links,.btn-outline{display:none}
+      .hamburger{display:flex}
+      .page-hero h1{font-size:1.9rem}
+      .footer-grid{grid-template-columns:1fr}
+      .section-inner{padding:48px 16px}
+      .cta-block{padding:40px 20px}
+      .rank-grid2{grid-template-columns:1fr}
+      .calc-cols{grid-template-columns:1fr}
+    }
+    /* Floating cost-calculator sticker — always visible */
+    .calc-sticker{position:fixed;right:18px;bottom:22px;z-index:95;display:flex;align-items:center;gap:11px;padding:12px 16px;background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;border-radius:14px;box-shadow:0 12px 32px rgba(14,165,233,.35);text-decoration:none;max-width:250px;transition:transform .2s,box-shadow .2s;animation:cs-pulse 2.6s ease-in-out infinite}
+    .calc-sticker:hover{transform:translateY(-3px);box-shadow:0 18px 44px rgba(124,58,237,.5)}
+    .cs-emoji{font-size:1.55rem;line-height:1;flex-shrink:0}
+    .cs-text{display:flex;flex-direction:column;line-height:1.25}
+    .cs-text strong{font-size:.92rem;font-weight:800}
+    .cs-text span{font-size:.72rem;opacity:.92}
+    @keyframes cs-pulse{0%,100%{box-shadow:0 12px 32px rgba(14,165,233,.32)}50%{box-shadow:0 14px 42px rgba(124,58,237,.55)}}
+    @media(prefers-reduced-motion:reduce){.calc-sticker{animation:none}}
+    @media(max-width:640px){.calc-sticker{right:12px;bottom:14px;padding:10px 12px;max-width:188px}.cs-text strong{font-size:.82rem}.cs-text span{font-size:.66rem}}
+      .ei{display:inline-block;width:1em;height:1em;vertical-align:-0.14em;stroke:currentColor;stroke-width:1.85;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;transition:transform .25s ease}
+    .ei:hover{transform:scale(1.18) rotate(-3deg)}
+    a:hover .ei,button:hover .ei,[class*='card']:hover .ei{transform:scale(1.15)}
+    @media(prefers-reduced-motion:reduce){.ei{transition:none}}
+  </style>
+  <script defer data-domain="fieldgovern.com" src="https://plausible.io/js/script.js"></script>
+</head>
+<body>
+
+<nav id="navbar">
+  <a href="index.html" class="nav-logo">
+    <img src="assets/logo-wide.png" alt="FieldGovern" style="height:40px;width:auto;mix-blend-mode:multiply"/>
+  </a>
+  <ul class="nav-links">
+    <li><a href="features.html">Features</a></li>
+    <li><a href="integrations.html">Integrations</a></li>
+    <li><a href="use-cases.html">Use Cases</a></li>
+    <li><a href="compare.html">Compare</a></li>
+    <li><a href="security.html">Security</a></li>
+    <li><a href="pricing.html">Pricing</a></li>
+    <li><a href="about.html">About</a></li>
+  </ul>
+  <div style="display:flex;gap:8px;align-items:center">
+    <a href="demo.html" class="btn-outline">Try Demo</a>
+    <a href="https://app.fieldgovern.com" class="btn-primary">Open App →</a>
+    <button class="hamburger" id="hamburgerBtn" aria-label="Open menu" onclick="toggleMenu()">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<div id="mobileMenu" role="navigation">
+  <a href="features.html">✦ Features</a>
+  <a href="integrations.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Integrations</a>
+  <a href="use-cases.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Use Cases</a>
+  <a href="compare.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Compare</a>
+  <a href="security.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Security</a>
+  <a href="pricing.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Pricing</a>
+  <a href="about.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg> About Us</a>
+  <a href="demo.html" style="color:var(--brand);font-weight:700"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Try Free Demo</a>
+</div>
+
+<!-- Floating cost-calculator sticker — stays on screen, scrolls to calculator -->
+<a href="#calc" class="calc-sticker" aria-label="Jump to the cost calculator">
+  <span class="cs-emoji"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></span>
+  <span class="cs-text"><strong>Cost calculator</strong><span>See your 6-month savings →</span></span>
+</a>
+
+<!-- Nav clearance (hero removed) -->
+<div style="height:88px"></div>
+
+<!-- ═══ COST CALCULATOR — inputs on top, tiles below ═══ -->
+<div class="section-inner" id="calc" style="padding-bottom:0">
+ <div class="calc-tile">
+  <div class="sec-head">
+    <span class="calc-eyebrow"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg> Cost calculator</span>
+    <h2 style="margin-top:14px">Your numbers: every platform, side by side</h2>
+    <p>Set the shape of your fieldwork below. We compute the <strong>total project cost</strong> for FieldGovern, KoboToolbox, SurveyCTO and paper/manual — broken down line by line.</p>
+  </div>
+
+  <!-- INPUTS (top) -->
+  <div class="calc-inputs-top">
+    <div class="calc-fields">
+      <div class="calc-field">
+        <label>Admins / projects <span class="hint">project managers</span></label>
+        <input id="ci-programs" type="number" min="1" value="2"/>
+      </div>
+      <div class="calc-field">
+        <label>Volume <span class="hint">enter by</span></label>
+        <div class="vol-row">
+          <select id="ci-volmode" onchange="setVolMode(this.value)">
+            <option value="subs">Submissions / month</option>
+            <option value="quest">Questionnaires / project</option>
+          </select>
+          <input id="ci-subs" type="number" min="1" value="2000" placeholder="responses / mo"/>
+          <input id="ci-perproject" type="number" min="1" value="3000" placeholder="per project" style="display:none"/>
+        </div>
+      </div>
+      <div class="calc-field">
+        <label>Pages / form <span class="hint">double-sided</span></label>
+        <input id="ci-pages" type="number" min="1" value="12"/>
+      </div>
+      <div class="calc-field">
+        <label>Duration <span class="hint">months</span></label>
+        <input id="ci-months" type="number" min="1" value="6"/>
+      </div>
+      <div class="calc-field">
+        <label>Data-entry wage <span class="hint">₹ / mo per operator</span></label>
+        <input id="ci-opsal" type="number" min="0" step="500" value="15000"/>
+      </div>
+      <div class="calc-field">
+        <label>Analyst salary <span class="hint">₹ / month</span></label>
+        <input id="ci-ansal" type="number" min="0" step="1000" value="30000"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- TILES (below) -->
+  <div class="calc-rank-head"><span>Total project cost — line by line</span><span id="co-context">—</span></div>
+  <div class="calc-matrix" id="calc-matrix"></div>
+
+  <!-- SAVINGS -->
+  <div class="calc-verdict">
+    <div class="cv-cols">
+      <div class="cv-col cv-paper">
+        <div class="cv-col-head">vs Paper</div>
+        <div class="cv-pct" id="co-pct">—</div>
+        <div class="cv-save" id="co-save">—</div>
+        <div class="cv-detail" id="co-paper-detail">—</div>
+      </div>
+      <div class="cv-col cv-plat">
+        <div class="cv-col-head">vs Digital platforms</div>
+        <div class="cv-plat-lines" id="co-plat">—</div>
+        <div class="cv-detail" id="co-plat-note">—</div>
+      </div>
+    </div>
+    <div class="cv-btns">
+      <a href="pricing.html" class="btn-outline" style="background:white;border-color:white;color:var(--brand-dark);padding:9px 18px;font-size:.86rem">See plan details</a>
+      <a href="https://wa.me/918088709011?text=Hi%2C%20I%27d%20like%20a%20FieldGovern%20quote%20for%20my%20fieldwork." target="_blank" class="btn-outline" style="background:transparent;border-color:rgba(255,255,255,.6);color:white;padding:9px 18px;font-size:.86rem">Get a quote</a>
+    </div>
+  </div>
+
+  <p class="calc-assume"><strong>Assumptions:</strong> printing ₹1 per double-sided sheet; data entry by operators (~1 per 800 subs/mo) at the wage you set (prefilled ₹15,000/mo) for the project duration; analyst at the salary you set (prefilled ₹30,000/mo) for the project; report writing ₹15,000 per project. <strong>KoboToolbox and SurveyCTO don't include cleaning, analysis or report writing</strong>, so an analyst + report cost still applies to them — only FieldGovern bundles these. Software assumed (₹83/$): SurveyCTO ~$250–700/mo by volume; KoboToolbox paid plans — Professional ~$159/mo (≤25k subs), Teams ~$300/mo (≤50k), Enterprise ~$500/mo above. FieldGovern price introductory, +18% GST extra. Indicative only — actual costs vary by team and location.</p>
+ </div>
+</div>
+
+<!-- ═══ RANKING ═══ -->
+<div class="section-inner" id="ranking">
+  <div class="sec-head">
+    <h2>Overall ranking for Indian field teams</h2>
+    <p>Scored on offline reliability, built-in analysis &amp; AI, India-first features (languages, DPDP, UPI) and total cost of ownership. Each tool is excellent at something — here's where they win.</p>
+  </div>
+  <div class="rank-featured">
+    <div class="rank-no">#1</div>
+    <div class="rank-body">
+      <div class="rank-name">FieldGovern <span class="rank-badge">BEST OVERALL · INDIA</span></div>
+      <div class="rank-why"><span class="rank-bestfor">Best for:</span> end-to-end field research in India — collect, clean, analyse and report in one place. Offline PWA (no install), AI data cleaning, cross-tabs, panel study, FG Writer reports, DPDP compliance, UPI billing, 22 Indian languages. Lowest total cost.</div>
+    </div>
+    <div class="rank-score"><div class="num">9.6</div><div class="den">/ 10</div></div>
+  </div>
+  <div class="rank-grid2">
+    <div class="rank-cell">
+      <div class="rank-no">#2</div>
+      <div class="rank-body">
+        <div class="rank-name"><a href="surveycto-alternative.html">SurveyCTO</a></div>
+        <div class="rank-why"><span class="rank-bestfor">Best for:</span> complex global RCTs and donor-funded academic research. Outstanding data-quality controls — but $198–700/mo, US-hosted, app-only, and no built-in analysis, AI or report writing (you export to Stata/R).</div>
+      </div>
+      <div class="rank-score"><div class="num">9.0</div><div class="den">/ 10</div></div>
+    </div>
+    <div class="rank-cell">
+      <div class="rank-no">#3</div>
+      <div class="rank-body">
+        <div class="rank-name"><a href="kobotoolbox-alternative.html">KoboToolbox</a></div>
+        <div class="rank-why"><span class="rank-bestfor">Best for:</span> zero-budget humanitarian NGOs. Generous free tier (5,000 submissions/mo) — but collection-only, limited analysis, EU-hosted, and no AI cleaning or report writer.</div>
+      </div>
+      <div class="rank-score"><div class="num">8.3</div><div class="den">/ 10</div></div>
+    </div>
+    <div class="rank-cell">
+      <div class="rank-no">#4</div>
+      <div class="rank-body">
+        <div class="rank-name"><a href="odk-alternative.html">ODK</a></div>
+        <div class="rank-why"><span class="rank-bestfor">Best for:</span> technical teams that want full data ownership and self-hosting. Free, open-source and infinitely customisable — but you supply the IT team, servers and the entire analysis layer.</div>
+      </div>
+      <div class="rank-score"><div class="num">8.0</div><div class="den">/ 10</div></div>
+    </div>
+    <div class="rank-cell">
+      <div class="rank-no">#5</div>
+      <div class="rank-body">
+        <div class="rank-name"><a href="commcare-alternative.html">CommCare</a></div>
+        <div class="rank-why"><span class="rank-bestfor">Best for:</span> frontline-worker case management and longitudinal beneficiary programs — but enterprise pricing, heavier setup, and dated analytics for survey research.</div>
+      </div>
+      <div class="rank-score"><div class="num">7.6</div><div class="den">/ 10</div></div>
+    </div>
+  </div>
+  <p class="paper-note">Why we rank #1 where ChatGPT/Gemini don't: those rankings score for global RCTs and treat FieldGovern as program-management only. For <strong>Indian</strong> teams that need collection <em>and</em> analysis <em>and</em> reporting — under DPDP, in regional languages, paid by UPI — the all-in-one pipeline and total cost decide it.</p>
+</div>
+
+<!-- ═══ FEATURE MATRIX ═══ -->
+<div class="section-inner" style="padding-top:0">
+  <div class="sec-head">
+    <h2>Feature-by-feature</h2>
+    <p>Where the platforms genuinely differ. FieldGovern's edge is everything <em>after</em> collection — cleaning, tabulation and AI reporting built in.</p>
+  </div>
+  <div class="cmp-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th class="highlight">FieldGovern ✦</th>
+          <th><a href="surveycto-alternative.html" style="color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">SurveyCTO</a></th>
+          <th><a href="kobotoolbox-alternative.html" style="color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">KoboToolbox</a></th>
+          <th><a href="odk-alternative.html" style="color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">ODK</a></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="grp" style="background:rgba(14,165,233,.04)"><td colspan="5" style="color:var(--brand)"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> Collection &amp; Field</td></tr>
+        <tr><td>Monthly Price</td><td class="col-fg"><span class="tag-better">From ₹6,999 (~$84)</span></td><td><span class="tag-worse">$198–700</span></td><td><span class="tag-ok">Free (limited)</span></td><td><span class="tag-ok">Self-hosted + ops</span></td></tr>
+        <tr><td>True Offline Mode</td><td class="col-fg"><span class="tag-better">✓ Full offline</span></td><td><span class="tag-better">✓ App only</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Partial</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> App only</span></td></tr>
+        <tr><td>No Installation Needed</td><td class="col-fg"><span class="tag-better">✓ PWA — any browser</span></td><td><span class="tag-worse">✕ App required</span></td><td><span class="tag-worse">✕ App required</span></td><td><span class="tag-worse">✕ App required</span></td></tr>
+        <tr><td>GPS Capture in Forms</td><td class="col-fg"><span class="tag-better">✓ Built-in geopoint</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-better">✓</span></td></tr>
+        <tr><td>Photo &amp; Audio Capture</td><td class="col-fg"><span class="tag-better">✓ + auto-compress</span></td><td><span class="tag-worse">✗ No compression</span></td><td><span class="tag-worse">✗ No compression</span></td><td><span class="tag-worse">✗ No compression</span></td></tr>
+        <tr><td>Auto Photo Compression</td><td class="col-fg"><span class="tag-better">✓ 96% reduction</span></td><td><span class="tag-worse">✕ None</span></td><td><span class="tag-worse">✕ None</span></td><td><span class="tag-worse">✕ None</span></td></tr>
+        <tr><td>Multi-language Forms</td><td class="col-fg"><span class="tag-better">✓ 22 Indian languages</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> EN only UI</span></td><td><span class="tag-better">✓ Many</span></td><td><span class="tag-better">✓ Many</span></td></tr>
+        <tr><td>Background Sync</td><td class="col-fg"><span class="tag-better">✓ Even app-closed</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Real-Time Dashboard</td><td class="col-fg"><span class="tag-better">✓ Instant</span></td><td><span class="tag-better">✓ Delayed</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Delayed</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Skip Logic (AND/OR)</td><td class="col-fg"><span class="tag-better">✓ Nested</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-better">✓</span></td></tr>
+
+        <tr class="grp" style="background:rgba(16,185,129,.05)"><td colspan="5" style="color:var(--green)"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg> Quality &amp; Field Supervision</td></tr>
+        <tr><td>GPS Validation (geofence)</td><td class="col-fg"><span class="tag-better">✓ Geofence + flag</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Basic</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Basic</span></td></tr>
+        <tr><td>Interview-Timing / Speed-Trap</td><td class="col-fg"><span class="tag-better">✓ Duration + rushed flag</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Audio Audits (QC recording)</td><td class="col-fg"><span class="tag-better">✓ Compressed, in-app</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Limited</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Back-Check Workflow</td><td class="col-fg"><span class="tag-better">✓ Built-in</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Duplicate / Outlier Detection</td><td class="col-fg"><span class="tag-better">✓ AI, automatic</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Rules only</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Consent + Audit Trail</td><td class="col-fg"><span class="tag-better">✓ DPDP-aligned</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Manual</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> DIY</span></td></tr>
+
+        <tr class="grp" style="background:rgba(124,58,237,.05)"><td colspan="5" style="color:var(--accent)"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2z"/></svg> Analysis &amp; Reporting — FieldGovern's Unique Advantage</td></tr>
+        <tr><td>Built-in Data Cleaner</td><td class="col-fg"><span class="tag-better">✓ Dedup, type-fix, QC</span></td><td><span class="tag-worse">✕ Export &amp; use Stata</span></td><td><span class="tag-worse">✕ Export &amp; use R</span></td><td><span class="tag-worse">✕ Export &amp; use R</span></td></tr>
+        <tr><td>Cross-tab / Tabulation Engine</td><td class="col-fg"><span class="tag-better">✓ Browser, live</span></td><td><span class="tag-worse">✕ External tool</span></td><td><span class="tag-worse">✕ External tool</span></td><td><span class="tag-worse">✕ External tool</span></td></tr>
+        <tr><td>AI Auto-Generate Insights</td><td class="col-fg"><span class="tag-better">✓ 10 tables, 1 click</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Smart Builder (NL Query + Column Picker)</td><td class="col-fg"><span class="tag-better">✓ Live, both modes</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Per-Table AI Interpretation</td><td class="col-fg"><span class="tag-better">✓ 10 focus templates</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>AI Report Writer</td><td class="col-fg"><span class="tag-better">✓ 6 styles + interpretations</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Panel Study &amp; Attrition</td><td class="col-fg"><span class="tag-better">✓ Wave tracking</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Scheduled Report Emails</td><td class="col-fg"><span class="tag-better">✓ Daily / weekly</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Stata .dta Export</td><td class="col-fg"><span class="tag-better">✓ Built-in</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>SPSS .sav Export</td><td class="col-fg"><span class="tag-better">✓ Built-in</span></td><td><span class="tag-better">✓ Paid add-on</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+
+        <tr class="grp" style="background:rgba(16,185,129,.04)"><td colspan="5" style="color:var(--green)"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> Platform &amp; Compliance</td></tr>
+        <tr><td>White-label Branding</td><td class="col-fg"><span class="tag-better">✓ Per tenant</span></td><td><span class="tag-ok">Enterprise only</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>REST API + API Keys</td><td class="col-fg"><span class="tag-better">✓ All paid plans</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Paid add-on</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-better">✓</span></td></tr>
+        <tr><td>Multi-tenant SaaS</td><td class="col-fg"><span class="tag-better">✓ Full DB isolation</span></td><td><span class="tag-better">✓</span></td><td><span class="tag-worse">✕</span></td><td><span class="tag-worse">✕</span></td></tr>
+        <tr><td>Data Stored in India</td><td class="col-fg"><span class="tag-better">✓ Mumbai servers</span></td><td><span class="tag-worse">✕ US servers</span></td><td><span class="tag-worse">✕ EU servers</span></td><td><span class="tag-ok"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Self-hosted</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div style="text-align:center;margin-top:24px;display:flex;flex-wrap:wrap;gap:10px;justify-content:center">
+    <a href="surveycto-alternative.html" class="btn-outline" style="padding:9px 16px;font-size:.85rem">Full SurveyCTO →</a>
+    <a href="kobotoolbox-alternative.html" class="btn-outline" style="padding:9px 16px;font-size:.85rem">Full KoboToolbox →</a>
+    <a href="odk-alternative.html" class="btn-outline" style="padding:9px 16px;font-size:.85rem">Full ODK →</a>
+    <a href="commcare-alternative.html" class="btn-outline" style="padding:9px 16px;font-size:.85rem">Full CommCare →</a>
+  </div>
+</div>
+
+<!-- ═══ PRICING ═══ -->
+<div style="background:var(--bg2)">
+<div class="section-inner">
+  <div class="sec-head">
+    <h2>Pricing, head to head</h2>
+    <p>Every FieldGovern paid plan bundles data cleaning, analysis and AI report writing. With the others, those are separate software licences and analyst costs on top of the price below.</p>
+  </div>
+  <div class="cmp-wrap">
+    <table>
+      <thead>
+        <tr><th>Tier (per month)</th><th class="highlight">FieldGovern ✦</th><th>SurveyCTO</th><th>KoboToolbox</th><th>ODK</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Free</td><td class="col-fg"><div class="fg-plan">₹0 · Free forever</div><div class="fg-meta">300 subs/mo</div></td><td><span class="tag-ok">Community · 200/mo</span></td><td><span class="tag-better">Community · 5,000/mo</span></td><td><span class="tag-ok">Free (self-host)</span></td></tr>
+        <tr><td>Entry</td><td class="col-fg"><div class="fg-plan">Starter · ₹6,999</div><div class="fg-meta">2,000 subs · <del>₹7,999</del></div></td><td><span class="tag-worse">~$198 (₹16,500+)</span></td><td><span class="tag-ok">Professional · 25,000</span></td><td><span class="tag-ok">ODK Cloud / hosting</span></td></tr>
+        <tr><td>Mid</td><td class="col-fg"><div class="fg-plan">Growth · ₹12,999</div><div class="fg-meta">5,000 subs · <del>₹14,999</del></div></td><td><span class="tag-worse">~$300 (₹25,000+)</span></td><td><span class="tag-ok">Teams · 50,000</span></td><td><span class="tag-ok">Server + DevOps</span></td></tr>
+        <tr><td>Top managed</td><td class="col-fg"><div class="fg-plan">Pro · ₹24,999</div><div class="fg-meta">25,000 subs · <del>₹28,999</del></div></td><td><span class="tag-worse">up to ~$700 (₹58,000+)</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Your servers + DevOps</span></td></tr>
+        <tr><td>Beyond / custom</td><td class="col-fg"><div class="fg-plan">Custom</div><div class="fg-meta">by subs / schedules / project</div></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Self-managed</span></td></tr>
+        <tr><td>Built-in cleaning + analysis + AI reports</td><td class="col-fg"><span class="tag-better">✓ Included in price</span></td><td><span class="tag-worse">✕ Buy Stata + analyst</span></td><td><span class="tag-worse">✕ Buy tools + analyst</span></td><td><span class="tag-worse">✕ Buy tools + analyst</span></td></tr>
+        <tr><td>Payment</td><td class="col-fg"><span class="tag-better">UPI / NEFT (INR)</span></td><td><span class="tag-worse">USD card</span></td><td><span class="tag-worse">USD card</span></td><td><span class="tag-ok">n/a</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="paper-note">FieldGovern shows live introductory pricing (struck regular price in brackets); +18% GST on Indian plans. Competitor figures are public 2026 list prices (USD ≈ INR at ₹83/$) and may change. See <a href="pricing.html" style="color:var(--brand);font-weight:600">full FieldGovern pricing →</a></p>
+</div>
+</div>
+
+<!-- CTA -->
+<div style="padding:0 0 64px">
+  <div class="cta-block">
+    <h2>See it on your own data</h2>
+    <p>Free forever for everyone, a 15-day full-feature trial, and a live demo with no signup. Pay by UPI when you're ready.</p>
+    <div class="cta-buttons">
+      <a href="https://app.fieldgovern.com/login" class="btn-primary" style="font-size:.95rem;padding:14px 28px">Start Free →</a>
+      <a href="https://wa.me/918088709011?text=Hi%2C%20I%27d%20like%20to%20compare%20FieldGovern%20for%20my%20team." target="_blank" class="wa-btn">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Chat with us
+      </a>
+      <a href="pricing.html" class="btn-outline" style="font-size:.95rem;padding:14px 28px">See pricing</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" style="display:block;margin-bottom:2px">
+          <div class="footer-logo-box">
+            <img src="assets/logo-wide.png" alt="FieldGovern" loading="lazy" decoding="async"/>
+          </div>
+        </a>
+        <p>Offline-first field data collection for India's research teams. Built to replace SurveyCTO at 1/3 the cost.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="features.html">Features</a></li>
+          <li><a href="integrations.html">Integrations</a></li>
+          <li><a href="compare.html">Compare</a></li>
+          <li><a href="security.html">Security</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="demo.html">Live Demo</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="about.html">About Us</a></li>
+          <li><a href="about.html#contact">Contact</a></li>
+          <li><a href="privacy.html">Privacy Policy</a></li>
+          <li><a href="terms.html">Terms of Service</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Contact</h4>
+        <ul>
+          <li><a href="mailto:hello@fieldgovern.com">hello@fieldgovern.com</a></li>
+          <li><a href="https://app.fieldgovern.com" target="_blank">Live App ↗</a></li>
+          <li><a href="demo.html">Try Demo</a></li>
+        </ul>
+        <div style="margin-top:16px;font-size:.8rem;color:rgba(255,255,255,.3)">EN · हिन्दी · ಕನ್ನಡ · తెలుగు</div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 FieldGovern · <a href="privacy.html" style="color:rgba(255,255,255,.4)">Privacy</a> · <a href="terms.html" style="color:rgba(255,255,255,.4)">Terms</a> · <a href="about.html" style="color:rgba(255,255,255,.4)">About</a></span>
+      <span>Founded by Pallavi Deshetty · FastAPI + React + PostgreSQL</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const navbar = document.getElementById('navbar');
+  window.addEventListener('scroll', () => navbar.classList.toggle('scrolled', scrollY > 20));
+  function toggleMenu() {
+    document.getElementById('mobileMenu').classList.toggle('open');
+    document.getElementById('hamburgerBtn').classList.toggle('open');
+  }
+
+  /* Cost calculator — paper/manual vs FieldGovern */
+  var volMode = 'subs';
+  function setVolMode(m){
+    volMode = m;
+    document.getElementById('ci-subs').style.display = m === 'subs' ? '' : 'none';
+    document.getElementById('ci-perproject').style.display = m === 'quest' ? '' : 'none';
+    calcCost();
+  }
+  function fmtINR(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function animateINR(el, target){
+    if (!el) return;
+    if (reduceMotion){ el.textContent = fmtINR(target); el.dataset.val = target; return; }
+    var start = parseInt(el.dataset.val || '0', 10) || 0;
+    el.dataset.val = target;
+    if (start === target){ el.textContent = fmtINR(target); return; }
+    var t0 = performance.now(), dur = 450;
+    function step(now){
+      var p = Math.min(1, (now - t0) / dur);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtINR(start + (target - start) * eased);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  function animatePct(el, target){
+    if (!el) return;
+    var suffix = '% less';
+    if (reduceMotion){ el.textContent = target + suffix; el.dataset.val = target; return; }
+    var start = parseInt(el.dataset.val || '0', 10) || 0;
+    el.dataset.val = target;
+    if (start === target){ el.textContent = target + suffix; return; }
+    var t0 = performance.now(), dur = 550;
+    function step(now){
+      var p = Math.min(1, (now - t0) / dur);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(start + (target - start) * eased) + suffix;
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  // Recommend the plan that genuinely fits the user's volume (real pricing.html caps,
+  // gated by submissions/month). No upselling.
+  function recommendPlan(subsPerMonth, programs){
+    if (subsPerMonth <= 2000)   return {name:'Starter', price:6999};
+    if (subsPerMonth <= 5000)   return {name:'Growth', price:12999};
+    if (subsPerMonth <= 25000)  return {name:'Pro', price:24999};
+    return {name:'Custom', price:null};
+  }
+  function calcCost(){
+    var v = function(id){ return Math.max(1, parseInt(document.getElementById(id).value, 10) || 1); };
+    var n = function(id){ return Math.max(0, parseInt(document.getElementById(id).value, 10) || 0); };
+    var programs = v('ci-programs'), pages = v('ci-pages'), months = v('ci-months');
+    var opSal = n('ci-opsal'), anSal = n('ci-ansal');
+
+    var subsPerMonth, totalSubs;
+    if (volMode === 'quest'){
+      totalSubs = programs * v('ci-perproject');   // target responses per project × projects
+      subsPerMonth = Math.max(1, Math.round(totalSubs / months));
+    } else {
+      subsPerMonth = v('ci-subs');
+      totalSubs = subsPerMonth * months;
+    }
+    var sheets = Math.ceil(pages / 2);
+
+    var operators = Math.max(1, Math.ceil(subsPerMonth / 800)); // ~800 forms/operator/mo
+    var printing = totalSubs * sheets * 1;        // ₹1 per double-sided sheet
+    // Data entry: staff data-entry operators (scales with volume) at the wage you set, for the project duration
+    var entry = operators * opSal * months;       // operators × monthly wage × months
+    var analyst = anSal * months;                 // one analyst for the project
+    var report = programs * 15000;                // ₹15k per project / admin
+    var paperTotal = printing + entry + analyst + report;
+
+    var plan = recommendPlan(subsPerMonth, programs);
+    var fgTotal = plan.price === null ? null : plan.price * months;
+    var mLabel = months + ' month' + (months > 1 ? 's' : '');
+    var set = function(id, txt){ document.getElementById(id).textContent = txt; };
+
+    // Competitor TCO: digital tools remove printing + data entry, but only
+    // FieldGovern also removes the analyst + report-writing cost (built-in AI).
+    var USD = 83;
+    // SurveyCTO: tiered by volume (~$250 floor up to ~$700 advanced)
+    var sctoMo = subsPerMonth <= 5000 ? 250 * USD : (subsPerMonth <= 25000 ? 450 * USD : 700 * USD);
+    var odkMo  = 6000;                          // est. self-host server + ops
+    // KoboToolbox: tiered paid plans (Professional → Teams → Enterprise), never the free Community tier
+    var koboMo, koboPlan;
+    if (subsPerMonth <= 25000)      { koboMo = 159 * USD; koboPlan = 'Professional plan'; }
+    else if (subsPerMonth <= 50000) { koboMo = 300 * USD; koboPlan = 'Teams plan'; }
+    else                            { koboMo = 500 * USD; koboPlan = 'Enterprise plan'; }
+    var sctoTotal = sctoMo * months + analyst + report;
+    var koboTotal = koboMo * months + analyst + report;
+    var odkTotal  = odkMo  * months + analyst + report;
+
+    set('co-context', subsPerMonth.toLocaleString('en-IN') + ' subs/mo · ' + mLabel);
+
+    var maxT = Math.max(paperTotal, sctoTotal, koboTotal, (fgTotal || 0)) || 1;
+    var fgSoftLabel = plan.price === null ? 'FieldGovern (Custom)' : plan.name + ' plan';
+    var fgFoot = plan.price === null
+      ? 'Custom metered — everything below included'
+      : (plan.price === 0
+          ? '<strong>Free student plan</strong> — everything below included'
+          : '<strong>' + plan.name + '</strong> · ' + fmtINR(plan.price) + '/mo × ' + months + ' — no analyst, no report writer to hire');
+    // AI features unique to FieldGovern — others get an ✗
+    var FEATURES = ['AI summariser','1-click AI stat analyst','Auto report generator',
+      'Reads &amp; explains the full report in one shot — summary, conclusion &amp; abstract','24×7 support'];
+    var cols = [
+      {name:'✦ FieldGovern', badge:'best value', cls:'fg', total:fgTotal,
+        lines:[['Printing',0],['Data entry',0],[fgSoftLabel,fgTotal],['Analyst','inc'],['Report writing','inc']], foot:fgFoot,
+        extras:FEATURES, hasExtras:true},
+      {name:'KoboToolbox', cls:'', total:koboTotal,
+        lines:[['Printing',0],['Data entry',0],[koboPlan,koboMo * months],['Analyst',analyst],['Report writing',report]],
+        foot:koboPlan + ' (~' + fmtINR(koboMo) + '/mo) — but you still hire an analyst + report writer',
+        extras:FEATURES, hasExtras:false},
+      {name:'SurveyCTO', cls:'', total:sctoTotal,
+        lines:[['Printing',0],['Data entry',0],['Subscription',sctoMo * months],['Analyst',analyst],['Report writing',report]],
+        foot:'USD subscription (~' + fmtINR(sctoMo) + '/mo) — but you still hire an analyst + report writer',
+        extras:FEATURES, hasExtras:false},
+      {name:'<svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Paper / manual', cls:'paper', total:paperTotal,
+        lines:[['Printing',printing],['Data entry',entry],['Software',0],['Analyst',analyst],['Report writing',report]],
+        foot:'Print, ship &amp; re-key by hand, then analyst + report writer',
+        extras:FEATURES, hasExtras:false}
+    ];
+    function cell(v){
+      if (v === 'inc') return '<b class="inc">incl.</b>';
+      if (v === null)  return '<b>Custom</b>';
+      return '<b class="' + (v === 0 ? 'inc' : '') + '">' + fmtINR(v) + '</b>';
+    }
+    document.getElementById('calc-matrix').innerHTML = cols.map(function(c){
+      var totTxt = c.total === null ? 'Custom' : fmtINR(c.total);
+      var ratio = c.total === null ? 0 : (c.total / maxT);     // 0 cheapest → 1 dearest
+      var pct = Math.round(ratio * 100);
+      var hueCol = c.total === null ? 'var(--brand)' : 'hsl(' + Math.round(130 * (1 - ratio)) + ',72%,40%)';  // green→red by cost
+      var lines = c.lines.map(function(l){ return '<li><span>' + l[0] + '</span>' + cell(l[1]) + '</li>'; }).join('');
+      return '<div class="cmpcol ' + c.cls + '">'
+        + '<div class="cc-name">' + c.name + (c.badge ? ' <span class="cc-badge">' + c.badge + '</span>' : '') + '</div>'
+        + '<div class="cc-total" style="color:' + hueCol + '">' + totTxt + '</div>'
+        + '<div class="cc-sub">over ' + mLabel + '</div>'
+        + '<div class="cc-bar"><i style="width:' + pct + '%;background:' + hueCol + '"></i></div>'
+        + '<ul class="cc-lines">' + lines + '</ul>'
+        + (c.extras ? '<ul class="cc-extras">' + c.extras.map(function(x){ return '<li class="' + (c.hasExtras ? '' : 'no') + '">' + x + '</li>'; }).join('') + '</ul>' : '')
+        + '<div class="cc-foot">' + c.foot + '</div>'
+        + '</div>';
+    }).join('');
+
+    var pctEl = document.getElementById('co-pct');
+    var saveEl = document.getElementById('co-save');
+    var paperDetailEl = document.getElementById('co-paper-detail');
+    var platEl = document.getElementById('co-plat');
+    var platNoteEl = document.getElementById('co-plat-note');
+    // Build per-platform "less than" lines for the digital column (when FG wins)
+    var platLines = function(base){
+      var c = [];
+      var line = function(tot, name){
+        var pct = tot > 0 ? Math.round((tot - base) / tot * 100) : 0;
+        return '<div><strong>' + pct + '% less</strong> than ' + name + ' · ' + fmtINR(tot - base) + ' saved</div>';
+      };
+      if (koboTotal - base > 0) c.push(line(koboTotal, 'KoboToolbox'));
+      if (sctoTotal - base > 0) c.push(line(sctoTotal, 'SurveyCTO'));
+      return c.length ? c.join('') : '<div>On par with digital platforms at this volume.</div>';
+    };
+    if (fgTotal === null){
+      pctEl.textContent = 'Custom'; pctEl.dataset.val = 0;
+      saveEl.textContent = 'Metered quote recommended';
+      paperDetailEl.innerHTML = 'At <strong>' + subsPerMonth.toLocaleString('en-IN') + ' submissions/mo</strong> across ' + programs + ' admins/projects, talk to us for a metered <strong>Custom</strong> quote — still a fraction of paper (' + fmtINR(paperTotal) + ').';
+      platEl.innerHTML = '<div>KoboToolbox <strong>' + fmtINR(koboTotal) + '</strong></div><div>SurveyCTO <strong>' + fmtINR(sctoTotal) + '</strong></div>';
+      platNoteEl.innerHTML = 'Cleaning, analysis &amp; AI reports included — Kobo &amp; SurveyCTO bill these on top.';
+    } else {
+      var saved = paperTotal - fgTotal;
+      var pctv = paperTotal > 0 ? Math.round(saved / paperTotal * 100) : 0;
+      animatePct(pctEl, pctv);
+      saveEl.textContent = fmtINR(saved) + ' saved · ' + plan.name + ' plan';
+      paperDetailEl.innerHTML = 'FieldGovern <strong>' + fmtINR(fgTotal) + '</strong> vs ~' + fmtINR(paperTotal) + ' on paper over ' + mLabel + ' (' + pctv + '% less).';
+      platEl.innerHTML = platLines(fgTotal);
+      platNoteEl.innerHTML = 'Cleaning, analysis &amp; AI reports included — Kobo &amp; SurveyCTO bill these on top.';
+    }
+    if (!reduceMotion){
+      var vc = document.querySelector('.calc-verdict');
+      if (vc){ vc.classList.remove('pulse'); void vc.offsetWidth; vc.classList.add('pulse'); }
+    }
+  }
+  ['ci-programs','ci-subs','ci-perproject','ci-pages','ci-months','ci-opsal','ci-ansal'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', calcCost);
+  });
+  calcCost();
+
+  /* Cascade-reveal the FieldGovern column when each comparison table scrolls in */
+  if ('IntersectionObserver' in window && !reduceMotion){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (!e.isIntersecting) return;
+        var wrap = e.target;
+        wrap.querySelectorAll('td.col-fg').forEach(function(c, i){ c.style.animationDelay = (i * 45) + 'ms'; });
+        wrap.classList.add('animate-fg');
+        io.unobserve(wrap);
+      });
+    }, {threshold:0.12});
+    document.querySelectorAll('.cmp-wrap').forEach(function(w){ io.observe(w); });
+  }
+</script>
+<script defer src="/assets/trial-cta.js"></script>
+</body>
+</html>
