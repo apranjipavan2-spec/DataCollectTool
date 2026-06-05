@@ -1005,11 +1005,13 @@ function SectionEditor({ section, schema, onTitleChange, onSkipLogicChange, onAd
 function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange: (s: FormSchema) => void }) {
   const [randOpen, setRandOpen] = React.useState(false)
   const [geoOpen, setGeoOpen] = React.useState(false)
+  const [auditOpen, setAuditOpen] = React.useState(false)
   const [validationOpen, setValidationOpen] = React.useState(false)
   const [locating, setLocating] = React.useState(false)
 
   const rand = schema.settings?.randomization ?? {}
   const geo = schema.settings?.geofence ?? {}
+  const aud = (schema.settings?.audio_audit ?? {}) as { enabled?: boolean }
   const validationRules: Array<{ field_id: string; operator: string; value: string; message: string }> =
     (schema.settings?.validation_rules as typeof validationRules | undefined) ?? []
   const allFields = getAllFieldsInOrder(schema.sections)
@@ -1031,6 +1033,9 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
 
   const updateGeo = (patch: Record<string, unknown>) =>
     onChange({ ...schema, settings: { ...schema.settings, geofence: { ...geo, ...patch } } })
+
+  const updateAudit = (patch: Record<string, unknown>) =>
+    onChange({ ...schema, settings: { ...schema.settings, audio_audit: { ...aud, ...patch } } })
 
   const useMyLocation = () => {
     setLocating(true)
@@ -1258,6 +1263,35 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
                   </button>
                 </>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* Audio audit (QC) */}
+        <div className="mb-4 border border-catalan-border rounded-xl overflow-hidden">
+          <button
+            onClick={() => setAuditOpen(o => !o)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-catalan-surface hover:bg-catalan-hover transition-colors text-left"
+          >
+            <span className="font-medium text-catalan-text text-sm"><EmojiIcon e="🎙" /> Audio audit (QC)</span>
+            <span className="text-catalan-textMuted text-xs">{auditOpen ? '▲' : '▼'}</span>
+          </button>
+          {auditOpen && (
+            <div className="p-4 border-t border-catalan-border space-y-3 bg-catalan-hover/30">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!aud.enabled}
+                  onChange={e => updateAudit({ enabled: e.target.checked })}
+                  className="w-4 h-4 accent-catalan-primary"
+                />
+                <span className="text-sm text-catalan-text">Record a compressed audio audit of each interview</span>
+              </label>
+              <p className="text-xs text-catalan-textMuted leading-relaxed">
+                Captures the interview audio in the background (low-bitrate, compressed) so supervisors can spot-check
+                for quality, fabrication, or rushed interviews. Recording starts when the form opens and stops at submit.
+                Make sure your consent script informs respondents that audio may be recorded.
+              </p>
             </div>
           )}
         </div>

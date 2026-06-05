@@ -725,7 +725,7 @@ export default function FieldApp() {
         } else if (typeof value === 'string' && value.startsWith('data:audio/')) {
           await store.saveMediaItem({
             id: uuidv4(), submissionId: draft.id, fieldName,
-            fileType: 'audio', dataUri: value, status: 'pending',
+            fileType: fieldName === '_audio_audit' ? 'audio_audit' : 'audio', dataUri: value, status: 'pending',
             createdAt: new Date().toISOString(),
           })
         }

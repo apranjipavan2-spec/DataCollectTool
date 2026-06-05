@@ -41,7 +41,7 @@ export interface MediaQueueItem {
   id: string             // unique ID for this queue entry
   submissionId: string   // links to SubmissionRecord.id
   fieldName: string      // which form field produced this media
-  fileType: 'photo' | 'audio'
+  fileType: 'photo' | 'audio' | 'audio_audit'
   dataUri: string        // base64 data URI (compressed)
   status: 'pending' | 'uploading' | 'uploaded' | 'failed'
   createdAt: string

@@ -802,6 +802,18 @@ def get_submission(submission_id: str, user=Depends(get_current_user), db: Sessi
         sub, enumerator_name = row
         if role == "enumerator" and str(sub.enumerator_id) != str(user["sub"]):
             raise HTTPException(status_code=403, detail="You can only view your own submissions")
+        # Attach uploaded media (photos, audio, audio audits) with servable URLs
+        from app.models.media_file import MediaFile
+        media = [
+            {
+                "field_name": m.field_name,
+                "file_type": m.file_type,
+                "mime_type": m.mime_type,
+                "url": m.cloud_url,
+                "size_bytes": m.file_size_bytes,
+            }
+            for m in db.query(MediaFile).filter(MediaFile.submission_id == sub.id).all()
+        ]
         return {
             "id": str(sub.id),
             "form_id": str(sub.form_id),
@@ -818,6 +830,7 @@ def get_submission(submission_id: str, user=Depends(get_current_user), db: Sessi
             "backcheck_form_id": str(sub.backcheck_form_id) if sub.backcheck_form_id else None,
             "local_created_at": sub.local_created_at.isoformat() if sub.local_created_at else None,
             "server_received_at": sub.server_received_at.isoformat() if sub.server_received_at else None,
+            "media": media,
         }
     except HTTPException:
         raise
