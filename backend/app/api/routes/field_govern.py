@@ -395,7 +395,7 @@ def _get_analyzer_data_inner(program_id, user, db):
     violations = sum(1 for s in subs if s.has_violations)
 
     # Sample rows for AI tabulation context (strip internal metadata keys)
-    _internal = {"_gps_lat", "_gps_lng", "_gps_accuracy", "_duplicate_suspect", "_validation_violations"}
+    _internal = {"_gps_lat", "_gps_lng", "_gps_accuracy", "_duplicate_suspect", "_validation_violations", "_started_at", "_duration_sec", "_audio_audit"}
     sample_rows = [
         {k: v for k, v in s.data_json.items() if k not in _internal}
         for s in subs[:8] if s.data_json and isinstance(s.data_json, dict)
@@ -1394,7 +1394,7 @@ async def _run_ai_generation(
                 cols_high_missing[col["label"]] = round(missing_ct / total_subs * 100, 1)
         cleaning_summary = {"total": total_subs, "skipped": skipped, "cols_high_missing": cols_high_missing}
 
-        _internal = {"_gps_lat", "_gps_lng", "_gps_accuracy", "_duplicate_suspect", "_validation_violations"}
+        _internal = {"_gps_lat", "_gps_lng", "_gps_accuracy", "_duplicate_suspect", "_validation_violations", "_started_at", "_duration_sec", "_audio_audit"}
         sample_rows = [
             {k: v for k, v in s.data_json.items() if k not in _internal}
             for s in subs[:8] if s.data_json

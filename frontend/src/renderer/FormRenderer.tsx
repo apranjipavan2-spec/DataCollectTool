@@ -77,6 +77,10 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
   const [syncStatus, setSyncStatus] = useState<'saved' | 'saving' | 'error'>('saved')
   const saveTimer  = useRef<ReturnType<typeof setTimeout>>()
   const scrollRef  = useRef<HTMLDivElement>(null)
+  // QC: background audio-audit recorder (compressed)
+  const auditRecRef    = useRef<MediaRecorder | null>(null)
+  const auditChunksRef = useRef<Blob[]>([])
+  const auditStreamRef = useRef<MediaStream | null>(null)
 
   // Flatten visible fields — respects both section-level and field-level skip logic
   const allFields: FormField[] = (() => {
@@ -124,6 +128,50 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
   useEffect(() => {
     captureGps().then(gps => setDraft(d => ({ ...d, gpsOpen: gps })))
   }, [])
+
+  // QC: start a compressed background audio audit when enabled (never blocks collection)
+  useEffect(() => {
+    const cfg = schema.settings?.audio_audit as { enabled?: boolean } | undefined
+    if (!cfg?.enabled || initialDraft) return  // only fresh sessions
+    let cancelled = false
+    ;(async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
+        })
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return }
+        const mt = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+          : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : ''
+        const rec = new MediaRecorder(stream, { ...(mt ? { mimeType: mt } : {}), audioBitsPerSecond: 16000 })
+        auditChunksRef.current = []
+        rec.ondataavailable = e => { if (e.data.size > 0) auditChunksRef.current.push(e.data) }
+        rec.start(5000)
+        auditRecRef.current = rec
+        auditStreamRef.current = stream
+      } catch { /* mic denied — skip the audit, never block data collection */ }
+    })()
+    return () => {
+      cancelled = true
+      try { if (auditRecRef.current?.state !== 'inactive') auditRecRef.current?.stop() } catch { }
+      auditStreamRef.current?.getTracks().forEach(t => t.stop())
+    }
+  }, [])
+
+  // Stop the audit recorder and resolve a compressed data URI (or null)
+  const stopAudit = (): Promise<string | null> => new Promise(resolve => {
+    const rec = auditRecRef.current
+    if (!rec || rec.state === 'inactive') return resolve(null)
+    rec.onstop = () => {
+      auditStreamRef.current?.getTracks().forEach(t => t.stop())
+      try {
+        const blob = new Blob(auditChunksRef.current, { type: rec.mimeType })
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.readAsDataURL(blob)
+      } catch { resolve(null) }
+    }
+    try { rec.stop() } catch { resolve(null) }
+  })
 
   // Debounced auto-save (300ms)
   const triggerSave = useCallback((d: SubmissionDraft) => {
@@ -196,7 +244,17 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
     }
     setSubmitting(true)
     const gpsSubmit = await captureGps()
-    const final: SubmissionDraft = { ...draft, values: valuesWithCalc, gpsSubmit, status: 'outbox' }
+    // QC: stamp interview timing + stop the audio audit (both ride data_json; backend skips via _internal / media pipeline)
+    const startedMs = draft.startedAt ? Date.parse(draft.startedAt) : Date.now()
+    const _duration_sec = Math.max(0, Math.round((Date.now() - startedMs) / 1000))
+    const auditUri = await stopAudit()
+    const valuesWithMeta = {
+      ...valuesWithCalc,
+      _started_at: draft.startedAt ?? new Date().toISOString(),
+      _duration_sec,
+      ...(auditUri && auditUri.startsWith('data:audio/') ? { _audio_audit: auditUri } : {}),
+    }
+    const final: SubmissionDraft = { ...draft, values: valuesWithMeta, gpsSubmit, status: 'outbox' }
     setDraft(final)
     try { await onSubmit(final) }
     finally { setSubmitting(false) }

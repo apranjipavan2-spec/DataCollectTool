@@ -68,6 +68,7 @@ interface SubDetail extends Submission {
   flag_note: string | null
   local_created_at: string
   backcheck_form_id?: string | null
+  media?: { field_name: string; file_type: string; mime_type: string | null; url: string; size_bytes: number | null }[]
 }
 
 interface TeamMember {
@@ -390,14 +391,39 @@ function SubmissionDetailModal({
           </div>
         )}
 
+        {/* Quality & Field Audit */}
+        {(() => {
+          const dur = sub.data_json?.['_duration_sec']
+          const audit = sub.media?.find(m => m.file_type === 'audio_audit')
+          if (typeof dur !== 'number' && !audit) return null
+          const fmtDur = (d: number) => { const m = Math.floor(d / 60), s = d % 60; return m ? `${m}m ${s}s` : `${s}s` }
+          return (
+            <div className="px-5 py-3 border-t border-catalan-border">
+              <div className="text-xs font-medium text-catalan-textMuted uppercase tracking-wider mb-2">Quality &amp; Field Audit</div>
+              {typeof dur === 'number' && (
+                <div className="flex items-center gap-2 text-sm mb-2">
+                  <span className="text-catalan-textMuted">Interview duration:</span>
+                  <span className={`font-semibold ${dur < 90 ? 'text-red-600' : 'text-catalan-text'}`}>{fmtDur(dur)}{dur < 90 && ' · flagged as rushed'}</span>
+                </div>
+              )}
+              {audit && (
+                <div className="bg-catalan-hover border border-catalan-border rounded-xl p-3">
+                  <div className="text-xs text-catalan-textMuted mb-1 flex items-center gap-1"><EmojiIcon e="🎙" /> Audio audit (QC sample){audit.size_bytes ? ` · ${Math.round(audit.size_bytes / 1024)} KB` : ''}</div>
+                  <audio src={audit.url} controls preload="none" className="w-full h-9" />
+                </div>
+              )}
+            </div>
+          )
+        })()}
+
         {/* Response Data */}
         <div className="px-5 py-3">
           <div className="text-xs font-medium text-catalan-textMuted uppercase tracking-wider mb-3">Response Data</div>
-          {Object.keys(sub.data_json).length === 0 ? (
+          {Object.keys(sub.data_json).filter(k => !k.startsWith('_')).length === 0 ? (
             <p className="text-sm text-catalan-textMuted text-center py-4">No data</p>
           ) : (
             <div className="space-y-3">
-              {Object.entries(sub.data_json).map(([key, val]) => (
+              {Object.entries(sub.data_json).filter(([key]) => !key.startsWith('_')).map(([key, val]) => (
                 <div key={key} className="border-b border-catalan-border pb-2">
                   <div className="text-xs text-catalan-textMuted mb-1">{key}</div>
                   <div className="text-sm text-catalan-text">{renderFieldValue(val)}</div>
@@ -2084,6 +2110,14 @@ export default function Dashboard() {
                                 {sub.has_violations && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-yellow-700 bg-yellow-100"><EmojiIcon e="⚠" /> Violations</span>}
                                 {sub.data_json?.['_duplicate_suspect'] && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-orange-700 bg-orange-100">Dup?</span>}
                                 {sub.backcheck_required && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-blue-700 bg-blue-100"><EmojiIcon e="🔍" /> Back-Check</span>}
+                                {(() => {
+                                  const d = sub.data_json?.['_duration_sec']
+                                  if (typeof d !== 'number') return null
+                                  const m = Math.floor(d / 60), s = d % 60
+                                  const label = m ? `${m}m ${s}s` : `${s}s`
+                                  const rushed = d < 90
+                                  return <span title="Interview duration" className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${rushed ? 'text-red-700 bg-red-100' : 'text-catalan-textMuted bg-catalan-hover'}`}>{rushed && <EmojiIcon e="⚡" />}{rushed ? 'Rushed · ' : ''}{label}</span>
+                                })()}
                               </div>
                             </td>
                             <td className="px-3 py-2 text-catalan-textMuted text-xs cursor-pointer" onClick={() => openDetail(sub.id)}>{new Date(sub.server_received_at).toLocaleString()}</td>
