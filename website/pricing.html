@@ -152,23 +152,25 @@
     .price-regular{font-size:.95rem;font-weight:600;color:var(--text3);text-decoration:line-through;margin-bottom:2px}
 
     /* FEATURE MATRIX */
-    .matrix-wrap{margin-top:8px;width:min(96vw,1640px);margin-left:50%;transform:translateX(-50%);border:1px solid var(--border);border-radius:20px;overflow:auto;box-shadow:0 14px 50px rgba(15,23,42,.07);opacity:0;transition:opacity .6s cubic-bezier(.16,1,.3,1)}
+    .matrix-wrap{margin-top:8px;width:min(90vw,1480px);margin-left:50%;transform:translateX(-50%);border:1px solid var(--border);border-radius:20px;overflow:visible;box-shadow:0 14px 50px rgba(15,23,42,.07);opacity:0;transition:opacity .6s cubic-bezier(.16,1,.3,1)}
+    @media(max-width:1060px){.matrix-wrap{overflow-x:auto}}
     .matrix-wrap.in{opacity:1}
     table.matrix{width:100%;border-collapse:collapse;font-size:.86rem;min-width:940px;table-layout:fixed}
     table.matrix col.c-feat{width:18%}
     table.matrix col.c-plan{width:16.4%}
-    table.matrix td{padding:13px 16px;text-align:center;border-bottom:1px solid var(--border);vertical-align:middle}
+    table.matrix td{padding:8px 14px;text-align:center;border-bottom:1px solid var(--border);vertical-align:middle}
     /* rich plan header */
-    table.matrix thead th{background:var(--bg2);padding:18px 14px 16px;text-align:center;border-bottom:2px solid var(--border);vertical-align:top;position:sticky;top:0;z-index:3}
+    table.matrix thead th{background:var(--bg2);padding:13px 14px 12px;text-align:center;border-bottom:2px solid var(--border);vertical-align:top;position:sticky;top:68px;z-index:3}
     table.matrix thead th.col-fg{background:linear-gradient(180deg,rgba(14,165,233,.10),rgba(124,58,237,.05))}
-    .mh-badge{display:inline-block;font-size:.56rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 9px;border-radius:999px;margin-bottom:6px}
+    .mh-badge{display:inline-block;font-size:.56rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 9px;border-radius:999px;margin-bottom:5px;height:16px;line-height:12px}
     .mh-badge.free{background:#dcfce7;color:#16a34a}
     .mh-badge.pop{background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;box-shadow:0 4px 12px rgba(124,58,237,.3)}
+    .mh-badge.ph{visibility:hidden}
     .mh-name{font-size:1.05rem;font-weight:900;color:var(--text)}
-    .mh-price{font-size:1.3rem;font-weight:900;color:var(--text);margin-top:3px;line-height:1.1}
+    .mh-price{font-size:1.25rem;font-weight:900;color:var(--text);margin-top:2px;line-height:1.1}
     .mh-price small{font-size:.6rem;font-weight:600;color:var(--text3)}
     .mh-price .price-6month,.mh-price .price-annual,.mh-price .price-3year{display:none}
-    .mh-tag{font-size:.66rem;color:var(--text3);line-height:1.35;margin:6px auto 10px;max-width:150px}
+    .mh-tag{font-size:.66rem;color:var(--text3);line-height:1.3;margin:5px auto 9px;max-width:160px;min-height:2.5em}
     /* left feature column with compact descriptions */
     table.matrix td.row-h{text-align:left;background:var(--bg2);position:sticky;left:0;z-index:1;padding:11px 16px}
     .rh-name{font-weight:700;color:var(--text);font-size:.84rem;line-height:1.2}
@@ -393,6 +395,7 @@
             <a href="https://app.fieldgovern.com/login" class="mx-cta free">Start Free</a>
           </th>
           <th class="col-fg">
+            <div class="mh-badge ph">·</div>
             <div class="mh-name">Starter</div>
             <div class="mh-price"><span class="price-monthly">₹6,999</span><span class="price-6month">₹6,299</span><span class="price-annual">₹5,833</span><span class="price-3year">₹4,899</span> <small>/mo</small></div>
             <div class="mh-tag">Small teams &amp; pilots</div>
@@ -406,12 +409,14 @@
             <a href="https://app.fieldgovern.com/login" class="mx-cta pri">Get Started</a>
           </th>
           <th class="col-fg">
+            <div class="mh-badge ph">·</div>
             <div class="mh-name">Pro</div>
             <div class="mh-price"><span class="price-monthly">₹24,999</span><span class="price-6month">₹22,499</span><span class="price-annual">₹20,833</span><span class="price-3year">₹17,499</span> <small>/mo</small></div>
             <div class="mh-tag">High-volume, multi-project teams</div>
             <a href="https://app.fieldgovern.com/login" class="mx-cta pri">Get Started</a>
           </th>
           <th>
+            <div class="mh-badge ph">·</div>
             <div class="mh-name">Custom</div>
             <div class="mh-price">PAYG</div>
             <div class="mh-tag">Consortiums, govt &amp; enterprise</div>
@@ -420,14 +425,13 @@
         </tr>
       </thead>
       <tbody>
-        <tr><td class="row-h"><div class="rh-name">Submissions / month</div><div class="rh-desc">Total form responses your team can collect each month before the cap.</div></td><td class="mx-num">300</td><td class="col-fg mx-num">2,000</td><td class="col-fg mx-num">5,000</td><td class="col-fg mx-num">25,000</td><td class="mx-num">Unlimited</td></tr>
-        <tr><td class="row-h"><div class="rh-name">Storage</div><div class="rh-desc">Space for photos, audio &amp; attachments across all your submissions.</div></td><td class="mx-num">50 MB</td><td class="col-fg mx-num">500 MB</td><td class="col-fg mx-num">2 GB</td><td class="col-fg mx-num">5 GB</td><td class="mx-num">Unlimited</td></tr>
-        <tr><td class="row-h"><div class="rh-name">Admins / PMs</div><div class="rh-desc">Org admins &amp; project managers who build forms and manage the team.</div></td><td class="mx-num">1</td><td class="col-fg mx-num">2</td><td class="col-fg mx-num">5</td><td class="col-fg mx-num">10</td><td class="mx-num">Unlimited</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Submissions / month</div></td><td class="mx-num">300</td><td class="col-fg mx-num">2,000</td><td class="col-fg mx-num">5,000</td><td class="col-fg mx-num">25,000</td><td class="mx-num">Unlimited</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Storage</div></td><td class="mx-num">50 MB</td><td class="col-fg mx-num">500 MB</td><td class="col-fg mx-num">2 GB</td><td class="col-fg mx-num">5 GB</td><td class="mx-num">Unlimited</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Admins / PMs</div></td><td class="mx-num">1</td><td class="col-fg mx-num">2</td><td class="col-fg mx-num">5</td><td class="col-fg mx-num">10</td><td class="mx-num">Unlimited</td></tr>
         <tr><td class="row-h"><div class="rh-name">Questionnaires / admin</div><div class="rh-desc">Distinct questionnaires each admin can run at the same time.</div></td><td class="mx-num">2</td><td class="col-fg mx-num">4</td><td class="col-fg mx-num">4</td><td class="col-fg mx-num">8</td><td class="mx-num">Custom</td></tr>
-        <tr><td class="row-h"><div class="rh-name">Total schedules</div><div class="rh-desc">Active data-collection schedules running simultaneously.</div></td><td class="mx-num">2</td><td class="col-fg mx-num">8</td><td class="col-fg mx-num">20</td><td class="col-fg mx-num">80</td><td class="mx-num">Custom</td></tr>
         <tr><td class="row-h"><div class="rh-name">List of inputs</div><div class="rh-desc">Pre-loaded reference lists (rosters, beneficiaries, cascading options).</div></td><td class="mx-num">100</td><td class="col-fg mx-num">500</td><td class="col-fg mx-num">800</td><td class="col-fg mx-num">1,000</td><td class="mx-num">Custom</td></tr>
-        <tr><td class="row-h"><div class="rh-name">Question types</div><div class="rh-desc">GPS, photo, audio, barcode, signature, matrix, repeat groups &amp; more.</div></td><td class="mx-num">10</td><td class="col-fg mx-num">All</td><td class="col-fg mx-num">All</td><td class="col-fg mx-num">All</td><td class="mx-num">All</td></tr>
-        <tr><td class="row-h"><div class="rh-name">Map View</div><div class="rh-desc">Live map of GPS-tagged submissions for real-time field oversight.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td class="row-h"><div class="rh-name">Question types</div></td><td class="mx-num">10</td><td class="col-fg mx-num">All</td><td class="col-fg mx-num">All</td><td class="col-fg mx-num">All</td><td class="mx-num">All</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Map View</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
         <tr><td class="row-h"><div class="rh-name">GPS tracking &amp; validation</div><div class="rh-desc">Capture and geofence-validate enumerator location on every submission.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
         <tr><td class="row-h"><div class="rh-name">Data Cleaner</div><div class="rh-desc">AI flags duplicates, fixes data types &amp; detects outliers — no export to Stata/R.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="lim">Limited</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
         <tr><td class="row-h"><div class="rh-name">Data Dashboard</div><div class="rh-desc">Real-time charts &amp; cross-tabs the moment data syncs from the field.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="lim">Limited</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
@@ -435,10 +439,10 @@
         <tr><td class="row-h"><div class="rh-name">AI Writer</div><div class="rh-desc">FG Writer drafts donor &amp; research reports from your analysed tables.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="lim">Limited</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
         <tr><td class="row-h"><div class="rh-name">Advanced STAT analysis</div><div class="rh-desc">Significance tests &amp; statistical interpretation, built in.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="lim">Limited</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
         <tr><td class="row-h"><div class="rh-name">Audio audits &amp; timing QC</div><div class="rh-desc">Compressed interview recording + rushed-interview detection for back-checking.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td class="row-h"><div class="rh-name">SPSS + Stata + R export</div><div class="rh-desc">Download analysis-ready files for academic / policy stats tools.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td class="row-h"><div class="rh-name">2FA &amp; security</div><div class="rh-desc">Two-factor authentication and DPDP-aligned data protection.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td class="row-h"><div class="rh-name">Export formats</div><div class="rh-desc">File formats you can download your data &amp; reports in.</div></td><td class="mx-num">CSV</td><td class="col-fg mx-num">CSV + Word</td><td class="col-fg mx-num" style="font-size:.78rem">CSV·Word·Python·PDF</td><td class="col-fg mx-num" style="font-size:.78rem">CSV·Word·Python·PDF</td><td class="mx-num">All formats</td></tr>
-        <tr><td class="row-h"><div class="rh-name">Support</div><div class="rh-desc">How fast our team responds to your questions.</div></td><td><span class="no">✕</span></td><td class="col-fg mx-num" style="font-size:.78rem">Email · 48h</td><td class="col-fg mx-num" style="font-size:.78rem">Direct · 24h</td><td class="col-fg mx-num" style="font-size:.78rem">Priority · 8h</td><td class="mx-num" style="font-size:.78rem">Dedicated CSM</td></tr>
+        <tr><td class="row-h"><div class="rh-name">SPSS + Stata + R export</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td class="row-h"><div class="rh-name">2FA &amp; security</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td class="row-h"><div class="rh-name">Export formats</div></td><td class="mx-num">CSV</td><td class="col-fg mx-num">CSV + Word</td><td class="col-fg mx-num" style="font-size:.78rem">CSV·Word·Python·PDF</td><td class="col-fg mx-num" style="font-size:.78rem">CSV·Word·Python·PDF</td><td class="mx-num">All formats</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Support</div></td><td><span class="no">✕</span></td><td class="col-fg mx-num" style="font-size:.78rem">Email · 48h</td><td class="col-fg mx-num" style="font-size:.78rem">Direct · 24h</td><td class="col-fg mx-num" style="font-size:.78rem">Priority · 8h</td><td class="mx-num" style="font-size:.78rem">Dedicated CSM</td></tr>
       </tbody>
     </table>
   </div>
