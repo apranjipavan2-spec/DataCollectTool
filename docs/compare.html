@@ -149,15 +149,18 @@
     .calc-sub{font-size:.74rem;color:var(--text3);margin-bottom:12px}
     .calc-line{display:flex;justify-content:space-between;gap:8px;font-size:.79rem;padding:5px 0;border-top:1px dashed var(--border);color:var(--text2)}
     .calc-line span:last-child{font-weight:700;color:var(--text);white-space:nowrap}
-    .calc-verdict{border-radius:18px;padding:18px 24px;background:linear-gradient(135deg,var(--brand),var(--accent));color:white;margin-top:8px;display:grid;grid-template-columns:auto 1fr;gap:8px 28px;align-items:center}
-    .calc-verdict .cv-left{text-align:center;padding-right:24px;border-right:1px solid rgba(255,255,255,.25)}
-    .calc-verdict .cv-right{display:flex;flex-direction:column;gap:10px}
+    .calc-verdict{border-radius:18px;padding:18px 24px;background:linear-gradient(135deg,var(--brand),var(--accent));color:white;margin-top:8px}
+    .calc-verdict .cv-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 28px}
+    .calc-verdict .cv-col{display:flex;flex-direction:column;gap:6px;padding:2px 0}
+    .calc-verdict .cv-paper{padding-right:28px;border-right:1px solid rgba(255,255,255,.25)}
+    .calc-verdict .cv-col-head{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;opacity:.82}
     .calc-verdict .cv-pct{font-size:2.4rem;font-weight:900;line-height:1;letter-spacing:-.01em}
-    .calc-verdict .cv-save{font-size:.92rem;font-weight:700;opacity:.96;margin-top:4px}
-    .calc-verdict .cv-plan{font-size:.88rem;line-height:1.5;color:rgba(255,255,255,.95)}
-    .calc-verdict .cv-plan strong{background:rgba(255,255,255,.22);padding:2px 8px;border-radius:6px;font-weight:800}
-    .calc-verdict .cv-btns{display:flex;flex-wrap:wrap;gap:10px}
-    @media(max-width:600px){.calc-verdict{grid-template-columns:1fr;text-align:center}.calc-verdict .cv-left{padding-right:0;border-right:none;border-bottom:1px solid rgba(255,255,255,.25);padding-bottom:12px}.calc-verdict .cv-btns{justify-content:center}}
+    .calc-verdict .cv-save{font-size:.92rem;font-weight:700;opacity:.96}
+    .calc-verdict .cv-detail{font-size:.84rem;line-height:1.5;opacity:.93;margin-top:2px}
+    .calc-verdict .cv-detail strong,.calc-verdict .cv-plat-lines strong{background:rgba(255,255,255,.22);padding:2px 8px;border-radius:6px;font-weight:800}
+    .calc-verdict .cv-plat-lines{display:flex;flex-direction:column;gap:8px;font-size:.95rem;font-weight:700}
+    .calc-verdict .cv-btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+    @media(max-width:600px){.calc-verdict .cv-cols{grid-template-columns:1fr;gap:16px}.calc-verdict .cv-paper{padding-right:0;border-right:none;border-bottom:1px solid rgba(255,255,255,.25);padding-bottom:16px}.calc-verdict .cv-btns{justify-content:center}}
     /* multi-platform ranked comparison */
     /* Calculator tile — highlighted, distinct from page flow */
     #calc{max-width:1400px}
@@ -427,16 +430,22 @@
 
   <!-- SAVINGS -->
   <div class="calc-verdict">
-    <div class="cv-left">
-      <div class="cv-pct" id="co-pct">—</div>
-      <div class="cv-save" id="co-save">—</div>
-    </div>
-    <div class="cv-right">
-      <div class="cv-plan" id="co-verdict">—</div>
-      <div class="cv-btns">
-        <a href="pricing.html" class="btn-outline" style="background:white;border-color:white;color:var(--brand-dark);padding:9px 18px;font-size:.86rem">See plan details</a>
-        <a href="https://wa.me/918088709011?text=Hi%2C%20I%27d%20like%20a%20FieldGovern%20quote%20for%20my%20fieldwork." target="_blank" class="btn-outline" style="background:transparent;border-color:rgba(255,255,255,.6);color:white;padding:9px 18px;font-size:.86rem">Get a quote</a>
+    <div class="cv-cols">
+      <div class="cv-col cv-paper">
+        <div class="cv-col-head">vs Paper</div>
+        <div class="cv-pct" id="co-pct">—</div>
+        <div class="cv-save" id="co-save">—</div>
+        <div class="cv-detail" id="co-paper-detail">—</div>
       </div>
+      <div class="cv-col cv-plat">
+        <div class="cv-col-head">vs Digital platforms</div>
+        <div class="cv-plat-lines" id="co-plat">—</div>
+        <div class="cv-detail" id="co-plat-note">—</div>
+      </div>
+    </div>
+    <div class="cv-btns">
+      <a href="pricing.html" class="btn-outline" style="background:white;border-color:white;color:var(--brand-dark);padding:9px 18px;font-size:.86rem">See plan details</a>
+      <a href="https://wa.me/918088709011?text=Hi%2C%20I%27d%20like%20a%20FieldGovern%20quote%20for%20my%20fieldwork." target="_blank" class="btn-outline" style="background:transparent;border-color:rgba(255,255,255,.6);color:white;padding:9px 18px;font-size:.86rem">Get a quote</a>
     </div>
   </div>
 
@@ -679,7 +688,7 @@
   }
   function animatePct(el, target){
     if (!el) return;
-    var suffix = '% less than paper';
+    var suffix = '% less';
     if (reduceMotion){ el.textContent = target + suffix; el.dataset.val = target; return; }
     var start = parseInt(el.dataset.val || '0', 10) || 0;
     el.dataset.val = target;
@@ -798,24 +807,34 @@
 
     var pctEl = document.getElementById('co-pct');
     var saveEl = document.getElementById('co-save');
-    var verdictEl = document.getElementById('co-verdict');
-    // Build "also cheaper than" clauses for the digital platforms (when FG wins)
-    var vsClauses = function(base){
+    var paperDetailEl = document.getElementById('co-paper-detail');
+    var platEl = document.getElementById('co-plat');
+    var platNoteEl = document.getElementById('co-plat-note');
+    // Build per-platform "less than" lines for the digital column (when FG wins)
+    var platLines = function(base){
       var c = [];
-      if (koboTotal - base > 0) c.push(fmtINR(koboTotal - base) + ' less than KoboToolbox');
-      if (sctoTotal - base > 0) c.push(fmtINR(sctoTotal - base) + ' less than SurveyCTO');
-      return c.length ? ' Also <strong>' + c.join('</strong> and <strong>') + '</strong>.' : '';
+      var line = function(tot, name){
+        var pct = tot > 0 ? Math.round((tot - base) / tot * 100) : 0;
+        return '<div><strong>' + pct + '% less</strong> than ' + name + ' · ' + fmtINR(tot - base) + ' saved</div>';
+      };
+      if (koboTotal - base > 0) c.push(line(koboTotal, 'KoboToolbox'));
+      if (sctoTotal - base > 0) c.push(line(sctoTotal, 'SurveyCTO'));
+      return c.length ? c.join('') : '<div>On par with digital platforms at this volume.</div>';
     };
     if (fgTotal === null){
       pctEl.textContent = 'Custom'; pctEl.dataset.val = 0;
       saveEl.textContent = 'Metered quote recommended';
-      verdictEl.innerHTML = 'At <strong>' + subsPerMonth.toLocaleString('en-IN') + ' submissions/mo</strong> across ' + programs + ' programs, talk to us for a metered <strong>Custom</strong> quote — still a fraction of paper (' + fmtINR(paperTotal) + '), KoboToolbox (' + fmtINR(koboTotal) + ') or SurveyCTO (' + fmtINR(sctoTotal) + ').';
+      paperDetailEl.innerHTML = 'At <strong>' + subsPerMonth.toLocaleString('en-IN') + ' submissions/mo</strong> across ' + programs + ' programs, talk to us for a metered <strong>Custom</strong> quote — still a fraction of paper (' + fmtINR(paperTotal) + ').';
+      platEl.innerHTML = '<div>KoboToolbox <strong>' + fmtINR(koboTotal) + '</strong></div><div>SurveyCTO <strong>' + fmtINR(sctoTotal) + '</strong></div>';
+      platNoteEl.innerHTML = 'Cleaning, analysis &amp; AI reports included — Kobo &amp; SurveyCTO bill these on top.';
     } else {
       var saved = paperTotal - fgTotal;
       var pctv = paperTotal > 0 ? Math.round(saved / paperTotal * 100) : 0;
       animatePct(pctEl, pctv);
-      saveEl.textContent = fmtINR(saved) + ' saved vs paper · ' + plan.name + ' plan';
-      verdictEl.innerHTML = 'FieldGovern <strong>' + fmtINR(fgTotal) + '</strong> vs ~' + fmtINR(paperTotal) + ' on paper over ' + mLabel + ' (' + pctv + '% less).' + vsClauses(fgTotal) + ' Cleaning, analysis &amp; AI reports included.';
+      saveEl.textContent = fmtINR(saved) + ' saved · ' + plan.name + ' plan';
+      paperDetailEl.innerHTML = 'FieldGovern <strong>' + fmtINR(fgTotal) + '</strong> vs ~' + fmtINR(paperTotal) + ' on paper over ' + mLabel + ' (' + pctv + '% less).';
+      platEl.innerHTML = platLines(fgTotal);
+      platNoteEl.innerHTML = 'Cleaning, analysis &amp; AI reports included — Kobo &amp; SurveyCTO bill these on top.';
     }
     if (!reduceMotion){
       var vc = document.querySelector('.calc-verdict');
