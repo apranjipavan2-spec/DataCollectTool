@@ -799,20 +799,23 @@
     var pctEl = document.getElementById('co-pct');
     var saveEl = document.getElementById('co-save');
     var verdictEl = document.getElementById('co-verdict');
+    // Build "also cheaper than" clauses for the digital platforms (when FG wins)
+    var vsClauses = function(base){
+      var c = [];
+      if (koboTotal - base > 0) c.push(fmtINR(koboTotal - base) + ' less than KoboToolbox');
+      if (sctoTotal - base > 0) c.push(fmtINR(sctoTotal - base) + ' less than SurveyCTO');
+      return c.length ? ' Also <strong>' + c.join('</strong> and <strong>') + '</strong>.' : '';
+    };
     if (fgTotal === null){
       pctEl.textContent = 'Custom'; pctEl.dataset.val = 0;
       saveEl.textContent = 'Metered quote recommended';
-      verdictEl.innerHTML = 'At <strong>' + subsPerMonth.toLocaleString('en-IN') + ' submissions/mo</strong> across ' + programs + ' programs, talk to us for a metered <strong>Custom</strong> quote — still a fraction of the paper path (' + fmtINR(paperTotal) + ').';
-    } else if (fgTotal === 0){
-      animatePct(pctEl, 100);
-      saveEl.textContent = fmtINR(paperTotal) + ' saved vs paper · Free student plan';
-      verdictEl.innerHTML = 'You fit the <strong>Free student plan</strong> — ₹0 vs ' + fmtINR(paperTotal) + ' on paper, and results in days not weeks.';
+      verdictEl.innerHTML = 'At <strong>' + subsPerMonth.toLocaleString('en-IN') + ' submissions/mo</strong> across ' + programs + ' programs, talk to us for a metered <strong>Custom</strong> quote — still a fraction of paper (' + fmtINR(paperTotal) + '), KoboToolbox (' + fmtINR(koboTotal) + ') or SurveyCTO (' + fmtINR(sctoTotal) + ').';
     } else {
       var saved = paperTotal - fgTotal;
       var pctv = paperTotal > 0 ? Math.round(saved / paperTotal * 100) : 0;
       animatePct(pctEl, pctv);
       saveEl.textContent = fmtINR(saved) + ' saved vs paper · ' + plan.name + ' plan';
-      verdictEl.innerHTML = 'FieldGovern <strong>' + fmtINR(fgTotal) + '</strong> vs ~' + fmtINR(paperTotal) + ' on paper over ' + mLabel + ' — cleaning, analysis &amp; AI reports included, results in days.';
+      verdictEl.innerHTML = 'FieldGovern <strong>' + fmtINR(fgTotal) + '</strong> vs ~' + fmtINR(paperTotal) + ' on paper over ' + mLabel + ' (' + pctv + '% less).' + vsClauses(fgTotal) + ' Cleaning, analysis &amp; AI reports included.';
     }
     if (!reduceMotion){
       var vc = document.querySelector('.calc-verdict');
