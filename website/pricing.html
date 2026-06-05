@@ -152,23 +152,45 @@
     .price-regular{font-size:.95rem;font-weight:600;color:var(--text3);text-decoration:line-through;margin-bottom:2px}
 
     /* FEATURE MATRIX */
-    .matrix-wrap{margin-top:8px;border:1px solid var(--border);border-radius:18px;overflow:hidden;overflow-x:auto}
-    table.matrix{width:100%;border-collapse:collapse;font-size:.86rem;min-width:760px}
-    table.matrix th,table.matrix td{padding:11px 14px;text-align:center;border-bottom:1px solid var(--border)}
-    table.matrix thead th{background:var(--bg2);font-weight:800;color:var(--text);font-size:.82rem;position:sticky;top:0}
-    table.matrix th.row-h,table.matrix td.row-h{text-align:left;font-weight:600;color:var(--text2);background:var(--bg2);white-space:nowrap}
-    table.matrix th.col-fg{color:var(--brand-dark)}
-    table.matrix td.col-fg{background:rgba(14,165,233,.05)}
-    table.matrix tbody tr:hover td{background:rgba(14,165,233,.04)}
+    .matrix-wrap{margin-top:8px;border:1px solid var(--border);border-radius:20px;overflow:auto;max-height:none;box-shadow:0 14px 50px rgba(15,23,42,.07);opacity:0;transform:translateY(18px);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1)}
+    .matrix-wrap.in{opacity:1;transform:none}
+    table.matrix{width:100%;border-collapse:collapse;font-size:.86rem;min-width:940px}
+    table.matrix td{padding:13px 16px;text-align:center;border-bottom:1px solid var(--border);vertical-align:middle}
+    /* rich plan header */
+    table.matrix thead th{background:var(--bg2);padding:18px 14px 16px;text-align:center;border-bottom:2px solid var(--border);vertical-align:top;position:sticky;top:0;z-index:3}
+    table.matrix thead th.col-fg{background:linear-gradient(180deg,rgba(14,165,233,.10),rgba(124,58,237,.05))}
+    .mh-badge{display:inline-block;font-size:.56rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 9px;border-radius:999px;margin-bottom:6px}
+    .mh-badge.free{background:#dcfce7;color:#16a34a}
+    .mh-badge.pop{background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;box-shadow:0 4px 12px rgba(124,58,237,.3)}
+    .mh-name{font-size:1.05rem;font-weight:900;color:var(--text)}
+    .mh-price{font-size:1.3rem;font-weight:900;color:var(--text);margin-top:3px;line-height:1.1}
+    .mh-price small{font-size:.6rem;font-weight:600;color:var(--text3)}
+    .mh-price .price-6month,.mh-price .price-annual,.mh-price .price-3year{display:none}
+    .mh-tag{font-size:.66rem;color:var(--text3);line-height:1.35;margin:6px auto 10px;max-width:150px}
+    /* left feature column with descriptions */
+    table.matrix td.row-h{text-align:left;background:var(--bg2);min-width:250px;position:sticky;left:0;z-index:1}
+    .rh-name{font-weight:700;color:var(--text);font-size:.88rem;line-height:1.25}
+    .rh-desc{font-weight:400;color:var(--text3);font-size:.73rem;line-height:1.4;margin-top:2px}
+    table.matrix td.col-fg{background:rgba(14,165,233,.04)}
+    table.matrix tbody tr{opacity:0}
+    .matrix-wrap.in table.matrix tbody tr{animation:mxRow .5s cubic-bezier(.16,1,.3,1) forwards}
+    @keyframes mxRow{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+    @media(prefers-reduced-motion:reduce){.matrix-wrap{transition:none;opacity:1;transform:none}table.matrix tbody tr{opacity:1!important;animation:none!important}}
+    table.matrix tbody tr:hover td{background:rgba(14,165,233,.08)}
+    table.matrix tbody tr:hover td.row-h{background:rgba(14,165,233,.08)}
+    /* color-coded values: dark-green ✓ · red ✕ · light-green Limited */
+    table.matrix .yes{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#dcfce7;color:#15803d;font-weight:900;font-size:.78rem;transition:transform .2s}
+    table.matrix tbody tr:hover .yes{transform:scale(1.15)}
+    table.matrix .no{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#fee2e2;color:#dc2626;font-weight:900;font-size:.78rem}
+    table.matrix .lim{display:inline-block;background:#ecfccb;color:#4d7c0f;font-weight:700;font-size:.71rem;padding:3px 11px;border-radius:999px}
+    table.matrix .mx-num{font-weight:700;color:var(--text)}
     table.matrix .mx-price{font-size:1.05rem;font-weight:900;color:var(--text)}
-    table.matrix .yes{color:var(--green);font-weight:700}
-    table.matrix .lim{color:var(--orange);font-weight:700}
-    table.matrix .no{color:#cbd5e1;font-weight:700}
-    table.matrix .mx-cta{display:inline-block;padding:8px 16px;border-radius:10px;font-weight:700;font-size:.8rem;text-decoration:none}
+    table.matrix .mx-cta{display:inline-block;padding:9px 18px;border-radius:11px;font-weight:700;font-size:.8rem;text-decoration:none;transition:transform .2s,box-shadow .2s}
+    table.matrix .mx-cta:hover{transform:translateY(-2px)}
     table.matrix .mx-cta.free{background:#ecfdf5;color:#047857;border:1px solid #6ee7b7}
-    table.matrix .mx-cta.pri{background:linear-gradient(135deg,var(--brand),var(--accent));color:white}
+    table.matrix .mx-cta.pri{background:linear-gradient(135deg,var(--brand),var(--accent));color:white;box-shadow:0 6px 16px rgba(14,165,233,.3)}
     table.matrix .mx-cta.dark{background:var(--dark);color:white}
-    @media(max-width:640px){table.matrix th,table.matrix td{padding:9px 10px;font-size:.8rem}}
+    @media(max-width:640px){table.matrix td{padding:10px 11px;font-size:.8rem}table.matrix td.row-h{min-width:190px}.rh-desc{display:none}}
 
     /* CUSTOM BANNER */
     .custom-banner{margin-top:24px;border:2px solid var(--dark);border-radius:24px;background:linear-gradient(135deg,#0f172a,#1e293b);color:white;padding:36px 32px;position:relative}
@@ -343,158 +365,74 @@
   </div>
 
   <!-- ═══ PLANS ═══ -->
-  <div class="plan-grid">
-    <!-- Free · Everyone -->
-    <div class="plan-card free-hl">
-      <div class="free-badge">FREE FOREVER</div>
-      <div class="plan-tier" style="color:#059669">Free</div>
-      <div class="plan-name">Free</div>
-      <div class="plan-desc">For everyone getting started — learn the platform, run a small study, or pilot before you scale.</div>
-      <div class="plan-price">₹0</div>
-      <div class="plan-period">Free forever</div>
-      <div class="plan-note">Open to all — just sign up. No card, no credit check.</div>
-      <hr class="plan-divider"/>
-      <ul class="plan-list">
-        <li><strong>300</strong> submissions / month</li>
-        <li>50 MB storage · 1 admin</li>
-        <li>10 question types · 2 questionnaires</li>
-        <li>Offline collection + auto-sync</li>
-        <li>CSV export</li>
-        <li class="cross">Map View &amp; GPS tracking</li>
-        <li class="cross">AI Cleaner, Analyzer &amp; Writer</li>
-        <li class="cross">2FA</li>
-      </ul>
-      <a href="https://app.fieldgovern.com/login" class="plan-cta cta-free">Start Free</a>
-    </div>
-    <!-- Starter -->
-    <div class="plan-card">
-      <div class="plan-tier">Starter</div>
-      <div class="plan-name">Starter</div>
-      <div class="plan-desc">For small teams &amp; pilots. AI cleaning + unlimited FG Writer reports. Below Kobo Community.</div>
-      <div class="intro-badge"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/><path d="M18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8z"/></svg> Intro offer · ~13% off</div>
-      <div class="price-regular">₹7,999/mo</div>
-      <div class="plan-price">
-        <span class="price-monthly" style="display:block">₹6,999<span>/mo</span></span>
-        <span class="price-6month">₹6,299<span>/mo</span></span>
-        <span class="price-annual">₹5,833<span>/mo</span></span>
-        <span class="price-3year">₹4,899<span>/mo</span></span>
-      </div>
-      <div class="plan-usd">≈ $84 / month</div>
-      <div class="plan-period">Intro price · billed per selected cycle · +18% GST</div>
-      <hr class="plan-divider"/>
-      <ul class="plan-list">
-        <li><strong>2,000</strong> submissions / month</li>
-        <li>500 MB storage · 2 Admins</li>
-        <li class="ai">AI Cleaner, Analyzer &amp; Writer <em>(fair-use limits)</em></li>
-        <li>Map View + GPS tracking</li>
-        <li>SPSS + Stata + R export</li>
-        <li>CSV + Word export</li>
-        <li>10 min ASR · 6,000 chars translation</li>
-        <li>Email support (48hr SLA)</li>
-      </ul>
-      <a href="https://app.fieldgovern.com/login" class="plan-cta cta-primary">Get Started</a>
-    </div>
-    <!-- Growth -->
-    <div class="plan-card popular">
-      <div class="popular-badge">MOST POPULAR</div>
-      <div class="plan-tier">Growth</div>
-      <div class="plan-name">Growth</div>
-      <div class="plan-desc">Full AI suite · Panel study · Donor templates · SPSS/Stata. For growing research &amp; M&amp;E teams.</div>
-      <div class="intro-badge"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/><path d="M18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8z"/></svg> Intro offer · ~13% off</div>
-      <div class="price-regular">₹14,999/mo</div>
-      <div class="plan-price">
-        <span class="price-monthly" style="display:block">₹12,999<span>/mo</span></span>
-        <span class="price-6month">₹11,699<span>/mo</span></span>
-        <span class="price-annual">₹10,833<span>/mo</span></span>
-        <span class="price-3year">₹9,099<span>/mo</span></span>
-      </div>
-      <div class="plan-usd">≈ $156 / month</div>
-      <div class="plan-period">Intro price · billed per selected cycle · +18% GST</div>
-      <hr class="plan-divider"/>
-      <ul class="plan-list">
-        <li><strong>5,000</strong> submissions / month</li>
-        <li>2 GB storage · 5 Admins</li>
-        <li class="ai">Full AI suite: Clean, Write, Build, Interpret</li>
-        <li class="ai">Panel Study &amp; Attrition Reports</li>
-        <li class="ai">Donor templates (USAID, EU, Gates)</li>
-        <li>SPSS + Stata + R · 2FA · CSV+Word+Python+PDF</li>
-        <li>120 min ASR · 72,000 chars translation</li>
-        <li>Direct support (24hr SLA)</li>
-      </ul>
-      <a href="https://app.fieldgovern.com/login" class="plan-cta cta-primary">Get Started</a>
-    </div>
-    <!-- Pro -->
-    <div class="plan-card">
-      <div class="plan-tier">Pro</div>
-      <div class="plan-name">Pro</div>
-      <div class="plan-desc">High-volume, multi-project teams. Advanced panel, GPS fraud detection, hierarchy RBAC, SSO option.</div>
-      <div class="intro-badge"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/><path d="M18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8z"/></svg> Intro offer · ~14% off</div>
-      <div class="price-regular">₹28,999/mo</div>
-      <div class="plan-price">
-        <span class="price-monthly" style="display:block">₹24,999<span>/mo</span></span>
-        <span class="price-6month">₹22,499<span>/mo</span></span>
-        <span class="price-annual">₹20,833<span>/mo</span></span>
-        <span class="price-3year">₹17,499<span>/mo</span></span>
-      </div>
-      <div class="plan-usd">≈ $300 / month</div>
-      <div class="plan-period">Intro price · billed per selected cycle · +18% GST</div>
-      <hr class="plan-divider"/>
-      <ul class="plan-list">
-        <li><strong>25,000</strong> submissions / month</li>
-        <li>5 GB storage · 10 Admins</li>
-        <li class="ai">Everything in Growth, plus:</li>
-        <li class="ai">Advanced panel (nested waves, cohorts)</li>
-        <li>GPS spoofing &amp; fraud detection</li>
-        <li>Advanced RBAC (district/block/branch hierarchy)</li>
-        <li>Multi-project dashboard · IRB audit trail · SSO option</li>
-        <li>Priority support (8hr SLA)</li>
-      </ul>
-      <a href="https://app.fieldgovern.com/login" class="plan-cta cta-primary">Get Started</a>
-    </div>
+  <!-- ═══ ONE MERGED PRICING TABLE ═══ -->
+  <div style="text-align:center;margin-bottom:18px">
+    <h2 style="font-size:1.5rem;font-weight:900;color:var(--text)">Every plan, line by line</h2>
+    <p style="font-size:.92rem;color:var(--text3);max-width:620px;margin:8px auto 0">One simple table — exact limits, and what each feature actually does. <strong>Custom</strong> is metered pay-as-you-go with everything unlocked. Start any paid plan with a <strong>15-day free trial</strong> — full features, no card.</p>
   </div>
-
-  <!-- ═══ FULL COMPARISON MATRIX ═══ -->
-  <div style="margin-top:48px;text-align:center;margin-bottom:20px">
-    <h2 style="font-size:1.5rem;font-weight:900;color:var(--text)">Compare every plan, line by line</h2>
-    <p style="font-size:.92rem;color:var(--text3);max-width:560px;margin:8px auto 0">Exact limits and features per plan. <strong>Custom</strong> is metered pay-as-you-go with everything unlocked.</p>
-  </div>
-  <div class="matrix-wrap">
+  <div class="matrix-wrap" id="matrixWrap">
     <table class="matrix">
       <thead>
         <tr>
-          <th class="row-h">Details</th>
-          <th>Free</th>
-          <th class="col-fg">Starter</th>
-          <th class="col-fg">Growth</th>
-          <th class="col-fg">Pro</th>
-          <th>Custom</th>
+          <th class="row-h" style="vertical-align:bottom;font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Feature</th>
+          <th>
+            <div class="mh-badge free">Free forever</div>
+            <div class="mh-name">Free</div>
+            <div class="mh-price">₹0</div>
+            <div class="mh-tag">Get started · pilot before you scale</div>
+            <a href="https://app.fieldgovern.com/login" class="mx-cta free">Start Free</a>
+          </th>
+          <th class="col-fg">
+            <div class="mh-name">Starter</div>
+            <div class="mh-price"><span class="price-monthly">₹6,999</span><span class="price-6month">₹6,299</span><span class="price-annual">₹5,833</span><span class="price-3year">₹4,899</span> <small>/mo</small></div>
+            <div class="mh-tag">Small teams &amp; pilots</div>
+            <a href="https://app.fieldgovern.com/login" class="mx-cta pri">Get Started</a>
+          </th>
+          <th class="col-fg">
+            <div class="mh-badge pop">Most popular</div>
+            <div class="mh-name">Growth</div>
+            <div class="mh-price"><span class="price-monthly">₹12,999</span><span class="price-6month">₹11,699</span><span class="price-annual">₹10,833</span><span class="price-3year">₹9,099</span> <small>/mo</small></div>
+            <div class="mh-tag">Growing research &amp; M&amp;E teams</div>
+            <a href="https://app.fieldgovern.com/login" class="mx-cta pri">Get Started</a>
+          </th>
+          <th class="col-fg">
+            <div class="mh-name">Pro</div>
+            <div class="mh-price"><span class="price-monthly">₹24,999</span><span class="price-6month">₹22,499</span><span class="price-annual">₹20,833</span><span class="price-3year">₹17,499</span> <small>/mo</small></div>
+            <div class="mh-tag">High-volume, multi-project teams</div>
+            <a href="https://app.fieldgovern.com/login" class="mx-cta pri">Get Started</a>
+          </th>
+          <th>
+            <div class="mh-name">Custom</div>
+            <div class="mh-price">PAYG</div>
+            <div class="mh-tag">Consortiums, govt &amp; enterprise</div>
+            <a href="https://wa.me/918088709011?text=Hi%2C%20I%27d%20like%20a%20Custom%20FieldGovern%20quote." target="_blank" class="mx-cta dark">Talk to Us</a>
+          </th>
         </tr>
       </thead>
       <tbody>
-        <tr><td class="row-h">Price</td><td><span class="mx-price">₹0</span></td><td class="col-fg"><span class="mx-price">₹6,999</span></td><td class="col-fg"><span class="mx-price">₹12,999</span></td><td class="col-fg"><span class="mx-price">₹24,999</span></td><td><span class="mx-price">Pay as you go</span></td></tr>
-        <tr><td class="row-h">Submissions / month</td><td>300</td><td class="col-fg">2,000</td><td class="col-fg">5,000</td><td class="col-fg">25,000</td><td>Unlimited</td></tr>
-        <tr><td class="row-h">Storage</td><td>50 MB</td><td class="col-fg">500 MB</td><td class="col-fg">2 GB</td><td class="col-fg">5 GB</td><td>Unlimited</td></tr>
-        <tr><td class="row-h">Admins / PM</td><td>1</td><td class="col-fg">2</td><td class="col-fg">5</td><td class="col-fg">10</td><td>Unlimited</td></tr>
-        <tr><td class="row-h">Questionnaires / admin</td><td>2</td><td class="col-fg">4</td><td class="col-fg">4</td><td class="col-fg">8</td><td>Custom</td></tr>
-        <tr><td class="row-h">Total schedules</td><td>2</td><td class="col-fg">8</td><td class="col-fg">20</td><td class="col-fg">80</td><td>Custom</td></tr>
-        <tr><td class="row-h">List of inputs</td><td>100</td><td class="col-fg">500</td><td class="col-fg">800</td><td class="col-fg">1,000</td><td>Custom</td></tr>
-        <tr><td class="row-h">Question types</td><td>10</td><td class="col-fg">All</td><td class="col-fg">All</td><td class="col-fg">All</td><td>All</td></tr>
-        <tr><td class="row-h">Map View</td><td><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td class="row-h">GPS tracking</td><td><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td class="row-h">Data Cleaner</td><td><span class="no">✕</span></td><td class="col-fg"><span class="lim">Limited</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td class="row-h">Data Dashboard</td><td><span class="no">✕</span></td><td class="col-fg"><span class="lim">Limited</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td class="row-h">Data Analyzer</td><td><span class="no">✕</span></td><td class="col-fg"><span class="lim">Limited</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td class="row-h">AI Writer</td><td><span class="no">✕</span></td><td class="col-fg"><span class="lim">Limited</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td class="row-h">Advanced STAT analysis</td><td><span class="no">✕</span></td><td class="col-fg"><span class="lim">Limited</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td class="row-h">Email support</td><td><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td class="row-h">SPSS + Stata + R</td><td><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td class="row-h">2FA</td><td><span class="no">✕</span></td><td class="col-fg"><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td class="row-h">Export formats</td><td>CSV</td><td class="col-fg">CSV + Word</td><td class="col-fg">CSV + Word + Python + PDF</td><td class="col-fg">CSV + Word + Python + PDF</td><td>All formats</td></tr>
-        <tr><td class="row-h"></td><td><a href="https://app.fieldgovern.com/login" class="mx-cta free">Start Free</a></td><td class="col-fg"><a href="https://app.fieldgovern.com/login" class="mx-cta pri">Get Started</a></td><td class="col-fg"><a href="https://app.fieldgovern.com/login" class="mx-cta pri">Get Started</a></td><td class="col-fg"><a href="https://app.fieldgovern.com/login" class="mx-cta pri">Get Started</a></td><td><a href="https://wa.me/918088709011?text=Hi%2C%20I%27d%20like%20a%20Custom%20FieldGovern%20quote." target="_blank" class="mx-cta dark">Talk to Us</a></td></tr>
+        <tr><td class="row-h"><div class="rh-name">Submissions / month</div><div class="rh-desc">Total form responses your team can collect each month before the cap.</div></td><td class="mx-num">300</td><td class="col-fg mx-num">2,000</td><td class="col-fg mx-num">5,000</td><td class="col-fg mx-num">25,000</td><td class="mx-num">Unlimited</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Storage</div><div class="rh-desc">Space for photos, audio &amp; attachments across all your submissions.</div></td><td class="mx-num">50 MB</td><td class="col-fg mx-num">500 MB</td><td class="col-fg mx-num">2 GB</td><td class="col-fg mx-num">5 GB</td><td class="mx-num">Unlimited</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Admins / PMs</div><div class="rh-desc">Org admins &amp; project managers who build forms and manage the team.</div></td><td class="mx-num">1</td><td class="col-fg mx-num">2</td><td class="col-fg mx-num">5</td><td class="col-fg mx-num">10</td><td class="mx-num">Unlimited</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Questionnaires / admin</div><div class="rh-desc">Distinct questionnaires each admin can run at the same time.</div></td><td class="mx-num">2</td><td class="col-fg mx-num">4</td><td class="col-fg mx-num">4</td><td class="col-fg mx-num">8</td><td class="mx-num">Custom</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Total schedules</div><div class="rh-desc">Active data-collection schedules running simultaneously.</div></td><td class="mx-num">2</td><td class="col-fg mx-num">8</td><td class="col-fg mx-num">20</td><td class="col-fg mx-num">80</td><td class="mx-num">Custom</td></tr>
+        <tr><td class="row-h"><div class="rh-name">List of inputs</div><div class="rh-desc">Pre-loaded reference lists (rosters, beneficiaries, cascading options).</div></td><td class="mx-num">100</td><td class="col-fg mx-num">500</td><td class="col-fg mx-num">800</td><td class="col-fg mx-num">1,000</td><td class="mx-num">Custom</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Question types</div><div class="rh-desc">GPS, photo, audio, barcode, signature, matrix, repeat groups &amp; more.</div></td><td class="mx-num">10</td><td class="col-fg mx-num">All</td><td class="col-fg mx-num">All</td><td class="col-fg mx-num">All</td><td class="mx-num">All</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Map View</div><div class="rh-desc">Live map of GPS-tagged submissions for real-time field oversight.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td class="row-h"><div class="rh-name">GPS tracking &amp; validation</div><div class="rh-desc">Capture and geofence-validate enumerator location on every submission.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td class="row-h"><div class="rh-name">Data Cleaner</div><div class="rh-desc">AI flags duplicates, fixes data types &amp; detects outliers — no export to Stata/R.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="lim">Limited</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td class="row-h"><div class="rh-name">Data Dashboard</div><div class="rh-desc">Real-time charts &amp; cross-tabs the moment data syncs from the field.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="lim">Limited</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td class="row-h"><div class="rh-name">Data Analyzer</div><div class="rh-desc">1-click AI cross-tabs, Smart Builder &amp; per-table interpretation.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="lim">Limited</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td class="row-h"><div class="rh-name">AI Writer</div><div class="rh-desc">FG Writer drafts donor &amp; research reports from your analysed tables.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="lim">Limited</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td class="row-h"><div class="rh-name">Advanced STAT analysis</div><div class="rh-desc">Significance tests &amp; statistical interpretation, built in.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="lim">Limited</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td class="row-h"><div class="rh-name">Audio audits &amp; timing QC</div><div class="rh-desc">Compressed interview recording + rushed-interview detection for back-checking.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td class="row-h"><div class="rh-name">SPSS + Stata + R export</div><div class="rh-desc">Download analysis-ready files for academic / policy stats tools.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td class="row-h"><div class="rh-name">2FA &amp; security</div><div class="rh-desc">Two-factor authentication and DPDP-aligned data protection.</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td class="row-h"><div class="rh-name">Export formats</div><div class="rh-desc">File formats you can download your data &amp; reports in.</div></td><td class="mx-num">CSV</td><td class="col-fg mx-num">CSV + Word</td><td class="col-fg mx-num" style="font-size:.78rem">CSV·Word·Python·PDF</td><td class="col-fg mx-num" style="font-size:.78rem">CSV·Word·Python·PDF</td><td class="mx-num">All formats</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Support</div><div class="rh-desc">How fast our team responds to your questions.</div></td><td><span class="no">✕</span></td><td class="col-fg mx-num" style="font-size:.78rem">Email · 48h</td><td class="col-fg mx-num" style="font-size:.78rem">Direct · 24h</td><td class="col-fg mx-num" style="font-size:.78rem">Priority · 8h</td><td class="mx-num" style="font-size:.78rem">Dedicated CSM</td></tr>
       </tbody>
     </table>
   </div>
-  <p style="font-size:.76rem;color:var(--text3);text-align:center;margin-top:12px"><strong>Limited</strong> = fair-use caps on Starter; see the app for current limits. All prices +18% GST. Start any paid plan with a 15-day free trial — full features, no card.</p>
+  <p style="font-size:.76rem;color:var(--text3);text-align:center;margin-top:12px"><strong><span style="display:inline-block;background:#ecfccb;color:#4d7c0f;font-weight:700;padding:1px 8px;border-radius:999px">Limited</span></strong> = fair-use caps on Starter (see the app for current limits). All prices +18% GST. Start any paid plan with a 15-day free trial — full features, no card.</p>
 
   <!-- ═══ CUSTOM · PAY AS YOU GO ═══ -->
   <div class="custom-banner">
@@ -688,11 +626,24 @@
     // Fix: handle the 6month key properly
     const cls = cycle === '6month' ? '.price-6month' : cycle === '3year' ? '.price-3year' : cycle === 'annual' ? '.price-annual' : '.price-monthly';
     document.querySelectorAll('.price-monthly,.price-6month,.price-annual,.price-3year').forEach(el => el.style.display='none');
-    document.querySelectorAll(cls).forEach(el => el.style.display='block');
+    document.querySelectorAll(cls).forEach(el => el.style.display='inline-block');
   }
 
   // Init: show monthly prices
   setCycle('monthly');
+
+  // Animate the pricing matrix: reveal on scroll + staggered rows
+  (function(){
+    var wrap = document.getElementById('matrixWrap');
+    if (!wrap) return;
+    wrap.querySelectorAll('tbody tr').forEach(function(r, i){ r.style.animationDelay = (i * 45) + 'ms'; });
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function(entries){
+        entries.forEach(function(e){ if (e.isIntersecting) { wrap.classList.add('in'); io.disconnect(); } });
+      }, { threshold: 0.06 });
+      io.observe(wrap);
+    } else { wrap.classList.add('in'); }
+  })();
 </script>
 <script defer src="/assets/trial-cta.js"></script>
 </body>
