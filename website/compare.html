@@ -575,10 +575,10 @@
         <tr><th>Tier (per month)</th><th class="highlight">FieldGovern ✦</th><th>SurveyCTO</th><th>KoboToolbox</th><th>ODK</th></tr>
       </thead>
       <tbody>
-        <tr><td>Free</td><td class="col-fg"><div class="fg-plan">₹0 · Students</div><div class="fg-meta">1,000 subs/mo</div></td><td><span class="tag-ok">Community · 200/mo</span></td><td><span class="tag-better">Community · 5,000/mo</span></td><td><span class="tag-ok">Free (self-host)</span></td></tr>
-        <tr><td>Entry</td><td class="col-fg"><div class="fg-plan">Starter · ₹6,999</div><div class="fg-meta">5,000 subs · <del>₹7,999</del></div></td><td><span class="tag-worse">~$198 (₹16,500+)</span></td><td><span class="tag-ok">Professional · 25,000</span></td><td><span class="tag-ok">ODK Cloud / hosting</span></td></tr>
-        <tr><td>Mid</td><td class="col-fg"><div class="fg-plan">Growth · ₹12,999</div><div class="fg-meta">25,000 subs · <del>₹14,999</del></div></td><td><span class="tag-worse">~$300 (₹25,000+)</span></td><td><span class="tag-ok">Teams · 50,000</span></td><td><span class="tag-ok">Server + DevOps</span></td></tr>
-        <tr><td>Top managed</td><td class="col-fg"><div class="fg-plan">Pro · ₹24,999</div><div class="fg-meta">1,00,000 subs · <del>₹28,999</del></div></td><td><span class="tag-worse">up to ~$700 (₹58,000+)</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Your servers + DevOps</span></td></tr>
+        <tr><td>Free</td><td class="col-fg"><div class="fg-plan">₹0 · Free forever</div><div class="fg-meta">300 subs/mo</div></td><td><span class="tag-ok">Community · 200/mo</span></td><td><span class="tag-better">Community · 5,000/mo</span></td><td><span class="tag-ok">Free (self-host)</span></td></tr>
+        <tr><td>Entry</td><td class="col-fg"><div class="fg-plan">Starter · ₹6,999</div><div class="fg-meta">2,000 subs · <del>₹7,999</del></div></td><td><span class="tag-worse">~$198 (₹16,500+)</span></td><td><span class="tag-ok">Professional · 25,000</span></td><td><span class="tag-ok">ODK Cloud / hosting</span></td></tr>
+        <tr><td>Mid</td><td class="col-fg"><div class="fg-plan">Growth · ₹12,999</div><div class="fg-meta">5,000 subs · <del>₹14,999</del></div></td><td><span class="tag-worse">~$300 (₹25,000+)</span></td><td><span class="tag-ok">Teams · 50,000</span></td><td><span class="tag-ok">Server + DevOps</span></td></tr>
+        <tr><td>Top managed</td><td class="col-fg"><div class="fg-plan">Pro · ₹24,999</div><div class="fg-meta">25,000 subs · <del>₹28,999</del></div></td><td><span class="tag-worse">up to ~$700 (₹58,000+)</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Your servers + DevOps</span></td></tr>
         <tr><td>Beyond / custom</td><td class="col-fg"><div class="fg-plan">Custom</div><div class="fg-meta">by subs / schedules / project</div></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Self-managed</span></td></tr>
         <tr><td>Built-in cleaning + analysis + AI reports</td><td class="col-fg"><span class="tag-better">✓ Included in price</span></td><td><span class="tag-worse">✕ Buy Stata + analyst</span></td><td><span class="tag-worse">✕ Buy tools + analyst</span></td><td><span class="tag-worse">✕ Buy tools + analyst</span></td></tr>
         <tr><td>Payment</td><td class="col-fg"><span class="tag-better">UPI / NEFT (INR)</span></td><td><span class="tag-worse">USD card</span></td><td><span class="tag-worse">USD card</span></td><td><span class="tag-ok">n/a</span></td></tr>
@@ -593,7 +593,7 @@
 <div style="padding:0 0 64px">
   <div class="cta-block">
     <h2>See it on your own data</h2>
-    <p>Free for students, 30-day trial for everyone, and a live demo with no signup. Pay by UPI when you're ready.</p>
+    <p>Free forever for everyone, a 15-day full-feature trial, and a live demo with no signup. Pay by UPI when you're ready.</p>
     <div class="cta-buttons">
       <a href="https://app.fieldgovern.com/login" class="btn-primary" style="font-size:.95rem;padding:14px 28px">Start Free →</a>
       <a href="https://wa.me/918088709011?text=Hi%2C%20I%27d%20like%20to%20compare%20FieldGovern%20for%20my%20team." target="_blank" class="wa-btn">
@@ -703,11 +703,11 @@
     requestAnimationFrame(step);
   }
   // Recommend the plan that genuinely fits the user's volume (real pricing.html caps,
-  // gated by submissions/month; Free is also limited to 1 project). No upselling.
+  // gated by submissions/month). No upselling.
   function recommendPlan(subsPerMonth, programs){
-    if (subsPerMonth <= 5000)   return {name:'Starter', price:6999};
-    if (subsPerMonth <= 25000)  return {name:'Growth', price:12999};
-    if (subsPerMonth <= 100000) return {name:'Pro', price:24999};
+    if (subsPerMonth <= 2000)   return {name:'Starter', price:6999};
+    if (subsPerMonth <= 5000)   return {name:'Growth', price:12999};
+    if (subsPerMonth <= 25000)  return {name:'Pro', price:24999};
     return {name:'Custom', price:null};
   }
   function calcCost(){
@@ -861,5 +861,6 @@
     document.querySelectorAll('.cmp-wrap').forEach(function(w){ io.observe(w); });
   }
 </script>
+<script defer src="/assets/trial-cta.js"></script>
 </body>
 </html>
