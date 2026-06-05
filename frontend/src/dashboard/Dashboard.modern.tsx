@@ -2084,6 +2084,14 @@ export default function Dashboard() {
                                 {sub.has_violations && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-yellow-700 bg-yellow-100"><EmojiIcon e="⚠" /> Violations</span>}
                                 {sub.data_json?.['_duplicate_suspect'] && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-orange-700 bg-orange-100">Dup?</span>}
                                 {sub.backcheck_required && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-blue-700 bg-blue-100"><EmojiIcon e="🔍" /> Back-Check</span>}
+                                {(() => {
+                                  const d = sub.data_json?.['_duration_sec']
+                                  if (typeof d !== 'number') return null
+                                  const m = Math.floor(d / 60), s = d % 60
+                                  const label = m ? `${m}m ${s}s` : `${s}s`
+                                  const rushed = d < 90
+                                  return <span title="Interview duration" className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${rushed ? 'text-red-700 bg-red-100' : 'text-catalan-textMuted bg-catalan-hover'}`}>{rushed && <EmojiIcon e="⚡" />}{rushed ? 'Rushed · ' : ''}{label}</span>
+                                })()}
                               </div>
                             </td>
                             <td className="px-3 py-2 text-catalan-textMuted text-xs cursor-pointer" onClick={() => openDetail(sub.id)}>{new Date(sub.server_received_at).toLocaleString()}</td>

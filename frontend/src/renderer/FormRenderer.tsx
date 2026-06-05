@@ -196,7 +196,11 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
     }
     setSubmitting(true)
     const gpsSubmit = await captureGps()
-    const final: SubmissionDraft = { ...draft, values: valuesWithCalc, gpsSubmit, status: 'outbox' }
+    // QC: stamp interview timing (rides data_json; backend skips these via _internal)
+    const startedMs = draft.startedAt ? Date.parse(draft.startedAt) : Date.now()
+    const _duration_sec = Math.max(0, Math.round((Date.now() - startedMs) / 1000))
+    const valuesWithMeta = { ...valuesWithCalc, _started_at: draft.startedAt ?? new Date().toISOString(), _duration_sec }
+    const final: SubmissionDraft = { ...draft, values: valuesWithMeta, gpsSubmit, status: 'outbox' }
     setDraft(final)
     try { await onSubmit(final) }
     finally { setSubmitting(false) }
