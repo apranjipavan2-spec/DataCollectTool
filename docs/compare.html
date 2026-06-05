@@ -440,7 +440,7 @@
     </div>
   </div>
 
-  <p class="calc-assume"><strong>Assumptions:</strong> printing ₹1 per double-sided sheet; data entry ₹1 per page (front &amp; back), min ₹15,000; analyst at the salary you set (prefilled ₹30,000/mo) for the project; report writing ₹15,000/program. <strong>KoboToolbox and SurveyCTO don't include cleaning, analysis or report writing</strong>, so an analyst + report cost still applies to them — only FieldGovern bundles these. Software assumed: SurveyCTO ~$198–700/mo (₹83/$); KoboToolbox Professional plan ~$166/mo (₹83/$). FieldGovern price introductory, +18% GST extra. Indicative only — actual costs vary by team and location.</p>
+  <p class="calc-assume"><strong>Assumptions:</strong> printing ₹1 per double-sided sheet; data entry ₹1 per page (front &amp; back), min ₹15,000; analyst at the salary you set (prefilled ₹30,000/mo) for the project; report writing ₹15,000/program. <strong>KoboToolbox and SurveyCTO don't include cleaning, analysis or report writing</strong>, so an analyst + report cost still applies to them — only FieldGovern bundles these. Software assumed (₹83/$): SurveyCTO ~$250–700/mo by volume; KoboToolbox paid plans — Professional ~$159/mo (≤25k subs), Teams ~$300/mo (≤50k), Enterprise ~$500/mo above. FieldGovern price introductory, +18% GST extra. Indicative only — actual costs vary by team and location.</p>
  </div>
 </div>
 
@@ -696,7 +696,6 @@
   // Recommend the plan that genuinely fits the user's volume (real pricing.html caps,
   // gated by submissions/month; Free is also limited to 1 project). No upselling.
   function recommendPlan(subsPerMonth, programs){
-    if (subsPerMonth <= 1000 && programs <= 1) return {name:'Free (Students)', price:0};
     if (subsPerMonth <= 5000)   return {name:'Starter', price:6999};
     if (subsPerMonth <= 25000)  return {name:'Growth', price:12999};
     if (subsPerMonth <= 100000) return {name:'Pro', price:24999};
@@ -734,9 +733,14 @@
     // Competitor TCO: digital tools remove printing + data entry, but only
     // FieldGovern also removes the analyst + report-writing cost (built-in AI).
     var USD = 83;
-    var sctoMo = subsPerMonth <= 5000 ? 198 * USD : (subsPerMonth <= 25000 ? 300 * USD : 700 * USD);
+    // SurveyCTO: tiered by volume (~$250 floor up to ~$700 advanced)
+    var sctoMo = subsPerMonth <= 5000 ? 250 * USD : (subsPerMonth <= 25000 ? 450 * USD : 700 * USD);
     var odkMo  = 6000;                          // est. self-host server + ops
-    var koboMo = 166 * USD;                      // Professional plan ($166/mo) — paid tier, not free Community
+    // KoboToolbox: tiered paid plans (Professional → Teams → Enterprise), never the free Community tier
+    var koboMo, koboPlan;
+    if (subsPerMonth <= 25000)      { koboMo = 159 * USD; koboPlan = 'Professional plan'; }
+    else if (subsPerMonth <= 50000) { koboMo = 300 * USD; koboPlan = 'Teams plan'; }
+    else                            { koboMo = 500 * USD; koboPlan = 'Enterprise plan'; }
     var sctoTotal = sctoMo * months + analyst + report;
     var koboTotal = koboMo * months + analyst + report;
     var odkTotal  = odkMo  * months + analyst + report;
@@ -758,8 +762,8 @@
         lines:[['Printing',0],['Data entry',0],[fgSoftLabel,fgTotal],['Analyst','inc'],['Report writing','inc']], foot:fgFoot,
         extras:FEATURES, hasExtras:true},
       {name:'KoboToolbox', cls:'', total:koboTotal,
-        lines:[['Printing',0],['Data entry',0],['Professional plan',koboMo * months],['Analyst',analyst],['Report writing',report]],
-        foot:'Professional plan (~' + fmtINR(koboMo) + '/mo) — but you still hire an analyst + report writer',
+        lines:[['Printing',0],['Data entry',0],[koboPlan,koboMo * months],['Analyst',analyst],['Report writing',report]],
+        foot:koboPlan + ' (~' + fmtINR(koboMo) + '/mo) — but you still hire an analyst + report writer',
         extras:FEATURES, hasExtras:false},
       {name:'SurveyCTO', cls:'', total:sctoTotal,
         lines:[['Printing',0],['Data entry',0],['Subscription',sctoMo * months],['Analyst',analyst],['Report writing',report]],
