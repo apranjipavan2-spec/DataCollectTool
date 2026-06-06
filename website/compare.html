@@ -711,11 +711,11 @@
     requestAnimationFrame(step);
   }
   // Recommend the plan that genuinely fits the user's volume (real pricing.html caps,
-  // gated by submissions/month). No upselling.
+  // gated by both submissions/month AND admins/PMs). No upselling.
   function recommendPlan(subsPerMonth, programs){
-    if (subsPerMonth <= 2000)   return {name:'Starter', price:6999};
-    if (subsPerMonth <= 5000)   return {name:'Growth', price:12999};
-    if (subsPerMonth <= 25000)  return {name:'Pro', price:24999};
+    if (subsPerMonth <= 2000  && programs <= 2)  return {name:'Starter', price:6999};
+    if (subsPerMonth <= 5000  && programs <= 5)  return {name:'Growth',  price:12999};
+    if (subsPerMonth <= 25000 && programs <= 10) return {name:'Pro',     price:24999};
     return {name:'Custom', price:null};
   }
   function calcCost(){
