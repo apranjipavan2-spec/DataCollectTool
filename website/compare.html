@@ -399,10 +399,10 @@
         <div class="vol-row">
           <select id="ci-volmode" onchange="setVolMode(this.value)">
             <option value="subs">Submissions / month</option>
-            <option value="quest">Questionnaires / project</option>
+            <option value="quest">Responses / form</option>
           </select>
           <input id="ci-subs" type="number" min="1" value="2000" placeholder="responses / mo"/>
-          <input id="ci-perproject" type="number" min="1" value="3000" placeholder="per project" style="display:none"/>
+          <input id="ci-perproject" type="number" min="1" value="3000" placeholder="per form" style="display:none"/>
         </div>
       </div>
       <div class="calc-field">
@@ -726,7 +726,7 @@
 
     var subsPerMonth, totalSubs;
     if (volMode === 'quest'){
-      totalSubs = programs * v('ci-perproject');   // target responses per project × projects
+      totalSubs = programs * v('ci-perproject');   // target responses per form × active forms
       subsPerMonth = Math.max(1, Math.round(totalSubs / months));
     } else {
       subsPerMonth = v('ci-subs');
@@ -739,7 +739,7 @@
     // Data entry: staff data-entry operators (scales with volume) at the wage you set, for the project duration
     var entry = operators * opSal * months;       // operators × monthly wage × months
     var analyst = anSal * months;                 // one analyst for the project
-    var report = programs * 15000;                // ₹15k per project / admin
+    var report = programs * 15000;                // ₹15k per active form (report writing cost)
     var paperTotal = printing + entry + analyst + report;
 
     var plan = recommendPlan(subsPerMonth, programs);
@@ -832,7 +832,7 @@
     if (fgTotal === null){
       pctEl.textContent = 'Custom'; pctEl.dataset.val = 0;
       saveEl.textContent = 'Metered quote recommended';
-      paperDetailEl.innerHTML = 'At <strong>' + subsPerMonth.toLocaleString('en-IN') + ' submissions/mo</strong> across ' + programs + ' admins/projects, talk to us for a metered <strong>Custom</strong> quote — still a fraction of paper (' + fmtINR(paperTotal) + ').';
+      paperDetailEl.innerHTML = 'At <strong>' + subsPerMonth.toLocaleString('en-IN') + ' submissions/mo</strong> across ' + programs + ' active forms, talk to us for a metered <strong>Custom</strong> quote — still a fraction of paper (' + fmtINR(paperTotal) + ').';
       platEl.innerHTML = '<div>KoboToolbox <strong>' + fmtINR(koboTotal) + '</strong></div><div>SurveyCTO <strong>' + fmtINR(sctoTotal) + '</strong></div>';
       platNoteEl.innerHTML = 'Cleaning, analysis &amp; AI reports included — Kobo &amp; SurveyCTO bill these on top.';
     } else {
