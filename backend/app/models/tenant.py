@@ -12,7 +12,7 @@ class Tenant(Base):
     logo_url = Column(String)
     primary_color = Column(String, default="#2563EB")
     app_name = Column(String, default="")  # white-label app name
-    plan_tier = Column(String, default="free")  # free | starter | professional | enterprise
+    plan_tier = Column(String, default="free")  # free | starter | growth | pro | custom  (legacy: professional, enterprise)
     subscription_status = Column(String, default="active")
     free_submissions_used = Column(String, default=0)
     allow_enumerator_edit = Column(Boolean, default=True, nullable=False, server_default='true')

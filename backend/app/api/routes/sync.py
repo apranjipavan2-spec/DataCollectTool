@@ -409,6 +409,15 @@ async def upload_media(
     if len(content) > 10 * 1024 * 1024:  # 10MB safety limit (before compression)
         raise HTTPException(status_code=413, detail="File too large (max 10MB)")
 
+    # Enforce storage limit before accepting the upload
+    from app.services.plan_enforcement import check_storage_limit
+    from app.models.tenant import Tenant
+    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+    if tenant:
+        storage_result = check_storage_limit(db, str(user["tenant_id"]), tenant.plan_tier)
+        if not storage_result["allowed"]:
+            raise HTTPException(status_code=402, detail=storage_result["reason"])
+
     mime = file.content_type or "application/octet-stream"
     original_size = len(content)
 

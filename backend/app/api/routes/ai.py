@@ -202,6 +202,14 @@ async def generate_report(
     if user.get("role") != "master_admin":
         from app.api.routes.billing import check_feature
         check_feature(user["tenant_id"], "ai_writer", db)
+        # Check monthly AI report quota
+        from app.services.plan_enforcement import check_ai_reports_limit
+        from app.models.tenant import Tenant
+        tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+        if tenant:
+            ai_result = check_ai_reports_limit(db, str(user["tenant_id"]), tenant.plan_tier)
+            if not ai_result["allowed"]:
+                raise HTTPException(402, ai_result["reason"])
 
     cfg = _logged_cfg(db, user, "report")
     if not cfg.get("api_key"):
@@ -252,6 +260,9 @@ async def generate_report(
             try:
                 report_md = await ai_service.generate_report(cfg, form_title, field_labels, sub_data)
                 _upd(sess, "done", "Report complete!", result=report_md)
+                # Increment monthly AI report counter after successful generation
+                from app.services.plan_enforcement import increment_ai_reports
+                increment_ai_reports(sess, job_tenant_id)
             except Exception as e:
                 _upd(sess, "failed", error=str(e))
 

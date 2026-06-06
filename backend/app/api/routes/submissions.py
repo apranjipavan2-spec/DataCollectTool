@@ -606,8 +606,13 @@ def list_potential_duplicates(
 @limiter.limit("60/minute")
 def create_submission(request: Request, body: SubmissionCreate, background_tasks: BackgroundTasks, user=Depends(require_enumerator), db: Session = Depends(get_db)):
     if user.get("role") != "master_admin":
-        from app.api.routes.billing import check_submission_limit
-        check_submission_limit(user["tenant_id"], db)
+        from app.services.plan_enforcement import check_submission_limit
+        from app.models.tenant import Tenant
+        _tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+        if _tenant:
+            _sub_result = check_submission_limit(db, str(user["tenant_id"]), _tenant.plan_tier)
+            if not _sub_result["allowed"]:
+                raise HTTPException(status_code=402, detail=_sub_result["reason"])
 
     try:
         sub = Submission(

@@ -58,20 +58,24 @@ def list_users(page: int = 1, page_size: int = 50, user=Depends(require_supervis
 @router.post("/", status_code=status.HTTP_201_CREATED)
 @limiter.limit("30/minute")
 def create_user(request: Request, body: UserCreate, user=Depends(require_org_admin), db: Session = Depends(get_db)):
-    # Enforce plan user limit
-    from app.api.routes.tenants import PLAN_LIMITS
-    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
-    if tenant:
-        limit = PLAN_LIMITS.get(tenant.plan_tier, PLAN_LIMITS["free"])["users"]
-        if limit >= 0:
-            current_count = db.query(func.count(User.id)).filter(
-                User.tenant_id == user["tenant_id"], User.is_active == True
-            ).scalar() or 0
-            if current_count >= limit:
-                raise HTTPException(
-                    status_code=402,
-                    detail=f"User limit reached ({current_count}/{limit}). Upgrade your plan to add more team members.",
-                )
+    # Enforce admin limit when creating an org_admin (enumerators and supervisors are uncapped)
+    if body.role == "org_admin":
+        from app.core.plan_limits import _limits_for_db
+        tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+        if tenant:
+            limits = _limits_for_db(tenant.plan_tier, db)
+            admin_limit = limits.get("admins", -1)
+            if admin_limit >= 0:
+                current_count = db.query(func.count(User.id)).filter(
+                    User.tenant_id == user["tenant_id"],
+                    User.is_active == True,
+                    User.role == "org_admin",
+                ).scalar() or 0
+                if current_count >= admin_limit:
+                    raise HTTPException(
+                        status_code=402,
+                        detail=f"Admin limit reached ({current_count}/{admin_limit} on your plan). Upgrade to add more admins.",
+                    )
 
     if db.query(User).filter(User.phone == body.phone).first():
         raise HTTPException(status_code=400, detail="Phone already registered")
@@ -129,12 +133,13 @@ def bulk_import_users(
     skipped = 0
     errors: list[str] = []
 
-    # Enforce plan user limit
-    from app.api.routes.tenants import PLAN_LIMITS
+    # Bulk import: track admin limit separately; enumerators/supervisors are uncapped
+    from app.core.plan_limits import _limits_for_db
     tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
-    plan_user_limit = -1
+    plan_admin_limit = -1
     if tenant:
-        plan_user_limit = PLAN_LIMITS.get(tenant.plan_tier, PLAN_LIMITS["free"])["users"]
+        limits = _limits_for_db(tenant.plan_tier, db)
+        plan_admin_limit = limits.get("admins", -1)
 
     current_user_count = db.query(func.count(User.id)).filter(
         User.tenant_id == user["tenant_id"], User.is_active == True
@@ -167,10 +172,14 @@ def bulk_import_users(
             skipped += 1
             continue
 
-        # Check plan limit before adding
-        if plan_user_limit >= 0 and (current_user_count + created) >= plan_user_limit:
-            errors.append(f"Row {idx}: user limit ({plan_user_limit}) reached — remaining rows skipped")
-            break
+        # For org_admin role, enforce the admin seat limit
+        if role == "org_admin" and plan_admin_limit >= 0:
+            admin_created_so_far = db.query(func.count(User.id)).filter(
+                User.tenant_id == user["tenant_id"], User.is_active == True, User.role == "org_admin"
+            ).scalar() or 0
+            if admin_created_so_far + created >= plan_admin_limit:
+                errors.append(f"Row {idx}: admin limit ({plan_admin_limit}) reached — skipping remaining admins")
+                continue
 
         # ── Create user ──
         new_user = User(

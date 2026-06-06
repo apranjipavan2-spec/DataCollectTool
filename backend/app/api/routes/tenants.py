@@ -19,29 +19,17 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_role
 from app.core.security import hash_password
+from app.core.plan_limits import PLAN_LIMITS, _limits_for, _limits_for_db
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.submission import Submission
 from app.models.form import Form
+from app.models.media_file import MediaFile
+from app.models.billing import UsageRecord
 
 router = APIRouter()
 
 require_master = require_role("master_admin")
-
-# ── Plan limits ───────────────────────────────────────────────────────────────
-# -1 = unlimited
-
-PLAN_LIMITS: dict[str, dict] = {
-    # free: 3 users (1 admin + 1 supervisor + 1 enumerator), 100 submissions LIFETIME, 3 forms
-    "free":         {"submissions_per_month": -2,    "submissions_total": 100, "users": 3,   "forms": 3},
-    "starter":      {"submissions_per_month": 5_000, "submissions_total": -1,  "users": 25,  "forms": 20},
-    "professional": {"submissions_per_month": 50_000,"submissions_total": -1,  "users": 100, "forms": 100},
-    "enterprise":   {"submissions_per_month": -1,    "submissions_total": -1,  "users": -1,  "forms": -1},
-}
-# submissions_per_month == -2 means: use submissions_total instead (lifetime cap)
-
-def _limits_for(plan_tier: str) -> dict:
-    return PLAN_LIMITS.get(plan_tier, PLAN_LIMITS["free"])
 
 
 # ── Branding (public-ish, needs auth) ─────────────────────────────────────
@@ -73,39 +61,61 @@ def get_my_usage(user=Depends(get_current_user), db: Session = Depends(get_db)):
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
-    limits = _limits_for(tenant.plan_tier)
+    limits = _limits_for_db(tenant.plan_tier, db)
+    tid = user["tenant_id"]
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    is_lifetime = limits.get("submissions_per_month") == -2
+    subs_used = (
+        db.query(func.count(Submission.id))
+        .filter(Submission.tenant_id == tid, Submission.server_received_at >= month_start)
+        .scalar() or 0
+    )
+    active_forms_count = (
+        db.query(func.count(Form.id))
+        .filter(Form.tenant_id == tid, Form.status == "active")
+        .scalar() or 0
+    )
+    users_count = (
+        db.query(func.count(User.id))
+        .filter(User.tenant_id == tid, User.is_active == True)
+        .scalar() or 0
+    )
+    admins_count = (
+        db.query(func.count(User.id))
+        .filter(User.tenant_id == tid, User.is_active == True, User.role == "org_admin")
+        .scalar() or 0
+    )
+    storage_bytes = (
+        db.query(func.sum(MediaFile.file_size_bytes))
+        .filter(MediaFile.tenant_id == tid)
+        .scalar() or 0
+    )
+    storage_used_mb = round(storage_bytes / (1024 * 1024), 2)
 
-    if is_lifetime:
-        subs_used = db.query(func.count(Submission.id)).filter(
-            Submission.tenant_id == user["tenant_id"],
-        ).scalar() or 0
-    else:
-        now = datetime.now(timezone.utc)
-        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        subs_used = db.query(func.count(Submission.id)).filter(
-            Submission.tenant_id == user["tenant_id"],
-            Submission.server_received_at >= month_start,
-        ).scalar() or 0
-
-    users_count = db.query(func.count(User.id)).filter(
-        User.tenant_id == user["tenant_id"],
-        User.is_active == True,
-    ).scalar() or 0
-
-    forms_count = db.query(func.count(Form.id)).filter(
-        Form.tenant_id == user["tenant_id"],
-    ).scalar() or 0
+    usage_rec = (
+        db.query(UsageRecord)
+        .filter(
+            UsageRecord.tenant_id == tid,
+            UsageRecord.period_year == now.year,
+            UsageRecord.period_month == now.month,
+        )
+        .first()
+    )
+    ai_reports_used = (usage_rec.ai_reports_used or 0) if usage_rec else 0
+    api_calls_used  = (getattr(usage_rec, "api_calls_used", 0) or 0) if usage_rec else 0
 
     return {
         "plan_tier": tenant.plan_tier,
         "limits": limits,
         "usage": {
             "submissions_this_month": subs_used,
-            "submissions_mode": "lifetime" if is_lifetime else "monthly",
-            "users": users_count,
-            "forms": forms_count,
+            "active_forms":          active_forms_count,
+            "storage_used_mb":       storage_used_mb,
+            "ai_reports_this_month": ai_reports_used,
+            "api_calls_this_month":  api_calls_used,
+            "users":                 users_count,
+            "admins":                admins_count,
         },
     }
 
@@ -202,10 +212,17 @@ def create_tenant(body: TenantCreate, user=Depends(require_master), db: Session 
     db.commit()
 
     from datetime import timedelta
-    from app.models.billing import Subscription
+    from app.models.billing import Subscription, Plan as BillingPlan
+    # Find the unified plan row for the requested tier; fall back to ngo_free
+    unified_plan = db.query(BillingPlan).filter(
+        BillingPlan.segment == "unified",
+        BillingPlan.tier == body.plan_tier,
+        BillingPlan.is_active == True,
+    ).first()
+    initial_plan_id = unified_plan.id if unified_plan else "ngo_free"
     trial_sub = Subscription(
         tenant_id=tenant.id,
-        plan_id="ngo_free",
+        plan_id=initial_plan_id,
         billing_cycle="monthly",
         status="trialing",
         trial_start=datetime.now(timezone.utc),
@@ -240,9 +257,38 @@ def update_tenant(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
-    for field, value in body.model_dump(exclude_unset=True).items():
+    updates = body.model_dump(exclude_unset=True)
+    new_plan_tier = updates.pop("plan_tier", None)
+
+    # Only master_admin may change plan_tier
+    if new_plan_tier and user["role"] != "master_admin":
+        raise HTTPException(status_code=403, detail="Only master admin can change plan tier")
+
+    for field, value in updates.items():
         if hasattr(tenant, field):
             setattr(tenant, field, value)
+
+    # When plan_tier changes, sync the Subscription row so both paths stay consistent
+    if new_plan_tier and new_plan_tier != tenant.plan_tier:
+        from app.models.billing import Subscription, Plan as BillingPlan
+        unified_plan = db.query(BillingPlan).filter(
+            BillingPlan.segment == "unified",
+            BillingPlan.tier == new_plan_tier,
+            BillingPlan.is_active == True,
+        ).first()
+        if unified_plan:
+            sub = db.query(Subscription).filter(Subscription.tenant_id == tenant.id).first()
+            if sub:
+                sub.plan_id = unified_plan.id
+            else:
+                from datetime import timedelta
+                db.add(Subscription(
+                    tenant_id=tenant.id,
+                    plan_id=unified_plan.id,
+                    billing_cycle="monthly",
+                    status="active",
+                ))
+        tenant.plan_tier = new_plan_tier
 
     db.commit()
     return {"id": str(tenant.id), "name": tenant.name}

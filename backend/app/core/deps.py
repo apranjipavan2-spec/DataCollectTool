@@ -99,11 +99,21 @@ def get_current_user_api_key(
     payload: dict = Depends(_get_api_key_payload),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Validate API key, set RLS tenant context, and return user payload."""
+    """Validate API key, set RLS tenant context, enforce API call limit, and return user payload."""
     tenant_id = payload.get("tenant_id")
     if not tenant_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing tenant")
     set_tenant_context(db, tenant_id)
+
+    from app.models.tenant import Tenant
+    from app.services.plan_enforcement import check_api_calls_limit, increment_api_calls
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if tenant:
+        result = check_api_calls_limit(db, tenant_id, tenant.plan_tier)
+        if not result["allowed"]:
+            raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=result["reason"])
+        increment_api_calls(db, tenant_id)
+
     return payload
 
 

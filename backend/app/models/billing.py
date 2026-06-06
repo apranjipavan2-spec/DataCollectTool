@@ -23,8 +23,11 @@ class Plan(Base):
     max_org_admins      = Column(Integer)
     max_supervisors     = Column(Integer)
     max_enumerators     = Column(Integer)
-    asr_minutes_limit   = Column(Integer, default=5)
-    translation_chars   = Column(Integer, default=3000)
+    asr_minutes_limit    = Column(Integer, default=5)
+    translation_chars    = Column(Integer, default=3000)
+    active_forms_limit   = Column(Integer)   # null = unlimited
+    ai_reports_per_month = Column(Integer)   # null = unlimited
+    api_calls_per_month  = Column(Integer)   # null = unlimited
 
     # Feature flags
     ai_cleaning         = Column(Boolean, default=False)
@@ -113,5 +116,6 @@ class UsageRecord(Base):
     ai_reports_used      = Column(Integer, default=0)
     ai_cleaning_runs     = Column(Integer, default=0)
     asr_minutes_used     = Column(Float, default=0.0)
+    api_calls_used       = Column(Integer, default=0)
 
     updated_at           = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

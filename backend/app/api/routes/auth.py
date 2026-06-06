@@ -252,10 +252,16 @@ def register(request: Request, body: RegisterRequest, db: Session = Depends(get_
     db.add(admin)
     db.flush()
 
-    # Assign free plan for chosen segment
+    # Assign the unified free plan; fall back to any available free plan if seed hasn't run yet
+    from app.models.billing import Plan as BillingPlan
+    free_plan = (
+        db.query(BillingPlan).filter(BillingPlan.id == "fg_free").first()
+        or db.query(BillingPlan).filter(BillingPlan.tier == "free", BillingPlan.is_active == True).first()
+    )
+    initial_plan_id = free_plan.id if free_plan else f"{segment}_free"
     trial_sub = Subscription(
         tenant_id=tenant.id,
-        plan_id=f"{segment}_free",
+        plan_id=initial_plan_id,
         billing_cycle="monthly",
         status="trialing",
         trial_start=datetime.now(timezone.utc),

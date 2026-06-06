@@ -116,10 +116,13 @@ def _activate_subscription(db: Session, tenant_id, plan_id: str, billing_cycle: 
         )
         db.add(sub)
 
-    # Mirror plan tier on tenant for quick reads
+    # Mirror plan tier on tenant for quick reads.
+    # We store the tier name (e.g. "starter"), not the plan_id (e.g. "fg_starter"),
+    # so that _limits_for_db(tenant.plan_tier, db) can resolve the right unified Plan row.
+    plan_row = db.query(Plan).filter(Plan.id == plan_id).first()
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
-    if tenant:
-        tenant.plan_tier = plan_id
+    if tenant and plan_row:
+        tenant.plan_tier = plan_row.tier   # e.g. "starter", "growth", "pro"
         tenant.subscription_status = "active"
 
     db.commit()
@@ -571,48 +574,198 @@ def admin_cancel_subscription(
     return {"message": "Subscription cancelled."}
 
 
-# ── Plan limit check helper (used by other routes) ────────────────────────────
+# ── Plan helpers (used by other routes) ──────────────────────────────────────
 
 def get_org_plan(tenant_id, db: Session) -> Plan:
-    """Return the current plan for an org (falls back to free plan)."""
+    """Return the Plan row for an org via its active Subscription.
+
+    Falls back to the ngo_free plan so callers always get a valid object.
+    Used by check_feature() for feature-flag enforcement.
+    Limit enforcement (submissions, forms, AI, storage, API) is handled by
+    app.services.plan_enforcement which reads from Tenant.plan_tier instead.
+    """
     sub = db.query(Subscription).filter(
         Subscription.tenant_id == tenant_id,
         Subscription.status.in_(["active", "trialing"]),
     ).first()
     plan_id = sub.plan_id if sub else "ngo_free"
     plan = db.query(Plan).filter(Plan.id == plan_id).first()
+    if plan is None:
+        plan = db.query(Plan).filter(Plan.id == "fg_free").first()
     return plan
 
 
-def get_org_usage(tenant_id, db: Session) -> UsageRecord:
-    """Return or create current month's usage record."""
-    now = datetime.now(timezone.utc)
-    usage = db.query(UsageRecord).filter(
-        UsageRecord.tenant_id    == tenant_id,
-        UsageRecord.period_year  == now.year,
-        UsageRecord.period_month == now.month,
-    ).first()
-    if not usage:
-        usage = UsageRecord(tenant_id=tenant_id, period_year=now.year, period_month=now.month)
-        db.add(usage); db.commit(); db.refresh(usage)
-    return usage
-
-
-def check_submission_limit(tenant_id, db: Session):
-    """Raise 402 if org has hit submission limit. Increment on success."""
-    plan  = get_org_plan(tenant_id, db)
-    usage = get_org_usage(tenant_id, db)
-    if plan.submissions_limit and usage.submissions_used >= plan.submissions_limit:
-        raise HTTPException(402, f"Submission limit reached ({plan.submissions_limit}/month). Please upgrade your plan.")
-    usage.submissions_used += 1
-    db.commit()
-
-
 def check_feature(tenant_id, feature: str, db: Session):
-    """Raise 403 if the org's plan doesn't include the feature."""
+    """Raise 403 if the org's active plan doesn't include the feature flag."""
     plan = get_org_plan(tenant_id, db)
     if plan is None or not getattr(plan, feature, False):
         raise HTTPException(403, f"Feature '{feature}' is not available on your current plan. Please upgrade.")
+
+
+# ── Admin: unified plan configuration (limits editable without a code deploy) ─
+
+UNIFIED_TIERS = ["free", "starter", "growth", "pro", "custom"]
+
+EDITABLE_PLAN_FIELDS = {
+    # Limits
+    "submissions_limit", "storage_limit_mb", "active_forms_limit",
+    "ai_reports_per_month", "api_calls_per_month",
+    "max_org_admins", "max_supervisors", "max_enumerators",
+    "asr_minutes_limit", "translation_chars",
+    # Pricing
+    "price_inr", "price_usd_cents",
+    # Feature flags
+    "ai_cleaning", "ai_writer", "ai_smart_builder", "ai_interpret", "ai_analyzer",
+    "map_view", "panel_study", "spss_export", "api_write", "webhooks",
+    "two_fa", "sso", "audit_log", "advanced_rbac", "white_label",
+    "on_premise", "priority_support",
+    # Meta
+    "name", "description", "is_active",
+}
+
+
+def _plan_to_admin_dict(p: Plan) -> dict:
+    return {
+        "id": p.id, "tier": p.tier, "segment": p.segment, "name": p.name,
+        "description": p.description, "is_active": p.is_active,
+        "price_inr": p.price_inr, "price_usd_cents": p.price_usd_cents,
+        "limits": {
+            "submissions_per_month": p.submissions_limit,
+            "storage_mb":            p.storage_limit_mb,
+            "active_forms":          p.active_forms_limit,
+            "ai_reports_per_month":  p.ai_reports_per_month,
+            "api_calls_per_month":   p.api_calls_per_month,
+            "max_org_admins":        p.max_org_admins,
+            "max_supervisors":       p.max_supervisors,
+            "max_enumerators":       p.max_enumerators,
+            "asr_minutes_limit":     p.asr_minutes_limit,
+            "translation_chars":     p.translation_chars,
+        },
+        "features": {
+            "ai_cleaning":     p.ai_cleaning,     "ai_writer":       p.ai_writer,
+            "ai_smart_builder":p.ai_smart_builder, "ai_interpret":    p.ai_interpret,
+            "ai_analyzer":     p.ai_analyzer,      "map_view":        p.map_view,
+            "panel_study":     p.panel_study,      "spss_export":     p.spss_export,
+            "api_write":       p.api_write,        "webhooks":        p.webhooks,
+            "two_fa":          p.two_fa,           "sso":             p.sso,
+            "audit_log":       p.audit_log,        "advanced_rbac":   p.advanced_rbac,
+            "white_label":     p.white_label,      "on_premise":      p.on_premise,
+            "priority_support":p.priority_support,
+        },
+    }
+
+
+@router.get("/admin/plans")
+def admin_list_plans(
+    user=Depends(require_role("master_admin")),
+    db: Session = Depends(get_db),
+):
+    """Return all plans grouped by segment — unified plans first.
+
+    The super-admin sees every column so they can edit limits directly.
+    Changes made via PATCH /billing/admin/plans/{plan_id} take effect immediately
+    in enforcement without a code deploy.
+    """
+    plans = db.query(Plan).order_by(Plan.segment, Plan.sort_order).all()
+    return [_plan_to_admin_dict(p) for p in plans]
+
+
+@router.patch("/admin/plans/{plan_id}")
+def admin_update_plan(
+    plan_id: str,
+    body: dict,
+    user=Depends(require_role("master_admin")),
+    db: Session = Depends(get_db),
+):
+    """Update any editable field on a Plan row.
+
+    For unified plans (segment='unified'), changes propagate to enforcement immediately —
+    no restart required.  Send only the fields you want to change.
+
+    Null/None values are interpreted as 'unlimited' for integer limit columns.
+    """
+    plan = db.query(Plan).filter(Plan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(404, "Plan not found")
+
+    unknown = set(body) - EDITABLE_PLAN_FIELDS
+    if unknown:
+        raise HTTPException(400, f"Unknown fields: {sorted(unknown)}")
+
+    for field, value in body.items():
+        setattr(plan, field, value)
+
+    db.commit()
+    db.refresh(plan)
+    return _plan_to_admin_dict(plan)
+
+
+@router.get("/public-pricing")
+def public_pricing(db: Session = Depends(get_db)):
+    """Return current unified plan pricing for the website pricing page.
+
+    No authentication required — intended for the public-facing website to fetch
+    live pricing so the super-admin's DB changes reflect on the site instantly.
+    """
+    plans = (
+        db.query(Plan)
+        .filter(Plan.segment == "unified", Plan.is_active == True)
+        .order_by(Plan.sort_order)
+        .all()
+    )
+    if not plans:
+        # Seed hasn't run yet — return hardcoded defaults so the site doesn't break
+        from app.core.plan_limits import PLAN_LIMITS
+        return [
+            {
+                "tier": tier,
+                "limits": PLAN_LIMITS.get(tier, {}),
+                "price_inr": {"free": 0, "starter": 6999, "growth": 12999, "pro": 24999, "custom": 0}.get(tier, 0),
+            }
+            for tier in ["free", "starter", "growth", "pro", "custom"]
+        ]
+
+    return [
+        {
+            "id": p.id,
+            "tier": p.tier,
+            "name": p.name,
+            "description": p.description,
+            "price_inr": p.price_inr,
+            "price_usd_cents": p.price_usd_cents,
+            "billing": {
+                cycle: {
+                    "discount_pct": disc,
+                    "months": CYCLE_MONTHS[cycle],
+                    "total_inr": _calc_amount(p, cycle),
+                    "monthly_effective_inr": (
+                        int(_calc_amount(p, cycle) / CYCLE_MONTHS[cycle]) if p.price_inr else 0
+                    ),
+                }
+                for cycle, disc in CYCLE_DISCOUNT.items()
+            },
+            "limits": {
+                "submissions_per_month": p.submissions_limit,
+                "storage_mb":            p.storage_limit_mb,
+                "active_forms":          p.active_forms_limit,
+                "ai_reports_per_month":  p.ai_reports_per_month,
+                "api_calls_per_month":   p.api_calls_per_month,
+                "max_org_admins":        p.max_org_admins,
+            },
+            "features": {
+                "ai_cleaning":     p.ai_cleaning,     "ai_writer":        p.ai_writer,
+                "ai_smart_builder":p.ai_smart_builder, "ai_interpret":     p.ai_interpret,
+                "ai_analyzer":     p.ai_analyzer,      "map_view":         p.map_view,
+                "panel_study":     p.panel_study,      "spss_export":      p.spss_export,
+                "api_write":       p.api_write,        "webhooks":         p.webhooks,
+                "two_fa":          p.two_fa,           "sso":              p.sso,
+                "audit_log":       p.audit_log,        "advanced_rbac":    p.advanced_rbac,
+                "white_label":     p.white_label,      "on_premise":       p.on_premise,
+                "priority_support":p.priority_support,
+            },
+        }
+        for p in plans
+    ]
 
 
 # ── Reseller / Partner Program ────────────────────────────────────────────────

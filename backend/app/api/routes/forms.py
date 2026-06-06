@@ -170,19 +170,7 @@ def list_forms(
 @router.post("/", status_code=status.HTTP_201_CREATED)
 @limiter.limit("20/minute")
 def create_form(request: Request, body: FormCreate, user=Depends(require_org_admin), db: Session = Depends(get_db)):
-    # Enforce plan form limit
-    from app.api.routes.tenants import PLAN_LIMITS
-    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
-    if tenant:
-        limit = PLAN_LIMITS.get(tenant.plan_tier, PLAN_LIMITS["free"])["forms"]
-        if limit >= 0:
-            current_count = db.query(func.count(Form.id)).filter(Form.tenant_id == user["tenant_id"]).scalar() or 0
-            if current_count >= limit:
-                raise HTTPException(
-                    status_code=402,
-                    detail=f"Form limit reached ({current_count}/{limit}). Upgrade your plan to create more forms.",
-                )
-
+    # Forms are created as drafts — the active-forms limit is checked at activation time.
     form = Form(
         tenant_id=user["tenant_id"],
         title=body.title,
@@ -233,6 +221,14 @@ def update_form(form_id: str, body: FormUpdate, user=Depends(require_org_admin),
         _snapshot_version(db, form)
 
     if body.status is not None:
+        # Enforce active-forms limit when activating a non-active form
+        if body.status == "active" and form.status != "active":
+            from app.services.plan_enforcement import check_active_forms_limit
+            tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+            if tenant:
+                result = check_active_forms_limit(db, str(user["tenant_id"]), tenant.plan_tier)
+                if not result["allowed"]:
+                    raise HTTPException(status_code=402, detail=result["reason"])
         form.status = body.status
 
     if "allow_enumerator_edit" in body.model_fields_set:
