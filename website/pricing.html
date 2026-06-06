@@ -397,21 +397,21 @@
           <th class="col-fg">
             <div class="mh-badge ph">·</div>
             <div class="mh-name">Starter</div>
-            <div class="mh-price"><span class="price-monthly">₹6,999</span><span class="price-6month">₹6,299</span><span class="price-annual">₹5,833</span><span class="price-3year">₹4,899</span> <small>/mo</small></div>
+            <div class="mh-price"><span class="price-monthly" id="price-starter-monthly">₹6,999</span><span class="price-6month" id="price-starter-6month">₹6,299</span><span class="price-annual" id="price-starter-annual">₹5,833</span><span class="price-3year" id="price-starter-3year">₹4,899</span> <small>/mo</small></div>
             <div class="mh-tag">Small teams &amp; pilots</div>
             <a href="https://app.fieldgovern.com/login" class="mx-cta pri">Get Started</a>
           </th>
           <th class="col-fg">
             <div class="mh-badge pop">Most popular</div>
             <div class="mh-name">Growth</div>
-            <div class="mh-price"><span class="price-monthly">₹12,999</span><span class="price-6month">₹11,699</span><span class="price-annual">₹10,833</span><span class="price-3year">₹9,099</span> <small>/mo</small></div>
+            <div class="mh-price"><span class="price-monthly" id="price-growth-monthly">₹12,999</span><span class="price-6month" id="price-growth-6month">₹11,699</span><span class="price-annual" id="price-growth-annual">₹10,833</span><span class="price-3year" id="price-growth-3year">₹9,099</span> <small>/mo</small></div>
             <div class="mh-tag">Growing research &amp; M&amp;E teams</div>
             <a href="https://app.fieldgovern.com/login" class="mx-cta pri">Get Started</a>
           </th>
           <th class="col-fg">
             <div class="mh-badge ph">·</div>
             <div class="mh-name">Pro</div>
-            <div class="mh-price"><span class="price-monthly">₹24,999</span><span class="price-6month">₹22,499</span><span class="price-annual">₹20,833</span><span class="price-3year">₹17,499</span> <small>/mo</small></div>
+            <div class="mh-price"><span class="price-monthly" id="price-pro-monthly">₹24,999</span><span class="price-6month" id="price-pro-6month">₹22,499</span><span class="price-annual" id="price-pro-annual">₹20,833</span><span class="price-3year" id="price-pro-3year">₹17,499</span> <small>/mo</small></div>
             <div class="mh-tag">High-volume, multi-project teams</div>
             <a href="https://app.fieldgovern.com/login" class="mx-cta pri">Get Started</a>
           </th>
@@ -425,12 +425,12 @@
         </tr>
       </thead>
       <tbody>
-        <tr><td class="row-h"><div class="rh-name">Submissions / month</div></td><td class="mx-num">300</td><td class="col-fg mx-num">2,000</td><td class="col-fg mx-num">5,000</td><td class="col-fg mx-num">25,000</td><td class="mx-num">Unlimited</td></tr>
-        <tr><td class="row-h"><div class="rh-name">Storage</div></td><td class="mx-num">50 MB</td><td class="col-fg mx-num">500 MB</td><td class="col-fg mx-num">5 GB</td><td class="col-fg mx-num">10 GB</td><td class="mx-num">Unlimited</td></tr>
-        <tr><td class="row-h"><div class="rh-name">Admins / PMs</div></td><td class="mx-num">1</td><td class="col-fg mx-num">2</td><td class="col-fg mx-num">5</td><td class="col-fg mx-num">20</td><td class="mx-num">Unlimited</td></tr>
-        <tr><td class="row-h"><div class="rh-name">Active forms</div><div class="rh-desc">Total questionnaires actively collecting data on the account at the same time.</div></td><td class="mx-num">2</td><td class="col-fg mx-num">8</td><td class="col-fg mx-num">20</td><td class="col-fg mx-num">100</td><td class="mx-num">Unlimited</td></tr>
-        <tr><td class="row-h"><div class="rh-name">AI reports / mo</div><div class="rh-desc">FG Writer donor &amp; research reports generated per month.</div></td><td class="mx-num">0</td><td class="col-fg mx-num">8</td><td class="col-fg mx-num">30</td><td class="col-fg mx-num">100</td><td class="mx-num">Unlimited</td></tr>
-        <tr><td class="row-h"><div class="rh-name">API calls / mo</div><div class="rh-desc">REST API requests across all integrations.</div></td><td class="mx-num">0</td><td class="col-fg mx-num">3,000</td><td class="col-fg mx-num">10,000</td><td class="col-fg mx-num">25,000</td><td class="mx-num">Unlimited</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Submissions / month</div></td><td class="mx-num">300</td><td class="col-fg mx-num" id="lim-starter-subs">2,000</td><td class="col-fg mx-num" id="lim-growth-subs">5,000</td><td class="col-fg mx-num" id="lim-pro-subs">25,000</td><td class="mx-num">Unlimited</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Storage</div></td><td class="mx-num">50 MB</td><td class="col-fg mx-num" id="lim-starter-storage">500 MB</td><td class="col-fg mx-num" id="lim-growth-storage">5 GB</td><td class="col-fg mx-num" id="lim-pro-storage">10 GB</td><td class="mx-num">Unlimited</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Admins / PMs</div></td><td class="mx-num">1</td><td class="col-fg mx-num" id="lim-starter-admins">2</td><td class="col-fg mx-num" id="lim-growth-admins">5</td><td class="col-fg mx-num" id="lim-pro-admins">20</td><td class="mx-num">Unlimited</td></tr>
+        <tr><td class="row-h"><div class="rh-name">Active forms</div><div class="rh-desc">Total questionnaires actively collecting data on the account at the same time.</div></td><td class="mx-num">2</td><td class="col-fg mx-num" id="lim-starter-forms">8</td><td class="col-fg mx-num" id="lim-growth-forms">20</td><td class="col-fg mx-num" id="lim-pro-forms">100</td><td class="mx-num">Unlimited</td></tr>
+        <tr><td class="row-h"><div class="rh-name">AI reports / mo</div><div class="rh-desc">FG Writer donor &amp; research reports generated per month.</div></td><td class="mx-num">0</td><td class="col-fg mx-num" id="lim-starter-ai">8</td><td class="col-fg mx-num" id="lim-growth-ai">30</td><td class="col-fg mx-num" id="lim-pro-ai">100</td><td class="mx-num">Unlimited</td></tr>
+        <tr><td class="row-h"><div class="rh-name">API calls / mo</div><div class="rh-desc">REST API requests across all integrations.</div></td><td class="mx-num">0</td><td class="col-fg mx-num" id="lim-starter-api">3,000</td><td class="col-fg mx-num" id="lim-growth-api">10,000</td><td class="col-fg mx-num" id="lim-pro-api">25,000</td><td class="mx-num">Unlimited</td></tr>
         <tr><td class="row-h"><div class="rh-name">List of inputs</div><div class="rh-desc">Pre-loaded reference lists (rosters, beneficiaries, cascading options).</div></td><td class="mx-num">100</td><td class="col-fg mx-num">500</td><td class="col-fg mx-num">800</td><td class="col-fg mx-num">1,000</td><td class="mx-num">Custom</td></tr>
         <tr><td class="row-h"><div class="rh-name">Question types</div></td><td class="mx-num">10</td><td class="col-fg mx-num">All</td><td class="col-fg mx-num">All</td><td class="col-fg mx-num">All</td><td class="mx-num">All</td></tr>
         <tr><td class="row-h"><div class="rh-name">Map View</div></td><td><span class="no">✕</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td class="col-fg"><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
@@ -647,6 +647,54 @@
 
   // Init: show monthly prices
   setCycle('monthly');
+
+  // Dynamic pricing — fetch live plan data from the backend
+  const _FG_API = 'https://app.fieldgovern.com/api/v1';
+  function _fmtPrice(n) { return '₹' + n.toLocaleString('en-IN'); }
+  function _fmtLimit(val, key) {
+    if (val === null || val === undefined || val === -1) return 'Unlimited';
+    if (val === 0) return '0';
+    if (key === 'storage_mb') return val >= 1024 ? (val / 1024) + ' GB' : val + ' MB';
+    return val.toLocaleString('en-IN');
+  }
+  async function loadPricing() {
+    try {
+      const res = await fetch(_FG_API + '/billing/public-pricing');
+      if (!res.ok) return;
+      const plans = await res.json();
+      const byTier = {};
+      plans.forEach(function(p) { byTier[p.tier] = p; });
+      ['starter', 'growth', 'pro'].forEach(function(tier) {
+        var p = byTier[tier];
+        if (!p) return;
+        // Update prices per billing cycle
+        ['monthly', '6month', 'annual', '3year'].forEach(function(cycle) {
+          var el = document.getElementById('price-' + tier + '-' + cycle);
+          if (el && p.billing && p.billing[cycle] && p.billing[cycle].monthly_effective_inr) {
+            el.textContent = _fmtPrice(p.billing[cycle].monthly_effective_inr);
+          }
+        });
+        // Update limit cells
+        if (p.limits) {
+          var L = p.limits;
+          var cells = [
+            ['lim-' + tier + '-subs',    L.submissions_per_month, 'submissions_per_month'],
+            ['lim-' + tier + '-storage', L.storage_mb,            'storage_mb'],
+            ['lim-' + tier + '-admins',  L.max_org_admins,        'admins'],
+            ['lim-' + tier + '-forms',   L.active_forms,          'active_forms'],
+            ['lim-' + tier + '-ai',      L.ai_reports_per_month,  'ai_reports_per_month'],
+            ['lim-' + tier + '-api',     L.api_calls_per_month,   'api_calls_per_month'],
+          ];
+          cells.forEach(function(c) {
+            var el = document.getElementById(c[0]);
+            if (el) el.textContent = _fmtLimit(c[1], c[2]);
+          });
+        }
+      });
+      setCycle(currentCycle);
+    } catch (e) { /* API unavailable — static fallback HTML stays */ }
+  }
+  loadPricing();
 
   // Animate the pricing matrix: reveal on scroll + staggered rows
   (function(){
