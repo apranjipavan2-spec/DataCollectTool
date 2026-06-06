@@ -26,8 +26,9 @@ router = APIRouter(prefix="/billing", tags=["billing"])
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
-CYCLE_DISCOUNT = {"monthly": 0, "6month": 10, "annual": 20, "3year": 30}
-CYCLE_MONTHS   = {"monthly": 1, "6month": 6,  "annual": 12, "3year": 36}
+CYCLE_DISCOUNT     = {"monthly": 0, "6month": 0, "annual": 0, "3year": 0}
+CYCLE_MONTHS       = {"monthly": 1, "6month": 6, "annual": 12, "3year": 36}
+CYCLE_BONUS_MONTHS = {"monthly": 0, "6month": 0, "annual": 2,  "3year": 6}
 
 _PAYMENT_DEFAULTS = {
     "upi_id":         "fieldgovernindia@upi",
@@ -84,12 +85,16 @@ def _order_ref() -> str:
 
 
 def _calc_amount(plan: Plan, billing_cycle: str) -> int:
-    """Return total amount in INR (not paise) for the chosen billing cycle."""
-    discount = CYCLE_DISCOUNT.get(billing_cycle, 0)
-    months   = CYCLE_MONTHS.get(billing_cycle, 1)
-    monthly  = plan.price_inr   # stored in INR directly
-    total    = monthly * months
-    return int(total * (1 - discount / 100))
+    """Return total amount in INR for the chosen billing cycle.
+
+    paid_months = total_months - bonus_months (e.g. annual: pay 10, get 12)
+    price_discount reduces the per-month amount on top (currently 0 for all cycles).
+    """
+    months      = CYCLE_MONTHS.get(billing_cycle, 1)
+    bonus       = CYCLE_BONUS_MONTHS.get(billing_cycle, 0)
+    discount    = CYCLE_DISCOUNT.get(billing_cycle, 0)
+    paid_months = months - bonus
+    return int(plan.price_inr * paid_months * (1 - discount / 100))
 
 
 def _activate_subscription(db: Session, tenant_id, plan_id: str, billing_cycle: str, amount: int, discount: int):
@@ -155,8 +160,10 @@ def list_plans(db: Session = Depends(get_db)):
             },
             "billing": {
                 cycle: {
-                    "discount_pct": disc,
                     "months": CYCLE_MONTHS[cycle],
+                    "bonus_months": CYCLE_BONUS_MONTHS[cycle],
+                    "paid_months": CYCLE_MONTHS[cycle] - CYCLE_BONUS_MONTHS[cycle],
+                    "price_discount_pct": disc,
                     "total_inr": _calc_amount(p, cycle),
                     "monthly_effective_inr": (
                         int(_calc_amount(p, cycle) / CYCLE_MONTHS[cycle]) if p.price_inr > 0 else 0
