@@ -391,7 +391,7 @@
   <div class="calc-inputs-top">
     <div class="calc-fields">
       <div class="calc-field">
-        <label>Admins / projects <span class="hint">project managers</span></label>
+        <label>Active forms <span class="hint">collecting data now</span></label>
         <input id="ci-programs" type="number" min="1" value="2"/>
       </div>
       <div class="calc-field">
@@ -711,11 +711,11 @@
     requestAnimationFrame(step);
   }
   // Recommend the plan that genuinely fits the user's volume (real pricing.html caps,
-  // gated by both submissions/month AND admins/PMs). No upselling.
+  // gated by both submissions/month AND active forms). No upselling.
   function recommendPlan(subsPerMonth, programs){
-    if (subsPerMonth <= 2000  && programs <= 2)  return {name:'Starter', price:6999};
-    if (subsPerMonth <= 5000  && programs <= 5)  return {name:'Growth',  price:12999};
-    if (subsPerMonth <= 25000 && programs <= 10) return {name:'Pro',     price:24999};
+    if (subsPerMonth <= 2000  && programs <= 8)   return {name:'Starter', price:6999};
+    if (subsPerMonth <= 5000  && programs <= 20)  return {name:'Growth',  price:12999};
+    if (subsPerMonth <= 25000 && programs <= 100) return {name:'Pro',     price:24999};
     return {name:'Custom', price:null};
   }
   function calcCost(){
