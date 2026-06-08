@@ -469,6 +469,9 @@ export default function App() {
     const token = params.get('token');
     if (!fgUrl || !token) return;
     setFgContext({ fgUrl, token, programId: programId || undefined });
+    // Strip query params from the URL bar — keeps the JWT out of browser history
+    // and the address clean on startup.
+    window.history.replaceState(null, '', window.location.pathname);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
