@@ -60,16 +60,11 @@ const FEATURE_LABELS: Partial<Record<keyof PlanFeatures, string>> = {
   white_label: 'White-Label Reports', priority_support: 'Priority Support',
 }
 
-const SEGMENT_LABELS: Record<string, string> = {
-  ngo: 'NGO / Social Impact', govt: 'Government', research: 'Research', corporate: 'Corporate'
-}
-
 export default function SubscriptionPage() {
   const user  = getStoredUser()
   const toast = useToast()
 
   const [plans,     setPlans]     = useState<Plan[]>([])
-  const [segment,   setSegment]   = useState('ngo')
   const [cycle,     setCycle]     = useState('monthly')
   const [loading,   setLoading]   = useState(false)
   const [paymentCfg, setPaymentCfg] = useState<Record<string, string>>({})
@@ -91,7 +86,9 @@ export default function SubscriptionPage() {
     api.get('/billing/payment-config').then(r => setPaymentCfg(r.data)).catch(() => {})
   }, [])
 
-  const segmentPlans = plans.filter(p => p.segment === segment && p.tier !== 'enterprise')
+  // Show the single unified plan set (Free / Starter / Growth / Pro) — the same
+  // plans the marketing pricing page renders. 'custom' is shown as the CTA card.
+  const displayPlans = plans.filter(p => p.segment === 'unified' && p.tier !== 'custom')
 
   const requestPayment = async (plan: Plan) => {
     setLoading(true)
@@ -123,6 +120,7 @@ export default function SubscriptionPage() {
 
   const tierBadge = (tier: string) => {
     const cls = tier === 'growth' ? 'bg-catalan-primary/10 text-catalan-primary border-catalan-primary/20'
+      : tier === 'pro' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20'
       : tier === 'starter' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
       : 'bg-catalan-hover text-catalan-textMuted border-catalan-border'
     return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${cls}`}>{tier.toUpperCase()}</span>
@@ -178,18 +176,6 @@ export default function SubscriptionPage() {
             </div>
           </div>
 
-          {/* Segment tabs */}
-          <div className="flex gap-1 border-b border-catalan-border">
-            {Object.entries(SEGMENT_LABELS).map(([k, v]) => (
-              <button key={k} onClick={() => setSegment(k)}
-                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                  segment === k ? 'border-catalan-primary text-catalan-primary' : 'border-transparent text-catalan-textMuted hover:text-catalan-text'
-                }`}>
-                {v}
-              </button>
-            ))}
-          </div>
-
           {/* Billing cycle toggle */}
           <div className="flex gap-2 items-center flex-wrap">
             <span className="text-xs text-catalan-textMuted">Billing cycle:</span>
@@ -208,7 +194,7 @@ export default function SubscriptionPage() {
 
           {/* Plan cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {segmentPlans.map(plan => {
+            {displayPlans.map(plan => {
               const billing = plan.billing[cycle]
               const isFree  = plan.tier === 'free'
               const isGrowth= plan.tier === 'growth'
@@ -300,27 +286,28 @@ export default function SubscriptionPage() {
               )
             })}
 
-            {/* Enterprise CTA */}
+            {/* Custom / pay-as-you-go CTA — matches the marketing pricing page */}
             <div className={`${card} flex flex-col gap-3 border-dashed`}>
-              <div className="text-base font-bold text-catalan-text">Enterprise</div>
-              <div className="text-xs text-catalan-textMuted">Custom volume, SSO, on-premise, white-label, DPDP compliance, dedicated support.</div>
-              <div className="text-2xl font-bold text-catalan-text">Custom</div>
+              <div className="text-base font-bold text-catalan-text">Custom</div>
+              <div className="text-xs text-catalan-textMuted">Pay-as-you-go, metered by submissions, schedules, or project. Everything unlocked — SSO, on-premise, white-label, DPDP compliance, dedicated support.</div>
+              <div className="text-2xl font-bold text-catalan-text">Talk to us</div>
               <div className="space-y-1 text-xs text-catalan-textMuted">
                 <div>✓ Unlimited submissions & storage</div>
                 <div>✓ All AI features</div>
                 <div>✓ SSO + Audit log + On-premise</div>
                 <div>✓ Dedicated CSM + Priority SLA</div>
               </div>
-              <a href="mailto:pallavi@dataworx.co.in?subject=FieldGovern Enterprise Enquiry"
+              <a href="https://wa.me/918088709011?text=Hi%2C%20I%27d%20like%20a%20Custom%20FieldGovern%20quote."
+                target="_blank" rel="noopener noreferrer"
                 className={`${btnSe} text-center mt-auto`}>
-                Contact Sales →
+                Talk to Us →
               </a>
             </div>
           </div>
 
           {/* 1-month free trial note */}
           <p className="text-xs text-catalan-textMuted text-center">
-            All paid plans include a <b>1-month free trial</b> — full access, no payment required upfront. · INR billing · GST invoice provided.
+            All paid plans include a <b>15-day free trial</b> — full access, no card required. · All prices +18% GST · INR billing · GST invoice provided.
             {' '}<a href="/pricing.html" target="_blank" rel="noopener noreferrer"
               className="text-catalan-primary hover:underline font-medium">
               Compare all plans →
