@@ -1968,6 +1968,12 @@ const _fgToken     = _fgParams.get('token');
 const _fgProgId    = _fgParams.get('program_id');
 let   _fgProgramId = _fgProgId;   // updated when user selects a program
 
+// Strip query params (incl. the JWT) from the URL bar once captured — keeps the
+// token out of browser history and shows a clean short URL on startup.
+if (_fgToken || _tfHandoffId) {
+  window.history.replaceState(null, '', window.location.pathname);
+}
+
 // Wire logo link to FG dashboard
 if (_fgUrl) {
   const _homeLink = document.getElementById('fgHomeLink');
@@ -2017,17 +2023,36 @@ async function fgLoadData(programId, questionnaireId) {
 
   // Fetch programs
   let programs = [];
+  let progError = '';
   try {
     const r = await fetch(BASE_URL + '/api/fg/programs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken }),
     });
-    programs = await r.json();
-    if (!Array.isArray(programs)) programs = [];
-  } catch { programs = []; }
+    const payload = await r.json();
+    if (Array.isArray(payload)) {
+      programs = payload;
+    } else {
+      // Proxy/API returned an error object instead of a list — surface it.
+      progError = (payload && (payload.error || payload.detail)) || `Request failed (HTTP ${r.status})`;
+    }
+  } catch (e) { progError = 'Could not reach FieldGovern: ' + e; }
 
   const box = document.getElementById('fgSelector');
   if (!box) return;
+
+  // No programs → tell the user why instead of showing a blank dropdown.
+  if (!programs.length) {
+    const note = document.createElement('div');
+    note.className = 'fg-field';
+    note.style.cssText = 'font-size:13px;color:#b45309;line-height:1.5';
+    note.innerHTML = progError
+      ? `⚠️ Couldn't load programs: ${progError}`
+      : '⚠️ No programs found for this account. The cleaner opened with a platform/master-admin login, which has no program data — sign in to the organisation that owns the programs to use it here.';
+    box.appendChild(note);
+    if (progError) toast(progError, 'error');
+    return;
+  }
 
   // Program field
   const progField = document.createElement('div');

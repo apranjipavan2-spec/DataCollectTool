@@ -5,16 +5,31 @@ import uuid
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Header, Query
+from fastapi import APIRouter, HTTPException, Header, Query, Depends
 from pydantic import BaseModel
 import pandas as pd
 
 from ..shared import (datasets, custom_metrics, audit_logs, annotations,
                       column_roles, study_designs,
                       PROJECTS_DIR, CACHE_DIR, EXPORTS_DIR,
-                      sanitize_for_json, add_audit_log, get_user_projects_dir, is_super_admin)
+                      sanitize_for_json, add_audit_log, get_user_projects_dir, is_super_admin,
+                      verify_fg_identity)
 
 router = APIRouter()
+
+
+async def current_identity(
+    authorization: Optional[str] = Header(None),
+    x_fg_base_url: Optional[str] = Header(None),
+) -> dict:
+    """Verified caller identity. The id and role come ONLY from a valid FG token,
+    so they cannot be spoofed via headers or leaked through stale browser state.
+    Returns {"id": None, "role": None} when unauthenticated."""
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    identity = await verify_fg_identity(token, x_fg_base_url)
+    return identity or {"id": None, "role": None}
 
 
 class ProjectData(BaseModel):
@@ -24,12 +39,14 @@ class ProjectData(BaseModel):
 
 
 @router.post("/api/project/save")
-async def save_project(project: ProjectData, x_user_id: Optional[str] = Header(None), x_user_role: Optional[str] = Header(None)):
+async def save_project(project: ProjectData, ident: dict = Depends(current_identity)):
+    if not ident["id"]:
+        raise HTTPException(status_code=401, detail="Sign in to save projects")
     project_id = str(uuid.uuid4())
     safe_name = "".join(c for c in project.name if c.isalnum() or c in " _-").strip()
     if not safe_name:
         safe_name = "project"
-    projects_dir = get_user_projects_dir(x_user_id)
+    projects_dir = get_user_projects_dir(ident["id"])
     filepath = projects_dir / f"{safe_name}.tableforge"
     timestamp = datetime.now().isoformat()
 
@@ -118,7 +135,7 @@ async def save_project(project: ProjectData, x_user_id: Optional[str] = Header(N
 
 
 @router.get("/api/projects")
-async def list_projects(x_user_id: Optional[str] = Header(None), x_user_role: Optional[str] = Header(None)):
+async def list_projects(ident: dict = Depends(current_identity)):
     projects = []
 
     def scan_dir(d: Path):
@@ -137,17 +154,17 @@ async def list_projects(x_user_id: Optional[str] = Header(None), x_user_role: Op
             except Exception:
                 pass
 
-    if is_super_admin(x_user_role):
+    if is_super_admin(ident["role"]):
         scan_dir(PROJECTS_DIR)
         for user_dir in PROJECTS_DIR.iterdir():
             if user_dir.is_dir():
                 scan_dir(user_dir)
-    elif x_user_id:
-        user_dir = get_user_projects_dir(x_user_id)
+    elif ident["id"]:
+        user_dir = get_user_projects_dir(ident["id"])
         scan_dir(user_dir)
-    # No x_user_id and not super_admin → return empty rather than scanning
-    # the root, which previously leaked super_admin's projects to every
-    # caller that omitted the X-User-Id header.
+    # Unauthenticated (no verified token) → return empty. Identity is never taken
+    # from headers, so a stale or spoofed X-User-Id can no longer surface another
+    # user's (or super_admin's) projects.
 
     return {"projects": sorted(projects, key=lambda p: p.get("created", ""), reverse=True), "projects_dir": str(PROJECTS_DIR)}
 
@@ -158,14 +175,14 @@ class ProjectRenameRequest(BaseModel):
 
 
 @router.post("/api/project/rename")
-async def rename_project(req: ProjectRenameRequest, x_user_id: Optional[str] = Header(None), x_user_role: Optional[str] = Header(None)):
+async def rename_project(req: ProjectRenameRequest, ident: dict = Depends(current_identity)):
     p = Path(req.path)
     if not p.exists():
         raise HTTPException(404, "Project not found")
-    if not is_super_admin(x_user_role):
-        if not x_user_id:
+    if not is_super_admin(ident["role"]):
+        if not ident["id"]:
             raise HTTPException(401, "Authentication required")
-        user_dir = get_user_projects_dir(x_user_id)
+        user_dir = get_user_projects_dir(ident["id"])
         if not str(p.resolve()).startswith(str(user_dir.resolve())):
             raise HTTPException(403, "Access denied")
 
@@ -192,14 +209,14 @@ class ProjectDeleteRequest(BaseModel):
 
 
 @router.post("/api/project/delete")
-async def delete_project(req: ProjectDeleteRequest, x_user_id: Optional[str] = Header(None), x_user_role: Optional[str] = Header(None)):
+async def delete_project(req: ProjectDeleteRequest, ident: dict = Depends(current_identity)):
     p = Path(req.path)
     if not p.exists():
         raise HTTPException(404, "Project not found")
-    if not is_super_admin(x_user_role):
-        if not x_user_id:
+    if not is_super_admin(ident["role"]):
+        if not ident["id"]:
             raise HTTPException(401, "Authentication required")
-        user_dir = get_user_projects_dir(x_user_id)
+        user_dir = get_user_projects_dir(ident["id"])
         if not str(p.resolve()).startswith(str(user_dir.resolve())):
             raise HTTPException(403, "Access denied")
 
@@ -324,14 +341,14 @@ async def rollback_project(req: RollbackRequest):
 
 
 @router.get("/api/project/load")
-async def load_project(path: str, password: Optional[str] = None, x_user_id: Optional[str] = Header(None), x_user_role: Optional[str] = Header(None)):
+async def load_project(path: str, password: Optional[str] = None, ident: dict = Depends(current_identity)):
     p = Path(path)
     if not p.exists():
         raise HTTPException(404, "Project file not found")
-    if not is_super_admin(x_user_role):
-        if not x_user_id:
+    if not is_super_admin(ident["role"]):
+        if not ident["id"]:
             raise HTTPException(401, "Authentication required")
-        user_dir = get_user_projects_dir(x_user_id)
+        user_dir = get_user_projects_dir(ident["id"])
         if not str(p.resolve()).startswith(str(user_dir.resolve())):
             raise HTTPException(403, "Access denied: you can only access your own projects")
     raw = json.loads(p.read_text())

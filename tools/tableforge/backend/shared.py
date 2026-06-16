@@ -50,6 +50,62 @@ def is_super_admin(role: Optional[str]) -> bool:
     return role == SUPER_ADMIN_ROLE
 
 
+# ── Authenticated identity ────────────────────────────────────────────────────
+# Identity (user id + role) must come from a verified FieldGovern JWT — NEVER from
+# client-supplied X-User-Id / X-User-Role headers, which are trivially spoofable
+# and leak across users via stale browser storage. We resolve the token against
+# FieldGovern's own /users/me, so FG remains the single source of truth.
+_identity_cache: dict = {}   # token -> (expires_at, {"id", "role"})
+_IDENTITY_TTL = 60           # seconds — short, so role/account changes propagate
+
+
+def _resolve_fg_base(fg_base_url: Optional[str]) -> str:
+    """Pick the host we trust to answer 'who is this token?'. Prefer a
+    server-configured FG URL; only fall back to the client-provided base when no
+    env is set. Hardened deployments should set FG_INTERNAL_URL so the identity
+    authority can never be pointed at an attacker-controlled server."""
+    for env in ("FG_INTERNAL_URL", "FG_PUBLIC_URL"):
+        val = os.environ.get(env, "").rstrip("/")
+        if val:
+            return val
+    return (fg_base_url or "").rstrip("/")
+
+
+async def verify_fg_identity(token: Optional[str], fg_base_url: Optional[str] = None) -> Optional[dict]:
+    """Return {"id", "role"} for a valid FG token, or None if unauthenticated."""
+    import time
+    import httpx
+
+    if not token:
+        return None
+    now = time.time()
+    cached = _identity_cache.get(token)
+    if cached and cached[0] > now:
+        return cached[1]
+
+    base = _resolve_fg_base(fg_base_url)
+    if not base:
+        return None
+    internal = bool(os.environ.get("FG_INTERNAL_URL", "").strip())
+    try:
+        async with httpx.AsyncClient(timeout=15.0, verify=bool(not internal)) as client:
+            resp = await client.get(f"{base}/api/v1/users/me",
+                                    headers={"Authorization": f"Bearer {token}"})
+    except Exception:
+        return None
+    if resp.status_code != 200:
+        return None
+    try:
+        data = resp.json()
+    except Exception:
+        return None
+    identity = {"id": str(data.get("id") or ""), "role": data.get("role") or ""}
+    if not identity["id"]:
+        return None
+    _identity_cache[token] = (now + _IDENTITY_TTL, identity)
+    return identity
+
+
 def sanitize_for_json(obj):
     """Recursively convert any value to a JSON-safe primitive.
 
