@@ -437,27 +437,35 @@ export default function FieldApp() {
   useEffect(() => {
     const loadForms = async () => {
       try {
-        const store = await getStorage()
-        const outbox = await store.getOutbox()
-        const pendingMedia = await store.getMediaQueueCount()
-        const allMedia = await store.getMediaQueue()
-        setOutboxCount(outbox.length)
-        setMediaQueueCount(pendingMedia)
-        const failedMedia = allMedia.filter(m => m.status === 'failed')
-        setFailedMediaCount(failedMedia.length)
-        // Auto-reset failed media to pending on every startup so they retry automatically
-        if (failedMedia.length > 0 && navigator.onLine) {
-          for (const item of failedMedia) await store.updateMediaStatus(item.id, 'pending')
-          setFailedMediaCount(0)
-        }
-        if ((outbox.length > 0 || pendingMedia > 0 || failedMedia.length > 0) && navigator.onLine) syncToServer()
-
-        // Storage quota warning
+        // Storage (OPFS/wa-sqlite) init can fail independently of the network —
+        // e.g. a CSP that blocks WASM. Isolate it so a storage failure never
+        // prevents the form list from loading from the server.
+        let store: Awaited<ReturnType<typeof getStorage>> | null = null
         try {
-          const info = await store.getStorageInfo()
-          const freeMB = (info.quotaBytes - info.usedBytes) / 1024 / 1024
-          setLowStorage(freeMB < 200)
-        } catch { }
+          store = await getStorage()
+          const outbox = await store.getOutbox()
+          const pendingMedia = await store.getMediaQueueCount()
+          const allMedia = await store.getMediaQueue()
+          setOutboxCount(outbox.length)
+          setMediaQueueCount(pendingMedia)
+          const failedMedia = allMedia.filter(m => m.status === 'failed')
+          setFailedMediaCount(failedMedia.length)
+          // Auto-reset failed media to pending on every startup so they retry automatically
+          if (failedMedia.length > 0 && navigator.onLine) {
+            for (const item of failedMedia) await store.updateMediaStatus(item.id, 'pending')
+            setFailedMediaCount(0)
+          }
+          if ((outbox.length > 0 || pendingMedia > 0 || failedMedia.length > 0) && navigator.onLine) syncToServer()
+
+          // Storage quota warning
+          try {
+            const info = await store.getStorageInfo()
+            const freeMB = (info.quotaBytes - info.usedBytes) / 1024 / 1024
+            setLowStorage(freeMB < 200)
+          } catch { }
+        } catch {
+          setFormsError('Offline storage is unavailable on this browser — submissions can still be made online, but won’t be saved for offline use.')
+        }
 
         api.get('/schedules/').then(r => setSchedules(r.data)).catch(() => {})
         api.get('/programs/locations').then(r => setLocations(r.data)).catch(() => {})
@@ -478,13 +486,13 @@ export default function FieldApp() {
         try {
           const currentUserId = getStoredUser()?.id ?? ''
           const lastUserId = localStorage.getItem('fg_last_form_cache_user') ?? ''
-          if (currentUserId && currentUserId === lastUserId) {
+          if (store && currentUserId && currentUserId === lastUserId) {
             const cached = await store.listFormCache()
             if (cached.length > 0) {
               setForms(cached.map(c => ({ id: c.id, title: c.title, version: c.version })))
               setLoading(false)
             }
-          } else if (currentUserId && currentUserId !== lastUserId) {
+          } else if (store && currentUserId && currentUserId !== lastUserId) {
             // User changed — clear stale cache to prevent cross-user data appearing in UI
             const stale = await store.listFormCache()
             await Promise.all(stale.map(f => store.deleteFormCache(f.id)))
@@ -500,18 +508,21 @@ export default function FieldApp() {
           setFormsError('')
           const userId = getStoredUser()?.id ?? ''
           if (userId) localStorage.setItem('fg_last_form_cache_user', userId)
-          ;(async () => {
-            await Promise.all(list.map(async f => {
-              try {
-                const detail = await api.get<{ json_schema: FormSchema }>(`/forms/${f.id}`)
-                await store.saveFormCache({
-                  id: f.id, title: f.title, version: f.version, status: 'active',
-                  schema: JSON.stringify(detail.data.json_schema),
-                  cachedAt: new Date().toISOString(),
-                })
-              } catch { }
-            }))
-          })()
+          if (store) {
+            const s = store
+            ;(async () => {
+              await Promise.all(list.map(async f => {
+                try {
+                  const detail = await api.get<{ json_schema: FormSchema }>(`/forms/${f.id}`)
+                  await s.saveFormCache({
+                    id: f.id, title: f.title, version: f.version, status: 'active',
+                    schema: JSON.stringify(detail.data.json_schema),
+                    cachedAt: new Date().toISOString(),
+                  })
+                } catch { }
+              }))
+            })()
+          }
         } catch (e) {
           // Don't fail silently — a swallowed error here looks identical to
           // "no forms" and hides auth/network problems from admins.
