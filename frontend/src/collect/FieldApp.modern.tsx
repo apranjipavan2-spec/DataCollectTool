@@ -115,6 +115,7 @@ export default function FieldApp() {
   const [screen, setScreen] = useState<Screen>(initialScreen)
   const [forms, setForms] = useState<FormMeta[]>([])
   const [activeForm, setActiveForm] = useState<{ meta: FormMeta; schema: FormSchema } | null>(null)
+  const [formsError, setFormsError] = useState('')
   const [outboxCount, setOutboxCount] = useState(0)
   const [mediaQueueCount, setMediaQueueCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -492,12 +493,15 @@ export default function FieldApp() {
 
         // Refresh from server; cache schemas in background without blocking UI
         try {
-          const { data } = await api.get<Array<{ id: string; title: string; version: number }>>('/forms/?status=active')
-          setForms(data)
+          const { data } = await api.get<Array<{ id: string; title: string; version: number }> | { forms: Array<{ id: string; title: string; version: number }> }>('/forms/?status=active')
+          // Tolerate both the bare-array and { forms: [...] } response shapes.
+          const list = Array.isArray(data) ? data : (data?.forms ?? [])
+          setForms(list)
+          setFormsError('')
           const userId = getStoredUser()?.id ?? ''
           if (userId) localStorage.setItem('fg_last_form_cache_user', userId)
           ;(async () => {
-            await Promise.all(data.map(async f => {
+            await Promise.all(list.map(async f => {
               try {
                 const detail = await api.get<{ json_schema: FormSchema }>(`/forms/${f.id}`)
                 await store.saveFormCache({
@@ -508,7 +512,17 @@ export default function FieldApp() {
               } catch { }
             }))
           })()
-        } catch { }
+        } catch (e) {
+          // Don't fail silently — a swallowed error here looks identical to
+          // "no forms" and hides auth/network problems from admins.
+          const status = (e as { response?: { status?: number } })?.response?.status
+          setFormsError(
+            status === 401 ? 'Your session expired — please sign in again.'
+            : status ? `Couldn't load forms (error ${status}). Pull to refresh.`
+            : (navigator.onLine ? "Couldn't load forms. Pull to refresh."
+                                : 'Offline — showing cached forms only.')
+          )
+        }
       } catch { } finally {
         setLoading(false)
         setRefreshing(false)
@@ -1272,8 +1286,19 @@ export default function FieldApp() {
               {!loading && forms.length === 0 && (
                 <div className="text-center py-16 bg-catalan-surface border border-catalan-border rounded-xl">
                   <div className="text-5xl mb-4"><EmojiIcon e="📋" /></div>
-                  <p className="text-catalan-textMuted font-medium">No forms assigned yet</p>
-                  <p className="text-catalan-textMuted text-sm mt-1">Your supervisor will assign forms to you.</p>
+                  {formsError ? (
+                    <p className="text-catalan-warning font-medium">{formsError}</p>
+                  ) : (storedUser?.role === 'enumerator') ? (
+                    <>
+                      <p className="text-catalan-textMuted font-medium">No forms assigned yet</p>
+                      <p className="text-catalan-textMuted text-sm mt-1">Your supervisor will assign forms to you.</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-catalan-textMuted font-medium">No active forms yet</p>
+                      <p className="text-catalan-textMuted text-sm mt-1">Create and activate a form in Form Builder to start collecting.</p>
+                    </>
+                  )}
                 </div>
               )}
 
