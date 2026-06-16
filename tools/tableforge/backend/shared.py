@@ -60,15 +60,30 @@ _IDENTITY_TTL = 60           # seconds — short, so role/account changes propag
 
 
 def _resolve_fg_base(fg_base_url: Optional[str]) -> str:
-    """Pick the host we trust to answer 'who is this token?'. Prefer a
-    server-configured FG URL; only fall back to the client-provided base when no
-    env is set. Hardened deployments should set FG_INTERNAL_URL so the identity
-    authority can never be pointed at an attacker-controlled server."""
+    """Pick the host we trust to answer 'who is this token?'.
+
+    The identity authority MUST be server-configured (FG_INTERNAL_URL /
+    FG_PUBLIC_URL). We never fall back to a client-supplied base: the client
+    also supplies the token, so trusting its base would let an attacker point
+    verification at a server that returns any identity/role it likes — a full
+    authz bypass. If no trusted base is configured we fail closed (return ""),
+    and the caller treats the request as unauthenticated.
+
+    FG_ALLOWED_VERIFY_HOSTS (comma-separated) may additionally allow specific
+    client-supplied bases for multi-tenant/dev setups that can't use an env URL.
+    """
     for env in ("FG_INTERNAL_URL", "FG_PUBLIC_URL"):
         val = os.environ.get(env, "").rstrip("/")
         if val:
             return val
-    return (fg_base_url or "").rstrip("/")
+    # Optional allowlist for client-supplied bases — empty by default (fail closed).
+    candidate = (fg_base_url or "").rstrip("/")
+    if candidate:
+        allowed = [h.strip().rstrip("/") for h in
+                   os.environ.get("FG_ALLOWED_VERIFY_HOSTS", "").split(",") if h.strip()]
+        if candidate in allowed:
+            return candidate
+    return ""
 
 
 async def verify_fg_identity(token: Optional[str], fg_base_url: Optional[str] = None) -> Optional[dict]:
