@@ -158,7 +158,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Allow the SPA to function; restrict everything else
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://us-assets.i.posthog.com; "
+            # 'wasm-unsafe-eval' lets the OPFS/wa-sqlite WebAssembly module compile
+            # (needed by the offline Collect storage layer). It permits WASM only —
+            # NOT general JS eval() — so it is far narrower than 'unsafe-eval'.
+            "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://us-assets.i.posthog.com; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: blob: https://*.tile.openstreetmap.org; "
             "connect-src 'self' https://api.deepseek.com https://us.i.posthog.com https://us-assets.i.posthog.com; "

@@ -14,7 +14,10 @@ interface PlanFeatures {
   webhooks: boolean; two_fa: boolean; sso: boolean; audit_log: boolean
   advanced_rbac: boolean; white_label: boolean; priority_support: boolean
 }
-interface BillingOption { discount_pct: number; months: number; total_inr: number; monthly_effective_inr: number }
+interface BillingOption {
+  months: number; bonus_months: number; paid_months: number
+  price_discount_pct: number; total_inr: number; monthly_effective_inr: number
+}
 interface Plan {
   id: string; segment: string; tier: string; name: string; description: string
   price_inr: number; price_usd_cents: number
@@ -37,11 +40,13 @@ const btnPr = 'px-4 py-2 bg-catalan-primary text-catalan-bg rounded-lg text-sm f
 const btnSe = 'px-3 py-1.5 text-sm border border-catalan-border rounded-lg text-catalan-text hover:bg-catalan-hover transition-colors'
 const inp   = 'border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text focus:ring-2 focus:ring-catalan-primary outline-none w-full'
 
+// Bonus-months model (matches the marketing pricing page + billing API):
+// longer commitments grant free months rather than a percentage discount.
 const CYCLES = [
-  { key: 'monthly', label: 'Monthly',  badge: '' },
-  { key: '6month',  label: '6-Month',  badge: '10% off' },
-  { key: 'annual',  label: 'Annual',   badge: '20% off' },
-  { key: '3year',   label: '3-Year',   badge: '30% off' },
+  { key: 'monthly', label: 'Monthly', months: 1,  badge: '' },
+  { key: '6month',  label: '6-Month', months: 6,  badge: '' },
+  { key: 'annual',  label: 'Annual',  months: 12, badge: '2 months free' },
+  { key: '3year',   label: '3-Year',  months: 36, badge: '6 months free' },
 ]
 
 const FEATURE_LABELS: Partial<Record<keyof PlanFeatures, string>> = {
@@ -234,11 +239,13 @@ export default function SubscriptionPage() {
                         {cycle !== 'monthly' && (
                           <div className="text-xs text-catalan-textMuted mt-0.5">
                             {formatINR(billing.total_inr)} billed {CYCLES.find(c => c.key === cycle)?.label.toLowerCase()}
-                            {' '}· <span className="text-green-500">Save {billing.discount_pct}%</span>
+                            {billing.bonus_months > 0 && (
+                              <> · <span className="text-green-500">{billing.bonus_months} month{billing.bonus_months > 1 ? 's' : ''} free</span></>
+                            )}
                           </div>
                         )}
                         <div className="text-xs text-catalan-textMuted">
-                          (~{formatUSD(Math.round(billing.total_inr * 0.012 * 100) / CYCLES.find(c=>c.key===cycle)!.months)}/mo)
+                          (~{formatUSD(Math.round(billing.total_inr * 0.012 * 100) / billing.months)}/mo)
                         </div>
                       </>
                     )}
@@ -335,7 +342,9 @@ export default function SubscriptionPage() {
             <div className="bg-catalan-hover rounded-xl p-4 mb-4 space-y-1 text-sm">
               <div className="flex justify-between"><span className="text-catalan-textMuted">Plan</span><span className="font-semibold text-catalan-text">{paymentDetail.plan_name}</span></div>
               <div className="flex justify-between"><span className="text-catalan-textMuted">Billing</span><span className="text-catalan-text">{CYCLES.find(c => c.key === paymentDetail.billing_cycle)?.label}</span></div>
-              {paymentDetail.discount_pct > 0 && <div className="flex justify-between"><span className="text-catalan-textMuted">Discount</span><span className="text-green-500">−{paymentDetail.discount_pct}%</span></div>}
+              {CYCLES.find(c => c.key === paymentDetail.billing_cycle)?.badge && (
+                <div className="flex justify-between"><span className="text-catalan-textMuted">Bonus</span><span className="text-green-500">{CYCLES.find(c => c.key === paymentDetail.billing_cycle)?.badge}</span></div>
+              )}
               <div className="flex justify-between font-bold text-base border-t border-catalan-border pt-2 mt-2">
                 <span className="text-catalan-text">Total</span>
                 <span className="text-catalan-primary">₹{paymentDetail.amount_inr.toLocaleString('en-IN')}</span>

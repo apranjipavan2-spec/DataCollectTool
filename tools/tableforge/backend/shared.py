@@ -50,6 +50,77 @@ def is_super_admin(role: Optional[str]) -> bool:
     return role == SUPER_ADMIN_ROLE
 
 
+# ── Authenticated identity ────────────────────────────────────────────────────
+# Identity (user id + role) must come from a verified FieldGovern JWT — NEVER from
+# client-supplied X-User-Id / X-User-Role headers, which are trivially spoofable
+# and leak across users via stale browser storage. We resolve the token against
+# FieldGovern's own /users/me, so FG remains the single source of truth.
+_identity_cache: dict = {}   # token -> (expires_at, {"id", "role"})
+_IDENTITY_TTL = 60           # seconds — short, so role/account changes propagate
+
+
+def _resolve_fg_base(fg_base_url: Optional[str]) -> str:
+    """Pick the host we trust to answer 'who is this token?'.
+
+    The identity authority MUST be server-configured (FG_INTERNAL_URL /
+    FG_PUBLIC_URL). We never fall back to a client-supplied base: the client
+    also supplies the token, so trusting its base would let an attacker point
+    verification at a server that returns any identity/role it likes — a full
+    authz bypass. If no trusted base is configured we fail closed (return ""),
+    and the caller treats the request as unauthenticated.
+
+    FG_ALLOWED_VERIFY_HOSTS (comma-separated) may additionally allow specific
+    client-supplied bases for multi-tenant/dev setups that can't use an env URL.
+    """
+    for env in ("FG_INTERNAL_URL", "FG_PUBLIC_URL"):
+        val = os.environ.get(env, "").rstrip("/")
+        if val:
+            return val
+    # Optional allowlist for client-supplied bases — empty by default (fail closed).
+    candidate = (fg_base_url or "").rstrip("/")
+    if candidate:
+        allowed = [h.strip().rstrip("/") for h in
+                   os.environ.get("FG_ALLOWED_VERIFY_HOSTS", "").split(",") if h.strip()]
+        if candidate in allowed:
+            return candidate
+    return ""
+
+
+async def verify_fg_identity(token: Optional[str], fg_base_url: Optional[str] = None) -> Optional[dict]:
+    """Return {"id", "role"} for a valid FG token, or None if unauthenticated."""
+    import time
+    import httpx
+
+    if not token:
+        return None
+    now = time.time()
+    cached = _identity_cache.get(token)
+    if cached and cached[0] > now:
+        return cached[1]
+
+    base = _resolve_fg_base(fg_base_url)
+    if not base:
+        return None
+    internal = bool(os.environ.get("FG_INTERNAL_URL", "").strip())
+    try:
+        async with httpx.AsyncClient(timeout=15.0, verify=bool(not internal)) as client:
+            resp = await client.get(f"{base}/api/v1/users/me",
+                                    headers={"Authorization": f"Bearer {token}"})
+    except Exception:
+        return None
+    if resp.status_code != 200:
+        return None
+    try:
+        data = resp.json()
+    except Exception:
+        return None
+    identity = {"id": str(data.get("id") or ""), "role": data.get("role") or ""}
+    if not identity["id"]:
+        return None
+    _identity_cache[token] = (now + _IDENTITY_TTL, identity)
+    return identity
+
+
 def sanitize_for_json(obj):
     """Recursively convert any value to a JSON-safe primitive.
 

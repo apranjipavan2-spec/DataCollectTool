@@ -1,14 +1,44 @@
 // import.meta.env.BASE_URL is '/' in dev, '/analyzer/' in production build
 export const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api';
 
+// ── Authenticated identity ────────────────────────────────────────────────────
+// Identity flows ONLY through the verified FG token. We never send (or trust) a
+// user_id / user_role from the URL or localStorage — those were spoofable and
+// leaked the super-admin's projects across users on a shared browser.
+let _fgToken: string | null = null;
+let _fgBaseUrl: string | null = null;
+
+// Capture the token from the launch URL at module load — before <App> strips the
+// query string — so the first request already carries it.
+(function initFgAuth() {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    const t = p.get('token');
+    if (t) { _fgToken = t; _fgBaseUrl = p.get('fg_url'); }
+  } catch { /* no-op */ }
+})();
+
+export function setFgAuth(token: string | null, baseUrl: string | null) {
+  _fgToken = token || null;
+  _fgBaseUrl = baseUrl || null;
+}
+
 export function getUserHeaders(): Record<string, string> {
-  const params = new URLSearchParams(window.location.search);
   const headers: Record<string, string> = {};
-  const userId = params.get('user_id') || localStorage.getItem('tf_user_id') || '';
-  const userRole = params.get('user_role') || localStorage.getItem('tf_user_role') || '';
-  if (userId) { headers['X-User-Id'] = userId; localStorage.setItem('tf_user_id', userId); }
-  if (userRole) { headers['X-User-Role'] = userRole; localStorage.setItem('tf_user_role', userRole); }
+  if (_fgToken) {
+    headers['Authorization'] = `Bearer ${_fgToken}`;
+    if (_fgBaseUrl) headers['X-FG-Base-Url'] = _fgBaseUrl;
+  }
   return headers;
+}
+
+// Role is read from the current token's payload for UI hints only — the backend
+// independently re-verifies the token, so a tampered payload grants nothing.
+function tokenRole(): string {
+  if (!_fgToken) return '';
+  try {
+    return JSON.parse(atob(_fgToken.split('.')[1] || '')).role || '';
+  } catch { return ''; }
 }
 
 async function parseError(res: Response): Promise<string> {
@@ -240,12 +270,11 @@ export async function deleteProject(path: string) {
 }
 
 export function getUserRole(): string {
-  const params = new URLSearchParams(window.location.search);
-  return params.get('user_role') || localStorage.getItem('tf_user_role') || '';
+  return tokenRole();
 }
 
 export function isSuperAdmin(): boolean {
-  return getUserRole() === 'master_admin';
+  return tokenRole() === 'master_admin';
 }
 
 export async function rollbackProject(path: string, versionIndex: number) {

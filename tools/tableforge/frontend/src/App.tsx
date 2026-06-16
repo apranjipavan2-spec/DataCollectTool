@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType, TableSection, NumberingConfig } from './types';
-import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg, getColumnRoles, bulkSetColumnRoles, saveStudyDesign, cleanerApi, buildCleanerUrl } from './api';
+import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg, getColumnRoles, bulkSetColumnRoles, saveStudyDesign, cleanerApi, buildCleanerUrl, setFgAuth } from './api';
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
 import { LivePreview } from './components/LivePreview';
@@ -469,6 +469,7 @@ export default function App() {
     const token = params.get('token');
     if (!fgUrl || !token) return;
     setFgContext({ fgUrl, token, programId: programId || undefined });
+    setFgAuth(token, fgUrl);   // route the verified token to project API calls
     // Strip query params from the URL bar — keeps the JWT out of browser history
     // and the address clean on startup.
     window.history.replaceState(null, '', window.location.pathname);
