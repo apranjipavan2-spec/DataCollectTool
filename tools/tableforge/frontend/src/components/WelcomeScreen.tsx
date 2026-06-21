@@ -104,24 +104,30 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
   const [serverFiles, setServerFiles]       = useState<ServerFile[]>([]);
   const [sfLoading, setSfLoading]           = useState('');
   const [sfUploading, setSfUploading]       = useState(false);
+  // Tracks the initial project/file fetch so we can show a spinner instead of
+  // the "nothing saved" message while the list is still loading. Identity is
+  // verified server-side via a live call to FieldGovern, so the first fetch can
+  // take a moment — without this, an in-flight request looked like an empty list.
+  const [listLoading, setListLoading]       = useState(true);
   const serverFileRef = useRef<HTMLInputElement>(null);
   const isAdmin = isSuperAdmin();
 
   const refreshProjects = () => {
-    listProjects()
+    return listProjects()
       .then((res: any) => setLocalProjects((res.projects || []).slice(0, 20)))
       .catch(() => {});
   };
 
   const refreshFiles = () => {
-    listServerFiles()
+    return listServerFiles()
       .then(res => setServerFiles(res.files || []))
       .catch(() => {});
   };
 
   useEffect(() => {
-    refreshProjects();
-    refreshFiles();
+    setListLoading(true);
+    Promise.all([refreshProjects(), refreshFiles()])
+      .finally(() => setListLoading(false));
   }, []);
 
   const analyzerProjects = localProjects.filter(p => p.name !== '__autosave__');
@@ -472,8 +478,16 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
                   </>
                 )}
 
-                {/* No content message */}
-                {!loading && !fgLoading && serverFiles.length === 0 && analyzerProjects.length === 0 && (
+                {/* Loading indicator — list fetch still in flight */}
+                {!loading && !fgLoading && listLoading && serverFiles.length === 0 && analyzerProjects.length === 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '24px 0' }}>
+                    <div style={{ width: 14, height: 14, border: '2px solid rgba(59,130,246,0.2)', borderTop: '2px solid #3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    <span style={{ fontSize: 12, color: '#64748b' }}>Loading your files & projects…</span>
+                  </div>
+                )}
+
+                {/* No content message — only once the fetch has finished */}
+                {!loading && !fgLoading && !listLoading && serverFiles.length === 0 && analyzerProjects.length === 0 && (
                   <div style={{ fontSize: 12, color: '#475569', textAlign: 'center', padding: '24px 0' }}>
                     No files or projects saved yet
                   </div>

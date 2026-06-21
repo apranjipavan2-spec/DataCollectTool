@@ -32,6 +32,23 @@ async def current_identity(
     return identity or {"id": None, "role": None}
 
 
+def require_project_access(path: str, ident: dict) -> Path:
+    """Resolve `path`, ensuring the caller may touch it. super_admin may access any
+    project; everyone else is confined to their own user dir. Raises 401/403/404.
+    Returns the validated Path. Use for every endpoint that takes a raw path so a
+    predictable path can't be used to read or mutate another tenant's project."""
+    p = Path(path)
+    if not p.exists():
+        raise HTTPException(404, "Project not found")
+    if not is_super_admin(ident["role"]):
+        if not ident["id"]:
+            raise HTTPException(401, "Authentication required")
+        user_dir = get_user_projects_dir(ident["id"])
+        if not str(p.resolve()).startswith(str(user_dir.resolve())):
+            raise HTTPException(403, "Access denied")
+    return p
+
+
 class ProjectData(BaseModel):
     name: str
     config: dict
@@ -227,10 +244,8 @@ async def delete_project(req: ProjectDeleteRequest, ident: dict = Depends(curren
 
 
 @router.get("/api/project/versions")
-async def get_project_versions(path: str):
-    p = Path(path)
-    if not p.exists():
-        raise HTTPException(404, "Project not found")
+async def get_project_versions(path: str, ident: dict = Depends(current_identity)):
+    p = require_project_access(path, ident)
     data = json.loads(p.read_text())
     return {"versions": data.get("versions", [])}
 
@@ -278,13 +293,12 @@ def _diff_tables(left: list, right: list) -> dict:
 
 
 @router.get("/api/project/diff")
-async def diff_project_versions(path: str, left: int = -1, right: int = -1):
+async def diff_project_versions(path: str, left: int = -1, right: int = -1,
+                                ident: dict = Depends(current_identity)):
     """Compare two versions of the same project.
     Indices into versions[]; use -1 for 'current'.
     """
-    p = Path(path)
-    if not p.exists():
-        raise HTTPException(404, "Project not found")
+    p = require_project_access(path, ident)
     data = json.loads(p.read_text())
     if data.get("encrypted"):
         raise HTTPException(400, "Diff not supported on encrypted projects")
@@ -304,10 +318,8 @@ class RollbackRequest(BaseModel):
 
 
 @router.post("/api/project/rollback")
-async def rollback_project(req: RollbackRequest):
-    p = Path(req.path)
-    if not p.exists():
-        raise HTTPException(404, "Project not found")
+async def rollback_project(req: RollbackRequest, ident: dict = Depends(current_identity)):
+    p = require_project_access(req.path, ident)
     data = json.loads(p.read_text())
     if data.get("encrypted"):
         raise HTTPException(400, "Cannot rollback encrypted projects without password")
@@ -367,8 +379,10 @@ async def load_project(path: str, password: Optional[str] = None, ident: dict = 
 
 
 @router.post("/api/project/reload-file")
-async def reload_project_file(body: dict):
+async def reload_project_file(body: dict, ident: dict = Depends(current_identity)):
     """Re-import the cached source file associated with a project."""
+    if not ident["id"]:
+        raise HTTPException(401, "Authentication required")
     cache_path = body.get("cache_path") or ""
     dataset_id_hint = body.get("dataset_id") or ""
     filename = body.get("filename") or "unknown"
@@ -382,6 +396,10 @@ async def reload_project_file(body: dict):
                 break
     if not p or not p.exists():
         raise HTTPException(404, "Source file not found in cache. Please re-import the file manually.")
+    # Confine reads to our own cache/project storage — never an arbitrary server path.
+    allowed_roots = [CACHE_DIR.resolve(), PROJECTS_DIR.resolve()]
+    if not any(str(p.resolve()).startswith(str(root)) for root in allowed_roots):
+        raise HTTPException(403, "Access denied")
 
     ext = p.suffix.lstrip(".").lower()
     dataset_id = str(uuid.uuid4())
@@ -438,14 +456,12 @@ class BatchProcessConfig(BaseModel):
 
 
 @router.post("/api/project/batch")
-async def batch_process(config: BatchProcessConfig):
+async def batch_process(config: BatchProcessConfig, ident: dict = Depends(current_identity)):
     """Apply a project template to multiple files and export each."""
     from .tabulate import TableConfig, tabulate
     from .export import ExportConfig, export_excel, export_word, export_pdf, export_csv
 
-    p = Path(config.project_path)
-    if not p.exists():
-        raise HTTPException(404, "Project file not found")
+    p = require_project_access(config.project_path, ident)
 
     project_data = json.loads(p.read_text())
     tables_config = project_data.get("tables", [])
