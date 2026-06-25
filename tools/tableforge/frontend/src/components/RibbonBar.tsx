@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TableConfig, NumberFormat, ConditionalFormat, ColumnInfo } from '../types';
-import { API_BASE } from '../api';
+import { API_BASE, fgListUserProjects, fgArchiveProject, fgRestoreProject } from '../api';
+
+interface FgContext { fgUrl: string; token: string; programId?: string }
 
 interface Props {
   table: TableConfig | null;
@@ -13,6 +15,8 @@ interface Props {
   onColumnTypeChange?: (column: string, newType: string) => void;
   projectFilterCount?: number;   // number of active project-level filters
   onAskAI?: (query: string) => void;  // #15 Talk-to-your-data: NL query → smart-build modal
+  fgContext?: FgContext | null;  // FieldGovern account → per-user saved projects
+  onLoadProject?: (tables: TableConfig[], annotationsMap?: Record<string, any[]>, extra?: Record<string, any>) => void;
 }
 
 type TabKey = 'home' | 'insert' | 'data' | 'statistics' | 'format' | 'view' | 'ai-smart';
@@ -193,13 +197,13 @@ function TemplateDropdown({ table, onAction, disabled }: { table: TableConfig | 
 }
 
 // ── Root component ─────────────────────────────────────────
-export function RibbonBar({ table, dataset, onAction, onUpdate, theme, activeTab: externalTab, columns, onColumnTypeChange, projectFilterCount = 0, onAskAI }: Props) {
+export function RibbonBar({ table, dataset, onAction, onUpdate, theme, activeTab: externalTab, columns, onColumnTypeChange, projectFilterCount = 0, onAskAI, fgContext, onLoadProject }: Props) {
   const [internalTab, setInternalTab] = useState<TabKey>('home');
   const activeTab = (externalTab as TabKey) || internalTab;
 
   return (
     <div className="ribbon-content">
-      {activeTab === 'home'       && <HomeRibbon      table={table} dataset={dataset} onAction={onAction} onUpdate={onUpdate} projectFilterCount={projectFilterCount} onAskAI={onAskAI} />}
+      {activeTab === 'home'       && <HomeRibbon      table={table} dataset={dataset} onAction={onAction} onUpdate={onUpdate} projectFilterCount={projectFilterCount} onAskAI={onAskAI} fgContext={fgContext} onLoadProject={onLoadProject} />}
       {activeTab === 'insert'     && <InsertRibbon    dataset={dataset} onAction={onAction} />}
       {activeTab === 'data'       && <DataRibbon      dataset={dataset} onAction={onAction} />}
       {activeTab === 'statistics' && <StatisticsRibbon dataset={dataset} onAction={onAction} />}
@@ -266,19 +270,28 @@ function FToggle({ label, checked, onChange }: { label: string; checked: boolean
   );
 }
 
-// ── Import dropdown (shows saved projects list) ────────────
-interface ProjectEntry {
+// ── Import dropdown (shows the user's FieldGovern account projects) ─────────
+interface FgProjectEntry {
+  id: string;
   name: string;
-  path: string;
-  created: string;
-  source_file?: { filename?: string; row_count?: number; col_count?: number } | null;
+  program_id: string | null;
+  data: any;
+  updated_at: string;
+  archived_at?: string | null;
 }
 
-function ImportDropdownBtn({ onAction }: { onAction: (action: string) => void }) {
+function ImportDropdownBtn({ onAction, fgContext, onLoadProject }: {
+  onAction: (action: string) => void;
+  fgContext?: FgContext | null;
+  onLoadProject?: (tables: TableConfig[], annotationsMap?: Record<string, any[]>, extra?: Record<string, any>) => void;
+}) {
   const [open, setOpen] = useState(false);
-  const [projects, setProjects] = useState<ProjectEntry[]>([]);
+  const [projects, setProjects] = useState<FgProjectEntry[]>([]);
+  const [archived, setArchived] = useState<FgProjectEntry[]>([]);
+  const [showArchive, setShowArchive] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [fetched, setFetched] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   // Close when clicking outside
@@ -291,19 +304,23 @@ function ImportDropdownBtn({ onAction }: { onAction: (action: string) => void })
   }, []);
 
   const fetchProjects = useCallback(async () => {
-    if (fetched) return;
+    if (fetched || !fgContext) return;
     setFetching(true);
     try {
-      const res = await fetch(`${API_BASE}/projects`);
-      const data = await res.json();
-      setProjects(data.projects || []);
+      const [active, arch] = await Promise.all([
+        fgListUserProjects(fgContext.fgUrl, fgContext.token, 'analyzer', false),
+        fgListUserProjects(fgContext.fgUrl, fgContext.token, 'analyzer', true),
+      ]);
+      const clean = (list: any[]) => list.filter(p => p.name && p.name !== '__autosave__');
+      setProjects(clean(active));
+      setArchived(clean(arch));
       setFetched(true);
     } catch {
-      setProjects([]);
+      setProjects([]); setArchived([]);
     } finally {
       setFetching(false);
     }
-  }, [fetched]);
+  }, [fetched, fgContext]);
 
   const toggle = () => {
     const next = !open;
@@ -311,10 +328,43 @@ function ImportDropdownBtn({ onAction }: { onAction: (action: string) => void })
     if (next && !fetched) fetchProjects();
   };
 
-  const loadProject = (path: string) => {
-    onAction('load_project:' + path);
+  const loadProject = (p: FgProjectEntry) => {
+    if (p.data?.tables && onLoadProject) {
+      const extra: Record<string, any> = {};
+      if (p.data.comparisonState) extra.comparisonState = p.data.comparisonState;
+      if (p.data.projectFilters) extra.projectFilters = p.data.projectFilters;
+      if (p.data.columnTypeOverrides) extra.columnTypeOverrides = p.data.columnTypeOverrides;
+      onLoadProject(p.data.tables, p.data.annotationsMap, extra);
+    } else {
+      onAction('projects');  // fall back to the full manager
+    }
     setOpen(false);
   };
+
+  const archiveProject = async (p: FgProjectEntry, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!fgContext) return;
+    setBusyId(p.id);
+    try {
+      await fgArchiveProject(fgContext.fgUrl, fgContext.token, p.id);
+      setProjects(prev => prev.filter(x => x.id !== p.id));
+      setArchived(prev => [{ ...p, archived_at: new Date().toISOString() }, ...prev]);
+    } catch { /* no-op */ } finally { setBusyId(null); }
+  };
+
+  const restoreProject = async (p: FgProjectEntry, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!fgContext) return;
+    setBusyId(p.id);
+    try {
+      await fgRestoreProject(fgContext.fgUrl, fgContext.token, p.id);
+      setArchived(prev => prev.filter(x => x.id !== p.id));
+      setProjects(prev => [{ ...p, archived_at: null }, ...prev]);
+    } catch { /* no-op */ } finally { setBusyId(null); }
+  };
+
+  const fmtDate = (d?: string) =>
+    d ? new Date(d).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : '';
 
   return (
     <div style={{ position: 'relative' }} ref={ref}>
@@ -329,45 +379,76 @@ function ImportDropdownBtn({ onAction }: { onAction: (action: string) => void })
 
       {open && (
         <div className="import-drop-panel">
-          <div className="import-drop-section-title">Recent Projects</div>
+          <div className="import-drop-section-title">
+            {showArchive ? 'Archived Projects' : 'Recent Projects'}
+          </div>
 
-          {fetching && (
+          {!fgContext && (
+            <div className="import-drop-empty">Sign in via FieldGovern to see your saved projects.</div>
+          )}
+          {fgContext && fetching && (
             <div className="import-drop-empty">Loading…</div>
           )}
 
-          {!fetching && projects.length === 0 && (
-            <div className="import-drop-empty">No saved projects yet.</div>
-          )}
-
-          {!fetching && projects.length > 0 && (
-            <div className="import-drop-list">
-              {projects.slice(0, 12).map(p => (
-                <button
-                  key={p.path}
-                  className="import-drop-item"
-                  onClick={() => loadProject(p.path)}
-                  title={p.path}
-                >
-                  <span className="import-drop-icon">🗂</span>
-                  <span className="import-drop-info">
-                    <span className="import-drop-name">{p.name}</span>
-                    <span className="import-drop-meta">
-                      {p.source_file?.filename
-                        ? <>📄 {p.source_file.filename} · </>
-                        : null}
-                      {p.created ? new Date(p.created).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+          {fgContext && !fetching && (() => {
+            const list = showArchive ? archived : projects;
+            if (list.length === 0) {
+              return (
+                <div className="import-drop-empty">
+                  {showArchive ? 'No archived projects.' : 'No saved projects yet.'}
+                </div>
+              );
+            }
+            return (
+              <div className="import-drop-list">
+                {list.slice(0, 12).map(p => (
+                  <button
+                    key={p.id}
+                    className="import-drop-item"
+                    onClick={() => loadProject(p)}
+                    title={p.name}
+                  >
+                    <span className="import-drop-icon">{showArchive ? '🗄' : '🗂'}</span>
+                    <span className="import-drop-info">
+                      <span className="import-drop-name">{p.name}</span>
+                      <span className="import-drop-meta">{fmtDate(p.archived_at || p.updated_at)}</span>
                     </span>
-                  </span>
-                </button>
-              ))}
-              {projects.length > 12 && (
-                <div className="import-drop-more">+{projects.length - 12} more — browse all below</div>
-              )}
-            </div>
-          )}
+                    {showArchive ? (
+                      <span
+                        role="button"
+                        className="import-drop-rowbtn"
+                        title="Restore to active projects"
+                        onClick={(e) => restoreProject(p, e)}
+                        style={{ opacity: busyId === p.id ? 0.5 : 1 }}
+                      >↩ Restore</span>
+                    ) : (
+                      <span
+                        role="button"
+                        className="import-drop-rowbtn"
+                        title="Archive (never deleted — restorable from the Archive folder)"
+                        onClick={(e) => archiveProject(p, e)}
+                        style={{ opacity: busyId === p.id ? 0.5 : 1 }}
+                      >🗄 Archive</span>
+                    )}
+                  </button>
+                ))}
+                {list.length > 12 && (
+                  <div className="import-drop-more">+{list.length - 12} more — browse all below</div>
+                )}
+              </div>
+            );
+          })()}
 
           <div className="import-drop-divider" />
 
+          {fgContext && (
+            <button
+              className="import-drop-action"
+              onClick={() => setShowArchive(s => !s)}
+            >
+              <span>🗄</span> {showArchive ? `← Back to Recent` : `Archive folder${archived.length ? ` (${archived.length})` : ''}`}
+            </button>
+          )}
           <button
             className="import-drop-action"
             onClick={() => { onAction('projects'); setOpen(false); }}
@@ -387,11 +468,13 @@ function ImportDropdownBtn({ onAction }: { onAction: (action: string) => void })
 }
 
 // ── HOME ───────────────────────────────────────────────────
-function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0, onAskAI }: {
+function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0, onAskAI, fgContext, onLoadProject }: {
   table: TableConfig | null; dataset: boolean;
   onAction: (action: string) => void; onUpdate: (update: Partial<TableConfig>) => void;
   projectFilterCount?: number;
   onAskAI?: (query: string) => void;
+  fgContext?: FgContext | null;
+  onLoadProject?: (tables: TableConfig[], annotationsMap?: Record<string, any[]>, extra?: Record<string, any>) => void;
 }) {
   const [openDrop, setOpenDrop] = useState<string | null>(null);
   const [askQuery, setAskQuery] = useState('');
@@ -442,7 +525,7 @@ function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0
         </div>
       </RGroup>
       <RGroup label="File">
-        <ImportDropdownBtn onAction={onAction} />
+        <ImportDropdownBtn onAction={onAction} fgContext={fgContext} onLoadProject={onLoadProject} />
         <RBtn icon="💾" label="Save"    onClick={() => onAction('save')}   disabled={!dataset} />
         <RBtn icon="↓"  label="Export"  onClick={() => onAction('export')} disabled={!dataset} />
         <RBtn icon="🔄" label="Reload"  onClick={() => onAction('reload_data')} disabled={!dataset} />

@@ -122,8 +122,10 @@ def detect_and_stamp():
             stamp = "0039"
         elif not _index_exists(cur, "uq_users_active_phone"):
             stamp = "0041"
+        elif not col_exists(cur, "user_tool_projects", "archived_at"):
+            stamp = "0043"
         else:
-            stamp = "0042"
+            stamp = "0044"
 
         print(f"Stamping alembic_version to {stamp}")
         if not has_alembic:

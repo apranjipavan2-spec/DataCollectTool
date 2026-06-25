@@ -144,6 +144,8 @@ _PATCHES = [
     "ALTER TABLE shared_files ADD COLUMN IF NOT EXISTS tenant_id UUID",
     """UPDATE shared_files f SET tenant_id = u.tenant_id
        FROM   users u WHERE u.id = f.uploaded_by AND f.tenant_id IS NULL""",
+    # 0044 — soft-archive flag on tool projects (archive instead of delete).
+    "ALTER TABLE user_tool_projects ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ",
     # 0042 — partial unique indexes on active users (phone, email). Seed data is
     # already conflict-free; including the indexes here keeps fresh databases
     # consistent with migrated ones.

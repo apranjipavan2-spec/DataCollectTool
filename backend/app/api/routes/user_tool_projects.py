@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
+from sqlalchemy.sql import func
 from pydantic import BaseModel
 from typing import Optional, List
 from app.core.deps import require_supervisor, get_current_user, get_db
@@ -24,13 +25,15 @@ def _serialize(r: UserToolProject) -> dict:
         "program_id": str(r.program_id) if r.program_id else None,
         "data": r.data,
         "shared_with": [str(t) for t in (r.shared_with_tenants or [])],
+        "archived_at": r.archived_at.isoformat() if r.archived_at else None,
         "created_at": r.created_at.isoformat() if r.created_at else None,
         "updated_at": r.updated_at.isoformat() if r.updated_at else None,
     }
 
 
 @router.get("/tool-projects/")
-def list_projects(tool: str = "", user=Depends(require_supervisor), db: Session = Depends(get_db)):
+def list_projects(tool: str = "", archived: bool = False,
+                  user=Depends(require_supervisor), db: Session = Depends(get_db)):
     tenant_id = user["tenant_id"]
     q = db.query(UserToolProject).filter(
         or_(
@@ -40,6 +43,11 @@ def list_projects(tool: str = "", user=Depends(require_supervisor), db: Session 
     )
     if tool:
         q = q.filter(UserToolProject.tool == tool)
+    # Active list hides archived projects; pass ?archived=true for the Archive folder.
+    if archived:
+        q = q.filter(UserToolProject.archived_at.isnot(None))
+    else:
+        q = q.filter(UserToolProject.archived_at.is_(None))
     rows = q.order_by(UserToolProject.updated_at.desc()).all()
     return [_serialize(r) for r in rows]
 
@@ -94,8 +102,7 @@ def share_project(project_id: str, body: ShareProjectRequest, user=Depends(get_c
     return {"id": str(proj.id), "shared_with": body.tenant_ids}
 
 
-@router.delete("/tool-projects/{project_id}")
-def delete_project(project_id: str, user=Depends(require_supervisor), db: Session = Depends(get_db)):
+def _owned_project(project_id: str, user, db: Session) -> UserToolProject:
     proj = db.query(UserToolProject).filter(
         UserToolProject.id == project_id,
         UserToolProject.user_id == user["sub"],
@@ -103,6 +110,23 @@ def delete_project(project_id: str, user=Depends(require_supervisor), db: Sessio
     ).first()
     if not proj:
         raise HTTPException(404, "Project not found")
-    db.delete(proj)
+    return proj
+
+
+@router.delete("/tool-projects/{project_id}")
+def delete_project(project_id: str, user=Depends(require_supervisor), db: Session = Depends(get_db)):
+    """Soft-delete: archive the project instead of removing it. Stays restorable."""
+    proj = _owned_project(project_id, user, db)
+    if proj.archived_at is None:
+        proj.archived_at = func.now()
+        db.commit()
+    return {"archived": True}
+
+
+@router.post("/tool-projects/{project_id}/restore")
+def restore_project(project_id: str, user=Depends(require_supervisor), db: Session = Depends(get_db)):
+    """Move an archived project back into the active list."""
+    proj = _owned_project(project_id, user, db)
+    proj.archived_at = None
     db.commit()
-    return {"deleted": True}
+    return {"restored": True}

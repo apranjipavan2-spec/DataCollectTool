@@ -16,5 +16,6 @@ class UserToolProject(Base):
     program_id = Column(UUID(as_uuid=True), ForeignKey("programs.id", ondelete="SET NULL"), nullable=True)
     data       = Column(JSONB, nullable=False, default=dict, server_default="'{}'::jsonb")
     shared_with_tenants = Column(ARRAY(UUID(as_uuid=True)), default=[], server_default="{}")
+    archived_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

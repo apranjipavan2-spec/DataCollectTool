@@ -342,14 +342,34 @@ export async function fgSaveProject(fgUrl: string, token: string, name: string, 
   return res.json();
 }
 
-export async function fgListUserProjects(fgUrl: string, token: string, tool = 'analyzer') {
+export async function fgListUserProjects(fgUrl: string, token: string, tool = 'analyzer', archived = false) {
   const res = await fetch(`${API_BASE}/fg/user-projects/list`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fg_base_url: fgUrl, token, tool }),
+    body: JSON.stringify({ fg_base_url: fgUrl, token, tool, archived }),
   });
   if (!res.ok) throw new Error(await parseError(res));
-  return res.json() as Promise<{ id: string; name: string; program_id: string | null; data: any; updated_at: string }[]>;
+  return res.json() as Promise<{ id: string; name: string; program_id: string | null; data: any; updated_at: string; archived_at?: string | null }[]>;
+}
+
+export async function fgArchiveProject(fgUrl: string, token: string, projectId: string) {
+  const res = await fetch(`${API_BASE}/fg/user-projects/archive`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fg_base_url: fgUrl, token, project_id: projectId }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function fgRestoreProject(fgUrl: string, token: string, projectId: string) {
+  const res = await fetch(`${API_BASE}/fg/user-projects/restore`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fg_base_url: fgUrl, token, project_id: projectId }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
 }
 
 export interface FgProgressEvent {

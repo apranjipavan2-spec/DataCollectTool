@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TableConfig } from '../types';
-import { rollbackProject, diffProjectVersions, fgSaveProject, fgListUserProjects, API_BASE, getUserHeaders } from '../api';
+import { rollbackProject, diffProjectVersions, fgSaveProject, fgListUserProjects, fgArchiveProject, fgRestoreProject, API_BASE, getUserHeaders } from '../api';
 
 interface ProjectEntry {
   name: string;
@@ -58,7 +58,10 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchResults, setBatchResults] = useState<any[]>([]);
   const [projectPassword, setProjectPassword] = useState('');
-  const [saveMode, setSaveMode] = useState<'server' | 'download' | 'fg'>('server');
+  // Default to the FieldGovern Account store: it's per-user private (server-side
+  // user_id filter + RLS) and syncs across devices. App Storage (local disk) needs
+  // server-side FG verify config and is the legacy fallback only.
+  const [saveMode, setSaveMode] = useState<'server' | 'download' | 'fg'>(fgContext ? 'fg' : 'server');
 
   // Auto-association: check if there's a last project for the current file
   const lastProjectName = currentFilename ? localStorage.getItem(`tableforge_last_project_${currentFilename}`) : null;
@@ -73,7 +76,10 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
 
   const [projectsDir, setProjectsDir] = useState('');
   const [fgProjects, setFgProjects] = useState<any[]>([]);
+  const [fgArchived, setFgArchived] = useState<any[]>([]);
+  const [showFgArchive, setShowFgArchive] = useState(false);
   const [loadingFg, setLoadingFg] = useState(false);
+  const [fgBusyId, setFgBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`${API_BASE}/projects`, { headers: getUserHeaders() })
@@ -83,12 +89,48 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
       .finally(() => setLoading(false));
     if (fgContext) {
       setLoadingFg(true);
-      fgListUserProjects(fgContext.fgUrl, fgContext.token, 'analyzer')
-        .then(projs => setFgProjects(projs.filter((p: any) => p.name && p.name !== '__autosave__')))
+      const clean = (list: any[]) => list.filter((p: any) => p.name && p.name !== '__autosave__');
+      Promise.all([
+        fgListUserProjects(fgContext.fgUrl, fgContext.token, 'analyzer', false),
+        fgListUserProjects(fgContext.fgUrl, fgContext.token, 'analyzer', true),
+      ])
+        .then(([active, arch]) => { setFgProjects(clean(active)); setFgArchived(clean(arch)); })
         .catch(() => {})
         .finally(() => setLoadingFg(false));
     }
   }, []);
+
+  const handleFgArchive = async (p: any) => {
+    if (!fgContext) return;
+    setFgBusyId(p.id);
+    try {
+      await fgArchiveProject(fgContext.fgUrl, fgContext.token, p.id);
+      setFgProjects(prev => prev.filter(x => x.id !== p.id));
+      setFgArchived(prev => [{ ...p, archived_at: new Date().toISOString() }, ...prev]);
+    } catch (e: any) { setError(e.message || 'Archive failed'); }
+    finally { setFgBusyId(null); }
+  };
+
+  const handleFgRestore = async (p: any) => {
+    if (!fgContext) return;
+    setFgBusyId(p.id);
+    try {
+      await fgRestoreProject(fgContext.fgUrl, fgContext.token, p.id);
+      setFgArchived(prev => prev.filter(x => x.id !== p.id));
+      setFgProjects(prev => [{ ...p, archived_at: null }, ...prev]);
+    } catch (e: any) { setError(e.message || 'Restore failed'); }
+    finally { setFgBusyId(null); }
+  };
+
+  const loadFgProject = (p: any) => {
+    if (p.data?.tables) {
+      const extra: Record<string, any> = {};
+      if (p.data.comparisonState) extra.comparisonState = p.data.comparisonState;
+      if (p.data.projectFilters) extra.projectFilters = p.data.projectFilters;
+      if (p.data.columnTypeOverrides) extra.columnTypeOverrides = p.data.columnTypeOverrides;
+      onLoad(p.data.tables, p.data.annotationsMap, extra);
+    }
+  };
 
   const handleSave = async () => {
     if (!saveName.trim()) { setError('Project name required'); return; }
@@ -137,7 +179,24 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
           headers: { 'Content-Type': 'application/json', ...getUserHeaders() },
           body: JSON.stringify({ name: saveName.trim(), config: { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, columnTypeOverrides: currentColumnTypeOverrides, sections: currentSections, numberingConfig: currentNumberingConfig, dataset_id: currentDatasetId, source_file: sourceFileInfo }, password: projectPassword || undefined }),
         });
-        if (!res.ok) throw new Error(await res.text());
+        // App Storage needs server-side FG verify config. If it rejects (e.g. 401
+        // "Sign in to save projects"), fall back to the private FG Account store
+        // so the user's work is never lost — and it stays visible only to them.
+        if (!res.ok) {
+          if (fgContext) {
+            await fgSaveProject(
+              fgContext.fgUrl, fgContext.token, saveName.trim(),
+              fgContext.programId || null,
+              { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, columnTypeOverrides: currentColumnTypeOverrides },
+            );
+            setSuccess(`Project "${saveName}" saved to your FieldGovern account (private to you). Access it from any device when logged in.`);
+            if (currentFilename) localStorage.setItem(`tableforge_last_project_${currentFilename}`, saveName.trim());
+            setSaveName('');
+            setSaving(false);
+            return;
+          }
+          throw new Error(await res.text());
+        }
         const saveResult = await res.json();
         const savedPath = saveResult.path || '';
         if (fgContext) {
@@ -354,31 +413,46 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
               {/* FG Account Projects */}
               {fgContext && (
                 <div style={{ marginTop: 16 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    FieldGovern Account Projects
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {showFgArchive ? '🗄 Archived Projects' : 'FieldGovern Account Projects'}
+                    </div>
+                    <button className="btn-secondary" style={{ padding: '3px 10px', fontSize: 11 }}
+                      onClick={() => setShowFgArchive(s => !s)}>
+                      {showFgArchive ? '← Active projects' : `🗄 Archive folder${fgArchived.length ? ` (${fgArchived.length})` : ''}`}
+                    </button>
                   </div>
                   {loadingFg ? (
                     <div className="loading-spinner">Loading account projects...</div>
-                  ) : fgProjects.length === 0 ? (
-                    <div style={{ fontSize: 12, color: '#64748b', padding: '8px 0' }}>No saved projects in your account.</div>
+                  ) : (showFgArchive ? fgArchived : fgProjects).length === 0 ? (
+                    <div style={{ fontSize: 12, color: '#64748b', padding: '8px 0' }}>
+                      {showFgArchive ? 'No archived projects.' : 'No saved projects in your account.'}
+                    </div>
                   ) : (
                     <div className="project-list">
-                      {fgProjects.map((p: any) => (
+                      {(showFgArchive ? fgArchived : fgProjects).map((p: any) => (
                         <div key={p.id} className="project-item">
                           <div className="project-info">
-                            <div className="project-name">☁️ {p.name}</div>
-                            <div className="project-date">{p.updated_at ? new Date(p.updated_at).toLocaleDateString() : ''}</div>
+                            <div className="project-name">{showFgArchive ? '🗄' : '☁️'} {p.name}</div>
+                            <div className="project-date">
+                              {(p.archived_at || p.updated_at) ? new Date(p.archived_at || p.updated_at).toLocaleDateString() : ''}
+                              {showFgArchive ? ' · archived' : ''}
+                            </div>
                           </div>
-                          <button className="btn-primary" style={{ padding: '4px 12px', fontSize: 12 }}
-                            onClick={() => {
-                              if (p.data?.tables) {
-                                const extra: Record<string, any> = {};
-                                if (p.data.comparisonState) extra.comparisonState = p.data.comparisonState;
-                                if (p.data.projectFilters) extra.projectFilters = p.data.projectFilters;
-                                if (p.data.columnTypeOverrides) extra.columnTypeOverrides = p.data.columnTypeOverrides;
-                                onLoad(p.data.tables, p.data.annotationsMap, extra);
-                              }
-                            }}>Load</button>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button className="btn-primary" style={{ padding: '4px 12px', fontSize: 12 }}
+                              onClick={() => loadFgProject(p)}>Load</button>
+                            {showFgArchive ? (
+                              <button className="btn-secondary" style={{ padding: '4px 10px', fontSize: 12 }}
+                                disabled={fgBusyId === p.id}
+                                onClick={() => handleFgRestore(p)}>↩ Restore</button>
+                            ) : (
+                              <button className="btn-secondary" style={{ padding: '4px 10px', fontSize: 12 }}
+                                disabled={fgBusyId === p.id}
+                                title="Archive (never deleted — restorable from the Archive folder)"
+                                onClick={() => handleFgArchive(p)}>🗄 Archive</button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -423,9 +497,9 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
                 </div>
                 <div className="hint-text" style={{ marginTop: 4 }}>
                   {saveMode === 'server'
-                    ? <>Saves to: <code style={{ background: 'rgba(0,0,0,0.2)', padding: '1px 4px', borderRadius: 3, fontSize: 11 }}>{projectsDir || 'projects/'}</code>. Shows up in the Recent tab.</>
+                    ? <>Saves to this server's local store (<code style={{ background: 'rgba(0,0,0,0.2)', padding: '1px 4px', borderRadius: 3, fontSize: 11 }}>{projectsDir || 'projects/'}</code>). If unavailable, it falls back to your private FieldGovern account.</>
                     : saveMode === 'fg'
-                    ? 'Saves to your FieldGovern account. Access from any device when logged in.'
+                    ? 'Saves privately to your FieldGovern account — visible only to you, on any device when logged in.'
                     : 'Downloads a .tableforge file to your chosen folder. Import it later from Recent tab.'}
                 </div>
               </div>
