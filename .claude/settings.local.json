@@ -52,7 +52,25 @@
       "WebFetch(domain:www.kobotoolbox.org)",
       "Read(//c/c/Life/DataCollectTool/tools/**)",
       "Read(//c/c/Life/DataCollectTool/tools/ngo_intel/**)",
-      "PowerShell(Get-CimInstance *)"
+      "PowerShell(Get-CimInstance *)",
+      "Bash(export LC_ALL=C.UTF-8 LANG=C.UTF-8)",
+      "Bash(export LC_ALL=C.UTF-8)",
+      "Skill(gstack)",
+      "WebFetch(domain:www.data.gov.in)",
+      "PowerShell(& \"C:\\\\Life\\\\Database_Contacts\\\\csr_intel\\\\refresh.bat\")",
+      "PowerShell(\"--- last lines of refresh log ---\")",
+      "Bash('C:\\\\Users\\\\apran/.claude/skills/gstack/browse/dist/browse' goto *)",
+      "Bash('C:\\\\Users\\\\apran/.claude/skills/gstack/browse/dist/browse' wait *)",
+      "Bash('C:\\\\Users\\\\apran/.claude/skills/gstack/browse/dist/browse' js *)",
+      "Bash('C:\\\\Users\\\\apran/.claude/skills/gstack/browse/dist/browse' console *)",
+      "Bash('C:\\\\Users\\\\apran/.claude/skills/gstack/browse/dist/browse' viewport *)",
+      "Bash('C:\\\\Users\\\\apran/.claude/skills/gstack/browse/dist/browse' screenshot *)",
+      "Bash('C:\\\\Users\\\\apran/.claude/skills/gstack/browse/dist/browse' click *)",
+      "Bash('C:\\\\Users\\\\apran/.claude/skills/gstack/browse/dist/browse' reload *)",
+      "Bash(nslookup -type=TXT fieldgovern.com)",
+      "Bash(nslookup -type=TXT google._domainkey.fieldgovern.com)",
+      "Bash(nslookup -type=TXT _dmarc.fieldgovern.com)",
+      "Bash(nslookup -type=MX fieldgovern.com)"
     ]
   },
   "mcpServers": {

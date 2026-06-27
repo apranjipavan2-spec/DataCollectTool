@@ -339,6 +339,20 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  flex: 1;
+}
+.import-drop-rowbtn {
+  flex-shrink: 0;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: var(--text-dim);
+  background: var(--bg-hover);
+  white-space: nowrap;
+}
+.import-drop-rowbtn:hover {
+  color: var(--text);
+  background: var(--accent, #3b82f6);
 }
 .import-drop-name {
   font-weight: 600;

@@ -191,13 +191,50 @@ async def proxy_save_fg_project(body: FGSaveProjectBody):
     return resp.json()
 
 
+class FGListBody(BaseModel):
+    fg_base_url: str
+    token: str
+    tool: str = "analyzer"
+    archived: bool = False
+
+
+class FGProjectActionBody(BaseModel):
+    fg_base_url: str
+    token: str
+    project_id: str
+
+
 @router.post("/api/fg/user-projects/list")
-async def proxy_list_fg_projects(body: FGBaseBody):
+async def proxy_list_fg_projects(body: FGListBody):
     import httpx
     base, verify = _fg_base(body.fg_base_url)
-    url = f"{base}/api/v1/tool-projects/?tool=analyzer"
+    url = f"{base}/api/v1/tool-projects/?tool={body.tool}&archived={'true' if body.archived else 'false'}"
     async with httpx.AsyncClient(timeout=30, verify=verify) as client:
         resp = await client.get(url, headers={"Authorization": f"Bearer {body.token}"})
     if resp.status_code != 200:
         raise HTTPException(resp.status_code, "Failed to list projects from FieldGovern")
+    return resp.json()
+
+
+@router.post("/api/fg/user-projects/archive")
+async def proxy_archive_fg_project(body: FGProjectActionBody):
+    import httpx
+    base, verify = _fg_base(body.fg_base_url)
+    url = f"{base}/api/v1/tool-projects/{body.project_id}"
+    async with httpx.AsyncClient(timeout=30, verify=verify) as client:
+        resp = await client.delete(url, headers={"Authorization": f"Bearer {body.token}"})
+    if resp.status_code != 200:
+        raise HTTPException(resp.status_code, "Failed to archive project in FieldGovern")
+    return resp.json()
+
+
+@router.post("/api/fg/user-projects/restore")
+async def proxy_restore_fg_project(body: FGProjectActionBody):
+    import httpx
+    base, verify = _fg_base(body.fg_base_url)
+    url = f"{base}/api/v1/tool-projects/{body.project_id}/restore"
+    async with httpx.AsyncClient(timeout=30, verify=verify) as client:
+        resp = await client.post(url, headers={"Authorization": f"Bearer {body.token}"})
+    if resp.status_code != 200:
+        raise HTTPException(resp.status_code, "Failed to restore project in FieldGovern")
     return resp.json()

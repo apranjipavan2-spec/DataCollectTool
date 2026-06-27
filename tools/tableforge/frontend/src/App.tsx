@@ -1006,6 +1006,106 @@ export default function App() {
     } finally { setLoading(false); setLoadingMsg(''); }
   }, [allColumns, pushUndo, runTabulationsBatch]);
 
+  // Apply already-fetched project data (inline tables, e.g. a FieldGovern
+  // account project) into the workspace. Mirrors the ProjectManager onLoad path.
+  const handleProjectLoaded = (loadedTablesArg: TableConfig[], loadedAnnotations?: Record<string, any[]>, loadedExtra?: Record<string, any>) => {
+    let loadedTables = loadedTablesArg;
+    if (loadedAnnotations) setAnnotationsMap(loadedAnnotations);
+    if (loadedExtra?.reportTemplate) setReportTemplate(loadedExtra.reportTemplate);
+    if (loadedExtra?.comparisonState) setComparisonState(loadedExtra.comparisonState);
+    if (loadedExtra?.projectFilters) {
+      setProjectFilters(loadedExtra.projectFilters);
+      projectFiltersRef.current = loadedExtra.projectFilters;
+    }
+    if (loadedExtra?.metadata) setPendingMetadataRestore(loadedExtra.metadata);
+    if (Array.isArray(loadedExtra?.sections)) setSections(loadedExtra.sections);
+    if (loadedExtra?.numberingConfig) setNumberingConfig(loadedExtra.numberingConfig);
+    if (loadedExtra?.columnTypeOverrides) {
+      const overrides = loadedExtra.columnTypeOverrides as Record<string, string>;
+      setColumnTypeOverrides(overrides);
+      if (dataset) {
+        setDataset(prev => prev ? ({
+          ...prev,
+          columns: prev.columns.map(c => overrides[c.name] ? { ...c, type: overrides[c.name] as any } : c),
+        }) : prev);
+        Object.entries(overrides).forEach(([col, newType]) => {
+          changeColumnType(dataset.dataset_id, col, newType).catch(() => {});
+        });
+      }
+    }
+    if (loadedExtra?.comparisonState && loadedTables.length > 0) {
+      const legacy = loadedExtra.comparisonState;
+      loadedTables = loadedTables.map(t => t.comparisonConfig ? t : { ...t, comparisonConfig: legacy });
+    }
+    if (!dataset) {
+      if (loadedExtra?.source_file?.cache_path || loadedExtra?.source_file?.dataset_id) {
+        fetch(`${API_BASE}/project/reload-file`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(loadedExtra.source_file),
+        }).then(r => r.ok ? r.json() : null).then(meta => {
+          if (meta) {
+            const overrides = loadedExtra?.columnTypeOverrides as Record<string, string> | undefined;
+            if (overrides && Object.keys(overrides).length > 0) {
+              meta.columns = meta.columns.map((c: any) => overrides[c.name] ? { ...c, type: overrides[c.name] } : c);
+              Object.entries(overrides).forEach(([col, newType]) => {
+                changeColumnType(meta.dataset_id, col, newType).catch(() => {});
+              });
+            }
+            setDataset(meta);
+          }
+          pushUndo();
+          setTables(loadedTables);
+          setActiveTableIdx(0);
+          setResults(rehydrateStatResults(loadedTables));
+          setModal(null);
+        }).catch(() => {
+          pushUndo();
+          setTables(loadedTables);
+          setActiveTableIdx(0);
+          setResults(rehydrateStatResults(loadedTables));
+          setModal(null);
+        });
+        return;
+      }
+      pushUndo();
+      setTables(loadedTables);
+      setActiveTableIdx(0);
+      setResults(rehydrateStatResults(loadedTables));
+      setModal(null);
+      return;
+    }
+    const colNames = allColumns.map(c => c.name);
+    const mismatches: ReconcileState['mismatches'] = [];
+    for (const t of loadedTables) {
+      const allFields = [
+        ...t.rows.map(f => ({ field: f, zone: 'rows' })),
+        ...t.columns.map(f => ({ field: f, zone: 'columns' })),
+        ...t.values.map(v => ({ field: v.field, zone: 'values' })),
+        ...Object.keys(t.filters).map(f => ({ field: f, zone: 'filters' })),
+      ];
+      for (const { field, zone } of allFields) {
+        if (!colNames.includes(field) && !mismatches.find(m => m.field === field)) {
+          mismatches.push({ field, zone, suggestion: fuzzyMatch(field, colNames) });
+        }
+      }
+    }
+    if (mismatches.length > 0) {
+      setModal(null);
+      setReconcileState({
+        pendingTables: loadedTables,
+        mismatches,
+        mapping: Object.fromEntries(mismatches.map(m => [m.field, m.suggestion])),
+      });
+    } else {
+      pushUndo();
+      setTables(loadedTables);
+      setActiveTableIdx(0);
+      setResults(rehydrateStatResults(loadedTables));
+      setModal(null);
+    }
+  };
+
   const handleReorderTables = useCallback((fromIdx: number, toIdx: number) => {
     if (fromIdx === toIdx) return;
     pushUndo();
@@ -1024,43 +1124,6 @@ export default function App() {
       }
       return prev;
     });
-  }, [pushUndo]);
-
-  const addTable = useCallback(() => {
-    const id = String(Date.now());
-    const num = tables.length + 1;
-    pushUndo();
-    setTables(prev => [...prev, createEmptyTable(id, `Table ${num}`)]);
-    setActiveTableIdx(tables.length);
-  }, [tables, pushUndo]);
-
-  const duplicateTable = useCallback(() => {
-    const src = tables[activeTableIdx];
-    const id = String(Date.now());
-    // Deep copy ALL settings including formatting, conditional formats, footnotes, etc.
-    const copy: TableConfig = JSON.parse(JSON.stringify(src));
-    copy.id = id;
-    copy.name = `${src.name} (copy)`;
-    pushUndo();
-    const insertAt = activeTableIdx + 1;
-    setTables(prev => [...prev.slice(0, insertAt), copy, ...prev.slice(insertAt)]);
-    setActiveTableIdx(insertAt);
-    runTabulation(copy);
-  }, [tables, activeTableIdx, pushUndo, runTabulation]);
-
-  const handleTransposeTable = useCallback(() => {
-    const table = tables[activeTableIdx];
-    updateTable({ rows: table.columns, columns: table.rows });
-  }, [tables, activeTableIdx, updateTable]);
-
-  const togglePinTable = useCallback((idx: number) => {
-    pushUndo();
-    setTables(prev => prev.map((tb, ti) => ti === idx ? { ...tb, pinned: !tb.pinned } : tb));
-  }, [pushUndo]);
-
-  const handleAssignSection = useCallback((tableIdx: number, sectionId: string | undefined) => {
-    pushUndo();
-    setTables(prev => prev.map((tb, ti) => ti === tableIdx ? { ...tb, section_id: sectionId } : tb));
   }, [pushUndo]);
 
   const formatTableNumber = useCallback((n: number, style: NumberingConfig['style'], sectionIdx?: number): string => {
@@ -1082,45 +1145,90 @@ export default function App() {
     return String(n);
   }, []);
 
-  const handleApplyNumbering = useCallback(() => {
-    pushUndo();
+  // Pure: re-derive every table's sequential number from its position/section.
+  // Used by Apply Numbering and on duplicate, so a new table never inherits a
+  // stale copy of another table's number.
+  const renumberTables = useCallback((tablesArr: TableConfig[]): TableConfig[] => {
     const prefix = numberingConfig.prefix || '';
     const suffix = numberingConfig.suffix || '';
-    setTables(prev => {
-      // Build ordered list of tables, grouped by section
-      const sortedSections = [...sections].sort((a, b) => a.order - b.order);
-      const grouped: Array<{ secIdx: number | undefined; tables: number[] }> = [];
-      // Unsectioned first
-      const unsectioned = prev.map((t, i) => (!t.section_id ? i : -1)).filter(i => i >= 0);
-      if (unsectioned.length) grouped.push({ secIdx: undefined, tables: unsectioned });
-      // Then by section order
-      sortedSections.forEach((sec, si) => {
-        const inSec = prev.map((t, i) => (t.section_id === sec.id ? i : -1)).filter(i => i >= 0);
-        if (inSec.length) grouped.push({ secIdx: si, tables: inSec });
-      });
-
-      const numberByIdx: Record<number, string> = {};
-      if (numberingConfig.scope === 'continuous') {
-        let counter = 1;
-        grouped.forEach(g => g.tables.forEach(idx => {
-          numberByIdx[idx] = `${prefix}${formatTableNumber(counter, numberingConfig.style)}${suffix}`;
-          counter++;
-        }));
-      } else {
-        // per_section
-        grouped.forEach(g => {
-          let counter = 1;
-          g.tables.forEach(idx => {
-            numberByIdx[idx] = `${prefix}${formatTableNumber(counter, numberingConfig.style, g.secIdx)}${suffix}`;
-            counter++;
-          });
-        });
-      }
-      return prev.map((tb, ti) => numberByIdx[ti] !== undefined
-        ? { ...tb, table_number: numberByIdx[ti], table_number_prefix: '' }
-        : tb);
+    const sortedSections = [...sections].sort((a, b) => a.order - b.order);
+    const grouped: Array<{ secIdx: number | undefined; tables: number[] }> = [];
+    const unsectioned = tablesArr.map((t, i) => (!t.section_id ? i : -1)).filter(i => i >= 0);
+    if (unsectioned.length) grouped.push({ secIdx: undefined, tables: unsectioned });
+    sortedSections.forEach((sec, si) => {
+      const inSec = tablesArr.map((t, i) => (t.section_id === sec.id ? i : -1)).filter(i => i >= 0);
+      if (inSec.length) grouped.push({ secIdx: si, tables: inSec });
     });
-  }, [pushUndo, sections, numberingConfig, formatTableNumber]);
+
+    const numberByIdx: Record<number, string> = {};
+    if (numberingConfig.scope === 'continuous') {
+      let counter = 1;
+      grouped.forEach(g => g.tables.forEach(idx => {
+        numberByIdx[idx] = `${prefix}${formatTableNumber(counter, numberingConfig.style)}${suffix}`;
+        counter++;
+      }));
+    } else {
+      grouped.forEach(g => {
+        let counter = 1;
+        g.tables.forEach(idx => {
+          numberByIdx[idx] = `${prefix}${formatTableNumber(counter, numberingConfig.style, g.secIdx)}${suffix}`;
+          counter++;
+        });
+      });
+    }
+    return tablesArr.map((tb, ti) => numberByIdx[ti] !== undefined
+      ? { ...tb, table_number: numberByIdx[ti], table_number_prefix: '' }
+      : tb);
+  }, [sections, numberingConfig, formatTableNumber]);
+
+  const addTable = useCallback(() => {
+    const id = String(Date.now());
+    const num = tables.length + 1;
+    pushUndo();
+    setTables(prev => [...prev, createEmptyTable(id, `Table ${num}`)]);
+    setActiveTableIdx(tables.length);
+  }, [tables, pushUndo]);
+
+  const duplicateTable = useCallback(() => {
+    const src = tables[activeTableIdx];
+    const id = String(Date.now());
+    // Deep copy ALL settings including formatting, conditional formats, footnotes, etc.
+    const copy: TableConfig = JSON.parse(JSON.stringify(src));
+    copy.id = id;
+    copy.name = `${src.name} (copy)`;
+    // Don't carry over the source's table number — clear it, then re-derive
+    // sequential numbers if numbering is in use so the copy gets the next one.
+    const numberingActive = tables.some(t => t.table_number);
+    copy.table_number = '';
+    pushUndo();
+    const insertAt = activeTableIdx + 1;
+    setTables(prev => {
+      const next = [...prev.slice(0, insertAt), copy, ...prev.slice(insertAt)];
+      return numberingActive ? renumberTables(next) : next;
+    });
+    setActiveTableIdx(insertAt);
+    runTabulation(copy);
+  }, [tables, activeTableIdx, pushUndo, runTabulation, renumberTables]);
+
+  const handleTransposeTable = useCallback(() => {
+    const table = tables[activeTableIdx];
+    updateTable({ rows: table.columns, columns: table.rows });
+  }, [tables, activeTableIdx, updateTable]);
+
+  const togglePinTable = useCallback((idx: number) => {
+    pushUndo();
+    setTables(prev => prev.map((tb, ti) => ti === idx ? { ...tb, pinned: !tb.pinned } : tb));
+  }, [pushUndo]);
+
+  const handleAssignSection = useCallback((tableIdx: number, sectionId: string | undefined) => {
+    pushUndo();
+    setTables(prev => prev.map((tb, ti) => ti === tableIdx ? { ...tb, section_id: sectionId } : tb));
+  }, [pushUndo]);
+
+  const handleApplyNumbering = useCallback(() => {
+    pushUndo();
+    setTables(prev => renumberTables(prev));
+  }, [pushUndo, renumberTables]);
 
   const refreshExtraColumns = useCallback(async () => {
     if (!dataset) return;
@@ -1400,7 +1508,7 @@ export default function App() {
             else if (a.startsWith('load_project:')) handleLoadProjectByPath(a.slice('load_project:'.length));
             else if (a === 'metric_library' || a === 'projects') setModal(a as ModalType);
           }}
-          onUpdate={() => {}} theme={theme} />
+          onUpdate={() => {}} theme={theme} fgContext={fgContext} onLoadProject={handleProjectLoaded} />
         <WelcomeScreen onFileUpload={handleFileUpload} loading={loading}
           loadingMsg={loadingMsg}
           uploadProgress={uploadProgress}
@@ -1448,7 +1556,7 @@ export default function App() {
             if (a === 'theme') setTheme(t => t === 'dark' ? 'light' : 'dark');
             else setModal(a as ModalType);
           }}
-          onUpdate={() => {}} theme={theme} />
+          onUpdate={() => {}} theme={theme} fgContext={fgContext} onLoadProject={handleProjectLoaded} />
         <DataPreview dataset={dataset}
           focusRow={previewFocus?.row ?? null}
           focusColumn={previewFocus?.column ?? null}
@@ -1545,6 +1653,8 @@ export default function App() {
         columns={allColumns}
         onColumnTypeChange={handleColumnTypeChange}
         onAskAI={q => { setSmartBuildPrefill({ query: q, autoSubmit: true }); setModal('ai-smart-build'); }}
+        fgContext={fgContext}
+        onLoadProject={handleProjectLoaded}
       />
       {aiPolishUndo && (Date.now() - aiPolishUndo.appliedAt < 60000) && (
         <div style={{ margin: '0 12px', padding: '8px 14px', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.35)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, flexShrink: 0 }}>
@@ -2467,112 +2577,7 @@ export default function App() {
         currentAnnotationsMap={annotationsMap} currentComparisonState={comparisonState} currentProjectFilters={projectFilters} currentColumnTypeOverrides={columnTypeOverrides} currentFilename={dataset?.filename}
         currentDatasetId={dataset?.dataset_id} currentRowCount={dataset?.row_count} currentColCount={dataset?.columns?.length}
         currentSections={sections} currentNumberingConfig={numberingConfig}
-        onLoad={(loadedTables, loadedAnnotations, loadedExtra) => {
-          if (loadedAnnotations) setAnnotationsMap(loadedAnnotations);
-          if (loadedExtra?.reportTemplate) setReportTemplate(loadedExtra.reportTemplate);
-          if (loadedExtra?.comparisonState) setComparisonState(loadedExtra.comparisonState);
-          if (loadedExtra?.projectFilters) {
-            setProjectFilters(loadedExtra.projectFilters);
-            projectFiltersRef.current = loadedExtra.projectFilters;
-          }
-          if (loadedExtra?.metadata) setPendingMetadataRestore(loadedExtra.metadata);
-          if (Array.isArray(loadedExtra?.sections)) setSections(loadedExtra.sections);
-          if (loadedExtra?.numberingConfig) setNumberingConfig(loadedExtra.numberingConfig);
-          if (loadedExtra?.columnTypeOverrides) {
-            const overrides = loadedExtra.columnTypeOverrides as Record<string, string>;
-            setColumnTypeOverrides(overrides);
-            if (dataset) {
-              setDataset(prev => prev ? ({
-                ...prev,
-                columns: prev.columns.map(c => overrides[c.name] ? { ...c, type: overrides[c.name] as any } : c),
-              }) : prev);
-              Object.entries(overrides).forEach(([col, newType]) => {
-                changeColumnType(dataset.dataset_id, col, newType).catch(() => {});
-              });
-            }
-          }
-          // Migrate legacy global comparisonState into per-table comparisonConfig
-          if (loadedExtra?.comparisonState && loadedTables.length > 0) {
-            const legacy = loadedExtra.comparisonState;
-            loadedTables = loadedTables.map(t =>
-              t.comparisonConfig ? t : { ...t, comparisonConfig: legacy }
-            );
-          }
-          if (!dataset) {
-            // Try to reload the source file from cache if available
-            if (loadedExtra?.source_file?.cache_path || loadedExtra?.source_file?.dataset_id) {
-              fetch(`${API_BASE}/project/reload-file`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(loadedExtra.source_file),
-              }).then(r => r.ok ? r.json() : null).then(meta => {
-                if (meta) {
-                  const overrides = loadedExtra?.columnTypeOverrides as Record<string, string> | undefined;
-                  if (overrides && Object.keys(overrides).length > 0) {
-                    meta.columns = meta.columns.map((c: any) => overrides[c.name] ? { ...c, type: overrides[c.name] } : c);
-                    Object.entries(overrides).forEach(([col, newType]) => {
-                      changeColumnType(meta.dataset_id, col, newType).catch(() => {});
-                    });
-                  }
-                  setDataset(meta);
-                  pushUndo();
-                  setTables(loadedTables);
-                  setActiveTableIdx(0);
-                  setResults(rehydrateStatResults(loadedTables));
-                } else {
-                  pushUndo();
-                  setTables(loadedTables);
-                  setActiveTableIdx(0);
-                  setResults(rehydrateStatResults(loadedTables));
-                }
-                setModal(null);
-              }).catch(() => {
-                pushUndo();
-                setTables(loadedTables);
-                setActiveTableIdx(0);
-                setResults(rehydrateStatResults(loadedTables));
-                setModal(null);
-              });
-              return;
-            }
-            pushUndo();
-            setTables(loadedTables);
-            setActiveTableIdx(0);
-            setResults(rehydrateStatResults(loadedTables));
-            setModal(null);
-            return;
-          }
-          // Check for column mismatches
-          const colNames = allColumns.map(c => c.name);
-          const mismatches: ReconcileState['mismatches'] = [];
-          for (const t of loadedTables) {
-            const allFields = [
-              ...t.rows.map(f => ({ field: f, zone: 'rows' })),
-              ...t.columns.map(f => ({ field: f, zone: 'columns' })),
-              ...t.values.map(v => ({ field: v.field, zone: 'values' })),
-              ...Object.keys(t.filters).map(f => ({ field: f, zone: 'filters' })),
-            ];
-            for (const { field, zone } of allFields) {
-              if (!colNames.includes(field) && !mismatches.find(m => m.field === field)) {
-                mismatches.push({ field, zone, suggestion: fuzzyMatch(field, colNames) });
-              }
-            }
-          }
-          if (mismatches.length > 0) {
-            setModal(null);
-            setReconcileState({
-              pendingTables: loadedTables,
-              mismatches,
-              mapping: Object.fromEntries(mismatches.map(m => [m.field, m.suggestion])),
-            });
-          } else {
-            pushUndo();
-            setTables(loadedTables);
-            setActiveTableIdx(0);
-            setResults(rehydrateStatResults(loadedTables));
-            setModal(null);
-          }
-        }}
+        onLoad={handleProjectLoaded}
         onClose={() => setModal(null)} fgContext={fgContext} />}
       {/* Column Reconciliation Dialog */}
       {reconcileState && (

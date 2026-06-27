@@ -610,15 +610,42 @@ async def export_word(config: ExportConfig):
     else:
         first_table_idx = 0
 
-    for t_idx, t in enumerate(config.tables):
-        # Each table decides orientation based on its own content width
-        est_width = _estimate_table_width_cm(t)
-        table_landscape = est_width > portrait_usable_cm
+    # Orientation: "portrait"/"landscape" forces a single orientation for every
+    # table; "auto" (default fallback) decides per-table by width. Continuous flow
+    # is only possible with a fixed orientation — different orientations require
+    # separate Word sections, which always break the page.
+    forced_orientation = opts.get("orientation")
+    if forced_orientation not in ("portrait", "landscape"):
+        forced_orientation = None
+    continuous = bool(opts.get("continuous")) and forced_orientation is not None
+    section_started = False
 
-        if t_idx == 0 and not opts.get("cover_page"):
-            section = doc.sections[0]
+    for t_idx, t in enumerate(config.tables):
+        if forced_orientation is not None:
+            table_landscape = forced_orientation == "landscape"
+        else:
+            # Each table decides orientation based on its own content width
+            est_width = _estimate_table_width_cm(t)
+            table_landscape = est_width > portrait_usable_cm
+
+        if not section_started:
+            # First content section. Reuse section 0 unless a cover page already
+            # claimed it (cover is portrait); then start a fresh content section.
+            if opts.get("cover_page"):
+                doc.add_section()
+                section = doc.sections[-1]
+            else:
+                section = doc.sections[0]
             _setup_section(section, table_landscape)
             _setup_header_footer(section)
+            section_started = True
+        elif continuous:
+            # Same orientation throughout → keep one section and just separate
+            # tables with a spacer, unless the table opts into its own page break.
+            if t.get("page_break_before"):
+                doc.add_page_break()
+            else:
+                doc.add_paragraph()
         else:
             # Honour per-table "Page Break Before" before starting a new section.
             if t.get("page_break_before"):
@@ -1036,9 +1063,16 @@ async def export_pdf(config: ExportConfig):
     output_path = EXPORTS_DIR / f"{config.filename}.pdf"
     opts = config.options or {}
 
+    # Page orientation: "landscape"/"portrait" applies to the whole document.
+    # "auto" (or unset) leaves the default portrait. Tables already flow
+    # continuously in the HTML body, so no per-table page breaks are inserted.
+    _pdf_orient = opts.get("orientation")
+    _page_size = "A4 landscape" if _pdf_orient == "landscape" else "A4 portrait"
+
     # Build HTML
     html_parts = ["""<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-    body { font-family: Segoe UI, Arial, sans-serif; font-size: 11px; margin: 20px; }
+    @page { size: %s; margin: 1cm; }
+    body { font-family: Segoe UI, Arial, sans-serif; font-size: 11px; margin: 20px; }""" % _page_size + """
     h1 { font-size: 20px; margin-bottom: 4px; }
     h2 { font-size: 14px; margin-bottom: 2px; color: #333; }
     .subtitle { font-size: 11px; color: #666; margin-bottom: 12px; }

@@ -69,7 +69,7 @@ function buildFormattedRows(t: TableConfig, res: TableResult): string[][] {
 function buildExportHtml(t: TableConfig, res: TableResult, fmtRows: string[][]): string {
   const renames = t.header_renames || {};
   const dispHeaders = res.headers.map(h => renames[h] || h);
-  const allHeaders = t.serial_number ? ['#', ...dispHeaders] : dispHeaders;
+  const allHeaders = t.serial_number ? ['SN', ...dispHeaders] : dispHeaders;
   const nRowCols = (t.rows?.length || 0) + (t.serial_number ? 1 : 0);
   const cg = res.column_groups;
   const hasMultiLevel = cg?.has_multi_level;
@@ -188,7 +188,8 @@ interface ExportOptions {
   footer_text: string;
   page_numbers: boolean;
   include_raw_data: boolean;
-  landscape: boolean;
+  orientation: 'auto' | 'portrait' | 'landscape';
+  continuous: boolean;
   formula_export: boolean;
 }
 
@@ -208,7 +209,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
   const [opts, setOpts] = useState<ExportOptions>({
     cover_page: false, cover_title: '', cover_subtitle: '',
     header_text: '', footer_text: '', page_numbers: true,
-    include_raw_data: false, landscape: false, formula_export: false,
+    include_raw_data: false, orientation: 'portrait', continuous: true, formula_export: false,
   });
 
   // Off-screen ChartCanvas refs so we can serialize SVGs to PNG for Word/PPTX export.
@@ -345,7 +346,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
           }));
           return {
             name: t.name,
-            headers: t.serial_number ? ['#', ...displayHeaders] : displayHeaders,
+            headers: t.serial_number ? ['SN', ...displayHeaders] : displayHeaders,
             rows: t.serial_number
               ? res.rows.map((row, ri) => {
                   const isGT = String(row[0]) === 'Grand Total';
@@ -515,7 +516,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
         }));
         return {
           name: t.name,
-          headers: t.serial_number ? ['#', ...displayHeaders] : displayHeaders,
+          headers: t.serial_number ? ['SN', ...displayHeaders] : displayHeaders,
           rows: t.serial_number
             ? res.rows.map((row, ri) => {
                 const isGT = String(row[0]) === 'Grand Total';
@@ -625,7 +626,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
       const renames = t.header_renames || {};
       const dispHeaders = res.headers.map(h => renames[h] || h);
       const fmtRows = buildFormattedRows(t, res);
-      const allHeaders = t.serial_number ? ['#', ...dispHeaders] : dispHeaders;
+      const allHeaders = t.serial_number ? ['SN', ...dispHeaders] : dispHeaders;
       const nRowCols = (t.rows?.length || 0) + (t.serial_number ? 1 : 0);
       const cg = res.column_groups;
       const hasMultiLevel = cg?.has_multi_level;
@@ -958,10 +959,21 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
                       onChange={e => setOpts(o => ({ ...o, page_numbers: e.target.checked }))} />
                     Include Page Numbers
                   </label>
+                  <div className="form-row" style={{ marginTop: 6 }}>
+                    <label>Page Orientation</label>
+                    <select value={opts.orientation}
+                      onChange={e => setOpts(o => ({ ...o, orientation: e.target.value as ExportOptions['orientation'] }))}>
+                      <option value="portrait">Portrait (all tables)</option>
+                      <option value="landscape">Landscape (all tables)</option>
+                      <option value="auto">Auto (fit each table by width)</option>
+                    </select>
+                  </div>
                   <label className="checkbox-label" style={{ marginTop: 6 }}>
-                    <input type="checkbox" checked={opts.landscape}
-                      onChange={e => setOpts(o => ({ ...o, landscape: e.target.checked }))} />
-                    Landscape Orientation
+                    <input type="checkbox" checked={opts.continuous}
+                      disabled={opts.orientation === 'auto'}
+                      onChange={e => setOpts(o => ({ ...o, continuous: e.target.checked }))} />
+                    Continuous flow (don't start each table on a new page)
+                    {opts.orientation === 'auto' && <span style={{ color: '#999', fontSize: 11 }}> — pick a fixed orientation to enable</span>}
                   </label>
                 </>
               )}
