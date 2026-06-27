@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import type { TableConfig, TableResult, DatasetMeta } from '../types'
+import { tabulate } from '../api'
 
 type Status = 'pending' | 'running' | 'done' | 'error' | 'skipped'
 interface RowState {
@@ -80,8 +81,34 @@ export function BatchRenameModal({ tables, allResults, dataset, projectFilters, 
       updateRow(i, { status: 'running' })
 
       try {
-        const result = allResults.get(tab.id)
-        if (!result) {
+        // Most tables aren't tabulated until viewed, so allResults is usually
+        // empty right after a project loads. Rather than skip them all, compute
+        // the result on the fly so the AI has real headers/sample rows to work with.
+        let result = allResults.get(tab.id)
+        if (!result || !result.headers) {
+          try {
+            result = await tabulate({
+              dataset_id: dataset.dataset_id,
+              rows: tab.rows, columns: tab.columns, values: tab.values,
+              filters: { ...projectFilters, ...(tab.filters || {}) },
+              grand_total: tab.grand_total ?? true,
+              grand_total_rows: tab.grand_total_rows,
+              grand_total_columns: tab.grand_total_columns,
+              grand_total_combined: tab.grand_total_combined,
+              grand_total_agg: tab.grand_total_agg,
+              subtotals: tab.subtotals ?? false,
+              subtotal_pct_base: tab.subtotal_pct_base,
+              missing_data: tab.missing_data ?? '',
+              sort_by: tab.sort_by, sort_order: tab.sort_order,
+              multi_sort: tab.multi_sort,
+              date_groupings: tab.date_groupings,
+              blank_suppress: tab.blank_suppress,
+              hide_subgroup: tab.hide_subgroup,
+              net_rows: tab.net_rows,
+            })
+          } catch { /* fall through to skip below */ }
+        }
+        if (!result || !result.headers) {
           updateRow(i, { status: 'skipped' })
           skippedCount++
           continue
