@@ -1065,11 +1065,17 @@ async def tabulate(config: TableConfig):
                     if has_margin_col and gt_col:
                         pivot_df[gt_col] = 100.0
                 elif sa == "pct_grand":
-                    # Use only data columns to calculate the grand total (exclude margin column)
-                    grand = pivot_df[data_cols].values.sum() if data_cols else pivot_df[numeric_cols].values.sum()
-                    # If margins exist, the actual grand is half (margins double it)
-                    if has_margin_col and config.grand_total:
-                        grand = grand  # data_cols already excludes Grand Total column
+                    # Denominator = sum of body cells only. data_cols already drops the
+                    # Grand Total *column*; we must also drop the Grand Total/Subtotal
+                    # *rows*, otherwise the margin row double-counts the total (e.g. a
+                    # real total of 205 becomes 410, so every cell reads half its true %).
+                    if isinstance(pivot_df.index, pd.MultiIndex):
+                        _lbl = pd.Series([" ".join(str(x) for x in tup) for tup in pivot_df.index])
+                    else:
+                        _lbl = pivot_df.iloc[:, 0].astype(str).reset_index(drop=True)
+                    _body_mask = ~_lbl.str.contains("Grand Total|Subtotal", na=False)
+                    _body = pivot_df.loc[_body_mask.values]
+                    grand = np.nansum(_body[data_cols].values) if data_cols else np.nansum(_body[numeric_cols].values)
                     if grand != 0:
                         for c in numeric_cols:
                             pivot_df[c] = (pivot_df[c] / grand * 100).round(decimal_places)
