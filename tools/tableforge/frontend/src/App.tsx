@@ -589,6 +589,7 @@ export default function App() {
       rows: config.rows, columns: config.columns, values: config.values,
       filters: mergeProjectFilters(projectFiltersRef.current, config.filters), grand_total: config.grand_total,
       grand_total_rows: config.grand_total_rows, grand_total_columns: config.grand_total_columns, grand_total_combined: config.grand_total_combined,
+      grand_total_agg: config.grand_total_agg,
       subtotals: config.subtotals, subtotal_pct_base: config.subtotal_pct_base,
       missing_data: config.missing_data,
       sort_by: config.sort_by, sort_order: config.sort_order,
@@ -717,7 +718,7 @@ export default function App() {
     // theme, formats, etc.) don't need a re-tabulation, which makes typing in those inputs snappy.
     const TABULATION_KEYS = new Set([
       'rows', 'columns', 'values', 'filters',
-      'grand_total', 'grand_total_rows', 'grand_total_columns', 'grand_total_combined',
+      'grand_total', 'grand_total_rows', 'grand_total_columns', 'grand_total_combined', 'grand_total_agg',
       'subtotals', 'subtotal_pct_base',
       'missing_data',
       'sort_by', 'sort_order', 'multi_sort',

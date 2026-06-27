@@ -88,6 +88,7 @@ export async function tabulate(config: {
   grand_total_rows?: boolean;
   grand_total_columns?: boolean;
   grand_total_combined?: boolean;
+  grand_total_agg?: 'auto' | 'sum' | 'average';
   subtotals: boolean;
   subtotal_pct_base?: string;
   missing_data: string;

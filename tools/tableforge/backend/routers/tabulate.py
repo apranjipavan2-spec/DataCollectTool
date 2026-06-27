@@ -172,6 +172,7 @@ class TableConfig(BaseModel):
     grand_total_rows: Optional[bool] = None    # None = follow grand_total
     grand_total_columns: Optional[bool] = None # None = follow grand_total
     grand_total_combined: bool = False         # Club all values into single Grand Total column
+    grand_total_agg: str = "auto"              # "auto" | "sum" | "average" — how the row Grand Total combines value columns
     sort_by: Optional[str] = None
     sort_order: str = "asc"
     multi_sort: list[dict] = []     # [{field, order}] for multi-key sorting
@@ -704,8 +705,14 @@ async def tabulate(config: TableConfig):
                 existing_vcols = [c for c in value_cols if c in result.columns]
                 if existing_vcols:
                     numeric_part = result[existing_vcols].apply(pd.to_numeric, errors="coerce").fillna(0)
-                    all_avg = all(v.get("agg", "sum") in ("average", "mean") for v in config.values)
-                    result["Grand Total"] = numeric_part.mean(axis=1) if all_avg else numeric_part.sum(axis=1)
+                    gta = (config.grand_total_agg or "auto").lower()
+                    if gta == "average":
+                        use_mean = True
+                    elif gta == "sum":
+                        use_mean = False
+                    else:  # auto: average only when every value field is an average/mean
+                        use_mean = all(v.get("agg", "sum") in ("average", "mean") for v in config.values)
+                    result["Grand Total"] = numeric_part.mean(axis=1) if use_mean else numeric_part.sum(axis=1)
 
             # Blank suppression
             if config.blank_suppress:
