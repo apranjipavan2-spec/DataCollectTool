@@ -241,8 +241,11 @@ async def tabulate(config: TableConfig):
                 elif override is None and vc in df.columns and _is_multi_choice(df[vc]):
                     multi_choice_cols.append(vc)
 
-        # Explode multi-choice columns: split comma-separated values into separate rows
-        _nan_strs = {'nan', 'NaN', 'None', 'NaT', '', '<NA>', 'null'}
+        # Explode multi-choice columns: split comma-separated values into separate rows.
+        # NOTE: "None"/"null" are NOT treated as missing here — in a survey multi-choice
+        # question "None" (e.g. "None of the above") is a legitimate answer the user wants
+        # counted. Only true serialization artifacts / actual NaN count as missing.
+        _nan_strs = {'nan', 'NaN', 'NaT', '', '<NA>'}
         for mc_col in multi_choice_cols:
             def _split_multi(x, _ns=_nan_strs):
                 if pd.isna(x):
@@ -286,7 +289,10 @@ async def tabulate(config: TableConfig):
             return {"headers": [], "rows": [], "row_count": 0, "col_count": 0}
 
         # Clean NaT/NaN from groupby/pivot fields to prevent index errors
-        _bad_strs = {'nan', 'NaN', 'NaT', 'None', '<NA>'}
+        # "None" is intentionally NOT here: it's a legitimate categorical/survey answer
+        # ("None of the above"). Only true NaN (via pd.isna) and serialization artifacts
+        # count as blank.
+        _bad_strs = {'nan', 'NaN', 'NaT', '<NA>'}
         for _gc in config.rows + config.columns:
             if _gc in df.columns:
                 _nat_mask = df[_gc].apply(lambda v: pd.isna(v) or str(v).strip() in _bad_strs)
@@ -819,7 +825,7 @@ async def tabulate(config: TableConfig):
             # Clean NaT/NaN from pivot index and column fields to prevent margins errors
             for _pc in config.rows + temp_cols:
                 if _pc in df.columns:
-                    _nat_mask = df[_pc].apply(lambda v: pd.isna(v) or str(v).strip() in ('nan', 'NaN', 'NaT', 'None', '<NA>'))
+                    _nat_mask = df[_pc].apply(lambda v: pd.isna(v) or str(v).strip() in ('nan', 'NaN', 'NaT', '<NA>'))
                     if _nat_mask.any():
                         df.loc[_nat_mask, _pc] = "(blank)"
 

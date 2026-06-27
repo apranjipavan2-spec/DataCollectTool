@@ -469,7 +469,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
               const nRowCols = tableConfig?.rows?.length || 0;
               return (
                 <tr style={{ background: tv.headerBg }}>
-                  {serialNumber && <th rowSpan={2} style={{ background: tv.headerBg, color: tv.headerColor, borderColor: tv.borderColor }}>#</th>}
+                  {serialNumber && <th rowSpan={2} style={{ background: tv.headerBg, color: tv.headerColor, borderColor: tv.borderColor }}>SN</th>}
                   {/* Row dimension columns span two rows */}
                   {result.headers.slice(0, nRowCols).map((h, i) => (
                     <th key={i} rowSpan={2} style={{ borderColor: tv.borderColor, ...getHeaderStyle(h, tv) }}>
@@ -488,7 +488,7 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
             {/* Main header row */}
             <tr style={{ background: tv.headerBg }}>
               {!result.column_groups?.has_multi_level && serialNumber && (
-                <th style={{ background: tv.headerBg, color: tv.headerColor, borderColor: tv.borderColor }}>#</th>
+                <th style={{ background: tv.headerBg, color: tv.headerColor, borderColor: tv.borderColor }}>SN</th>
               )}
               {result.headers.map((h, i) => {
                 // Skip row-dimension headers if they already have rowSpan=2 above

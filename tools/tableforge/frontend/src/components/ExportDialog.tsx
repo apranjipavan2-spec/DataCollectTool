@@ -69,7 +69,7 @@ function buildFormattedRows(t: TableConfig, res: TableResult): string[][] {
 function buildExportHtml(t: TableConfig, res: TableResult, fmtRows: string[][]): string {
   const renames = t.header_renames || {};
   const dispHeaders = res.headers.map(h => renames[h] || h);
-  const allHeaders = t.serial_number ? ['#', ...dispHeaders] : dispHeaders;
+  const allHeaders = t.serial_number ? ['SN', ...dispHeaders] : dispHeaders;
   const nRowCols = (t.rows?.length || 0) + (t.serial_number ? 1 : 0);
   const cg = res.column_groups;
   const hasMultiLevel = cg?.has_multi_level;
@@ -345,7 +345,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
           }));
           return {
             name: t.name,
-            headers: t.serial_number ? ['#', ...displayHeaders] : displayHeaders,
+            headers: t.serial_number ? ['SN', ...displayHeaders] : displayHeaders,
             rows: t.serial_number
               ? res.rows.map((row, ri) => {
                   const isGT = String(row[0]) === 'Grand Total';
@@ -515,7 +515,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
         }));
         return {
           name: t.name,
-          headers: t.serial_number ? ['#', ...displayHeaders] : displayHeaders,
+          headers: t.serial_number ? ['SN', ...displayHeaders] : displayHeaders,
           rows: t.serial_number
             ? res.rows.map((row, ri) => {
                 const isGT = String(row[0]) === 'Grand Total';
@@ -625,7 +625,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
       const renames = t.header_renames || {};
       const dispHeaders = res.headers.map(h => renames[h] || h);
       const fmtRows = buildFormattedRows(t, res);
-      const allHeaders = t.serial_number ? ['#', ...dispHeaders] : dispHeaders;
+      const allHeaders = t.serial_number ? ['SN', ...dispHeaders] : dispHeaders;
       const nRowCols = (t.rows?.length || 0) + (t.serial_number ? 1 : 0);
       const cg = res.column_groups;
       const hasMultiLevel = cg?.has_multi_level;
