@@ -555,6 +555,14 @@ function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0
               <FToggle label="Combined Grand Total" checked={!!t.grand_total_combined} onChange={v => onUpdate({ grand_total_combined: v })} />
               <FToggle label="Subtotals (hierarchical)" checked={t.subtotals}      onChange={v => onUpdate({ subtotals: v })} />
             </div>
+            <FField label="Grand Total Calculation" style={{ marginTop: 8 }}>
+              <select value={t.grand_total_agg || 'auto'} className="fdrop-select"
+                onChange={e => onUpdate({ grand_total_agg: e.target.value as any })}>
+                <option value="auto">Auto (average if all values are averages)</option>
+                <option value="sum">Total (sum the values)</option>
+                <option value="average">Average (mean of the values)</option>
+              </select>
+            </FField>
             {t.subtotals && (
               <>
               <FField label="Subtotal Position" style={{ marginTop: 8 }}>

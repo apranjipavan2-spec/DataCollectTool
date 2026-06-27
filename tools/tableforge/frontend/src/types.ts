@@ -115,6 +115,7 @@ export interface TableConfig {
   grand_total_rows?: boolean;
   grand_total_columns?: boolean;
   grand_total_combined?: boolean;
+  grand_total_agg?: 'auto' | 'sum' | 'average';
   subtotals: boolean;
   subtotals_position?: 'top' | 'bottom';
   subtotal_pct_base?: 'subtotal' | 'grand_total';
