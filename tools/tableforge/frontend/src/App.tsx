@@ -248,6 +248,9 @@ export default function App() {
   const [showProjectFilterPanel, setShowProjectFilterPanel] = useState(false);
   const [projectFilters, setProjectFilters] = useState<Record<string, string[]>>({});
   const projectFiltersRef = useRef<Record<string, string[]>>({});
+  // Mirror of columnTypeOverrides so async tabulation always reads the latest
+  // value without a stale closure (used to keep multi_choice across reloads).
+  const columnTypeOverridesRef = useRef<Record<string, string>>({});
   const [statEditConfig, setStatEditConfig] = useState<{ columns: string[]; alpha: number; analysisFilters: Record<string, string[]>; useProjectFilter: boolean } | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -398,6 +401,7 @@ export default function App() {
 
   // Keep projectFiltersRef in sync so runTabulation can read the latest value
   useEffect(() => { projectFiltersRef.current = projectFilters; }, [projectFilters]);
+  useEffect(() => { columnTypeOverridesRef.current = columnTypeOverrides; }, [columnTypeOverrides]);
 
   // Fetch column-type hints whenever the dataset (or override set) changes
   useEffect(() => {
@@ -588,6 +592,11 @@ export default function App() {
       dataset_id: dataset.dataset_id,
       rows: config.rows, columns: config.columns, values: config.values,
       filters: mergeProjectFilters(projectFiltersRef.current, config.filters), grand_total: config.grand_total,
+      // Carry the user's column-type overrides (e.g. multi_choice) with every
+      // request so tabulation honours them even before the async changeColumnType
+      // calls finish on reload — otherwise a multi_choice column briefly reverts
+      // to text/category and the table is built wrong.
+      column_type_overrides: columnTypeOverridesRef.current,
       grand_total_rows: config.grand_total_rows, grand_total_columns: config.grand_total_columns, grand_total_combined: config.grand_total_combined,
       grand_total_agg: config.grand_total_agg,
       subtotals: config.subtotals, subtotal_pct_base: config.subtotal_pct_base,
@@ -2483,6 +2492,7 @@ export default function App() {
           result={results.get(tables[activeTableIdx]?.id) || null}
           interpretation={tableInterpretations[tables[activeTableIdx]?.id] || ''}
           projectFilters={projectFilters}
+          columnTypeOverrides={columnTypeOverrides}
           columnDescriptions={columnDescriptions}
           prefillQuery={smartBuildPrefill || undefined}
           onClose={() => { setModal(null); setSmartBuildPrefill(null); }}

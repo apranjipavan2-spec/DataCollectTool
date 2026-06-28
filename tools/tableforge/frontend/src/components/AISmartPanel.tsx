@@ -12,6 +12,7 @@ interface Props {
   result: TableResult | null;
   interpretation?: string;
   projectFilters?: Record<string, string[]>;
+  columnTypeOverrides?: Record<string, string>;
   onClose: () => void;
   onApplyPolish?: (title: string, subtitle: string, renames: Record<string, string>) => void;
   onApplyPolishAll?: (updates: { tableId: string; title: string; subtitle: string; renames: Record<string, string> }[]) => void;
@@ -43,7 +44,7 @@ const REPORT_STYLES = [
   { key: 'executive', label: 'Executive Summary' },
 ];
 
-export function AISmartPanel({ mode, table, tables, allResults, dataset, result, interpretation, projectFilters = {}, onClose, onApplyPolish, onApplyPolishAll, onApplyInterpretation, onApplyInterpretationAll, onApplySuggestion, onApplySmartBuild, columnDescriptions = {}, prefillQuery }: Props) {
+export function AISmartPanel({ mode, table, tables, allResults, dataset, result, interpretation, projectFilters = {}, columnTypeOverrides = {}, onClose, onApplyPolish, onApplyPolishAll, onApplyInterpretation, onApplyInterpretationAll, onApplySuggestion, onApplySmartBuild, columnDescriptions = {}, prefillQuery }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [aiResult, setAiResult] = useState<any>(null);
@@ -381,10 +382,13 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
                   allResults={allResults}
                   dataset={dataset}
                   projectFilters={projectFilters}
+                  columnTypeOverrides={columnTypeOverrides}
                   onClose={() => setShowBatchRename(false)}
                   onApplyAll={(updates) => {
+                    // Apply the renames but keep the modal open so its progress
+                    // bar and completion summary stay visible. The modal's own
+                    // "Done" button (onClose) is what dismisses it.
                     onApplyPolishAll?.(updates);
-                    setShowBatchRename(false);
                   }}
                   onRollback={() => setShowBatchRename(false)}
                 />
