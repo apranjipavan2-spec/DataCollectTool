@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType, TableSection, NumberingConfig } from './types';
-import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg, getColumnRoles, bulkSetColumnRoles, saveStudyDesign, cleanerApi, buildCleanerUrl, setFgAuth } from './api';
+import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg, getColumnRoles, bulkSetColumnRoles, saveStudyDesign, cleanerApi, buildCleanerUrl, setFgAuth, getUserHeaders } from './api';
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
 import { LivePreview } from './components/LivePreview';
@@ -932,7 +932,7 @@ export default function App() {
   const handleLoadProjectByPath = useCallback(async (path: string) => {
     setLoading(true); setLoadingMsg('Loading project…');
     try {
-      const res = await fetch(`${API_BASE}/project/load?path=` + encodeURIComponent(path));
+      const res = await fetch(`${API_BASE}/project/load?path=` + encodeURIComponent(path), { headers: getUserHeaders() });
       if (!res.ok) throw new Error('Failed to load project');
       const data = await res.json();
       if (!data.tables || !Array.isArray(data.tables)) throw new Error('Invalid project data');
@@ -1271,13 +1271,13 @@ export default function App() {
   const handleApplyLastProject = useCallback(async (projectName: string) => {
     try {
       // First list projects to find the path
-      const listRes = await fetch(`${API_BASE}/projects`);
+      const listRes = await fetch(`${API_BASE}/projects`, { headers: getUserHeaders() });
       const listData = await listRes.json();
       const proj = (listData.projects || []).find((p: any) => p.name === projectName);
       if (!proj) { setError(`Project "${projectName}" not found`); return; }
 
       // Load the project
-      const res = await fetch(`${API_BASE}/project/load?path=` + encodeURIComponent(proj.path));
+      const res = await fetch(`${API_BASE}/project/load?path=` + encodeURIComponent(proj.path), { headers: getUserHeaders() });
       if (!res.ok) throw new Error('Failed to load project');
       const data = await res.json();
       if (!data.tables || !Array.isArray(data.tables)) throw new Error('Invalid project data');
