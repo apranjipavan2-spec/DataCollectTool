@@ -84,6 +84,7 @@ export async function tabulate(config: {
   columns: string[];
   values: { field: string; agg: string; label?: string; suppress_below_n?: number; [key: string]: any }[];
   filters: Record<string, string[]>;
+  column_type_overrides?: Record<string, string>;
   grand_total: boolean;
   grand_total_rows?: boolean;
   grand_total_columns?: boolean;

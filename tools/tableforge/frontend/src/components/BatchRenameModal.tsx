@@ -16,6 +16,7 @@ interface Props {
   allResults: Map<string, TableResult>
   dataset: DatasetMeta | null
   projectFilters: Record<string, string[]>
+  columnTypeOverrides?: Record<string, string>
   onClose: () => void
   onApplyAll: (updates: { tableId: string; title: string; subtitle: string; renames: Record<string, string> }[]) => void
   onRollback: () => void
@@ -23,7 +24,7 @@ interface Props {
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api'
 
-export function BatchRenameModal({ tables, allResults, dataset, projectFilters, onClose, onApplyAll, onRollback }: Props) {
+export function BatchRenameModal({ tables, allResults, dataset, projectFilters, columnTypeOverrides, onClose, onApplyAll, onRollback }: Props) {
   const [rowStates, setRowStates] = useState<RowState[]>(tables.map(t => ({ id: t.id, name: t.name || t.title, status: 'pending' })))
   const [currentIdx, setCurrentIdx] = useState(0)
   const [phase, setPhase] = useState<'idle' | 'running' | 'cancelled' | 'done' | 'error'>('idle')
@@ -91,6 +92,7 @@ export function BatchRenameModal({ tables, allResults, dataset, projectFilters, 
               dataset_id: dataset.dataset_id,
               rows: tab.rows, columns: tab.columns, values: tab.values,
               filters: { ...projectFilters, ...(tab.filters || {}) },
+              column_type_overrides: columnTypeOverrides,
               grand_total: tab.grand_total ?? true,
               grand_total_rows: tab.grand_total_rows,
               grand_total_columns: tab.grand_total_columns,

@@ -173,6 +173,7 @@ class TableConfig(BaseModel):
     grand_total_columns: Optional[bool] = None # None = follow grand_total
     grand_total_combined: bool = False         # Club all values into single Grand Total column
     grand_total_agg: str = "auto"              # "auto" | "sum" | "average" — how the row Grand Total combines value columns
+    column_type_overrides: dict = {}           # {col: "multi_choice"|"text"|...} carried per-request so reloads don't race
     sort_by: Optional[str] = None
     sort_order: str = "asc"
     multi_sort: list[dict] = []     # [{field, order}] for multi-key sorting
@@ -220,7 +221,10 @@ async def tabulate(config: TableConfig):
         multi_choice_cols = []
         all_used_cols = list(set(config.rows + config.columns + list(config.filters.keys())))
         from ..shared import get_overrides as _get_overrides
-        _type_overrides = _get_overrides(config.dataset_id)
+        # Merge server-side overrides with any carried in the request. The request
+        # copy wins so a freshly-reloaded project keeps its multi_choice columns
+        # even before the async changeColumnType calls land server-side.
+        _type_overrides = {**_get_overrides(config.dataset_id), **(config.column_type_overrides or {})}
         for col_name in all_used_cols:
             override = _type_overrides.get(col_name)
             if override == "multi_choice":
