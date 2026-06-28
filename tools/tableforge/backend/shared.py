@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel
+from fastapi import Header, HTTPException
 
 # In-memory stores
 datasets: dict = {}
@@ -118,6 +119,23 @@ async def verify_fg_identity(token: Optional[str], fg_base_url: Optional[str] = 
     if not identity["id"]:
         return None
     _identity_cache[token] = (now + _IDENTITY_TTL, identity)
+    return identity
+
+
+async def require_identity(
+    authorization: Optional[str] = Header(None),
+    x_fg_base_url: Optional[str] = Header(None),
+) -> dict:
+    """Global auth gate for data/compute endpoints. Rejects the request with 401
+    unless the caller presents a FieldGovern JWT that FG itself confirms is valid.
+    Identity is never taken from client-supplied id/role headers — only from the
+    verified token — so the analyzer cannot be used anonymously."""
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    identity = await verify_fg_identity(token, x_fg_base_url)
+    if not identity or not identity.get("id"):
+        raise HTTPException(status_code=401, detail="Authentication required")
     return identity
 
 

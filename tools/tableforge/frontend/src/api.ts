@@ -8,19 +8,88 @@ export const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api';
 let _fgToken: string | null = null;
 let _fgBaseUrl: string | null = null;
 
+const FG_TOKEN_KEY = 'tf_fg_token';
+const FG_BASE_KEY = 'tf_fg_base';
+
 // Capture the token from the launch URL at module load — before <App> strips the
-// query string — so the first request already carries it.
+// query string — so the first request already carries it. Persist it to
+// sessionStorage so a page refresh / internal navigation keeps the session
+// instead of silently dropping auth (which previously left the tool open).
 (function initFgAuth() {
   try {
     const p = new URLSearchParams(window.location.search);
     const t = p.get('token');
-    if (t) { _fgToken = t; _fgBaseUrl = p.get('fg_url'); }
+    if (t) {
+      _fgToken = t;
+      _fgBaseUrl = p.get('fg_url');
+      try {
+        sessionStorage.setItem(FG_TOKEN_KEY, t);
+        if (_fgBaseUrl) sessionStorage.setItem(FG_BASE_KEY, _fgBaseUrl);
+      } catch { /* storage disabled */ }
+    } else {
+      _fgToken = sessionStorage.getItem(FG_TOKEN_KEY);
+      _fgBaseUrl = sessionStorage.getItem(FG_BASE_KEY);
+    }
   } catch { /* no-op */ }
 })();
 
 export function setFgAuth(token: string | null, baseUrl: string | null) {
   _fgToken = token || null;
   _fgBaseUrl = baseUrl || null;
+  try {
+    if (token) sessionStorage.setItem(FG_TOKEN_KEY, token);
+    else sessionStorage.removeItem(FG_TOKEN_KEY);
+    if (baseUrl) sessionStorage.setItem(FG_BASE_KEY, baseUrl);
+    else sessionStorage.removeItem(FG_BASE_KEY);
+  } catch { /* storage disabled */ }
+}
+
+// ── Client-side auth gate helpers ─────────────────────────────────────────────
+// The backend re-verifies the token on every request (the real boundary); these
+// helpers only decide whether to render the tool or a "please log in" screen.
+export function hasValidToken(): boolean {
+  if (!_fgToken) return false;
+  try {
+    const payload = JSON.parse(atob(_fgToken.split('.')[1] || ''));
+    if (payload && payload.exp && Date.now() / 1000 >= payload.exp) return false;
+  } catch { return false; }
+  return true;
+}
+
+export function clearFgAuth() { setFgAuth(null, null); }
+
+// Where to send an unauthenticated visitor to log in — the main FieldGovern app.
+export function getFgLoginUrl(): string {
+  const base = (_fgBaseUrl || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '');
+  return `${base}/login`;
+}
+
+// Inject the FG token into every same-origin /api request. Centralised here so
+// individual call sites don't each have to remember to attach auth headers — a
+// missed one previously meant that endpoint was reachable anonymously.
+if (typeof window !== 'undefined' && !(window as any).__tfFetchPatched) {
+  const _origFetch = window.fetch.bind(window);
+  window.fetch = (input: any, init: any = {}) => {
+    try {
+      const url = typeof input === 'string' ? input : (input && input.url) || '';
+      if (_fgToken && typeof url === 'string' && url.includes('/api')) {
+        const h = new Headers(init.headers || (typeof input !== 'string' ? input.headers : undefined) || {});
+        if (!h.has('Authorization')) h.set('Authorization', `Bearer ${_fgToken}`);
+        if (_fgBaseUrl && !h.has('X-FG-Base-Url')) h.set('X-FG-Base-Url', _fgBaseUrl);
+        init = { ...init, headers: h };
+      }
+    } catch { /* fall through to original fetch */ }
+    return _origFetch(input, init);
+  };
+  (window as any).__tfFetchPatched = true;
+}
+
+// XHR uploads bypass the fetch wrapper, so attach the header explicitly.
+function applyAuthToXhr(xhr: XMLHttpRequest) {
+  if (_fgToken) {
+    xhr.setRequestHeader('Authorization', `Bearer ${_fgToken}`);
+    if (_fgBaseUrl) xhr.setRequestHeader('X-FG-Base-Url', _fgBaseUrl);
+  }
 }
 
 export function getUserHeaders(): Record<string, string> {
@@ -57,6 +126,7 @@ export async function uploadFile(file: File, onProgress?: (pct: number) => void)
   return new Promise<any>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${API_BASE}/upload`);
+    applyAuthToXhr(xhr);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) {
         onProgress(Math.round((e.loaded / e.total) * 100));
@@ -442,6 +512,7 @@ export async function uploadToServer(file: File, onProgress?: (pct: number) => v
   return new Promise<{ message: string; file: ServerFile }>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${API_BASE}/files/upload`);
+    applyAuthToXhr(xhr);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
     };
