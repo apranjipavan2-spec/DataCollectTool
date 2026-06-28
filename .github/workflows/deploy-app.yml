@@ -148,7 +148,12 @@ jobs:
             sleep 2
 
             echo "Starting analyzer and cleaner..."
+            # FG_INTERNAL_URL is REQUIRED: the analyzer verifies every caller's
+            # FieldGovern token against the main app's /api/v1/users/me. Without it
+            # token verification fails closed and every authenticated request 401s.
+            # 'app' resolves on nginx's network (same alias nginx proxies to).
             docker run -d --name analyzer --network "$NGINX_NET" --restart unless-stopped \
+              -e FG_INTERNAL_URL=http://app:8000 \
               -v fg_tableforge_data:/app/projects \
               -v fg_tableforge_exports:/app/exports \
               fieldgovern-analyzer:latest
