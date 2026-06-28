@@ -1527,9 +1527,26 @@ function CsvTab() {
     }).catch(() => { toast.error('Failed to load shared file') })
   }, [])
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) return
+    // Excel can't be parsed reliably in the browser without a heavy library, so
+    // send it to the backend (pandas) which returns the same {headers, rows} shape.
+    if (/\.(xlsx|xls)$/i.test(f.name)) {
+      try {
+        const fd = new FormData()
+        fd.append('file', f)
+        const { data } = await api.post('/fg/parse-upload', fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        setHeaders(data.headers); setRows(data.rows); setFileName(f.name)
+        setGroupby(data.headers[0] ?? ''); setValueField('*'); setResult(null)
+      } catch (err: any) {
+        toast.error(err.response?.data?.detail || 'Failed to read Excel file')
+      }
+      e.target.value = ''
+      return
+    }
     const reader = new FileReader()
     reader.onload = ev => {
       const { headers: h, rows: r } = parseCsv(ev.target?.result as string)
@@ -1537,6 +1554,7 @@ function CsvTab() {
       setGroupby(h[0] ?? ''); setValueField('*'); setResult(null)
     }
     reader.readAsText(f)
+    e.target.value = ''
   }
 
   const runTable = async () => {
@@ -1561,16 +1579,29 @@ function CsvTab() {
   return (
     <div className="space-y-5">
       <div className={card}>
-        <div className={sh}>Upload CSV File</div>
-        <p className="text-xs text-catalan-textMuted mb-3">
-          Upload any CSV file to build cross-tabulation tables. Only visible to Org Admin.
-        </p>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <div className={sh}>Upload Data File</div>
+            <p className="text-xs text-catalan-textMuted mb-3">
+              Upload a CSV or Excel (.xlsx / .xls) file to build cross-tabulation tables. Only visible to Org Admin.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              const token = localStorage.getItem('fp_token')
+              window.location.href = `${window.location.origin}/analyzer/?fg_url=${encodeURIComponent(window.location.origin)}&token=${token}`
+            }}
+            className="shrink-0 px-4 py-2 bg-catalan-primary text-catalan-bg rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity whitespace-nowrap"
+          >
+            Open Analyzer Wizard →
+          </button>
+        </div>
         <div className="flex items-center gap-3 flex-wrap">
           <button onClick={() => fileRef.current?.click()} className={btnPr}>
-            Choose CSV
+            Choose File
           </button>
           {fileName && <span className="text-sm text-catalan-textMuted">{fileName} · {rows.length} rows</span>}
-          <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFile} />
+          <input ref={fileRef} type="file" accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" className="hidden" onChange={handleFile} />
         </div>
       </div>
 
