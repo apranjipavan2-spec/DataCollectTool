@@ -87,7 +87,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   // label widths, legend slot, and rotation. These initial values are just
   // safe defaults so any code that reads them before the recompute still works.
   let ML = 56, MR = 24;
-  const MT = 28;
+  let MT = 28;
   let MB = 60;
   let PH = H - MT - MB;
   let PW = W - ML - MR;
@@ -248,12 +248,24 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   }
   // 'left' legend extends ML below — handled after ML is computed.
 
-  // X-axis rotation + bottom margin: rotated labels project downward by
-  // labelLength * sin(angle). Pad for descenders + caption.
-  const effectiveXRot = xRot !== null ? xRot : (multiData.length > 8 ? -35 : 0);
+  // Top margin: outside value labels sit ABOVE the tallest bar, so reserve room
+  // for them (two lines when value & % are split) — otherwise they clip the top.
+  const labelPosEarly = config.labelPosition === 'inside' ? 'inside' : 'outside';
+  if (showLabels && labelPosEarly === 'outside' && chartType !== 'pie' && chartType !== 'donut') {
+    const lines = valueLabelSplit ? 2 : 1;
+    MT = Math.max(MT, 16 + labelFontSize * lines + 6);
+  }
+
+  // X-axis rotation: auto-rotate only when horizontal labels would not fit the
+  // per-category slot (prevents the overlapping x-values the user reported).
+  const provInnerW = Math.max(40, W - ML - MR);
+  const xSlotW = multiData.length > 0 ? provInnerW / multiData.length : provInnerW;
+  const longestXChars = multiData.reduce((m, d) => Math.max(m, String(d.label).length), 0);
+  const horizXFits = longestXChars * charPx <= xSlotW - 4;
+  const effectiveXRot = xRot !== null ? xRot : (chartType === 'bar_h' ? 0 : (horizXFits ? 0 : -45));
   const xIsRotated = effectiveXRot !== 0;
   const xRotMag = Math.abs(effectiveXRot);
-  const xWrapCols = xIsRotated ? 24 : 12;
+  const xWrapCols = xIsRotated ? 24 : Math.max(8, Math.floor(xSlotW / charPx));
   const maxXWrapLines = chartType === 'bar_h'
     ? 1
     : multiData.reduce((m, d) => Math.max(m, wrapText(String(d.label), xWrapCols).length), 1);
@@ -267,8 +279,13 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   const labelSweep = xIsRotated
     ? Math.ceil(xLabelTextPx * Math.sin(rotRad) + 14 + extraXLineH * Math.cos(rotRad))
     : Math.ceil(labelFontSize + 10 + extraXLineH);
+  // X-axis caption: wrap to the plot width and reserve height for every line so
+  // a long axis title stays inside the white background instead of overflowing.
   const hasXCaption = !!xAxisLabel && chartType !== 'bar_h';
-  const captionGap = hasXCaption ? labelFontSize + 18 : 0;
+  const xCapBudget = Math.max(12, Math.floor(provInnerW / charPx));
+  const xCapLines = hasXCaption ? wrapText(xAxisLabel, xCapBudget, 3) : [];
+  const xCapLineH = (labelFontSize + 1) * 1.2;
+  const captionGap = hasXCaption ? Math.ceil(xCapLines.length * xCapLineH + 12) : 0;
   MB = 14 + labelSweep + captionGap;
   // Where the x-axis caption sits (below the rotated label sweep).
   const xLabelExtraOffset = labelSweep + 14;
@@ -277,8 +294,14 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   // For bar_h the left gutter holds CATEGORY labels (truncated to 14 chars).
   const yTickLabelMaxChars = Math.max(...yTicks.map(t => fmt(t).length), 2);
   const yTickPx = yTickLabelMaxChars * charPx;
-  const hasYCaption = chartType !== 'bar_h' && !!(yAxisLabel || yFieldsResolved[0]);
-  const yCaptionSlot = hasYCaption ? labelFontSize + 10 : 0;
+  // Y-axis caption: wrap to the plot height (text is rotated) and reserve width
+  // per line so a long caption fits inside the left gutter, not off the canvas.
+  const yCapText = yAxisLabel || yFieldsResolved[0] || '';
+  const hasYCaption = chartType !== 'bar_h' && !!yCapText;
+  const yCapBudget = Math.max(10, Math.floor((H - MT - MB) / charPx));
+  const yCapLines = hasYCaption ? wrapText(yCapText, yCapBudget, 2) : [];
+  const yCapLineH = (labelFontSize + 1) * 1.2;
+  const yCaptionSlot = hasYCaption ? Math.ceil(yCapLines.length * yCapLineH + 8) : 0;
   if (chartType === 'bar_h') {
     const maxCatChars = Math.min(18, multiData.reduce((m, d) => Math.max(m, String(d.label).length), 0));
     ML = Math.max(64, Math.ceil(maxCatChars * charPx + 16));
@@ -307,7 +330,7 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
   const gridColor = config.gridColor || (lightMode ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)');
   const labelColor = config.tickColor || (lightMode ? '#374151' : '#9ca3af');
   const captionColor = config.axisLabelColor || (lightMode ? '#1f2937' : '#e4e4e7');
-  const fontFamily = config.fontFamily;
+  const fontFamily = config.fontFamily || '"Times New Roman", Times, serif';
   const singleColor = config.singleColor;
   const seriesColors = config.seriesColors || {};
   const colorFor = (i: number): string => {
@@ -325,6 +348,17 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
       return value < condCol.threshold ? condCol.below : condCol.above;
     }
     return colorFor(seriesIdx);
+  };
+
+  // Single-series bar charts use ONE colour for every bar by default (rather
+  // than cycling the palette per category). A per-category override or the
+  // singleColor/conditional settings still win. catIdx is the bar's category.
+  const singleSeriesBars = yIndices.length <= 1;
+  const barFill = (catIdx: number, value: number): string => {
+    if (seriesColors[catIdx]) return seriesColors[catIdx];
+    if (condCol && isFinite(value)) return value < condCol.threshold ? condCol.below : condCol.above;
+    if (singleColor) return singleColor;
+    return colors[0];
   };
 
   // Pattern fills: produce SVG <pattern> defs so each series gets a B&W hatch.
@@ -450,18 +484,31 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             );
           });
         })()}
-        {hasXCaption && (
-          <text x={ML + PW / 2} y={MT + PH + xLabelExtraOffset + 4} textAnchor="middle"
-            fontSize={labelFontSize + 1} fill={captionColor} fontWeight={500}>
-            {xAxisLabel}
-          </text>
-        )}
-        {(yAxisLabel || yFieldsResolved[0]) && (
-          <text x={yLabelX} y={MT + PH / 2} textAnchor="middle" fontSize={labelFontSize + 1} fill={captionColor} fontWeight={500}
-            transform={`rotate(-90,${yLabelX},${MT + PH / 2})`}>
-            {yAxisLabel || yFieldsResolved[0]}
-          </text>
-        )}
+        {hasXCaption && (() => {
+          const cx = ML + PW / 2;
+          const baseY = MT + PH + xLabelExtraOffset + 4;
+          return (
+            <text x={cx} y={baseY} textAnchor="middle"
+              fontSize={labelFontSize + 1} fill={captionColor} fontWeight={500}>
+              {xCapLines.map((ln, li) => (
+                <tspan key={li} x={cx} dy={li === 0 ? 0 : xCapLineH}>{ln}</tspan>
+              ))}
+            </text>
+          );
+        })()}
+        {hasYCaption && (() => {
+          const cy = MT + PH / 2;
+          // For the rotated caption, stack wrapped lines about the centre.
+          const startDy = -((yCapLines.length - 1) * yCapLineH) / 2;
+          return (
+            <text x={yLabelX} y={cy} textAnchor="middle" fontSize={labelFontSize + 1} fill={captionColor} fontWeight={500}
+              transform={`rotate(-90,${yLabelX},${cy})`}>
+              {yCapLines.map((ln, li) => (
+                <tspan key={li} x={yLabelX} dy={li === 0 ? startDy : yCapLineH}>{ln}</tspan>
+              ))}
+            </text>
+          );
+        })()}
       </g>
     );
 
@@ -473,9 +520,9 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
             const v = d.values[0];
             const y = yToSvg(Math.max(v, 0));
             const h = Math.abs(yToSvg(Math.min(v, 0)) - yToSvg(Math.max(v, 0)));
-            const fill = fillRefFor(i, v);
+            const fill = patternFills ? `url(#${patternId(i)})` : (singleSeriesBars ? barFill(i, v) : fillRefFor(i, v));
             const lblY = labelPos === 'inside' ? y + Math.min(h - 4, labelFontSize + 2) : y - 4;
-            const lblFill = labelPos === 'inside' ? (dataLabelColor || '#ffffff') : labelFill(i);
+            const lblFill = labelPos === 'inside' ? (dataLabelColor || '#ffffff') : (dataLabelColor || (singleSeriesBars ? barFill(i, v) : labelFill(i)));
             return (
               <g key={i}>
                 <rect x={x} y={y} width={barW} height={Math.max(h, 1)} fill={fill} rx={2} opacity={barOpacity}
@@ -518,14 +565,14 @@ export const ChartCanvas = forwardRef<SVGSVGElement, Props>(function ChartCanvas
                   );
                 })()}
                 <rect x={xScale(0)} y={y} width={Math.abs(xScale(v) - xScale(0))} height={rowH}
-                  fill={fillRefFor(i, v)} rx={2} opacity={barOpacity}
+                  fill={patternFills ? `url(#${patternId(i)})` : barFill(i, v)} rx={2} opacity={barOpacity}
                   onMouseEnter={e => showTip(e, `${d.label}\n${dispLabel(d.displays[0], v)}`)}
                   onMouseLeave={hideTip} style={{ cursor: interactive ? 'pointer' : 'default' }} />
                 {showLabels && (() => {
                   const inside = labelPos === 'inside';
                   const lx = inside ? Math.max(xScale(0), xScale(v)) - 4 : Math.max(xScale(0), xScale(v)) + 4;
                   const anchor = inside ? 'end' : 'start';
-                  const lf = inside ? (dataLabelColor || '#ffffff') : labelFill(i);
+                  const lf = inside ? (dataLabelColor || '#ffffff') : (dataLabelColor || barFill(i, v));
                   return renderLabel(lx, y + rowH / 2 + 4, dispLabel(d.displays[0], v), { anchor, size: labelFontSize - 1, fill: lf });
                 })()}
               </g>

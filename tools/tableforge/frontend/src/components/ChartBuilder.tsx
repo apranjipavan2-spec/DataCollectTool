@@ -142,8 +142,8 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
   const [chartTitle, setChartTitle] = useState('');
   const [xAxisLabel, setXAxisLabel] = useState('');
   const [yAxisLabel, setYAxisLabel] = useState('');
-  const [labelFontSize, setLabelFontSize] = useState(10);
-  const [titleFontSize, setTitleFontSize] = useState(14);
+  const [labelFontSize, setLabelFontSize] = useState(16);
+  const [titleFontSize, setTitleFontSize] = useState(18);
   const [barOpacity, setBarOpacity] = useState(0.9);
   const [chartOnly, setChartOnly] = useState(false);
   const [xLabelRotation, setXLabelRotation] = useState<number | 'auto'>('auto');
@@ -153,14 +153,14 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
   const [aspectPreset, setAspectPreset] = useState<string>('auto');
   const [valueLabelSplit, setValueLabelSplit] = useState<boolean>(false);
   // ─── Color & font customisation ──────────────────────────────────────────
-  const [fontFamily, setFontFamily] = useState<string>('');
+  const [fontFamily, setFontFamily] = useState<string>('"Times New Roman", Times, serif');
   const [axisColor, setAxisColor] = useState<string>('#374151');
   const [gridColor, setGridColor] = useState<string>('rgba(255,255,255,0.05)');
   const [tickColor, setTickColor] = useState<string>('#9ca3af');
   const [axisLabelColor, setAxisLabelColor] = useState<string>('#e4e4e7');
   const [dataLabelColor, setDataLabelColor] = useState<string>('');  // blank = use series color
   const [titleColor, setTitleColor] = useState<string>('');          // blank = default fill
-  const [singleColor, setSingleColor] = useState<string>('');        // blank = use palette
+  const [singleColor, setSingleColor] = useState<string>('#3b82f6'); // default: one colour for all bars
   const [seriesColors, setSeriesColors] = useState<Record<number, string>>({});
   const [presets, setPresets] = useState<Record<string, ChartStylePreset>>(() => loadPresets());
   const [presetName, setPresetName] = useState<string>('');
@@ -184,7 +184,7 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
   const [condThreshold, setCondThreshold] = useState<number>(0);
   const [condBelow, setCondBelow] = useState<string>('#ef4444');
   const [condAbove, setCondAbove] = useState<string>('#10b981');
-  const [lightMode, setLightMode] = useState<boolean>(false);
+  const [lightMode, setLightMode] = useState<boolean>(true);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
 
@@ -203,8 +203,8 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
       setChartTitle(cc.chartTitle || '');
       setXAxisLabel(cc.xAxisLabel || '');
       setYAxisLabel(cc.yAxisLabel || '');
-      setLabelFontSize(cc.labelFontSize || 10);
-      setTitleFontSize(cc.titleFontSize || 14);
+      setLabelFontSize(cc.labelFontSize || 16);
+      setTitleFontSize(cc.titleFontSize || 18);
       setBarOpacity(cc.barOpacity ?? 0.9);
       setChartOnly(!!cc.chart_only);
       const xRot = cc.xLabelRotation;
@@ -214,14 +214,14 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
       setChartHeight(typeof cc.chartHeight === 'number' ? cc.chartHeight : H_DEFAULT);
       setAspectPreset(typeof cc.aspectPreset === 'string' ? cc.aspectPreset : 'auto');
       setValueLabelSplit(!!cc.valueLabelSplit);
-      setFontFamily(typeof cc.fontFamily === 'string' ? cc.fontFamily : '');
+      setFontFamily(typeof cc.fontFamily === 'string' && cc.fontFamily ? cc.fontFamily : '"Times New Roman", Times, serif');
       setAxisColor(typeof cc.axisColor === 'string' ? cc.axisColor : '#374151');
       setGridColor(typeof cc.gridColor === 'string' ? cc.gridColor : 'rgba(255,255,255,0.05)');
       setTickColor(typeof cc.tickColor === 'string' ? cc.tickColor : '#9ca3af');
       setAxisLabelColor(typeof cc.axisLabelColor === 'string' ? cc.axisLabelColor : '#e4e4e7');
       setDataLabelColor(typeof cc.dataLabelColor === 'string' ? cc.dataLabelColor : '');
       setTitleColor(typeof cc.titleColor === 'string' ? cc.titleColor : '');
-      setSingleColor(typeof cc.singleColor === 'string' ? cc.singleColor : '');
+      setSingleColor(typeof cc.singleColor === 'string' ? cc.singleColor : '#3b82f6');
       setSeriesColors(cc.seriesColors && typeof cc.seriesColors === 'object' ? cc.seriesColors : {});
       setTitleAlign((cc.titleAlign as any) || 'center');
       setTitleBold(cc.titleBold !== false);
@@ -242,28 +242,28 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
       setCondThreshold(cc2 && isFinite(cc2.threshold) ? cc2.threshold : 0);
       setCondBelow(cc2?.below || '#ef4444');
       setCondAbove(cc2?.above || '#10b981');
-      setLightMode(!!cc.lightMode);
+      setLightMode(cc.lightMode !== false);
     } else {
       // New chart — seed with the saved global default style if one exists.
       const def = loadDefaultStyle();
       setChartType((def?.chartType as any) || 'bar'); setXField(''); setYFields([]);
       setPalette(def?.palette ?? 0); setShowGrid(def?.showGrid ?? true); setShowLabels(def?.showLabels ?? false); setShowLegend(def?.showLegend ?? 'right');
       setChartTitle(''); setXAxisLabel(''); setYAxisLabel('');
-      setLabelFontSize(def?.labelFontSize ?? 10); setTitleFontSize(def?.titleFontSize ?? 14); setBarOpacity(def?.barOpacity ?? 0.9);
+      setLabelFontSize(def?.labelFontSize ?? 16); setTitleFontSize(def?.titleFontSize ?? 18); setBarOpacity(def?.barOpacity ?? 0.9);
       setChartOnly(false);
       setXLabelRotation(def?.xLabelRotation ?? 'auto'); setYLabelRotation(def?.yLabelRotation ?? 0);
       setChartWidth(W_DEFAULT); setChartHeight(H_DEFAULT); setAspectPreset('auto');
       setValueLabelSplit(def?.valueLabelSplit ?? false);
-      setFontFamily(def?.fontFamily ?? ''); setAxisColor(def?.axisColor ?? '#374151'); setGridColor(def?.gridColor ?? 'rgba(255,255,255,0.05)');
+      setFontFamily(def?.fontFamily ?? '"Times New Roman", Times, serif'); setAxisColor(def?.axisColor ?? '#374151'); setGridColor(def?.gridColor ?? 'rgba(255,255,255,0.05)');
       setTickColor(def?.tickColor ?? '#9ca3af'); setAxisLabelColor(def?.axisLabelColor ?? '#e4e4e7');
-      setDataLabelColor(def?.dataLabelColor ?? ''); setTitleColor(def?.titleColor ?? ''); setSingleColor(def?.singleColor ?? ''); setSeriesColors(def?.seriesColors ?? {});
+      setDataLabelColor(def?.dataLabelColor ?? ''); setTitleColor(def?.titleColor ?? ''); setSingleColor(def?.singleColor ?? '#3b82f6'); setSeriesColors(def?.seriesColors ?? {});
       setTitleAlign(def?.titleAlign ?? 'center'); setTitleBold(def?.titleBold ?? true); setTitleItalic(def?.titleItalic ?? false);
       setRefLineValue(''); setRefLineLabel(''); setRefLineColor('#f97316');
       setCategorySort('none'); setTopN(0); setTopNOther(false);
       setStacked100(def?.stacked100 ?? false); setLabelPosition(def?.labelPosition ?? 'outside');
       setTrendline(false); setPatternFills(def?.patternFills ?? false);
       setCondEnabled(def?.condEnabled ?? false); setCondThreshold(def?.condThreshold ?? 0); setCondBelow(def?.condBelow ?? '#ef4444'); setCondAbove(def?.condAbove ?? '#10b981');
-      setLightMode(def?.lightMode ?? false);
+      setLightMode(def?.lightMode ?? true);
     }
   }, [table?.id]);
 
@@ -590,7 +590,7 @@ export function ChartBuilder({ tables, results, onClose, onChartChange, activeTa
       <div className="form-group" style={{ display: 'flex', gap: 8 }}>
         <div style={{ flex: 1 }}>
           <label style={{ fontSize: 10 }}>Tick Size</label>
-          <input type="number" value={labelFontSize} min={7} max={16} onChange={e => setLabelFontSize(+e.target.value)} style={{ width: '100%' }} />
+          <input type="number" value={labelFontSize} min={7} max={28} onChange={e => setLabelFontSize(+e.target.value)} style={{ width: '100%' }} />
         </div>
         <div style={{ flex: 1 }}>
           <label style={{ fontSize: 10 }}>Title Size</label>

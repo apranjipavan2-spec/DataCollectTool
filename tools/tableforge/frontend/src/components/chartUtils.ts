@@ -184,7 +184,7 @@ export function buildChartExportSvg(opts: ChartExportSvgOpts): { xml: string; to
   // Title text uses a dark fill so it remains legible on white document pages.
   const isTransparent = bgColor === 'transparent' || bgColor === 'none';
   const titleFill = titleColor || (isTransparent ? '#1f2937' : '#e5e7eb');
-  const titleFontFamily = fontFamily || 'Arial, sans-serif';
+  const titleFontFamily = fontFamily || '"Times New Roman", Times, serif';
   const wrapperStyle = fontFamily ? ` style="font-family:${escapeXml(fontFamily)}"` : '';
   const titleX = titleAlign === 'left' ? 8 : (titleAlign === 'right' ? width - 8 : width / 2);
   const titleAnchor = titleAlign === 'left' ? 'start' : (titleAlign === 'right' ? 'end' : 'middle');
