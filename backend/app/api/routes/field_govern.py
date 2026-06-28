@@ -10,7 +10,7 @@ from uuid import UUID
 logger = logging.getLogger(__name__)
 
 import pandas as pd
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import func, text
@@ -852,6 +852,38 @@ def _execute_tabulation_inner(program_id, body, user, db):
         "chart_type": body.chart_type,
         "title": body.title,
     }
+
+
+# ── File parse (org_admin only) — CSV or Excel → headers + rows ──────────────
+
+@router.post("/parse-upload")
+async def parse_upload(
+    file: UploadFile = File(...),
+    user: dict = Depends(require_org_admin),
+):
+    """Parse an uploaded CSV/XLSX/XLS into {headers, rows} for the analyzer.
+    Excel is read with pandas (openpyxl/xlrd) so the browser doesn't need a
+    spreadsheet library; all cells are returned as strings to match the CSV path."""
+    name = (file.filename or "").lower()
+    contents = await file.read()
+    try:
+        if name.endswith((".xlsx", ".xls")):
+            engine = "openpyxl" if name.endswith(".xlsx") else "xlrd"
+            df = pd.read_excel(io.BytesIO(contents), sheet_name=0, engine=engine, dtype=str)
+        elif name.endswith((".csv", ".tsv")) or not name:
+            sep = "\t" if name.endswith(".tsv") else ","
+            df = pd.read_csv(io.BytesIO(contents), sep=sep, dtype=str)
+        else:
+            raise HTTPException(400, "Unsupported file type. Upload a CSV, XLSX, or XLS file.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, f"Could not read file: {e}")
+
+    df = df.fillna("")
+    headers = [str(c) for c in df.columns]
+    rows = df.astype(str).to_dict(orient="records")
+    return {"headers": headers, "rows": rows, "filename": file.filename or "upload", "row_count": len(rows)}
 
 
 # ── CSV Tabulation (org_admin only, rows provided directly) ──────────────────

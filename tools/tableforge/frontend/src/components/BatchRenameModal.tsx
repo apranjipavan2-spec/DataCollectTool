@@ -72,7 +72,11 @@ export function BatchRenameModal({ tables, allResults, dataset, projectFilters, 
       const tab = tables.find(t => t.id === rs.id)
       if (!tab) continue
 
-      if (skipRenamed && tab.header_renames && Object.keys(tab.header_renames).length > 0) {
+      // Only skip tables an AI rename has actually touched. Presence of
+      // header_renames alone is not proof of an AI rename — auto-titles, manual
+      // edits and templates also populate it, which previously caused every
+      // table to be skipped.
+      if (skipRenamed && (tab as any)._aiRenamed) {
         updateRow(i, { status: 'skipped' })
         skippedCount++
         continue

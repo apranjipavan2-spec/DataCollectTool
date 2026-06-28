@@ -169,6 +169,7 @@ export interface TableConfig {
   footnotes?: { marker: string; text: string }[];
   footnote_style?: 'numeric' | 'alpha' | 'symbol' | 'custom';  // 1,2,3 / a,b,c / *,†,‡ / custom
   _autoTitle?: boolean;  // true = auto-generate title from config; false = user manually edited
+  _aiRenamed?: boolean;  // true once an AI rename has applied; drives "skip already-renamed" in batch rename
   _statResult?: boolean; // true = result was injected from a stat test, skip pivot tabulation
   _statResultData?: { headers: string[]; rows: any[][] }; // persisted stat result, rehydrated into results map on project load
   _statConfig?: {

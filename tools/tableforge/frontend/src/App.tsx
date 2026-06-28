@@ -2501,7 +2501,7 @@ export default function App() {
             if (t) {
               pushUndo();
               setAiPolishUndo({ snapshots: [{ ...t, values: [...t.values], rows: [...t.rows], columns: [...t.columns], filters: { ...t.filters } }], scope: 'single', appliedAt: Date.now() });
-              const updated = { ...t, title, subtitle, name: title || t.name, header_renames: { ...(t.header_renames || {}), ...renames }, _autoTitle: false };
+              const updated = { ...t, title, subtitle, name: title || t.name, header_renames: { ...(t.header_renames || {}), ...renames }, _autoTitle: false, _aiRenamed: true };
               setTables(prev => prev.map(x => x.id === t.id ? updated : x));
             }
           }}
@@ -2516,7 +2516,7 @@ export default function App() {
             setTables(prev => prev.map(t => {
               const u = updates.find(u => u.tableId === t.id);
               if (!u) return t;
-              return { ...t, title: u.title, subtitle: u.subtitle, name: u.title || t.name, header_renames: { ...(t.header_renames || {}), ...u.renames }, _autoTitle: false };
+              return { ...t, title: u.title, subtitle: u.subtitle, name: u.title || t.name, header_renames: { ...(t.header_renames || {}), ...u.renames }, _autoTitle: false, _aiRenamed: true };
             }));
           }}
           onApplyInterpretation={(text) => {
