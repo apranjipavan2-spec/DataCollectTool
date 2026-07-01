@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import pandas as pd
@@ -54,6 +55,10 @@ class StatTableConfig(BaseModel):
 
 @router.post("/api/stat/correlation")
 async def stat_correlation(config: StatTableConfig):
+    return await asyncio.to_thread(_stat_correlation_impl, config)
+
+
+def _stat_correlation_impl(config: StatTableConfig):
     """Generate correlation matrix for selected numeric columns."""
     if config.dataset_id not in datasets:
         raise HTTPException(404, "Dataset not found")
@@ -124,6 +129,10 @@ async def stat_correlation(config: StatTableConfig):
 
 @router.post("/api/stat/descriptive")
 async def stat_descriptive(config: StatTableConfig):
+    return await asyncio.to_thread(_stat_descriptive_impl, config)
+
+
+def _stat_descriptive_impl(config: StatTableConfig):
     """Generate descriptive statistics table (Table 1 style)."""
     if config.dataset_id not in datasets:
         raise HTTPException(404, "Dataset not found")
@@ -193,6 +202,10 @@ async def stat_descriptive(config: StatTableConfig):
 
 @router.post("/api/stat/cramers_matrix")
 async def stat_cramers_matrix(config: StatTableConfig):
+    return await asyncio.to_thread(_stat_cramers_matrix_impl, config)
+
+
+def _stat_cramers_matrix_impl(config: StatTableConfig):
     """Pairwise Cramér's V for N categorical columns — like a correlation matrix for categorical data."""
     if config.dataset_id not in datasets:
         raise HTTPException(404, "Dataset not found")
@@ -302,6 +315,10 @@ async def stat_cramers_matrix(config: StatTableConfig):
 
 @router.post("/api/stat/crosstab")
 async def stat_crosstab(config: StatTableConfig):
+    return await asyncio.to_thread(_stat_crosstab_impl, config)
+
+
+def _stat_crosstab_impl(config: StatTableConfig):
     """Generate cross-tabulation with chi-square test."""
     if config.dataset_id not in datasets:
         raise HTTPException(404, "Dataset not found")
@@ -398,6 +415,10 @@ async def stat_crosstab(config: StatTableConfig):
 
 @router.post("/api/stat/ttest")
 async def stat_ttest(config: StatTableConfig):
+    return await asyncio.to_thread(_stat_ttest_impl, config)
+
+
+def _stat_ttest_impl(config: StatTableConfig):
     """Perform t-test or Mann-Whitney U test between two groups."""
     if config.dataset_id not in datasets:
         raise HTTPException(404, "Dataset not found")
@@ -513,6 +534,10 @@ async def stat_ttest(config: StatTableConfig):
 
 @router.post("/api/stat/anova")
 async def stat_anova(config: StatTableConfig):
+    return await asyncio.to_thread(_stat_anova_impl, config)
+
+
+def _stat_anova_impl(config: StatTableConfig):
     """Perform one-way ANOVA."""
     if config.dataset_id not in datasets:
         raise HTTPException(404, "Dataset not found")
@@ -639,6 +664,10 @@ async def stat_anova(config: StatTableConfig):
 
 @router.post("/api/stat/regression")
 async def stat_regression(config: StatTableConfig):
+    return await asyncio.to_thread(_stat_regression_impl, config)
+
+
+def _stat_regression_impl(config: StatTableConfig):
     """Perform OLS linear regression. First column = dependent (Y), rest = independent (X)."""
     if config.dataset_id not in datasets:
         raise HTTPException(404, "Dataset not found")
@@ -773,6 +802,10 @@ async def stat_regression(config: StatTableConfig):
 
 @router.post("/api/stat/normality")
 async def stat_normality(config: StatTableConfig):
+    return await asyncio.to_thread(_stat_normality_impl, config)
+
+
+def _stat_normality_impl(config: StatTableConfig):
     """Test normality of selected numeric columns (Shapiro-Wilk + K-S tests)."""
     if config.dataset_id not in datasets:
         raise HTTPException(404, "Dataset not found")
@@ -850,6 +883,10 @@ async def stat_normality(config: StatTableConfig):
 
 @router.post("/api/stat/outlier")
 async def stat_outlier(config: StatTableConfig):
+    return await asyncio.to_thread(_stat_outlier_impl, config)
+
+
+def _stat_outlier_impl(config: StatTableConfig):
     """Detect outliers using IQR and Z-score methods."""
     if config.dataset_id not in datasets:
         raise HTTPException(404, "Dataset not found")
@@ -918,6 +955,10 @@ async def stat_outlier(config: StatTableConfig):
 
 @router.post("/api/stat/frequency")
 async def stat_frequency(config: StatTableConfig):
+    return await asyncio.to_thread(_stat_frequency_impl, config)
+
+
+def _stat_frequency_impl(config: StatTableConfig):
     """Generate frequency distribution table for selected columns."""
     if config.dataset_id not in datasets:
         raise HTTPException(404, "Dataset not found")

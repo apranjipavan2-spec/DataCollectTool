@@ -26,6 +26,12 @@ const FG_BASE_KEY = 'tf_fg_base';
         sessionStorage.setItem(FG_TOKEN_KEY, t);
         if (_fgBaseUrl) sessionStorage.setItem(FG_BASE_KEY, _fgBaseUrl);
       } catch { /* storage disabled */ }
+      // Strip the token (and other handoff params) from the address bar at the
+      // earliest possible moment — before React mounts — so the JWT doesn't sit
+      // in the URL / browser history. The URL collapses to e.g. "/analyzer/".
+      try {
+        window.history.replaceState(null, '', window.location.pathname);
+      } catch { /* no-op */ }
     } else {
       _fgToken = sessionStorage.getItem(FG_TOKEN_KEY);
       _fgBaseUrl = sessionStorage.getItem(FG_BASE_KEY);

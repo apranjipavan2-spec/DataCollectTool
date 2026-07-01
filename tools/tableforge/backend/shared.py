@@ -38,6 +38,48 @@ LARGE_FILE_THRESHOLD = 50 * 1024 * 1024  # 50 MB
 MEMORY_LIMIT = 500 * 1024 * 1024  # 500 MB
 SUPER_ADMIN_ROLE = "master_admin"
 
+# ── Idle dataset eviction ─────────────────────────────────────────────────────
+# `datasets` and its sibling dicts above never had anything remove entries on the
+# normal upload/analyze path — every dataset a user ever opened stayed in RAM for
+# the life of the process, so RSS only ever grew. `touch_dataset` is called from
+# `apply_metrics_and_bins` (used on nearly every compute route: tabulate, stats,
+# likert, mr, observer, causal, triangulate, compare, columns, bins, metrics...),
+# so it fires on real usage without needing every router edited individually.
+_dataset_last_seen: dict = {}   # dataset_id -> last-access unix time
+DATASET_IDLE_TTL = 6 * 3600     # evict a dataset after 6h with no requests touching it
+
+
+def touch_dataset(dataset_id: str) -> None:
+    import time
+    _dataset_last_seen[dataset_id] = time.time()
+
+
+def evict_stale_datasets(max_idle_seconds: int = DATASET_IDLE_TTL) -> list:
+    """Drop datasets (and their per-dataset side tables) idle longer than the TTL.
+    A dataset with no recorded last-seen time yet (just uploaded, never touched
+    via apply_metrics_and_bins) is treated as fresh rather than evicted."""
+    import time
+    now = time.time()
+    removed = []
+    for dataset_id in list(datasets.keys()):
+        last_seen = _dataset_last_seen.get(dataset_id)
+        if last_seen is None:
+            touch_dataset(dataset_id)
+            continue
+        if now - last_seen > max_idle_seconds:
+            datasets.pop(dataset_id, None)
+            custom_metrics.pop(dataset_id, None)
+            custom_bins.pop(dataset_id, None)
+            audit_logs.pop(dataset_id, None)
+            annotations.pop(dataset_id, None)
+            upload_progress.pop(dataset_id, None)
+            column_type_overrides.pop(dataset_id, None)
+            column_roles.pop(dataset_id, None)
+            study_designs.pop(dataset_id, None)
+            _dataset_last_seen.pop(dataset_id, None)
+            removed.append(dataset_id)
+    return removed
+
 
 def get_user_projects_dir(user_id: Optional[str]) -> Path:
     if user_id:
@@ -58,6 +100,7 @@ def is_super_admin(role: Optional[str]) -> bool:
 # FieldGovern's own /users/me, so FG remains the single source of truth.
 _identity_cache: dict = {}   # token -> (expires_at, {"id", "role"})
 _IDENTITY_TTL = 60           # seconds — short, so role/account changes propagate
+_identity_inflight: dict = {}  # token -> asyncio.Future, de-dupes concurrent verifications
 
 
 def _resolve_fg_base(fg_base_url: Optional[str]) -> str:
@@ -87,10 +130,42 @@ def _resolve_fg_base(fg_base_url: Optional[str]) -> str:
     return ""
 
 
+async def _fetch_fg_identity(token: str, base: str) -> Optional[dict]:
+    """One round-trip to FG's /users/me, with a single retry on transient failures
+    (timeout / connection error / 5xx) so a single blip under a concurrent burst of
+    stat-table requests doesn't fail one chart's auth while its siblings succeed."""
+    import asyncio
+    import httpx
+
+    internal = bool(os.environ.get("FG_INTERNAL_URL", "").strip())
+    resp = None
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=15.0, verify=bool(not internal)) as client:
+                resp = await client.get(f"{base}/api/v1/users/me",
+                                        headers={"Authorization": f"Bearer {token}"})
+        except Exception:
+            resp = None
+        if resp is not None and (resp.status_code < 500 or attempt == 1):
+            break
+        await asyncio.sleep(0.2)
+
+    if resp is None or resp.status_code != 200:
+        return None
+    try:
+        data = resp.json()
+    except Exception:
+        return None
+    identity = {"id": str(data.get("id") or ""), "role": data.get("role") or ""}
+    if not identity["id"]:
+        return None
+    return identity
+
+
 async def verify_fg_identity(token: Optional[str], fg_base_url: Optional[str] = None) -> Optional[dict]:
     """Return {"id", "role"} for a valid FG token, or None if unauthenticated."""
+    import asyncio
     import time
-    import httpx
 
     if not token:
         return None
@@ -102,24 +177,27 @@ async def verify_fg_identity(token: Optional[str], fg_base_url: Optional[str] = 
     base = _resolve_fg_base(fg_base_url)
     if not base:
         return None
-    internal = bool(os.environ.get("FG_INTERNAL_URL", "").strip())
+
+    # Concurrent requests (e.g. a burst of stat-table calls) that arrive before the
+    # cache is warm previously each fired their own outbound verification — coalesce
+    # them into a single in-flight call so they share one result instead of racing.
+    inflight = _identity_inflight.get(token)
+    if inflight is not None:
+        return await inflight
+
+    future: "asyncio.Future" = asyncio.get_event_loop().create_future()
+    _identity_inflight[token] = future
     try:
-        async with httpx.AsyncClient(timeout=15.0, verify=bool(not internal)) as client:
-            resp = await client.get(f"{base}/api/v1/users/me",
-                                    headers={"Authorization": f"Bearer {token}"})
-    except Exception:
-        return None
-    if resp.status_code != 200:
-        return None
-    try:
-        data = resp.json()
-    except Exception:
-        return None
-    identity = {"id": str(data.get("id") or ""), "role": data.get("role") or ""}
-    if not identity["id"]:
-        return None
-    _identity_cache[token] = (now + _IDENTITY_TTL, identity)
-    return identity
+        identity = await _fetch_fg_identity(token, base)
+        if identity:
+            _identity_cache[token] = (time.time() + _IDENTITY_TTL, identity)
+        future.set_result(identity)
+        return identity
+    except Exception as e:
+        future.set_exception(e)
+        raise
+    finally:
+        _identity_inflight.pop(token, None)
 
 
 async def require_identity(
@@ -389,6 +467,7 @@ def _col_is_text(df: pd.DataFrame, col_name: str) -> bool:
 
 def apply_metrics_and_bins(df: pd.DataFrame, dataset_id: str) -> pd.DataFrame:
     """Apply custom metrics and bins to the dataframe."""
+    touch_dataset(dataset_id)
     # Apply bins first
     for bdef in custom_bins.get(dataset_id, []):
         src = bdef["source_column"]

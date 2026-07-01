@@ -671,7 +671,13 @@ export default function App() {
     let refreshed = 0;
     let skipped = 0;
     if (!silent) setLoadingMsg(`Refreshing stat tables… 0/${statTables.length}`);
-    await Promise.all(statTables.map(async t => {
+    // Capped worker pool (matches runTabulationsBatch) — an unbounded Promise.all here
+    // fired every stat table at once (dozens on a large project), saturating the
+    // single-core backend and stalling every other request until they all finished.
+    const concurrency = 4;
+    const total = statTables.length;
+    let cursor = 0;
+    const runOne = async (t: TableConfig) => {
       let statType: string | null = null;
       let columns: string[] = [];
       let alpha = 0.05;
@@ -717,7 +723,15 @@ export default function App() {
         refreshed++;
       } catch { skipped++; }
       if (!silent) setLoadingMsg(`Refreshing stat tables… ${refreshed + skipped}/${statTables.length}`);
-    }));
+    };
+    const worker = async () => {
+      while (true) {
+        const idx = cursor++;
+        if (idx >= total) return;
+        await runOne(statTables[idx]);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(concurrency, total) }, () => worker()));
     if (!silent) setLoadingMsg('');
     return { refreshed, skipped, total: statTables.length };
   }, [tables, dataset, allColumns]);
@@ -1269,6 +1283,7 @@ export default function App() {
   }, []);
 
   const handleApplyLastProject = useCallback(async (projectName: string) => {
+    setLoading(true); setLoadingMsg('Generating tables from project…');
     try {
       // First list projects to find the path
       const listRes = await fetch(`${API_BASE}/projects`, { headers: getUserHeaders() });
@@ -1333,20 +1348,25 @@ export default function App() {
         pushUndo();
         setTables(data.tables);
         setActiveTableIdx(0);
+        // Seed with the saved stat-result snapshot so the UI isn't blank while
+        // the recompute below runs against the newly-loaded dataset.
         setResults(rehydrateStatResults(data.tables));
         setShowDataPreview(false);
         setLastProjectHint(null);
         const toRun = data.tables.filter((t: TableConfig) => t.values.length > 0);
-        if (toRun.length > 0) {
-          setLoading(true);
-          try { await runTabulationsBatch(toRun); }
-          finally { setLoading(false); setLoadingMsg(''); }
+        if (toRun.length > 0) await runTabulationsBatch(toRun);
+        // Stat tables (crosstab/Cramér's V/etc.) aren't recomputed by runTabulationsBatch —
+        // without this they silently kept showing results from the OLD dataset.
+        if (data.tables.some((t: TableConfig) => (t as any)._statResult)) {
+          await rerunStatTables(data.projectFilters || {}, { force: true, silent: true });
         }
       }
     } catch (e: any) {
       setError(e.message || 'Failed to apply project');
+    } finally {
+      setLoading(false); setLoadingMsg('');
     }
-  }, [allColumns, pushUndo, runTabulationsBatch]);
+  }, [allColumns, pushUndo, runTabulationsBatch, rerunStatTables]);
 
   const handleDataRefresh = useCallback(async () => {
     if (!dataset) return;

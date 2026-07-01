@@ -4,13 +4,37 @@ All endpoint logic lives in routers/. Shared state and utilities live in shared.
 This file only creates the app, registers routers, and serves the frontend.
 """
 
+import asyncio
+import contextlib
 from pathlib import Path
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from .shared import BASE_DIR, require_identity
+from .shared import BASE_DIR, require_identity, evict_stale_datasets
+
+_EVICTION_INTERVAL = 30 * 60  # sweep every 30 minutes
+
+
+async def _dataset_eviction_loop():
+    while True:
+        await asyncio.sleep(_EVICTION_INTERVAL)
+        try:
+            evict_stale_datasets()
+        except Exception:
+            pass
+
+
+@contextlib.asynccontextmanager
+async def _lifespan(app: FastAPI):
+    task = asyncio.create_task(_dataset_eviction_loop())
+    try:
+        yield
+    finally:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
 
 from .routers import (
     upload,
@@ -48,7 +72,7 @@ from .routers import (
     play_mode,
 )
 
-app = FastAPI(title="TableForge", version="2.0")
+app = FastAPI(title="TableForge", version="2.0", lifespan=_lifespan)
 
 app.add_middleware(
     CORSMiddleware,
