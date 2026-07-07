@@ -301,6 +301,7 @@ export default function App() {
       }
       if (Array.isArray(data.sections)) setSections(data.sections);
       if (data.numberingConfig) setNumberingConfig(data.numberingConfig);
+      if (data.tableInterpretations) setTableInterpretations(data.tableInterpretations);
       if (data.columnTypeOverrides && dataset) {
         const overrides = data.columnTypeOverrides as Record<string, string>;
         setColumnTypeOverrides(overrides);
@@ -348,13 +349,30 @@ export default function App() {
       saveProject('__autosave__', {
         tables, annotationsMap, comparisonState,
         projectFilters: projectFiltersRef.current,
-        columnTypeOverrides, sections, numberingConfig,
+        columnTypeOverrides, sections, numberingConfig, tableInterpretations,
         dataset_id: dataset.dataset_id,
         source_file: { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length },
       }).catch(() => {});
     }, 800);
     return () => clearTimeout(t);
   }, [projectFilters, dataset?.dataset_id]);
+
+  // Debounced immediate autosave for AI interpretations — otherwise editing an
+  // interpretation alone (without touching tables/filters) would only hit disk
+  // on the 5-minute interval, or not at all if that interval's closure is stale.
+  useEffect(() => {
+    if (!dataset) return;
+    const t = setTimeout(() => {
+      saveProject('__autosave__', {
+        tables, annotationsMap, comparisonState,
+        projectFilters: projectFiltersRef.current,
+        columnTypeOverrides, sections, numberingConfig, tableInterpretations,
+        dataset_id: dataset.dataset_id,
+        source_file: { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length },
+      }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(t);
+  }, [tableInterpretations, dataset?.dataset_id]);
 
   // Auto-save every 5 minutes
   useEffect(() => {
@@ -365,7 +383,7 @@ export default function App() {
         // Use the ref for projectFilters so we always autosave the latest value
         // (the interval closure captures other state at effect-setup time, but
         // projectFilters can change without the deps array refreshing).
-        saveProject('__autosave__', { tables, annotationsMap, comparisonState, projectFilters: projectFiltersRef.current, columnTypeOverrides, sections, numberingConfig, dataset_id: dataset?.dataset_id, source_file: dataset ? { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length } : undefined }).then(() => {
+        saveProject('__autosave__', { tables, annotationsMap, comparisonState, projectFilters: projectFiltersRef.current, columnTypeOverrides, sections, numberingConfig, tableInterpretations, dataset_id: dataset?.dataset_id, source_file: dataset ? { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length } : undefined }).then(() => {
           // Update last save state and clear dirty flag
           lastSaveStateRef.current = JSON.stringify({ tables, annotationsMap, comparisonState });
           setIsDirty(false);
@@ -373,7 +391,7 @@ export default function App() {
       }
     }, 5 * 60 * 1000);
     return () => { if (autoSaveRef.current) clearInterval(autoSaveRef.current); };
-  }, [dataset, tables, annotationsMap, comparisonState, columnTypeOverrides]);
+  }, [dataset, tables, annotationsMap, comparisonState, columnTypeOverrides, tableInterpretations]);
 
   // Warn about unsaved changes
   useEffect(() => {
@@ -532,6 +550,7 @@ export default function App() {
     }
     if (Array.isArray(data.sections)) setSections(data.sections);
     if (data.numberingConfig) setNumberingConfig(data.numberingConfig);
+    if (data.tableInterpretations) setTableInterpretations(data.tableInterpretations);
     if (data.source_file) {
       setDataset({ dataset_id: data.source_file.dataset_id, filename: data.source_file.filename, row_count: data.source_file.row_count, columns: [], sheets: [], preview: [] });
     }
@@ -960,6 +979,7 @@ export default function App() {
         setProjectFilters(data.projectFilters);
         projectFiltersRef.current = data.projectFilters;
       }
+      if (data.tableInterpretations) setTableInterpretations(data.tableInterpretations);
       if (data.columnTypeOverrides && dataset) {
         const overrides = data.columnTypeOverrides as Record<string, string>;
         setColumnTypeOverrides(overrides);
@@ -1044,6 +1064,7 @@ export default function App() {
     if (loadedExtra?.metadata) setPendingMetadataRestore(loadedExtra.metadata);
     if (Array.isArray(loadedExtra?.sections)) setSections(loadedExtra.sections);
     if (loadedExtra?.numberingConfig) setNumberingConfig(loadedExtra.numberingConfig);
+    if (loadedExtra?.tableInterpretations) setTableInterpretations(loadedExtra.tableInterpretations);
     if (loadedExtra?.columnTypeOverrides) {
       const overrides = loadedExtra.columnTypeOverrides as Record<string, string>;
       setColumnTypeOverrides(overrides);
@@ -1844,6 +1865,12 @@ export default function App() {
                     <option value="pct_row">+ % Row</option>
                     <option value="pct_col">+ % Col</option>
                   </select>
+                  {v.combo_show_as && v.combo_show_as !== 'normal' && (
+                    <select className="ribbon-select ribbon-dec" value={v.combo_decimals ?? v.decimals ?? 2} title="Combo % Decimal Places"
+                      onChange={e => handleValueFieldUpdate(v.field, { combo_decimals: parseInt(e.target.value) })}>
+                      {[0,1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}dp</option>)}
+                    </select>
+                  )}
                 </div>
               ))}
             </div>
@@ -2607,7 +2634,7 @@ export default function App() {
       {modal === 'projects' && <ProjectManager currentTables={tables}
         currentAnnotationsMap={annotationsMap} currentComparisonState={comparisonState} currentProjectFilters={projectFilters} currentColumnTypeOverrides={columnTypeOverrides} currentFilename={dataset?.filename}
         currentDatasetId={dataset?.dataset_id} currentRowCount={dataset?.row_count} currentColCount={dataset?.columns?.length}
-        currentSections={sections} currentNumberingConfig={numberingConfig}
+        currentSections={sections} currentNumberingConfig={numberingConfig} currentInterpretationsMap={tableInterpretations}
         onLoad={handleProjectLoaded}
         onClose={() => setModal(null)} fgContext={fgContext} />}
       {/* Column Reconciliation Dialog */}

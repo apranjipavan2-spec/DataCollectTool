@@ -302,6 +302,18 @@ export function DropZones({ table, columns, draggedField, onDrop, onRemove, onAg
                             </select>
                           </div>
 
+                          {valConfig.combo_show_as && valConfig.combo_show_as !== 'normal' && (
+                            <div className="vsp-section">
+                              <label className="vsp-label">Combo % Decimal Places</label>
+                              <select className="vsp-select vsp-small" value={valConfig.combo_decimals ?? valConfig.decimals ?? 2}
+                                onChange={e => onValueFieldUpdate(field, { combo_decimals: parseInt(e.target.value) })}>
+                                {[0, 1, 2, 3, 4, 5, 6].map(n => (
+                                  <option key={n} value={n}>{n}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
                           <div className="vsp-section" style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 4 }}>
                             <label className="vsp-label" style={{ fontWeight: 600 }}>Statistical Display</label>
                             <label className="vsp-check"><input type="checkbox" checked={valConfig.show_mean_sd ?? false}

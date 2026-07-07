@@ -358,9 +358,12 @@ async def tabulate(config: TableConfig):
                 # Queue show_as post-calculation
                 if show_as and show_as != "normal":
                     post_calcs.append({"field": safe_field, "agg": show_as, "label": vlabel, "decimals": decimals})
-                # Queue combo post-calculation (value + % in parentheses)
+                # Queue combo post-calculation (value + % in parentheses). The combo's
+                # own decimal places (for the parenthetical %) can differ from the
+                # main value's decimal places (for the number before it).
                 if combo_show_as and combo_show_as != "normal":
-                    post_calcs.append({"field": safe_field, "agg": f"combo_{combo_show_as}", "label": vlabel, "decimals": decimals})
+                    combo_decimals = v.get("combo_decimals", decimals)
+                    post_calcs.append({"field": safe_field, "agg": f"combo_{combo_show_as}", "label": vlabel, "decimals": combo_decimals, "value_decimals": decimals})
 
             result = df.groupby(config.rows, dropna=False).agg(agg_dict).reset_index()
 
@@ -467,7 +470,10 @@ async def tabulate(config: TableConfig):
                 if is_combo:
                     # Compute the percentage values
                     pct_values = apply_show_as(result[label].copy(), actual_agg, config.rows, result, dec)
-                    # Format as "value (pct%)" — handle NaN/Inf gracefully
+                    # Format as "value (pct%)" — handle NaN/Inf gracefully. The main
+                    # value uses its own decimal setting (value_decimals); the
+                    # parenthetical % uses the combo's decimal setting (dec).
+                    val_dec = pc.get("value_decimals") if pc.get("value_decimals") is not None else dec
                     missing_fill = config.missing_data if config.missing_data else ""
                     combo_col = []
                     for ov, pv in zip(orig_values, pct_values):
@@ -477,10 +483,10 @@ async def tabulate(config: TableConfig):
                             if ov_is_na:
                                 combo_col.append(missing_fill)
                             elif pv_is_na:
-                                ov_str = f"{ov:,.{dec}f}" if isinstance(ov, (int, float)) else str(ov)
+                                ov_str = f"{ov:,.{val_dec}f}" if isinstance(ov, (int, float)) else str(ov)
                                 combo_col.append(f"{ov_str}\n({missing_fill or '0'}%)")
                             else:
-                                ov_str = f"{ov:,.{dec}f}" if isinstance(ov, (int, float)) else str(ov)
+                                ov_str = f"{ov:,.{val_dec}f}" if isinstance(ov, (int, float)) else str(ov)
                                 pv_str = f"{pv:.{dec}f}%" if isinstance(pv, (int, float)) else str(pv)
                                 combo_col.append(f"{ov_str}\n({pv_str})")
                         except (ValueError, TypeError):
@@ -667,6 +673,7 @@ async def tabulate(config: TableConfig):
                         agg = "count"
                     combo_sa = v.get("combo_show_as", "normal")
                     dec = v.get("decimals") if v.get("decimals") is not None else 2
+                    combo_dec = v.get("combo_decimals", dec)
                     if agg in ("sum", "running_total", "cumulative_sum"):
                         raw_val = df[field].sum()
                     elif agg == "count":
@@ -688,7 +695,7 @@ async def tabulate(config: TableConfig):
                     if combo_sa and combo_sa != "normal":
                         try:
                             ov_str = f"{raw_val:,.{dec}f}" if isinstance(raw_val, (int, float)) and not pd.isna(raw_val) else str(raw_val)
-                            total_row[label] = f"{ov_str}\n(100.00%)"
+                            total_row[label] = f"{ov_str}\n({100:.{combo_dec}f}%)"
                         except (ValueError, TypeError):
                             total_row[label] = raw_val
                     else:
@@ -895,7 +902,9 @@ async def tabulate(config: TableConfig):
                 _pv_cfgs.append({
                     "label": _vl, "show_as": _v.get("show_as", "normal"),
                     "combo_show_as": _v.get("combo_show_as", "normal"),
-                    "decimals": _v.get("decimals", 2), "agg": _va,
+                    "decimals": _v.get("decimals", 2),
+                    "combo_decimals": _v.get("combo_decimals", _v.get("decimals", 2)),
+                    "agg": _va,
                 })
 
             for _tf in _pv_temp_cleanup:
@@ -1015,6 +1024,7 @@ async def tabulate(config: TableConfig):
             show_as = v0.get("show_as", "normal")
             combo_show_as = v0.get("combo_show_as", "normal")
             dec = v0.get("decimals", 2)
+            combo_dec = v0.get("combo_decimals", dec)
             # Legacy compat: old frontend sends pct_row/pct_col as agg
             if v0.get("agg", "sum") in PERCENT_AGGS:
                 show_as = v0["agg"]
@@ -1149,7 +1159,11 @@ async def tabulate(config: TableConfig):
                                 pivot_df[c] = (pivot_df[c] / grand * 100).round(decimal_places)
                 return pivot_df
 
-            def _apply_combo(target_df, orig_df, sa, decimal_places, col_filter=None):
+            def _apply_combo(target_df, orig_df, sa, decimal_places, col_filter=None, value_decimal_places=None):
+                # decimal_places formats the parenthetical % (and its underlying calc);
+                # value_decimal_places formats the main number in front of it — these
+                # can be set independently, defaulting to the same value.
+                vdec = decimal_places if value_decimal_places is None else value_decimal_places
                 apply_pivot_show_as(target_df, sa, decimal_places, col_filter=col_filter)
                 missing_fill = config.missing_data if config.missing_data else ""
                 ncols = orig_df.select_dtypes(include=[np.number]).columns
@@ -1164,10 +1178,10 @@ async def tabulate(config: TableConfig):
                             if ov_na:
                                 combined.append(missing_fill)
                             elif pv_na:
-                                ov_s = f"{ov:,.{decimal_places}f}" if isinstance(ov, (int, float)) else str(ov)
+                                ov_s = f"{ov:,.{vdec}f}" if isinstance(ov, (int, float)) else str(ov)
                                 combined.append(f"{ov_s}\n({missing_fill or '0'}%)")
                             else:
-                                ov_s = f"{ov:,.{decimal_places}f}" if isinstance(ov, (int, float)) else str(ov)
+                                ov_s = f"{ov:,.{vdec}f}" if isinstance(ov, (int, float)) else str(ov)
                                 pv_s = f"{pv:.{decimal_places}f}%" if isinstance(pv, (int, float)) else str(pv)
                                 combined.append(f"{ov_s}\n({pv_s})")
                         except (ValueError, TypeError):
@@ -1180,6 +1194,7 @@ async def tabulate(config: TableConfig):
                     _sa = _vc.get("show_as", "normal")
                     _csa = _vc.get("combo_show_as", "normal")
                     _dec = _vc.get("decimals", 2)
+                    _combo_dec = _vc.get("combo_decimals", _dec)
                     _lbl = _vc["label"]
                     # Legacy compat
                     if _vc.get("agg", "sum") in PERCENT_AGGS:
@@ -1187,7 +1202,7 @@ async def tabulate(config: TableConfig):
                     _cf = [_lbl]
                     if _csa and _csa != "normal":
                         orig_pivot = pivot.copy()
-                        _apply_combo(pivot, orig_pivot, _csa, _dec, col_filter=_cf)
+                        _apply_combo(pivot, orig_pivot, _csa, _combo_dec, col_filter=_cf, value_decimal_places=_dec)
                     elif _sa and _sa != "normal":
                         apply_pivot_show_as(pivot, _sa, _dec, col_filter=_cf)
                     if _dec is not None:
@@ -1197,7 +1212,7 @@ async def tabulate(config: TableConfig):
             else:
                 if combo_show_as and combo_show_as != "normal":
                     orig_pivot = pivot.copy()
-                    _apply_combo(pivot, orig_pivot, combo_show_as, dec)
+                    _apply_combo(pivot, orig_pivot, combo_show_as, combo_dec, value_decimal_places=dec)
                 elif show_as and show_as != "normal":
                     apply_pivot_show_as(pivot, show_as, dec)
                 # Apply decimal rounding to all numeric columns

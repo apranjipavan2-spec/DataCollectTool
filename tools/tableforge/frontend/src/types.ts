@@ -29,6 +29,7 @@ export interface ValueField {
   show_as?: string;       // Show values as: normal, pct_grand, pct_row, pct_col, pct_parent_row, pct_parent_col, running_total, rank_asc, rank_desc, index, pct_point_change, z_score, percentile_rank, cagr
   decimals?: number;      // Decimal places (0-6)
   combo_show_as?: string; // If set, shows "value (show_as%)" combination e.g. "1500 (25.3%)"
+  combo_decimals?: number; // Decimal places for the combo's parenthetical % (defaults to `decimals`)
   label?: string;
   number_format?: NumberFormat;
   // Statistical display options

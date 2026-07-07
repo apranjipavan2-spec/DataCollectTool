@@ -26,6 +26,7 @@ interface Props {
   currentColumnTypeOverrides?: Record<string, string>;
   currentSections?: any[];
   currentNumberingConfig?: any;
+  currentInterpretationsMap?: Record<string, string>;
   onLoad: (tables: TableConfig[], annotationsMap?: Record<string, any[]>, extra?: Record<string, any>) => void;
   onClose: () => void;
   currentFilename?: string;
@@ -35,7 +36,7 @@ interface Props {
   fgContext?: FgContext | null;
 }
 
-export function ProjectManager({ currentTables, currentAnnotationsMap = {}, currentComparisonState, currentProjectFilters, currentColumnTypeOverrides = {}, currentSections = [], currentNumberingConfig, onLoad, onClose, currentFilename, currentDatasetId, currentRowCount, currentColCount, fgContext }: Props) {
+export function ProjectManager({ currentTables, currentAnnotationsMap = {}, currentComparisonState, currentProjectFilters, currentColumnTypeOverrides = {}, currentSections = [], currentNumberingConfig, currentInterpretationsMap = {}, onLoad, onClose, currentFilename, currentDatasetId, currentRowCount, currentColCount, fgContext }: Props) {
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saveName, setSaveName] = useState('');
@@ -128,6 +129,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
       if (p.data.comparisonState) extra.comparisonState = p.data.comparisonState;
       if (p.data.projectFilters) extra.projectFilters = p.data.projectFilters;
       if (p.data.columnTypeOverrides) extra.columnTypeOverrides = p.data.columnTypeOverrides;
+      if (p.data.tableInterpretations) extra.tableInterpretations = p.data.tableInterpretations;
       onLoad(p.data.tables, p.data.annotationsMap, extra);
     }
   };
@@ -155,6 +157,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
           columnTypeOverrides: currentColumnTypeOverrides,
           sections: currentSections,
           numberingConfig: currentNumberingConfig,
+          tableInterpretations: currentInterpretationsMap,
           source_file: sourceFileInfo,
         };
         const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
@@ -170,14 +173,14 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
         await fgSaveProject(
           fgContext.fgUrl, fgContext.token, saveName.trim(),
           fgContext.programId || null,
-          { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, columnTypeOverrides: currentColumnTypeOverrides },
+          { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, columnTypeOverrides: currentColumnTypeOverrides, tableInterpretations: currentInterpretationsMap },
         );
         setSuccess(`Project "${saveName}" saved to FieldGovern! Access it from any device via your account.`);
       } else {
         const res = await fetch(`${API_BASE}/project/save`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getUserHeaders() },
-          body: JSON.stringify({ name: saveName.trim(), config: { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, columnTypeOverrides: currentColumnTypeOverrides, sections: currentSections, numberingConfig: currentNumberingConfig, dataset_id: currentDatasetId, source_file: sourceFileInfo }, password: projectPassword || undefined }),
+          body: JSON.stringify({ name: saveName.trim(), config: { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, columnTypeOverrides: currentColumnTypeOverrides, sections: currentSections, numberingConfig: currentNumberingConfig, tableInterpretations: currentInterpretationsMap, dataset_id: currentDatasetId, source_file: sourceFileInfo }, password: projectPassword || undefined }),
         });
         // App Storage needs server-side FG verify config. If it rejects (e.g. 401
         // "Sign in to save projects"), fall back to the private FG Account store
@@ -187,7 +190,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
             await fgSaveProject(
               fgContext.fgUrl, fgContext.token, saveName.trim(),
               fgContext.programId || null,
-              { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, columnTypeOverrides: currentColumnTypeOverrides },
+              { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, columnTypeOverrides: currentColumnTypeOverrides, tableInterpretations: currentInterpretationsMap },
             );
             setSuccess(`Project "${saveName}" saved to your FieldGovern account (private to you). Access it from any device when logged in.`);
             if (currentFilename) localStorage.setItem(`tableforge_last_project_${currentFilename}`, saveName.trim());
@@ -204,7 +207,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
             await fgSaveProject(
               fgContext.fgUrl, fgContext.token, saveName.trim(),
               fgContext.programId || null,
-              { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, columnTypeOverrides: currentColumnTypeOverrides },
+              { tables: currentTables, annotationsMap: currentAnnotationsMap, comparisonState: currentComparisonState || null, projectFilters: currentProjectFilters || {}, columnTypeOverrides: currentColumnTypeOverrides, tableInterpretations: currentInterpretationsMap },
             );
           } catch { /* non-fatal */ }
         }
@@ -237,6 +240,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
         if (data.metadata || data.config?.metadata) extra.metadata = data.metadata || data.config?.metadata;
         if (Array.isArray(data.sections)) extra.sections = data.sections;
         if (data.numberingConfig) extra.numberingConfig = data.numberingConfig;
+        if (data.tableInterpretations) extra.tableInterpretations = data.tableInterpretations;
         const sourceFile = data.meta?.source_file || data.source_file;
         if (sourceFile) extra.source_file = sourceFile;
         onLoad(data.tables, data.annotationsMap, extra);
@@ -257,6 +261,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
       columnTypeOverrides: currentColumnTypeOverrides,
       sections: currentSections,
       numberingConfig: currentNumberingConfig,
+      tableInterpretations: currentInterpretationsMap,
     }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -280,6 +285,7 @@ export function ProjectManager({ currentTables, currentAnnotationsMap = {}, curr
           if (data.columnTypeOverrides) extra.columnTypeOverrides = data.columnTypeOverrides;
           if (Array.isArray(data.sections)) extra.sections = data.sections;
           if (data.numberingConfig) extra.numberingConfig = data.numberingConfig;
+          if (data.tableInterpretations) extra.tableInterpretations = data.tableInterpretations;
           const sourceFile = data.meta?.source_file || data.source_file;
           if (sourceFile) extra.source_file = sourceFile;
           onLoad(data.tables, data.annotationsMap, extra);
