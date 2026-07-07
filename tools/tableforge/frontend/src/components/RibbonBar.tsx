@@ -74,7 +74,7 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
     icon: '#',
     description: 'Count with row percentages. Subtotals if cross-tab.',
     apply: (t) => ({
-      values: t.values.map(v => ({ ...v, agg: 'count', show_as: 'normal', combo_show_as: 'pct_row', decimals: 1 })),
+      values: t.values.map(v => ({ ...v, agg: 'count', show_as: 'normal', combo_show_as: 'pct_row', combo_decimals: 2, decimals: 1 })),
       grand_total: true, grand_total_rows: true, grand_total_columns: true,
       subtotals: t.columns.length > 0,
     }),
@@ -85,7 +85,7 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
     icon: '#',
     description: 'Count with column percentages and totals.',
     apply: (t) => ({
-      values: t.values.map(v => ({ ...v, agg: 'count', show_as: 'normal', combo_show_as: 'pct_col', decimals: 1 })),
+      values: t.values.map(v => ({ ...v, agg: 'count', show_as: 'normal', combo_show_as: 'pct_col', combo_decimals: 2, decimals: 1 })),
       grand_total: true, grand_total_rows: true, grand_total_columns: true,
       subtotals: t.columns.length > 0,
     }),
@@ -96,7 +96,7 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
     icon: '%',
     description: 'Count with percentage of grand total.',
     apply: (t) => ({
-      values: t.values.map(v => ({ ...v, agg: 'count', show_as: 'normal', combo_show_as: 'pct_grand', decimals: 1 })),
+      values: t.values.map(v => ({ ...v, agg: 'count', show_as: 'normal', combo_show_as: 'pct_grand', combo_decimals: 2, decimals: 1 })),
       grand_total: true, grand_total_rows: true, grand_total_columns: true,
       subtotals: t.columns.length > 0,
     }),
@@ -129,7 +129,7 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
     icon: 'S',
     description: 'Sum aggregation with row percentages.',
     apply: (t) => ({
-      values: t.values.map(v => ({ ...v, agg: 'sum', show_as: 'normal', combo_show_as: 'pct_row', decimals: 2 })),
+      values: t.values.map(v => ({ ...v, agg: 'sum', show_as: 'normal', combo_show_as: 'pct_row', combo_decimals: 2, decimals: 2 })),
       grand_total: true, grand_total_rows: true, grand_total_columns: true,
       subtotals: t.columns.length > 0,
     }),
@@ -151,7 +151,7 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
     icon: '+',
     description: 'Count + row % + subtotals + grand totals. Full cross-tabulation.',
     apply: (t) => ({
-      values: t.values.map(v => ({ ...v, agg: 'count', show_as: 'normal', combo_show_as: 'pct_row', decimals: 1 })),
+      values: t.values.map(v => ({ ...v, agg: 'count', show_as: 'normal', combo_show_as: 'pct_row', combo_decimals: 2, decimals: 1 })),
       grand_total: true, grand_total_rows: true, grand_total_columns: true,
       subtotals: true, subtotals_position: 'bottom' as const,
     }),

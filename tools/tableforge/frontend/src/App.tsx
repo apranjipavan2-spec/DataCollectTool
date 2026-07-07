@@ -943,7 +943,13 @@ export default function App() {
     updateTable({
       values: table.values.map(v => {
         if (v.field !== fieldName) return v;
-        const merged = { ...v, ...updates };
+        let merged = { ...v, ...updates };
+        // Default combo_decimals to 2dp the first time a combo is enabled (or for older
+        // projects saved before combo_decimals existed), so it becomes its own stored
+        // setting independent of the value's decimals from that point on.
+        if (merged.combo_show_as && merged.combo_show_as !== 'normal' && merged.combo_decimals === undefined) {
+          merged = { ...merged, combo_decimals: 2 };
+        }
         return { ...merged, label: buildValueLabel(merged.agg, merged.show_as, merged.combo_show_as, fieldName) };
       }),
     });
