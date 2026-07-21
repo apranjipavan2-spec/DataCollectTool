@@ -78,6 +78,35 @@ function pickColumnByOverlap(
   return best ? best.name : null;
 }
 
+// Keyword fallback for tables the user has renamed away from the default STAT_TITLES
+// text (e.g. "Correlation between Borewell Depth and Water Yield for ... Beneficiaries").
+// Order matters — more specific phrases must be checked before their generic substrings
+// (e.g. "paired t-test" before "t-test", "multiple regression" before "regression").
+const TITLE_KEYWORDS: [RegExp, string][] = [
+  [/multinomial/i, 'multinomial_logistic'],
+  [/logistic regression/i, 'logistic_regression'],
+  [/multiple regression/i, 'multiple_regression'],
+  [/paired t-?test/i, 'paired_ttest'],
+  [/wilcoxon/i, 'wilcoxon'],
+  [/mcnemar/i, 'mcnemar'],
+  [/kruskal/i, 'kruskal'],
+  [/friedman/i, 'friedman'],
+  [/spearman/i, 'spearman'],
+  [/kendall/i, 'kendall'],
+  [/cram[ée]r/i, 'cramers_matrix'],
+  [/cross-?tab/i, 'crosstab'],
+  [/post-?hoc/i, 'posthoc'],
+  [/reliability|cronbach/i, 'reliability'],
+  [/anova/i, 'anova'],
+  [/t-?test/i, 'ttest'],
+  [/regression/i, 'regression'],
+  [/normality/i, 'normality'],
+  [/outlier/i, 'outlier'],
+  [/frequency/i, 'frequency'],
+  [/descriptive/i, 'descriptive'],
+  [/correlat/i, 'correlation'],
+];
+
 export function inferStatConfigFromResult(
   title: string,
   resultData: { headers: string[]; rows: any[][] } | undefined,
@@ -90,12 +119,43 @@ export function inferStatConfigFromResult(
     ? knownColumns
     : Array.from(knownColumns).map(name => ({ name }));
   const nameSet = new Set(colsArray.map(c => c.name));
+  // Users often hand-edit the auto title and paste in an en/em dash ("–"/"—") or a
+  // curly-quote variant instead of the plain ASCII the exact-match below expects —
+  // normalize both sides so those don't silently fall through to the keyword fallback.
+  const normalizeDashesAndQuotes = (s: string) => s.replace(/[–—]/g, '-').replace(/[‘’]/g, "'");
+  const normTitle = normalizeDashesAndQuotes(title);
   // Try exact match first, then prefix match (titles can be suffixed with " - <column>" by auto-title).
   // Prefer the LONGEST matching prefix to disambiguate (e.g. "Cramér's V Association Matrix" vs "Cramér").
-  const candidates = Object.entries(STAT_TITLES).filter(([, t]) => title === t || title.startsWith(t + ' ') || title.startsWith(t + '-') || title.startsWith(t + ' -'));
-  if (candidates.length === 0) return null;
-  candidates.sort((a, b) => b[1].length - a[1].length);
-  const statType = candidates[0][0];
+  const candidates = Object.entries(STAT_TITLES)
+    .map(([k, t]) => [k, normalizeDashesAndQuotes(t)] as [string, string])
+    .filter(([, t]) => normTitle === t || normTitle.startsWith(t + ' ') || normTitle.startsWith(t + '-') || normTitle.startsWith(t + ' -'));
+
+  let statType: string;
+  let titleColumns: string[] = [];
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => b[1].length - a[1].length);
+    statType = candidates[0][0];
+    // Pass 2: title-suffix recovery — many auto-titles append " - <column>" or " - <colA> vs <colB>".
+    // Scan the suffix after the matched stat title for known column names.
+    const matchedTitle = candidates[0][1];
+    const suffix = normTitle.slice(matchedTitle.length).replace(/^[\s\-:]+/, '');
+    if (suffix) {
+      const sorted = colsArray.slice().sort((a, b) => b.name.length - a.name.length);
+      for (const c of sorted) {
+        if (suffix.includes(c.name) && !titleColumns.includes(c.name)) titleColumns.push(c.name);
+      }
+    }
+  } else {
+    // Fully custom title (user renamed the table) — guess the stat type from keywords,
+    // then scan the WHOLE title (no fixed prefix to strip) for known column names.
+    const kw = TITLE_KEYWORDS.find(([re]) => re.test(title));
+    if (!kw) return null;
+    statType = kw[1];
+    const sorted = colsArray.slice().sort((a, b) => b.name.length - a.name.length);
+    for (const c of sorted) {
+      if (title.includes(c.name) && !titleColumns.includes(c.name)) titleColumns.push(c.name);
+    }
+  }
 
   // Pass 1: matrix-style stat — column names ARE the row labels.
   if (resultData?.rows && STAT_TYPES_WITH_COLS_IN_ROWS.has(statType)) {
@@ -104,19 +164,6 @@ export function inferStatConfigFromResult(
       .filter(name => name && nameSet.has(name));
     const deduped = Array.from(new Set(matrixCols));
     if (deduped.length > 0) return { statType, columns: deduped };
-  }
-
-  // Pass 2: title-suffix recovery — many auto-titles append " - <column>" or " - <colA> vs <colB>".
-  // Scan the suffix after the matched stat title for known column names.
-  const matchedTitle = candidates[0][1];
-  const suffix = title.slice(matchedTitle.length).replace(/^[\s\-:]+/, '');
-  const titleColumns: string[] = [];
-  if (suffix) {
-    // Sort known columns by length desc so longer names match before substrings.
-    const sorted = colsArray.slice().sort((a, b) => b.name.length - a.name.length);
-    for (const c of sorted) {
-      if (suffix.includes(c.name) && !titleColumns.includes(c.name)) titleColumns.push(c.name);
-    }
   }
 
   // Pass 3: value-overlap recovery for non-matrix two-column stats.

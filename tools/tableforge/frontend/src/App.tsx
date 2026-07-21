@@ -66,7 +66,7 @@ function rehydrateStatResults(tables: TableConfig[]): Map<string, TableResult> {
   const m = new Map<string, TableResult>();
   for (const t of tables) {
     const d = (t as any)._statResultData;
-    if (t._statResult && d?.headers && d?.rows) {
+    if (d?.headers && d?.rows) {
       m.set(t.id, { headers: d.headers, rows: d.rows, row_count: d.rows.length, col_count: d.headers.length });
     }
   }
@@ -270,68 +270,8 @@ export default function App() {
 
   // (tab context menu removed — tables now in SourcePanel)
 
-  // Auto-apply pending project after data file is loaded
-  useEffect(() => {
-    if (pendingProjectData && dataset && allColumns.length > 0) {
-      const data = pendingProjectData;
-      setPendingProjectData(null);
-      // Check column mismatches
-      const colNames = allColumns.map(c => c.name);
-      const mismatches: ReconcileState['mismatches'] = [];
-      for (const t of data.tables) {
-        const allFields = [
-          ...t.rows.map((f: string) => ({ field: f, zone: 'rows' })),
-          ...t.columns.map((f: string) => ({ field: f, zone: 'columns' })),
-          ...t.values.map((v: any) => ({ field: v.field, zone: 'values' })),
-          ...Object.keys(t.filters || {}).map((f: string) => ({ field: f, zone: 'filters' })),
-        ];
-        for (const { field, zone } of allFields) {
-          if (!colNames.includes(field) && !mismatches.find(m => m.field === field)) {
-            mismatches.push({ field, zone, suggestion: fuzzyMatch(field, colNames) });
-          }
-        }
-      }
-      if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
-      if (data.comparisonState) setComparisonState(data.comparisonState);
-      // Sync the ref alongside state so the deferred batch tabulation reads
-      // the loaded filters (state→ref mirror effect runs after commit).
-      if (data.projectFilters) {
-        setProjectFilters(data.projectFilters);
-        projectFiltersRef.current = data.projectFilters;
-      }
-      if (Array.isArray(data.sections)) setSections(data.sections);
-      if (data.numberingConfig) setNumberingConfig(data.numberingConfig);
-      if (data.tableInterpretations) setTableInterpretations(data.tableInterpretations);
-      if (data.columnTypeOverrides && dataset) {
-        const overrides = data.columnTypeOverrides as Record<string, string>;
-        setColumnTypeOverrides(overrides);
-        setDataset(prev => prev ? ({
-          ...prev,
-          columns: prev.columns.map(c => overrides[c.name] ? { ...c, type: overrides[c.name] as any } : c),
-        }) : prev);
-        Object.entries(overrides).forEach(([col, newType]) => {
-          changeColumnType(dataset.dataset_id, col, newType).catch(() => {});
-        });
-      }
-      if (mismatches.length > 0) {
-        setShowDataPreview(false);
-        setReconcileState({ pendingTables: data.tables, mismatches, mapping: Object.fromEntries(mismatches.map(m => [m.field, m.suggestion])) });
-      } else {
-        setTables(data.tables);
-        setActiveTableIdx(0);
-        setResults(rehydrateStatResults(data.tables));
-        setShowDataPreview(false);
-        // Trigger batch tabulation after state settles
-        setTimeout(async () => {
-          const toRun = data.tables.filter((t: TableConfig) => t.values.length > 0);
-          if (toRun.length === 0) return;
-          setLoading(true);
-          try { await runTabulationsBatch(toRun); }
-          finally { setLoading(false); setLoadingMsg(''); }
-        }, 50);
-      }
-    }
-  }, [pendingProjectData, dataset, allColumns]);
+  // Auto-apply pending project after data file is loaded — moved below
+  // runTabulationsBatch/rerunStatTables (see further down) since it depends on both.
 
   // Track dirty state (unsaved changes)
   useEffect(() => {
@@ -536,28 +476,6 @@ export default function App() {
     if (next[activeTableIdx]) runTabulation(next[activeTableIdx]);
   }, [redoStack, tables, activeTableIdx]);
 
-  const handleResumeYes = useCallback(async () => {
-    const data = resumePrompt?.data;
-    setResumePrompt(null);
-    if (!data) return;
-    // Restore autosave state
-    if (data.tables) setTables(data.tables);
-    if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
-    if (data.comparisonState) setComparisonState(data.comparisonState);
-    if (data.projectFilters) {
-      setProjectFilters(data.projectFilters);
-      projectFiltersRef.current = data.projectFilters;
-    }
-    if (Array.isArray(data.sections)) setSections(data.sections);
-    if (data.numberingConfig) setNumberingConfig(data.numberingConfig);
-    if (data.tableInterpretations) setTableInterpretations(data.tableInterpretations);
-    if (data.source_file) {
-      setDataset({ dataset_id: data.source_file.dataset_id, filename: data.source_file.filename, row_count: data.source_file.row_count, columns: [], sheets: [], preview: [] });
-    }
-    setActiveTableIdx(0);
-    setResults(Array.isArray(data.tables) ? rehydrateStatResults(data.tables) : new Map());
-  }, [resumePrompt]);
-
   const handleResumeNo = useCallback(async () => {
     const data = resumePrompt?.data;
     setResumePrompt(null);
@@ -601,9 +519,13 @@ export default function App() {
 
   const runTabulationCore = useCallback(async (config: TableConfig) => {
     // Stat-result tables carry pre-computed headers/rows in `results` and have no
-    // values/rows/columns to pivot. Bail without touching the result map.
-    if ((config as any)._statResult) return;
-    if (!dataset || config.values.length === 0) {
+    // values/rows/columns to pivot. Bail without touching the result map. Check
+    // `_statResultData` too, not just the `_statResult` flag — a table can lose the
+    // flag on an old save while still carrying stat headers/rows, and treating it
+    // as a normal pivot table with empty rows/columns/values crashes the backend
+    // (it tries to build a pivot out of nothing).
+    if ((config as any)._statResult || (config as any)._statResultData) return;
+    if (!dataset || config.values.length === 0 || (config.rows.length === 0 && config.columns.length === 0)) {
       if (config.values.length === 0) setResults(prev => { const next = new Map(prev); next.delete(config.id); return next; });
       return;
     }
@@ -685,7 +607,7 @@ export default function App() {
     if (!dataset) return { refreshed: 0, skipped: 0, total: 0 };
     const force = !!opts?.force;
     const silent = !!opts?.silent;
-    const statTables = tables.filter(t => (t as any)._statResult);
+    const statTables = tables.filter(t => (t as any)._statResult || (t as any)._statResultData);
     if (statTables.length === 0) return { refreshed: 0, skipped: 0, total: 0 };
     let refreshed = 0;
     let skipped = 0;
@@ -754,6 +676,145 @@ export default function App() {
     if (!silent) setLoadingMsg('');
     return { refreshed, skipped, total: statTables.length };
   }, [tables, dataset, allColumns]);
+
+  const handleResumeYes = useCallback(async () => {
+    const data = resumePrompt?.data;
+    setResumePrompt(null);
+    if (!data) return;
+    // Restore autosave state
+    if (data.tables) setTables(data.tables);
+    if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
+    if (data.comparisonState) setComparisonState(data.comparisonState);
+    if (data.projectFilters) {
+      setProjectFilters(data.projectFilters);
+      projectFiltersRef.current = data.projectFilters;
+    }
+    if (Array.isArray(data.sections)) setSections(data.sections);
+    if (data.numberingConfig) setNumberingConfig(data.numberingConfig);
+    if (data.tableInterpretations) setTableInterpretations(data.tableInterpretations);
+    if (data.source_file) {
+      setDataset({ dataset_id: data.source_file.dataset_id, filename: data.source_file.filename, row_count: data.source_file.row_count, columns: [], sheets: [], preview: [] });
+    }
+    setActiveTableIdx(0);
+    setResults(Array.isArray(data.tables) ? rehydrateStatResults(data.tables) : new Map());
+
+    // The dataset behind this autosave lives only in backend RAM and doesn't
+    // survive a restart or the idle-eviction sweep — the cached values above
+    // are shown immediately so the screen isn't blank, but they can be stale
+    // if the source data changed since. When we know which FieldGovern
+    // program/questionnaire this came from, pull a fresh copy now and
+    // recompute every table + stat table against it rather than leaving the
+    // old dataset_id in place (which would 404 on the next recompute anyway).
+    if (fgContext?.programId && Array.isArray(data.tables) && data.tables.length > 0) {
+      setLoading(true); setLoadingMsg('Refreshing data from FieldGovern…');
+      try {
+        const meta = await importFromFg(fgContext.fgUrl, fgContext.token, fgContext.programId, data.questionnaire_id || undefined);
+        const colNames = (meta.columns || []).map((c: any) => c.name);
+        const mismatches: ReconcileState['mismatches'] = [];
+        for (const t of data.tables as TableConfig[]) {
+          const allFields = [
+            ...t.rows.map((f: string) => ({ field: f, zone: 'rows' })),
+            ...t.columns.map((f: string) => ({ field: f, zone: 'columns' })),
+            ...t.values.map((v: any) => ({ field: v.field, zone: 'values' })),
+            ...Object.keys(t.filters).map((f: string) => ({ field: f, zone: 'filters' })),
+          ];
+          for (const { field, zone } of allFields) {
+            if (!colNames.includes(field) && !mismatches.find(m => m.field === field)) {
+              mismatches.push({ field, zone, suggestion: fuzzyMatch(field, colNames) });
+            }
+          }
+        }
+        setDataset(meta);
+        if (mismatches.length > 0) {
+          setReconcileState({
+            pendingTables: data.tables,
+            mismatches,
+            mapping: Object.fromEntries(mismatches.map(m => [m.field, m.suggestion])),
+          });
+        } else {
+          const toRun = (data.tables as TableConfig[]).filter(t => t.values.length > 0);
+          if (toRun.length > 0) await runTabulationsBatch(toRun);
+          if ((data.tables as any[]).some(t => t._statResult || t._statResultData)) {
+            await rerunStatTables(data.projectFilters || {}, { force: true, silent: true });
+          }
+        }
+      } catch (e: any) {
+        setError('Could not refresh from FieldGovern — showing last saved results. ' + (e.message || ''));
+      } finally {
+        setLoading(false); setLoadingMsg('');
+      }
+    }
+  }, [resumePrompt, fgContext, runTabulationsBatch, rerunStatTables]);
+
+  // Auto-apply pending project after data file is loaded
+  useEffect(() => {
+    if (pendingProjectData && dataset && allColumns.length > 0) {
+      const data = pendingProjectData;
+      setPendingProjectData(null);
+      // Check column mismatches
+      const colNames = allColumns.map(c => c.name);
+      const mismatches: ReconcileState['mismatches'] = [];
+      for (const t of data.tables) {
+        const allFields = [
+          ...t.rows.map((f: string) => ({ field: f, zone: 'rows' })),
+          ...t.columns.map((f: string) => ({ field: f, zone: 'columns' })),
+          ...t.values.map((v: any) => ({ field: v.field, zone: 'values' })),
+          ...Object.keys(t.filters || {}).map((f: string) => ({ field: f, zone: 'filters' })),
+        ];
+        for (const { field, zone } of allFields) {
+          if (!colNames.includes(field) && !mismatches.find(m => m.field === field)) {
+            mismatches.push({ field, zone, suggestion: fuzzyMatch(field, colNames) });
+          }
+        }
+      }
+      if (data.annotationsMap) setAnnotationsMap(data.annotationsMap);
+      if (data.comparisonState) setComparisonState(data.comparisonState);
+      // Sync the ref alongside state so the deferred batch tabulation reads
+      // the loaded filters (state→ref mirror effect runs after commit).
+      if (data.projectFilters) {
+        setProjectFilters(data.projectFilters);
+        projectFiltersRef.current = data.projectFilters;
+      }
+      if (Array.isArray(data.sections)) setSections(data.sections);
+      if (data.numberingConfig) setNumberingConfig(data.numberingConfig);
+      if (data.tableInterpretations) setTableInterpretations(data.tableInterpretations);
+      if (data.columnTypeOverrides && dataset) {
+        const overrides = data.columnTypeOverrides as Record<string, string>;
+        setColumnTypeOverrides(overrides);
+        setDataset(prev => prev ? ({
+          ...prev,
+          columns: prev.columns.map(c => overrides[c.name] ? { ...c, type: overrides[c.name] as any } : c),
+        }) : prev);
+        Object.entries(overrides).forEach(([col, newType]) => {
+          changeColumnType(dataset.dataset_id, col, newType).catch(() => {});
+        });
+      }
+      if (mismatches.length > 0) {
+        setShowDataPreview(false);
+        setReconcileState({ pendingTables: data.tables, mismatches, mapping: Object.fromEntries(mismatches.map(m => [m.field, m.suggestion])) });
+      } else {
+        setTables(data.tables);
+        setActiveTableIdx(0);
+        setResults(rehydrateStatResults(data.tables));
+        setShowDataPreview(false);
+        // Trigger batch tabulation after state settles
+        setTimeout(async () => {
+          const toRun = data.tables.filter((t: TableConfig) => t.values.length > 0);
+          setLoading(true);
+          try {
+            if (toRun.length > 0) await runTabulationsBatch(toRun);
+            // Stat tables (correlation/crosstab/t-test/etc.) carry their own compute
+            // path and aren't covered by runTabulationsBatch above — without this
+            // they'd keep showing whatever was cached in the imported file instead
+            // of being recomputed against the dataset now loaded in this session.
+            if (data.tables.some((t: any) => t._statResult || t._statResultData)) {
+              await rerunStatTables(data.projectFilters || projectFiltersRef.current || {}, { force: true, silent: true });
+            }
+          } finally { setLoading(false); setLoadingMsg(''); }
+        }, 50);
+      }
+    }
+  }, [pendingProjectData, dataset, allColumns, runTabulationsBatch, rerunStatTables]);
 
   const updateTable = useCallback((update: Partial<TableConfig>) => {
     // Fields that affect what the backend computes; display-only fields (header_renames, title,
@@ -1049,12 +1110,18 @@ export default function App() {
         setActiveTableIdx(0);
         setResults(rehydrateStatResults(data.tables));
         const toRun = data.tables.filter((t: TableConfig) => t.values.length > 0);
-        await runTabulationsBatch(toRun);
+        if (toRun.length > 0) await runTabulationsBatch(toRun);
+        // Recompute stat tables (correlation/crosstab/t-test/etc.) against whatever
+        // dataset is currently loaded — otherwise reopening a saved project just
+        // replays the numbers from whenever it was last saved.
+        if (data.tables.some((t: any) => t._statResult || t._statResultData)) {
+          await rerunStatTables(data.projectFilters || projectFiltersRef.current || {}, { force: true, silent: true });
+        }
       }
     } catch (e: any) {
       setError(e.message || 'Failed to load project');
     } finally { setLoading(false); setLoadingMsg(''); }
-  }, [allColumns, pushUndo, runTabulationsBatch]);
+  }, [allColumns, pushUndo, runTabulationsBatch, rerunStatTables]);
 
   // Apply already-fetched project data (inline tables, e.g. a FieldGovern
   // account project) into the workspace. Mirrors the ProjectManager onLoad path.
@@ -1105,11 +1172,27 @@ export default function App() {
             }
             setDataset(meta);
           }
-          pushUndo();
-          setTables(loadedTables);
-          setActiveTableIdx(0);
-          setResults(rehydrateStatResults(loadedTables));
           setModal(null);
+          if (meta) {
+            // Route through the same pendingProjectData effect used for drag-drop
+            // project imports — it runs once `dataset` has actually committed to
+            // the new value, so the recompute below sees the right dataset instead
+            // of a stale closure over the `null` we had before this reload.
+            setPendingProjectData({
+              tables: loadedTables,
+              annotationsMap: loadedAnnotations,
+              comparisonState: loadedExtra?.comparisonState,
+              projectFilters: loadedExtra?.projectFilters,
+              sections: loadedExtra?.sections,
+              numberingConfig: loadedExtra?.numberingConfig,
+              tableInterpretations: loadedExtra?.tableInterpretations,
+            });
+          } else {
+            pushUndo();
+            setTables(loadedTables);
+            setActiveTableIdx(0);
+            setResults(rehydrateStatResults(loadedTables));
+          }
         }).catch(() => {
           pushUndo();
           setTables(loadedTables);
@@ -1154,6 +1237,13 @@ export default function App() {
       setActiveTableIdx(0);
       setResults(rehydrateStatResults(loadedTables));
       setModal(null);
+      const toRun = loadedTables.filter(t => t.values.length > 0);
+      (async () => {
+        if (toRun.length > 0) await runTabulationsBatch(toRun);
+        if (loadedTables.some((t: any) => t._statResult || t._statResultData)) {
+          await rerunStatTables(loadedExtra?.projectFilters || projectFiltersRef.current || {}, { force: true, silent: true });
+        }
+      })();
     }
   };
 
@@ -1384,7 +1474,7 @@ export default function App() {
         if (toRun.length > 0) await runTabulationsBatch(toRun);
         // Stat tables (crosstab/Cramér's V/etc.) aren't recomputed by runTabulationsBatch —
         // without this they silently kept showing results from the OLD dataset.
-        if (data.tables.some((t: TableConfig) => (t as any)._statResult)) {
+        if (data.tables.some((t: TableConfig) => (t as any)._statResult || (t as any)._statResultData)) {
           await rerunStatTables(data.projectFilters || {}, { force: true, silent: true });
         }
       }
@@ -2681,9 +2771,17 @@ export default function App() {
               <button className="btn-secondary" onClick={() => {
                 // Load without remapping
                 pushUndo();
-                setTables(reconcileState.pendingTables);
-                setActiveTableIdx(0); setResults(rehydrateStatResults(reconcileState.pendingTables));
+                const pending = reconcileState.pendingTables;
+                setTables(pending);
+                setActiveTableIdx(0); setResults(rehydrateStatResults(pending));
                 setReconcileState(null);
+                setTimeout(async () => {
+                  const toRun = pending.filter(t => t.values.length > 0);
+                  if (toRun.length > 0) await runTabulationsBatch(toRun);
+                  if (pending.some((t: any) => t._statResult || t._statResultData)) {
+                    await rerunStatTables(projectFiltersRef.current || {}, { force: true, silent: true });
+                  }
+                }, 100);
               }}>Load As-Is</button>
               <button className="btn-primary" onClick={() => {
                 // Apply mapping
@@ -2704,8 +2802,13 @@ export default function App() {
                 setTables(remapped);
                 setActiveTableIdx(0); setResults(rehydrateStatResults(remapped));
                 setReconcileState(null);
-                // Re-run tabulations
-                setTimeout(() => remapped.forEach(t => { if (t.values.length > 0) runTabulation(t); }), 100);
+                // Re-run tabulations, then any stat tables (correlation/crosstab/etc.)
+                setTimeout(async () => {
+                  remapped.forEach(t => { if (t.values.length > 0) runTabulation(t); });
+                  if (remapped.some((t: any) => t._statResult || t._statResultData)) {
+                    await rerunStatTables(projectFiltersRef.current || {}, { force: true, silent: true });
+                  }
+                }, 100);
               }}>Apply Mapping</button>
             </div>
           </div>
