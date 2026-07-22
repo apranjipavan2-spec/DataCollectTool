@@ -30,6 +30,13 @@ jobs:
               || docker volume inspect $(docker volume ls -q | grep certbot_webroot | head -1) --format '{{.Mountpoint}}')
             echo "Webroot host path: $WEBROOT"
 
+            # The previous attempt's certbot process got orphaned when the SSH
+            # session was killed by our command_timeout mid-run, leaving its
+            # lock file behind — clear it so this run isn't blocked by a ghost.
+            pkill -f "certbot" 2>/dev/null || true
+            sleep 1
+            rm -f /var/lib/letsencrypt/.certbot.lock /etc/letsencrypt/.certbot.lock 2>/dev/null || true
+
             # Reissue directly with explicit flags rather than hand-editing the
             # renewal .ini — certbot rewrites that file itself (correctly, with
             # a [webroot_map] section) once this succeeds, which also fixes the
