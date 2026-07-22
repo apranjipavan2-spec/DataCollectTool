@@ -1,0 +1,69 @@
+name: Renew SSL Certificate
+
+# One-off/maintenance workflow: fixes app.fieldgovern.com's Let's Encrypt cert.
+# The original cert was issued with `certbot certonly --standalone`, which needs
+# port 80 free — but nginx has held port 80/443 since day one, so every daily
+# cron renewal attempt has been failing silently. This switches the cert's
+# renewal method to `webroot` (matching the ACME-challenge location nginx.conf
+# already serves), renews immediately, and reloads nginx.
+on:
+  workflow_dispatch:
+
+jobs:
+  renew:
+    name: Renew cert via webroot + reload nginx
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Renew via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            cd /opt/fieldgovern
+
+            WEBROOT=$(docker volume inspect fieldgovern_certbot_webroot --format '{{.Mountpoint}}' 2>/dev/null \
+              || docker volume inspect $(docker volume ls -q | grep certbot_webroot | head -1) --format '{{.Mountpoint}}')
+            echo "Webroot host path: $WEBROOT"
+
+            RENEWAL_CONF="/etc/letsencrypt/renewal/app.fieldgovern.com.conf"
+            if [ -f "$RENEWAL_CONF" ]; then
+              echo "--- renewal conf before ---"
+              grep -E "authenticator|webroot_path" "$RENEWAL_CONF" || true
+              sed -i "s/^authenticator = .*/authenticator = webroot/" "$RENEWAL_CONF"
+              if grep -q "^webroot_path" "$RENEWAL_CONF"; then
+                sed -i "s#^webroot_path = .*#webroot_path = $WEBROOT,#" "$RENEWAL_CONF"
+              else
+                sed -i "/^\[webroot_map\]/i webroot_path = $WEBROOT," "$RENEWAL_CONF"
+              fi
+              if grep -q "^\[webroot_map\]" "$RENEWAL_CONF"; then
+                sed -i "/^\[webroot_map\]/,/^$/{s#app.fieldgovern.com = .*#app.fieldgovern.com = $WEBROOT#}" "$RENEWAL_CONF"
+              fi
+              echo "--- renewal conf after ---"
+              grep -E "authenticator|webroot_path|app.fieldgovern.com =" "$RENEWAL_CONF" || true
+            else
+              echo "No existing renewal conf found — issuing fresh via webroot"
+              certbot certonly --webroot -w "$WEBROOT" -d app.fieldgovern.com \
+                --non-interactive --agree-tos --email pallavi@dataworx.co.in
+            fi
+
+            echo "--- Running renewal ---"
+            certbot renew --cert-name app.fieldgovern.com --force-renewal --non-interactive
+
+            echo "--- Restarting nginx to pick up new cert ---"
+            docker compose restart nginx
+            sleep 4
+
+            echo "--- Verifying ---"
+            docker compose ps nginx
+            echo | openssl s_client -connect app.fieldgovern.com:443 -servername app.fieldgovern.com 2>/dev/null | openssl x509 -noout -dates
+
+      - name: Health check
+        run: |
+          sleep 5
+          curl -f https://app.fieldgovern.com/health || exit 1
+          echo "Health check passed — cert renewed"
