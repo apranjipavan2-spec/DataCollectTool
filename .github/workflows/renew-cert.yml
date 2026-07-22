@@ -33,7 +33,10 @@ jobs:
             # The previous attempt's certbot process got orphaned when the SSH
             # session was killed by our command_timeout mid-run, leaving its
             # lock file behind — clear it so this run isn't blocked by a ghost.
-            pkill -f "certbot" 2>/dev/null || true
+            # `-x` matches the process name exactly (not `-f`, which matches
+            # the full command line — and this very script's argv contains the
+            # word "certbot" several times, so `-f` kills itself instead).
+            pkill -x certbot 2>/dev/null || true
             sleep 1
             rm -f /var/lib/letsencrypt/.certbot.lock /etc/letsencrypt/.certbot.lock 2>/dev/null || true
 
