@@ -21,7 +21,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 5m
+          command_timeout: 3m
           script: |
             set -e
             cd /opt/fieldgovern
@@ -30,29 +30,17 @@ jobs:
               || docker volume inspect $(docker volume ls -q | grep certbot_webroot | head -1) --format '{{.Mountpoint}}')
             echo "Webroot host path: $WEBROOT"
 
-            RENEWAL_CONF="/etc/letsencrypt/renewal/app.fieldgovern.com.conf"
-            if [ -f "$RENEWAL_CONF" ]; then
-              echo "--- renewal conf before ---"
-              grep -E "authenticator|webroot_path" "$RENEWAL_CONF" || true
-              sed -i "s/^authenticator = .*/authenticator = webroot/" "$RENEWAL_CONF"
-              if grep -q "^webroot_path" "$RENEWAL_CONF"; then
-                sed -i "s#^webroot_path = .*#webroot_path = $WEBROOT,#" "$RENEWAL_CONF"
-              else
-                sed -i "/^\[webroot_map\]/i webroot_path = $WEBROOT," "$RENEWAL_CONF"
-              fi
-              if grep -q "^\[webroot_map\]" "$RENEWAL_CONF"; then
-                sed -i "/^\[webroot_map\]/,/^$/{s#app.fieldgovern.com = .*#app.fieldgovern.com = $WEBROOT#}" "$RENEWAL_CONF"
-              fi
-              echo "--- renewal conf after ---"
-              grep -E "authenticator|webroot_path|app.fieldgovern.com =" "$RENEWAL_CONF" || true
-            else
-              echo "No existing renewal conf found — issuing fresh via webroot"
-              certbot certonly --webroot -w "$WEBROOT" -d app.fieldgovern.com \
-                --non-interactive --agree-tos --email pallavi@dataworx.co.in
-            fi
+            # Reissue directly with explicit flags rather than hand-editing the
+            # renewal .ini — certbot rewrites that file itself (correctly, with
+            # a [webroot_map] section) once this succeeds, which also fixes the
+            # existing cron's plain `certbot renew` going forward.
+            certbot certonly --webroot -w "$WEBROOT" -d app.fieldgovern.com \
+              --cert-name app.fieldgovern.com \
+              --non-interactive --agree-tos --email pallavi@dataworx.co.in \
+              --force-renewal
 
-            echo "--- Running renewal ---"
-            certbot renew --cert-name app.fieldgovern.com --force-renewal --non-interactive
+            echo "--- renewal conf after ---"
+            grep -E "authenticator|webroot_path|app.fieldgovern.com =" /etc/letsencrypt/renewal/app.fieldgovern.com.conf || true
 
             echo "--- Restarting nginx to pick up new cert ---"
             docker compose restart nginx
