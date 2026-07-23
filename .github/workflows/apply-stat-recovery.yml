@@ -55,7 +55,7 @@ jobs:
 
             echo "=== Applying recovery ==="
             docker run --rm -v "$DATA_ROOT":/data -v "$SCRIPT_DIR":/scripts:ro python:3.11-slim sh -c \
-              "pip install --quiet openpyxl && python3 /scripts/apply_stat_recovery.py '/data/$USER_ID/GK-INTERIM.tableforge' '/data/GK-INTERIM_data.xlsx'"
+              "pip install --quiet openpyxl && python3 /scripts/apply_stat_recovery.py '/data/$USER_ID/GK-INTERIM.tableforge' '/data/GK-INTERIM_data.xlsx' '/data/$USER_ID/__autosave__.tableforge' '/data/GK-INTERIM-ARCHIVED-2026-05-30-358row.tableforge'"
 
             echo ""
             echo "=== Archiving old duplicate root-level GK-INTERIM.tableforge ==="
