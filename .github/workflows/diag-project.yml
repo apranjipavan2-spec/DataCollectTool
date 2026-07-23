@@ -21,6 +21,10 @@ on:
         description: "Comma-separated extra .tableforge paths (relative to /app/projects) to search as fallback sources"
         required: false
         default: "6781e087-d12b-43cb-9207-ec2a3f6093f2/__autosave__.tableforge,GK-INTERIM.tableforge"
+      source_xlsx:
+        description: "Path (relative to /app/projects) of the cached source data file, to read its full header row"
+        required: false
+        default: "GK-INTERIM_data.xlsx"
 
 jobs:
   diagnose:
@@ -52,6 +56,7 @@ jobs:
             USER_DIR="${{ inputs.user_dir }}"
             PROJECT_NAME="${{ inputs.project_name }}"
             OTHER_FILES="${{ inputs.other_files }}"
+            SOURCE_XLSX="${{ inputs.source_xlsx }}"
 
             DATA_ROOT=$(docker inspect analyzer --format '{{range .Mounts}}{{if eq .Destination "/app/projects"}}{{.Source}}{{end}}{{end}}' 2>/dev/null)
             echo "DATA_ROOT: $DATA_ROOT"
@@ -63,8 +68,13 @@ jobs:
             for p in "${PARTS[@]}"; do
               OTHER_ARGS="$OTHER_ARGS /data/$p"
             done
+            SOURCE_ARGS=""
+            if [ -n "$SOURCE_XLSX" ]; then
+              SOURCE_ARGS="--source-xlsx /data/$SOURCE_XLSX"
+            fi
             echo "Current: $CURRENT"
             echo "Fallback sources: $OTHER_ARGS"
+            echo "Source headers: $SOURCE_ARGS"
             echo ""
             docker run --rm -v "$DATA_ROOT":/data:ro -v "$SCRIPT_PATH":/script.py:ro \
-              python:3.11-slim python3 /script.py "$CURRENT" $OTHER_ARGS
+              python:3.11-slim sh -c "pip install --quiet openpyxl && python3 /script.py '$CURRENT' $OTHER_ARGS $SOURCE_ARGS"

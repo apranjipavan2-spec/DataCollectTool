@@ -6,7 +6,12 @@ t-test, ANOVA, etc.) actually used.
 Read-only. Never prints row-level survey data — only table titles, stat
 types, and the column NAMES a table was built from (survey question labels).
 
-Usage: python3 recover_stat_configs.py <current.tableforge> [other.tableforge ...]
+Usage: python3 recover_stat_configs.py <current.tableforge> [other.tableforge ...] [--source-xlsx <path>]
+
+--source-xlsx reads ONLY the header row of the actual source data file (no
+row data) and merges those real column names into the matching pool — this
+covers columns that no surviving table happens to reference anymore, which
+the project-file-only pool can't see.
 """
 import json
 import re
@@ -189,6 +194,28 @@ def resolve_table(t: dict, known_cols: set) -> dict:
     return {"status": "unrecoverable_in_this_file", "statType": stat_type, "columns": []}
 
 
+def load_headers_from_source(path: str) -> set:
+    """Read just the header row of the real source data file — no row data —
+    to widen the matching pool beyond what's still referenced by a table."""
+    try:
+        if path.lower().endswith((".xlsx", ".xls")):
+            import openpyxl
+            wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+            ws = wb[wb.sheetnames[0]]
+            header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
+            wb.close()
+            return {str(c).strip() for c in header_row if c is not None and str(c).strip()}
+        else:
+            import csv
+            with open(path, newline="", encoding="utf-8-sig", errors="replace") as f:
+                reader = csv.reader(f)
+                header_row = next(reader)
+            return {c.strip() for c in header_row if c and c.strip()}
+    except Exception as e:  # noqa: BLE001
+        print(f"could not read headers from {path}: {e}")
+        return set()
+
+
 def load_file(path: str):
     try:
         data = json.loads(Path(path).read_text())
@@ -200,16 +227,26 @@ def load_file(path: str):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("usage: recover_stat_configs.py <current.tableforge> [other.tableforge ...]")
+    args = sys.argv[1:]
+    source_xlsx = None
+    if "--source-xlsx" in args:
+        idx = args.index("--source-xlsx")
+        source_xlsx = args[idx + 1]
+        args = args[:idx] + args[idx + 2:]
+    if len(args) < 1:
+        print("usage: recover_stat_configs.py <current.tableforge> [other.tableforge ...] [--source-xlsx <path>]")
         return
-    current_path, *other_paths = sys.argv[1:]
+    current_path, *other_paths = args
     data, err = load_file(current_path)
     if err:
         print(err)
         return
 
     known_cols = collect_known_columns(data)
+    if source_xlsx:
+        header_cols = load_headers_from_source(source_xlsx)
+        print(f"source file headers: {len(header_cols)} columns read from {source_xlsx}")
+        known_cols |= header_cols
     all_sources = []
     for op in other_paths:
         od, oerr = load_file(op)
