@@ -55,8 +55,14 @@ jobs:
             cp "$SRC_DIR/RAITASIRI NEW 28062026.tableforge" "/tmp/proj_sync/RAITASIRI_28062026.json"
             ls -la /tmp/proj_sync
 
-            docker cp /tmp/proj_sync/. app:/tmp/proj_sync/
-            docker cp /tmp/diag-sync/tools/tableforge/backend/scripts/sync_projects_to_account.py app:/tmp/sync_projects_to_account.py
+            docker compose exec -T app mkdir -p /tmp/proj_sync
+            docker compose cp /tmp/proj_sync/GK-INTERIM.json app:/tmp/proj_sync/GK-INTERIM.json
+            docker compose cp /tmp/proj_sync/AIRAVATA.json app:/tmp/proj_sync/AIRAVATA.json
+            docker compose cp /tmp/proj_sync/MCF_MEMBER.json app:/tmp/proj_sync/MCF_MEMBER.json
+            docker compose cp /tmp/proj_sync/MCF_SHG.json app:/tmp/proj_sync/MCF_SHG.json
+            docker compose cp /tmp/proj_sync/RAITASIRI_NEW.json app:/tmp/proj_sync/RAITASIRI_NEW.json
+            docker compose cp /tmp/proj_sync/RAITASIRI_28062026.json app:/tmp/proj_sync/RAITASIRI_28062026.json
+            docker compose cp /tmp/diag-sync/tools/tableforge/backend/scripts/sync_projects_to_account.py app:/tmp/sync_projects_to_account.py
 
             docker compose exec -T app python3 /tmp/sync_projects_to_account.py "$TENANT_ID" "$USER_ID" \
               "GK-INTERIM=/tmp/proj_sync/GK-INTERIM.json" \
