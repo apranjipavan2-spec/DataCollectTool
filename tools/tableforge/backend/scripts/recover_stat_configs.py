@@ -233,10 +233,36 @@ def main():
         idx = args.index("--source-xlsx")
         source_xlsx = args[idx + 1]
         args = args[:idx] + args[idx + 2:]
+    grep_terms = None
+    if "--grep" in args:
+        idx = args.index("--grep")
+        grep_terms = [t.strip().lower() for t in args[idx + 1].split(",") if t.strip()]
+        args = args[:idx] + args[idx + 2:]
     if len(args) < 1:
-        print("usage: recover_stat_configs.py <current.tableforge> [other.tableforge ...] [--source-xlsx <path>]")
+        print("usage: recover_stat_configs.py <current.tableforge> [other.tableforge ...] [--source-xlsx <path>] [--grep term1,term2]")
         return
     current_path, *other_paths = args
+
+    if grep_terms:
+        # Standalone lookup mode: just list every real column (project file +
+        # source headers) containing any of the given terms, so a human can
+        # eyeball a whole question family instead of guessing at an acronym.
+        data, err = load_file(current_path)
+        pool = collect_known_columns(data) if not err else set()
+        if source_xlsx:
+            pool |= load_headers_from_source(source_xlsx)
+        for op in other_paths:
+            od, oerr = load_file(op)
+            if not oerr:
+                pool |= collect_known_columns(od)
+                for v in od.get("versions", []) or []:
+                    pool |= collect_known_columns(v)
+        matches = sorted(c for c in pool if any(t in c.lower() for t in grep_terms))
+        print(f"{len(matches)} column(s) matching {grep_terms}:\n")
+        for c in matches:
+            print(f"  - {c}")
+        return
+
     data, err = load_file(current_path)
     if err:
         print(err)
