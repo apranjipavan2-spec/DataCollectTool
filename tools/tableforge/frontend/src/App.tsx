@@ -669,7 +669,19 @@ export default function App() {
         if (!res.ok) { skipped++; return; }
         const data = await res.json();
         const { headers, rows } = data;
-        setTables(prev => prev.map(p => p.id === t.id ? { ...p, _statResultData: { headers, rows } } as any : p));
+        setTables(prev => prev.map(p => {
+          if (p.id !== t.id) return p;
+          const prevCfg = (p as any)._statConfig;
+          return {
+            ...p,
+            _statResultData: { headers, rows },
+            // Stamp the dataset this was just computed against — otherwise the
+            // "stale" badge (which compares _statConfig.datasetId to the live
+            // dataset) keeps flagging a table as stale forever, even right
+            // after a successful recompute against the current data.
+            ...(prevCfg ? { _statConfig: { ...prevCfg, datasetId: dataset.dataset_id, computedAt: new Date().toISOString() } } : {}),
+          } as any;
+        }));
         setResults(prev => {
           const next = new Map(prev);
           next.set(t.id, { headers, rows, row_count: rows.length, col_count: headers.length });
@@ -1643,17 +1655,25 @@ export default function App() {
     setLoading(true); setLoadingMsg('Reloading data file…'); setError(null);
     try {
       const meta = await uploadFile(file);
-      setDataset(meta);
       setExtraColumns([]);
-      setLoadingMsg('Regenerating tables…');
-      setTimeout(async () => {
-        tables.forEach(t => { if (t.values.length > 0) runTabulation(t); });
-        await rerunStatTables(projectFiltersRef.current, { force: true, silent: true });
-      }, 100);
+      // Don't recompute here — `rerunStatTables`/`runTabulation` closed over
+      // in this callback still reference the OLD dataset (setDataset above
+      // hasn't committed yet; React state updates aren't visible until the
+      // next render), so calling them synchronously — even after a
+      // setTimeout — silently recomputes against the dataset we're replacing
+      // instead of the newly uploaded one. Route through the same deferred
+      // pendingProjectData effect used elsewhere, which only fires once
+      // `dataset` has actually updated to the new value.
+      setPendingProjectData({
+        tables, annotationsMap, comparisonState,
+        projectFilters: projectFiltersRef.current,
+        columnTypeOverrides, sections, numberingConfig, tableInterpretations,
+      });
+      setDataset(meta);
     } catch (e: any) {
       setError('Reload failed: ' + (e.message || ''));
     } finally { setLoading(false); setLoadingMsg(''); }
-  }, [dataset, tables, runTabulation, rerunStatTables]);
+  }, [dataset, tables, annotationsMap, comparisonState, columnTypeOverrides, sections, numberingConfig, tableInterpretations]);
 
   if (!dataset) {
     return (
