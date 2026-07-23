@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       names:
-        description: "Comma-separated project names to check (must match exactly, spaces ok)"
+        description: "Comma-separated project names to check (must match exactly, spaces ok). Use the literal word ALL to list every analyzer row unfiltered."
         required: true
         default: "AIRAVATA,MCF  MEMBER"
 
@@ -31,4 +31,4 @@ jobs:
             set -e
             cd /opt/fieldgovern
             NAMES='${{ inputs.names }}'
-            docker compose exec -T app python3 -c "from app.core.database import SessionLocal; from app.models.user_tool_project import UserToolProject; names=[n.strip() for n in '''$NAMES'''.split(',') if n.strip()]; db=SessionLocal(); rows=db.query(UserToolProject).filter(UserToolProject.tool=='analyzer', UserToolProject.name.in_(names)).all(); print(f'{len(rows)} row(s) found for names={names}'); [print(f'  id={r.id} name={r.name!r} tenant={r.tenant_id} user={r.user_id} updated_at={r.updated_at} tables={len((r.data or {}).get(\"tables\") or [])} stat_like={sum(1 for t in ((r.data or {}).get(\"tables\") or []) if t.get(\"_statResult\") or t.get(\"_statResultData\") or (not t.get(\"rows\") and not t.get(\"columns\") and not t.get(\"values\")))} archived={r.archived_at}') for r in rows]; db.close()"
+            docker compose exec -T app python3 -c "from app.core.database import SessionLocal; from app.models.user_tool_project import UserToolProject; names=[n.strip() for n in '''$NAMES'''.split(',') if n.strip()]; db=SessionLocal(); q=db.query(UserToolProject).filter(UserToolProject.tool=='analyzer'); rows=q.all() if names==['ALL'] else q.filter(UserToolProject.name.in_(names)).all(); print(f'{len(rows)} row(s) found (mode={names})'); [print(f'  id={r.id} name={r.name!r} tenant={r.tenant_id} user={r.user_id} updated_at={r.updated_at} tables={len((r.data or {}).get(\"tables\") or [])} stat_like={sum(1 for t in ((r.data or {}).get(\"tables\") or []) if t.get(\"_statResult\") or t.get(\"_statResultData\") or (not t.get(\"rows\") and not t.get(\"columns\") and not t.get(\"values\")))} archived={r.archived_at}') for r in rows]; db.close()"
