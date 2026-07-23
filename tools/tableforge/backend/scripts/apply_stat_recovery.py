@@ -70,13 +70,23 @@ def find_unique(keyword: str, known_cols):
 
 def main():
     if len(sys.argv) < 3:
-        print("usage: apply_stat_recovery.py <project.tableforge> <source.xlsx>")
+        print("usage: apply_stat_recovery.py <project.tableforge> <source.xlsx> [extra.tableforge ...]")
         return
     proj_path = Path(sys.argv[1])
     source_xlsx = sys.argv[2]
+    extra_paths = sys.argv[3:]
 
     data = json.loads(proj_path.read_text(encoding="utf-8"))
     known_cols = collect_known_columns(data) | load_headers_from_source(source_xlsx)
+    for ep in extra_paths:
+        try:
+            ed = json.loads(Path(ep).read_text(encoding="utf-8"))
+        except Exception as e:  # noqa: BLE001
+            print(f"could not read extra source {ep}: {e}")
+            continue
+        known_cols |= collect_known_columns(ed)
+        for v in ed.get("versions", []) or []:
+            known_cols |= collect_known_columns(v)
 
     tables_by_title = {}
     for t in data.get("tables", []):
