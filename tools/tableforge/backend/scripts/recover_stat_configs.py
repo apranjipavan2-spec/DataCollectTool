@@ -187,6 +187,14 @@ def main():
         for t in od.get("tables", []) or []:
             all_sources.append((f"{op}@current", t))
 
+    total_tables = len(data.get("tables") or [])
+    stat_tables_seen = sum(1 for t in (data.get("tables") or []) if is_stat_table(t))
+    print(f"DEBUG: {total_tables} total tables in current file, {stat_tables_seen} look like stat tables")
+    print(f"DEBUG: known_cols pool size = {len(known_cols)}")
+    print(f"DEBUG: sample known_cols = {sorted(known_cols)[:25]}")
+    print(f"DEBUG: {len(all_sources)} fallback source tables loaded from other files")
+    print("")
+
     results = []
     for t in data.get("tables", []) or []:
         if not is_stat_table(t):
