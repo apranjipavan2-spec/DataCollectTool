@@ -59,6 +59,20 @@ function createEmptyTable(id: string, name: string): TableConfig {
   };
 }
 
+// A table can lose both its `_statResult` flag and its `_statResultData` snapshot
+// entirely on an old save (pre-dating either field), leaving nothing to key off
+// except its title. A real pivot table always has at least one row/column/value
+// field configured — so a table with a recognizable stat-model title (even
+// hand-edited) AND no pivot fields at all can only be a stat table, and is safe
+// to attempt recomputing from scratch via inferStatConfigFromResult.
+function looksLikeStatTable(t: TableConfig, allColumns: { name: string; sample_values?: string[] }[]): boolean {
+  if ((t as any)._statResult || (t as any)._statResultData) return true;
+  if (t.rows.length === 0 && t.columns.length === 0 && t.values.length === 0) {
+    return !!inferStatConfigFromResult(t.title || '', undefined, allColumns);
+  }
+  return false;
+}
+
 // Stat-test results aren't recomputable from TableConfig — they were injected once
 // when the user ran the test. We persist them on `_statResultData` so reload/resume
 // can put them back into the `results` map.
@@ -607,7 +621,7 @@ export default function App() {
     if (!dataset) return { refreshed: 0, skipped: 0, total: 0 };
     const force = !!opts?.force;
     const silent = !!opts?.silent;
-    const statTables = tables.filter(t => (t as any)._statResult || (t as any)._statResultData);
+    const statTables = tables.filter(t => looksLikeStatTable(t, allColumns));
     if (statTables.length === 0) return { refreshed: 0, skipped: 0, total: 0 };
     let refreshed = 0;
     let skipped = 0;
@@ -734,7 +748,7 @@ export default function App() {
         } else {
           const toRun = (data.tables as TableConfig[]).filter(t => t.values.length > 0);
           if (toRun.length > 0) await runTabulationsBatch(toRun);
-          if ((data.tables as any[]).some(t => t._statResult || t._statResultData)) {
+          if ((data.tables as any[]).some((t: any) => looksLikeStatTable(t, allColumns))) {
             await rerunStatTables(data.projectFilters || {}, { force: true, silent: true });
           }
         }
@@ -807,7 +821,7 @@ export default function App() {
             // path and aren't covered by runTabulationsBatch above — without this
             // they'd keep showing whatever was cached in the imported file instead
             // of being recomputed against the dataset now loaded in this session.
-            if (data.tables.some((t: any) => t._statResult || t._statResultData)) {
+            if (data.tables.some((t: any) => looksLikeStatTable(t, allColumns))) {
               await rerunStatTables(data.projectFilters || projectFiltersRef.current || {}, { force: true, silent: true });
             }
           } finally { setLoading(false); setLoadingMsg(''); }
@@ -1114,7 +1128,7 @@ export default function App() {
         // Recompute stat tables (correlation/crosstab/t-test/etc.) against whatever
         // dataset is currently loaded — otherwise reopening a saved project just
         // replays the numbers from whenever it was last saved.
-        if (data.tables.some((t: any) => t._statResult || t._statResultData)) {
+        if (data.tables.some((t: any) => looksLikeStatTable(t, allColumns))) {
           await rerunStatTables(data.projectFilters || projectFiltersRef.current || {}, { force: true, silent: true });
         }
       }
@@ -1240,7 +1254,7 @@ export default function App() {
       const toRun = loadedTables.filter(t => t.values.length > 0);
       (async () => {
         if (toRun.length > 0) await runTabulationsBatch(toRun);
-        if (loadedTables.some((t: any) => t._statResult || t._statResultData)) {
+        if (loadedTables.some((t: any) => looksLikeStatTable(t, allColumns))) {
           await rerunStatTables(loadedExtra?.projectFilters || projectFiltersRef.current || {}, { force: true, silent: true });
         }
       })();
@@ -1474,7 +1488,7 @@ export default function App() {
         if (toRun.length > 0) await runTabulationsBatch(toRun);
         // Stat tables (crosstab/Cramér's V/etc.) aren't recomputed by runTabulationsBatch —
         // without this they silently kept showing results from the OLD dataset.
-        if (data.tables.some((t: TableConfig) => (t as any)._statResult || (t as any)._statResultData)) {
+        if (data.tables.some((t: TableConfig) => looksLikeStatTable(t, allColumns))) {
           await rerunStatTables(data.projectFilters || {}, { force: true, silent: true });
         }
       }
@@ -2778,7 +2792,7 @@ export default function App() {
                 setTimeout(async () => {
                   const toRun = pending.filter(t => t.values.length > 0);
                   if (toRun.length > 0) await runTabulationsBatch(toRun);
-                  if (pending.some((t: any) => t._statResult || t._statResultData)) {
+                  if (pending.some((t: any) => looksLikeStatTable(t, allColumns))) {
                     await rerunStatTables(projectFiltersRef.current || {}, { force: true, silent: true });
                   }
                 }, 100);
@@ -2805,7 +2819,7 @@ export default function App() {
                 // Re-run tabulations, then any stat tables (correlation/crosstab/etc.)
                 setTimeout(async () => {
                   remapped.forEach(t => { if (t.values.length > 0) runTabulation(t); });
-                  if (remapped.some((t: any) => t._statResult || t._statResultData)) {
+                  if (remapped.some((t: any) => looksLikeStatTable(t, allColumns))) {
                     await rerunStatTables(projectFiltersRef.current || {}, { force: true, silent: true });
                   }
                 }, 100);
