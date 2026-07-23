@@ -1,0 +1,70 @@
+name: Sync Complete Projects to FieldGovern Account
+
+# Pushes the current, complete local .tableforge project data into the
+# FieldGovern-account project store (user_tool_projects), overwriting stale
+# snapshots there, and archives clearly-superseded draft rows. Fixes the
+# admin-visible project list showing old/incomplete versions.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type YES to actually write to the database (dry-run otherwise is not implemented — this always writes)"
+        required: true
+        default: "YES"
+
+jobs:
+  sync:
+    name: Upsert + archive user_tool_projects rows
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout (for the sync script)
+        uses: actions/checkout@v4
+
+      - name: Copy sync script to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "tools/tableforge/backend/scripts/sync_projects_to_account.py"
+          target: "/tmp/diag-sync/"
+
+      - name: Sync via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            set -e
+            cd /opt/fieldgovern
+            TENANT_ID="b3725f57-8c61-462b-89ed-3cf778ee6103"
+            USER_ID="6781e087-d12b-43cb-9207-ec2a3f6093f2"
+            DATA_ROOT=$(docker inspect analyzer --format '{{range .Mounts}}{{if eq .Destination "/app/projects"}}{{.Source}}{{end}}{{end}}' 2>/dev/null)
+            echo "DATA_ROOT: $DATA_ROOT"
+
+            SRC_DIR="$DATA_ROOT/6781e087-d12b-43cb-9207-ec2a3f6093f2"
+            mkdir -p /tmp/proj_sync
+            cp "$SRC_DIR/GK-INTERIM.tableforge" /tmp/proj_sync/GK-INTERIM.json
+            cp "$DATA_ROOT/AIRAVATA.tableforge" /tmp/proj_sync/AIRAVATA.json
+            cp "$DATA_ROOT/MCF  MEMBER.tableforge" "/tmp/proj_sync/MCF_MEMBER.json"
+            cp "$DATA_ROOT/MCF  SHG.tableforge" "/tmp/proj_sync/MCF_SHG.json"
+            cp "$SRC_DIR/RAITASIRI  NEW.tableforge" "/tmp/proj_sync/RAITASIRI_NEW.json"
+            cp "$SRC_DIR/RAITASIRI NEW 28062026.tableforge" "/tmp/proj_sync/RAITASIRI_28062026.json"
+            ls -la /tmp/proj_sync
+
+            docker cp /tmp/proj_sync/. app:/tmp/proj_sync/
+            docker cp /tmp/diag-sync/tools/tableforge/backend/scripts/sync_projects_to_account.py app:/tmp/sync_projects_to_account.py
+
+            docker compose exec -T app python3 /tmp/sync_projects_to_account.py "$TENANT_ID" "$USER_ID" \
+              "GK-INTERIM=/tmp/proj_sync/GK-INTERIM.json" \
+              "AIRAVATA=/tmp/proj_sync/AIRAVATA.json" \
+              "MCF @ MEMBER=/tmp/proj_sync/MCF_MEMBER.json" \
+              "MCF @ SHG=/tmp/proj_sync/MCF_SHG.json" \
+              "RAITASIRI @ NEW=/tmp/proj_sync/RAITASIRI_NEW.json" \
+              "RAITASIRI NEW 28062026=/tmp/proj_sync/RAITASIRI_28062026.json" \
+              --archive "RS Part 1,RS with INT,RS NEW 28"
+
+            rm -rf /tmp/proj_sync
