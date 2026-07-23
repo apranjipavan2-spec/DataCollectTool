@@ -218,7 +218,7 @@ def load_headers_from_source(path: str) -> set:
 
 def load_file(path: str):
     try:
-        data = json.loads(Path(path).read_text())
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
     except Exception as e:  # noqa: BLE001
         return None, f"error reading {path}: {e}"
     if data.get("encrypted"):
