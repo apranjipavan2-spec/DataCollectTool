@@ -1,0 +1,34 @@
+name: Diagnose FieldGovern-account Mirrored Projects
+
+# Read-only diagnostic. Queries the user_tool_projects table (the
+# FieldGovern-account mirror of tableforge projects, separate from the local
+# .tableforge files) to check whether a mirrored project's data actually
+# matches its local-file counterpart, and whether its own stat tables are
+# intact. Only prints table titles/counts and column NAMES — never
+# row-level survey data.
+on:
+  workflow_dispatch:
+    inputs:
+      names:
+        description: "Comma-separated project names to check (must match exactly, spaces ok)"
+        required: true
+        default: "AIRAVATA,MCF  MEMBER"
+
+jobs:
+  diagnose:
+    name: Query user_tool_projects
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Query via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 2m
+          script: |
+            set -e
+            cd /opt/fieldgovern
+            NAMES='${{ inputs.names }}'
+            docker compose exec -T app python3 -c "from app.core.database import SessionLocal; from app.models.user_tool_project import UserToolProject; names=[n.strip() for n in '''$NAMES'''.split(',') if n.strip()]; db=SessionLocal(); rows=db.query(UserToolProject).filter(UserToolProject.tool=='analyzer', UserToolProject.name.in_(names)).all(); print(f'{len(rows)} row(s) found for names={names}'); [print(f'  id={r.id} name={r.name!r} tenant={r.tenant_id} user={r.user_id} updated_at={r.updated_at} tables={len((r.data or {}).get(\"tables\") or [])} stat_like={sum(1 for t in ((r.data or {}).get(\"tables\") or []) if t.get(\"_statResult\") or t.get(\"_statResultData\") or (not t.get(\"rows\") and not t.get(\"columns\") and not t.get(\"values\")))} archived={r.archived_at}') for r in rows]; db.close()"
