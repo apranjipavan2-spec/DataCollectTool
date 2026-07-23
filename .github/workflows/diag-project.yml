@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       user_dir:
-        description: "User folder under /app/projects to inspect"
+        description: "User folder under /app/projects to inspect, or the literal word ROOT for root-level projects"
         required: true
         default: "6781e087-d12b-43cb-9207-ec2a3f6093f2"
       project_name:
@@ -67,11 +67,15 @@ jobs:
             echo "DATA_ROOT: $DATA_ROOT"
             SCRIPT_PATH="/tmp/diag-recover/tools/tableforge/backend/scripts/recover_stat_configs.py"
 
-            CURRENT="/data/$USER_DIR/${PROJECT_NAME}.tableforge"
+            if [ "$USER_DIR" = "ROOT" ]; then
+              CURRENT="/data/${PROJECT_NAME}.tableforge"
+            else
+              CURRENT="/data/$USER_DIR/${PROJECT_NAME}.tableforge"
+            fi
             OTHER_ARGS=""
             IFS=',' read -ra PARTS <<< "$OTHER_FILES"
             for p in "${PARTS[@]}"; do
-              OTHER_ARGS="$OTHER_ARGS /data/$p"
+              [ -n "$p" ] && OTHER_ARGS="$OTHER_ARGS /data/$p"
             done
             SOURCE_ARGS=""
             if [ -n "$SOURCE_XLSX" ]; then
