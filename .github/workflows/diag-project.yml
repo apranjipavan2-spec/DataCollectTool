@@ -1,10 +1,11 @@
 name: Diagnose Project Version History
 
 # Read-only diagnostic — no writes to any project file. Inspects the
-# tableforge_data volume to figure out why a specific user's project isn't
-# accumulating version history the way projects.py's save_project() expects.
-# Only prints filenames/mtimes/sizes and JSON *structure* (top-level keys,
-# versions array length, meta block) — never table/row content.
+# tableforge_data volume and runs recover_stat_configs.py to figure out which
+# stat tables (correlation, crosstab, t-test, etc.) still have their columns
+# recorded somewhere (current file, saved _statConfig, or an older snapshot),
+# and which are genuinely unrecoverable. Only prints table titles and column
+# NAMES (survey question labels) — never row-level survey data.
 on:
   workflow_dispatch:
     inputs:
@@ -13,48 +14,57 @@ on:
         required: true
         default: "6781e087-d12b-43cb-9207-ec2a3f6093f2"
       project_name:
-        description: "Project filename stem (without .tableforge)"
+        description: "Current/active project filename stem (without .tableforge)"
         required: true
         default: "GK-INTERIM"
+      other_files:
+        description: "Comma-separated extra .tableforge paths (relative to /app/projects) to search as fallback sources"
+        required: false
+        default: "6781e087-d12b-43cb-9207-ec2a3f6093f2/__autosave__.tableforge,GK-INTERIM.tableforge"
 
 jobs:
   diagnose:
-    name: Inspect project file + version history
+    name: Inspect project + recover stat table columns
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Checkout (for the recovery script)
+        uses: actions/checkout@v4
+
+      - name: Copy recovery script to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "tools/tableforge/backend/scripts/recover_stat_configs.py"
+          target: "/tmp/diag-recover/"
+
       - name: Inspect via SSH
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 2m
+          command_timeout: 3m
           script: |
             set -e
             USER_DIR="${{ inputs.user_dir }}"
             PROJECT_NAME="${{ inputs.project_name }}"
-
-            echo "=== All docker volumes matching 'tableforge' ==="
-            docker volume ls | grep tableforge || echo "none matched"
-            echo ""
-            echo "=== Actual mounts on the running 'analyzer' container ==="
-            docker inspect analyzer --format '{{range .Mounts}}{{.Name}} -> {{.Destination}} (src: {{.Source}}){{"\n"}}{{end}}' 2>/dev/null || echo "analyzer container not found/running"
-            echo ""
+            OTHER_FILES="${{ inputs.other_files }}"
 
             DATA_ROOT=$(docker inspect analyzer --format '{{range .Mounts}}{{if eq .Destination "/app/projects"}}{{.Source}}{{end}}{{end}}' 2>/dev/null)
-            echo "Resolved DATA_ROOT from running container: $DATA_ROOT"
+            echo "DATA_ROOT: $DATA_ROOT"
+            SCRIPT_PATH="/tmp/diag-recover/tools/tableforge/backend/scripts/recover_stat_configs.py"
+
+            CURRENT="/data/$USER_DIR/${PROJECT_NAME}.tableforge"
+            OTHER_ARGS=""
+            IFS=',' read -ra PARTS <<< "$OTHER_FILES"
+            for p in "${PARTS[@]}"; do
+              OTHER_ARGS="$OTHER_ARGS /data/$p"
+            done
+            echo "Current: $CURRENT"
+            echo "Fallback sources: $OTHER_ARGS"
             echo ""
-            echo "=== Top-level listing of DATA_ROOT ==="
-            ls -la --time-style=full-iso "$DATA_ROOT" 2>/dev/null || echo "DATA_ROOT listing failed"
-            echo ""
-            echo "=== Listing of $DATA_ROOT/$USER_DIR ==="
-            ls -la --time-style=full-iso "$DATA_ROOT/$USER_DIR" 2>/dev/null || echo "user dir not found at that path"
-            echo ""
-            TARGET="$DATA_ROOT/$USER_DIR/${PROJECT_NAME}.tableforge"
-            echo "=== Structure of $TARGET ==="
-            if [ -f "$TARGET" ]; then
-              docker run --rm -v "$DATA_ROOT":/data:ro python:3.11-slim python3 -c "import json,sys; d=json.load(open(sys.argv[1])); m=d.get('meta',{}); print('top_level_keys:', sorted(d.keys())); print('has_meta:', bool(m)); print('meta_keys:', sorted(m.keys()) if m else None); print('meta_created:', m.get('created')); print('meta_name:', m.get('name')); print('meta_version:', m.get('version')); vs=d.get('versions',[]); print('versions_count:', len(vs)); [print('  version saved_at=', v.get('saved_at'), 'tables=', len(v.get('tables',[]))) for v in vs]; print('tables_count_current:', len(d.get('tables',[])))" "/data/$USER_DIR/${PROJECT_NAME}.tableforge"
-            else
-              echo "FILE NOT FOUND at $TARGET"
-            fi
+            docker run --rm -v "$DATA_ROOT":/data:ro -v "$SCRIPT_PATH":/script.py:ro \
+              python:3.11-slim python3 /script.py "$CURRENT" $OTHER_ARGS
