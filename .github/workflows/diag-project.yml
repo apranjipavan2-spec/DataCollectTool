@@ -47,23 +47,7 @@ jobs:
             TARGET="$DATA_ROOT/$USER_DIR/${PROJECT_NAME}.tableforge"
             echo "=== Structure of $TARGET ==="
             if [ -f "$TARGET" ]; then
-              docker run --rm -v "$DATA_ROOT":/data:ro python:3.11-slim python3 -c "
-import json
-p = '/data/$USER_DIR/${PROJECT_NAME}.tableforge'
-d = json.load(open(p))
-print('top-level keys:', sorted(d.keys()))
-print('has meta:', 'meta' in d)
-if 'meta' in d:
-    m = d['meta']
-    print('meta keys:', sorted(m.keys()))
-    print('meta.created:', m.get('created'))
-    print('meta.name:', m.get('name'))
-    print('meta.version:', m.get('version'))
-print('versions count:', len(d.get('versions', [])))
-for i, v in enumerate(d.get('versions', [])):
-    print(f'  version[{i}].saved_at =', v.get('saved_at'), '| tables:', len(v.get('tables', [])))
-print('tables count (current):', len(d.get('tables', [])))
-"
+              docker run --rm -v "$DATA_ROOT":/data:ro python:3.11-slim python3 -c "import json,sys; d=json.load(open(sys.argv[1])); m=d.get('meta',{}); print('top_level_keys:', sorted(d.keys())); print('has_meta:', bool(m)); print('meta_keys:', sorted(m.keys()) if m else None); print('meta_created:', m.get('created')); print('meta_name:', m.get('name')); print('meta_version:', m.get('version')); vs=d.get('versions',[]); print('versions_count:', len(vs)); [print('  version saved_at=', v.get('saved_at'), 'tables=', len(v.get('tables',[]))) for v in vs]; print('tables_count_current:', len(d.get('tables',[])))" "/data/$USER_DIR/${PROJECT_NAME}.tableforge"
             else
               echo "FILE NOT FOUND at $TARGET"
             fi
