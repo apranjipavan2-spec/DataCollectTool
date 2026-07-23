@@ -25,6 +25,10 @@ on:
         description: "Path (relative to /app/projects) of the cached source data file, to read its full header row"
         required: false
         default: "GK-INTERIM_data.xlsx"
+      grep_terms:
+        description: "Comma-separated single-word substrings (no spaces) — if set, just lists every column containing any of them instead of running the full recovery scan"
+        required: false
+        default: ""
 
 jobs:
   diagnose:
@@ -57,6 +61,7 @@ jobs:
             PROJECT_NAME="${{ inputs.project_name }}"
             OTHER_FILES="${{ inputs.other_files }}"
             SOURCE_XLSX="${{ inputs.source_xlsx }}"
+            GREP_TERMS="${{ inputs.grep_terms }}"
 
             DATA_ROOT=$(docker inspect analyzer --format '{{range .Mounts}}{{if eq .Destination "/app/projects"}}{{.Source}}{{end}}{{end}}' 2>/dev/null)
             echo "DATA_ROOT: $DATA_ROOT"
@@ -72,9 +77,14 @@ jobs:
             if [ -n "$SOURCE_XLSX" ]; then
               SOURCE_ARGS="--source-xlsx /data/$SOURCE_XLSX"
             fi
+            GREP_ARGS=""
+            if [ -n "$GREP_TERMS" ]; then
+              GREP_ARGS="--grep $GREP_TERMS"
+            fi
             echo "Current: $CURRENT"
             echo "Fallback sources: $OTHER_ARGS"
             echo "Source headers: $SOURCE_ARGS"
+            echo "Grep: $GREP_ARGS"
             echo ""
             docker run --rm -v "$DATA_ROOT":/data:ro -v "$SCRIPT_PATH":/script.py:ro \
-              python:3.11-slim sh -c "pip install --quiet openpyxl && python3 /script.py '$CURRENT' $OTHER_ARGS $SOURCE_ARGS"
+              python:3.11-slim sh -c "pip install --quiet openpyxl && python3 /script.py '$CURRENT' $OTHER_ARGS $SOURCE_ARGS $GREP_ARGS"
