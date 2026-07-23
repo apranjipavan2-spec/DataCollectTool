@@ -34,15 +34,22 @@ jobs:
             set -e
             USER_DIR="${{ inputs.user_dir }}"
             PROJECT_NAME="${{ inputs.project_name }}"
-            DATA_ROOT=$(docker volume inspect fieldgovern_tableforge_data --format '{{.Mountpoint}}' 2>/dev/null \
-              || docker volume inspect $(docker volume ls -q | grep tableforge_data | head -1) --format '{{.Mountpoint}}')
-            echo "Data root: $DATA_ROOT"
+
+            echo "=== All docker volumes matching 'tableforge' ==="
+            docker volume ls | grep tableforge || echo "none matched"
             echo ""
-            echo "=== Files in user dir (name, size, mtime) ==="
-            find "$DATA_ROOT/$USER_DIR" -maxdepth 1 -iname "*${PROJECT_NAME}*" -exec ls -la --time-style=full-iso {} \; 2>/dev/null || echo "(none found — checking case-insensitive / dir listing)"
+            echo "=== Actual mounts on the running 'analyzer' container ==="
+            docker inspect analyzer --format '{{range .Mounts}}{{.Name}} -> {{.Destination}} (src: {{.Source}}){{"\n"}}{{end}}' 2>/dev/null || echo "analyzer container not found/running"
             echo ""
-            echo "=== Full listing of user dir ==="
-            ls -la --time-style=full-iso "$DATA_ROOT/$USER_DIR" 2>/dev/null || echo "user dir not found"
+
+            DATA_ROOT=$(docker inspect analyzer --format '{{range .Mounts}}{{if eq .Destination "/app/projects"}}{{.Source}}{{end}}{{end}}' 2>/dev/null)
+            echo "Resolved DATA_ROOT from running container: $DATA_ROOT"
+            echo ""
+            echo "=== Top-level listing of DATA_ROOT ==="
+            ls -la --time-style=full-iso "$DATA_ROOT" 2>/dev/null || echo "DATA_ROOT listing failed"
+            echo ""
+            echo "=== Listing of $DATA_ROOT/$USER_DIR ==="
+            ls -la --time-style=full-iso "$DATA_ROOT/$USER_DIR" 2>/dev/null || echo "user dir not found at that path"
             echo ""
             TARGET="$DATA_ROOT/$USER_DIR/${PROJECT_NAME}.tableforge"
             echo "=== Structure of $TARGET ==="
