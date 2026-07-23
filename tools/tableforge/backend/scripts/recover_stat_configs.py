@@ -126,6 +126,43 @@ def find_columns_in_title(title: str, known_cols: set):
     return found
 
 
+STOPWORDS = {
+    "vs", "and", "the", "of", "by", "for", "in", "to", "on", "at", "with",
+    "before", "after", "pre", "post", "test", "matrix", "correlation",
+}
+
+
+def title_remainder(title: str) -> str:
+    """Strip the matched stat-type phrase off the front of a title, leaving
+    just the analyst's own description of what it's about."""
+    nt = normalize(title)
+    for t in STAT_TITLES.values():
+        nt2 = normalize(t)
+        if nt.startswith(nt2):
+            return nt[len(nt2):].strip(" -:–—")
+    return title
+
+
+def suggest_columns_by_keywords(title: str, known_cols: set, top_n: int = 3):
+    """Fuzzy fallback when exact column names can't be found anywhere: score
+    each known real column by how many meaningful words from the title's own
+    description appear in it (whole-word match), and return the best guesses.
+    These are SUGGESTIONS for a human to confirm, not an automatic answer —
+    unlike resolve_table()'s columns, which are exact recoveries."""
+    remainder = title_remainder(title)
+    tokens = [w.lower() for w in re.findall(r"[A-Za-z]+", remainder) if len(w) >= 3 and w.lower() not in STOPWORDS]
+    if not tokens:
+        return []
+    scored = []
+    for c in known_cols:
+        cl = c.lower()
+        score = sum(1 for tok in tokens if re.search(r"\b" + re.escape(tok) + r"\b", cl))
+        if score > 0:
+            scored.append((score, c))
+    scored.sort(key=lambda x: (-x[0], len(x[1])))
+    return scored[:top_n]
+
+
 def is_stat_table(t: dict) -> bool:
     return bool(t.get("_statResult")) or bool(t.get("_statResultData")) or (
         not t.get("rows") and not t.get("columns") and not t.get("values")
@@ -189,11 +226,9 @@ def main():
 
     total_tables = len(data.get("tables") or [])
     stat_tables_seen = sum(1 for t in (data.get("tables") or []) if is_stat_table(t))
-    print(f"DEBUG: {total_tables} total tables in current file, {stat_tables_seen} look like stat tables")
-    print(f"DEBUG: known_cols pool size = {len(known_cols)}")
-    print(f"DEBUG: sample known_cols = {sorted(known_cols)[:25]}")
-    print(f"DEBUG: {len(all_sources)} fallback source tables loaded from other files")
-    print("")
+    print(f"{total_tables} total tables in current file, {stat_tables_seen} look like stat tables")
+    print(f"known-columns pool: {len(known_cols)} real column names collected from every other table/version")
+    print(f"{len(all_sources)} fallback source tables loaded from other files\n")
 
     results = []
     for t in data.get("tables", []) or []:
@@ -226,8 +261,18 @@ def main():
     bad = [r for r in results if not r[1]["columns"] or str(r[1]["status"]).startswith("PARTIAL")]
     print(f"=== {len(results)} stat tables found | {len(ok)} recoverable | {len(bad)} still unrecoverable ===\n")
     for title, r in results:
-        cols = ", ".join(r["columns"]) if r["columns"] else "??? NONE FOUND ???"
-        print(f"[{r['status']}] statType={r.get('statType')}\n    title: {title}\n    columns: {cols}\n")
+        print(f"[{r['status']}] statType={r.get('statType')}\n    title: {title}")
+        if r["columns"]:
+            print(f"    columns: {', '.join(r['columns'])}\n")
+            continue
+        suggestions = suggest_columns_by_keywords(title, known_cols)
+        if suggestions:
+            print("    columns: NOT RECOVERED - best-guess candidates (confirm manually, not automatic):")
+            for score, col in suggestions:
+                print(f"      [{score} word match] {col}")
+            print("")
+        else:
+            print("    columns: NOT RECOVERED - no keyword overlap found either; this one needs to be rebuilt from scratch\n")
 
 
 if __name__ == "__main__":
