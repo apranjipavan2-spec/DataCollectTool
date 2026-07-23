@@ -1,0 +1,69 @@
+name: Diagnose Project Version History
+
+# Read-only diagnostic — no writes to any project file. Inspects the
+# tableforge_data volume to figure out why a specific user's project isn't
+# accumulating version history the way projects.py's save_project() expects.
+# Only prints filenames/mtimes/sizes and JSON *structure* (top-level keys,
+# versions array length, meta block) — never table/row content.
+on:
+  workflow_dispatch:
+    inputs:
+      user_dir:
+        description: "User folder under /app/projects to inspect"
+        required: true
+        default: "6781e087-d12b-43cb-9207-ec2a3f6093f2"
+      project_name:
+        description: "Project filename stem (without .tableforge)"
+        required: true
+        default: "GK-INTERIM"
+
+jobs:
+  diagnose:
+    name: Inspect project file + version history
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Inspect via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 2m
+          script: |
+            set -e
+            USER_DIR="${{ inputs.user_dir }}"
+            PROJECT_NAME="${{ inputs.project_name }}"
+            DATA_ROOT=$(docker volume inspect fieldgovern_tableforge_data --format '{{.Mountpoint}}' 2>/dev/null \
+              || docker volume inspect $(docker volume ls -q | grep tableforge_data | head -1) --format '{{.Mountpoint}}')
+            echo "Data root: $DATA_ROOT"
+            echo ""
+            echo "=== Files in user dir (name, size, mtime) ==="
+            find "$DATA_ROOT/$USER_DIR" -maxdepth 1 -iname "*${PROJECT_NAME}*" -exec ls -la --time-style=full-iso {} \; 2>/dev/null || echo "(none found — checking case-insensitive / dir listing)"
+            echo ""
+            echo "=== Full listing of user dir ==="
+            ls -la --time-style=full-iso "$DATA_ROOT/$USER_DIR" 2>/dev/null || echo "user dir not found"
+            echo ""
+            TARGET="$DATA_ROOT/$USER_DIR/${PROJECT_NAME}.tableforge"
+            echo "=== Structure of $TARGET ==="
+            if [ -f "$TARGET" ]; then
+              docker run --rm -v "$DATA_ROOT":/data:ro python:3.11-slim python3 -c "
+import json
+p = '/data/$USER_DIR/${PROJECT_NAME}.tableforge'
+d = json.load(open(p))
+print('top-level keys:', sorted(d.keys()))
+print('has meta:', 'meta' in d)
+if 'meta' in d:
+    m = d['meta']
+    print('meta keys:', sorted(m.keys()))
+    print('meta.created:', m.get('created'))
+    print('meta.name:', m.get('name'))
+    print('meta.version:', m.get('version'))
+print('versions count:', len(d.get('versions', [])))
+for i, v in enumerate(d.get('versions', [])):
+    print(f'  version[{i}].saved_at =', v.get('saved_at'), '| tables:', len(v.get('tables', [])))
+print('tables count (current):', len(d.get('tables', [])))
+"
+            else
+              echo "FILE NOT FOUND at $TARGET"
+            fi
