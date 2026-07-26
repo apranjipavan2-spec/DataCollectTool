@@ -1392,6 +1392,13 @@ export default function App() {
     setTables(prev => prev.map((tb, ti) => ti === tableIdx ? { ...tb, section_id: sectionId } : tb));
   }, [pushUndo]);
 
+  const handleBulkAssignSection = useCallback((indices: number[], sectionId: string | undefined) => {
+    if (indices.length === 0) return;
+    pushUndo();
+    const idxSet = new Set(indices);
+    setTables(prev => prev.map((tb, ti) => idxSet.has(ti) ? { ...tb, section_id: sectionId } : tb));
+  }, [pushUndo]);
+
   const handleApplyNumbering = useCallback(() => {
     pushUndo();
     setTables(prev => renumberTables(prev));
@@ -1941,6 +1948,7 @@ export default function App() {
           sections={sections}
           onSectionsChange={setSections}
           onAssignSection={handleAssignSection}
+          onBulkAssignSection={handleBulkAssignSection}
           numberingConfig={numberingConfig}
           onNumberingConfigChange={setNumberingConfig}
           onApplyNumbering={handleApplyNumbering}

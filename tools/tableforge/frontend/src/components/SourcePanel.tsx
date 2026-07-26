@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ColumnInfo, ColumnRole, TableConfig, TableResult, TableSection, NumberingConfig } from '../types';
+import { OrganizeModal } from './OrganizeModal';
 
 interface Props {
   columns: ColumnInfo[];
@@ -31,6 +32,7 @@ interface Props {
   sections?: TableSection[];
   onSectionsChange?: (sections: TableSection[]) => void;
   onAssignSection?: (tableIdx: number, sectionId: string | undefined) => void;
+  onBulkAssignSection?: (indices: number[], sectionId: string | undefined) => void;
   numberingConfig?: NumberingConfig;
   onNumberingConfigChange?: (cfg: NumberingConfig) => void;
   onApplyNumbering?: () => void;
@@ -88,7 +90,7 @@ export function SourcePanel({
   tables = [], activeTableIdx = 0, results, error,
   onTableSelect, onAddTable, onDuplicateTable, onDuplicateTables, onRenameTable, onDeleteTable, onDeleteTables,
   onReorderTables, onTogglePin, onOpenChartFor,
-  sections = [], onSectionsChange, onAssignSection,
+  sections = [], onSectionsChange, onAssignSection, onBulkAssignSection,
   numberingConfig, onNumberingConfigChange, onApplyNumbering,
 }: Props) {
   const [search, setSearch] = useState('');
@@ -100,7 +102,19 @@ export function SourcePanel({
   const [descDraft, setDescDraft] = useState('');
   const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set());
   const [showNumberingModal, setShowNumberingModal] = useState(false);
+  const [showOrganizeModal, setShowOrganizeModal] = useState(false);
+  const [showMoveMenu, setShowMoveMenu] = useState(false);
+  const moveMenuRef = useRef<HTMLDivElement>(null);
   const [renamingSection, setRenamingSection] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!showMoveMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (moveMenuRef.current && !moveMenuRef.current.contains(e.target as Node)) setShowMoveMenu(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMoveMenu]);
 
   // Resizable sidebars
   const [tablesWidth, setTablesWidth] = useState(170);
@@ -339,6 +353,16 @@ export function SourcePanel({
     setSelectedTables(new Set(tables.map(t => t.id)));
   };
 
+  const handleBulkMoveToSection = (sectionId: string | undefined) => {
+    if (selectedTables.size === 0 || !onBulkAssignSection) return;
+    const indices = tables
+      .map((t, i) => selectedTables.has(t.id) ? i : -1)
+      .filter(i => i >= 0);
+    onBulkAssignSection(indices, sectionId);
+    setShowMoveMenu(false);
+    setSelectedTables(new Set());
+  };
+
   const renderTablesView = () => (
     <>
       <div className="panel-header" style={{ paddingBottom: 6 }}>
@@ -378,6 +402,34 @@ export function SourcePanel({
           <button className="table-multi-btn" onClick={handleBulkDuplicate} title="Duplicate selected">⧉ Dup</button>
           <button className="table-multi-btn table-multi-del" onClick={handleBulkDelete} title="Delete selected">🗑 Del</button>
           <button className="table-multi-btn" onClick={selectAllTables} title="Select all">All</button>
+          {onBulkAssignSection && (
+            <div ref={moveMenuRef} style={{ position: 'relative' }}>
+              <button className="table-multi-btn" onClick={() => setShowMoveMenu(v => !v)} title="Move selected to a section">↦ Move ▾</button>
+              {showMoveMenu && (
+                <div className="fdrop-panel" style={{ width: 180, right: 0, left: 'auto' }}>
+                  <div className="fdrop-title">Move {selectedTables.size} table(s) to</div>
+                  <button
+                    onClick={() => handleBulkMoveToSection(undefined)}
+                    style={{ textAlign: 'left', padding: '5px 8px', background: 'transparent', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, borderRadius: 4 }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >(none — unsectioned)</button>
+                  {sections.length === 0 && (
+                    <div style={{ padding: '4px 8px', fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' }}>No sections yet</div>
+                  )}
+                  {[...sections].sort((a, b) => a.order - b.order).map(sec => (
+                    <button
+                      key={sec.id}
+                      onClick={() => handleBulkMoveToSection(sec.id)}
+                      style={{ textAlign: 'left', padding: '5px 8px', background: 'transparent', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 12, borderRadius: 4 }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >{sec.name}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <button className="table-multi-clear" onClick={() => setSelectedTables(new Set())} title="Clear selection">✕</button>
         </div>
       )}
@@ -399,6 +451,11 @@ export function SourcePanel({
           title="Apply table numbering"
           style={{ flex: 1, padding: '3px 6px', background: 'rgba(59,130,246,0.15)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
         >№ Numbering</button>
+        <button
+          onClick={() => setShowOrganizeModal(true)}
+          title="Arrange the order of sections and tables"
+          style={{ flex: 1, padding: '3px 6px', background: 'rgba(34,197,94,0.15)', color: '#86efac', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+        >⇅ Organize</button>
       </div>
       <div className="panel-hint" style={{ padding: '2px 12px', fontSize: 10 }}>
         Ctrl+Click to multi-select · Shift+Click for range
@@ -458,6 +515,17 @@ export function SourcePanel({
             </div>
           </div>
         </div>
+      )}
+
+      {showOrganizeModal && onSectionsChange && onAssignSection && onReorderTables && (
+        <OrganizeModal
+          tables={tables}
+          sections={sections}
+          onReorderTables={onReorderTables}
+          onAssignSection={onAssignSection}
+          onSectionsChange={onSectionsChange}
+          onClose={() => setShowOrganizeModal(false)}
+        />
       )}
 
       <div className="column-list table-nav-list">
