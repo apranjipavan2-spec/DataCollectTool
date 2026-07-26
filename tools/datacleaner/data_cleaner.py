@@ -25,6 +25,22 @@ app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB max upload
 COPIES_DIR = pathlib.Path(__file__).resolve().parent / "working_copies"
 COPIES_DIR.mkdir(exist_ok=True)
 
+def _read_csv_smart(path_or_buf, **kwargs):
+    """pd.read_csv with an encoding fallback chain.
+
+    Excel "CSV UTF-8" exports are actually UTF-8, but plain "CSV" exports on
+    Windows are cp1252 (curly quotes/dashes like 0x92 aren't valid UTF-8 start
+    bytes and blow up the default decode). latin-1 never fails to decode, so
+    it's the guaranteed-success final fallback.
+    """
+    for encoding in ("utf-8", "cp1252", "latin-1"):
+        try:
+            return pd.read_csv(path_or_buf, encoding=encoding, **kwargs)
+        except UnicodeDecodeError:
+            if hasattr(path_or_buf, "seek"):
+                path_or_buf.seek(0)
+            continue
+
 # ── Per-session in-memory state ───────────────────────────────────────────────
 # Each browser gets its own isolated state keyed by a `cleaner_sid` cookie, so
 # one user's loaded data is NEVER visible to another. State is held in memory and
@@ -279,7 +295,7 @@ def upload():
     # Parse from the saved copy
     try:
         if fname.endswith(".csv"):
-            df = pd.read_csv(copy_path, dtype=str, keep_default_na=False, na_values=[''])
+            df = _read_csv_smart(copy_path, dtype=str, keep_default_na=False, na_values=[''])
         elif fname.endswith((".xlsx", ".xls")):
             xls = pd.ExcelFile(copy_path, engine="openpyxl")
             sheet_names = xls.sheet_names
@@ -386,7 +402,7 @@ def load_server_file(file_id):
     try:
         if fname.endswith(".csv") or fname.endswith(".tsv"):
             sep = "\t" if fname.endswith(".tsv") else ","
-            df = pd.read_csv(copy_path, sep=sep, dtype=str, keep_default_na=False, na_values=[''])
+            df = _read_csv_smart(copy_path, sep=sep, dtype=str, keep_default_na=False, na_values=[''])
         elif fname.endswith((".xlsx", ".xls")):
             xls = pd.ExcelFile(copy_path, engine="openpyxl")
             if len(xls.sheet_names) > 1:
@@ -555,7 +571,7 @@ def configure_headers():
             df = df.dropna(how='all').reset_index(drop=True)
 
         elif fname.endswith(".csv"):
-            df = pd.read_csv(copy_path, header=list(range(header_rows)), dtype=str, keep_default_na=False, na_values=[''])
+            df = _read_csv_smart(copy_path, header=list(range(header_rows)), dtype=str, keep_default_na=False, na_values=[''])
             # Flatten MultiIndex columns
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = [separator.join(str(x) for x in col if str(x) != '' and not str(x).startswith('Unnamed'))
