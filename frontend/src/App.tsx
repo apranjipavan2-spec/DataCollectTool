@@ -85,9 +85,11 @@ function SessionTimeoutManager() {
     logout()
   }
 
+  const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000
+
   const { remaining, isWarning, extend } = useSessionTimeout({
-    warnAfterMs:   28 * 60 * 1000,
-    expireAfterMs: 30 * 60 * 1000,
+    warnAfterMs:   THREE_DAYS_MS - 5 * 60 * 1000,
+    expireAfterMs: THREE_DAYS_MS,
     onExpire: handleExpire,
   })
 

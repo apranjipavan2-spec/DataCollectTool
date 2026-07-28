@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import api, { storeUser } from '@/lib/api'
+import api, { storeUser, getKnownDevice, forgetKnownDevice } from '@/lib/api'
 import { useNavigate } from 'react-router-dom'
 import { subscribeToPush } from '@/lib/pushNotifications'
 
@@ -105,10 +105,15 @@ export default function LoginPage() {
   const [pendingPhone, setPendingPhone]   = useState('')
   const googleBtnRef = useRef<HTMLDivElement>(null)
   const [activeFeature, setActiveFeature] = useState(0)
+  const [knownDevice, setKnownDevice] = useState(getKnownDevice())
 
   useEffect(() => {
     const t = setInterval(() => setActiveFeature(i => (i + 1) % FEATURES.length), 3000)
     return () => clearInterval(t)
+  }, [])
+
+  useEffect(() => {
+    if (knownDevice) setPhone(knownDevice.identifier)
   }, [])
 
   useEffect(() => {
@@ -345,9 +350,24 @@ export default function LoginPage() {
             <div className="mb-7 pb-6 text-center" style={{ borderBottom: '1px solid #e2e8f0' }}>
               <div className="flex flex-col items-center gap-3 mb-2">
                 <img src="/logo-wide.png" alt="FieldGovern" className="h-9 w-auto object-contain" />
-                <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#1e293b' }}>Welcome back</h1>
+                <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#1e293b' }}>
+                  {knownDevice ? `Welcome back, ${knownDevice.name.split(' ')[0]}` : 'Welcome back'}
+                </h1>
               </div>
-              <p className="text-sm" style={{ color: '#64748b' }}>Sign in to continue to FieldGovern</p>
+              <p className="text-sm" style={{ color: '#64748b' }}>
+                {knownDevice
+                  ? <>Sign in as <strong style={{ color: '#1e293b' }}>{knownDevice.identifier}</strong>{' · '}
+                      <button
+                        type="button"
+                        onClick={() => { forgetKnownDevice(); setKnownDevice(null); setPhone('') }}
+                        className="font-semibold underline"
+                        style={{ color: '#6366f1' }}
+                      >
+                        Not you?
+                      </button>
+                    </>
+                  : 'Sign in to continue to FieldGovern'}
+              </p>
               <div className="flex items-center justify-center gap-3 mt-2">
                 <button
                   onClick={() => navigate('/register')}

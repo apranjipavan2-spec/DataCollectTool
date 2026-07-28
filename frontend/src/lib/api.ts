@@ -130,6 +130,7 @@ export function storeUser(user: AuthUser) {
   localStorage.setItem('fp_token', user.access_token)
   if (user.refresh_token) localStorage.setItem('fp_refresh_token', user.refresh_token)
   localStorage.setItem('fp_user', JSON.stringify(user))
+  rememberDevice(user)
   // Identify user in PostHog so funnels track real people, not anonymous IDs
   try {
     const ph = (window as any).posthog
@@ -137,6 +138,28 @@ export function storeUser(user: AuthUser) {
       ph.identify(user.id, { email: user.email, name: user.name, role: user.role })
     }
   } catch { /* non-fatal */ }
+}
+
+// ── Returning-device memory ────────────────────────────────────────────────
+// Survives logout (unlike fp_token/fp_user) so the login page can greet a
+// returning user on this device instead of showing a blank form every time.
+export interface KnownDevice {
+  name: string
+  identifier: string // phone or email, used to prefill the login field
+}
+
+function rememberDevice(user: AuthUser) {
+  const identifier = user.phone || user.email
+  if (!identifier) return
+  localStorage.setItem('fp_known_device', JSON.stringify({ name: user.name, identifier } as KnownDevice))
+}
+
+export function getKnownDevice(): KnownDevice | null {
+  try { return JSON.parse(localStorage.getItem('fp_known_device') ?? 'null') } catch { return null }
+}
+
+export function forgetKnownDevice() {
+  localStorage.removeItem('fp_known_device')
 }
 
 export interface RegisterData {
