@@ -302,6 +302,13 @@ async def tabulate(config: TableConfig):
             if _gc in df.columns:
                 _nat_mask = df[_gc].apply(lambda v: pd.isna(v) or str(v).strip() in _bad_strs)
                 if _nat_mask.any():
+                    # A column that's entirely (or mostly) NaN keeps a numeric dtype
+                    # (float64) since pandas has no way to infer it's text-typed.
+                    # Assigning the "(blank)" string into a numeric column raises
+                    # (or, on older pandas, silently warns before a future break) —
+                    # cast to object first so the fill always succeeds.
+                    if df[_gc].dtype != object:
+                        df[_gc] = df[_gc].astype(object)
                     df.loc[_nat_mask, _gc] = "(blank)"
 
         # Resolve survey weights once (used in both groupby and pivot paths)
@@ -867,6 +874,10 @@ async def tabulate(config: TableConfig):
                 if _pc in df.columns:
                     _nat_mask = df[_pc].apply(lambda v: pd.isna(v) or str(v).strip() in ('nan', 'NaN', 'NaT', '<NA>'))
                     if _nat_mask.any():
+                        # See comment above: a fully/mostly-NaN column stays numeric
+                        # dtype, so cast to object before writing the "(blank)" string.
+                        if df[_pc].dtype != object:
+                            df[_pc] = df[_pc].astype(object)
                         df.loc[_nat_mask, _pc] = "(blank)"
 
             # Build per-value pivots (supports multiple value fields with independent aggs)
