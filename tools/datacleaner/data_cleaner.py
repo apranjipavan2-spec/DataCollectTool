@@ -891,9 +891,82 @@ def fill_proportional():
     return jsonify(ok=True, filled=actual_filled, distribution=distribution)
 
 
+# ── AI config resolution ───────────────────────────────────────────────
+# The AI key is entered once in TableForge's Tools > AI settings panel.
+# Cleaner has no key UI of its own — it resolves TableForge's config over
+# the private Docker network on every call, never caching the secret.
+ANALYZER_INTERNAL_URL = os.environ.get("ANALYZER_INTERNAL_URL", "").rstrip("/")
+INTERNAL_SHARED_SECRET = os.environ.get("INTERNAL_SHARED_SECRET", "")
+
+
+def _load_ai_cfg():
+    """Resolve the AI provider/key to use, sourced from TableForge."""
+    if ANALYZER_INTERNAL_URL:
+        try:
+            resp = _requests.get(
+                f"{ANALYZER_INTERNAL_URL}/api/ai/config-internal",
+                headers={"X-Internal-Secret": INTERNAL_SHARED_SECRET},
+                timeout=5,
+            )
+            if resp.status_code == 200:
+                cfg = resp.json()
+                if cfg.get("api_key"):
+                    return cfg
+        except Exception:
+            pass
+    # Fallback for local/dev use without TableForge running alongside
+    legacy_key = os.getenv("GOOGLE_API_KEY")
+    if legacy_key:
+        return {"provider": "gemini", "api_key": legacy_key, "model": "gemini-3-flash-preview"}
+    return {}
+
+
+def _call_llm(cfg, prompt):
+    """Call the configured LLM provider (mirrors TableForge's provider switch)."""
+    provider = cfg.get("provider")
+    key = cfg.get("api_key")
+    model = cfg.get("model")
+    if not provider or not key:
+        raise RuntimeError("AI not configured. Set the AI key in TableForge's Tools → AI settings.")
+
+    if provider == "gemini":
+        import google.generativeai as genai
+        genai.configure(api_key=key)
+        m = genai.GenerativeModel(model or "gemini-3-flash-preview")
+        return m.generate_content(prompt).text
+
+    elif provider == "openai":
+        from openai import OpenAI
+        client = OpenAI(api_key=key)
+        r = client.chat.completions.create(
+            model=model or "gpt-4o", messages=[{"role": "user", "content": prompt}], max_tokens=4096,
+        )
+        return r.choices[0].message.content or ""
+
+    elif provider == "anthropic":
+        from anthropic import Anthropic
+        client = Anthropic(api_key=key)
+        r = client.messages.create(
+            model=model or "claude-sonnet-4-6", max_tokens=4096,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return r.content[0].text
+
+    elif provider == "deepseek":
+        from openai import OpenAI
+        client = OpenAI(api_key=key, base_url="https://api.deepseek.com")
+        r = client.chat.completions.create(
+            model=model or "deepseek-chat", messages=[{"role": "user", "content": prompt}], max_tokens=8192,
+        )
+        return r.choices[0].message.content or ""
+
+    else:
+        raise RuntimeError(f"Unsupported AI provider: {provider}")
+
+
 @app.route("/api/ai_correct", methods=["POST"])
 def ai_correct():
-    """Send column data to Gemini for AI-powered correction suggestions."""
+    """Send column data to the configured LLM for AI-powered correction suggestions."""
     df = _df()
     if df is None:
         return jsonify(error="No data loaded"), 400
@@ -973,15 +1046,11 @@ Respond in this EXACT JSON format:
 Return ONLY valid JSON, no markdown fences."""
 
     try:
-        import google.generativeai as genai
-        api_key = os.getenv("GOOGLE_API_KEY")
-        if not api_key:
-            return jsonify(error="GOOGLE_API_KEY not set in .env"), 400
+        cfg = _load_ai_cfg()
+        if not cfg.get("api_key"):
+            return jsonify(error="AI not configured. Set the AI key in TableForge's Tools → AI settings."), 400
 
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-3-flash-preview")
-        response = model.generate_content(prompt)
-        text = response.text.strip()
+        text = _call_llm(cfg, prompt).strip()
         # Strip markdown code fences (```json ... ``` or ``` ... ```)
         if text.startswith("```"):
             # Remove opening fence line
@@ -1082,15 +1151,11 @@ def generate_regex():
     )
 
     try:
-        import google.generativeai as genai
-        api_key = os.getenv("GOOGLE_API_KEY")
-        if not api_key:
-            return jsonify(error="GOOGLE_API_KEY not set in .env"), 400
+        cfg = _load_ai_cfg()
+        if not cfg.get("api_key"):
+            return jsonify(error="AI not configured. Set the AI key in TableForge's Tools → AI settings."), 400
 
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-3-flash-preview")
-        response = model.generate_content(prompt)
-        regex = response.text.strip().replace("`", "")
+        regex = _call_llm(cfg, prompt).strip().replace("`", "")
         return jsonify(ok=True, regex=regex)
     except Exception as e:
         return jsonify(error=f"AI error: {str(e)}"), 500
@@ -1593,6 +1658,7 @@ def save_to_account():
     token = body.get("token", "")
     name = body.get("name", "").strip() or "Cleaner Export"
     program_id = body.get("program_id") or None
+    autosave = bool(body.get("autosave", False))
     if not fg_base_url or not token:
         return jsonify(error="fg_base_url and token required"), 400
     df = _df()
@@ -1608,6 +1674,7 @@ def save_to_account():
         "tool": "cleaner",
         "name": name,
         "program_id": program_id,
+        "autosave": autosave,
         "data": {
             "csv_content": csv_str,
             "row_count": len(df),
@@ -1622,6 +1689,58 @@ def save_to_account():
         return jsonify(resp.json()), resp.status_code
     except Exception as e:
         return jsonify(error=str(e)), 502
+
+
+@app.route("/api/account-history", methods=["POST"])
+def account_history():
+    """List saved version history for a tool-project (proxied from FieldGovern)."""
+    body = request.json or {}
+    fg_base_url = body.get("fg_base_url", "").rstrip("/")
+    token = body.get("token", "")
+    project_id = body.get("project_id", "")
+    if not fg_base_url or not token or not project_id:
+        return jsonify(error="fg_base_url, token and project_id required"), 400
+    try:
+        resp = _requests.get(f"{fg_base_url}/api/v1/tool-projects/{project_id}/history",
+                             headers={"Authorization": f"Bearer {token}"}, timeout=30)
+        return jsonify(resp.json()), resp.status_code
+    except Exception as e:
+        return jsonify(error=str(e)), 502
+
+
+@app.route("/api/account-history/restore", methods=["POST"])
+def account_history_restore():
+    """Restore a past saved version from FieldGovern and load it into the working dataset."""
+    body = request.json or {}
+    fg_base_url = body.get("fg_base_url", "").rstrip("/")
+    token = body.get("token", "")
+    project_id = body.get("project_id", "")
+    index = body.get("index")
+    if not fg_base_url or not token or not project_id or index is None:
+        return jsonify(error="fg_base_url, token, project_id and index required"), 400
+    try:
+        resp = _requests.post(
+            f"{fg_base_url}/api/v1/tool-projects/{project_id}/history/{index}/restore",
+            headers={"Authorization": f"Bearer {token}"}, timeout=30)
+        if resp.status_code != 200:
+            return jsonify(resp.json() if resp.content else {"error": "Restore failed"}), resp.status_code
+    except Exception as e:
+        return jsonify(error=str(e)), 502
+
+    payload = resp.json()
+    csv_content = (payload.get("data") or {}).get("csv_content", "")
+    if not csv_content:
+        return jsonify(error="Restored version has no data"), 502
+    try:
+        df = _read_csv_smart(io.StringIO(csv_content))
+    except Exception as e:
+        return jsonify(error=f"Could not parse restored version: {e}"), 400
+
+    _push_undo("Restore from history")
+    DATA["df"] = df
+    _save_state()
+    mark_state_dirty()
+    return jsonify(ok=True, rows=len(df), cols=len(df.columns), columns=df.columns.tolist())
 
 
 @app.route("/api/fg/user-projects/save", methods=["POST"])

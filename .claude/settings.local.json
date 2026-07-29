@@ -70,7 +70,9 @@
       "Bash(nslookup -type=TXT fieldgovern.com)",
       "Bash(nslookup -type=TXT google._domainkey.fieldgovern.com)",
       "Bash(nslookup -type=TXT _dmarc.fieldgovern.com)",
-      "Bash(nslookup -type=MX fieldgovern.com)"
+      "Bash(nslookup -type=MX fieldgovern.com)",
+      "Bash(ls .github/workflows/)",
+      "Bash(find . -maxdepth 2 -iname \"deploy*\")"
     ]
   },
   "mcpServers": {

@@ -347,6 +347,19 @@ async def tabulate(config: TableConfig):
                 if agg in NUMERIC_ONLY_AGGS and _col_is_text(df, safe_field):
                     agg = "count"
 
+                # _col_is_text only samples the first 50 non-null rows, so a column
+                # that's clean there but has a stray non-numeric cell later (blank
+                # marker, "N/A", typo) still reaches sum/mean as raw object dtype and
+                # crashes pandas with a str/int TypeError. Coerce a private copy for
+                # numeric aggs — bad cells become NaN and are skipped; other value
+                # entries on the same field (e.g. a Count alongside this Sum) keep
+                # seeing the original column.
+                if agg in NUMERIC_ONLY_AGGS and str(df[safe_field].dtype) == "object":
+                    numsafe_field = f"__temp_numsafe_{len(safe_fields)}__"
+                    df[numsafe_field] = pd.to_numeric(df[safe_field], errors="coerce")
+                    safe_field = numsafe_field
+                    safe_fields.append(safe_field)
+
                 if agg in AGG_MAP:
                     if _w_aggs and agg in _w_aggs:
                         agg_dict[safe_field] = _w_aggs[agg]
@@ -674,22 +687,26 @@ async def tabulate(config: TableConfig):
                     combo_sa = v.get("combo_show_as", "normal")
                     dec = v.get("decimals") if v.get("decimals") is not None else 2
                     combo_dec = v.get("combo_decimals", dec)
+                    # Coerce to numeric for numeric aggs: a column can pass the
+                    # (row-sampled) text check upstream yet still carry a stray
+                    # non-numeric cell, which crashes raw sum/mean with a str/int
+                    # TypeError. Coercion drops those cells to NaN instead.
                     if agg in ("sum", "running_total", "cumulative_sum"):
-                        raw_val = df[field].sum()
+                        raw_val = pd.to_numeric(df[field], errors="coerce").sum()
                     elif agg == "count":
                         raw_val = len(df)
                     elif agg in ("average", "mean"):
-                        raw_val = df[field].mean()
+                        raw_val = pd.to_numeric(df[field], errors="coerce").mean()
                     elif agg == "min":
-                        raw_val = df[field].min()
+                        raw_val = pd.to_numeric(df[field], errors="coerce").min()
                     elif agg == "max":
-                        raw_val = df[field].max()
+                        raw_val = pd.to_numeric(df[field], errors="coerce").max()
                     elif agg == "median":
-                        raw_val = df[field].median()
+                        raw_val = pd.to_numeric(df[field], errors="coerce").median()
                     elif agg == "pct_grand":
                         raw_val = 100.0
                     else:
-                        raw_val = df[field].sum()
+                        raw_val = pd.to_numeric(df[field], errors="coerce").sum()
 
                     # Apply combo formatting to grand total (always 100% for pct_grand)
                     if combo_sa and combo_sa != "normal":
@@ -876,6 +893,16 @@ async def tabulate(config: TableConfig):
                     _tvf = f"__temp_{_vf}_{_vi}__"
                     df[_tvf] = df[_vf]
                     _pv_temp_cleanup.append(_tvf)
+
+                # Same stray-non-numeric-cell guard as the groupby path above —
+                # _col_is_text's 50-row sample can miss a bad cell further down,
+                # which would otherwise crash pivot_table's sum/mean with a
+                # str/int TypeError.
+                if _va in NUMERIC_ONLY_AGGS and str(df[_tvf].dtype) == "object":
+                    _tvf_safe = f"__temp_numsafe_{_vi}__"
+                    df[_tvf_safe] = pd.to_numeric(df[_tvf], errors="coerce")
+                    _pv_temp_cleanup.append(_tvf_safe)
+                    _tvf = _tvf_safe
 
                 _p = pd.pivot_table(
                     df, values=_tvf, index=config.rows, columns=temp_cols,
@@ -1414,24 +1441,27 @@ async def tabulate(config: TableConfig):
                 if field == "*":
                     agg = "count"
                 label = v.get("label", f"{agg.title()} of {field}")
+                # Coerce to numeric for numeric aggs — a stray non-numeric cell
+                # (blank marker, "N/A", typo) in an otherwise-numeric column
+                # would otherwise crash raw sum/mean with a str/int TypeError.
                 if agg == "sum":
-                    result[label] = df[field].sum()
+                    result[label] = pd.to_numeric(df[field], errors="coerce").sum()
                 elif agg == "count":
                     result[label] = len(df)
                 elif agg in ("average", "mean"):
-                    result[label] = df[field].mean()
+                    result[label] = pd.to_numeric(df[field], errors="coerce").mean()
                 elif agg == "min":
-                    result[label] = df[field].min()
+                    result[label] = pd.to_numeric(df[field], errors="coerce").min()
                 elif agg == "max":
-                    result[label] = df[field].max()
+                    result[label] = pd.to_numeric(df[field], errors="coerce").max()
                 elif agg == "median":
-                    result[label] = df[field].median()
+                    result[label] = pd.to_numeric(df[field], errors="coerce").median()
                 elif agg == "std":
-                    result[label] = df[field].std()
+                    result[label] = pd.to_numeric(df[field], errors="coerce").std()
                 elif agg == "var":
-                    result[label] = df[field].var()
+                    result[label] = pd.to_numeric(df[field], errors="coerce").var()
                 else:
-                    result[label] = df[field].sum()
+                    result[label] = pd.to_numeric(df[field], errors="coerce").sum()
 
             headers = list(result.keys())
             rows = [list(result.values())]

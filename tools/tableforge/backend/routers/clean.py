@@ -9,14 +9,17 @@ Pattern mirrors the existing FieldGovern handoff in datacleaner:
 """
 
 import io
+import os
 import uuid
 import time
 from typing import Optional
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Header
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
+
+from .ai import _load_ai_cfg
 
 from ..shared import (
     datasets,
@@ -167,3 +170,18 @@ async def delete_handoff(handoff_id: str):
     """Frontend can revoke a handoff explicitly (e.g. user closed the cleaner tab)."""
     _handoffs.pop(handoff_id, None)
     return {"status": "ok"}
+
+
+@router.get("/api/ai/config-internal")
+async def get_ai_config_internal(x_internal_secret: str = Header(default="")):
+    """Resolved AI config incl. the raw key, for the Cleaner service on the
+    private Docker network only. Lives in this unauthenticated router (like
+    the rest of the cleaner handoff) rather than the FieldGovern-identity-gated
+    `ai` router, since Cleaner has no FieldGovern user JWT to present here —
+    guarded instead by a shared secret both containers are given at deploy time.
+    nginx proxies the whole /analyzer/ prefix, so this path is otherwise
+    reachable from the public internet like any other route in this app."""
+    expected = os.environ.get("INTERNAL_SHARED_SECRET", "")
+    if not expected or x_internal_secret != expected:
+        raise HTTPException(403, "Forbidden")
+    return _load_ai_cfg()

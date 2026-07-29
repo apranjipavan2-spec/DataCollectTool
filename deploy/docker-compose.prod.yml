@@ -37,6 +37,7 @@ services:
     environment:
       FG_INTERNAL_URL: "http://app:8000"
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      INTERNAL_SHARED_SECRET: ${INTERNAL_SHARED_SECRET}
     volumes:
       - tableforge_data:/app/projects
       - tableforge_exports:/app/exports
@@ -49,6 +50,9 @@ services:
       context: ../tools/datacleaner
       dockerfile: Dockerfile
     restart: always
+    environment:
+      ANALYZER_INTERNAL_URL: "http://analyzer:8001"
+      INTERNAL_SHARED_SECRET: ${INTERNAL_SHARED_SECRET}
     volumes:
       - cleaner_data:/app/working_copies
       - shared_uploads:/app/uploads

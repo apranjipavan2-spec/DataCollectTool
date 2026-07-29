@@ -590,7 +590,18 @@ export default function App() {
     try {
       await runTabulationCore(config);
     } catch (e: any) {
-      setError(e.message || 'Tabulation failed');
+      // Column-type overrides (e.g. marking a field multi_choice) are applied
+      // server-side asynchronously — see the comment on column_type_overrides
+      // above. A tabulate() call that lands just before that finishes can
+      // fail transiently even though the config is fine; one retry after a
+      // beat clears it without the user having to manually reselect/rebuild
+      // the table.
+      try {
+        await new Promise(r => setTimeout(r, 500));
+        await runTabulationCore(config);
+      } catch (e2: any) {
+        setError(e2.message || e.message || 'Tabulation failed');
+      }
     } finally { setLoading(false); setLoadingMsg(''); }
   }, [runTabulationCore]);
 
@@ -609,7 +620,17 @@ export default function App() {
       while (true) {
         const idx = cursor++;
         if (idx >= total) return;
-        try { await runTabulationCore(toRun[idx]); } catch {}
+        try {
+          await runTabulationCore(toRun[idx]);
+        } catch {
+          // Same transient column-type-override race as runTabulation — retry
+          // once so a bulk load doesn't leave tables stuck on a stale error
+          // that a manual reselect would've cleared anyway.
+          try {
+            await new Promise(r => setTimeout(r, 500));
+            await runTabulationCore(toRun[idx]);
+          } catch {}
+        }
         done++;
         update();
       }
@@ -1619,7 +1640,11 @@ export default function App() {
     try {
       const actions: any[] = action === 'trim_whitespace'
         ? [{ action: 'trim_whitespace' }]
-        : dataset.columns.filter(c => c.type === 'text').map(c => ({ action: 'text_case', column: c.name, case_type: caseType }));
+        // Categorical fields (e.g. status/source columns) are auto-typed
+        // 'multi_choice' rather than 'text' but still hold plain text values —
+        // exclude them and UPPER/lower/Proper silently no-ops on exactly the
+        // columns users most want case-normalized.
+        : dataset.columns.filter(c => c.type === 'text' || c.type === 'multi_choice').map(c => ({ action: 'text_case', column: c.name, case_type: caseType }));
       if (actions.length === 0) { setError('No text columns found'); setLoading(false); return; }
       const res = await fetch(`${API_BASE}/dataset/clean_bulk`, {
         method: 'POST',

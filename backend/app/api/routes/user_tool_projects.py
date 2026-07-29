@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -9,21 +10,32 @@ from app.models.user_tool_project import UserToolProject
 
 router = APIRouter()
 
+# Version history is kept inline in the JSONB `data` blob under "_history" —
+# capped in count and throttled in time so autosave ticks don't blow up the
+# row with near-identical snapshots.
+MAX_HISTORY_VERSIONS = 12
+MIN_SECONDS_BETWEEN_VERSIONS = 120
+
 
 class ProjectIn(BaseModel):
     tool: str          # 'analyzer' | 'cleaner'
     name: str
     program_id: Optional[str] = None
     data: dict = {}
+    autosave: bool = False
 
 
 def _serialize(r: UserToolProject) -> dict:
+    data = dict(r.data or {})
+    history = data.pop("_history", [])
+    data.pop("_autosave", None)
     return {
         "id": str(r.id),
         "tool": r.tool,
         "name": r.name,
         "program_id": str(r.program_id) if r.program_id else None,
-        "data": r.data,
+        "data": data,
+        "history_count": len(history),
         "shared_with": [str(t) for t in (r.shared_with_tenants or [])],
         "archived_at": r.archived_at.isoformat() if r.archived_at else None,
         "created_at": r.created_at.isoformat() if r.created_at else None,
@@ -62,19 +74,43 @@ def upsert_project(body: ProjectIn, user=Depends(require_supervisor), db: Sessio
         UserToolProject.name == body.name,
     ).first()
 
+    new_data = dict(body.data)
+    new_data["_autosave"] = body.autosave
+
     if existing:
+        old_data = dict(existing.data or {})
+        history = old_data.pop("_history", [])
+        changed = old_data.get("csv_content") != new_data.get("csv_content")
+        if changed:
+            last_saved_at = history[-1]["saved_at"] if history else None
+            due = True
+            if last_saved_at:
+                try:
+                    elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(last_saved_at)).total_seconds()
+                    due = elapsed >= MIN_SECONDS_BETWEEN_VERSIONS
+                except Exception:
+                    due = True
+            if due:
+                history.append({
+                    "snapshot": old_data,
+                    "saved_at": datetime.now(timezone.utc).isoformat(),
+                    "autosave": old_data.get("_autosave", False),
+                })
+                history = history[-MAX_HISTORY_VERSIONS:]
+        new_data["_history"] = history
         existing.program_id = body.program_id
-        existing.data = body.data
+        existing.data = new_data
         db.commit()
         return {"id": str(existing.id), "created": False}
 
+    new_data["_history"] = []
     proj = UserToolProject(
         tenant_id=user["tenant_id"],
         user_id=user["sub"],
         tool=body.tool,
         name=body.name,
         program_id=body.program_id or None,
-        data=body.data,
+        data=new_data,
     )
     db.add(proj)
     db.commit()
@@ -130,3 +166,47 @@ def restore_project(project_id: str, user=Depends(require_supervisor), db: Sessi
     proj.archived_at = None
     db.commit()
     return {"restored": True}
+
+
+@router.get("/tool-projects/{project_id}/history")
+def list_project_history(project_id: str, user=Depends(require_supervisor), db: Session = Depends(get_db)):
+    """List saved version checkpoints for a project (autosave + manual saves), newest first."""
+    proj = _owned_project(project_id, user, db)
+    history = (proj.data or {}).get("_history", [])
+    return [
+        {
+            "index": i,
+            "saved_at": h.get("saved_at"),
+            "autosave": h.get("autosave", False),
+            "row_count": h.get("snapshot", {}).get("row_count"),
+            "col_count": h.get("snapshot", {}).get("col_count"),
+            "filename": h.get("snapshot", {}).get("filename"),
+        }
+        for i, h in reversed(list(enumerate(history)))
+    ]
+
+
+@router.post("/tool-projects/{project_id}/history/{index}/restore")
+def restore_project_version(project_id: str, index: int, user=Depends(require_supervisor), db: Session = Depends(get_db)):
+    """Roll a project's live data back to a past checkpoint. The current state is
+    itself archived first, so restoring a version is never destructive/final."""
+    proj = _owned_project(project_id, user, db)
+    data = dict(proj.data or {})
+    history = data.get("_history", [])
+    if index < 0 or index >= len(history):
+        raise HTTPException(404, "Version not found")
+
+    target = history[index]["snapshot"]
+    current_snapshot = {k: v for k, v in data.items() if k != "_history"}
+    remaining = history[:index] + history[index + 1:]
+    remaining.append({
+        "snapshot": current_snapshot,
+        "saved_at": datetime.now(timezone.utc).isoformat(),
+        "autosave": current_snapshot.get("_autosave", False),
+    })
+
+    new_data = dict(target)
+    new_data["_history"] = remaining[-MAX_HISTORY_VERSIONS:]
+    proj.data = new_data
+    db.commit()
+    return {"restored": True, "data": target}

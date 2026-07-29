@@ -379,6 +379,22 @@ input, select, textarea { font-family: inherit; }
   </div>
 </div>
 
+<!-- History Modal -->
+<div class="modal-overlay" id="historyModal">
+  <div class="modal" style="max-width: 480px;">
+    <div class="modal-header">
+      <span>Edit History</span>
+      <button class="btn btn-sm btn-secondary" onclick="closeHistory()">Close</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px; color:var(--text2); margin-bottom:12px;">Previous saved versions of this file, including autosaves. Restoring loads that version back into the working file — your current state is saved first, so nothing is lost.</p>
+      <div id="historyList" style="max-height:360px; overflow-y:auto;">
+        <div style="padding:20px; color:var(--text3); font-size:12px; text-align:center;">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="app">
   <!-- ── Sidebar ─────────────────────────────────── -->
   <div class="sidebar" id="sidebar" style="width: 250px; min-width: 250px;">
@@ -420,6 +436,8 @@ input, select, textarea { font-family: inherit; }
       <button class="btn btn-success btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doExport('csv')">⬇ CSV</button>
       <button class="btn btn-success btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doExport('excel')">⬇ XLS</button>
       <button id="saveToAccountBtn" class="btn btn-primary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; margin-top:4px; display:none;" onclick="doSaveToAccount()" title="Save cleaned data to your FieldGovern account">💾 Save to Account</button>
+      <div id="autosaveStatus" style="flex:2; min-width:100%; display:none; font-size:11px; color:var(--text3); text-align:center; padding:2px 0;"></div>
+      <button id="historyBtn" class="btn btn-secondary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; display:none;" onclick="openHistory()" title="View and restore previous saved versions of this file">🕐 History</button>
       <button id="saveToServerBtn" class="btn btn-primary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; margin-top:4px; display:none;" onclick="doSaveToServer()" title="Save cleaned data back to server file (shared with Analyzer)">💾 Save to Server</button>
       <button id="saveToTableforgeBtn" class="btn btn-primary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; margin-top:4px; display:none; background: linear-gradient(135deg,#a78bfa,#7c3aed);" onclick="doSaveToTableforge()" title="Save cleaned data back to TableForge and return">🧹 Save &amp; Return to TableForge</button>
     </div>
@@ -594,7 +612,9 @@ async function apiPost(path, body, showSpinner = true) {
   }
   if (showSpinner) showLoading();
   try {
-    return await api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const result = await api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (result) _dirty = true;
+    return result;
   } finally {
     if (showSpinner) hideLoading();
   }
@@ -1520,15 +1540,14 @@ async function doRedo() {
   }
 }
 
-// ── Export ────────────────────────────────────────────────
-function doExport(fmt) {
-  window.open(`/api/export?format=${fmt}`, '_blank');
-}
-
 // ── Save to Account ──────────────────────────────────────
+let _toolProjectId = null;
+let _toolProjectName = null;
+let _dirty = false;
+
 async function doSaveToAccount() {
   if (!_fgUrl || !_fgToken) { toast('Not connected to FieldGovern', true); return; }
-  const defaultName = (DATA_FILENAME || 'cleaned_data').replace(/\.[^.]+$/, '') + '_cleaned';
+  const defaultName = _toolProjectName || (DATA_FILENAME || 'cleaned_data').replace(/\.[^.]+$/, '') + '_cleaned';
   const name = window.prompt('Save as:', defaultName);
   if (!name) return;
   const btn = document.getElementById('saveToAccountBtn');
@@ -1541,11 +1560,108 @@ async function doSaveToAccount() {
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || 'Save failed');
+    _toolProjectId = json.id || _toolProjectId;
+    _toolProjectName = name;
+    _dirty = false;
+    setAutosaveStatus('Saved just now');
     toast('Saved to your account ✓');
   } catch (e) {
     toast(e.message || 'Save failed', true);
   } finally {
     btn.disabled = false; btn.textContent = '💾 Save to Account';
+  }
+}
+
+// ── Autosave ───────────────────────────────────────────────
+// Ticks every 60s; only writes when something actually changed since the
+// last save (see the `_dirty` flag set by apiPost), and only once the user
+// is connected to a FieldGovern account (the only place saves persist to).
+function setAutosaveStatus(text) {
+  const el = document.getElementById('autosaveStatus');
+  if (!el) return;
+  el.textContent = text;
+  el.style.display = (_fgUrl && _fgToken) ? 'block' : 'none';
+}
+
+async function _autosaveTick() {
+  if (!_fgUrl || !_fgToken || !_dirty || !_df_loaded()) return;
+  const name = _toolProjectName || (DATA_FILENAME || 'cleaned_data').replace(/\.[^.]+$/, '') + '_cleaned';
+  try {
+    const res = await fetch(BASE_URL + '/api/save-to-account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken, name, program_id: _fgProgramId || null, autosave: true }),
+    });
+    const json = await res.json();
+    if (!res.ok) return; // offline / transient error — retried on the next tick
+    _toolProjectId = json.id || _toolProjectId;
+    _toolProjectName = name;
+    _dirty = false;
+    setAutosaveStatus('Autosaved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  } catch (e) {
+    // offline or server hiccup — try again next tick
+  }
+}
+function _df_loaded() { return !!DATA_FILENAME; }
+setInterval(_autosaveTick, 60000);
+
+// ── History (past saved/autosaved versions, restorable) ──────
+function openHistory() {
+  if (!_toolProjectId) { toast('Save to your account at least once before viewing history', true); return; }
+  document.getElementById('historyModal').classList.add('open');
+  loadHistoryList();
+}
+function closeHistory() {
+  document.getElementById('historyModal').classList.remove('open');
+}
+async function loadHistoryList() {
+  const list = document.getElementById('historyList');
+  list.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:12px;text-align:center;">Loading…</div>';
+  try {
+    const res = await fetch(BASE_URL + '/api/account-history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken, project_id: _toolProjectId }),
+    });
+    const versions = await res.json();
+    if (!res.ok) throw new Error((versions && versions.error) || 'Could not load history');
+    if (!versions.length) {
+      list.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:12px;text-align:center;">No previous versions yet — checkpoints appear here as you save.</div>';
+      return;
+    }
+    list.innerHTML = versions.map(v => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-size:13px; color:var(--text);">${new Date(v.saved_at).toLocaleString()}</div>
+          <div style="font-size:11px; color:var(--text3);">${v.autosave ? 'Autosaved' : 'Manual save'} · ${v.row_count ?? '?'} rows · ${v.col_count ?? '?'} cols</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="restoreHistoryVersion(${v.index})">Restore</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    list.innerHTML = `<div style="padding:20px;color:var(--red);font-size:12px;text-align:center;">${e.message}</div>`;
+  }
+}
+async function restoreHistoryVersion(index) {
+  if (!window.confirm('Restore this version into the working file? Your current state will be saved as a checkpoint first.')) return;
+  if (_dirty) await _autosaveTick(); // flush unsaved live edits so they aren't lost
+  showLoading('Restoring version…');
+  try {
+    const res = await fetch(BASE_URL + '/api/account-history/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken, project_id: _toolProjectId, index }),
+    });
+    const json = await res.json();
+    hideLoading();
+    if (!res.ok) throw new Error(json.error || 'Restore failed');
+    toast(`Restored version — ${json.rows} rows, ${json.cols} columns`);
+    closeHistory();
+    await loadInfo();
+    if (columns.length > 0) selectColumn(columns[0].name);
+  } catch (e) {
+    hideLoading();
+    toast(e.message || 'Restore failed', true);
   }
 }
 
@@ -1825,12 +1941,37 @@ function filterColumns() {
   });
 }
 
-// ── Export Modal Logic ───────────────────────────────────
+// ── Export (fetch+blob — never navigates the SPA away, so a
+// failed/error response can't replace the app and wipe state) ──
+async function _downloadExport(fmt, extraParams = '') {
+  try {
+    const res = await fetch(`/api/export?format=${fmt}${extraParams}`);
+    if (!res.ok) {
+      let msg = 'Export failed';
+      try { msg = (await res.json()).error || msg; } catch (e) {}
+      toast(msg, true);
+      return;
+    }
+    const blob = await res.blob();
+    const cd = res.headers.get('Content-Disposition') || '';
+    const match = cd.match(/filename="?([^";]+)"?/);
+    const filename = match ? match[1] : `export.${fmt === 'excel' ? 'xlsx' : 'csv'}`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast('Exported ✓');
+  } catch (e) {
+    toast(e.message || 'Export failed', true);
+  }
+}
+
 function doExport(fmt) {
   if (fmt === 'excel') {
     document.getElementById('exportModal').classList.add('open');
   } else {
-    window.location.href = `/api/export?format=${fmt}`;
+    _downloadExport(fmt);
   }
 }
 
@@ -1841,7 +1982,7 @@ function closeExportModal() {
 function confirmExport() {
   const includeComments = document.getElementById('exportComments').checked;
   closeExportModal();
-  window.location.href = `/api/export?format=excel&comments=${includeComments}`;
+  _downloadExport('excel', `&comments=${includeComments}`);
 }
 
 
@@ -2011,9 +2152,12 @@ async function fgLoadData(programId, questionnaireId) {
 (async function () {
   if (!_fgUrl || !_fgToken) return;
 
-  // Show Save to Account button (only when connected to FG)
+  // Show Save to Account / History buttons (only when connected to FG)
   const saveBtn = document.getElementById('saveToAccountBtn');
   if (saveBtn) saveBtn.style.display = '';
+  const historyBtn = document.getElementById('historyBtn');
+  if (historyBtn) historyBtn.style.display = '';
+  setAutosaveStatus('Autosave on — every 60s once you save once');
 
   // Hide the file upload zone — FG context is the primary data source
   const uploadZone = document.getElementById('uploadZone');
@@ -2041,16 +2185,20 @@ async function fgLoadData(programId, questionnaireId) {
   const box = document.getElementById('fgSelector');
   if (!box) return;
 
-  // No programs → tell the user why instead of showing a blank dropdown.
+  // No programs → tell the user why, but don't dead-end them: Save to Account,
+  // History, and AI Correction all work from an uploaded file with no Program
+  // needed, so give that path back instead of leaving them stuck.
   if (!programs.length) {
     const note = document.createElement('div');
     note.className = 'fg-field';
     note.style.cssText = 'font-size:13px;color:#b45309;line-height:1.5';
     note.innerHTML = progError
-      ? `⚠️ Couldn't load programs: ${progError}`
-      : '⚠️ No programs found for this account. The cleaner opened with a platform/master-admin login, which has no program data — sign in to the organisation that owns the programs to use it here.';
+      ? `⚠️ Couldn't load programs: ${progError}. You can still upload a file below and use "Save to Account".`
+      : '⚠️ No data-collection Programs found for this account. (This is separate from any TableForge/Cleaner "Projects" you\'ve saved — the platform/master-admin account has no Programs of its own by design.) You can still upload a file below and use "Save to Account" — it doesn\'t require a Program.';
     box.appendChild(note);
     if (progError) toast(progError, 'error');
+    if (uploadZone) uploadZone.style.display = '';
+    if (divider) divider.style.display = '';
     return;
   }
 
