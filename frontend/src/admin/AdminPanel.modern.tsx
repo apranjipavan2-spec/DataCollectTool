@@ -36,7 +36,7 @@ interface DrillSub {
 }
 
 interface DrillUser {
-  id: string; name: string; phone: string; role: string; email: string | null
+  id: string; name: string; phone: string; role: string; email: string | null; is_active: boolean
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -173,6 +173,12 @@ export default function AdminPanel() {
   const [drillStats, setDrillStats] = useState<EnumStat[]>([])
   const [loadingDrill, setLoadingDrill] = useState(false)
 
+  // ── Edit user (cross-tenant) ──
+  const [showUserModal, setShowUserModal] = useState(false)
+  const [editingUser, setEditingUser] = useState<DrillUser | null>(null)
+  const [userForm, setUserForm] = useState({ name: '', phone: '', email: '', role: 'enumerator', is_active: true })
+  const [newPassword, setNewPassword] = useState('')
+
   // ── Shared Files ──
   const [sharedFiles, setSharedFiles] = useState<any[]>([])
   const [loadingFiles, setLoadingFiles] = useState(false)
@@ -248,6 +254,51 @@ export default function AdminPanel() {
     setDrillTab('progress')
     setDrillSubs([]); setDrillUsers([]); setDrillStats([])
     setTab('tenants')
+  }
+
+  // ── Edit user (cross-tenant) ──
+  const refreshDrillUsers = async () => {
+    if (!selectedTenant) return
+    try {
+      const { data } = await api.get(`/admin/monitor/tenant/${selectedTenant.id}/users`)
+      setDrillUsers(data)
+    } catch { /* keep showing stale list rather than blanking it */ }
+  }
+
+  const openUserModal = (u: DrillUser) => {
+    setEditingUser(u)
+    setUserForm({ name: u.name, phone: u.phone, email: u.email || '', role: u.role, is_active: u.is_active })
+    setNewPassword('')
+    setShowUserModal(true)
+  }
+
+  const saveUser = async () => {
+    if (!selectedTenant || !editingUser) return
+    try {
+      await api.patch(`/admin/monitor/tenant/${selectedTenant.id}/user/${editingUser.id}`, userForm)
+      await refreshDrillUsers()
+      setShowUserModal(false); setEditingUser(null)
+    } catch (e: any) { setError(e.response?.data?.detail || 'Failed to update user') }
+  }
+
+  const toggleUserActive = async (u: DrillUser) => {
+    if (!selectedTenant) return
+    const verb = u.is_active ? 'Deactivate' : 'Reactivate'
+    if (!confirm(`${verb} ${u.name}?`)) return
+    try {
+      await api.patch(`/admin/monitor/tenant/${selectedTenant.id}/user/${u.id}`, { is_active: !u.is_active })
+      await refreshDrillUsers()
+    } catch (e: any) { setError(e.response?.data?.detail || 'Failed to update user') }
+  }
+
+  const resetUserPassword = async () => {
+    if (!selectedTenant || !editingUser) return
+    if (newPassword.length < 6) { setError('Password must be at least 6 characters'); return }
+    if (!confirm(`Set a new password for ${editingUser.name}? They'll need to use it on next login.`)) return
+    try {
+      await api.post(`/admin/monitor/tenant/${selectedTenant.id}/user/${editingUser.id}/reset-password`, { new_password: newPassword })
+      setNewPassword('')
+    } catch (e: any) { setError(e.response?.data?.detail || 'Failed to reset password') }
   }
 
   // ── Shared Files ──
@@ -632,7 +683,7 @@ export default function AdminPanel() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {drillUsers.map(u => (
                         <div key={u.id} className="flex items-center justify-between p-4 rounded-xl transition-all duration-200 hover:bg-white/[0.03]"
-                          style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                          style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', opacity: u.is_active ? 1 : 0.5 }}>
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
                               style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8' }}>
@@ -641,9 +692,16 @@ export default function AdminPanel() {
                             <div>
                               <p className="text-sm font-semibold text-catalan-text">{u.name}</p>
                               <p className="text-xs text-catalan-textMuted">{u.phone}{u.email ? ` · ${u.email}` : ''}</p>
+                              {!u.is_active && <p className="text-xs font-semibold" style={{ color: '#f87171' }}>Deactivated</p>}
                             </div>
                           </div>
-                          <RoleBadge role={u.role} />
+                          <div className="flex items-center gap-2">
+                            <RoleBadge role={u.role} />
+                            <button className="text-xs px-2 py-1 rounded-lg border border-white/10 text-catalan-textMuted hover:text-catalan-text hover:border-white/20"
+                              onClick={() => openUserModal(u)}>Edit</button>
+                            <button className="text-xs px-2 py-1 rounded-lg border border-white/10 text-catalan-textMuted hover:text-catalan-text hover:border-white/20"
+                              onClick={() => toggleUserActive(u)}>{u.is_active ? 'Deactivate' : 'Reactivate'}</button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -874,6 +932,40 @@ export default function AdminPanel() {
               <Input label="Primary Color" type="color" value={formData.primary_color} onChange={e => setFormData({...formData, primary_color: e.target.value})} />
             </div>
             <Input label="Logo URL" value={formData.logo_url} onChange={e => setFormData({...formData, logo_url: e.target.value})} placeholder="https://…" />
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit User Modal (cross-tenant) */}
+      {showUserModal && editingUser && (
+        <Modal isOpen onClose={() => { setShowUserModal(false); setEditingUser(null) }} title={`Edit: ${editingUser.name}`}
+          footer={<div className="flex gap-3"><Button variant="secondary" onClick={() => { setShowUserModal(false); setEditingUser(null) }}>Cancel</Button><Button onClick={saveUser}>Save</Button></div>}>
+          <div className="space-y-4">
+            <Input label="Name" value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} />
+            <Input label="Phone" value={userForm.phone} onChange={e => setUserForm({...userForm, phone: e.target.value})} />
+            <Input label="Email" value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} placeholder="optional" />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-catalan-text mb-2">Role</label>
+                <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value})} className="w-full bg-catalan-hover border border-catalan-border text-catalan-text rounded px-3 py-2 text-sm">
+                  <option value="enumerator">Enumerator</option><option value="supervisor">Supervisor</option><option value="org_admin">Org Admin</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-catalan-text mb-2">Status</label>
+                <select value={userForm.is_active ? 'active' : 'inactive'} onChange={e => setUserForm({...userForm, is_active: e.target.value === 'active'})} className="w-full bg-catalan-hover border border-catalan-border text-catalan-text rounded px-3 py-2 text-sm">
+                  <option value="active">Active</option><option value="inactive">Deactivated</option>
+                </select>
+              </div>
+            </div>
+            <div className="pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <label className="block text-sm font-medium text-catalan-text mb-2">Set New Password</label>
+              <div className="flex gap-3">
+                <Input value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="min 6 characters" type="password" />
+                <Button variant="secondary" onClick={resetUserPassword} disabled={newPassword.length < 6}>Set Password</Button>
+              </div>
+              <p className="text-xs text-catalan-textMuted mt-2">Takes effect immediately — they'll need this password on their next login.</p>
+            </div>
           </div>
         </Modal>
       )}

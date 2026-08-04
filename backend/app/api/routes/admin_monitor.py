@@ -1,12 +1,16 @@
 """Cross-tenant monitoring endpoints — master_admin only."""
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Query, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, Query, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 import uuid as _uuid
 
 from app.core.database import get_db
 from app.core.deps import require_master_admin
+from app.core.security import hash_password
+from app.models.audit_log import AuditLog
 from app.models.tenant import Tenant
 from app.models.form import Form
 from app.models.program import Program, ProgramQuestionnaire
@@ -14,6 +18,11 @@ from app.models.submission import Submission
 from app.models.user import User
 
 router = APIRouter(prefix="/admin/monitor", tags=["admin-monitor"])
+
+# Roles master_admin may assign to a tenant user via the endpoints below.
+# master_admin is deliberately excluded — platform-admin accounts are never
+# created or touched through this cross-tenant surface.
+_ASSIGNABLE_ROLES = {"org_admin", "supervisor", "enumerator"}
 
 
 @router.get("/overview")
@@ -177,8 +186,100 @@ def _resolve_tenant(tenant_id: str, db: Session) -> Tenant:
 @router.get("/tenant/{tenant_id}/users")
 def get_tenant_users(tenant_id: str, user=Depends(require_master_admin), db: Session = Depends(get_db)):
     t = _resolve_tenant(tenant_id, db)
-    users = db.query(User).filter(User.tenant_id == t.id, User.is_active == True).order_by(User.name).all()
-    return [{"id": str(u.id), "name": u.name or u.phone, "phone": u.phone, "role": u.role, "email": u.email, "created_at": u.created_at.isoformat() if u.created_at else None} for u in users]
+    # Include inactive users too — otherwise a deactivated user could never be
+    # found and reactivated from this panel.
+    users = db.query(User).filter(User.tenant_id == t.id).order_by(User.name).all()
+    return [{"id": str(u.id), "name": u.name or u.phone, "phone": u.phone, "role": u.role, "email": u.email, "is_active": u.is_active, "created_at": u.created_at.isoformat() if u.created_at else None} for u in users]
+
+
+def _resolve_tenant_user(tenant_id: str, user_id: str, db: Session) -> User:
+    t = _resolve_tenant(tenant_id, db)
+    try:
+        uid = _uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid user_id")
+    target = db.query(User).filter(User.id == uid, User.tenant_id == t.id).first()
+    if not target:
+        raise HTTPException(404, "User not found in this tenant")
+    if target.role == "master_admin":
+        raise HTTPException(403, "Platform-admin accounts cannot be modified through this panel")
+    return target
+
+
+class TenantUserUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+@router.patch("/tenant/{tenant_id}/user/{user_id}")
+def update_tenant_user(
+    tenant_id: str, user_id: str, body: TenantUserUpdate,
+    request: Request,
+    user=Depends(require_master_admin), db: Session = Depends(get_db),
+):
+    target = _resolve_tenant_user(tenant_id, user_id, db)
+
+    if body.role is not None and body.role not in _ASSIGNABLE_ROLES:
+        raise HTTPException(422, f"role must be one of {', '.join(sorted(_ASSIGNABLE_ROLES))}")
+
+    if body.phone is not None and body.phone.strip() != target.phone:
+        clash = db.query(User).filter(User.phone == body.phone.strip(), User.id != target.id).first()
+        if clash:
+            raise HTTPException(400, "Phone already in use")
+
+    before = {"name": target.name, "phone": target.phone, "email": target.email, "role": target.role, "is_active": target.is_active}
+    changed: dict = {}
+
+    if body.name is not None and body.name.strip() != target.name:
+        target.name = body.name.strip(); changed["name"] = target.name
+    if body.phone is not None and body.phone.strip() != target.phone:
+        target.phone = body.phone.strip(); changed["phone"] = target.phone
+    if body.email is not None and (body.email.strip() or None) != target.email:
+        target.email = body.email.strip() or None; changed["email"] = target.email
+    if body.role is not None and body.role != target.role:
+        target.role = body.role; changed["role"] = target.role
+    if body.is_active is not None and body.is_active != target.is_active:
+        target.is_active = body.is_active; changed["is_active"] = target.is_active
+
+    if changed:
+        db.add(AuditLog(
+            tenant_id=target.tenant_id, user_id=_uuid.UUID(user["sub"]),
+            action="master_admin_update_user", resource="user", resource_id=str(target.id),
+            detail={"changed_fields": list(changed.keys()), "before": before, "after": changed},
+            ip_address=request.client.host if request.client else None,
+        ))
+        db.commit()
+        db.refresh(target)
+
+    return {"id": str(target.id), "name": target.name, "phone": target.phone, "email": target.email, "role": target.role, "is_active": target.is_active}
+
+
+class PasswordReset(BaseModel):
+    new_password: str
+
+
+@router.post("/tenant/{tenant_id}/user/{user_id}/reset-password")
+def reset_tenant_user_password(
+    tenant_id: str, user_id: str, body: PasswordReset,
+    request: Request,
+    user=Depends(require_master_admin), db: Session = Depends(get_db),
+):
+    target = _resolve_tenant_user(tenant_id, user_id, db)
+    if len(body.new_password) < 6:
+        raise HTTPException(422, "Password must be at least 6 characters")
+
+    target.password_hash = hash_password(body.new_password)
+    db.add(AuditLog(
+        tenant_id=target.tenant_id, user_id=_uuid.UUID(user["sub"]),
+        action="master_admin_reset_password", resource="user", resource_id=str(target.id),
+        detail={},  # deliberately no password material, not even a hash
+        ip_address=request.client.host if request.client else None,
+    ))
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/tenant/{tenant_id}/submissions")
