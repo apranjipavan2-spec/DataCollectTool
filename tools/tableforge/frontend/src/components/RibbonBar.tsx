@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { TableConfig, NumberFormat, ConditionalFormat, ColumnInfo } from '../types';
+import { TableConfig, NumberFormat, ConditionalFormat, ColumnInfo, TableResult } from '../types';
 import { API_BASE, fgListUserProjects, fgArchiveProject, fgRestoreProject } from '../api';
 
 interface FgContext { fgUrl: string; token: string; programId?: string }
@@ -7,6 +7,7 @@ interface FgContext { fgUrl: string; token: string; programId?: string }
 interface Props {
   table: TableConfig | null;
   dataset: boolean;
+  result?: TableResult | null;   // last computed result for `table` — used to offer real output columns (incl. Grand Total / Subtotal) as sort keys
   onAction: (action: string) => void;
   onUpdate: (update: Partial<TableConfig>) => void;
   theme: 'dark' | 'light';
@@ -197,13 +198,13 @@ function TemplateDropdown({ table, onAction, disabled }: { table: TableConfig | 
 }
 
 // ── Root component ─────────────────────────────────────────
-export function RibbonBar({ table, dataset, onAction, onUpdate, theme, activeTab: externalTab, columns, onColumnTypeChange, projectFilterCount = 0, onAskAI, fgContext, onLoadProject }: Props) {
+export function RibbonBar({ table, dataset, result, onAction, onUpdate, theme, activeTab: externalTab, columns, onColumnTypeChange, projectFilterCount = 0, onAskAI, fgContext, onLoadProject }: Props) {
   const [internalTab, setInternalTab] = useState<TabKey>('home');
   const activeTab = (externalTab as TabKey) || internalTab;
 
   return (
     <div className="ribbon-content">
-      {activeTab === 'home'       && <HomeRibbon      table={table} dataset={dataset} onAction={onAction} onUpdate={onUpdate} projectFilterCount={projectFilterCount} onAskAI={onAskAI} fgContext={fgContext} onLoadProject={onLoadProject} />}
+      {activeTab === 'home'       && <HomeRibbon      table={table} dataset={dataset} result={result} onAction={onAction} onUpdate={onUpdate} projectFilterCount={projectFilterCount} onAskAI={onAskAI} fgContext={fgContext} onLoadProject={onLoadProject} />}
       {activeTab === 'insert'     && <InsertRibbon    dataset={dataset} onAction={onAction} />}
       {activeTab === 'data'       && <DataRibbon      dataset={dataset} onAction={onAction} />}
       {activeTab === 'statistics' && <StatisticsRibbon dataset={dataset} onAction={onAction} />}
@@ -468,8 +469,9 @@ function ImportDropdownBtn({ onAction, fgContext, onLoadProject }: {
 }
 
 // ── HOME ───────────────────────────────────────────────────
-function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0, onAskAI, fgContext, onLoadProject }: {
+function HomeRibbon({ table, dataset, result, onAction, onUpdate, projectFilterCount = 0, onAskAI, fgContext, onLoadProject }: {
   table: TableConfig | null; dataset: boolean;
+  result?: TableResult | null;
   onAction: (action: string) => void; onUpdate: (update: Partial<TableConfig>) => void;
   projectFilterCount?: number;
   onAskAI?: (query: string) => void;
@@ -611,8 +613,12 @@ function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0
                     onUpdate({ multi_sort: arr });
                   }}>
                   <option value="">-- field --</option>
-                  {t.values.map(v => <option key={v.field} value={v.label || v.field}>{v.label || v.field}</option>)}
-                  {t.rows.map(r => <option key={r} value={r}>{r}</option>)}
+                  {t.rows.map(r => <option key={r} value={r}>{r} (row label)</option>)}
+                  {result?.headers && result.headers.length > 0
+                    ? result.headers
+                        .filter(h => !t.rows.includes(h))
+                        .map(h => <option key={h} value={h}>{h}</option>)
+                    : t.values.map(v => <option key={v.field} value={v.label || v.field}>{v.label || v.field}</option>)}
                 </select>
                 <select value={sk.order} className="fdrop-select" style={{ flex: 1 }}
                   onChange={e => {
@@ -635,8 +641,8 @@ function HomeRibbon({ table, dataset, onAction, onUpdate, projectFilterCount = 0
         )}
       </RGroup>
       <RGroup label="Sort & Filter">
-        <RBtn icon="↕" label="Sort A-Z" onClick={() => table && onUpdate({ sort_order: 'asc' })}  disabled={!dataset} />
-        <RBtn icon="↕" label="Sort Z-A" onClick={() => table && onUpdate({ sort_order: 'desc' })} disabled={!dataset} />
+        <RBtn icon="↕" label="Sort A-Z" onClick={() => { if (table?.rows[0]) onUpdate({ sort_by: table.rows[0], sort_order: 'asc', multi_sort: [] }); }}  disabled={!dataset || !table?.rows[0]} />
+        <RBtn icon="↕" label="Sort Z-A" onClick={() => { if (table?.rows[0]) onUpdate({ sort_by: table.rows[0], sort_order: 'desc', multi_sort: [] }); }} disabled={!dataset || !table?.rows[0]} />
         <RBtn icon="🔍" label="Filters" onClick={() => onAction('filter_panel')} disabled={!dataset} />
         <div style={{ position: 'relative', display: 'inline-flex' }}>
           <button
@@ -698,6 +704,10 @@ function InsertRibbon({ dataset, onAction }: { dataset: boolean; onAction: (acti
         <RBtn icon="➕" label="Create Column" onClick={() => onAction('column-creator')} disabled={!dataset} />
         <RBtn icon="𝑓" label="Metric" onClick={() => onAction('metrics')} disabled={!dataset} />
         <RBtn icon="⊕" label="Bin"    onClick={() => onAction('bins')}    disabled={!dataset} />
+      </RGroup>
+      <RGroup label="Manual">
+        <RBtn icon="✎" label="Manual Column" onClick={() => onAction('manual_column')} disabled={!dataset} />
+        <RBtn icon="🔗" label="Merge Tables"  onClick={() => onAction('merge_tables')}  disabled={!dataset} />
       </RGroup>
       <RGroup label="Visual">
         <RBtn icon="📊" label="Chart"     onClick={() => onAction('charts')}    disabled={!dataset} />

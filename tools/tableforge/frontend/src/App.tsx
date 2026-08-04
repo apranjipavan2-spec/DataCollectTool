@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType, TableSection, NumberingConfig } from './types';
+import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType, TableSection, NumberingConfig, ManualColumnDef } from './types';
 import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg, getColumnRoles, bulkSetColumnRoles, saveStudyDesign, cleanerApi, buildCleanerUrl, setFgAuth, getUserHeaders } from './api';
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
@@ -13,6 +13,8 @@ import { ProjectFilterPanel } from './components/ProjectFilterPanel';
 import { MetricBuilder } from './components/MetricBuilder';
 import { BinCreator } from './components/BinCreator';
 import { ExportDialog } from './components/ExportDialog';
+import { ManualColumnModal } from './components/ManualColumnModal';
+import { MergeTablesModal } from './components/MergeTablesModal';
 import { DataQualityPanel } from './components/DataQualityPanel';
 import { ComparisonPanel } from './components/ComparisonPanel';
 import { ReportBuilder } from './components/ReportBuilder';
@@ -66,11 +68,29 @@ function createEmptyTable(id: string, name: string): TableConfig {
 // hand-edited) AND no pivot fields at all can only be a stat table, and is safe
 // to attempt recomputing from scratch via inferStatConfigFromResult.
 function looksLikeStatTable(t: TableConfig, allColumns: { name: string; sample_values?: string[] }[]): boolean {
+  if (t.merge_config) return false;   // merge tables also have empty rows/columns/values — don't misclassify
   if ((t as any)._statResult || (t as any)._statResultData) return true;
   if (t.rows.length === 0 && t.columns.length === 0 && t.values.length === 0) {
     return !!inferStatConfigFromResult(t.title || '', undefined, allColumns);
   }
   return false;
+}
+
+// Merged tables are built purely on the frontend from two already-computed
+// TableResults — Table A's columns first, then Table B's (its own row-label
+// column(s) dropped), aligned by matching each row's label (first cell).
+// Table A's row order is the anchor; a B row with no matching A row is dropped.
+function buildMergedResult(tableB: TableConfig, resultA: TableResult, resultB: TableResult): TableResult {
+  const nB = Math.max(1, tableB.rows.length || 1);
+  const restHeadersB = resultB.headers.slice(nB);
+  const mapB = new Map<string, any[]>();
+  resultB.rows.forEach(rowB => mapB.set(String(rowB[0]), rowB.slice(nB)));
+  const headers = [...resultA.headers, ...restHeadersB];
+  const rows = resultA.rows.map(rowA => {
+    const restB = mapB.get(String(rowA[0])) ?? restHeadersB.map(() => '');
+    return [...rowA, ...restB];
+  });
+  return { headers, rows, row_count: rows.length, col_count: headers.length };
 }
 
 // Stat-test results aren't recomputable from TableConfig — they were injected once
@@ -102,7 +122,7 @@ function generateAutoTitle(t: TableConfig): { title: string; subtitle: string; n
   return { title, subtitle, name: nameShort };
 }
 
-type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'stat_paired_ttest' | 'stat_wilcoxon' | 'stat_mcnemar' | 'stat_kruskal' | 'stat_friedman' | 'stat_spearman' | 'stat_kendall' | 'stat_logistic_regression' | 'stat_multiple_regression' | 'stat_posthoc' | 'stat_reliability' | 'stat_cramers_matrix' | 'stat_multinomial_logistic' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config' | 'anomalies' | 'diff' | 'variable_metadata' | 'study_design' | 'likert' | 'multi_response' | 'observer' | 'auto_analyze' | 'survey_insights' | 'survey_quality' | 'balance' | 'geo_summary' | 'driver' | 'cluster' | 'verbatim' | 'play_mode';
+type ModalType = null | 'metrics' | 'bins' | 'column-creator' | 'export' | 'quality' | 'comparison' | 'report' | 'audit' | 'projects' | 'table_compare' | 'metric_library' | 'charts' | 'stat_correlation' | 'stat_descriptive' | 'stat_crosstab' | 'stat_ttest' | 'stat_anova' | 'stat_regression' | 'stat_normality' | 'stat_outlier' | 'stat_frequency' | 'stat_paired_ttest' | 'stat_wilcoxon' | 'stat_mcnemar' | 'stat_kruskal' | 'stat_friedman' | 'stat_spearman' | 'stat_kendall' | 'stat_logistic_regression' | 'stat_multiple_regression' | 'stat_posthoc' | 'stat_reliability' | 'stat_cramers_matrix' | 'stat_multinomial_logistic' | 'ai-polish' | 'ai-interpret' | 'ai-refine' | 'ai-suggest' | 'ai-smart-build' | 'ai-auto-generate' | 'ai-report' | 'ai-config' | 'anomalies' | 'diff' | 'variable_metadata' | 'study_design' | 'likert' | 'multi_response' | 'observer' | 'auto_analyze' | 'survey_insights' | 'survey_quality' | 'balance' | 'geo_summary' | 'driver' | 'cluster' | 'verbatim' | 'play_mode' | 'manual_column' | 'merge_tables';
 
 const STAT_GUIDE_ACTIONS = new Set<string>([
   'stat_correlation', 'stat_descriptive', 'stat_crosstab', 'stat_ttest', 'stat_anova',
@@ -196,6 +216,26 @@ function AnomalyModal({ datasetId, onClose }: { datasetId: string; onClose: () =
             </table>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function LoadingOverlay({ loading, loadingMsg, uploadProgress }: { loading: boolean; loadingMsg: string; uploadProgress: number | null }) {
+  if (uploadProgress == null && !(loading && loadingMsg)) return null;
+  const message = uploadProgress != null
+    ? (uploadProgress < 100 ? `Uploading… ${uploadProgress}%` : 'Processing file…')
+    : loadingMsg;
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(8,12,20,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: 'rgba(15,23,42,0.97)', border: '1px solid rgba(59,130,246,0.4)', borderRadius: 12, padding: '28px 36px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', minWidth: 260 }}>
+        <span style={{ width: 32, height: 32, border: '3px solid rgba(59,130,246,0.25)', borderTop: '3px solid #3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <div style={{ color: '#e2e8f0', fontSize: 14, fontWeight: 500, textAlign: 'center' }}>{message}</div>
+        {uploadProgress != null && (
+          <div style={{ width: 200, height: 4, background: 'rgba(59,130,246,0.2)', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${uploadProgress}%`, background: '#3b82f6', transition: 'width 0.2s' }} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -327,6 +367,25 @@ export default function App() {
     }, 800);
     return () => clearTimeout(t);
   }, [tableInterpretations, dataset?.dataset_id]);
+
+  // Debounced immediate autosave for `tables` itself — table structure edits
+  // (add/remove a manual column, type a manual-column value, merge two tables,
+  // reorder, format changes, etc.) previously only hit disk on the 5-minute
+  // interval or an explicit Save. Closing the tab inside that window silently
+  // lost the edit. Mirrors the projectFilters/tableInterpretations effects above.
+  useEffect(() => {
+    if (!dataset) return;
+    const t = setTimeout(() => {
+      saveProject('__autosave__', {
+        tables, annotationsMap, comparisonState,
+        projectFilters: projectFiltersRef.current,
+        columnTypeOverrides, sections, numberingConfig, tableInterpretations,
+        dataset_id: dataset.dataset_id,
+        source_file: { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length },
+      }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(t);
+  }, [tables, dataset?.dataset_id]);
 
   // Auto-save every 5 minutes
   useEffect(() => {
@@ -539,6 +598,9 @@ export default function App() {
     // as a normal pivot table with empty rows/columns/values crashes the backend
     // (it tries to build a pivot out of nothing).
     if ((config as any)._statResult || (config as any)._statResultData) return;
+    // Merge tables have no pivot definition of their own — their result is built
+    // from two other tables' results (see rebuildMergeTables), never tabulated here.
+    if (config.merge_config) return;
     if (!dataset || config.values.length === 0 || (config.rows.length === 0 && config.columns.length === 0)) {
       if (config.values.length === 0) setResults(prev => { const next = new Map(prev); next.delete(config.id); return next; });
       return;
@@ -724,6 +786,28 @@ export default function App() {
     return { refreshed, skipped, total: statTables.length };
   }, [tables, dataset, allColumns]);
 
+  // Rebuilds every merge table's result from its two source tables' CURRENT
+  // results — always reads via the setResults updater's `prev`/`next` (never the
+  // `results` closure variable) so it sees results a just-awaited
+  // runTabulationsBatch/rerunStatTables actually committed, not a stale snapshot.
+  // No-ops per table if a source hasn't been computed yet (e.g. was deleted).
+  const rebuildMergeTables = useCallback((tablesList: TableConfig[]) => {
+    const mergeTables = tablesList.filter(t => t.merge_config);
+    if (mergeTables.length === 0) return;
+    setResults(prev => {
+      const next = new Map(prev);
+      for (const t of mergeTables) {
+        const { source_a, source_b } = t.merge_config!;
+        const resultA = next.get(source_a);
+        const resultB = next.get(source_b);
+        const sourceB = tablesList.find(x => x.id === source_b);
+        if (!resultA || !resultB || !sourceB) continue;
+        next.set(t.id, buildMergedResult(sourceB, resultA, resultB));
+      }
+      return next;
+    });
+  }, []);
+
   const handleResumeYes = useCallback(async () => {
     const data = resumePrompt?.data;
     setResumePrompt(null);
@@ -784,6 +868,7 @@ export default function App() {
           if ((data.tables as any[]).some((t: any) => looksLikeStatTable(t, allColumns))) {
             await rerunStatTables(data.projectFilters || {}, { force: true, silent: true });
           }
+          rebuildMergeTables(data.tables as TableConfig[]);
         }
       } catch (e: any) {
         setError('Could not refresh from FieldGovern — showing last saved results. ' + (e.message || ''));
@@ -857,6 +942,7 @@ export default function App() {
             if (data.tables.some((t: any) => looksLikeStatTable(t, allColumns))) {
               await rerunStatTables(data.projectFilters || projectFiltersRef.current || {}, { force: true, silent: true });
             }
+            rebuildMergeTables(data.tables);
           } finally { setLoading(false); setLoadingMsg(''); }
         }, 50);
       }
@@ -1164,6 +1250,7 @@ export default function App() {
         if (data.tables.some((t: any) => looksLikeStatTable(t, allColumns))) {
           await rerunStatTables(data.projectFilters || projectFiltersRef.current || {}, { force: true, silent: true });
         }
+        rebuildMergeTables(data.tables);
       }
     } catch (e: any) {
       setError(e.message || 'Failed to load project');
@@ -1290,6 +1377,7 @@ export default function App() {
         if (loadedTables.some((t: any) => looksLikeStatTable(t, allColumns))) {
           await rerunStatTables(loadedExtra?.projectFilters || projectFiltersRef.current || {}, { force: true, silent: true });
         }
+        rebuildMergeTables(loadedTables);
       })();
     }
   };
@@ -1420,6 +1508,60 @@ export default function App() {
     setTables(prev => prev.map((tb, ti) => idxSet.has(ti) ? { ...tb, section_id: sectionId } : tb));
   }, [pushUndo]);
 
+  // ── Merge two tables side by side (same rows, different columns) ──────────
+  const handleMergeTables = useCallback((idA: string, idB: string) => {
+    const tableA = tables.find(t => t.id === idA);
+    const tableB = tables.find(t => t.id === idB);
+    if (!tableA || !tableB) return;
+    pushUndo();
+    const id = String(Date.now());
+    const merged: TableConfig = {
+      ...createEmptyTable(id, `${tableA.name} + ${tableB.name} (Merged)`),
+      merge_config: { source_a: idA, source_b: idB },
+    };
+    setTables(prev => [...prev, merged]);
+    setActiveTableIdx(tables.length);
+    const resultA = results.get(idA);
+    const resultB = results.get(idB);
+    if (resultA && resultB) {
+      const mergedResult = buildMergedResult(tableB, resultA, resultB);
+      setResults(prev => new Map(prev).set(id, mergedResult));
+    }
+  }, [tables, results, pushUndo]);
+
+  // "Update Table" — the user asked for a linked-but-manual refresh: merge
+  // tables never recompute on their own, only when this is explicitly called.
+  const handleUpdateMergeTable = useCallback((tableId: string) => {
+    const t = tables.find(x => x.id === tableId);
+    if (t) rebuildMergeTables([t]);
+  }, [tables, rebuildMergeTables]);
+
+  // ── Manual columns — user-typed extra columns, not derived from the dataset ──
+  const handleAddManualColumn = useCallback((label: string, input_type: ManualColumnDef['input_type'], options?: string[]) => {
+    if (!activeTable) return;
+    pushUndo();
+    const id = `mcol_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    setTables(prev => prev.map(t => t.id === activeTable.id
+      ? { ...t, manual_columns: [...(t.manual_columns || []), { id, label, input_type, options, values: {} }] }
+      : t));
+  }, [activeTable, pushUndo]);
+
+  const handleRemoveManualColumn = useCallback((columnId: string) => {
+    if (!activeTable) return;
+    pushUndo();
+    setTables(prev => prev.map(t => t.id === activeTable.id
+      ? { ...t, manual_columns: (t.manual_columns || []).filter(c => c.id !== columnId) }
+      : t));
+  }, [activeTable, pushUndo]);
+
+  // No pushUndo here — a per-keystroke undo entry would spam the undo stack.
+  const handleUpdateManualColumnValue = useCallback((columnId: string, rowKey: string, value: string) => {
+    if (!activeTable) return;
+    setTables(prev => prev.map(t => t.id === activeTable.id
+      ? { ...t, manual_columns: (t.manual_columns || []).map(c => c.id === columnId ? { ...c, values: { ...c.values, [rowKey]: value } } : c) }
+      : t));
+  }, [activeTable]);
+
   const handleApplyNumbering = useCallback(() => {
     pushUndo();
     setTables(prev => renumberTables(prev));
@@ -1496,6 +1638,9 @@ export default function App() {
         setProjectFilters(data.projectFilters);
         projectFiltersRef.current = data.projectFilters;
       }
+      if (Array.isArray(data.sections)) setSections(data.sections);
+      if (data.numberingConfig) setNumberingConfig(data.numberingConfig);
+      if (data.tableInterpretations) setTableInterpretations(data.tableInterpretations);
       if (data.columnTypeOverrides && dataset) {
         const overrides = data.columnTypeOverrides as Record<string, string>;
         setColumnTypeOverrides(overrides);
@@ -1531,6 +1676,7 @@ export default function App() {
         if (data.tables.some((t: TableConfig) => looksLikeStatTable(t, allColumns))) {
           await rerunStatTables(data.projectFilters || {}, { force: true, silent: true });
         }
+        rebuildMergeTables(data.tables);
       }
     } catch (e: any) {
       setError(e.message || 'Failed to apply project');
@@ -1792,6 +1938,7 @@ export default function App() {
           // Re-run tabulations after data cleaning
           tables.forEach(t => { if (t.values.length > 0) runTabulation(t); });
         }} />}
+        <LoadingOverlay loading={loading} loadingMsg={loadingMsg} uploadProgress={uploadProgress} />
       </div>
     );
   }
@@ -1821,6 +1968,7 @@ export default function App() {
       <RibbonBar
         table={activeTable}
         dataset={!!dataset}
+        result={currentResult}
         activeTab={ribbonTab}
         projectFilterCount={Object.values(projectFilters).filter(v => v.length > 0).length}
         onAction={a => {
@@ -1981,6 +2129,20 @@ export default function App() {
         <div className="center-area">
           {activeTable && (
           <>
+          {activeTable.merge_config ? (
+            <div className="drop-zone" style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+              <span style={{ fontSize: 12 }}>
+                🔗 Merged from{' '}
+                <strong>{tables.find(t => t.id === activeTable.merge_config!.source_a)?.name || '(deleted table)'}</strong>
+                {' + '}
+                <strong>{tables.find(t => t.id === activeTable.merge_config!.source_b)?.name || '(deleted table)'}</strong>
+              </span>
+              <button className="btn-secondary" style={{ marginLeft: 'auto', fontSize: 12 }}
+                onClick={() => handleUpdateMergeTable(activeTable.id)}>
+                ↻ Update Table
+              </button>
+            </div>
+          ) : (
           <DropZones table={activeTable} columns={allColumns} draggedField={draggedField}
             onDrop={handleDrop} onRemove={handleRemoveField} onAggChange={handleAggChange}
             onValueFieldUpdate={handleValueFieldUpdate}
@@ -1988,6 +2150,7 @@ export default function App() {
             onDateGroupSuggest={handleDateGroupSuggest}
             onOpenFilters={() => setShowFilterPanel(true)}
           />
+          )}
           {/* Quick Ribbon for Value Fields */}
           {activeTable.values.length > 0 && (
             <div className="value-ribbon">
@@ -2277,6 +2440,7 @@ export default function App() {
                       }
                       updateTable({ header_renames: renames });
                     }}
+                    onManualColumnValueChange={(columnId, rowKey, value) => handleUpdateManualColumnValue(columnId, rowKey, value)}
                   />
                 )}
                 {effectiveTab === 'chart' && hasChart && (
@@ -2327,23 +2491,7 @@ export default function App() {
         </div>
       </div>
       <StatusBar dataset={dataset} result={currentResult} undoCount={undoStack.length} redoCount={redoStack.length} />
-      {(uploadProgress != null || (loading && loadingMsg)) && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999 }}>
-          <div style={{ height: 3, background: 'rgba(59,130,246,0.2)' }}>
-            {uploadProgress != null ? (
-              <div style={{ height: '100%', width: `${uploadProgress}%`, background: '#3b82f6', transition: 'width 0.2s' }} />
-            ) : (
-              <div style={{ height: '100%', width: '100%', background: '#3b82f6', animation: 'indeterminate 1.5s ease-in-out infinite' }} />
-            )}
-          </div>
-          <div style={{ position: 'absolute', top: 6, left: '50%', transform: 'translateX(-50%)', background: 'rgba(15,23,42,0.95)', color: '#e2e8f0', padding: '5px 18px', borderRadius: 6, fontSize: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 12, height: 12, border: '2px solid rgba(59,130,246,0.3)', borderTop: '2px solid #3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
-            {uploadProgress != null
-              ? (uploadProgress < 100 ? `Uploading… ${uploadProgress}%` : 'Processing file…')
-              : loadingMsg}
-          </div>
-        </div>
-      )}
+      <LoadingOverlay loading={loading} loadingMsg={loadingMsg} uploadProgress={uploadProgress} />
       {showTour && <OnboardingTour onClose={() => setShowTour(false)} />}
 
       {/* Date grouping suggestion modal */}
@@ -2428,6 +2576,13 @@ export default function App() {
           // Re-run tabulations after data cleaning
           tables.forEach(t => { if (t.values.length > 0) runTabulation(t); });
         }} />}
+      {modal === 'manual_column' && activeTable && <ManualColumnModal table={activeTable}
+        onAdd={(label, inputType, options) => handleAddManualColumn(label, inputType, options)}
+        onRemove={handleRemoveManualColumn}
+        onClose={() => setModal(null)} />}
+      {modal === 'merge_tables' && <MergeTablesModal tables={tables}
+        onMerge={(idA, idB) => handleMergeTables(idA, idB)}
+        onClose={() => setModal(null)} />}
       {modal === 'comparison' && <ComparisonPanel datasetId={dataset.dataset_id} columns={allColumns}
         onClose={() => setModal(null)}
         initialConfig={activeTable?.comparisonConfig || undefined}
@@ -2848,6 +3003,7 @@ export default function App() {
                   if (pending.some((t: any) => looksLikeStatTable(t, allColumns))) {
                     await rerunStatTables(projectFiltersRef.current || {}, { force: true, silent: true });
                   }
+                  rebuildMergeTables(pending);
                 }, 100);
               }}>Load As-Is</button>
               <button className="btn-primary" onClick={() => {
@@ -2875,6 +3031,7 @@ export default function App() {
                   if (remapped.some((t: any) => looksLikeStatTable(t, allColumns))) {
                     await rerunStatTables(projectFiltersRef.current || {}, { force: true, silent: true });
                   }
+                  rebuildMergeTables(remapped);
                 }, 100);
               }}>Apply Mapping</button>
             </div>

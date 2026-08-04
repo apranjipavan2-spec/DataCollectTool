@@ -1057,6 +1057,38 @@ async def tabulate(config: TableConfig):
                 pivot = pivot.sort_values(list(config.rows) + ["__sort_key__"]).reset_index(drop=True)
                 pivot.drop(columns=["__subtotal_level__", "__sort_key__"], inplace=True)
 
+            # General sort by a user-selected column — mirrors the rows-only sort
+            # logic further up, but against the flattened pivot columns so pivoted
+            # output columns ("Grand Total", "X | Subtotal", etc.) are valid sort
+            # keys too, not just the raw row/value field names. The Grand Total row
+            # (if present) is pinned to the end rather than reordered with the data.
+            # Limited to single-row-field crosstabs — multi-level row hierarchies
+            # already get their own group-preserving sort from the subtotals block
+            # above, and reconciling the two would require tracking which hierarchy
+            # level a sort key belongs to.
+            if len(config.rows) == 1:
+                row_label_col = config.rows[0]
+                if row_label_col in pivot.columns:
+                    is_gt_row = pivot[row_label_col].astype(str) == "Grand Total"
+                else:
+                    is_gt_row = pd.Series([False] * len(pivot), index=pivot.index)
+                gt_rows = pivot[is_gt_row]
+                data_rows = pivot[~is_gt_row]
+
+                if config.multi_sort:
+                    valid_keys = [(sk["field"], sk["order"] == "asc") for sk in config.multi_sort if sk.get("field") and sk["field"] in data_rows.columns]
+                    if valid_keys:
+                        sort_cols = [k[0] for k in valid_keys]
+                        sort_asc = [k[1] for k in valid_keys]
+                        data_rows = data_rows.sort_values(sort_cols, ascending=sort_asc)
+                elif config.custom_sort_orders and any(f in data_rows.columns for f in config.custom_sort_orders):
+                    first_custom = next(f for f in config.custom_sort_orders if f in data_rows.columns)
+                    data_rows = data_rows.sort_values(first_custom)
+                elif config.sort_by and config.sort_by in data_rows.columns:
+                    data_rows = data_rows.sort_values(config.sort_by, ascending=(config.sort_order == "asc"))
+
+                pivot = pd.concat([data_rows, gt_rows], ignore_index=True) if len(gt_rows) > 0 else data_rows.reset_index(drop=True)
+
             # Percentage of row/column total for pivot
             v0 = config.values[0]
             show_as = v0.get("show_as", "normal")

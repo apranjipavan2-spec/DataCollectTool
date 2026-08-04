@@ -66,6 +66,23 @@ function buildFormattedRows(t: TableConfig, res: TableResult): string[][] {
   });
 }
 
+// Manual columns live on TableConfig, not in the computed TableResult — append
+// them here so every downstream export path (headers/rows/formatted_rows/HTML)
+// picks them up automatically without needing separate per-format wiring.
+function withManualColumns(t: TableConfig, res: TableResult): TableResult {
+  const manualCols = t.manual_columns || [];
+  if (manualCols.length === 0) return res;
+  const headers = [...res.headers, ...manualCols.map(c => c.label)];
+  const rows = res.rows.map(row => {
+    const rowKey = String(row[0]);
+    const isGrandTotal = rowKey === 'Grand Total';
+    const isSubtotal = !isGrandTotal && (rowKey.includes('Subtotal') || (row.length > 1 && String(row[1]) === 'Subtotal'));
+    const extra = manualCols.map(c => (isGrandTotal || isSubtotal) ? '' : (c.values[rowKey] ?? ''));
+    return [...row, ...extra];
+  });
+  return { ...res, headers, rows, col_count: headers.length };
+}
+
 function buildExportHtml(t: TableConfig, res: TableResult, fmtRows: string[][]): string {
   const renames = t.header_renames || {};
   const dispHeaders = res.headers.map(h => renames[h] || h);
@@ -319,8 +336,9 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
 
       const exportData = selectedT
         .map(t => {
-          const res = results.get(t.id);
-          if (!res) return null;
+          const rawRes = results.get(t.id);
+          if (!rawRes) return null;
+          const res = withManualColumns(t, rawRes);
           const renames = t.header_renames || {};
           const displayHeaders = res.headers.map(h => renames[h] || h);
           const fmtRows = buildFormattedRows(t, res);
@@ -492,8 +510,9 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
     }
     const exportData = selectedT
       .map(t => {
-        const res = results.get(t.id);
-        if (!res) return null;
+        const rawRes = results.get(t.id);
+        if (!rawRes) return null;
+        const res = withManualColumns(t, rawRes);
         const renames = t.header_renames || {};
         const displayHeaders = res.headers.map(h => renames[h] || h);
         const fmtRows = buildFormattedRows(t, res);

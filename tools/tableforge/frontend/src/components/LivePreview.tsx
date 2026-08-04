@@ -15,6 +15,7 @@ interface Props {
   onAnnotationsChange?: (anns: Annotation[]) => void;
   tableMode?: 'dark' | 'light';
   onHeaderRename?: (original: string, newName: string) => void;
+  onManualColumnValueChange?: (columnId: string, rowKey: string, value: string) => void;
 }
 
 const THEME_VARS: Record<string, { headerBg: string; headerColor: string; totalBg: string; borderColor: string }> = {
@@ -26,7 +27,7 @@ const THEME_VARS: Record<string, { headerBg: string; headerColor: string; totalB
   teal:           { headerBg: '#0d7377', headerColor: '#fff', totalBg: '#e0f7fa', borderColor: '#14a085' },
 };
 
-export function LivePreview({ result, loading, error, title, subtitle, datasetId, tableConfig, annotations: externalAnnotations, onAnnotationsChange, tableMode = 'dark', onHeaderRename }: Props) {
+export function LivePreview({ result, loading, error, title, subtitle, datasetId, tableConfig, annotations: externalAnnotations, onAnnotationsChange, tableMode = 'dark', onHeaderRename, onManualColumnValueChange }: Props) {
   const [drillDown, setDrillDown] = useState<{ headers: string[]; rows: any[][]; row_count: number; showing: number } | null>(null);
   const [sortCol, setSortCol] = useState<number | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -482,6 +483,12 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                       {g.label}
                     </th>
                   ))}
+                  {/* Manual columns span both header rows, same as the row-dimension columns */}
+                  {(tableConfig?.manual_columns || []).map(col => (
+                    <th key={col.id} rowSpan={2} style={{ background: tv.headerBg, color: tv.headerColor, borderColor: tv.borderColor }}>
+                      {col.label}
+                    </th>
+                  ))}
                 </tr>
               );
             })()}
@@ -572,6 +579,12 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                   Trend
                 </th>
               )}
+              {/* Manual columns — already rendered with rowSpan=2 in the multi-level header row above when present */}
+              {!result.column_groups?.has_multi_level && (tableConfig?.manual_columns || []).map(col => (
+                <th key={col.id} style={{ background: tv.headerBg, color: tv.headerColor, borderColor: tv.borderColor }}>
+                  {col.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -696,6 +709,31 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                       </td>
                     );
                   })()}
+                  {(tableConfig?.manual_columns || []).map(col => {
+                    const rowKey = String(row[0]);
+                    const value = col.values[rowKey] ?? '';
+                    const inputStyle: React.CSSProperties = {
+                      width: '100%', background: 'transparent', color: 'inherit',
+                      border: '1px solid var(--border)', borderRadius: 3, fontSize: 'inherit', padding: '2px 4px',
+                    };
+                    return (
+                      <td key={col.id} style={{ borderColor: tv.borderColor, padding: '2px 4px' }}
+                        onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
+                        {isGrandTotal || isSubtotal ? null : col.input_type === 'dropdown' ? (
+                          <select value={value} style={inputStyle}
+                            onChange={e => onManualColumnValueChange?.(col.id, rowKey, e.target.value)}
+                            onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
+                            <option value="">—</option>
+                            {(col.options || []).map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        ) : (
+                          <input type={col.input_type === 'number' ? 'number' : 'text'} value={value} style={inputStyle}
+                            onChange={e => onManualColumnValueChange?.(col.id, rowKey, e.target.value)}
+                            onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} />
+                        )}
+                      </td>
+                    );
+                  })}
                 </tr>
               );
             })}

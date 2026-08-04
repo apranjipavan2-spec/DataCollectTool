@@ -105,6 +105,19 @@ export interface ComparisonConfig {
   moving_avg_n: number;
 }
 
+export interface ManualColumnDef {
+  id: string;
+  label: string;
+  input_type: 'text' | 'number' | 'dropdown';
+  options?: string[];              // dropdown choices
+  values: Record<string, string>;  // keyed by row-key = String(row[0])
+}
+
+export interface MergeConfig {
+  source_a: string;  // table id
+  source_b: string;  // table id
+}
+
 export interface TableConfig {
   id: string;
   name: string;
@@ -112,6 +125,8 @@ export interface TableConfig {
   columns: string[];
   values: ValueField[];
   filters: Record<string, string[]>;
+  manual_columns?: ManualColumnDef[];
+  merge_config?: MergeConfig;
   grand_total: boolean;
   grand_total_rows?: boolean;
   grand_total_columns?: boolean;

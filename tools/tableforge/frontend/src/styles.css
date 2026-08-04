@@ -712,12 +712,13 @@ body {
 .drop-zones { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; flex-shrink: 0; }
 .drop-zone {
   background: var(--bg-zone); border: 2px dashed var(--border);
-  border-radius: var(--radius); padding: 8px; min-height: 72px;
+  border-radius: var(--radius); padding: 8px; min-height: 72px; max-height: 140px;
+  display: flex; flex-direction: column;
   transition: border-color 0.15s, background 0.15s;
 }
 .drop-zone.zone-drag-over { background: rgba(59,130,246,0.1); }
 .zone-header {
-  font-size: 11px; font-weight: 700; margin-bottom: 6px;
+  font-size: 11px; font-weight: 700; margin-bottom: 6px; flex-shrink: 0;
   display: flex; align-items: center; gap: 4px;
 }
 .zone-icon { font-size: 13px; }
@@ -727,7 +728,7 @@ body {
   color: #f59e0b; border-radius: 4px; font-size: 11px; padding: 1px 6px; cursor: pointer;
 }
 .zone-filter-btn:hover { background: rgba(245,158,11,0.1); }
-.zone-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.zone-chips { display: flex; flex-wrap: wrap; gap: 4px; overflow-y: auto; flex: 1; min-height: 0; }
 .zone-placeholder { color: var(--text-dim); font-size: 11px; font-style: italic; }
 .chip {
   display: flex; align-items: center; gap: 4px;
