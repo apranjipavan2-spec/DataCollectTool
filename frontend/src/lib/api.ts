@@ -6,6 +6,10 @@ import axios from 'axios'
 
 const api = axios.create({ baseURL: '/api/v1' })
 
+// Endpoints where a 401 means "this login attempt failed", not "an existing
+// session expired" — safe to bail out immediately without trying refresh.
+const SESSION_START_PATHS = ['/auth/login', '/auth/google', '/auth/verify-otp', '/auth/qr-login', '/auth/refresh']
+
 api.interceptors.request.use(cfg => {
   const token = localStorage.getItem('fp_token')
   if (token) cfg.headers.Authorization = `Bearer ${token}`
@@ -28,8 +32,14 @@ api.interceptors.response.use(
 
     // ── 401 handling: attempt silent refresh ──────────────────────────────
     if (err.response?.status === 401 && !original._retry) {
-      // Auth endpoints themselves: don't recurse — just clear session
-      if (original.url?.includes('/auth/')) {
+      // Session-establishment endpoints: a 401 here means the login/refresh
+      // attempt itself failed, not that an existing session expired — don't
+      // recurse into refresh, just clear and bail. Other /auth/* endpoints
+      // (change-password, 2FA setup/verify) are authenticated actions where
+      // a 401 is a business-logic error (wrong password/code) and must NOT
+      // wipe a valid session — let them fall through to normal refresh+retry.
+      const isSessionStart = SESSION_START_PATHS.some(p => original.url?.includes(p))
+      if (isSessionStart) {
         _clearSession()
         return Promise.reject(err)
       }
