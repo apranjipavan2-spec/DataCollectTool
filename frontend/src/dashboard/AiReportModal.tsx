@@ -15,6 +15,9 @@ export default function AiReportModal({ formId, formTitle, onClose }: Props) {
 
   useEffect(() => {
     if (!aiJob.job) {
+      // startJob sets job.status to 'failed' itself before rejecting, so
+      // AiProgressBar already shows the error — this catch just prevents an
+      // unhandled-rejection warning, it isn't swallowing anything important.
       aiJob.startJob(() => api.post(`/ai/report/${formId}`)).catch(() => {})
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps

@@ -63,11 +63,20 @@ export function useAiJob({ storageKey, pollIntervalMs = POLL_MS }: UseAiJobOptio
   const startJob = useCallback(async (postFn: () => Promise<{ data: { job_id: string } }>) => {
     stopPolling()
     setJob({ status: 'pending', steps: [], result: null, error: null })
-    const { data } = await postFn()
-    const id = data.job_id
-    localStorage.setItem(storageKey, id)
-    setJobId(id)
-    startPolling(id)
+    try {
+      const { data } = await postFn()
+      const id = data.job_id
+      localStorage.setItem(storageKey, id)
+      setJobId(id)
+      startPolling(id)
+    } catch (e: any) {
+      // Without this, a caller that awaits/catches this rejection (to show its
+      // own toast) still leaves `job.status` stuck at 'pending' forever — no
+      // job_id was ever issued, so polling never starts and the UI shows an
+      // indefinite spinner even though the request never actually started.
+      setJob({ status: 'failed', steps: [], result: null, error: e?.response?.data?.detail || e?.message || 'Failed to start' })
+      throw e
+    }
   }, [storageKey, startPolling, stopPolling])
 
   const reset = useCallback(() => {

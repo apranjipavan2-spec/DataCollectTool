@@ -421,7 +421,7 @@ export default function FgWriter() {
     }
   }
 
-  const saveCurrentReport = () => {
+  const saveCurrentReport = async () => {
     if (!reportMd || !programId) return
     const versionNum = versions.length + 1
     const label = `v${versionNum} — ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`
@@ -433,15 +433,22 @@ export default function FgWriter() {
       created_at: new Date().toISOString(),
     }
     saveReport(programId, report)
-    // Also persist to server so it appears in File Manager
-    api.post('/tool-projects/', {
-      tool: 'writer',
-      name: `${prog?.name || 'Report'} — ${label}`,
-      program_id: programId,
-      data: { content: reportMd, style, label, created_at: report.created_at },
-    }).catch(() => {})
     reload()
-    toast.success('Report version saved')
+    // Also persist to server so it appears in File Manager — the version above
+    // is already safe in localStorage either way, but the user needs to know
+    // if it *didn't* make it to the server (invisible in File Manager, gone if
+    // they clear browser storage or switch devices).
+    try {
+      await api.post('/tool-projects/', {
+        tool: 'writer',
+        name: `${prog?.name || 'Report'} — ${label}`,
+        program_id: programId,
+        data: { content: reportMd, style, label, created_at: report.created_at },
+      })
+      toast.success('Report version saved')
+    } catch {
+      toast.error('Saved locally, but failed to sync to your account — it won’t appear in File Manager yet')
+    }
   }
 
   const copyMarkdown = async () => {
