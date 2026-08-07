@@ -115,6 +115,7 @@ async def save_back(handoff_id: str, request: Request):
     datasets[dataset_id]["df"] = df
     # Reset type overrides — cleaner is authoritative on types after a handoff
     column_type_overrides[dataset_id] = {}
+    datasets.persist(dataset_id)
 
     _handoffs[handoff_id]["completed_at"] = time.time()
 

@@ -161,6 +161,7 @@ async def load_server_file(file_id: str):
     annotations[dataset_id] = {}
     column_type_overrides[dataset_id] = {}
     add_audit_log(dataset_id, "server_file_load", f"Loaded '{filename}' from server storage")
+    datasets.persist(dataset_id)
 
     return {
         "dataset_id": dataset_id,

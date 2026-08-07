@@ -17,7 +17,6 @@ from ..shared import (
     column_type_overrides,
     upload_progress,
     CACHE_DIR,
-    PARQUET_DIR,
     LARGE_FILE_THRESHOLD,
     sanitize_for_json,
     add_audit_log,
@@ -88,14 +87,6 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(400, f"Failed to read file: {str(e)}")
 
-    # Cache large DataFrames as parquet for fast re-reads
-    if is_large_file:
-        try:
-            parquet_path = PARQUET_DIR / f"{dataset_id}.parquet"
-            df.to_parquet(parquet_path, index=False)
-        except Exception:
-            pass  # parquet cache is optional
-
     # Detect column types (modifies df in-place for numeric coercion)
     columns = _detect_columns(df)
 
@@ -112,6 +103,9 @@ async def upload_file(file: UploadFile = File(...)):
     annotations[dataset_id] = {}
     column_type_overrides[dataset_id] = {}
     add_audit_log(dataset_id, "file_import", f"Imported {filename}: {len(df)} rows, {len(df.columns)} columns")
+    # Persist to disk so this dataset survives idle eviction / a server restart —
+    # a saved TableForge project otherwise 404s once its dataset_id is gone.
+    datasets.persist(dataset_id)
 
     return {
         "dataset_id": dataset_id,

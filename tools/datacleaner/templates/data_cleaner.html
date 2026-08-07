@@ -1553,19 +1553,21 @@ async function doSaveToAccount() {
   const btn = document.getElementById('saveToAccountBtn');
   btn.disabled = true; btn.textContent = '💾 Saving…';
   try {
-    const res = await fetch(BASE_URL + '/api/save-to-account', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken, name, program_id: _fgProgramId || null }),
-    });
+    const res = await _postSaveToAccount(name, false);
     const json = await res.json();
-    if (!res.ok) throw new Error(json.error || 'Save failed');
+    if (!res.ok) {
+      const msg = res.status === 401
+        ? 'Your session expired and could not be renewed — please log in again.'
+        : (json.error || 'Save failed');
+      throw new Error(msg);
+    }
     _toolProjectId = json.id || _toolProjectId;
     _toolProjectName = name;
     _dirty = false;
     setAutosaveStatus('Saved just now');
     toast('Saved to your account ✓');
   } catch (e) {
+    setAutosaveStatus('Not saved — check your connection or log in again', true);
     toast(e.message || 'Save failed', true);
   } finally {
     btn.disabled = false; btn.textContent = '💾 Save to Account';
@@ -1576,30 +1578,44 @@ async function doSaveToAccount() {
 // Ticks every 60s; only writes when something actually changed since the
 // last save (see the `_dirty` flag set by apiPost), and only once the user
 // is connected to a FieldGovern account (the only place saves persist to).
-function setAutosaveStatus(text) {
+function setAutosaveStatus(text, isWarning) {
   const el = document.getElementById('autosaveStatus');
   if (!el) return;
   el.textContent = text;
+  el.style.color = isWarning ? '#f87171' : 'var(--text3)';
   el.style.display = (_fgUrl && _fgToken) ? 'block' : 'none';
+}
+
+async function _postSaveToAccount(name, autosave) {
+  const body = { fg_base_url: _fgUrl, token: _fgToken, name, program_id: _fgProgramId || null, autosave };
+  let res = await fetch(BASE_URL + '/api/save-to-account', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (res.status === 401 && await _refreshFgToken()) {
+    res = await fetch(BASE_URL + '/api/save-to-account', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...body, token: _fgToken }),
+    });
+  }
+  return res;
 }
 
 async function _autosaveTick() {
   if (!_fgUrl || !_fgToken || !_dirty || !_df_loaded()) return;
   const name = _toolProjectName || (DATA_FILENAME || 'cleaned_data').replace(/\.[^.]+$/, '') + '_cleaned';
   try {
-    const res = await fetch(BASE_URL + '/api/save-to-account', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken, name, program_id: _fgProgramId || null, autosave: true }),
-    });
+    const res = await _postSaveToAccount(name, true);
     const json = await res.json();
-    if (!res.ok) return; // offline / transient error — retried on the next tick
+    if (!res.ok) {
+      setAutosaveStatus('Not saved — check your connection or log in again', true);
+      return;
+    }
     _toolProjectId = json.id || _toolProjectId;
     _toolProjectName = name;
     _dirty = false;
     setAutosaveStatus('Autosaved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
   } catch (e) {
-    // offline or server hiccup — try again next tick
+    setAutosaveStatus('Not saved — check your connection or log in again', true);
   }
 }
 function _df_loaded() { return !!DATA_FILENAME; }
@@ -2105,9 +2121,47 @@ if (_tfUrl && _tfHandoffId) {
 // ── FieldGovern integration ───────────────────────────────────────────────────
 const _fgParams    = new URLSearchParams(window.location.search);
 const _fgUrl       = _fgParams.get('fg_url');
-const _fgToken     = _fgParams.get('token');
+let   _fgToken     = _fgParams.get('token');
 const _fgProgId    = _fgParams.get('program_id');
 let   _fgProgramId = _fgProgId;   // updated when user selects a program
+
+// The token handed off at launch expires after 2h (JWT_EXPIRE_MINUTES) with no
+// way for this page to renew it on its own. But Cleaner is served same-origin
+// with the main FieldGovern app, so the main app's refresh token (localStorage,
+// 30-day validity) is directly readable here. Without this, autosave silently
+// stops working for the rest of a multi-hour or multi-day session.
+let _fgRefreshing = null;  // in-flight refresh promise, shared across callers
+async function _refreshFgToken() {
+  if (_fgRefreshing) return _fgRefreshing;
+  _fgRefreshing = (async () => {
+    try {
+      const storedRefresh = localStorage.getItem('fp_refresh_token');
+      if (!storedRefresh) return false;
+      const res = await fetch(`${_fgUrl}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: storedRefresh }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (!data.access_token) return false;
+      _fgToken = data.access_token;
+      localStorage.setItem('fp_token', data.access_token);
+      if (data.refresh_token) localStorage.setItem('fp_refresh_token', data.refresh_token);
+      try {
+        const rawUser = localStorage.getItem('fp_user');
+        if (rawUser) {
+          const user = JSON.parse(rawUser);
+          localStorage.setItem('fp_user', JSON.stringify({ ...user, access_token: data.access_token }));
+        }
+      } catch { /* non-fatal */ }
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  try { return await _fgRefreshing; } finally { _fgRefreshing = null; }
+}
 
 // Strip query params (incl. the JWT) from the URL bar once captured — keeps the
 // token out of browser history and shows a clean short URL on startup.

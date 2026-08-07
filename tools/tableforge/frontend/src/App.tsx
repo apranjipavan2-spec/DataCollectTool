@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType, TableSection, NumberingConfig, ManualColumnDef } from './types';
-import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg, getColumnRoles, bulkSetColumnRoles, saveStudyDesign, cleanerApi, buildCleanerUrl, setFgAuth, getUserHeaders } from './api';
+import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg, getColumnRoles, bulkSetColumnRoles, saveStudyDesign, cleanerApi, buildCleanerUrl, setFgAuth, getUserHeaders, getFgLoginUrl } from './api';
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
 import { LivePreview } from './components/LivePreview';
@@ -307,6 +307,7 @@ export default function App() {
   const columnTypeOverridesRef = useRef<Record<string, string>>({});
   const [statEditConfig, setStatEditConfig] = useState<{ columns: string[]; alpha: number; analysisFilters: Record<string, string[]>; useProjectFilter: boolean } | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [lastProjectHint, setLastProjectHint] = useState<string | null>(null);
   const [pendingProjectData, setPendingProjectData] = useState<any>(null);
@@ -335,19 +336,31 @@ export default function App() {
     }
   }, [tables, annotationsMap, comparisonState, projectFilters]);
 
+  // Shared autosave call — the network layer (api.ts) already retries once on
+  // an expired token, so a failure reaching here means saving is genuinely not
+  // happening (offline, refresh token also dead, server down). Surfacing that
+  // is the point: previously every autosave site swallowed the error, so a
+  // session could go unsaved for days with nothing on screen to show for it.
+  const runAutosave = useCallback(() => {
+    if (!dataset) return;
+    saveProject('__autosave__', {
+      tables, annotationsMap, comparisonState,
+      projectFilters: projectFiltersRef.current,
+      columnTypeOverrides, sections, numberingConfig, tableInterpretations,
+      dataset_id: dataset.dataset_id,
+      source_file: { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length },
+    }).then(() => {
+      setSaveError(null);
+    }).catch(() => {
+      setSaveError('Not saved — check your connection or log in again. Your current work stays on this screen.');
+    });
+  }, [dataset, tables, annotationsMap, comparisonState, columnTypeOverrides, sections, numberingConfig, tableInterpretations]);
+
   // Debounced immediate autosave for project filters (otherwise they only hit
   // disk on the 5-minute interval and reload-in-under-5-min loses them).
   useEffect(() => {
     if (!dataset) return;
-    const t = setTimeout(() => {
-      saveProject('__autosave__', {
-        tables, annotationsMap, comparisonState,
-        projectFilters: projectFiltersRef.current,
-        columnTypeOverrides, sections, numberingConfig, tableInterpretations,
-        dataset_id: dataset.dataset_id,
-        source_file: { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length },
-      }).catch(() => {});
-    }, 800);
+    const t = setTimeout(runAutosave, 800);
     return () => clearTimeout(t);
   }, [projectFilters, dataset?.dataset_id]);
 
@@ -356,15 +369,7 @@ export default function App() {
   // on the 5-minute interval, or not at all if that interval's closure is stale.
   useEffect(() => {
     if (!dataset) return;
-    const t = setTimeout(() => {
-      saveProject('__autosave__', {
-        tables, annotationsMap, comparisonState,
-        projectFilters: projectFiltersRef.current,
-        columnTypeOverrides, sections, numberingConfig, tableInterpretations,
-        dataset_id: dataset.dataset_id,
-        source_file: { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length },
-      }).catch(() => {});
-    }, 800);
+    const t = setTimeout(runAutosave, 800);
     return () => clearTimeout(t);
   }, [tableInterpretations, dataset?.dataset_id]);
 
@@ -375,15 +380,7 @@ export default function App() {
   // lost the edit. Mirrors the projectFilters/tableInterpretations effects above.
   useEffect(() => {
     if (!dataset) return;
-    const t = setTimeout(() => {
-      saveProject('__autosave__', {
-        tables, annotationsMap, comparisonState,
-        projectFilters: projectFiltersRef.current,
-        columnTypeOverrides, sections, numberingConfig, tableInterpretations,
-        dataset_id: dataset.dataset_id,
-        source_file: { filename: dataset.filename, dataset_id: dataset.dataset_id, row_count: dataset.row_count, col_count: dataset.columns?.length },
-      }).catch(() => {});
-    }, 800);
+    const t = setTimeout(runAutosave, 800);
     return () => clearTimeout(t);
   }, [tables, dataset?.dataset_id]);
 
@@ -400,7 +397,10 @@ export default function App() {
           // Update last save state and clear dirty flag
           lastSaveStateRef.current = JSON.stringify({ tables, annotationsMap, comparisonState });
           setIsDirty(false);
-        }).catch(() => {});
+          setSaveError(null);
+        }).catch(() => {
+          setSaveError('Not saved — check your connection or log in again. Your current work stays on this screen.');
+        });
       }
     }, 5 * 60 * 1000);
     return () => { if (autoSaveRef.current) clearInterval(autoSaveRef.current); };
@@ -2490,6 +2490,25 @@ export default function App() {
           )}
         </div>
       </div>
+      {saveError && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          padding: '8px 14px', background: 'rgba(220,38,38,0.15)', borderTop: '1px solid rgba(220,38,38,0.4)',
+          color: '#fca5a5', fontSize: 12,
+        }}>
+          <span>⚠ {saveError}</span>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button onClick={runAutosave}
+              style={{ background: 'rgba(220,38,38,0.25)', border: '1px solid rgba(220,38,38,0.5)', color: '#fecaca', borderRadius: 4, padding: '3px 10px', fontSize: 12, cursor: 'pointer' }}>
+              Retry save
+            </button>
+            <a href={getFgLoginUrl()} target="_blank" rel="noopener noreferrer"
+              style={{ color: '#fecaca', textDecoration: 'underline', fontSize: 12, alignSelf: 'center' }}>
+              Log in again
+            </a>
+          </div>
+        </div>
+      )}
       <StatusBar dataset={dataset} result={currentResult} undoCount={undoStack.length} redoCount={redoStack.length} />
       <LoadingOverlay loading={loading} loadingMsg={loadingMsg} uploadProgress={uploadProgress} />
       {showTour && <OnboardingTour onClose={() => setShowTour(false)} />}

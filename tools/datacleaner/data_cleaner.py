@@ -50,7 +50,7 @@ SESSION_LOCKS = {}       # sid -> threading.Lock (serialises a session's own req
 SESSION_DIRTY = set()    # sids whose state needs saving
 SESSION_SEEN = {}        # sid -> last-access epoch (for idle eviction)
 REGISTRY_LOCK = threading.Lock()
-SESSION_TTL = 12 * 3600  # drop idle sessions from memory after 12h
+SESSION_TTL = 24 * 3600  # drop idle sessions from memory after 24h (disk copy kept for later restore)
 
 def _new_state():
     return {

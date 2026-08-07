@@ -70,23 +70,102 @@ export function getFgLoginUrl(): string {
   return `${base}/login`;
 }
 
-// Inject the FG token into every same-origin /api request. Centralised here so
-// individual call sites don't each have to remember to attach auth headers — a
-// missed one previously meant that endpoint was reachable anonymously.
+// ── Silent token refresh ────────────────────────────────────────────────────
+// The token handed off at launch is a snapshot — it expires after 2h
+// (JWT_EXPIRE_MINUTES) with no way for this tool to renew it on its own. But the
+// tool is served same-origin with the main FieldGovern app, so the main app's
+// refresh token (in localStorage, 30-day validity) is directly readable here.
+// Without this, every autosave/save silently 401s for the rest of a multi-hour
+// or multi-day session.
+const FP_TOKEN_KEY = 'fp_token';
+const FP_REFRESH_KEY = 'fp_refresh_token';
+const FP_USER_KEY = 'fp_user';
+
+let _isRefreshing = false;
+let _refreshQueue: ((token: string | null) => void)[] = [];
+
+function _drainRefreshQueue(token: string | null) {
+  _refreshQueue.forEach(cb => cb(token));
+  _refreshQueue = [];
+}
+
+// `origFetch` must be the unpatched fetch — calling the patched window.fetch
+// here would recurse into this same refresh logic on a failed refresh.
+async function _refreshFgToken(origFetch: typeof window.fetch): Promise<string | null> {
+  if (_isRefreshing) {
+    return new Promise(resolve => { _refreshQueue.push(resolve); });
+  }
+  _isRefreshing = true;
+  try {
+    let storedRefresh: string | null = null;
+    try { storedRefresh = localStorage.getItem(FP_REFRESH_KEY); } catch { /* storage disabled */ }
+    if (!storedRefresh) { _drainRefreshQueue(null); return null; }
+
+    const base = (_fgBaseUrl || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '');
+    const res = await origFetch(`${base}/api/v1/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: storedRefresh }),
+    });
+    if (!res.ok) { _drainRefreshQueue(null); return null; }
+    const data = await res.json();
+    if (!data.access_token) { _drainRefreshQueue(null); return null; }
+
+    setFgAuth(data.access_token, _fgBaseUrl);
+    try {
+      localStorage.setItem(FP_TOKEN_KEY, data.access_token);
+      if (data.refresh_token) localStorage.setItem(FP_REFRESH_KEY, data.refresh_token);
+      const rawUser = localStorage.getItem(FP_USER_KEY);
+      if (rawUser) {
+        const user = JSON.parse(rawUser);
+        localStorage.setItem(FP_USER_KEY, JSON.stringify({ ...user, access_token: data.access_token }));
+      }
+    } catch { /* main-app sync failed — tool still works via sessionStorage */ }
+
+    _drainRefreshQueue(data.access_token);
+    return data.access_token;
+  } catch {
+    _drainRefreshQueue(null);
+    return null;
+  } finally {
+    _isRefreshing = false;
+  }
+}
+
+// Inject the FG token into every same-origin /api request, and transparently
+// refresh + retry once on a 401. Centralised here so individual call sites
+// don't each have to remember to attach auth headers or handle expiry — a
+// missed one previously meant that endpoint was reachable anonymously, and an
+// unhandled 401 previously meant a save silently vanished.
 if (typeof window !== 'undefined' && !(window as any).__tfFetchPatched) {
   const _origFetch = window.fetch.bind(window);
-  window.fetch = (input: any, init: any = {}) => {
+
+  const _fetchWithAuth = async (input: any, init: any = {}): Promise<Response> => {
     try {
-      const url = typeof input === 'string' ? input : (input && input.url) || '';
-      if (_fgToken && typeof url === 'string' && url.includes('/api')) {
+      const reqUrl = typeof input === 'string' ? input : (input && input.url) || '';
+      if (_fgToken && typeof reqUrl === 'string' && reqUrl.includes('/api')) {
         const h = new Headers(init.headers || (typeof input !== 'string' ? input.headers : undefined) || {});
         if (!h.has('Authorization')) h.set('Authorization', `Bearer ${_fgToken}`);
         if (_fgBaseUrl && !h.has('X-FG-Base-Url')) h.set('X-FG-Base-Url', _fgBaseUrl);
         init = { ...init, headers: h };
       }
     } catch { /* fall through to original fetch */ }
-    return _origFetch(input, init);
+
+    const res = await _origFetch(input, init);
+
+    const reqUrl = typeof input === 'string' ? input : (input && input.url) || '';
+    if (res.status === 401 && typeof reqUrl === 'string' && reqUrl.includes('/api') && !init.__tfRetried) {
+      const newToken = await _refreshFgToken(_origFetch);
+      if (newToken) {
+        const h = new Headers(init.headers || {});
+        h.set('Authorization', `Bearer ${newToken}`);
+        return _origFetch(input, { ...init, headers: h, __tfRetried: true });
+      }
+    }
+    return res;
   };
+
+  window.fetch = _fetchWithAuth as typeof window.fetch;
   (window as any).__tfFetchPatched = true;
 }
 

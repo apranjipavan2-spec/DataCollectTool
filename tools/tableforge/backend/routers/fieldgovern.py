@@ -109,6 +109,7 @@ async def import_from_fg(body: FGImportBody):
             annotations[dataset_id] = {}
             column_type_overrides[dataset_id] = {}
             add_audit_log(dataset_id, "fg_import", f"Imported from FieldGovern program {body.program_id}: {row_count} rows")
+            datasets.persist(dataset_id)
 
             result = {
                 "dataset_id": dataset_id,

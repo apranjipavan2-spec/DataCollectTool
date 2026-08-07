@@ -7,12 +7,12 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from typing import Optional
+from collections.abc import MutableMapping
 from datetime import datetime
 from pydantic import BaseModel
 from fastapi import Header, HTTPException
 
 # In-memory stores
-datasets: dict = {}
 custom_metrics: dict = {}  # dataset_id -> [metric_defs]
 custom_bins: dict = {}     # dataset_id -> [bin_defs]
 audit_logs: dict = {}      # dataset_id -> [log_entries]
@@ -46,7 +46,8 @@ SUPER_ADMIN_ROLE = "master_admin"
 # likert, mr, observer, causal, triangulate, compare, columns, bins, metrics...),
 # so it fires on real usage without needing every router edited individually.
 _dataset_last_seen: dict = {}   # dataset_id -> last-access unix time
-DATASET_IDLE_TTL = 6 * 3600     # evict a dataset after 6h with no requests touching it
+DATASET_IDLE_TTL = 24 * 3600    # evict a dataset from RAM after 24h idle (disk copy survives — see _DatasetStore)
+DATASET_DISK_TTL = 30 * 24 * 3600  # permanently delete the disk copy after 30 days idle
 
 
 def touch_dataset(dataset_id: str) -> None:
@@ -54,10 +55,120 @@ def touch_dataset(dataset_id: str) -> None:
     _dataset_last_seen[dataset_id] = time.time()
 
 
+def _dataset_parquet_path(dataset_id: str) -> Path:
+    return PARQUET_DIR / f"{dataset_id}.parquet"
+
+
+def _dataset_meta_path(dataset_id: str) -> Path:
+    return PARQUET_DIR / f"{dataset_id}.meta.json"
+
+
+class _DatasetStore(MutableMapping):
+    """`datasets[id]` cache that transparently rehydrates from disk on a miss.
+
+    A saved TableForge project only stores pivot *configs* — they point at a
+    dataset_id that used to live purely in RAM. Once idle-evicted (or the
+    process restarted), that dataset_id 404'd and the saved project became
+    unusable even though its configuration was still on disk. This store
+    flushes each dataset (+ its sidecar metadata dicts) to PARQUET_DIR on
+    write/evict, and loads it back the moment anything asks for it again —
+    every existing `datasets[id]["df"]` call site keeps working unchanged.
+    """
+
+    def __init__(self):
+        self._data: dict = {}
+
+    def __getitem__(self, key):
+        if key in self._data:
+            return self._data[key]
+        loaded = self._load_from_disk(key)
+        if loaded is None:
+            raise KeyError(key)
+        self._data[key] = loaded
+        touch_dataset(key)
+        return loaded
+
+    def __setitem__(self, key, value):
+        self._data[key] = value
+
+    def __delitem__(self, key):
+        del self._data[key]
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __len__(self):
+        return len(self._data)
+
+    def __contains__(self, key):
+        if key in self._data:
+            return True
+        try:
+            self[key]  # triggers rehydration (and sidecar restore) as a side effect
+            return True
+        except KeyError:
+            return False
+
+    def drop(self, key) -> None:
+        """Remove from RAM only — does not touch the disk copy."""
+        self._data.pop(key, None)
+
+    def persist(self, dataset_id: str) -> None:
+        """Best-effort flush of a dataset + its sidecar state to disk. Never
+        raises — persistence is a durability improvement, not a request-
+        blocking dependency."""
+        entry = self._data.get(dataset_id)
+        if not entry or entry.get("df") is None:
+            return
+        try:
+            entry["df"].to_parquet(_dataset_parquet_path(dataset_id), index=False)
+            sidecar = {
+                "meta": {k: v for k, v in entry.items() if k != "df"},
+                "custom_metrics": custom_metrics.get(dataset_id, []),
+                "custom_bins": custom_bins.get(dataset_id, []),
+                "audit_logs": audit_logs.get(dataset_id, []),
+                "annotations": annotations.get(dataset_id, {}),
+                "column_type_overrides": column_type_overrides.get(dataset_id, {}),
+                "column_roles": column_roles.get(dataset_id, {}),
+                "study_designs": study_designs.get(dataset_id, {}),
+            }
+            _dataset_meta_path(dataset_id).write_text(json.dumps(sidecar), encoding="utf-8")
+        except Exception as e:
+            print(f"[tableforge] Failed to persist dataset {dataset_id}: {e}")
+
+    def _load_from_disk(self, dataset_id: str):
+        parquet_path = _dataset_parquet_path(dataset_id)
+        meta_path = _dataset_meta_path(dataset_id)
+        if not parquet_path.exists() or not meta_path.exists():
+            return None
+        try:
+            df = pd.read_parquet(parquet_path)
+            sidecar = json.loads(meta_path.read_text(encoding="utf-8"))
+            entry = dict(sidecar.get("meta") or {})
+            entry["df"] = df
+            custom_metrics[dataset_id] = sidecar.get("custom_metrics", [])
+            custom_bins[dataset_id] = sidecar.get("custom_bins", [])
+            audit_logs[dataset_id] = sidecar.get("audit_logs", [])
+            annotations[dataset_id] = sidecar.get("annotations", {})
+            column_type_overrides[dataset_id] = sidecar.get("column_type_overrides", {})
+            column_roles[dataset_id] = sidecar.get("column_roles", {})
+            study_designs[dataset_id] = sidecar.get("study_designs", {})
+            return entry
+        except Exception as e:
+            print(f"[tableforge] Failed to rehydrate dataset {dataset_id}: {e}")
+            return None
+
+
+datasets = _DatasetStore()
+
+
 def evict_stale_datasets(max_idle_seconds: int = DATASET_IDLE_TTL) -> list:
-    """Drop datasets (and their per-dataset side tables) idle longer than the TTL.
-    A dataset with no recorded last-seen time yet (just uploaded, never touched
-    via apply_metrics_and_bins) is treated as fresh rather than evicted."""
+    """Drop datasets (and their per-dataset side tables) idle longer than the TTL
+    from RAM — flushing to disk first, so a later access transparently
+    rehydrates instead of 404ing. Also permanently deletes disk copies nobody
+    has touched in DATASET_DISK_TTL. A dataset with no recorded last-seen time
+    yet (just uploaded, never touched via apply_metrics_and_bins) is treated as
+    fresh rather than evicted."""
     import time
     now = time.time()
     removed = []
@@ -67,7 +178,8 @@ def evict_stale_datasets(max_idle_seconds: int = DATASET_IDLE_TTL) -> list:
             touch_dataset(dataset_id)
             continue
         if now - last_seen > max_idle_seconds:
-            datasets.pop(dataset_id, None)
+            datasets.persist(dataset_id)
+            datasets.drop(dataset_id)
             custom_metrics.pop(dataset_id, None)
             custom_bins.pop(dataset_id, None)
             audit_logs.pop(dataset_id, None)
@@ -78,6 +190,16 @@ def evict_stale_datasets(max_idle_seconds: int = DATASET_IDLE_TTL) -> list:
             study_designs.pop(dataset_id, None)
             _dataset_last_seen.pop(dataset_id, None)
             removed.append(dataset_id)
+
+    try:
+        for parquet_path in PARQUET_DIR.glob("*.parquet"):
+            if now - parquet_path.stat().st_mtime > DATASET_DISK_TTL:
+                dataset_id = parquet_path.stem
+                parquet_path.unlink(missing_ok=True)
+                _dataset_meta_path(dataset_id).unlink(missing_ok=True)
+    except Exception as e:
+        print(f"[tableforge] Disk dataset cleanup failed: {e}")
+
     return removed
 
 
