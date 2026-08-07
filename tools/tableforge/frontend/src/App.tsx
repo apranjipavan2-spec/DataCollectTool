@@ -729,7 +729,10 @@ export default function App() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               dataset_id: dataset.dataset_id,
-              specs: batteryConfig.specs,
+              // _batteryConfig stores `kind` once (all specs in a group share
+              // it, by construction — see groupedByKind), but each RerunSpec
+              // the backend expects needs its own `kind` field.
+              specs: batteryConfig.specs.map(s => ({ ...s, kind: batteryConfig.kind })),
               correction: batteryConfig.correction,
               filters: newProjectFilters,
             }),
