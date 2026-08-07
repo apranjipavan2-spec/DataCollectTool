@@ -198,6 +198,19 @@ export interface TableConfig {
     datasetId?: string;
     computedAt?: string;
   };
+  // Recipe for a table promoted from the Auto-Analyze battery (single result
+  // or combined via combineResults) — stores the EXACT specs that were run
+  // (kind + per-outcome params) so reload can replay them via /rerun-specs
+  // instead of re-planning, which could pick a different test if the
+  // underlying data changed shape. See combineResults.ts for the row-union
+  // logic shared between promote-time and reload-time.
+  _batteryConfig?: {
+    kind: string;
+    correction: string;
+    specs: Array<{ outcome: string | null; params: Record<string, any>; label: string }>;
+    datasetId?: string;
+    computedAt?: string;
+  };
   bg_color?: string;           // Values area background color
   header_bg_color?: string;    // Header row background color
   header_text_color?: string;  // Header text color

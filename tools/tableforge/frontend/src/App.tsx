@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType, TableSection, NumberingConfig, ManualColumnDef } from './types';
 import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg, getColumnRoles, bulkSetColumnRoles, saveStudyDesign, cleanerApi, buildCleanerUrl, setFgAuth, getUserHeaders, getFgLoginUrl } from './api';
+import { combineResults, BatteryConfig } from './lib/combineResults';
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
 import { LivePreview } from './components/LivePreview';
@@ -716,6 +717,47 @@ export default function App() {
     const total = statTables.length;
     let cursor = 0;
     const runOne = async (t: TableConfig) => {
+      // Battery-derived tables (single promote or combine-into-one-table) carry
+      // an exact recipe of {kind, params} per outcome — replay those specs
+      // directly rather than falling through to _statConfig/title-guessing,
+      // which can't parse a multi-variable combined title at all.
+      const batteryConfig = (t as any)._batteryConfig as BatteryConfig | undefined;
+      if (batteryConfig) {
+        try {
+          const res = await fetch(`${API_BASE}/analyze/rerun-specs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              dataset_id: dataset.dataset_id,
+              specs: batteryConfig.specs,
+              correction: batteryConfig.correction,
+              filters: newProjectFilters,
+            }),
+          });
+          if (!res.ok) { skipped++; return; }
+          const data = await res.json();
+          const { headers, rows, interpretation } = combineResults(data.results || []);
+          setTables(prev => prev.map(p => {
+            if (p.id !== t.id) return p;
+            const prevCfg = (p as any)._batteryConfig;
+            return {
+              ...p,
+              _statResultData: { headers, rows },
+              subtitle: interpretation,
+              ...(prevCfg ? { _batteryConfig: { ...prevCfg, datasetId: dataset.dataset_id, computedAt: new Date().toISOString() } } : {}),
+            } as any;
+          }));
+          setResults(prev => {
+            const next = new Map(prev);
+            next.set(t.id, { headers, rows, row_count: rows.length, col_count: headers.length });
+            return next;
+          });
+          refreshed++;
+        } catch { skipped++; }
+        if (!silent) setLoadingMsg(`Refreshing stat tables… ${refreshed + skipped}/${statTables.length}`);
+        return;
+      }
+
       let statType: string | null = null;
       let columns: string[] = [];
       let alpha = 0.05;
@@ -2793,7 +2835,7 @@ export default function App() {
           projectFilters={projectFilters}
           onPackReady={(pack) => setLastAnalysisPack(pack)}
           onClose={() => setModal(null)}
-          onPromote={(label, headers, rows, interpretation) => {
+          onPromote={(label, headers, rows, interpretation, recipe) => {
             const id = String(Date.now() + Math.floor(Math.random() * 1000));
             pushUndo();
             const empty = createEmptyTable(id, label.slice(0, 30));
@@ -2801,6 +2843,12 @@ export default function App() {
             empty.subtitle = interpretation;
             empty._statResult = true;
             empty._statResultData = { headers, rows };
+            // Stores the exact specs behind this result so rerunStatTables can
+            // replay it on reload instead of falling through to title-guessing
+            // (which can't parse a combined multi-variable title at all).
+            if (recipe) {
+              (empty as any)._batteryConfig = { ...recipe, datasetId: dataset?.dataset_id, computedAt: new Date().toISOString() };
+            }
             setTables(prev => [...prev, empty]);
             setResults(prev => {
               const next = new Map(prev);

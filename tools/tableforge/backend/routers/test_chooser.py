@@ -68,16 +68,19 @@ def plan_battery(
     predictor_cols: list[str] | None,
     roles: dict[str, dict],
     design: dict | None,
-) -> list[dict]:
-    """Return a list of analysis specs to execute.
+) -> dict:
+    """Return the analysis specs to execute, plus which outcome/predictor
+    pairs were considered but produced no test and why.
 
-    Each spec: {id, kind, outcome, predictors, params, label}.
+    {"specs": [{id, kind, outcome, predictors, params, label}, ...],
+     "skipped": [{outcome, predictor, reason}, ...]}
     """
     design = design or {}
     predictor_cols = [c for c in (predictor_cols or []) if c in df.columns]
     outcome_cols = [c for c in outcome_cols if c in df.columns]
 
     specs: list[dict] = []
+    skipped: list[dict] = []
     counter = [0]
 
     def add(kind: str, outcome: str | None, predictors: list[str] | None,
@@ -91,6 +94,9 @@ def plan_battery(
             "params": params,
             "label": label,
         })
+
+    def skip(outcome: str | None, predictor: str | None, reason: str) -> None:
+        skipped.append({"outcome": outcome, "predictor": predictor, "reason": reason})
 
     # 1) Descriptives for every outcome
     for o in outcome_cols:
@@ -130,6 +136,8 @@ def plan_battery(
                 add("mr_by_group", o, [group],
                     {"mr_col": o, "group_col": group, "correction": "fdr_bh"},
                     f"Multi-response by {group} — {o}")
+            else:
+                skip(o, None, "Multi-response column needs a treatment/group column to compare against (none set in Study Design and no predictor selected).")
             continue
 
         used_predictors = []
@@ -139,6 +147,7 @@ def plan_battery(
             p_role = roles.get(p, {})
             p_scale = infer_scale(df[p], p_role)
             used_predictors.append((p, p_scale))
+            specs_before = len(specs)
 
             # binary outcome
             if o_scale == "binary":
@@ -211,6 +220,20 @@ def plan_battery(
                             {"value_col": p, "group_col": o, "posthoc": "tukey"},
                             f"ANOVA + Tukey HSD — {p} by {o}")
 
+            # Every branch above only calls add() for scale combinations with a
+            # valid test, or group counts of 2+ (needed to compare anything).
+            # If nothing was added for this pair, record why rather than the
+            # column silently vanishing from the results with no explanation.
+            if len(specs) == specs_before:
+                if o_scale == "multi_response" or p_scale == "multi_response":
+                    skip(o, p, "Multi-response columns can't be paired directly with another column this way.")
+                elif o_scale == "continuous" and p_scale in ("categorical", "binary") and int(df[p].nunique(dropna=True)) < 2:
+                    skip(o, p, f"'{p}' has fewer than 2 groups after removing missing values — nothing to compare.")
+                elif o_scale == "categorical" and p_scale in ("continuous", "likert") and int(df[o].nunique(dropna=True)) < 2:
+                    skip(o, p, f"'{o}' has fewer than 2 groups after removing missing values — nothing to compare.")
+                else:
+                    skip(o, p, f"No applicable test for a {o_scale} outcome vs. a {p_scale} predictor.")
+
         # 4) Multivariate model for outcome with ≥2 numeric/binary predictors
         num_or_bin = [p for p, s in used_predictors if s in ("continuous", "likert", "binary")]
         if len(num_or_bin) >= 2:
@@ -231,4 +254,4 @@ def plan_battery(
             {"item_cols": likert_items},
             f"Cronbach's α — {len(likert_items)} Likert items")
 
-    return specs
+    return {"specs": specs, "skipped": skipped}

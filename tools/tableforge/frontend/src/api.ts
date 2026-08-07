@@ -895,6 +895,12 @@ export async function planBattery(config: AutoAnalyzeConfig) {
   return postStat('/analyze/plan', config);
 }
 
+export interface SkippedColumn {
+  outcome: string | null;
+  predictor: string | null;
+  reason: string;
+}
+
 export interface BatteryProgress {
   step: 'start' | 'progress' | 'done';
   idx?: number;
@@ -904,6 +910,9 @@ export interface BatteryProgress {
   p_raw?: number | null;
   error?: string;
   skipped?: boolean;
+  /** Only present on the 'start' event — outcome/predictor pairs the planner
+   * considered but found no applicable test for, and why. */
+  skipped_columns?: SkippedColumn[];
   results?: any[];
   correction?: string;
   design_used?: boolean;

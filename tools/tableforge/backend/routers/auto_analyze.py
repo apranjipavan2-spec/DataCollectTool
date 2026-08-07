@@ -539,8 +539,8 @@ async def plan_only(config: AutoAnalyzeConfig):
             df = df[df[col].astype(str).isin([str(v) for v in vals])]
     roles = column_roles.get(config.dataset_id, {})
     design = study_designs.get(config.dataset_id, {}) if config.use_design else {}
-    plan = plan_battery(df, config.outcome_cols, config.predictor_cols, roles, design)
-    return {"plan": plan, "total": len(plan), "design_used": bool(design)}
+    planned = plan_battery(df, config.outcome_cols, config.predictor_cols, roles, design)
+    return {"plan": planned["specs"], "skipped": planned["skipped"], "total": len(planned["specs"]), "design_used": bool(design)}
 
 
 @router.post("/api/analyze/auto-battery")
@@ -556,13 +556,15 @@ async def auto_battery(config: AutoAnalyzeConfig):
             df = df[df[col].astype(str).isin([str(v) for v in vals])]
     roles = column_roles.get(config.dataset_id, {})
     design = study_designs.get(config.dataset_id, {}) if config.use_design else {}
-    plan = plan_battery(df, config.outcome_cols, config.predictor_cols, roles, design)
+    planned = plan_battery(df, config.outcome_cols, config.predictor_cols, roles, design)
+    plan = planned["specs"]
+    plan_skipped = planned["skipped"]
 
     def stream():
         results: list[dict] = []
         pvals_index: list[tuple[int, float]] = []
         total = len(plan)
-        yield f"data: {json.dumps({'step': 'start', 'total': total, 'design_used': bool(design)})}\n\n"
+        yield f"data: {json.dumps({'step': 'start', 'total': total, 'design_used': bool(design), 'skipped_columns': plan_skipped})}\n\n"
 
         for idx, spec in enumerate(plan, start=1):
             kind = spec["kind"]
@@ -602,6 +604,72 @@ async def auto_battery(config: AutoAnalyzeConfig):
         yield f"data: {json.dumps({'step': 'done', 'total': total, 'results': sanitized, 'correction': config.correction})}\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+class RerunSpec(BaseModel):
+    kind: str
+    outcome: str | None = None
+    params: dict
+    label: str = ""
+
+
+class RerunSpecsConfig(BaseModel):
+    dataset_id: str
+    specs: list[RerunSpec]
+    correction: str = "fdr_bh"
+    filters: dict = {}
+
+
+@router.post("/api/analyze/rerun-specs")
+async def rerun_specs(config: RerunSpecsConfig):
+    """Replay the EXACT specs a project last saved (a promoted battery result,
+    single or combined) against current data — used on project reload/refresh.
+
+    Deliberately does NOT re-plan via plan_battery: re-inferring column scales
+    against current data could pick a different test than what the user
+    actually saved (e.g. if a column's distribution changed shape), silently
+    showing them a different analysis than the one in their project. This
+    replays the same kind+params, only the data underneath is fresh.
+    """
+    if config.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+
+    df = datasets[config.dataset_id]["df"].copy()
+    df = apply_metrics_and_bins(df, config.dataset_id)
+    for col, vals in (config.filters or {}).items():
+        if vals and col in df.columns:
+            df = df[df[col].astype(str).isin([str(v) for v in vals])]
+
+    results: list[dict] = []
+    pvals_index: list[tuple[int, float]] = []
+    for spec in config.specs:
+        executor = EXECUTORS.get(spec.kind)
+        base = {"kind": spec.kind, "outcome": spec.outcome, "label": spec.label, "params": spec.params}
+        if executor is None:
+            results.append({**base, "table": {"headers": [], "rows": []}, "test": {},
+                            "interpretation": f"No executor for {spec.kind}", "warnings": ["missing executor"]})
+            continue
+        try:
+            payload = executor(df, spec.params)
+            merged = {**base, **payload}
+            p_raw = (payload.get("test") or {}).get("p_raw")
+            if isinstance(p_raw, (int, float)) and not (isinstance(p_raw, float) and math.isnan(p_raw)):
+                pvals_index.append((len(results), float(p_raw)))
+            results.append(merged)
+        except Exception as e:
+            traceback.print_exc()
+            results.append({**base, "table": {"headers": [], "rows": []}, "test": {},
+                            "interpretation": f"Error: {e}", "warnings": [str(e)]})
+
+    if pvals_index and config.correction != "none":
+        raw = [p for _, p in pvals_index]
+        adj = iu.correct_pvalues(raw, config.correction)
+        for (ri, _), adj_p in zip(pvals_index, adj):
+            results[ri].setdefault("test", {})["p_adj"] = iu.safe_round(adj_p, 6)
+            results[ri]["test"]["p_adj_method"] = config.correction
+            results[ri]["test"]["sig"] = iu.sig_stars(adj_p)
+
+    return {"results": sanitize_for_json(results)}
 
 
 # ───────────────────────── AI Executive Summary ─────────────────────────

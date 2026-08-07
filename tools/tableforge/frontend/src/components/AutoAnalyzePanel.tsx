@@ -1,8 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole, TableResult } from '../types';
-import { runAutoBattery, planBattery, BatteryProgress } from '../api';
+import { runAutoBattery, planBattery, BatteryProgress, SkippedColumn } from '../api';
 import { ColPicker } from './ColPicker';
 import { ProjectFilterBanner } from './ProjectFilterBanner';
+import { STAT_TITLES } from './StatisticalTables';
+import { combineResults, buildBatteryRecipe, BatteryConfig } from '../lib/combineResults';
+
+// A handful of battery `kind` values don't have a STAT_TITLES entry (that map
+// is keyed by the Statistics-tab stat type, not every battery executor).
+function humanKindLabel(kind: string): string {
+  return STAT_TITLES[kind] || kind.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+}
 
 interface Props {
   datasetId: string;
@@ -10,7 +18,7 @@ interface Props {
   columnRoles?: Record<string, ColumnRole>;
   projectFilters?: Record<string, string[]>;
   onClose: () => void;
-  onPromote?: (label: string, headers: string[], rows: any[][], interpretation: string) => void;
+  onPromote?: (label: string, headers: string[], rows: any[][], interpretation: string, recipe?: Omit<BatteryConfig, 'datasetId' | 'computedAt'>) => void;
   onPackReady?: (pack: any[]) => void;
 }
 
@@ -24,6 +32,8 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
 
   const [planLoading, setPlanLoading] = useState(false);
   const [plan, setPlan] = useState<any[] | null>(null);
+  const [skippedColumns, setSkippedColumns] = useState<SkippedColumn[]>([]);
+  const [showSkipped, setShowSkipped] = useState(false);
 
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ idx: number; total: number; label: string }>({ idx: 0, total: 0, label: '' });
@@ -53,6 +63,7 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
     setter(p => (p.includes(val) ? p.filter(x => x !== val) : [...p, val]));
     setPlan(null);
     setResults(null);
+    setSkippedColumns([]);
   };
 
   const doPlan = async () => {
@@ -64,6 +75,7 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
         correction, use_design: useDesign, filters: projectFilters || {},
       }) as any;
       setPlan(r.plan);
+      setSkippedColumns(r.skipped || []);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -83,6 +95,7 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
         (e: BatteryProgress) => {
           if (e.step === 'start') {
             setProgress({ idx: 0, total: e.total || 0, label: 'Starting…' });
+            setSkippedColumns(e.skipped_columns || []);
           } else if (e.step === 'progress') {
             setProgress({ idx: e.idx || 0, total: e.total || 0, label: e.label || '' });
           } else if (e.step === 'done') {
@@ -109,9 +122,34 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
     return out;
   }, [results]);
 
+  // Every result's `kind` maps 1:1 to a single backend executor (see
+  // EXECUTORS in auto_analyze.py), so same-kind results are guaranteed to
+  // share the same table.headers shape — safe to union their rows. Skip
+  // results with an empty table (executor error/skip) rather than silently
+  // corrupting the combined table with a blank row.
+  const groupedByKind = useMemo(() => {
+    if (!results) return null;
+    const out: Record<string, any[]> = {};
+    for (const r of results) {
+      if (!r.table?.headers?.length) continue;
+      (out[r.kind] = out[r.kind] || []).push(r);
+    }
+    return out;
+  }, [results]);
+
   const promote = (r: any) => {
     if (!onPromote || !r?.table) return;
-    onPromote(r.label, r.table.headers || [], r.table.rows || [], r.interpretation || '');
+    const recipe = buildBatteryRecipe(r.kind, correction, [r]);
+    onPromote(r.label, r.table.headers || [], r.table.rows || [], r.interpretation || '', recipe);
+  };
+
+  const combineGroup = (kind: string) => {
+    const group = groupedByKind?.[kind];
+    if (!onPromote || !group?.length) return;
+    const { headers, rows, interpretation } = combineResults(group);
+    const recipe = buildBatteryRecipe(kind, correction, group);
+    const label = `${humanKindLabel(kind)} — Combined (${group.length} variables)`;
+    onPromote(label, headers, rows, interpretation, recipe);
   };
 
   const toggleExpand = (id: string) => {
@@ -263,6 +301,25 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
             </div>
           )}
 
+          {skippedColumns.length > 0 && !results && (
+            <div style={{ marginBottom: 12, padding: 10, background: 'var(--bg-alt, #1e293b)', borderRadius: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                onClick={() => setShowSkipped(s => !s)}>
+                <span style={{ fontSize: 10 }}>{showSkipped ? '▾' : '▸'}</span>
+                {skippedColumns.length} column pair{skippedColumns.length === 1 ? '' : 's'} won't be tested — why
+              </div>
+              {showSkipped && (
+                <div style={{ maxHeight: 200, overflow: 'auto', marginTop: 6 }}>
+                  {skippedColumns.map((s, i) => (
+                    <div key={i} style={{ fontSize: 11, padding: '3px 4px', color: 'var(--text-dim)' }}>
+                      <strong>{s.outcome}{s.predictor ? ` × ${s.predictor}` : ''}</strong>: {s.reason}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {running && (
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 11, marginBottom: 4 }}>
@@ -282,6 +339,22 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
                 Pack — {results?.length} tests · correction = {correction}
               </div>
+
+              {groupedByKind && Object.values(groupedByKind).some(g => g.length > 1) && (
+                <div style={{ marginBottom: 16, padding: 10, background: 'var(--bg-alt, #1e293b)', borderRadius: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
+                    Same test across multiple variables — combine into one table:
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {Object.entries(groupedByKind).filter(([, g]) => g.length > 1).map(([kind, g]) => (
+                      <button key={kind} className="btn-small" onClick={() => combineGroup(kind)}>
+                        Combine {g.length} {humanKindLabel(kind)} results →
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {Object.entries(grouped).map(([outcome, items]) => (
                 <div key={outcome} style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent, #3b82f6)', marginBottom: 6 }}>
