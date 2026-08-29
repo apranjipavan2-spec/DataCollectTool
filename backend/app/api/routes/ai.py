@@ -432,6 +432,8 @@ async def generate_form(
                     study_type=study_type,
                     reference_schemas=ref_schemas,
                 )
+                from app.api.routes.forms import _validate_schema_formulas
+                _validate_schema_formulas(result["schema"])
                 form_rec.json_schema = result["schema"]
                 form_rec.title = result.get("title", "Generated Form")
                 form_rec.generation_status = "done"

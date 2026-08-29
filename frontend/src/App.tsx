@@ -79,11 +79,15 @@ function RoleHome() {
 function SessionTimeoutManager() {
   const user = getStoredUser()
 
-  const handleExpire = () => {
+  // Re-touch whichever draft was last being edited (via the active-draft
+  // pointer), preserving its own formId — re-saving under a hardcoded `null`
+  // would silently reassign an in-progress *existing* form's draft to the
+  // "new form" bucket, orphaning it from the form it actually belongs to.
+  const touchActiveDraft = () => {
     const draft = loadFormDraft()
     if (draft) saveFormDraft(draft.schema, draft.formId)
-    logout()
   }
+  const handleExpire = () => { touchActiveDraft(); logout() }
 
   const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000
 
@@ -99,7 +103,7 @@ function SessionTimeoutManager() {
     <SessionTimeoutModal
       remaining={remaining}
       onExtend={extend}
-      onLogout={() => { saveFormDraft(loadFormDraft()?.schema ?? { title:'', sections:[], version:1 }, null); logout() }}
+      onLogout={() => { touchActiveDraft(); logout() }}
     />
   )
 }

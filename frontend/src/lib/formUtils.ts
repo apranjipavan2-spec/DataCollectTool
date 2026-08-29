@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
-import type { FormField, FormSection, FormSchema, SkipCondition, FieldType, ConditionGroup } from '@/types/form'
+import { Parser, type Value } from 'expr-eval'
+import type { FormField, FormSection, FormSchema, SkipCondition, SkipLogic, FieldType, ConditionGroup } from '@/types/form'
 import { isConditionGroup } from '@/types/form'
 
 export function newField(type: FieldType): FormField {
@@ -69,38 +70,54 @@ function evaluateCondition(c: SkipCondition, values: Record<string, unknown>): b
   }
 }
 
+function toNumber(x: unknown): number {
+  const n = Number(x)
+  return isNaN(n) ? 0 : n
+}
+
+/**
+ * Build a formula parser with the helper functions available to authors:
+ * if(), sum(), round(), abs(), max(), min(), concat(), len(), contains(), num(), text().
+ * `if`, `max`, `min` are expr-eval built-ins with matching semantics; `round`/`abs` are
+ * expr-eval unary ops by default (arity 1) so they're removed before being redefined
+ * to accept the arities this formula language uses.
+ */
+function makeFormulaParser(): Parser {
+  const parser = new Parser()
+  delete parser.unaryOps.round
+  delete parser.unaryOps.abs
+  parser.functions.sum      = (...a: unknown[]) => a.reduce((acc: number, x) => acc + toNumber(x), 0)
+  parser.functions.round    = (n: unknown, d: unknown) => Number(toNumber(n).toFixed(toNumber(d ?? 0)))
+  parser.functions.abs      = (n: unknown) => Math.abs(toNumber(n))
+  parser.functions.concat   = (...a: unknown[]) => a.map(x => String(x ?? '')).join('')
+  parser.functions.len      = (s: unknown) => String(s ?? '').length
+  parser.functions.contains = (hay: unknown, needle: unknown) =>
+    String(hay ?? '').toLowerCase().includes(String(needle ?? '').toLowerCase())
+  parser.functions.num  = (s: unknown) => toNumber(s)
+  parser.functions.text = (n: unknown) => String(n ?? '')
+  return parser
+}
+
 /**
  * Evaluate a formula string against field values.
  * Supports: arithmetic, string comparisons, if(cond, then, else),
  * sum(), round(), abs(), max(), min().
  * Returns a string or number (or null on error).
+ *
+ * Parsed and evaluated with expr-eval (no `eval`/`new Function`) — formulas are
+ * author-controlled but run in every enumerator's browser at data-collection time,
+ * so this must never be able to reach arbitrary JS (DOM, fetch, localStorage, etc).
  */
 export function evalFormula(formula: string, values: Record<string, unknown>): string | number | null {
   try {
-    // Build scope: field values + built-in helpers
-    const scope: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(values)) {
-      // Keep strings as strings; coerce empty/null to 0 for numeric ops
-      scope[k] = v ?? ''
+    const parser = makeFormulaParser()
+    const expr = parser.parse(formula)
+    const scope: Record<string, Value> = {}
+    for (const key of expr.variables()) {
+      const v = values[key]
+      scope[key] = typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)) ? Number(v) : String(v ?? '')
     }
-    // Helper functions available in formulas
-    scope['if']    = (cond: unknown, t: unknown, f: unknown) => cond ? t : f
-    scope['sum']   = (...a: unknown[]) => a.reduce((acc: number, x) => acc + Number(x), 0)
-    scope['round'] = (n: unknown, d = 0) => Number(Number(n).toFixed(Number(d)))
-    scope['abs']   = (n: unknown) => Math.abs(Number(n))
-    scope['max']   = (...a: unknown[]) => Math.max(...a.map(Number))
-    scope['min']   = (...a: unknown[]) => Math.min(...a.map(Number))
-    scope['concat']   = (...a: unknown[]) => a.join('')
-    scope['len']      = (s: unknown) => String(s ?? '').length
-    scope['contains'] = (hay: unknown, needle: unknown) =>
-      String(hay ?? '').toLowerCase().includes(String(needle ?? '').toLowerCase())
-    scope['num']   = (s: unknown) => Number(s)
-    scope['text']  = (n: unknown) => String(n ?? '')
-
-    const keys = Object.keys(scope)
-    const vals = keys.map(k => scope[k])
-    // eslint-disable-next-line no-new-func
-    const result = new Function(...keys, `"use strict"; return (${formula})`)(...vals)
+    const result = expr.evaluate(scope)
     if (result === null || result === undefined) return null
     // Trim trailing decimals for clean display
     if (typeof result === 'number' && !isNaN(result)) {

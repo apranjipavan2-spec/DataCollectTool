@@ -193,7 +193,7 @@ export default function FormBuilder() {
         .catch(err => setFormLoadError(err.response?.data?.detail ?? 'Failed to load form'))
         .finally(() => { setFormLoading(false); isInitRef.current = false })
     } else {
-      const saved = loadFormDraft()
+      const saved = loadFormDraft(null)
       if (saved && saved.schema?.sections?.length) setDraft(saved)
       isInitRef.current = false
     }
@@ -217,7 +217,7 @@ export default function FormBuilder() {
     setDraft(null)
     toast.success('Draft restored')
   }
-  const handleDismissDraft = () => { clearFormDraft(); setDraft(null) }
+  const handleDismissDraft = () => { clearFormDraft(formId); setDraft(null) }
 
   // ── Section helpers ───────────────────────────────────────────────────────
   const toggleCollapse = (id: string) =>
@@ -379,7 +379,7 @@ export default function FormBuilder() {
       setSelectedSection(sections[0].id)
       setSelectedField(null)
       setDraft(null)
-      clearFormDraft()
+      clearFormDraft(formId)
       const totalFields = sections.reduce((n, s) => n + s.fields.length, 0)
       setImportSummary({ title: imported.title, sections: sections.length, fields: totalFields })
       toast.success(`Imported: ${sections.length} sections, ${totalFields} fields`)
@@ -412,7 +412,7 @@ export default function FormBuilder() {
         setFormId(data.id)
       }
       setSaved(true)
-      clearFormDraft()
+      clearFormDraft(formId)
       setDraft(null)
       toast.success('Form saved')
       setTimeout(() => setSaved(false), 2000)
@@ -859,7 +859,7 @@ function SectionEditor({ section, schema, onTitleChange, onSkipLogicChange, onAd
     const traverse = (secs: FormSection[]): boolean => {
       for (const sec of secs) {
         if (sec.id === section.id) return true
-        result.push(...sec.fields)
+        result.push(...sec.fields.filter(f => f.type !== 'note'))
         if (sec.subsections?.length && traverse(sec.subsections)) return true
       }
       return false

@@ -262,7 +262,7 @@ export default function SkipLogicEditor({ field, sections, onChange, prevFieldsO
       for (const sec of secs) {
         for (const f of sec.fields) {
           if (f.id === field.id) return true
-          result.push(f)
+          if (f.type !== 'note') result.push(f)
         }
         if (sec.subsections?.length && traverse(sec.subsections)) return true
       }

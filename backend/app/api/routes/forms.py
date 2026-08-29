@@ -1,4 +1,5 @@
 import hashlib
+import re
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from app.core.rate_limit import limiter
 from pydantic import BaseModel
@@ -131,6 +132,39 @@ def _snapshot_version(db: Session, form: Form) -> FormVersion:
     return fv
 
 
+# Mirrors the grammar frontend's evalFormula (frontend/src/lib/formUtils.ts)
+# actually supports — kept in sync manually if that grammar changes.
+_FORMULA_ALLOWED_CHARS = re.compile(r'^[\w\s()+\-*/%.,<>=!&|"\'?:]*$')
+_FORMULA_KNOWN_FUNCS = {"if", "sum", "round", "abs", "max", "min", "concat", "len", "contains", "num", "text"}
+_FORMULA_FUNC_CALL = re.compile(r'([A-Za-z_][A-Za-z0-9_]*)\s*\(')
+
+
+def _validate_schema_formulas(schema: dict[str, Any]) -> None:
+    """Reject a save if any calculated-field formula is malformed.
+
+    The builder UI only ever produces well-formed formulas (validated client-side
+    via expr-eval), but this route accepts json_schema directly, so a raw API call
+    could push a broken formula that silently fails for every enumerator who
+    later opens the form. This isn't a sandboxing check — expr-eval already runs
+    formulas safely — it's a guard against corrupt schemas reaching the renderer.
+    """
+    for key, field in _extract_field_keys(schema).items():
+        if field.get("type") != "calculated":
+            continue
+        formula = field.get("formula")
+        if not formula:
+            continue
+        if not isinstance(formula, str) or not formula.strip():
+            raise ValueError(f"Field '{key}': formula must be a non-empty string")
+        if not _FORMULA_ALLOWED_CHARS.match(formula):
+            raise ValueError(f"Field '{key}': formula contains disallowed characters")
+        if formula.count("(") != formula.count(")"):
+            raise ValueError(f"Field '{key}': unbalanced parentheses in formula")
+        for fn in _FORMULA_FUNC_CALL.findall(formula):
+            if fn not in _FORMULA_KNOWN_FUNCS:
+                raise ValueError(f"Field '{key}': unknown function '{fn}()' in formula")
+
+
 def _get_form_for_tenant(db: Session, form_id: str, tenant_id: str) -> Form:
     form = db.query(Form).filter(
         Form.id == form_id, Form.tenant_id == tenant_id
@@ -170,6 +204,10 @@ def list_forms(
 @router.post("/", status_code=status.HTTP_201_CREATED)
 @limiter.limit("20/minute")
 def create_form(request: Request, body: FormCreate, user=Depends(require_org_admin), db: Session = Depends(get_db)):
+    try:
+        _validate_schema_formulas(body.json_schema)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
     # Forms are created as drafts — the active-forms limit is checked at activation time.
     form = Form(
         tenant_id=user["tenant_id"],
@@ -215,6 +253,10 @@ def update_form(form_id: str, body: FormUpdate, user=Depends(require_org_admin),
         form.title = body.title
 
     if body.json_schema is not None:
+        try:
+            _validate_schema_formulas(body.json_schema)
+        except ValueError as e:
+            raise HTTPException(422, str(e))
         # Increment version and snapshot the new schema
         form.version += 1
         form.json_schema = body.json_schema

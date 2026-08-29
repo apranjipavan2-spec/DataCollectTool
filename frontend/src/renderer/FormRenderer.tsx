@@ -83,7 +83,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
   const auditStreamRef = useRef<MediaStream | null>(null)
 
   // Flatten visible fields — respects both section-level and field-level skip logic
-  const allFields: FormField[] = (() => {
+  const allFields: FormField[] = useMemo(() => {
     const result: FormField[] = []
     const traverse = (secs: typeof schema.sections) => {
       for (const sec of secs) {
@@ -97,14 +97,18 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
     }
     traverse(schema.sections)
     return result
-  })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schema, draft.values])
 
   // Auto-compute calculated fields in document order so later calcs can use earlier ones
-  const valuesWithCalc = { ...draft.values }
-  allFields.filter(f => f.type === 'calculated' && f.formula).forEach(f => {
-    const result = evalFormula(f.formula!, valuesWithCalc)
-    if (result !== null) valuesWithCalc[f.name] = result
-  })
+  const valuesWithCalc = useMemo(() => {
+    const values = { ...draft.values }
+    allFields.filter(f => f.type === 'calculated' && f.formula).forEach(f => {
+      const result = evalFormula(f.formula!, values)
+      if (result !== null) values[f.name] = result
+    })
+    return values
+  }, [allFields, draft.values])
 
   const currentField = allFields[page]
 
