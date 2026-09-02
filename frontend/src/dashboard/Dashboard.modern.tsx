@@ -448,7 +448,7 @@ function SubmissionDetailModal({
 // ── Assign Modal ───────────────────────────────────────────────────────────
 
 function AssignModal({
-  form, team, assignments, onAssign, onUnassign, onClose,
+  form, team, assignments, onAssign, onUnassign, onClose, onRefresh,
 }: {
   form: Form
   team: TeamMember[]
@@ -456,9 +456,11 @@ function AssignModal({
   onAssign: (enumeratorId: string) => Promise<void>
   onUnassign: (assignmentId: string) => Promise<void>
   onClose: () => void
+  onRefresh?: () => Promise<boolean>
 }) {
   const [busy, setBusy] = useState('')
   const [assigningAll, setAssigningAll] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const assignedIds = new Set(assignments.map(a => a.enumerator_id))
   const enumeratorCount = team.filter(u => u.role === 'enumerator').length
   const unassigned = team.filter(u => u.role === 'enumerator' && !assignedIds.has(u.id))
@@ -514,15 +516,27 @@ function AssignModal({
             <h4 className="text-xs font-medium text-catalan-textMuted uppercase tracking-wider">
               Available ({unassigned.length})
             </h4>
-            {unassigned.length > 1 && (
-              <button
-                onClick={handleAssignAll}
-                disabled={assigningAll || !!busy}
-                className="text-xs px-2.5 py-1 rounded border border-catalan-success/30 text-catalan-success hover:bg-catalan-success/10 disabled:opacity-50 transition-colors"
-              >
-                {assigningAll ? 'Assigning…' : 'Assign All'}
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {onRefresh && (
+                <button
+                  onClick={async () => { setRefreshing(true); try { await onRefresh() } finally { setRefreshing(false) } }}
+                  disabled={refreshing}
+                  className="text-xs px-2.5 py-1 rounded border border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary disabled:opacity-50 transition-colors"
+                  title="Reload the team list"
+                >
+                  {refreshing ? 'Refreshing…' : '↻ Refresh'}
+                </button>
+              )}
+              {unassigned.length > 1 && (
+                <button
+                  onClick={handleAssignAll}
+                  disabled={assigningAll || !!busy}
+                  className="text-xs px-2.5 py-1 rounded border border-catalan-success/30 text-catalan-success hover:bg-catalan-success/10 disabled:opacity-50 transition-colors"
+                >
+                  {assigningAll ? 'Assigning…' : 'Assign All'}
+                </button>
+              )}
+            </div>
           </div>
           {unassigned.length === 0 ? (
             <p className="text-sm text-catalan-textMuted">
@@ -811,7 +825,9 @@ export default function Dashboard() {
   useEffect(() => {
     if (isEnumerator) return
     if (tab === 'team' && team.length === 0) {
-      api.get('/users/?page_size=200').then(r => setTeam(r.data.items ?? r.data.users ?? [])).catch(() => {})
+      api.get('/users/?page_size=200')
+        .then(r => setTeam(r.data.items ?? r.data.users ?? []))
+        .catch(() => toast.error('Could not load your team list. Use the Refresh button or reload the page.'))
       api.get('/assignments/').then(r => setAssignments(r.data ?? [])).catch(() => {})
     }
   }, [tab])
@@ -1153,6 +1169,22 @@ export default function Dashboard() {
     }
   }
 
+  // Pull the team list fresh, with one retry — used on mount, on Assign-open, and
+  // by the Refresh button. Surfaces failures instead of silently showing an empty list.
+  const refreshTeam = async (): Promise<boolean> => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await api.get('/users/?page_size=200')
+        setTeam(r.data.items ?? r.data.users ?? [])
+        return true
+      } catch {
+        if (attempt === 0) await new Promise(res => setTimeout(res, 600))
+      }
+    }
+    toast.error('Could not load your team list. Check your connection and use Refresh.')
+    return false
+  }
+
   const handleExportSheets = async () => {
     if (!filterForm) { toast.warning('Select a form to export to Sheets'); return }
     setExportingSheets(true)
@@ -1469,6 +1501,7 @@ export default function Dashboard() {
             if (a) toast.info(`Removed ${a.enumerator_name} from assignment`)
           }}
           onClose={() => setAssignForm(null)}
+          onRefresh={refreshTeam}
         />
       )}
 
@@ -2516,7 +2549,7 @@ export default function Dashboard() {
                                 <span className="inline-flex items-center gap-1" data-help-id="assign-form-btn">
                                   <InfoButton topicId="assign-forms" />
                                   <button
-                                    onClick={() => setAssignForm(form)}
+                                    onClick={() => { setAssignForm(form); refreshTeam() }}
                                     className="text-xs text-catalan-success hover:underline"
                                   >
                                     Assign
