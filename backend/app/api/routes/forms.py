@@ -186,6 +186,10 @@ def list_forms(
     q = db.query(Form).filter(Form.tenant_id == user["tenant_id"])
     if status:
         q = q.filter(Form.status == status)
+    else:
+        # Hide archived (soft-deleted) forms from the default list; they remain
+        # fetchable via ?status=archived.
+        q = q.filter(Form.status != "archived")
 
     # Enumerators only see forms assigned to them; admins/supervisors see all
     if user.get("role") == "enumerator":

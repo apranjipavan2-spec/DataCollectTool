@@ -1125,6 +1125,17 @@ export default function Dashboard() {
     }
   }
 
+  const handleDeleteForm = async (form: Form) => {
+    if (!window.confirm(`Delete "${form.title}"? It will be removed from your forms. Any existing submissions are kept.`)) return
+    try {
+      await api.delete(`/forms/${form.id}`)
+      setForms(prev => prev.filter(f => f.id !== form.id))
+      toast.success(`"${form.title}" deleted`)
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail ?? 'Could not delete form')
+    }
+  }
+
   const handleExportSheets = async () => {
     if (!filterForm) { toast.warning('Select a form to export to Sheets'); return }
     setExportingSheets(true)
@@ -2501,6 +2512,15 @@ export default function Dashboard() {
                                     title="Share as public survey"
                                   >
                                     Share
+                                  </button>
+                                )}
+                                {['org_admin'].includes(user.role) && (
+                                  <button
+                                    onClick={() => handleDeleteForm(form)}
+                                    className="text-xs text-catalan-danger hover:underline"
+                                    title="Delete this form"
+                                  >
+                                    Delete
                                   </button>
                                 )}
                               </div>
