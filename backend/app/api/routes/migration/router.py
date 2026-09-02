@@ -107,7 +107,7 @@ def _save_submissions(
             form_version=form.version,
             data_json=data,
             status="synced",
-            enumerator_id=user.id,
+            enumerator_id=user["sub"],
             local_id=str(uuid.uuid4()),
         )
         db.add(sub)
@@ -152,7 +152,7 @@ def xlsform_save(
     db: Session = Depends(get_db),
 ):
     """Save a parsed XLSForm schema as a draft form."""
-    form = _save_form(db, str(user.tenant_id), body.title, body.json_schema)
+    form = _save_form(db, str(user["tenant_id"]), body.title, body.json_schema)
     return {"id": str(form.id), "title": form.title, "status": form.status}
 
 
@@ -202,7 +202,7 @@ async def kobo_import(
         raise HTTPException(422, f"XLSForm parse error: {e}")
 
     # 3. Save form
-    form = _save_form(db, str(user.tenant_id), parsed["title"], parsed["json_schema"])
+    form = _save_form(db, str(user["tenant_id"]), parsed["title"], parsed["json_schema"])
     result: dict[str, Any] = {
         "form_id": str(form.id),
         "title": form.title,
@@ -233,7 +233,7 @@ async def kobo_import(
             page += 1
         result["submissions_imported"] = total_imported
 
-    _post_import_hooks(db, str(user.tenant_id), form, "KoboToolbox", result["submissions_imported"], all_saved_rows)
+    _post_import_hooks(db, str(user["tenant_id"]), form, "KoboToolbox", result["submissions_imported"], all_saved_rows)
     return result
 
 
@@ -281,7 +281,7 @@ async def surveycto_import(
     except Exception as e:
         raise HTTPException(422, f"XLSForm parse error: {e}")
 
-    form = _save_form(db, str(user.tenant_id), parsed["title"], parsed["json_schema"])
+    form = _save_form(db, str(user["tenant_id"]), parsed["title"], parsed["json_schema"])
     result: dict[str, Any] = {
         "form_id": str(form.id),
         "title": form.title,
@@ -299,7 +299,7 @@ async def surveycto_import(
         except Exception as e:
             result["warnings"].append(f"Submission import error: {e}")
 
-    _post_import_hooks(db, str(user.tenant_id), form, "SurveyCTO", result["submissions_imported"], saved_rows)
+    _post_import_hooks(db, str(user["tenant_id"]), form, "SurveyCTO", result["submissions_imported"], saved_rows)
     return result
 
 
@@ -349,7 +349,7 @@ async def odk_import(
     except Exception as e:
         raise HTTPException(422, f"XLSForm parse error: {e}")
 
-    form = _save_form(db, str(user.tenant_id), parsed["title"], parsed["json_schema"])
+    form = _save_form(db, str(user["tenant_id"]), parsed["title"], parsed["json_schema"])
     result: dict[str, Any] = {
         "form_id": str(form.id),
         "title": form.title,
@@ -367,5 +367,5 @@ async def odk_import(
         except Exception as e:
             result["warnings"].append(f"Submission import error: {e}")
 
-    _post_import_hooks(db, str(user.tenant_id), form, "ODK Central", result["submissions_imported"], saved_rows)
+    _post_import_hooks(db, str(user["tenant_id"]), form, "ODK Central", result["submissions_imported"], saved_rows)
     return result

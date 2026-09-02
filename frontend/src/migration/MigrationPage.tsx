@@ -55,6 +55,11 @@ function countFields(sections: ParsedSection[]): number {
   return sections.reduce((n, s) => n + s.fields.length, 0)
 }
 
+/** Prefer the backend's error detail over axios's generic "Request failed with status code 500". */
+function errMsg(err: any, fallback: string): string {
+  return err?.response?.data?.detail || err?.message || fallback
+}
+
 function Input({ label, value, onChange, placeholder, type = 'text' }: {
   label: string; value: string; onChange: (v: string) => void
   placeholder?: string; type?: string
@@ -144,7 +149,7 @@ function XLSFormTab() {
       const { data: res } = await api.post('/migration/xlsform/parse', fd)
       setParsed({ title: res.title, schema: res.json_schema, warnings: res.warnings })
     } catch (err: any) {
-      setError(err.message || 'Parse failed')
+      setError(errMsg(err, 'Parse failed'))
     } finally {
       setLoading(false)
     }
@@ -159,7 +164,7 @@ function XLSFormTab() {
       setParsed(null)
       if (fileRef.current) fileRef.current.value = ''
     } catch (err: any) {
-      setError(err.message || 'Save failed')
+      setError(errMsg(err, 'Save failed'))
     } finally {
       setSaving(false)
     }
