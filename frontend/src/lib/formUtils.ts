@@ -95,6 +95,28 @@ function makeFormulaParser(): Parser {
     String(hay ?? '').toLowerCase().includes(String(needle ?? '').toLowerCase())
   parser.functions.num  = (s: unknown) => toNumber(s)
   parser.functions.text = (n: unknown) => String(n ?? '')
+  // age(dob[, ref]) — completed years from a date (YYYY-MM-DD) to today (or ref date)
+  parser.functions.age = (dob: unknown, ref?: unknown) => {
+    const b = new Date(String(dob))
+    const r = ref ? new Date(String(ref)) : new Date()
+    if (isNaN(b.getTime()) || isNaN(r.getTime())) return 0
+    let years = r.getFullYear() - b.getFullYear()
+    const m = r.getMonth() - b.getMonth()
+    if (m < 0 || (m === 0 && r.getDate() < b.getDate())) years--
+    return years
+  }
+  // ageAtLeast(dob, years, months, days[, ref]) → 1 if the person has reached that exact
+  // age by today (or ref), else 0. Exact calendar arithmetic (handles month/day lengths).
+  parser.functions.ageAtLeast = (dob: unknown, y: unknown, mo: unknown, d: unknown, ref?: unknown) => {
+    const b = new Date(String(dob))
+    const r = ref ? new Date(String(ref)) : new Date()
+    if (isNaN(b.getTime()) || isNaN(r.getTime())) return 0
+    const threshold = new Date(b)
+    threshold.setFullYear(threshold.getFullYear() + toNumber(y))
+    threshold.setMonth(threshold.getMonth() + toNumber(mo))
+    threshold.setDate(threshold.getDate() + toNumber(d))
+    return r >= threshold ? 1 : 0
+  }
   return parser
 }
 

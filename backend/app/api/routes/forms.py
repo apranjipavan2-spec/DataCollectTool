@@ -135,7 +135,7 @@ def _snapshot_version(db: Session, form: Form) -> FormVersion:
 # Mirrors the grammar frontend's evalFormula (frontend/src/lib/formUtils.ts)
 # actually supports — kept in sync manually if that grammar changes.
 _FORMULA_ALLOWED_CHARS = re.compile(r'^[\w\s()+\-*/%.,<>=!&|"\'?:]*$')
-_FORMULA_KNOWN_FUNCS = {"if", "sum", "round", "abs", "max", "min", "concat", "len", "contains", "num", "text"}
+_FORMULA_KNOWN_FUNCS = {"if", "sum", "round", "abs", "max", "min", "concat", "len", "contains", "num", "text", "age", "ageAtLeast"}
 _FORMULA_FUNC_CALL = re.compile(r'([A-Za-z_][A-Za-z0-9_]*)\s*\(')
 
 

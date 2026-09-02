@@ -280,7 +280,11 @@ function FormulaBuilder({ field, prevFields, onChange }: {
       f.name,
       f.type === 'number' || f.type === 'decimal' || f.type === 'rating'
         ? i + 1
-        : f.options?.[0]?.value ?? f.name,
+        : f.type === 'date'
+          ? '2005-06-15'   // sample DOB so age()/ageAtLeast() previews are meaningful
+          : f.type === 'time'
+            ? '10:30'
+            : f.options?.[0]?.value ?? f.name,
     ])
   )
   const preview = field.formula ? evalFormula(field.formula, sampleValues) : null
@@ -302,26 +306,53 @@ function FormulaBuilder({ field, prevFields, onChange }: {
 
       {/* ── Arithmetic mode ── */}
       {mode === 'arithmetic' && (
-        <div className="space-y-2">
-          <div className="relative">
-            <input
-              className={`${inputCls} font-mono text-sm pr-24`}
-              value={field.formula ?? ''}
-              onChange={e => onChange(e.target.value)}
-              placeholder="e.g.  area * rate + bonus"
-            />
+        <div className="space-y-2 w-full min-w-0">
+          {/* Formula input — full width, wraps inside the panel */}
+          <textarea
+            className={`${inputCls} font-mono text-sm w-full resize-y min-h-[3rem] break-words`}
+            value={field.formula ?? ''}
+            onChange={e => onChange(e.target.value)}
+            placeholder="e.g.  area * rate + bonus"
+          />
+
+          {/* Insert helpers — wrap within the panel width */}
+          <div className="flex flex-wrap items-center gap-1.5">
             <select
               value=""
-              onChange={e => e.target.value && onChange((field.formula ?? '') + (field.formula ? ' ' : '') + e.target.value)}
-              className="absolute right-1 top-1 bottom-1 text-xs bg-catalan-primary/10 border border-catalan-primary/20 text-catalan-primary rounded-md px-1 focus:outline-none cursor-pointer"
+              onChange={e => { if (e.target.value) onChange((field.formula ?? '') + (field.formula ? ' ' : '') + e.target.value) }}
+              className="max-w-full text-xs bg-catalan-primary/10 border border-catalan-primary/20 text-catalan-primary rounded-md px-2 py-1 focus:outline-none cursor-pointer"
             >
-              <option value="">+ field</option>
+              <option value="">+ insert field</option>
               {prevFields.map(f => <option key={f.id} value={f.name}>{f.label || f.name}</option>)}
             </select>
+
+            {/* Age from a date-of-birth field */}
+            {prevFields.some(f => f.type === 'date') && (
+              <select
+                value=""
+                onChange={e => { if (e.target.value) onChange((field.formula ?? '') + (field.formula ? ' ' : '') + `age(${e.target.value})`) }}
+                className="max-w-full text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 rounded-md px-2 py-1 focus:outline-none cursor-pointer"
+                title="Insert age in completed years from a date field (to today)"
+              >
+                <option value="">+ age(date)</option>
+                {prevFields.filter(f => f.type === 'date').map(f => <option key={f.id} value={f.name}>{f.label || f.name}</option>)}
+              </select>
+            )}
+
+            {['+', '−', '×', '÷', 'round(', 'sum('].map(op => (
+              <button
+                key={op}
+                type="button"
+                onClick={() => onChange((field.formula ?? '') + (field.formula ? ' ' : '') + (op === '−' ? '-' : op === '×' ? '*' : op === '÷' ? '/' : op))}
+                className="text-xs font-mono bg-catalan-hover border border-catalan-border rounded-md px-2 py-1 hover:border-catalan-primary"
+              >{op}</button>
+            ))}
           </div>
-          <p className="text-xs text-catalan-textMuted">
-            Use field variable names. Supports <code className="bg-catalan-hover px-1 rounded">+ − × ÷</code> and&nbsp;
-            <code className="bg-catalan-hover px-1 rounded">sum() round() abs() max() min()</code>
+
+          <p className="text-xs text-catalan-textMuted break-words">
+            Use field variable names. Supports <code className="bg-catalan-hover px-1 rounded">+ − × ÷</code>,&nbsp;
+            <code className="bg-catalan-hover px-1 rounded">sum() round() abs() max() min()</code>, and&nbsp;
+            <code className="bg-catalan-hover px-1 rounded">age(dob)</code> / <code className="bg-catalan-hover px-1 rounded">ageAtLeast(dob, 18, 11, 25)</code>.
           </p>
         </div>
       )}
