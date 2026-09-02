@@ -90,3 +90,13 @@ Programmatic SEO shipped (commit `125f8e2`): 8 competitor comparisons · 5 long-
 - CORS: `allow_origins=settings.cors_origins` (env: `CORS_ORIGINS`)
 - RLS: `set_tenant_context()` called in `deps.py` on every authenticated request
 - `IntegrationsPanel.tsx`: pre-existing `allow_enumerator_edit` missing on `ProgramListItem` — fixed by adding the optional field to `frontend/src/types/api.ts:54`
+
+## TODO (post-training) — Form link access mode
+When admin clicks Share, ask: "Anyone with the link" (public, current behavior) vs
+"Only my enumerators" (login required + must be an assigned enumerator).
+- Backend: public_survey needs an access_mode on the form/token; the /survey/{token}/info
+  + /submit endpoints must enforce auth + assignment check when mode=restricted.
+- Frontend: PublicSurveyPage must handle the restricted case (redirect to login, then
+  verify the logged-in user is assigned before rendering the form).
+- Decision captured 2026-09-02 (Niiti Sangwari endline). Interim: Share dialog now
+  warns that public = anonymous; Assign = enumerators-only.
