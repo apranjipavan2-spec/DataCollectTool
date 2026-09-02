@@ -41,6 +41,18 @@ const OPERATORS: { value: SkipCondition['operator']; label: string }[] = [
 
 const VALUELESS_OPERATORS = new Set(['is_empty', 'is_not_empty'])
 
+// Age operators only apply to date fields (treat the date as a DOB).
+const AGE_OPERATORS: { value: SkipCondition['operator']; label: string }[] = [
+  { value: 'age_gte', label: 'age is at least' },
+  { value: 'age_lt',  label: 'age is under' },
+]
+
+/** Parse "Y|M|D" → [years, months, days]. */
+function parseAge(v?: string | number): [number, number, number] {
+  const p = String(v ?? '').split('|').map(n => parseInt(n, 10) || 0)
+  return [p[0] || 0, p[1] || 0, p[2] || 0]
+}
+
 const selCls = 'bg-catalan-bg border border-catalan-border text-catalan-text rounded-md px-2 py-1 text-xs focus:outline-none focus:border-catalan-primary'
 const inpCls = 'flex-1 bg-catalan-bg border border-catalan-border text-catalan-text rounded-md px-2 py-1 text-xs focus:outline-none focus:border-catalan-primary placeholder-catalan-textMuted min-w-0'
 
@@ -75,7 +87,13 @@ function ConditionRow({ condition, allFields, onUpdate, onRemove }: {
   onUpdate: (patch: Partial<SkipCondition>) => void
   onRemove: () => void
 }) {
+  const selField = allFields.find(f => f.name === condition.field)
+  const isDate = selField?.type === 'date'
+  const isAgeOp = condition.operator === 'age_gte' || condition.operator === 'age_lt'
+  const operatorList = isDate ? [...OPERATORS, ...AGE_OPERATORS] : OPERATORS
   const needsValue = !VALUELESS_OPERATORS.has(condition.operator)
+  const [ay, am, ad] = parseAge(condition.value)
+  const setAge = (y: number, m: number, d: number) => onUpdate({ value: `${y}|${m}|${d}` })
   return (
     <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
       <select
@@ -92,12 +110,22 @@ function ConditionRow({ condition, allFields, onUpdate, onRemove }: {
           const op = e.target.value as SkipCondition['operator']
           const patch: Partial<SkipCondition> = { operator: op }
           if (VALUELESS_OPERATORS.has(op)) patch.value = undefined
+          if (op === 'age_gte' || op === 'age_lt') patch.value = '18|0|0'
           onUpdate(patch)
         }}
       >
-        {OPERATORS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
+        {operatorList.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
       </select>
-      {needsValue && (
+      {isAgeOp ? (
+        <span className="flex items-center gap-1">
+          <input type="number" min={0} className={`${inpCls} w-14`} value={ay} onChange={e => setAge(parseInt(e.target.value) || 0, am, ad)} title="years" />
+          <span className="text-xs text-catalan-textMuted">y</span>
+          <input type="number" min={0} max={11} className={`${inpCls} w-12`} value={am} onChange={e => setAge(ay, parseInt(e.target.value) || 0, ad)} title="months" />
+          <span className="text-xs text-catalan-textMuted">m</span>
+          <input type="number" min={0} max={30} className={`${inpCls} w-12`} value={ad} onChange={e => setAge(ay, am, parseInt(e.target.value) || 0)} title="days" />
+          <span className="text-xs text-catalan-textMuted">d</span>
+        </span>
+      ) : needsValue && (
         <input
           className={inpCls}
           value={condition.value != null ? String(condition.value) : ''}

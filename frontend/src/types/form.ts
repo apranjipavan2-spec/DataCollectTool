@@ -9,6 +9,9 @@ export interface SkipCondition {
   _key?: string  // stable React key — not sent to backend
   field: string
   operator: 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte' | 'contains' | 'is_empty' | 'is_not_empty'
+    // age_gte / age_lt: field must be a date (DOB); value is "Y|M|D" (years|months|days),
+    // compared as exact age from that date to today.
+    | 'age_gte' | 'age_lt'
   value?: string | number  // optional — not needed for is_empty / is_not_empty
 }
 
