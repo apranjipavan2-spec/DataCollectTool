@@ -1522,7 +1522,10 @@ export default function Dashboard() {
               <button onClick={() => setShareForm(null)} className="text-catalan-textMuted hover:text-catalan-text text-2xl leading-none">×</button>
             </div>
             <div className="px-5 py-5 space-y-4">
-              <p className="text-sm text-catalan-textMuted">Generate a public link that anyone can use to submit this form — no login required.</p>
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                <span className="font-semibold">⚠ Public link — anyone can fill it.</span> No login, no identity check; each submission is anonymous.
+                To restrict collection to your team (login required, only assigned enumerators), close this and use <span className="font-semibold">Assign</span> instead.
+              </div>
               {sharePublicUrl ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
