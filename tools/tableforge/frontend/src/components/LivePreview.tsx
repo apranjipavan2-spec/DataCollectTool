@@ -16,6 +16,7 @@ interface Props {
   tableMode?: 'dark' | 'light';
   onHeaderRename?: (original: string, newName: string) => void;
   onManualColumnValueChange?: (columnId: string, rowKey: string, value: string) => void;
+  onMergeGroupRename?: (side: 'a' | 'b', label: string) => void;
 }
 
 const THEME_VARS: Record<string, { headerBg: string; headerColor: string; totalBg: string; borderColor: string }> = {
@@ -27,7 +28,7 @@ const THEME_VARS: Record<string, { headerBg: string; headerColor: string; totalB
   teal:           { headerBg: '#0d7377', headerColor: '#fff', totalBg: '#e0f7fa', borderColor: '#14a085' },
 };
 
-export function LivePreview({ result, loading, error, title, subtitle, datasetId, tableConfig, annotations: externalAnnotations, onAnnotationsChange, tableMode = 'dark', onHeaderRename, onManualColumnValueChange }: Props) {
+export function LivePreview({ result, loading, error, title, subtitle, datasetId, tableConfig, annotations: externalAnnotations, onAnnotationsChange, tableMode = 'dark', onHeaderRename, onManualColumnValueChange, onMergeGroupRename }: Props) {
   const [drillDown, setDrillDown] = useState<{ headers: string[]; rows: any[][]; row_count: number; showing: number } | null>(null);
   const [sortCol, setSortCol] = useState<number | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -40,6 +41,9 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
   // Inline header editing
   const [editingHeader, setEditingHeader] = useState<number | null>(null);
   const [editHeaderVal, setEditHeaderVal] = useState('');
+  // Inline editing of a merge table's group-header label (Table A/B identifier row)
+  const [editingGroup, setEditingGroup] = useState<number | null>(null);
+  const [editGroupVal, setEditGroupVal] = useState('');
   const editCommittedRef = React.useRef(false);
   // Keyboard navigation
   const [kbCell, setKbCell] = useState<{ r: number; c: number } | null>(null);
@@ -477,12 +481,35 @@ export function LivePreview({ result, loading, error, title, subtitle, datasetId
                       {headerRenames[h] || h}
                     </th>
                   ))}
-                  {/* Top-level merged headers */}
-                  {groups.map((g, gi) => (
-                    <th key={gi} colSpan={g.colspan} style={{ textAlign: 'center', borderColor: tv.borderColor, background: tv.headerBg, color: tv.headerColor, ...(gi > 0 ? { borderLeft: groupBorderStyle } : {}) }}>
-                      {g.label}
-                    </th>
-                  ))}
+                  {/* Top-level merged headers. For merge tables (Table A + Table B side by side)
+                      this row identifies which source table each column block came from
+                      (e.g. "Before" / "After") and is editable by double-clicking. */}
+                  {groups.map((g, gi) => {
+                    const isMergeGroup = !!tableConfig?.merge_config && !!onMergeGroupRename && gi < 2;
+                    const side: 'a' | 'b' = gi === 0 ? 'a' : 'b';
+                    const isEditing = isMergeGroup && editingGroup === gi;
+                    return (
+                      <th key={gi} colSpan={g.colspan} style={{ textAlign: 'center', borderColor: tv.borderColor, background: tv.headerBg, color: tv.headerColor, cursor: isMergeGroup ? 'text' : undefined, ...(gi > 0 ? { borderLeft: groupBorderStyle } : {}) }}
+                        title={isMergeGroup ? 'Double-click to rename' : undefined}
+                        onDoubleClick={isMergeGroup ? () => { setEditingGroup(gi); setEditGroupVal(String(g.label)); } : undefined}
+                      >
+                        {isEditing ? (
+                          <input
+                            autoFocus
+                            value={editGroupVal}
+                            onChange={e => setEditGroupVal(e.target.value)}
+                            onBlur={() => { onMergeGroupRename!(side, editGroupVal.trim() || String(g.label)); setEditingGroup(null); }}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') { onMergeGroupRename!(side, editGroupVal.trim() || String(g.label)); setEditingGroup(null); }
+                              if (e.key === 'Escape') setEditingGroup(null);
+                            }}
+                            onClick={e => e.stopPropagation()}
+                            style={{ width: '100%', textAlign: 'center', background: 'var(--bg)', color: tv.headerColor, border: '1px solid var(--primary)', borderRadius: 3, fontSize: 'inherit', fontWeight: 'inherit', padding: '1px 4px' }}
+                          />
+                        ) : g.label}
+                      </th>
+                    );
+                  })}
                   {/* Manual columns span both header rows, same as the row-dimension columns */}
                   {(tableConfig?.manual_columns || []).map(col => (
                     <th key={col.id} rowSpan={2} style={{ background: tv.headerBg, color: tv.headerColor, borderColor: tv.borderColor }}>

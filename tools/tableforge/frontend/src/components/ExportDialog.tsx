@@ -4,6 +4,17 @@ import { API_BASE } from '../api';
 import { ChartCanvas } from './ChartCanvas';
 import { buildChartExportSvg, svgXmlToPngDataUrl, figTitleFromTable, ChartType, LegendPos, W_DEFAULT, H_DEFAULT } from './chartUtils';
 
+// Mirrors LivePreview's tableNumberLabel logic so exported titles carry the
+// same "Table 1: " prefix the user sees on screen (from Apply Numbering).
+function exportTitle(t: TableConfig): string {
+  const num = t.table_number
+    ? (t.table_number_prefix ? `${t.table_number_prefix} ${t.table_number}: ` : t.table_number)
+    : '';
+  if (!num) return t.title || '';
+  const sep = /\s$/.test(num) ? '' : ' ';
+  return t.title ? `${num}${sep}${t.title}` : num.trim();
+}
+
 function formatCell(cell: any): string {
   if (cell == null) return '';
   if (typeof cell === 'number') {
@@ -373,7 +384,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
               : res.rows,
             formatted_rows: fmtRows,
             styled_html: buildExportHtml(t, res, fmtRows),
-            title: t.title, subtitle: t.subtitle, footnote: t.footnote,
+            title: exportTitle(t), subtitle: t.subtitle, footnote: t.footnote,
             annotations: annotationsMap[t.id] || [],
             interpretation: interpretationsMap[t.id] || '',
             num_row_fields: nRowCols,
@@ -544,7 +555,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
             : res.rows,
           formatted_rows: fmtRows,
           styled_html: buildExportHtml(t, res, fmtRows),
-          title: t.title, subtitle: t.subtitle, footnote: t.footnote,
+          title: exportTitle(t), subtitle: t.subtitle, footnote: t.footnote,
           header_renames: t.header_renames,
           annotations: annotationsMap[t.id] || [],
           interpretation: interpretationsMap[t.id] || '',
@@ -652,7 +663,8 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
 
       // Plain text version
       const lines: string[] = [];
-      if (t.title) lines.push(t.title);
+      const clipTitle = exportTitle(t);
+      if (clipTitle) lines.push(clipTitle);
       if (t.subtitle) lines.push(t.subtitle);
       if (hasMultiLevel) {
         const topRow: string[] = [];
@@ -697,7 +709,7 @@ export function ExportDialog({ datasetId, tables, results, annotationsMap = {}, 
       }
 
       let html = '';
-      if (t.title) html += `<h3>${t.title}</h3>`;
+      if (clipTitle) html += `<h3>${clipTitle}</h3>`;
       if (t.subtitle) html += `<p style="color:#666;font-size:11px;">${t.subtitle}</p>`;
       html += '<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">';
       html += '<thead>';

@@ -116,6 +116,8 @@ export interface ManualColumnDef {
 export interface MergeConfig {
   source_a: string;  // table id
   source_b: string;  // table id
+  label_a?: string;  // group-header text shown above Table A's columns (defaults to source table's name)
+  label_b?: string;  // group-header text shown above Table B's columns (defaults to source table's name)
 }
 
 export interface TableConfig {

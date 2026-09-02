@@ -81,7 +81,7 @@ function looksLikeStatTable(t: TableConfig, allColumns: { name: string; sample_v
 // TableResults — Table A's columns first, then Table B's (its own row-label
 // column(s) dropped), aligned by matching each row's label (first cell).
 // Table A's row order is the anchor; a B row with no matching A row is dropped.
-function buildMergedResult(tableB: TableConfig, resultA: TableResult, resultB: TableResult): TableResult {
+function buildMergedResult(tableB: TableConfig, resultA: TableResult, resultB: TableResult, labelA: string, labelB: string): TableResult {
   const nB = Math.max(1, tableB.rows.length || 1);
   const restHeadersB = resultB.headers.slice(nB);
   const mapB = new Map<string, any[]>();
@@ -91,7 +91,18 @@ function buildMergedResult(tableB: TableConfig, resultA: TableResult, resultB: T
     const restB = mapB.get(String(rowA[0])) ?? restHeadersB.map(() => '');
     return [...rowA, ...restB];
   });
-  return { headers, rows, row_count: rows.length, col_count: headers.length };
+  // A group-header row above the column headers, labeling which source table
+  // each block of columns came from (e.g. "Before" / "After"), so merged
+  // columns stay visually distinguishable. Editable via the group `<th>` in LivePreview.
+  const column_groups = {
+    has_multi_level: true,
+    top: [
+      { label: labelA, colspan: resultA.headers.length, colstart: 0 },
+      { label: labelB, colspan: restHeadersB.length, colstart: resultA.headers.length },
+    ],
+    bottom: headers,
+  };
+  return { headers, rows, row_count: rows.length, col_count: headers.length, column_groups };
 }
 
 // Stat-test results aren't recomputable from TableConfig — they were injected once
@@ -384,6 +395,16 @@ export default function App() {
     const t = setTimeout(runAutosave, 800);
     return () => clearTimeout(t);
   }, [tables, dataset?.dataset_id]);
+
+  // Debounced immediate autosave for `sections` — creating/renaming/deleting a
+  // section (OrganizeModal / SourcePanel) previously only hit disk on the
+  // 5-minute interval, so a section created and a quick reload lost it.
+  // Mirrors the `tables` effect above.
+  useEffect(() => {
+    if (!dataset) return;
+    const t = setTimeout(runAutosave, 800);
+    return () => clearTimeout(t);
+  }, [sections, dataset?.dataset_id]);
 
   // Auto-save every 5 minutes
   useEffect(() => {
@@ -842,12 +863,15 @@ export default function App() {
     setResults(prev => {
       const next = new Map(prev);
       for (const t of mergeTables) {
-        const { source_a, source_b } = t.merge_config!;
+        const { source_a, source_b, label_a, label_b } = t.merge_config!;
         const resultA = next.get(source_a);
         const resultB = next.get(source_b);
+        const sourceA = tablesList.find(x => x.id === source_a);
         const sourceB = tablesList.find(x => x.id === source_b);
-        if (!resultA || !resultB || !sourceB) continue;
-        next.set(t.id, buildMergedResult(sourceB, resultA, resultB));
+        if (!resultA || !resultB || !sourceA || !sourceB) continue;
+        const labelA = label_a || sourceA.title || sourceA.name;
+        const labelB = label_b || sourceB.title || sourceB.name;
+        next.set(t.id, buildMergedResult(sourceB, resultA, resultB, labelA, labelB));
       }
       return next;
     });
@@ -1560,19 +1584,44 @@ export default function App() {
     if (!tableA || !tableB) return;
     pushUndo();
     const id = String(Date.now());
+    const labelA = tableA.title || tableA.name;
+    const labelB = tableB.title || tableB.name;
     const merged: TableConfig = {
       ...createEmptyTable(id, `${tableA.name} + ${tableB.name} (Merged)`),
-      merge_config: { source_a: idA, source_b: idB },
+      merge_config: { source_a: idA, source_b: idB, label_a: labelA, label_b: labelB },
     };
     setTables(prev => [...prev, merged]);
     setActiveTableIdx(tables.length);
     const resultA = results.get(idA);
     const resultB = results.get(idB);
     if (resultA && resultB) {
-      const mergedResult = buildMergedResult(tableB, resultA, resultB);
+      const mergedResult = buildMergedResult(tableB, resultA, resultB, labelA, labelB);
       setResults(prev => new Map(prev).set(id, mergedResult));
     }
   }, [tables, results, pushUndo]);
+
+  // Rename a merge table's group-header label (the "Before"/"After"-style row
+  // above the column headers). Just relabels — data is untouched.
+  const handleRenameMergeGroup = useCallback((tableId: string, side: 'a' | 'b', label: string) => {
+    pushUndo();
+    setTables(prev => prev.map(t => {
+      if (t.id !== tableId || !t.merge_config) return t;
+      return { ...t, merge_config: { ...t.merge_config, [side === 'a' ? 'label_a' : 'label_b']: label } };
+    }));
+    setResults(prev => {
+      const t = tables.find(x => x.id === tableId);
+      if (!t?.merge_config) return prev;
+      const { source_a, source_b, label_a, label_b } = t.merge_config;
+      const resultA = prev.get(source_a);
+      const resultB = prev.get(source_b);
+      const sourceA = tables.find(x => x.id === source_a);
+      const sourceB = tables.find(x => x.id === source_b);
+      if (!resultA || !resultB || !sourceA || !sourceB) return prev;
+      const labelA = side === 'a' ? label : (label_a || sourceA.title || sourceA.name);
+      const labelB = side === 'b' ? label : (label_b || sourceB.title || sourceB.name);
+      return new Map(prev).set(tableId, buildMergedResult(sourceB, resultA, resultB, labelA, labelB));
+    });
+  }, [tables, pushUndo]);
 
   // "Update Table" — the user asked for a linked-but-manual refresh: merge
   // tables never recompute on their own, only when this is explicitly called.
@@ -2486,6 +2535,7 @@ export default function App() {
                       updateTable({ header_renames: renames });
                     }}
                     onManualColumnValueChange={(columnId, rowKey, value) => handleUpdateManualColumnValue(columnId, rowKey, value)}
+                    onMergeGroupRename={(side, label) => handleRenameMergeGroup(activeTable.id, side, label)}
                   />
                 )}
                 {effectiveTab === 'chart' && hasChart && (
