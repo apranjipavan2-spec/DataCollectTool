@@ -98,7 +98,9 @@ def make_form_public(form_id: str, user: dict = Depends(require_org_admin), db: 
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
 
-    token = secrets.token_urlsafe(32)
+    # Reuse the existing token if the form is already public — regenerating on
+    # every click would silently invalidate links that were already shared.
+    token = form.public_token or secrets.token_urlsafe(32)
     form.public_token = token
     form.is_public = True
     db.commit()
