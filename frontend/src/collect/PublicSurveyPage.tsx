@@ -16,7 +16,7 @@ export default function PublicSurveyPage() {
 
   useEffect(() => {
     if (!token) return
-    axios.get(`/api/v1/public/survey/${token}/info`)
+    axios.get(`/api/v1/survey/${token}/info`)
       .then(r => {
         setSchema(r.data.json_schema as FormSchema)
         setFormTitle(r.data.title)
@@ -29,7 +29,7 @@ export default function PublicSurveyPage() {
     if (!token) return
     setSubmitting(true)
     try {
-      await axios.post(`/api/v1/public/survey/${token}/submit`, { data_json: draft.values })
+      await axios.post(`/api/v1/survey/${token}/submit`, { data_json: draft.values })
       setSubmitted(true)
     } catch (err: any) {
       if (err.response?.status === 429) {
