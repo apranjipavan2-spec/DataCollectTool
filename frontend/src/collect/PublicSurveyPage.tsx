@@ -29,7 +29,7 @@ export default function PublicSurveyPage() {
     if (!token) return
     setSubmitting(true)
     try {
-      await axios.post(`/api/v1/public/survey/${token}/submit`, { data_json: draft.data })
+      await axios.post(`/api/v1/public/survey/${token}/submit`, { data_json: draft.values })
       setSubmitted(true)
     } catch (err: any) {
       if (err.response?.status === 429) {
@@ -75,19 +75,18 @@ export default function PublicSurveyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-catalan-bg">
+    // Full-height flex column: FormRenderer uses h-full + internal flex-1 scrolling,
+    // so it MUST have a bounded-height parent or the form area collapses to 0px.
+    <div className="h-screen flex flex-col bg-catalan-bg">
       {/* Branded header */}
-      <header className="bg-catalan-surface border-b border-catalan-border">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center">
+      <header className="bg-catalan-surface border-b border-catalan-border flex-shrink-0">
+        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
           <img src="/logo-wide.png" alt="FieldGovern" className="h-7 w-auto object-contain" />
+          {formTitle && <span className="text-sm font-semibold text-catalan-text truncate">{formTitle}</span>}
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-xl font-bold text-catalan-text">{formTitle}</h1>
-          <p className="text-xs text-catalan-textMuted mt-1">Please fill in all required fields and submit.</p>
-        </div>
+      <div className="flex-1 min-h-0">
         {schema && (
           <FormRenderer
             schema={schema}
