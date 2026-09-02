@@ -34,30 +34,33 @@ def build() -> openpyxl.Workbook:
     survey = wb.active
     survey.title = "survey"
     survey_cols = ["type", "name", "label", "hint", "required",
-                   "relevant", "calculation", "appearance", "parameters"]
+                   "relevant", "calculation", "appearance", "parameters", "choice_filter"]
     survey.append(survey_cols)
     survey_rows = [
-        # type, name, label, hint, required, relevant, calculation, appearance, parameters
-        ["text", "respondent_name", "Full name", "As on ID", "yes", "", "", "", ""],
-        ["integer", "age", "Age (years)", "", "yes", "", "", "", ""],
-        ["decimal", "land_acres", "Land area (acres)", "", "no", "", "", "", ""],
-        ["date", "interview_date", "Date of interview", "", "yes", "", "", "", ""],
-        ["time", "start_time", "Start time", "", "no", "", "", "", ""],
-        ["select_one gender", "gender", "Gender", "", "yes", "", "", "", ""],
-        ["select_multiple issues", "issues", "Health issues", "Select all that apply", "no", "", "", "", ""],
-        ["geopoint", "location", "GPS location", "", "no", "", "", "", ""],
-        ["image", "house_photo", "Photo of house", "", "no", "", "", "", ""],
-        ["barcode", "hh_id", "Household barcode", "", "no", "", "", "", ""],
-        ["note", "thanks_note", "Thank you for your time.", "", "", "", "", "", ""],
-        ["calculate", "age_next_year", "", "", "", "", "age + 1", "", ""],
-        ["range", "satisfaction", "Satisfaction (1-5)", "", "no", "", "", "rating", "start=1 end=5 step=1"],
+        # type, name, label, hint, required, relevant, calculation, appearance, parameters, choice_filter
+        ["text", "respondent_name", "Full name", "As on ID", "yes", "", "", "", "", ""],
+        ["integer", "age", "Age (years)", "", "yes", "", "", "", "", ""],
+        ["decimal", "land_acres", "Land area (acres)", "", "no", "", "", "", "", ""],
+        ["date", "interview_date", "Date of interview", "", "yes", "", "", "", "", ""],
+        ["time", "start_time", "Start time", "", "no", "", "", "", "", ""],
+        ["select_one gender", "gender", "Gender", "", "yes", "", "", "", "", ""],
+        ["select_multiple issues", "issues", "Health issues", "Select all that apply", "no", "", "", "", "", ""],
+        # cascading select: district options are filtered by the chosen state (see choices sheet 'state' column)
+        ["select_one state", "state", "State", "", "yes", "", "", "", "", ""],
+        ["select_one district", "district", "District", "Only districts in the chosen state show", "yes", "", "", "", "", "state=${state}"],
+        ["geopoint", "location", "GPS location", "", "no", "", "", "", "", ""],
+        ["image", "house_photo", "Photo of house", "", "no", "", "", "", "", ""],
+        ["barcode", "hh_id", "Household barcode", "", "no", "", "", "", "", ""],
+        ["note", "thanks_note", "Thank you for your time.", "", "", "", "", "", "", ""],
+        ["calculate", "age_next_year", "", "", "", "", "age + 1", "", "", ""],
+        ["range", "satisfaction", "Satisfaction (1-5)", "", "no", "", "", "rating", "start=1 end=5 step=1", ""],
         # relevant = skip logic: only show if gender is female
-        ["integer", "num_children", "Number of children", "", "no", "${gender} = 'female'", "", "", ""],
+        ["integer", "num_children", "Number of children", "", "no", "${gender} = 'female'", "", "", "", ""],
         # a repeat group (roster): one block repeated per household member
-        ["begin_repeat", "members", "Household members", "", "", "", "", "", ""],
-        ["text", "member_name", "Member name", "", "yes", "", "", "", ""],
-        ["integer", "member_age", "Member age", "", "no", "", "", "", ""],
-        ["end_repeat", "members", "", "", "", "", "", "", ""],
+        ["begin_repeat", "members", "Household members", "", "", "", "", "", "", ""],
+        ["text", "member_name", "Member name", "", "yes", "", "", "", "", ""],
+        ["integer", "member_age", "Member age", "", "no", "", "", "", "", ""],
+        ["end_repeat", "members", "", "", "", "", "", "", "", ""],
     ]
     for r in survey_rows:
         survey.append(r)
@@ -65,16 +68,25 @@ def build() -> openpyxl.Workbook:
 
     # ── choices sheet ────────────────────────────────────────────────────────
     choices = wb.create_sheet("choices")
-    choices_cols = ["list_name", "name", "label"]
+    # 'state' is an extra column: it's the cascading attribute the district's
+    # choice_filter (state=${state}) matches on. Non-cascading lists leave it blank.
+    choices_cols = ["list_name", "name", "label", "state"]
     choices.append(choices_cols)
     choices_rows = [
-        ["gender", "female", "Female"],
-        ["gender", "male", "Male"],
-        ["gender", "other", "Other"],
-        ["issues", "fever", "Fever / Malaria"],
-        ["issues", "cough", "Cough / Respiratory"],
-        ["issues", "chronic", "Chronic (BP, diabetes)"],
-        ["issues", "none", "None"],
+        ["gender", "female", "Female", ""],
+        ["gender", "male", "Male", ""],
+        ["gender", "other", "Other", ""],
+        ["issues", "fever", "Fever / Malaria", ""],
+        ["issues", "cough", "Cough / Respiratory", ""],
+        ["issues", "chronic", "Chronic (BP, diabetes)", ""],
+        ["issues", "none", "None", ""],
+        # cascading example: state list, then districts tagged with their state
+        ["state", "mh", "Maharashtra", ""],
+        ["state", "cg", "Chhattisgarh", ""],
+        ["district", "pune", "Pune", "mh"],
+        ["district", "nagpur", "Nagpur", "mh"],
+        ["district", "raipur", "Raipur", "cg"],
+        ["district", "surguja", "Surguja", "cg"],
     ]
     for r in choices_rows:
         choices.append(r)

@@ -133,8 +133,16 @@ def _parse_range_params(row: dict) -> tuple[float | None, float | None]:
 
 # ── choices builder ───────────────────────────────────────────────────────────
 
+# choices columns that are never cascading attributes
+_CHOICE_RESERVED = {"list_name", "list name", "name", "label", "image", "media::image"}
+
+
 def _build_choices(choices_rows: list[dict]) -> dict[str, list[dict]]:
-    """Return {list_name: [{value, label}, ...]}."""
+    """Return {list_name: [{value, label, <attr>...}, ...]}.
+
+    Any extra column beyond list_name/name/label (and not a label:: variant) is kept
+    on each option as a cascading attribute, so a later field's choice_filter can match
+    on it (e.g. a 'block' column on the GP list)."""
     result: dict[str, list[dict]] = {}
     for row in choices_rows:
         list_name = row.get("list_name") or row.get("list name", "")
@@ -142,8 +150,21 @@ def _build_choices(choices_rows: list[dict]) -> dict[str, list[dict]]:
         label = _best_label(row)
         if not list_name or not name:
             continue
-        result.setdefault(list_name, []).append({"value": name, "label": label or name})
+        opt = {"value": name, "label": label or name}
+        for k, v in row.items():
+            if k in _CHOICE_RESERVED or k.startswith("label") or not v:
+                continue
+            opt[k] = v
+        result.setdefault(list_name, []).append(opt)
     return result
+
+
+# choice_filter like "block=${block} and gp=${gp_name}" -> [{attr, field}, ...]
+_CF_PART = re.compile(r"([A-Za-z0-9_]+)\s*=\s*\$\{([^}]+)\}")
+
+
+def _parse_choice_filter(expr: str) -> list[dict]:
+    return [{"attr": m[1], "field": m[2]} for m in _CF_PART.finditer(expr or "")]
 
 
 # ── main parser ───────────────────────────────────────────────────────────────
@@ -215,6 +236,7 @@ def parse_xlsform(file_bytes: bytes, filename: str = "") -> dict:
         relevant = row.get("relevant", "")
         calculation = row.get("calculation", "")
         appearance = row.get("appearance", "").lower()
+        choice_filter = row.get("choice_filter") or row.get("choice filter", "")
 
         # Parse type token (may be "select_one list_name")
         type_parts = raw_type.split()
@@ -225,6 +247,17 @@ def parse_xlsform(file_bytes: bytes, filename: str = "") -> dict:
         if base_type == "begin_group":
             sec_title = label or name or "Group"
             current_section = {"id": _uid(), "title": sec_title, "fields": []}
+            # section-level skip logic (relevant on the begin_group row) — the
+            # renderer hides the whole section when this is false.
+            if relevant:
+                sec_skip, sec_raw = parse_relevant(relevant)
+                if sec_skip:
+                    current_section["skipLogic"] = sec_skip
+                if sec_raw:
+                    warnings.append(
+                        f"Section '{sec_title}': relevant expression could not be fully "
+                        f"parsed — stored raw: '{sec_raw}'"
+                    )
             sections.append(current_section)
             continue
 
@@ -289,6 +322,16 @@ def parse_xlsform(file_bytes: bytes, filename: str = "") -> dict:
             field["options"] = opts
             if not opts:
                 warnings.append(f"Field '{name}': choice list '{list_name}' not found in choices sheet.")
+            # cascading select: filter options by a parent field's answer
+            if choice_filter:
+                cf = _parse_choice_filter(choice_filter)
+                if cf:
+                    field["choiceFilter"] = cf
+                else:
+                    warnings.append(
+                        f"Field '{name}': choice_filter '{choice_filter}' not understood — "
+                        f"cascading not applied (all options will show)."
+                    )
 
         # calculated formula
         if fg_type == "calculated" and calculation:

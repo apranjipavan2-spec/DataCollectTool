@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { FormSchema, FormField, FormSection } from '@/types/form'
-import { shouldShow, shouldShowSection, evalFormula, getAllFieldsInOrder } from '@/lib/formUtils'
+import { shouldShow, shouldShowSection, evalFormula, getAllFieldsInOrder, filterOptions } from '@/lib/formUtils'
 import { v4 as uuidv4 } from 'uuid'
 import { useLanguage, getLocalizedLabel, LANGUAGE_OPTIONS } from '@/i18n/LanguageContext'
 
@@ -136,17 +136,19 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
   const { language, setLanguage } = useLanguage()
   const localizedField = useMemo(() => {
     if (!currentField) return currentField
+    // Cascading select: narrow options by parent answers before localizing.
+    const visibleOptions = filterOptions(currentField, draft.values)
     return {
       ...currentField,
       label: getLocalizedLabel(currentField as unknown as Record<string, unknown>, 'label', language),
       hint: getLocalizedLabel(currentField as unknown as Record<string, unknown>, 'hint', language) || undefined,
       // Localize option labels for choice fields
-      options: currentField.options?.map(opt => ({
+      options: visibleOptions?.map(opt => ({
         ...opt,
         label: getLocalizedLabel(opt as unknown as Record<string, unknown>, 'label', language),
       })),
     } as FormField
-  }, [currentField, language])
+  }, [currentField, language, draft.values])
 
   // Capture GPS on mount
   useEffect(() => {

@@ -42,6 +42,8 @@ export interface ValidationRule {
 export interface FieldOption {
   value: string
   label: string
+  /** Cascading attributes (e.g. block/gp) that a later field's choiceFilter matches on. */
+  [attr: string]: string
 }
 
 export interface FormField {
@@ -55,6 +57,8 @@ export interface FormField {
   min?: number                 // number / decimal / rating
   max?: number
   autoNow?: boolean            // date/time: prefill with today's date / current time on open
+  /** Cascading select: show only options whose {attr} equals the answer of {field}. */
+  choiceFilter?: { attr: string; field: string }[]
   formula?: string             // calculated field expression
   fields?: FormField[]         // repeat_group children
   skipLogic?: SkipLogic

@@ -177,6 +177,24 @@ export function evalFormula(formula: string, values: Record<string, unknown>): s
   }
 }
 
+/**
+ * Cascading select: return the options visible given current answers.
+ * Keeps every option whose cascading attribute equals the answer of the field it
+ * depends on. If a parent hasn't been answered yet, no options are shown (the user
+ * must pick the parent first). Fields without choiceFilter are returned unchanged.
+ */
+export function filterOptions(field: FormField, values: Record<string, unknown>): FormField['options'] {
+  const opts = field.options
+  if (!opts || !field.choiceFilter?.length) return opts
+  return opts.filter(opt =>
+    field.choiceFilter!.every(({ attr, field: parent }) => {
+      const parentVal = values[parent]
+      if (parentVal === undefined || parentVal === null || parentVal === '') return false
+      return String((opt as Record<string, unknown>)[attr] ?? '') === String(parentVal)
+    })
+  )
+}
+
 /** Recursively map a section by id (handles subsections). */
 export function mapSectionById(
   sections: FormSection[],
