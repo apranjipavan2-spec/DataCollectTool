@@ -70,6 +70,9 @@ export default function FormBuilder() {
   const [showTranslate, setShowTranslate] = useState(false)
   const [translating, setTranslating]     = useState(false)
 
+  // ── My-forms picker ──────────────────────────────────────────────────────
+  const [showForms, setShowForms] = useState(false)
+
   const handleTranslate = async (lang: string) => {
     setTranslating(true)
     try {
@@ -728,6 +731,14 @@ export default function FormBuilder() {
               </button>
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleImportExcel(f) }} />
+              <a
+                href="/FieldGovern_Form_Template.xlsx"
+                download
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-catalan-textMuted text-xs font-medium hover:text-catalan-primary hover:bg-catalan-primary/5 transition-colors"
+                title="Download a blank XLSForm template with one example row per field type"
+              >
+                <span><EmojiIcon e="⬇️" /></span><span>Download Excel template</span>
+              </a>
 
               {importSummary && (
                 <div className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-catalan-success/10 border border-catalan-success/30">
@@ -755,15 +766,15 @@ export default function FormBuilder() {
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Top Bar */}
             <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-catalan-border bg-catalan-surface flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <button onClick={() => setShowLeftPanel(!showLeftPanel)} className="md:hidden p-1.5 rounded bg-catalan-hover text-catalan-primary text-sm"><EmojiIcon e="☰" /></button>
-                <span className="text-sm text-catalan-textMuted truncate">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <button onClick={() => setShowLeftPanel(!showLeftPanel)} className="md:hidden p-1.5 rounded bg-catalan-hover text-catalan-primary text-sm flex-shrink-0"><EmojiIcon e="☰" /></button>
+                <span className="text-sm text-catalan-textMuted break-words line-clamp-2 min-w-0">
                   {currentField
                     ? `${currentSection?.title} › ${currentField.label || 'Untitled field'}`
                     : currentSection?.title}
                 </span>
               </div>
-              <div className="flex gap-3 items-center flex-wrap">
+              <div className="flex gap-3 items-center flex-wrap flex-shrink-0">
                 {formLoadError && (
                   <div className="flex items-center gap-1.5 text-xs text-catalan-error bg-catalan-error/10 border border-catalan-error/30 rounded-lg px-2.5 py-1">
                     <span><EmojiIcon e="⚠" /></span><span>{formLoadError}</span>
@@ -789,6 +800,7 @@ export default function FormBuilder() {
                     </Button>
                   </span>
                 )}
+                <Button variant="secondary" size="sm" onClick={() => setShowForms(true)}>📂 My Forms</Button>
                 <Button variant="secondary" size="sm" onClick={() => setShowTranslate(true)}>Translate</Button>
                 <Button variant="secondary" size="sm" onClick={() => window.location.href = '/collect'}>Preview</Button>
                 <Button onClick={handleSave} disabled={saving} size="sm"
@@ -829,6 +841,7 @@ export default function FormBuilder() {
       </div>
 
       {showTypeMenu && <FieldTypeMenu onSelect={addField} onClose={() => setShowTypeMenu(false)} />}
+      {showForms && <MyFormsModal currentId={formId} onClose={() => setShowForms(false)} />}
       {showTranslate && (
         <TranslateModal
           onTranslate={handleTranslate}
@@ -1343,6 +1356,85 @@ function TranslateModal({ onTranslate, onClose, translating }: {
           <Button variant="secondary" size="sm" onClick={onClose} disabled={translating}>Cancel</Button>
           <Button size="sm" onClick={() => selected && onTranslate(selected)} disabled={!selected || translating}>
             {translating ? 'Translating…' : 'Translate'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── My Forms Modal ────────────────────────────────────────────────────────────
+
+interface FormListItem { id: string; title: string; version: number; status: string; updated_at: string }
+
+const FORM_STATUS_COLORS: Record<string, string> = {
+  draft:     'text-amber-700 bg-amber-100',
+  published: 'text-green-700 bg-green-100',
+  archived:  'text-catalan-textMuted bg-catalan-textMuted/10',
+}
+
+function MyFormsModal({ currentId, onClose }: { currentId: string | null; onClose: () => void }) {
+  const [forms, setForms]     = useState<FormListItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState('')
+
+  useEffect(() => {
+    let alive = true
+    api.get('/forms/')
+      .then(r => { if (alive) setForms(r.data.forms ?? r.data ?? []) })
+      .catch((e: any) => { if (alive) setError(e.response?.data?.detail || 'Could not load forms') })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [])
+
+  const open = (id: string) => { window.location.href = `/builder?id=${id}` }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-catalan-surface border border-catalan-border rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-catalan-border">
+          <h3 className="text-base font-semibold text-catalan-text">📂 My Forms</h3>
+          <button onClick={onClose} className="text-catalan-textMuted hover:text-catalan-text text-lg leading-none">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3">
+          {loading && <p className="text-center text-catalan-textMuted text-sm py-8 animate-pulse">Loading forms…</p>}
+          {error && <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg p-3">{error}</p>}
+          {!loading && !error && forms.length === 0 && (
+            <p className="text-center text-catalan-textMuted text-sm py-8">No forms yet. Build your first one below.</p>
+          )}
+          <div className="space-y-1.5">
+            {forms.map(f => (
+              <button
+                key={f.id}
+                onClick={() => open(f.id)}
+                disabled={f.id === currentId}
+                className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors ${
+                  f.id === currentId
+                    ? 'border-catalan-primary bg-catalan-primary/5 cursor-default'
+                    : 'border-catalan-border hover:border-catalan-primary hover:bg-catalan-primary/5'
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-catalan-text truncate">
+                    {f.title || 'Untitled Form'}
+                    {f.id === currentId && <span className="ml-2 text-xs text-catalan-primary font-normal">(editing)</span>}
+                  </div>
+                  <div className="text-xs text-catalan-textMuted mt-0.5">
+                    v{f.version} · updated {f.updated_at ? new Date(f.updated_at).toLocaleDateString() : '—'}
+                  </div>
+                </div>
+                <span className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${FORM_STATUS_COLORS[f.status] ?? 'text-catalan-textMuted bg-catalan-textMuted/10'}`}>
+                  {f.status}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-catalan-border">
+          <Button variant="secondary" size="sm" className="w-full" onClick={() => { window.location.href = '/builder' }}>
+            + New blank form
           </Button>
         </div>
       </div>

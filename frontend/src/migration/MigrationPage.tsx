@@ -192,6 +192,14 @@ function XLSFormTab() {
         <p className="text-sm text-catalan-textMuted">Standard XLSForm format used by ODK, KoboToolbox, SurveyCTO, and others.</p>
       </div>
 
+      <a
+        href="/FieldGovern_Form_Template.xlsx"
+        download
+        className="flex items-center gap-2 rounded-lg border border-catalan-primary/40 bg-catalan-primary/5 px-4 py-3 text-sm font-medium text-catalan-primary hover:bg-catalan-primary/10 transition-colors"
+      >
+        <EmojiIcon e="⬇️" /> Download starter template (.xlsx) — one example row per field type
+      </a>
+
       <label className="block border-2 border-dashed border-catalan-border rounded-xl p-10 text-center cursor-pointer hover:border-catalan-primary transition-colors group">
         <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile} />
         <div className="text-4xl mb-3"><EmojiIcon e="📄" /></div>

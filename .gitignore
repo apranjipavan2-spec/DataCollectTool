@@ -88,6 +88,8 @@ tools/datacleaner/*.db
 
 # Data analysis files
 *.xlsx
+# but the blank XLSForm starter template must ship with the app (download button)
+!frontend/public/FieldGovern_Form_Template.xlsx
 website/status.html
 
 # Local archive (Railway configs + old tools, zipped for reference)
