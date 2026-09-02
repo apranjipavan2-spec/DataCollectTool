@@ -105,9 +105,16 @@ jobs:
             set -e
             cd /opt/fieldgovern
 
-            # Pull the freshly-built image (VPS IPv6 route to ghcr resets
-            # mid-pull intermittently — retry before giving up).
-            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u apranjipavan2-spec --password-stdin
+            # Login + pull the freshly-built image. The VPS's route to ghcr
+            # (Fastly) intermittently TLS-handshake-times-out or resets, so retry
+            # BOTH the login and the pull before giving up.
+            ok=0
+            for i in 1 2 3 4 5 6; do
+              if echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u apranjipavan2-spec --password-stdin; then ok=1; break; fi
+              echo "Login attempt $i failed; retrying in 15s..."
+              sleep 15
+            done
+            [ "$ok" = 1 ] || { echo "ERROR: ghcr login failed after 6 attempts"; exit 1; }
             ok=0
             for i in 1 2 3 4 5 6; do
               if docker compose pull app; then ok=1; break; fi
