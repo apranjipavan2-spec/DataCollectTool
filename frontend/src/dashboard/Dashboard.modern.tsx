@@ -460,6 +460,7 @@ function AssignModal({
   const [busy, setBusy] = useState('')
   const [assigningAll, setAssigningAll] = useState(false)
   const assignedIds = new Set(assignments.map(a => a.enumerator_id))
+  const enumeratorCount = team.filter(u => u.role === 'enumerator').length
   const unassigned = team.filter(u => u.role === 'enumerator' && !assignedIds.has(u.id))
 
   const handleAssign = async (enumeratorId: string) => {
@@ -524,7 +525,11 @@ function AssignModal({
             )}
           </div>
           {unassigned.length === 0 ? (
-            <p className="text-sm text-catalan-textMuted">All enumerators assigned</p>
+            <p className="text-sm text-catalan-textMuted">
+              {enumeratorCount === 0
+                ? 'No enumerators in your team yet. Add one under the Roster tab (role: enumerator), then come back to assign.'
+                : 'All enumerators assigned'}
+            </p>
           ) : (
             <div className="space-y-1">
               {unassigned.map(u => (
@@ -1133,6 +1138,18 @@ export default function Dashboard() {
       toast.success(`"${form.title}" deleted`)
     } catch (err: any) {
       toast.error(err.response?.data?.detail ?? 'Could not delete form')
+    }
+  }
+
+  const handleTogglePublish = async (form: Form) => {
+    const next = form.status === 'active' ? 'draft' : 'active'
+    if (next === 'active' && !window.confirm(`Publish "${form.title}"? Assigned enumerators will be able to collect with it.`)) return
+    try {
+      await api.put(`/forms/${form.id}`, { status: next })
+      setForms(prev => prev.map(f => f.id === form.id ? { ...f, status: next } : f))
+      toast.success(next === 'active' ? `"${form.title}" published — now collecting` : `"${form.title}" unpublished (back to draft)`)
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail ?? `Could not ${next === 'active' ? 'publish' : 'unpublish'} form`)
     }
   }
 
@@ -2512,6 +2529,15 @@ export default function Dashboard() {
                                     title="Share as public survey"
                                   >
                                     Share
+                                  </button>
+                                )}
+                                {['org_admin'].includes(user.role) && (
+                                  <button
+                                    onClick={() => handleTogglePublish(form)}
+                                    className={`text-xs hover:underline ${form.status === 'active' ? 'text-catalan-warning' : 'text-catalan-success'}`}
+                                    title={form.status === 'active' ? 'Unpublish (back to draft)' : 'Publish so enumerators can collect'}
+                                  >
+                                    {form.status === 'active' ? 'Unpublish' : 'Publish'}
                                   </button>
                                 )}
                                 {['org_admin'].includes(user.role) && (
