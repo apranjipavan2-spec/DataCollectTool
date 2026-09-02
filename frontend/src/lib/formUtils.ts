@@ -73,21 +73,27 @@ function evaluateCondition(c: SkipCondition, values: Record<string, unknown>): b
 }
 
 /**
- * Has the person born on `dob` reached the age threshold `Y|M|D` by today?
- * Exact calendar arithmetic. Returns null when dob or threshold is unusable
- * (so age_gte and age_lt both fail rather than firing on garbage).
+ * Has the person born on `dob` reached the age threshold `Y|M|D[|refDate]`?
+ * The 4th "|" segment is an optional reference date (YYYY-MM-DD): age is measured
+ * as of that date; when absent, as of the collection date (today). Exact calendar
+ * arithmetic. Returns null when dob or threshold is unusable (so age_gte and
+ * age_lt both fail rather than firing on garbage).
  */
 function ageMeetsThreshold(dob: unknown, threshold: unknown): boolean | null {
   const b = new Date(String(dob))
   if (isNaN(b.getTime())) return null
-  const parts = String(threshold ?? '').split('|').map(n => parseInt(n, 10))
-  const [y, m, d] = [parts[0] || 0, parts[1] || 0, parts[2] || 0]
+  const raw = String(threshold ?? '').split('|')
+  const y = parseInt(raw[0], 10) || 0
+  const m = parseInt(raw[1], 10) || 0
+  const d = parseInt(raw[2], 10) || 0
   if (y === 0 && m === 0 && d === 0) return null
   const at = new Date(b)
   at.setFullYear(at.getFullYear() + y)
   at.setMonth(at.getMonth() + m)
   at.setDate(at.getDate() + d)
-  return new Date() >= at
+  const ref = raw[3] ? new Date(raw[3]) : new Date()
+  const refDate = isNaN(ref.getTime()) ? new Date() : ref
+  return refDate >= at
 }
 
 function toNumber(x: unknown): number {

@@ -47,10 +47,10 @@ const AGE_OPERATORS: { value: SkipCondition['operator']; label: string }[] = [
   { value: 'age_lt',  label: 'age is under' },
 ]
 
-/** Parse "Y|M|D" → [years, months, days]. */
-function parseAge(v?: string | number): [number, number, number] {
-  const p = String(v ?? '').split('|').map(n => parseInt(n, 10) || 0)
-  return [p[0] || 0, p[1] || 0, p[2] || 0]
+/** Parse "Y|M|D[|refDate]" → [years, months, days, refDate]. */
+function parseAge(v?: string | number): [number, number, number, string] {
+  const p = String(v ?? '').split('|')
+  return [parseInt(p[0], 10) || 0, parseInt(p[1], 10) || 0, parseInt(p[2], 10) || 0, p[3] || '']
 }
 
 const selCls = 'bg-catalan-bg border border-catalan-border text-catalan-text rounded-md px-2 py-1 text-xs focus:outline-none focus:border-catalan-primary'
@@ -92,8 +92,9 @@ function ConditionRow({ condition, allFields, onUpdate, onRemove }: {
   const isAgeOp = condition.operator === 'age_gte' || condition.operator === 'age_lt'
   const operatorList = isDate ? [...OPERATORS, ...AGE_OPERATORS] : OPERATORS
   const needsValue = !VALUELESS_OPERATORS.has(condition.operator)
-  const [ay, am, ad] = parseAge(condition.value)
-  const setAge = (y: number, m: number, d: number) => onUpdate({ value: `${y}|${m}|${d}` })
+  const [ay, am, ad, aref] = parseAge(condition.value)
+  const setAge = (y: number, m: number, d: number, ref: string = aref) =>
+    onUpdate({ value: ref ? `${y}|${m}|${d}|${ref}` : `${y}|${m}|${d}` })
   return (
     <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
       <select
@@ -117,13 +118,24 @@ function ConditionRow({ condition, allFields, onUpdate, onRemove }: {
         {operatorList.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
       </select>
       {isAgeOp ? (
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1 flex-wrap">
           <input type="number" min={0} className={`${inpCls} w-14`} value={ay} onChange={e => setAge(parseInt(e.target.value) || 0, am, ad)} title="years" />
           <span className="text-xs text-catalan-textMuted">y</span>
           <input type="number" min={0} max={11} className={`${inpCls} w-12`} value={am} onChange={e => setAge(ay, parseInt(e.target.value) || 0, ad)} title="months" />
           <span className="text-xs text-catalan-textMuted">m</span>
           <input type="number" min={0} max={30} className={`${inpCls} w-12`} value={ad} onChange={e => setAge(ay, am, parseInt(e.target.value) || 0)} title="days" />
           <span className="text-xs text-catalan-textMuted">d</span>
+          <span className="text-xs text-catalan-textMuted ml-1">as of</span>
+          <input
+            type="date"
+            className={`${inpCls} w-36`}
+            value={aref}
+            onChange={e => setAge(ay, am, ad, e.target.value)}
+            title="Reference date for the age calculation. Leave blank to use the data-collection date."
+          />
+          {aref
+            ? <button type="button" onClick={() => setAge(ay, am, ad, '')} className="text-xs text-catalan-textMuted hover:text-catalan-error" title="Clear — use collection date">✕</button>
+            : <span className="text-xs text-catalan-textMuted/70">(collection date)</span>}
         </span>
       ) : needsValue && (
         <input
