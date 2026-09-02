@@ -795,17 +795,18 @@ export default function FormBuilder() {
                   <span className="inline-flex items-center gap-1" data-help-id="version-history-btn">
                     <InfoButton topicId="form-versions" />
                     <Button variant="secondary" size="sm" onClick={() => setShowVersions(v => !v)}
+                      title={showVersions ? 'Close version history' : `Version history (v${schema.version})`}
                       className={showVersions ? '!border-catalan-primary !text-catalan-primary' : ''}>
-                      {showVersions ? '✕ Versions' : `v${schema.version} History`}
+                      {showVersions ? '✕' : `🕘 v${schema.version}`}
                     </Button>
                   </span>
                 )}
-                <Button variant="secondary" size="sm" onClick={() => setShowForms(true)}>📂 My Forms</Button>
-                <Button variant="secondary" size="sm" onClick={() => setShowTranslate(true)}>Translate</Button>
-                <Button variant="secondary" size="sm" onClick={() => window.location.href = '/collect'}>Preview</Button>
-                <Button onClick={handleSave} disabled={saving} size="sm"
+                <Button variant="secondary" size="sm" onClick={() => setShowForms(true)} title="My Forms">📂</Button>
+                <Button variant="secondary" size="sm" onClick={() => setShowTranslate(true)} title="Translate form labels">🌐</Button>
+                <Button variant="secondary" size="sm" onClick={() => window.location.href = '/collect'} title="Preview form">👁</Button>
+                <Button onClick={handleSave} disabled={saving} size="sm" title="Save form"
                   className={saved ? '!bg-catalan-success !text-catalan-bg !border-catalan-success hover:!bg-catalan-success' : ''}>
-                  {saving ? '...' : saved ? '✓ Saved' : 'Save'}
+                  {saving ? '…' : saved ? '✓' : '💾 Save'}
                 </Button>
               </div>
             </div>
