@@ -92,6 +92,9 @@ tools/datacleaner/*.db
 !frontend/public/FieldGovern_Form_Template.xlsx
 website/status.html
 
+# Customer deliverables / working drafts (not repo source)
+content-drafts/
+
 # Local archive (Railway configs + old tools, zipped for reference)
 _archive/
 _archive.zip
