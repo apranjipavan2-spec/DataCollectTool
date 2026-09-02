@@ -51,6 +51,7 @@ export interface FormField {
   options?: FieldOption[]      // for single_choice / multiple_choice
   min?: number                 // number / decimal / rating
   max?: number
+  autoNow?: boolean            // date/time: prefill with today's date / current time on open
   formula?: string             // calculated field expression
   fields?: FormField[]         // repeat_group children
   skipLogic?: SkipLogic

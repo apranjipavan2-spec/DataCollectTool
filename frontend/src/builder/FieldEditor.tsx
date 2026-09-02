@@ -754,6 +754,22 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
         {field.required && <span className="text-xs text-catalan-error bg-catalan-error/10 px-2 py-0.5 rounded">Must be answered</span>}
       </div>
 
+      {/* Date / Time — auto-fill with current date/time */}
+      {(field.type === 'date' || field.type === 'time') && (
+        <div className={`${groupCls} flex items-center gap-3`}>
+          <button
+            onClick={() => onChange({ autoNow: !field.autoNow })}
+            className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none ${field.autoNow ? 'bg-catalan-primary' : 'bg-catalan-hover border border-catalan-border'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${field.autoNow ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+          <span className="text-sm text-catalan-text">
+            Auto-fill with {field.type === 'date' ? "today's date" : 'the current time'}
+          </span>
+          <span className="text-xs text-catalan-textMuted">enumerator can still change it</span>
+        </div>
+      )}
+
       {/* Number / Decimal / Rating — Range */}
       {(field.type === 'number' || field.type === 'decimal' || field.type === 'rating') && (
         <div className={groupCls}>

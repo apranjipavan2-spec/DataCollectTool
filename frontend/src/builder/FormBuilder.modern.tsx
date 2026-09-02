@@ -425,6 +425,10 @@ export default function FormBuilder() {
   }
 
   // ── Recursive left panel renderers ────────────────────────────────────────
+  // Auto question numbers in document order — recomputed on every render, so they
+  // update immediately when fields are reordered or added/removed.
+  const fieldNumbers = new Map(getAllFieldsInOrder(schema.sections).map((f, i) => [f.id, i + 1]))
+
   const renderFieldRow = (sectionId: string, field: FormField, depth: number) => {
     const isSelected  = selectedField?.fieldId === field.id
     const isDragOver  = dragOver?.fieldId === field.id && dragSrc?.fieldId !== field.id
@@ -449,6 +453,7 @@ export default function FormBuilder() {
           } ${isDragging ? 'opacity-40' : ''}`}
         >
           <span className="text-catalan-textMuted/40 text-xs cursor-grab active:cursor-grabbing flex-shrink-0 select-none">⠿</span>
+          <span className="text-catalan-textMuted/70 text-xs w-6 text-right flex-shrink-0 tabular-nums select-none">{fieldNumbers.get(field.id)}.</span>
           <span className="text-catalan-textMuted text-xs w-4 text-center flex-shrink-0"><EmojiIcon e={FIELD_TYPE_ICONS[field.type] ?? '?'} /></span>
           <span className={`flex-1 text-xs leading-snug break-words min-w-0 ${field.label ? 'text-catalan-text' : 'text-catalan-error/80'}`}>
             {field.label || 'label missing'}

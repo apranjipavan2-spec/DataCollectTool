@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import type { FormSchema, FormField } from '@/types/form'
+import type { FormSchema, FormField, FormSection } from '@/types/form'
 import { shouldShow, shouldShowSection, evalFormula, getAllFieldsInOrder } from '@/lib/formUtils'
 import { v4 as uuidv4 } from 'uuid'
 import { useLanguage, getLocalizedLabel, LANGUAGE_OPTIONS } from '@/i18n/LanguageContext'
@@ -63,13 +63,33 @@ function validate(field: FormField, value: unknown): string {
   return ''
 }
 
+/** Seed default values for date/time fields flagged autoNow (today / current time). */
+function seedAutoNow(schema: FormSchema): Record<string, unknown> {
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+  const time = `${pad(now.getHours())}:${pad(now.getMinutes())}`
+  const values: Record<string, unknown> = {}
+  const walk = (secs: FormSection[]) => {
+    for (const s of secs) {
+      for (const f of s.fields) {
+        if (f.autoNow && f.type === 'date') values[f.name] = today
+        if (f.autoNow && f.type === 'time') values[f.name] = time
+      }
+      if (s.subsections?.length) walk(s.subsections)
+    }
+  }
+  walk(schema.sections)
+  return values
+}
+
 export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initialDraft }: Props) {
   const purpose = schema.settings?.purpose as string | undefined
   const [consentGiven, setConsentGiven] = useState(!purpose || !!initialDraft?.consentTimestamp)
 
   const [draft, setDraft] = useState<SubmissionDraft>(() => initialDraft ?? {
     id: uuidv4(), formVersion: schema.version,
-    values: {}, gpsOpen: null, gpsSubmit: null, status: 'draft', startedAt: new Date().toISOString(),
+    values: seedAutoNow(schema), gpsOpen: null, gpsSubmit: null, status: 'draft', startedAt: new Date().toISOString(),
   })
   const [page, setPage]       = useState(0)
   const [errors, setErrors]   = useState<Record<string, string>>({})
