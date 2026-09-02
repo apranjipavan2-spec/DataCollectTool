@@ -629,7 +629,7 @@ function RepeatGroupChildEditor({ fields, onChange }: {
                       {(cf.options ?? []).map((opt, oi) => (
                         <div key={oi} className="flex gap-1.5 items-center">
                           <input
-                            className={`${inputCls} flex-1 text-xs`}
+                            className={`${inputCls} flex-1 min-w-0 text-xs`}
                             value={opt.label}
                             placeholder="Label"
                             onChange={e => {
@@ -638,7 +638,7 @@ function RepeatGroupChildEditor({ fields, onChange }: {
                             }}
                           />
                           <input
-                            className={`${inputCls} w-24 text-xs font-mono`}
+                            className={`${inputCls} !w-24 flex-shrink-0 text-xs font-mono`}
                             value={opt.value}
                             placeholder="value"
                             onChange={e => {
@@ -874,11 +874,18 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
       {(field.type === 'single_choice' || field.type === 'multiple_choice') && (
         <div className={groupCls}>
           <label className={labelCls}>Options</label>
+          <div className="flex gap-2 items-center mb-1 px-0.5">
+            <span className="flex-1 min-w-0 text-[10px] uppercase tracking-wider text-catalan-textMuted">Label (shown to respondent)</span>
+            <span className="w-24 flex-shrink-0 text-[10px] uppercase tracking-wider text-catalan-textMuted">Value (export)</span>
+            <span className="w-8 flex-shrink-0" />
+          </div>
           <div className="space-y-2 mb-3">
             {(field.options ?? []).map((opt, i) => (
               <div key={opt.value || i} className="flex gap-2 items-center">
-                <input className={`${inputCls} flex-1`} value={opt.label} placeholder="Option label" onChange={e => updateOption(i, { label: e.target.value })} />
-                <input className={`${inputCls} w-32 font-mono text-xs`} value={opt.value} placeholder="value" onChange={e => updateOption(i, { value: e.target.value })} />
+                {/* min-w-0 lets the flex-1 label box actually shrink/grow; value box is
+                    a fixed width with flex-shrink-0 so it can't steal the label's width */}
+                <input className={`${inputCls} flex-1 min-w-0`} value={opt.label} placeholder="Option label" onChange={e => updateOption(i, { label: e.target.value })} />
+                <input className={`${inputCls} !w-24 flex-shrink-0 font-mono text-xs`} value={opt.value} placeholder="value" onChange={e => updateOption(i, { value: e.target.value })} />
                 <button onClick={() => removeOption(i)} className="w-8 h-8 flex items-center justify-center rounded-lg text-catalan-textMuted hover:text-catalan-error hover:bg-catalan-error/10 transition-colors flex-shrink-0 text-sm">✕</button>
               </div>
             ))}

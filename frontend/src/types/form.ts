@@ -43,7 +43,7 @@ export interface FieldOption {
   value: string
   label: string
   /** Cascading attributes (e.g. block/gp) that a later field's choiceFilter matches on. */
-  [attr: string]: string
+  [attr: string]: string | undefined
 }
 
 export interface FormField {
