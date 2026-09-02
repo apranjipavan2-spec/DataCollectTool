@@ -115,7 +115,16 @@ jobs:
 
             # ── 1. Pull and restart main app ────────────────────────────────────
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u apranjipavan2-spec --password-stdin
-            docker compose pull app
+            # The VPS's IPv6 route to ghcr.io (Fastly) resets mid-pull intermittently
+            # ("connection reset by peer"). Retry before giving up — each attempt is a
+            # fresh connection and usually succeeds within a few tries.
+            ok=0
+            for i in 1 2 3 4 5 6; do
+              if docker compose pull app; then ok=1; break; fi
+              echo "Pull attempt $i failed; retrying in 15s..."
+              sleep 15
+            done
+            [ "$ok" = 1 ] || { echo "ERROR: image pull failed after 6 attempts"; exit 1; }
             docker compose up -d --no-deps app
 
             # ── 2. Run DB migrations ─────────────────────────────────────────────
