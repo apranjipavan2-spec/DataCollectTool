@@ -40,6 +40,13 @@ _TYPE_MAP: dict[str, str] = {
 
 _STRUCTURAL = {"begin_group", "end_group", "begin_repeat", "end_repeat"}
 
+# ODK's `calculate` column uses XPath syntax (${field}, today(), div, ...) that
+# FieldGovern's formula engine (age(), ageAtLeast(), if(), sum(), ...) does not
+# understand — it copies the raw string through unchanged, so a syntax it can't
+# evaluate silently returns the field's own value instead of erroring.
+_ODK_CALC_MARKERS = ("${", "today(", "now(", " div ", "decimal-date-time(",
+                     "format-date(", "pulldata(", "indexed-repeat(", "jr:")
+
 # types that warn the user data may be lost or mapped approximately
 _WARN_MAP = {
     "video": "video fields mapped to audio — video files not supported",
@@ -336,6 +343,12 @@ def parse_xlsform(file_bytes: bytes, filename: str = "") -> dict:
         # calculated formula
         if fg_type == "calculated" and calculation:
             field["formula"] = calculation
+            if any(marker in calculation for marker in _ODK_CALC_MARKERS):
+                warnings.append(
+                    f"Field '{name}': calculate formula '{calculation}' uses ODK/XPath "
+                    f"syntax not supported by FieldGovern's formula engine — rewrite it "
+                    f"using bare field names and age()/if()/sum()/round() etc, e.g. age(dob)."
+                )
 
         # number min/max (from range parameters or constraint)
         if base_type == "range":
