@@ -10,17 +10,14 @@ import AiConfigPanel from './AiConfigPanel'
 import EmojiIcon from '@/components/EmojiIcon'
 
 export default function OrgAdminPanel() {
-  const [activeTab, setActiveTab] = useState('users')
+  const [activeTab, setActiveTab] = useState('api-keys')
 
   const user = getStoredUser() || { name: '', role: '' }
   const sidebarItems = getNavItems(user.role)
 
   const isMasterAdmin = user.role === 'master_admin'
   const tabs = [
-    { id: 'users',        label: 'Users',        description: 'Manage team members' },
     { id: 'api-keys',     label: 'API Keys',      description: 'Integration access' },
-    { id: 'forms',        label: 'Forms',         description: 'Form templates' },
-    { id: 'migration',    label: 'Import',        description: 'Kobo · SurveyCTO · XLSForm' },
     { id: 'integrations', label: 'Integrations',  description: 'Alerts · Webhooks · Sheets · Access' },
     { id: 'security',     label: 'Security',      description: 'QR login · Password' },
     ...(isMasterAdmin ? [{ id: 'ai', label: 'AI', description: 'OpenAI · Claude · Gemini' }] : []),
@@ -32,11 +29,6 @@ export default function OrgAdminPanel() {
       <div className="flex-1 flex flex-col overflow-auto">
         <TopNav title="Organization Settings" />
         <div className="flex-1 p-6">
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold text-catalan-text mb-2">Organization Admin</h2>
-            <p className="text-catalan-textMuted">Manage users, API keys, and form assignments</p>
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             {tabs.map((tab) => (
               <button
@@ -55,10 +47,7 @@ export default function OrgAdminPanel() {
           </div>
 
           <div>
-            {activeTab === 'users' && <UsersTab />}
             {activeTab === 'api-keys' && <ApiKeyManager />}
-            {activeTab === 'forms' && <FormsTab />}
-            {activeTab === 'migration' && <MigrationTab />}
             {activeTab === 'integrations' && (
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-catalan-text mb-6">Integrations</h3>
@@ -77,75 +66,6 @@ export default function OrgAdminPanel() {
         </div>
       </div>
     </div>
-  )
-}
-
-function UsersTab() {
-  return (
-    <Card>
-      <div className="p-6">
-        <h3 className="text-lg font-semibold text-catalan-text mb-4">Team Management</h3>
-        <div className="space-y-3">
-          <p className="text-catalan-textMuted">
-            User management is available in the <strong className="text-catalan-primary">Team tab</strong> of the main Dashboard.
-          </p>
-          <p className="text-sm text-catalan-textMuted">
-            You can add new users, remove team members, and manage their roles and permissions from there.
-          </p>
-          <div className="mt-6">
-            <a href="/" className="inline-block px-4 py-2 bg-catalan-primary text-catalan-bg rounded font-medium hover:bg-catalan-primaryDark transition-colors">
-              Go to Dashboard
-            </a>
-          </div>
-        </div>
-      </div>
-    </Card>
-  )
-}
-
-function MigrationTab() {
-  return (
-    <Card>
-      <div className="p-6">
-        <h3 className="text-lg font-semibold text-catalan-text mb-2">Import from Other Platforms</h3>
-        <p className="text-catalan-textMuted mb-6">
-          Migrate your forms and historical data from KoboToolbox, SurveyCTO, ODK Central, or any standard XLSForm file.
-        </p>
-        <a href="/migration" className="inline-block px-5 py-2.5 bg-catalan-primary text-catalan-bg rounded-lg font-semibold hover:opacity-90 transition-opacity">
-          <EmojiIcon e="🔄" /> Open Migration Wizard →
-        </a>
-      </div>
-    </Card>
-  )
-}
-
-function FormsTab() {
-  return (
-    <Card>
-      <div className="p-6">
-        <h3 className="text-lg font-semibold text-catalan-text mb-2">Form Builder</h3>
-        <p className="text-sm text-catalan-textMuted mb-6">
-          Design questionnaires, configure skip logic, add photos and GPS fields, and publish forms to your field team.
-        </p>
-        <div className="flex flex-wrap gap-3">
-          <a href="/builder" className="inline-flex items-center gap-2 px-5 py-3 bg-catalan-primary text-catalan-bg rounded-xl font-semibold text-sm hover:bg-catalan-primaryDark transition-colors shadow-sm">
-            <EmojiIcon e="📋" /> Open Form Builder →
-          </a>
-          <a href="/builder" className="inline-flex items-center gap-2 px-5 py-3 border border-catalan-border text-catalan-text rounded-xl font-medium text-sm hover:bg-catalan-hover transition-colors">
-            <EmojiIcon e="➕" /> Create New Form
-          </a>
-        </div>
-        <div className="mt-6 p-4 bg-catalan-bg border border-catalan-border rounded-xl text-sm text-catalan-textMuted">
-          <p className="font-medium text-catalan-text mb-1">What you can do in the Form Builder:</p>
-          <ul className="space-y-1 text-xs mt-2">
-            <li>• Build multi-section questionnaires with skip logic</li>
-            <li>• Add text, number, GPS, photo, audio, and choice fields</li>
-            <li>• Import existing XLSForm / KoboToolbox forms</li>
-            <li>• Publish and assign forms to enumerators</li>
-          </ul>
-        </div>
-      </div>
-    </Card>
   )
 }
 
@@ -211,7 +131,7 @@ function SecurityTab() {
   if (loading) return <div className="p-6 text-catalan-textMuted text-sm">Loading…</div>
 
   return (
-    <div className="p-6 space-y-6 max-w-xl">
+    <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl items-start">
       {/* QR Login toggle */}
       <Card>
         <div className="p-6">
@@ -272,7 +192,7 @@ function SecurityTab() {
       </Card>
 
       {/* Password change */}
-      <Card>
+      <Card className="lg:col-span-2 max-w-xl">
         <div className="p-6">
           <h3 className="text-base font-semibold text-catalan-text mb-1">Change Password</h3>
           <p className="text-sm text-catalan-textMuted mb-5">Update your admin account password.</p>
