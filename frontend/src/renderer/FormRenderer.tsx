@@ -432,7 +432,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
           <PhotoField field={localizedField} value={draft.values[currentField.name] as string ?? null} onChange={v => setValue(currentField.name, v)} />
         )}
         {localizedField.type === 'audio' && (
-          <AudioField field={localizedField} value={draft.values[currentField.name] as string ?? null} onChange={v => setValue(currentField.name, v)} />
+          <AudioField field={localizedField} value={draft.values[currentField.name] as string ?? null} onChange={v => setValue(currentField.name, v)} submissionId={draft.id} />
         )}
         {localizedField.type === 'repeat_group' && (
           <RepeatGroupField field={localizedField} value={draft.values[currentField.name] as { _id: string; [key: string]: unknown }[] ?? []} onChange={v => setValue(currentField.name, v)} />

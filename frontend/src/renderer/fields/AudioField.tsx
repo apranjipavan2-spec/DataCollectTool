@@ -3,14 +3,21 @@ import type { FormField } from '@/types/form'
 import { labelCls, hintCls, captureButtonCls, recordingButtonCls, fieldErrorCls, fieldHintCls, requiredCls } from './styles'
 import EmojiIcon from '@/components/EmojiIcon'
 
-interface Props { field: FormField; value: string | null; onChange: (v: string) => void }
+interface Props { field: FormField; value: string | null; onChange: (v: string) => void; submissionId?: string }
+
+/** Guess a file extension from a data: URI's mime type, for the download filename. */
+function extFromDataUri(uri: string): string {
+  const m = /^data:audio\/([a-z0-9]+)/i.exec(uri)
+  const mime = m?.[1]?.toLowerCase()
+  return mime === 'webm' ? 'webm' : mime === 'mp4' ? 'm4a' : mime === 'ogg' ? 'ogg' : mime === 'mpeg' ? 'mp3' : 'audio'
+}
 
 /**
  * AudioField — records audio via MediaRecorder API.
  * Stores compressed audio as a base64 data URI (webm/opus or mp4/aac fallback).
  * Typically 30s recording = ~60-100KB at low bitrate.
  */
-export default function AudioField({ field, value, onChange }: Props) {
+export default function AudioField({ field, value, onChange, submissionId }: Props) {
   const [recording, setRecording] = useState(false)
   const [paused, setPaused]       = useState(false)
   const [duration, setDuration]   = useState(0)
@@ -123,10 +130,22 @@ export default function AudioField({ field, value, onChange }: Props) {
           <audio ref={audioRef} src={value} controls className="w-full h-9" />
           <div className="flex items-center justify-between mt-1">
             <div className={fieldHintCls}>{Math.round(value.length * 0.75 / 1024)} KB recorded</div>
-            <button type="button" onClick={deleteRecording} className="text-catalan-error text-xs font-medium cursor-pointer hover:underline">
-              Delete recording
-            </button>
+            <div className="flex items-center gap-3">
+              <a
+                href={value}
+                download={`${field.name}_${submissionId ?? 'draft'}.${extFromDataUri(value)}`}
+                className="text-catalan-primary text-xs font-medium cursor-pointer hover:underline"
+              >
+                Download
+              </a>
+              <button type="button" onClick={deleteRecording} className="text-catalan-error text-xs font-medium cursor-pointer hover:underline">
+                Delete recording
+              </button>
+            </div>
           </div>
+          {submissionId && (
+            <div className="text-catalan-textMuted text-[10px] mt-1 font-mono opacity-60">ID: {submissionId}/{field.name}</div>
+          )}
         </div>
       )}
     </div>

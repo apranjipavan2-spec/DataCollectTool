@@ -811,6 +811,7 @@ def get_submission(submission_id: str, user=Depends(get_current_user), db: Sessi
         from app.models.media_file import MediaFile
         media = [
             {
+                "id": str(m.id),
                 "field_name": m.field_name,
                 "file_type": m.file_type,
                 "mime_type": m.mime_type,

@@ -68,7 +68,7 @@ interface SubDetail extends Submission {
   flag_note: string | null
   local_created_at: string
   backcheck_form_id?: string | null
-  media?: { field_name: string; file_type: string; mime_type: string | null; url: string; size_bytes: number | null }[]
+  media?: { id: string; field_name: string; file_type: string; mime_type: string | null; url: string; size_bytes: number | null }[]
 }
 
 interface TeamMember {
@@ -120,13 +120,33 @@ function RoleBadge({ role }: { role: string }) {
   )
 }
 
-function renderFieldValue(val: unknown): React.ReactNode {
+function renderFieldValue(val: unknown, media?: NonNullable<SubDetail['media']>[number]): React.ReactNode {
   if (val === null || val === undefined) return <span className="text-catalan-textMuted">—</span>
   if (typeof val === 'string') {
+    if (val.startsWith('media://') && media?.file_type === 'audio') {
+      return (
+        <div>
+          <audio src={media.url} controls preload="none" className="w-full h-9" />
+          <div className="flex items-center justify-between mt-1">
+            {media.size_bytes ? <span className="text-catalan-textMuted text-xs">{Math.round(media.size_bytes / 1024)} KB</span> : <span />}
+            <a href={media.url} download className="text-catalan-primary text-xs font-medium hover:underline">Download</a>
+          </div>
+          <div className="text-catalan-textMuted text-[10px] mt-1 font-mono opacity-60">ID: {media.id}</div>
+        </div>
+      )
+    }
     if (val.startsWith('media://')) return <span className="text-catalan-primary"><EmojiIcon e="📎" /> Media uploaded</span>
     if (val === '__photo_pending__') return <span className="text-catalan-warning"><EmojiIcon e="📷" /> Photo pending upload</span>
     if (val === '__audio_pending__') return <span className="text-catalan-warning"><EmojiIcon e="🎙" /> Audio pending upload</span>
     if (val.startsWith('data:image/')) return <img src={val} alt="photo" className="max-w-[200px] rounded-lg mt-1" />
+    if (val.startsWith('data:audio/')) {
+      return (
+        <div>
+          <audio src={val} controls preload="none" className="w-full h-9" />
+          <a href={val} download className="text-catalan-primary text-xs font-medium hover:underline block mt-1">Download</a>
+        </div>
+      )
+    }
     return val
   }
   if (Array.isArray(val)) return val.join(', ')
@@ -426,7 +446,7 @@ function SubmissionDetailModal({
               {Object.entries(sub.data_json).filter(([key]) => !key.startsWith('_')).map(([key, val]) => (
                 <div key={key} className="border-b border-catalan-border pb-2">
                   <div className="text-xs text-catalan-textMuted mb-1">{key}</div>
-                  <div className="text-sm text-catalan-text">{renderFieldValue(val)}</div>
+                  <div className="text-sm text-catalan-text">{renderFieldValue(val, sub.media?.find(m => m.field_name === key))}</div>
                 </div>
               ))}
             </div>
