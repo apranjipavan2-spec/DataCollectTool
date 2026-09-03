@@ -121,6 +121,22 @@ function _clearSession() {
 
 export default api
 
+/**
+ * Extract a display-safe string from an axios error. FastAPI's `detail` is a
+ * plain string for HTTPException, but an array of {type, loc, msg, input}
+ * objects for automatic Pydantic validation errors (422) — rendering that
+ * array directly crashes React ("Objects are not valid as a React child").
+ */
+export function apiErrorMessage(err: unknown, fallback: string): string {
+  const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+  if (typeof detail === 'string' && detail) return detail
+  if (Array.isArray(detail) && detail.length) {
+    return detail.map(d => (d && typeof d === 'object' && 'msg' in d ? String((d as { msg: unknown }).msg) : String(d))).join('; ')
+  }
+  const msg = (err as { message?: string })?.message
+  return typeof msg === 'string' && msg ? msg : fallback
+}
+
 // ── Auth helpers ──────────────────────────────────────────────────────────
 export interface AuthUser {
   access_token: string

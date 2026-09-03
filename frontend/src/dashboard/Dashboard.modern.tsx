@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'rea
 import type { FormListItem, ProgramListItem } from '@/types/api'
 import { getStorage } from '@/storage'
 import InfoButton from '@/help/InfoButton'
-import api, { getStoredUser } from '@/lib/api'
+import api, { getStoredUser, apiErrorMessage } from '@/lib/api'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
 import Sidebar from '@/components/Sidebar'
@@ -808,8 +808,23 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
+    // A bare "Network Error" (no HTTP response at all) is almost always a
+    // transient blip — a moment of connectivity loss, or the server briefly
+    // restarting mid-deploy — not a real failure worth surfacing. One retry
+    // after a short delay makes those invisible; a genuine HTTP error (4xx/5xx)
+    // is not retried since retrying won't change the server's answer.
+    const getWithRetry = async (url: string) => {
+      try {
+        return await api.get(url)
+      } catch (e) {
+        if ((e as { response?: unknown }).response) throw e
+        await new Promise(r => setTimeout(r, 1000))
+        return api.get(url)
+      }
+    }
+
     const calls: Promise<unknown>[] = [
-      api.get('/forms/').then(r => {
+      getWithRetry('/forms/').then(r => {
         const fs = r.data.forms ?? r.data ?? []
         setForms(fs)
         setFormEditOverrides(fs.map((f: FormListItem) => ({ id: f.id, title: f.title, allow_enumerator_edit: f.allow_enumerator_edit ?? null })))
@@ -825,7 +840,7 @@ export default function Dashboard() {
     Promise.allSettled(calls).then(results => {
       const failed = results.filter(r => r.status === 'rejected') as PromiseRejectedResult[]
       if (failed.length > 0) {
-        const msgs = failed.map(f => f.reason?.response?.data?.detail || f.reason?.message || 'unknown error')
+        const msgs = failed.map(f => apiErrorMessage(f.reason, 'unknown error'))
         setError(`Some data failed to load: ${msgs.join('; ')}`)
       }
     }).finally(() => setLoading(false))
@@ -1075,7 +1090,7 @@ export default function Dashboard() {
       setSharePublicUrl(window.location.origin + data.public_url)
       toast.success('Survey link created')
     } catch (err: any) {
-      toast.error(err.response?.data?.detail ?? 'Failed to make public')
+      toast.error(apiErrorMessage(err, 'Failed to make public'))
     } finally {
       setSharingBusy(false)
     }
@@ -1123,7 +1138,7 @@ export default function Dashboard() {
       setSubPage(page)
       setSubsLoaded(true)
     } catch (err: any) {
-      toast.error(err.response?.data?.detail ?? 'Failed to load submissions')
+      toast.error(apiErrorMessage(err, 'Failed to load submissions'))
     } finally {
       setSubsLoading(false)
     }
@@ -1160,7 +1175,7 @@ export default function Dashboard() {
       setForms(prev => [...prev, { id: data.id, title: data.title, version: data.version, status: data.status, updated_at: new Date().toISOString() }])
       setFormsSubTab('my-forms')
     } catch (err: any) {
-      toast.error(err.response?.data?.detail ?? 'Clone failed')
+      toast.error(apiErrorMessage(err, 'Clone failed'))
     } finally {
       setCloningSlug(null)
     }
@@ -1173,7 +1188,7 @@ export default function Dashboard() {
       setForms(prev => prev.filter(f => f.id !== form.id))
       toast.success(`"${form.title}" deleted`)
     } catch (err: any) {
-      toast.error(err.response?.data?.detail ?? 'Could not delete form')
+      toast.error(apiErrorMessage(err, 'Could not delete form'))
     }
   }
 
@@ -1185,7 +1200,7 @@ export default function Dashboard() {
       setForms(prev => prev.map(f => f.id === form.id ? { ...f, status: next } : f))
       toast.success(next === 'active' ? `"${form.title}" published — now collecting` : `"${form.title}" unpublished (back to draft)`)
     } catch (err: any) {
-      toast.error(err.response?.data?.detail ?? `Could not ${next === 'active' ? 'publish' : 'unpublish'} form`)
+      toast.error(apiErrorMessage(err, `Could not ${next === 'active' ? 'publish' : 'unpublish'} form`))
     }
   }
 
@@ -1216,7 +1231,7 @@ export default function Dashboard() {
       toast.success(`Exported ${data.rows} rows to Google Sheets`)
       window.open(data.url, '_blank', 'noopener')
     } catch (err: any) {
-      const detail = err.response?.data?.detail ?? 'Sheets export failed'
+      const detail = apiErrorMessage(err, 'Sheets export failed')
       toast.error(detail)
     } finally {
       setExportingSheets(false)
@@ -1250,7 +1265,7 @@ export default function Dashboard() {
       const { data } = await api.post('/reports/digest')
       toast.success(`Digest sent to ${data.sent} recipient${data.sent !== 1 ? 's' : ''}${data.skipped > 0 ? ` (${data.skipped} skipped — no email set)` : ''}`)
     } catch (err: any) {
-      toast.error(err.response?.data?.detail ?? 'Failed to send digest')
+      toast.error(apiErrorMessage(err, 'Failed to send digest'))
     } finally {
       setSendingDigest(false)
     }
@@ -1273,7 +1288,7 @@ export default function Dashboard() {
       ))
       setSelectedIds(new Set())
     } catch (err: any) {
-      toast.error(err.response?.data?.detail ?? `Bulk ${label.toLowerCase()} failed`)
+      toast.error(apiErrorMessage(err, `Bulk ${label.toLowerCase()} failed`))
     } finally {
       setBulkBusy(false)
     }
@@ -1290,7 +1305,7 @@ export default function Dashboard() {
       setShowAddUser(false)
       toast.success(`${newUser.name} added to the team`)
     } catch (err: any) {
-      toast.error(err.response?.data?.detail ?? 'Failed to add user')
+      toast.error(apiErrorMessage(err, 'Failed to add user'))
     } finally {
       setAddingUser(false)
     }
@@ -1316,7 +1331,7 @@ export default function Dashboard() {
       const qrDataUrl = await QRCode.toDataURL(fullUrl, { width: 256, margin: 2 })
       setQrModal({ memberId: member.id, memberName: member.name, qrDataUrl, qrUrl: fullUrl })
     } catch (err: any) {
-      toast.error(err.response?.data?.detail ?? 'Failed to generate QR code')
+      toast.error(apiErrorMessage(err, 'Failed to generate QR code'))
     } finally {
       setGeneratingQr(null)
     }
@@ -1340,7 +1355,7 @@ export default function Dashboard() {
       }
       if (data.errors.length > 0) toast.warning(`${data.errors.length} row${data.errors.length !== 1 ? 's' : ''} had errors`)
     } catch (err: any) {
-      toast.error(err.response?.data?.detail ?? 'Upload failed')
+      toast.error(apiErrorMessage(err, 'Upload failed'))
     } finally {
       setCsvUploading(false)
     }
@@ -1384,7 +1399,7 @@ export default function Dashboard() {
       setNewSchedule({ form_id: '', enumerator_id: '', start_date: '', end_date: '', location: '', target_count: 0, notes: '', program_questionnaire_id: '', location_id: '' })
       loadSchedules()
     } catch (err: any) {
-      toast.error(err.response?.data?.detail ?? 'Failed to create schedule')
+      toast.error(apiErrorMessage(err, 'Failed to create schedule'))
     } finally { setSavingSchedule(false) }
   }
 
@@ -1425,7 +1440,7 @@ export default function Dashboard() {
       setShowWebhookForm(false)
       toast.success('Webhook created')
     } catch (err: any) {
-      toast.error(err.response?.data?.detail ?? 'Failed to create webhook')
+      toast.error(apiErrorMessage(err, 'Failed to create webhook'))
     } finally { setSavingWebhook(false) }
   }
 
@@ -1460,7 +1475,7 @@ export default function Dashboard() {
       setShowApiKeyForm(false)
       toast.success('API key created — copy it now, it won\'t be shown again')
     } catch (err: any) {
-      toast.error(err.response?.data?.detail ?? 'Failed to create API key')
+      toast.error(apiErrorMessage(err, 'Failed to create API key'))
     } finally { setCreatingKey(false) }
   }
 

@@ -47,7 +47,7 @@ const Toast: React.FC<ToastProps> = ({
       `}
     >
       <span className="text-lg font-bold"><EmojiIcon e={icon[type]} /></span>
-      <span className="text-sm">{message}</span>
+      <span className="text-sm">{typeof message === 'string' ? message : 'Something went wrong'}</span>
       <button
         onClick={() => onClose(id)}
         className="ml-auto opacity-70 hover:opacity-100 transition-opacity"
