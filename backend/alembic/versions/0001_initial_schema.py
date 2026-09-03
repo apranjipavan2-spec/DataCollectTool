@@ -149,14 +149,24 @@ def upgrade():
         """)
 
     # App role for API connections (bypasses RLS only for master_admin via superuser)
-    # Note: Role creation is idempotent via grant statements. Role must be created separately:
-    # CREATE ROLE fieldgovern_app LOGIN PASSWORD 'apppassword' NOINHERIT
-    try:
-        op.execute("GRANT CONNECT ON DATABASE fieldgovern TO fieldgovern_app")
-        op.execute("GRANT USAGE ON SCHEMA public TO fieldgovern_app")
-        op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO fieldgovern_app")
-    except:
-        pass  # Role may already exist with grants
+    # Created here (not just granted) so a fresh database doesn't need the role
+    # set up by hand first. A bare try/except around the GRANTs doesn't protect
+    # against a missing role: Postgres aborts the whole migration transaction on
+    # the first failed statement regardless of the Python-level catch, so on a
+    # brand-new DB this used to kill migration 0001 outright.
+    conn = op.get_bind()
+    conn.execute(sa.text("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'fieldgovern_app') THEN
+                CREATE ROLE fieldgovern_app LOGIN PASSWORD 'apppassword' NOINHERIT;
+            END IF;
+        END
+        $$;
+    """))
+    conn.execute(sa.text("GRANT CONNECT ON DATABASE fieldgovern TO fieldgovern_app"))
+    conn.execute(sa.text("GRANT USAGE ON SCHEMA public TO fieldgovern_app"))
+    conn.execute(sa.text("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO fieldgovern_app"))
 
 
 def downgrade():

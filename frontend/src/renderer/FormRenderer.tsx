@@ -159,6 +159,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
   useEffect(() => {
     const cfg = schema.settings?.audio_audit as { enabled?: boolean } | undefined
     if (!cfg?.enabled || initialDraft) return  // only fresh sessions
+    if (!consentGiven) return  // wait for consent — also ensures mic is granted before we record
     let cancelled = false
     ;(async () => {
       try {
@@ -181,7 +182,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
       try { if (auditRecRef.current?.state !== 'inactive') auditRecRef.current?.stop() } catch { }
       auditStreamRef.current?.getTracks().forEach(t => t.stop())
     }
-  }, [])
+  }, [consentGiven])
 
   // Stop the audit recorder and resolve a compressed data URI (or null)
   const stopAudit = (): Promise<string | null> => new Promise(resolve => {
@@ -287,6 +288,9 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
   }
 
   const isLast = page === allFields.length - 1
+  // Auto-advance types move on by themselves — a manual Next is redundant (and confusing) on those pages.
+  const showManualNext = isLast || !AUTO_ADVANCE_TYPES.has(currentField.type)
+  const currentHasValue = draft.values[currentField.name] !== '' && draft.values[currentField.name] != null
   const progress = allFields.length > 0 ? ((page + 1) / allFields.length) * 100 : 0
 
   if (purpose && !consentGiven) {
@@ -297,6 +301,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
           <h2 className="text-lg font-semibold text-catalan-text mb-2">Data Collection Purpose</h2>
           <p className="text-sm text-catalan-textMuted mb-6 leading-relaxed">{purpose}</p>
           <button
+            type="button"
             onClick={() => {
               const ts = new Date().toISOString()
               setConsentGiven(true)
@@ -307,7 +312,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
             I Agree &amp; Continue
           </button>
           {onCancel && (
-            <button onClick={onCancel} className="mt-3 text-sm text-catalan-textMuted hover:text-catalan-text">
+            <button type="button" onClick={onCancel} className="mt-3 text-sm text-catalan-textMuted hover:text-catalan-text">
               Cancel
             </button>
           )}
@@ -489,14 +494,21 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
             >
               {submitting ? 'Submitting…' : 'Submit ✓'}
             </button>
-          ) : (
+          ) : showManualNext ? (
             <button
               onClick={goNext}
               className="flex-[2] bg-catalan-primary text-white rounded-xl py-4 text-[15px] font-semibold cursor-pointer hover:brightness-110 active:scale-[0.98] transition-all min-h-[56px]"
             >
               Next →
             </button>
-          )}
+          ) : !currentField.required && !currentHasValue ? (
+            <button
+              onClick={goNext}
+              className="flex-[2] text-catalan-textMuted rounded-xl py-4 text-[15px] font-medium cursor-pointer hover:text-catalan-text transition-all min-h-[56px]"
+            >
+              Skip →
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

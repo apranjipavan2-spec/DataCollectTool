@@ -285,7 +285,14 @@ export default function FormBuilder() {
   // ── Field helpers ─────────────────────────────────────────────────────────
   const addField = (type: FieldType) => {
     const field = newField(type)
-    updateSections(selectedSection, sec => ({ ...sec, fields: [...sec.fields, field] }))
+    updateSections(selectedSection, sec => {
+      const afterIdx = selectedField?.sectionId === selectedSection
+        ? sec.fields.findIndex(f => f.id === selectedField.fieldId)
+        : sec.fields.length - 1
+      const fields = [...sec.fields]
+      fields.splice(afterIdx + 1, 0, field)
+      return { ...sec, fields }
+    })
     setSelectedField({ sectionId: selectedSection, fieldId: field.id })
     setShowTypeMenu(false)
     setShowLeftPanel(false)

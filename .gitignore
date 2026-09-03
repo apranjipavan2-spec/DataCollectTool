@@ -110,3 +110,9 @@ tools/ngo_intel/
 tools/outreach/
 tools/prospect_intel/
 .claude/scheduled_tasks.lock
+
+# sigmap tool cache
+.context/
+
+# agent scratch notes
+MUNDER_DIFFLIN_AGENT_NOTES.md

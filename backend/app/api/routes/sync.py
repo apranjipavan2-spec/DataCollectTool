@@ -487,7 +487,8 @@ def _guess_extension(content_type: str) -> str:
         "audio/mp4": ".m4a",
         "audio/mpeg": ".mp3",
     }
-    return mapping.get(content_type, ".bin")
+    base = content_type.split(";")[0].strip().lower()  # drop codec params, e.g. "audio/webm;codecs=opus"
+    return mapping.get(base, ".bin")
 
 
 @router.get("/pull")

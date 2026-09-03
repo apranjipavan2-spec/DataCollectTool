@@ -12,6 +12,7 @@ interface Props { field: FormField; value: string | null; onChange: (v: string) 
  */
 export default function AudioField({ field, value, onChange }: Props) {
   const [recording, setRecording] = useState(false)
+  const [paused, setPaused]       = useState(false)
   const [duration, setDuration]   = useState(0)
   const [error, setError]         = useState('')
   const recorderRef = useRef<MediaRecorder | null>(null)
@@ -47,19 +48,43 @@ export default function AudioField({ field, value, onChange }: Props) {
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType })
         blobToDataUri(blob).then(onChange)
         setRecording(false)
+        setPaused(false)
       }
 
       recorder.start(1000)
       recorderRef.current = recorder
       setRecording(true)
+      setPaused(false)
       setDuration(0)
       timerRef.current = setInterval(() => setDuration(d => d + 1), 1000)
-    } catch {
-      setError('Microphone access denied')
+    } catch (e) {
+      const err = e as DOMException
+      const msg =
+        err?.name === 'NotAllowedError'  ? 'Microphone access denied. Allow mic in your browser settings and retry.'
+        : err?.name === 'NotFoundError'  ? 'No microphone found on this device.'
+        : err?.name === 'NotReadableError' ? 'Microphone is in use by another app. Close it and retry.'
+        : window.isSecureContext === false ? 'Recording needs a secure (https) connection.'
+        : `Recording failed: ${err?.name || ''} ${err?.message || String(e)}`.trim()
+      setError(msg)
+      console.error('[AudioField] recording error', e)
     }
   }
 
   const stopRecording = () => { recorderRef.current?.stop() }
+
+  const pauseRecording = () => {
+    recorderRef.current?.pause()
+    clearInterval(timerRef.current)
+    setPaused(true)
+  }
+
+  const resumeRecording = () => {
+    recorderRef.current?.resume()
+    timerRef.current = setInterval(() => setDuration(d => d + 1), 1000)
+    setPaused(false)
+  }
+
+  const deleteRecording = () => { onChange('') }
 
   const fmt = (s: number) =>
     `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
@@ -73,13 +98,19 @@ export default function AudioField({ field, value, onChange }: Props) {
       {field.hint && <div className={hintCls}>{field.hint}</div>}
 
       {recording ? (
-        <button onClick={stopRecording} className={recordingButtonCls}>
-          <span className="text-3xl">⏹</span>
-          <span>Stop Recording — {fmt(duration)}</span>
-          <span className="text-xl animate-pulse">●</span>
-        </button>
+        <div className="flex gap-2">
+          <button type="button" onClick={stopRecording} className={`${recordingButtonCls} flex-1`}>
+            <span className="text-3xl">⏹</span>
+            <span>Stop — {fmt(duration)}</span>
+            {!paused && <span className="text-xl animate-pulse">●</span>}
+          </button>
+          <button type="button" onClick={paused ? resumeRecording : pauseRecording} className={`${captureButtonCls} flex-1`}>
+            <span className="text-3xl">{paused ? '▶' : '⏸'}</span>
+            <span>{paused ? 'Resume' : 'Pause'}</span>
+          </button>
+        </div>
       ) : (
-        <button onClick={startRecording} className={captureButtonCls}>
+        <button type="button" onClick={startRecording} className={captureButtonCls}>
           <span className="text-3xl"><EmojiIcon e="🎙" /></span>
           <span>{value ? 'Re-record Audio' : 'Record Audio'}</span>
         </button>
@@ -90,8 +121,11 @@ export default function AudioField({ field, value, onChange }: Props) {
       {value && !recording && (
         <div className="mt-3 bg-catalan-hover border border-catalan-border rounded-xl p-3">
           <audio ref={audioRef} src={value} controls className="w-full h-9" />
-          <div className={`${fieldHintCls} mt-1`}>
-            {Math.round(value.length * 0.75 / 1024)} KB recorded
+          <div className="flex items-center justify-between mt-1">
+            <div className={fieldHintCls}>{Math.round(value.length * 0.75 / 1024)} KB recorded</div>
+            <button type="button" onClick={deleteRecording} className="text-catalan-error text-xs font-medium cursor-pointer hover:underline">
+              Delete recording
+            </button>
           </div>
         </div>
       )}
