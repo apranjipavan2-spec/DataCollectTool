@@ -153,7 +153,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=(self)"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         # Allow the SPA to function; restrict everything else
         response.headers["Content-Security-Policy"] = (
