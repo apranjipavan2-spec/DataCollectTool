@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_org_admin, require_supervisor
 from app.core.security import hash_password
+from app.core.phone import normalize_phone
 from app.core.rate_limit import limiter
 from app.models.user import User
 from app.models.tenant import Tenant
@@ -77,11 +78,12 @@ def create_user(request: Request, body: UserCreate, user=Depends(require_org_adm
                         detail=f"Admin limit reached ({current_count}/{admin_limit} on your plan). Upgrade to add more admins.",
                     )
 
-    if db.query(User).filter(User.phone == body.phone).first():
+    phone = normalize_phone(body.phone)
+    if db.query(User).filter(User.phone == phone).first():
         raise HTTPException(status_code=400, detail="Phone already registered")
     new_user = User(
         tenant_id=user["tenant_id"],
-        phone=body.phone,
+        phone=phone,
         name=body.name,
         role=body.role,
         language_pref=body.language_pref,
@@ -154,7 +156,7 @@ def bulk_import_users(
     }
 
     for idx, row in enumerate(reader, start=2):  # start=2 because row 1 is header
-        phone = (row.get("phone") or "").strip()
+        phone = normalize_phone((row.get("phone") or "").strip())
         name = (row.get("name") or "").strip()
         role = (row.get("role") or "enumerator").strip().lower()
         password = (row.get("password") or "").strip() or DEFAULT_PASSWORD
@@ -218,12 +220,13 @@ def update_user(user_id: str, body: UserUpdate, user=Depends(get_current_user), 
     if body.name is not None:
         target.name = body.name.strip()
     if body.phone is not None:
+        new_phone = normalize_phone(body.phone.strip())
         # Check phone uniqueness only if it changed
-        if body.phone.strip() != target.phone:
-            existing = db.query(User).filter(User.phone == body.phone.strip(), User.id != user_id).first()
+        if new_phone != target.phone:
+            existing = db.query(User).filter(User.phone == new_phone, User.id != user_id).first()
             if existing:
                 raise HTTPException(status_code=400, detail="Phone already in use")
-        target.phone = body.phone.strip()
+        target.phone = new_phone
     if body.email is not None:
         target.email = body.email.strip() or None
     if body.language_pref is not None:

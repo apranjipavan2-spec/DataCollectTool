@@ -66,7 +66,7 @@ interface ToastContainerProps {
 
 export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onClose }) => {
   return (
-    <div className="fixed bottom-4 right-4 space-y-2 z-40 max-w-sm">
+    <div className="fixed bottom-4 right-4 space-y-2 z-[60] max-w-sm">
       {toasts.map((toast) => (
         <Toast
           key={toast.id}

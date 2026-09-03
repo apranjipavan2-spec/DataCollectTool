@@ -220,7 +220,9 @@ def register(request: Request, body: RegisterRequest, db: Session = Depends(get_
     # Validate uniqueness
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
+    from app.core.phone import normalize_phone
     if body.phone:
+        body.phone = normalize_phone(body.phone)
         if db.query(User).filter(User.phone == body.phone).first():
             raise HTTPException(status_code=409, detail="An account with this phone number already exists.")
     if len(body.password) < 6:
