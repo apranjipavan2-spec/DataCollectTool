@@ -58,7 +58,7 @@ export class OpfsAdapter implements StorageAdapter {
 
   // ── Private helpers ─────────────────────────────────────────────────────
 
-  private _query(sql: string, params?: unknown[]): Promise<SQLiteResultSet[]> {
+  private _queryOnce(sql: string, params?: unknown[]): Promise<SQLiteResultSet[]> {
     return new Promise((resolve, reject) => {
       const id = this.nextId++
       const timer = setTimeout(() => {
@@ -71,6 +71,19 @@ export class OpfsAdapter implements StorageAdapter {
       })
       this.worker.postMessage({ id, sql, params })
     })
+  }
+
+  // All SQL here is static and internal, so a failure is almost always
+  // transient OPFS I/O/lock contention rather than a real bug — retry once
+  // before surfacing it as a save failure.
+  private async _query(sql: string, params?: unknown[]): Promise<SQLiteResultSet[]> {
+    try {
+      return await this._queryOnce(sql, params)
+    } catch (e) {
+      console.warn('[OpfsAdapter] query failed, retrying once', e)
+      await new Promise(r => setTimeout(r, 300))
+      return this._queryOnce(sql, params)
+    }
   }
 
   private _toRecord(columns: string[], row: unknown[]): SubmissionRecord {
