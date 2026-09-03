@@ -95,6 +95,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
   const [errors, setErrors]   = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [syncStatus, setSyncStatus] = useState<'saved' | 'saving' | 'error'>('saved')
+  const [saveExitError, setSaveExitError] = useState(false)
   const saveTimer  = useRef<ReturnType<typeof setTimeout>>()
   const scrollRef  = useRef<HTMLDivElement>(null)
   // QC: background audio-audit recorder (compressed)
@@ -259,8 +260,13 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
   const goPrev = () => { if (page > 0) setPage(p => p - 1) }
 
   const handleSaveExit = async () => {
-    try { await onSave({ ...draft, status: 'draft' }) } catch { }
-    onCancel?.()
+    setSaveExitError(false)
+    try {
+      await onSave({ ...draft, status: 'draft' })
+      onCancel?.()
+    } catch {
+      setSaveExitError(true)
+    }
   }
 
   const handleSubmit = async () => {
@@ -334,6 +340,14 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
 
   return (
     <div className="bg-catalan-bg flex flex-col font-sans h-full min-h-0">
+
+      {saveExitError && (
+        <div className="bg-catalan-error/10 border-b border-catalan-error/30 text-catalan-error px-4 py-2 text-xs shrink-0 z-20 flex items-center gap-3">
+          <span className="flex-1"><EmojiIcon e="⚠" /> Couldn't save your answers — check storage space and try again before leaving.</span>
+          <button type="button" onClick={handleSaveExit} className="font-semibold underline shrink-0">Retry</button>
+          <button type="button" onClick={onCancel} className="font-semibold underline shrink-0">Exit without saving</button>
+        </div>
+      )}
 
       {/* ── Header ── */}
       <div className="px-4 pt-3 pb-3 border-b border-catalan-border bg-catalan-surface sticky top-0 z-10 flex-shrink-0">
