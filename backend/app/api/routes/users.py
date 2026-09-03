@@ -79,7 +79,20 @@ def create_user(request: Request, body: UserCreate, user=Depends(require_org_adm
                     )
 
     phone = normalize_phone(body.phone)
-    if db.query(User).filter(User.phone == phone).first():
+    existing = db.query(User).filter(User.phone == phone).first()
+    if existing:
+        # Reactivate a previously-deactivated user in this tenant instead of dead-ending
+        if existing.tenant_id == user["tenant_id"] and not existing.is_active:
+            existing.is_active = True
+            existing.name = body.name
+            existing.role = body.role
+            existing.language_pref = body.language_pref
+            existing.email = body.email
+            if body.password:
+                existing.password_hash = hash_password(body.password)
+            db.commit()
+            db.refresh(existing)
+            return {"id": str(existing.id), "phone": existing.phone, "role": existing.role, "email": existing.email}
         raise HTTPException(status_code=400, detail="Phone already registered")
     new_user = User(
         tenant_id=user["tenant_id"],

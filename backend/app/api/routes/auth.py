@@ -12,6 +12,7 @@ from app.core.security import (
     create_access_token, create_refresh_token, decode_token,
 )
 from app.core.config import settings
+from app.core.phone import normalize_phone
 from app.core.rate_limit import limiter
 from app.core.deps import get_current_user, require_org_admin
 from app.models.user import User
@@ -163,8 +164,9 @@ def google_login(request: Request, body: GoogleLoginIn, db: Session = Depends(ge
 def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     """Authenticate with phone/email + password. Returns 2fa_required if tenant has 2FA enabled."""
     lookup = body.identifier or body.phone or ""
+    normalized = normalize_phone(lookup)
     user = db.query(User).filter(
-        or_(User.phone == lookup, User.email == lookup),
+        or_(User.phone == lookup, User.phone == normalized, User.email == lookup),
         User.is_active == True,
     ).first()
     if not user or not user.password_hash:
