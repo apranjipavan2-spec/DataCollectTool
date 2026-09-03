@@ -49,6 +49,17 @@ def _index_exists(cur, index):
     return bool(cur.fetchone())
 
 
+def _rev_behind(current, detected):
+    """True only when `current` is a strictly-lower numeric revision than
+    `detected`. Non-numeric or unparseable revisions return False so we never
+    touch tracking we don't understand (conservative: forward-only correction).
+    """
+    try:
+        return int(current) < int(detected)
+    except (TypeError, ValueError):
+        return False
+
+
 def detect_and_stamp():
     conn = psycopg2.connect(DATABASE_URL)
     conn.autocommit = True
@@ -63,8 +74,8 @@ def detect_and_stamp():
 
     print(f"alembic_version exists: {has_alembic}, current rev: {current_rev}")
 
-    if (not has_alembic or not current_rev) and table_exists(cur, "tenants"):
-        print("DB has tables but no alembic tracking — detecting revision to stamp...")
+    if table_exists(cur, "tenants"):
+        print("Detecting schema-true revision from actual tables/columns...")
 
         if not table_exists(cur, "schedules"):
             stamp = "0007"
@@ -129,18 +140,33 @@ def detect_and_stamp():
         else:
             stamp = "0045"
 
-        print(f"Stamping alembic_version to {stamp}")
-        if not has_alembic:
-            cur.execute(
-                "CREATE TABLE alembic_version ("
-                "version_num VARCHAR(32) NOT NULL, "
-                "CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num))"
-            )
-        cur.execute("DELETE FROM alembic_version")
-        cur.execute("INSERT INTO alembic_version (version_num) VALUES (%s)", (stamp,))
-        print(f"Stamped to {stamp} — alembic upgrade head will apply remaining migrations.")
+        fresh = not has_alembic or not current_rev
+        behind = _rev_behind(current_rev, stamp)
+
+        if fresh or behind:
+            if behind:
+                # Recorded revision lags the real schema (e.g. a column was added
+                # by hand and never tracked). Left alone, `alembic upgrade head`
+                # would try to re-apply an already-present migration and fail with
+                # "expected to match one row ... 0 found". Forward-correct the stamp
+                # so upgrade resumes from the true schema state. Never moves
+                # backward, so no already-applied migration is re-run.
+                print(f"alembic_version '{current_rev}' is BEHIND schema-detected '{stamp}' -- forward-correcting the stamp")
+            else:
+                print(f"DB has tables but no alembic tracking — stamping to {stamp}")
+            if not has_alembic:
+                cur.execute(
+                    "CREATE TABLE alembic_version ("
+                    "version_num VARCHAR(32) NOT NULL, "
+                    "CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num))"
+                )
+            cur.execute("DELETE FROM alembic_version")
+            cur.execute("INSERT INTO alembic_version (version_num) VALUES (%s)", (stamp,))
+            print(f"Stamped to {stamp} — alembic upgrade head will apply remaining migrations.")
+        else:
+            print(f"Alembic tracking OK at rev: {current_rev} (schema-detected {stamp})")
     else:
-        print(f"Alembic tracking OK at rev: {current_rev}")
+        print("No tenants table yet — leaving alembic to run migrations from base.")
 
     cur.close()
     conn.close()
