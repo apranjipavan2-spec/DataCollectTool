@@ -187,23 +187,22 @@ export default function PublicSurveyPage() {
               link once it's confirmed. Only shown if the server enabled recovery. */}
           {recoveryPubKey && backup.current && (
             <div className="mt-6">
-              {uploaded ? (
-                <button onClick={saveBackup}
-                  className="text-xs text-catalan-textMuted hover:text-catalan-primary underline">
-                  {backupSaved ? 'Backup saved ✓' : 'Save a backup copy (optional)'}
-                </button>
-              ) : (
-                <>
-                  <button onClick={saveBackup}
-                    className="w-full bg-catalan-primary text-white rounded-xl py-3 text-sm font-bold hover:brightness-110 active:scale-[0.98] transition-all">
-                    <EmojiIcon e="💾" /> {backupSaved ? 'Backup file saved — keep it safe' : 'Save backup file to this device'}
-                  </button>
-                  <p className="text-xs text-catalan-textMuted mt-2">
-                    Keep this file. If your answers don’t upload, open the{' '}
-                    <a href="/survey/recover" className="text-catalan-primary underline">Recover page</a>{' '}
-                    later and upload it — your data stays safe.
-                  </p>
-                </>
+              {/* Always offer a clear download of the submitted response as an
+                  encrypted backup file — prominent when the upload is still
+                  pending, still a full button (not a faint link) once confirmed. */}
+              <button onClick={saveBackup}
+                className={`w-full rounded-xl py-3 text-sm font-bold active:scale-[0.98] transition-all ${
+                  uploaded
+                    ? 'border border-catalan-primary/40 text-catalan-primary hover:bg-catalan-primary/10'
+                    : 'bg-catalan-primary text-white hover:brightness-110'}`}>
+                <EmojiIcon e="💾" /> {backupSaved ? 'Backup downloaded ✓ — keep it safe' : 'Download my response (backup)'}
+              </button>
+              {!uploaded && (
+                <p className="text-xs text-catalan-textMuted mt-2">
+                  Keep this file. If your answers don’t upload, open the{' '}
+                  <a href="/survey/recover" className="text-catalan-primary underline">Recover page</a>{' '}
+                  later and upload it — your data stays safe.
+                </p>
               )}
             </div>
           )}

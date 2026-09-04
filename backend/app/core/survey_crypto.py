@@ -38,6 +38,51 @@ def recovery_enabled() -> bool:
     return bool(settings.SURVEY_RECOVERY_PUBLIC_KEY and settings.SURVEY_RECOVERY_PRIVATE_KEY)
 
 
+_KEYPAIR_SETTING = "survey_recovery_keypair"
+
+
+def get_or_create_keypair(db) -> tuple[str, str] | tuple[None, None]:
+    """Return (public_pem, private_pem) for offline-backup encryption.
+
+    Resolution order, so the feature is zero-config but still overridable:
+      1. env (SURVEY_RECOVERY_PUBLIC_KEY / _PRIVATE_KEY) — ops-managed override.
+      2. a keypair persisted in system_settings — auto-generated once, reused.
+      3. generate a fresh 3072-bit RSA keypair, persist it, return it.
+
+    Never raises — on any failure returns (None, None) so the survey still works
+    and the frontend simply hides the backup button.
+    """
+    from app.core.config import settings
+    if settings.SURVEY_RECOVERY_PUBLIC_KEY and settings.SURVEY_RECOVERY_PRIVATE_KEY:
+        return normalize_pem(settings.SURVEY_RECOVERY_PUBLIC_KEY), normalize_pem(settings.SURVEY_RECOVERY_PRIVATE_KEY)
+    try:
+        from app.models.system_setting import SystemSetting
+        row = db.query(SystemSetting).filter(SystemSetting.key == _KEYPAIR_SETTING).first()
+        if row and isinstance(row.value, dict) and row.value.get("public") and row.value.get("private"):
+            return row.value["public"], row.value["private"]
+
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        key = rsa.generate_private_key(public_exponent=65537, key_size=3072)
+        priv = key.private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption()).decode()
+        pub = key.public_key().public_bytes(
+            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+        value = {"public": pub, "private": priv}
+        if row:
+            row.value = value
+        else:
+            db.add(SystemSetting(key=_KEYPAIR_SETTING, value=value))
+        db.commit()
+        return pub, priv
+    except Exception:  # noqa: BLE001
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return None, None
+
+
 def normalize_pem(value: str) -> str:
     """Accept a key as raw PEM or as single-line base64-of-PEM (easier in .env)."""
     if not value or "-----BEGIN" in value:

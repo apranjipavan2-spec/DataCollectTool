@@ -1121,11 +1121,12 @@ def recover_submissions(body: dict, user=Depends(require_enumerator), db: Sessio
 
     Media rides inline in data_json (as captured on-device) — this is a last-resort
     recovery path, so preserving the data outranks the normal media pipeline."""
-    from app.core.survey_crypto import decrypt_capsule, recovery_enabled, CapsuleError
+    from app.core.survey_crypto import decrypt_capsule, get_or_create_keypair, CapsuleError
     from sqlalchemy import func as _func
 
-    if not recovery_enabled():
-        raise HTTPException(status_code=503, detail="Offline recovery is not enabled on this server")
+    _, private_pem = get_or_create_keypair(db)
+    if not private_pem:
+        raise HTTPException(status_code=503, detail="Offline recovery is not available on this server")
     capsules = body.get("capsules")
     if not isinstance(capsules, list) or not capsules:
         raise HTTPException(status_code=400, detail="No capsules provided")
@@ -1137,7 +1138,7 @@ def recover_submissions(body: dict, user=Depends(require_enumerator), db: Sessio
     results = []
     for i, env in enumerate(capsules):
         try:
-            payload = decrypt_capsule(env)
+            payload = decrypt_capsule(env, private_pem)
         except CapsuleError as e:
             results.append({"index": i, "status": "error", "detail": str(e)})
             continue

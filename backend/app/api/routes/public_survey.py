@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 from app.core.database import get_db
 from app.core.deps import require_role
 from app.core.config import settings
-from app.core.survey_crypto import decrypt_capsule, recovery_enabled, normalize_pem, CapsuleError
+from app.core.survey_crypto import decrypt_capsule, get_or_create_keypair, CapsuleError
 from app.models.form import Form
 from app.models.submission import Submission
 
@@ -41,9 +41,9 @@ def public_survey_info(token: str, db: Session = Depends(get_db)):
         "title": form.title,
         "json_schema": form.json_schema,
         "form_id": str(form.id),
-        # Present only when offline-backup is configured; the page uses it to
-        # encrypt a downloadable recovery file. Absent → page skips the feature.
-        "recovery_public_key": normalize_pem(settings.SURVEY_RECOVERY_PUBLIC_KEY) if recovery_enabled() else None,
+        # Public key the page uses to encrypt a downloadable backup file.
+        # Auto-created on first use, so this is present with zero setup.
+        "recovery_public_key": get_or_create_keypair(db)[0],
     }
 
 
@@ -118,20 +118,19 @@ def public_survey_submit(token: str, body: dict, request: Request, db: Session =
 
 
 @router.get("/recovery/public-key")
-def recovery_public_key():
-    """Public RSA key used by any survey device to encrypt an offline backup.
-    Null when the feature isn't configured."""
-    if not recovery_enabled():
-        return {"public_key": None}
-    return {"public_key": normalize_pem(settings.SURVEY_RECOVERY_PUBLIC_KEY)}
+def recovery_public_key(db: Session = Depends(get_db)):
+    """Public RSA key any survey device uses to encrypt an offline backup.
+    Auto-created on first use — present with zero setup."""
+    return {"public_key": get_or_create_keypair(db)[0]}
 
 
 @router.post("/survey/recover")
 def public_survey_recover(body: dict, request: Request, db: Session = Depends(get_db)):
     """Recover offline-backup capsules (.fgresp files). No auth — the capsule can
     only be decrypted with our private key, which proves it originated from us."""
-    if not recovery_enabled():
-        raise HTTPException(status_code=503, detail="Offline recovery is not enabled on this server")
+    _, private_pem = get_or_create_keypair(db)
+    if not private_pem:
+        raise HTTPException(status_code=503, detail="Offline recovery is not available on this server")
 
     capsules = body.get("capsules")
     if not isinstance(capsules, list) or not capsules:
@@ -144,7 +143,7 @@ def public_survey_recover(body: dict, request: Request, db: Session = Depends(ge
     results = []
     for i, envelope in enumerate(capsules):
         try:
-            payload = decrypt_capsule(envelope)
+            payload = decrypt_capsule(envelope, private_pem)
         except CapsuleError as e:
             results.append({"index": i, "status": "error", "detail": str(e)})
             continue
