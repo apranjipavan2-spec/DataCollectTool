@@ -1192,6 +1192,19 @@ export default function Dashboard() {
     }
   }
 
+  const handleDownloadXlsform = async (form: Form) => {
+    try {
+      const res = await api.get(`/migration/xlsform/export/${form.id}`, { responseType: 'blob' })
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a')
+      const safe = form.title.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'form'
+      a.href = url; a.download = `${safe}_v${form.version}.xlsx`; a.click()
+      URL.revokeObjectURL(url)
+    } catch (err: any) {
+      toast.error(apiErrorMessage(err, 'Could not download XLSForm'))
+    }
+  }
+
   const handleTogglePublish = async (form: Form) => {
     const next = form.status === 'active' ? 'draft' : 'active'
     if (next === 'active' && !window.confirm(`Publish "${form.title}"? Assigned enumerators will be able to collect with it.`)) return
@@ -2600,6 +2613,15 @@ export default function Dashboard() {
                                     title="Share as public survey"
                                   >
                                     Share
+                                  </button>
+                                )}
+                                {['org_admin'].includes(user.role) && (
+                                  <button
+                                    onClick={() => handleDownloadXlsform(form)}
+                                    className="text-xs text-catalan-primary hover:underline"
+                                    title="Download as XLSForm (.xlsx) — re-importable"
+                                  >
+                                    XLSForm
                                   </button>
                                 )}
                                 {['org_admin'].includes(user.role) && (

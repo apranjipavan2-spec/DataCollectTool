@@ -356,6 +356,21 @@ export default function FormBuilder() {
     return opts.map(o => ({ value: o, label: o }))
   }
 
+  const handleDownloadMyForm = async () => {
+    try {
+      const res = await api.post('/migration/xlsform/serialize',
+        { title: schema.title, json_schema: schema },
+        { responseType: 'blob' })
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a')
+      const safe = (schema.title || 'form').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'form'
+      a.href = url; a.download = `${safe}.xlsx`; a.click()
+      URL.revokeObjectURL(url)
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail ?? 'Could not download form as Excel')
+    }
+  }
+
   const handleImportExcel = async (file: File) => {
     setImportingExcel(true)
     try {
@@ -738,14 +753,23 @@ export default function FormBuilder() {
               </button>
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleImportExcel(f) }} />
-              <a
-                href="/FieldGovern_Form_Template.xlsx"
-                download
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-catalan-textMuted text-xs font-medium hover:text-catalan-primary hover:bg-catalan-primary/5 transition-colors"
-                title="Download a blank XLSForm template with one example row per field type"
-              >
-                <span><EmojiIcon e="⬇️" /></span><span>Download Excel template</span>
-              </a>
+              <div className="flex items-center gap-1.5">
+                <a
+                  href="/FieldGovern_Form_Template.xlsx"
+                  download
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-catalan-textMuted text-xs font-medium hover:text-catalan-primary hover:bg-catalan-primary/5 transition-colors"
+                  title="Download a blank XLSForm template with one example row per field type"
+                >
+                  <span><EmojiIcon e="⬇️" /></span><span>Blank template</span>
+                </a>
+                <button
+                  onClick={handleDownloadMyForm}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-catalan-primary text-xs font-medium border border-catalan-primary/40 hover:bg-catalan-primary/10 transition-colors"
+                  title="Download THIS form as an XLSForm (.xlsx) — re-importable"
+                >
+                  <span><EmojiIcon e="📥" /></span><span>Download my form</span>
+                </button>
+              </div>
 
               {importSummary && (
                 <div className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-catalan-success/10 border border-catalan-success/30">

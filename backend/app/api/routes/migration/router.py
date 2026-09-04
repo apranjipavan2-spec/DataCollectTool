@@ -8,7 +8,11 @@ from __future__ import annotations
 import uuid
 from typing import Any, Optional
 
+import re as _re
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -22,6 +26,7 @@ from app.services.telegram import notify as tg_notify
 from app.services.sheets_sync import bulk_sync_submissions
 
 from .xlsform_parser import parse_xlsform
+from .xlsform_serializer import serialize_xlsform
 from .platform_clients import (
     KoboClient, SurveyCTOClient, ODKCentralClient, map_submission_data,
 )
@@ -154,6 +159,50 @@ def xlsform_save(
     """Save a parsed XLSForm schema as a draft form."""
     form = _save_form(db, str(user["tenant_id"]), body.title, body.json_schema)
     return {"id": str(form.id), "title": form.title, "status": form.status}
+
+
+@router.post("/xlsform/serialize")
+def xlsform_serialize(
+    body: XLSFormSaveRequest,
+    user=Depends(require_org_admin),
+):
+    """Serialize an in-memory schema (as edited in the builder) to a downloadable XLSForm."""
+    xlsx = serialize_xlsform(body.title, body.json_schema or {},
+                             version=int((body.json_schema or {}).get("version", 1) or 1))
+    safe = _re.sub(r"[^A-Za-z0-9._-]+", "_", body.title).strip("_") or "form"
+    filename = f"{safe}.xlsx"
+    return Response(
+        content=xlsx,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=\"{filename}\"; filename*=UTF-8''{quote(filename)}"},
+    )
+
+
+@router.get("/xlsform/export/{form_id}")
+def xlsform_export(
+    form_id: str,
+    user=Depends(require_org_admin),
+    db: Session = Depends(get_db),
+):
+    """Download an existing form as an XLSForm .xlsx (re-importable into FieldGovern)."""
+    try:
+        fid = uuid.UUID(form_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid form id")
+    form = db.query(Form).filter(
+        Form.id == fid, Form.tenant_id == uuid.UUID(str(user["tenant_id"]))
+    ).first()
+    if not form:
+        raise HTTPException(404, "Form not found")
+
+    xlsx = serialize_xlsform(form.title, form.json_schema or {}, str(form.id), form.version)
+    safe = _re.sub(r"[^A-Za-z0-9._-]+", "_", form.title).strip("_") or "form"
+    filename = f"{safe}_v{form.version}.xlsx"
+    return Response(
+        content=xlsx,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=\"{filename}\"; filename*=UTF-8''{quote(filename)}"},
+    )
 
 
 # ── Kobo ───────────────────────────────────────────────────────────────────────
