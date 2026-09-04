@@ -530,7 +530,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
                 <button
                   onClick={handleSubmitAndDownload}
                   disabled={submitting}
-                  className={`w-full bg-catalan-primary text-white rounded-xl py-3 text-[15px] font-semibold min-h-[52px] active:scale-[0.98] transition-all ${submitting ? 'cursor-wait opacity-70' : 'cursor-pointer hover:brightness-110'}`}
+                  className={`w-full bg-green-800 text-white rounded-xl py-3 text-[15px] font-semibold min-h-[52px] active:scale-[0.98] transition-all ${submitting ? 'cursor-wait opacity-70' : 'cursor-pointer hover:bg-green-900'}`}
                   title="Submit to the server AND save an encrypted backup file to this device"
                 >
                   <EmojiIcon e="💾" /> Submit &amp; download form
