@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import require_supervisor
 from app.models.form_assignment import FormAssignment
+from app.core.soft_delete import soft_delete
 from app.models.form import Form
 from app.models.user import User
 from app.api.routes.notifications import send_push
@@ -104,7 +105,7 @@ def unassign_form(assignment_id: str, user=Depends(require_supervisor), db: Sess
     ).first()
     if not a:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    db.delete(a)
+    soft_delete(a)
     db.commit()
 
 

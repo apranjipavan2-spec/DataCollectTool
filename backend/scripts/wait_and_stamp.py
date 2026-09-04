@@ -137,8 +137,10 @@ def detect_and_stamp():
             stamp = "0043"
         elif not col_exists(cur, "submissions", "schedule_id"):
             stamp = "0044"
-        else:
+        elif not col_exists(cur, "respondent_roster", "deleted_at"):
             stamp = "0045"
+        else:
+            stamp = "0046"
 
         fresh = not has_alembic or not current_rev
         behind = _rev_behind(current_rev, stamp)

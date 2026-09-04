@@ -2,9 +2,10 @@ from uuid import uuid4
 from sqlalchemy import Column, String, ForeignKey, TIMESTAMP, func
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
+from app.core.soft_delete import SoftDeleteMixin
 
 
-class Location(Base):
+class Location(Base, SoftDeleteMixin):
     __tablename__ = 'locations'
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey('tenants.id'), nullable=False)

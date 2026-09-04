@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import require_role, require_supervisor, require_enumerator
 from app.models.roster import RespondentRoster
+from app.core.soft_delete import soft_delete
 
 router = APIRouter()
 
@@ -151,7 +152,7 @@ def delete_roster(
     ).first()
     if not r:
         raise HTTPException(status_code=404, detail="Roster entry not found")
-    db.delete(r)
+    soft_delete(r)
     db.commit()
     return {"ok": True}
 

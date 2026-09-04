@@ -155,6 +155,16 @@ _PATCHES = [
     """CREATE UNIQUE INDEX IF NOT EXISTS uq_users_active_email
        ON users (lower(email))
        WHERE is_active = TRUE AND email IS NOT NULL AND email <> ''""",
+    # 0046 — soft-delete (360-day bin): deleted_at on every hard-deleted table
+    *[
+        f"ALTER TABLE {t} ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"
+        for t in (
+            "respondent_roster", "shared_files", "form_assignments", "programs",
+            "program_locations", "program_participant_types", "program_questionnaires",
+            "questionnaire_location_targets", "locations", "scheduled_reports",
+            "webhooks", "submission_comments",
+        )
+    ],
 ]
 
 from sqlalchemy import text as _text

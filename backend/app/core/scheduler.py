@@ -87,6 +87,17 @@ def _run_monthly_usage_reset():
         db.close()
 
 
+def _run_bin_purge():
+    """Hard-delete recycle-bin items past the 360-day retention window."""
+    from app.api.routes.bin import purge_expired
+    logger.info("[Scheduler] Recycle-bin purge starting")
+    try:
+        purged = purge_expired()
+        logger.info("[Scheduler] Recycle-bin purge done — %d items removed", purged)
+    except Exception:
+        logger.exception("[Scheduler] Recycle-bin purge failed")
+
+
 def start_scheduler():
     """Start the background scheduler. Call once on app startup."""
     global _scheduler
@@ -125,8 +136,18 @@ def start_scheduler():
         misfire_grace_time=1800,
     )
 
+    # Recycle-bin purge — daily at 03:15 UTC
+    _scheduler.add_job(
+        _run_bin_purge,
+        CronTrigger(hour=3, minute=15),
+        id="bin_purge",
+        name="Recycle-bin 360-day purge",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
     _scheduler.start()
-    logger.info("[Scheduler] Started — daily digest @ 07:00 UTC, monthly usage reset @ 1st 00:30 UTC, scheduled reports @ :00 each hour")
+    logger.info("[Scheduler] Started — daily digest @ 07:00 UTC, monthly usage reset @ 1st 00:30 UTC, scheduled reports @ :00 each hour, bin purge @ 03:15 UTC")
 
 
 def stop_scheduler():

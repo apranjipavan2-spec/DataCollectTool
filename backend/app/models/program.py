@@ -2,9 +2,10 @@ import uuid
 from sqlalchemy import Column, String, Integer, Date, DateTime, Float, ForeignKey, Text, Boolean, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.core.database import Base
+from app.core.soft_delete import SoftDeleteMixin
 
 
-class ProgramLocation(Base):
+class ProgramLocation(Base, SoftDeleteMixin):
     __tablename__ = "program_locations"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
@@ -18,7 +19,7 @@ class ProgramLocation(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
-class Program(Base):
+class Program(Base, SoftDeleteMixin):
     __tablename__ = "programs"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
@@ -35,7 +36,7 @@ class Program(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
-class ProgramParticipantType(Base):
+class ProgramParticipantType(Base, SoftDeleteMixin):
     __tablename__ = "program_participant_types"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     program_id = Column(UUID(as_uuid=True), ForeignKey("programs.id", ondelete="CASCADE"), nullable=False)
@@ -45,7 +46,7 @@ class ProgramParticipantType(Base):
     sort_order = Column(Integer, default=0)
 
 
-class ProgramQuestionnaire(Base):
+class ProgramQuestionnaire(Base, SoftDeleteMixin):
     __tablename__ = "program_questionnaires"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     program_id = Column(UUID(as_uuid=True), ForeignKey("programs.id", ondelete="CASCADE"), nullable=False)
@@ -63,7 +64,7 @@ class ProgramQuestionnaire(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
-class QuestionnaireLocationTarget(Base):
+class QuestionnaireLocationTarget(Base, SoftDeleteMixin):
     __tablename__ = "questionnaire_location_targets"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     questionnaire_id = Column(UUID(as_uuid=True), ForeignKey("program_questionnaires.id", ondelete="CASCADE"), nullable=False)

@@ -2,9 +2,10 @@ from uuid import uuid4
 from sqlalchemy import Column, String, Text, Date, ForeignKey, TIMESTAMP, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.core.database import Base
+from app.core.soft_delete import SoftDeleteMixin
 
 
-class RespondentRoster(Base):
+class RespondentRoster(Base, SoftDeleteMixin):
     __tablename__ = "respondent_roster"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)

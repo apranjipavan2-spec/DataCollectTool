@@ -9,6 +9,7 @@ from typing import List
 from sqlalchemy import or_
 from app.core.deps import get_current_user, get_db
 from app.models.shared_file import SharedFile
+from app.core.soft_delete import soft_delete
 
 router = APIRouter(prefix="/shared-files", tags=["shared-files"])
 
@@ -225,8 +226,8 @@ def delete_shared_file(file_id: str, user=Depends(get_current_user), db: Session
         raise HTTPException(404, "File not found")
     if str(record.uploaded_by) != user["sub"]:
         raise HTTPException(403, "Only the uploader can delete this file")
-    if os.path.exists(record.disk_path):
-        os.remove(record.disk_path)
-    db.delete(record)
+    # Soft-delete: keep the file on disk so it can be restored from the Bin.
+    # The 360-day purge job removes the disk file when it hard-deletes the row.
+    soft_delete(record)
     db.commit()
     return {"deleted": True}

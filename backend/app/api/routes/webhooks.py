@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import require_org_admin
 from app.models.webhook import Webhook
+from app.core.soft_delete import soft_delete
 from app.services.webhook import fire_webhooks
 
 logger = logging.getLogger(__name__)
@@ -143,7 +144,7 @@ def delete_webhook(webhook_id: str, user=Depends(require_org_admin), db: Session
     if not hook:
         raise HTTPException(status_code=404, detail="Webhook not found")
 
-    db.delete(hook)
+    soft_delete(hook)
     db.commit()
     return {"detail": "Webhook deleted"}
 

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import require_supervisor
 from app.models.scheduled_report import ScheduledReport
+from app.core.soft_delete import soft_delete
 
 router = APIRouter(prefix="/scheduled-reports", tags=["scheduled-reports"])
 
@@ -50,7 +51,7 @@ def update_scheduled_report(sr_id: str, body: dict, user=Depends(require_supervi
 @router.delete("/{sr_id}", status_code=204)
 def delete_scheduled_report(sr_id: str, user=Depends(require_supervisor), db: Session = Depends(get_db)):
     sr = _get_or_404(sr_id, user, db)
-    db.delete(sr)
+    soft_delete(sr)
     db.commit()
 
 

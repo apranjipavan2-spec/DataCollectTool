@@ -7,9 +7,10 @@ from sqlalchemy import Column, DateTime, ForeignKey, func
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from app.core.database import Base
+from app.core.soft_delete import SoftDeleteMixin
 
 
-class FormAssignment(Base):
+class FormAssignment(Base, SoftDeleteMixin):
     __tablename__ = "form_assignments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

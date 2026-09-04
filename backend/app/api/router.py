@@ -7,6 +7,7 @@ from app.api.routes import (
 )
 from app.api.routes.migration.router import router as migration_router
 from app.api.routes import public_survey, roster, analytics, locations, comments, inbox, shared_files
+from app.api.routes import bin as recycle_bin
 from app.api.routes.two_factor import router as two_factor_router
 from app.api.routes.audit import router as audit_router
 from app.api.routes.razorpay_billing import router as razorpay_router
@@ -48,3 +49,4 @@ router.include_router(shared_files.router, tags=["shared-files"])
 router.include_router(two_factor_router, prefix="/auth", tags=["2fa"])
 router.include_router(audit_router, tags=["audit"])
 router.include_router(razorpay_router, tags=["razorpay"])
+router.include_router(recycle_bin.router, tags=["bin"])

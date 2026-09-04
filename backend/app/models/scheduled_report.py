@@ -2,9 +2,10 @@ import uuid
 from sqlalchemy import Column, String, Boolean, JSON, ForeignKey, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
+from app.core.soft_delete import SoftDeleteMixin
 
 
-class ScheduledReport(Base):
+class ScheduledReport(Base, SoftDeleteMixin):
     __tablename__ = "scheduled_reports"
 
     id         = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

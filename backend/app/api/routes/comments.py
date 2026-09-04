@@ -45,10 +45,15 @@ def _ensure_table(db: Session):
                 author_name VARCHAR NOT NULL DEFAULT '',
                 author_role VARCHAR NOT NULL DEFAULT '',
                 body TEXT NOT NULL,
-                created_at TIMESTAMPTZ DEFAULT NOW()
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                deleted_at TIMESTAMPTZ
             )
         """))
         db.execute(text("CREATE INDEX IF NOT EXISTS idx_comments_submission ON submission_comments(submission_id)"))
+        db.commit()
+    else:
+        # Table predates soft-delete — add the column if it's missing.
+        db.execute(text("ALTER TABLE submission_comments ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"))
         db.commit()
 
 
@@ -58,7 +63,8 @@ def list_comments(submission_id: str, user: dict = Depends(require_any), db: Ses
     from sqlalchemy import text
     rows = db.execute(text(
         "SELECT id, author_name, author_role, body, created_at FROM submission_comments "
-        "WHERE submission_id = :sid AND tenant_id = :tid ORDER BY created_at ASC"
+        "WHERE submission_id = :sid AND tenant_id = :tid AND deleted_at IS NULL "
+        "ORDER BY created_at ASC"
     ), {"sid": submission_id, "tid": str(user["tenant_id"])}).fetchall()
     return [{"id": str(r[0]), "author_name": r[1], "author_role": r[2],
              "body": r[3], "created_at": r[4].isoformat() if r[4] else None} for r in rows]
@@ -106,8 +112,10 @@ def post_comment(submission_id: str, body: dict, user: dict = Depends(require_an
 def delete_comment(submission_id: str, comment_id: str,
                    user: dict = Depends(require_supervisor), db: Session = Depends(get_db)):
     from sqlalchemy import text
+    # Soft-delete: hide it, keep it recoverable, purge after 360 days.
     db.execute(text(
-        "DELETE FROM submission_comments WHERE id=:cid AND tenant_id=:tid"
+        "UPDATE submission_comments SET deleted_at = NOW() "
+        "WHERE id=:cid AND tenant_id=:tid AND deleted_at IS NULL"
     ), {"cid": comment_id, "tid": str(user["tenant_id"])})
     db.commit()
 

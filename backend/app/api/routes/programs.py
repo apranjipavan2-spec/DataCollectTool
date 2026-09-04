@@ -18,6 +18,7 @@ from app.models.program import (
     ProgramQuestionnaire, QuestionnaireLocationTarget,
 )
 from app.models.submission import Submission
+from app.core.soft_delete import soft_delete
 
 router = APIRouter()
 
@@ -114,7 +115,7 @@ def update_location(loc_id: str, body: LocationIn, user=Depends(require_supervis
 def delete_location(loc_id: str, user=Depends(require_supervisor), db: Session = Depends(get_db)):
     loc = db.query(ProgramLocation).filter(ProgramLocation.id == loc_id, ProgramLocation.tenant_id == user["tenant_id"]).first()
     if not loc: raise HTTPException(404, "Location not found")
-    db.delete(loc); db.commit()
+    soft_delete(loc); db.commit()
     return {"deleted": True}
 
 
@@ -268,7 +269,7 @@ def bulk_update_program_edit_setting(body: BulkProgEditSettingRequest, user=Depe
 def delete_program(prog_id: str, user=Depends(require_supervisor), db: Session = Depends(get_db)):
     p = db.query(Program).filter(Program.id == prog_id, Program.tenant_id == user["tenant_id"]).first()
     if not p: raise HTTPException(404, "Program not found")
-    db.delete(p); db.commit()
+    soft_delete(p); db.commit()
     return {"deleted": True}
 
 
@@ -297,7 +298,7 @@ def update_participant_type(prog_id: str, pt_id: str, body: ParticipantTypeIn, u
 def delete_participant_type(prog_id: str, pt_id: str, user=Depends(require_supervisor), db: Session = Depends(get_db)):
     pt = db.query(ProgramParticipantType).filter(ProgramParticipantType.id == pt_id, ProgramParticipantType.tenant_id == user["tenant_id"]).first()
     if not pt: raise HTTPException(404, "Participant type not found")
-    db.delete(pt); db.commit()
+    soft_delete(pt); db.commit()
     return {"deleted": True}
 
 
@@ -351,7 +352,7 @@ def update_questionnaire(prog_id: str, q_id: str, body: QuestionnaireIn, user=De
 def delete_questionnaire(prog_id: str, q_id: str, user=Depends(require_supervisor), db: Session = Depends(get_db)):
     q = db.query(ProgramQuestionnaire).filter(ProgramQuestionnaire.id == q_id, ProgramQuestionnaire.tenant_id == user["tenant_id"]).first()
     if not q: raise HTTPException(404, "Questionnaire not found")
-    db.delete(q); db.commit()
+    soft_delete(q); db.commit()
     return {"deleted": True}
 
 
@@ -380,7 +381,7 @@ def update_location_target(prog_id: str, q_id: str, t_id: str, body: LocationTar
 def delete_location_target(prog_id: str, q_id: str, t_id: str, user=Depends(require_supervisor), db: Session = Depends(get_db)):
     t = db.query(QuestionnaireLocationTarget).filter(QuestionnaireLocationTarget.id == t_id, QuestionnaireLocationTarget.tenant_id == user["tenant_id"]).first()
     if not t: raise HTTPException(404, "Target not found")
-    db.delete(t); db.commit()
+    soft_delete(t); db.commit()
     return {"deleted": True}
 
 
