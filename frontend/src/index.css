@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Drive Tailwind's dark: variant from the app's data-theme (set by ThemeContext),
+   not the device's prefers-color-scheme. Keeps dark: classes in sync with the theme toggle. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* ── Catalan Dark Theme ─────────────────────────────────────── */
 @theme {
   /* Colors */

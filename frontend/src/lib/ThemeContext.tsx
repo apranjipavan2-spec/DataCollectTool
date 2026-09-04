@@ -24,11 +24,7 @@ function resolveTheme(mode: ThemeMode): ResolvedTheme {
 
 function applyTheme(resolved: ResolvedTheme) {
   const html = document.documentElement
-  if (resolved === 'light') {
-    html.setAttribute('data-theme', 'light')
-  } else {
-    html.removeAttribute('data-theme')
-  }
+  html.setAttribute('data-theme', resolved)
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
