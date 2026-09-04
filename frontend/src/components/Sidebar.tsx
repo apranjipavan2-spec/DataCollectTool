@@ -39,6 +39,12 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
       ? 'rgba(99, 102, 241, 0.15)'
       : 'rgba(99, 102, 241, 0.08)',
     accent: '#6366f1',
+    // Text colors driven by the same `dark` flag as the background,
+    // so text can never merge into the background (no reliance on Tailwind dark:).
+    text: dark ? '#cbd5e1' : '#475569',        // default nav text
+    textHover: dark ? '#f1f5f9' : '#0f172a',   // hover / emphasis
+    textActive: dark ? '#a5b4fc' : '#4f46e5',  // active item (indigo)
+    textStrong: dark ? '#f1f5f9' : '#1e293b',  // headings / logo label
   }
 
   const isActive = (path: string) => {
@@ -55,16 +61,14 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
         className={`
           w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150
           md:justify-center lg:justify-start relative
-          ${active
-            ? 'text-indigo-500 dark:text-indigo-400 font-medium'
-            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-          }
+          ${active ? 'font-medium' : ''}
         `}
         style={{
           background: active ? glass.active : undefined,
+          color: active ? glass.textActive : glass.text,
         }}
-        onMouseEnter={e => { if (!active) e.currentTarget.style.background = glass.hover }}
-        onMouseLeave={e => { if (!active) e.currentTarget.style.background = '' }}
+        onMouseEnter={e => { if (!active) { e.currentTarget.style.background = glass.hover; e.currentTarget.style.color = glass.textHover } }}
+        onMouseLeave={e => { if (!active) { e.currentTarget.style.background = ''; e.currentTarget.style.color = glass.text } }}
         title={item.label}
       >
         {active && (
@@ -101,8 +105,8 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
             value={language}
             onChange={e => setLanguage(e.target.value as AppLanguage)}
             title="Language"
-            className="w-full rounded-md px-2 py-1.5 text-xs bg-transparent text-slate-500 dark:text-slate-400 focus:outline-none cursor-pointer appearance-none"
-            style={{ border: `1px solid ${glass.border}` }}
+            className="w-full rounded-md px-2 py-1.5 text-xs bg-transparent focus:outline-none cursor-pointer appearance-none"
+            style={{ border: `1px solid ${glass.border}`, color: glass.text }}
           >
             {LANGUAGE_OPTIONS.map(opt => (
               <option key={opt.code} value={opt.code} className="bg-white dark:bg-slate-900">{opt.label}</option>
@@ -118,12 +122,9 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
             className={`
               w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150
               md:justify-center lg:justify-start text-[13px]
-              ${isPanelOpen
-                ? 'text-indigo-500 dark:text-indigo-400 font-medium'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-              }
+              ${isPanelOpen ? 'font-medium' : ''}
             `}
-            style={{ background: isPanelOpen ? glass.active : undefined }}
+            style={{ background: isPanelOpen ? glass.active : undefined, color: isPanelOpen ? glass.textActive : glass.text }}
           >
             <span className="text-[15px] flex-shrink-0">?</span>
             <span className="hidden lg:inline tracking-wide">Help</span>
@@ -136,7 +137,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
             <div className="flex items-center gap-2 px-2.5 py-2 rounded-md text-[11px]"
               style={{ background: glass.hover, border: `1px solid ${glass.border}` }}>
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span className="text-slate-600 dark:text-slate-300 font-medium capitalize">{role?.replace('_', ' ')}</span>
+              <span className="font-medium capitalize" style={{ color: glass.text }}>{role?.replace('_', ' ')}</span>
             </div>
           </div>
         )}
@@ -147,8 +148,8 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
         <div className="md:hidden fixed top-4 left-4 z-50">
           <button
             onClick={() => setMobileOpen(true)}
-            className="w-10 h-10 flex items-center justify-center rounded-xl backdrop-blur-2xl text-slate-600 dark:text-slate-300 shadow-lg"
-            style={{ background: glass.bg, border: `1px solid ${glass.border}` }}
+            className="w-10 h-10 flex items-center justify-center rounded-xl backdrop-blur-2xl shadow-lg"
+            style={{ background: glass.bg, border: `1px solid ${glass.border}`, color: glass.textStrong }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M3 6h18M3 12h18M3 18h18" />
@@ -177,11 +178,12 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
         <div className="h-14 flex items-center justify-between px-4" style={{ borderBottom: `1px solid ${glass.border}` }}>
           <div className="flex items-center gap-2">
             <AppLogo size={28} />
-            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">FieldGovern</span>
+            <span className="text-sm font-semibold" style={{ color: glass.textStrong }}>FieldGovern</span>
           </div>
           <button
             onClick={() => setMobileOpen(false)}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-md transition-colors"
+            style={{ color: glass.text }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M18 6L6 18M6 6l12 12" />
@@ -198,8 +200,8 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
           <select
             value={language}
             onChange={e => setLanguage(e.target.value as AppLanguage)}
-            className="w-full rounded-md px-2 py-1.5 text-xs bg-transparent text-slate-500 dark:text-slate-400 focus:outline-none cursor-pointer"
-            style={{ border: `1px solid ${glass.border}` }}
+            className="w-full rounded-md px-2 py-1.5 text-xs bg-transparent focus:outline-none cursor-pointer"
+            style={{ border: `1px solid ${glass.border}`, color: glass.text }}
           >
             {LANGUAGE_OPTIONS.map(opt => (
               <option key={opt.code} value={opt.code} className="bg-white dark:bg-slate-900">{opt.label}</option>
@@ -210,12 +212,9 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
             onClick={() => { setMobileOpen(false); togglePanel() }}
             className={`
               w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-[13px]
-              ${isPanelOpen
-                ? 'text-indigo-500 font-medium'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-              }
+              ${isPanelOpen ? 'font-medium' : ''}
             `}
-            style={{ background: isPanelOpen ? glass.active : glass.hover }}
+            style={{ background: isPanelOpen ? glass.active : glass.hover, color: isPanelOpen ? glass.textActive : glass.text }}
           >
             <span>?</span>
             <span>Help</span>
@@ -225,7 +224,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
             <div className="flex items-center gap-2 px-2.5 py-2 rounded-md text-[11px]"
               style={{ background: glass.hover, border: `1px solid ${glass.border}` }}>
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span className="text-slate-600 dark:text-slate-300 font-medium capitalize">{role?.replace('_', ' ')}</span>
+              <span className="font-medium capitalize" style={{ color: glass.text }}>{role?.replace('_', ' ')}</span>
             </div>
           )}
         </div>
