@@ -52,7 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
     return location.pathname === path || location.pathname.startsWith(path + '/')
   }
 
-  const navItem = (item: SidebarItem, onClick?: () => void) => {
+  const navItem = (item: SidebarItem, onClick?: () => void, alwaysLabel = false) => {
     const active = isActive(item.path)
     return (
       <button
@@ -76,7 +76,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
             style={{ background: glass.accent }} />
         )}
         <span className="text-[15px] flex-shrink-0">{item.icon}</span>
-        <span className="text-[13px] hidden lg:inline tracking-wide">{item.label}</span>
+        <span className={`text-[13px] tracking-wide ${alwaysLabel ? 'inline' : 'hidden lg:inline'}`}>{item.label}</span>
       </button>
     )
   }
@@ -192,7 +192,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
         </div>
 
         <nav className="px-1.5 py-3 space-y-0.5">
-          {items.map(item => navItem(item, () => setMobileOpen(false)))}
+          {items.map(item => navItem(item, () => setMobileOpen(false), true))}
         </nav>
 
         {/* Bottom section - Mobile */}
