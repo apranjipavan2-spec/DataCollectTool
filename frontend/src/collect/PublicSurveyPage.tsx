@@ -82,7 +82,7 @@ export default function PublicSurveyPage() {
     if (!token || !recoveryPubKey || !backup.current) return
     try {
       const { id, values } = backup.current
-      const blob = await encryptCapsule(token, recoveryPubKey, values, id)
+      const blob = await encryptCapsule(recoveryPubKey, { data_json: values }, { id, token })
       const safe = (formTitle || 'survey').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '')
       downloadBlob(blob, `${safe}-response-${id.slice(0, 8)}.fgresp`)
       setBackupSaved(true)

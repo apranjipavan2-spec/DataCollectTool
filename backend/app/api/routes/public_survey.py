@@ -117,6 +117,15 @@ def public_survey_submit(token: str, body: dict, request: Request, db: Session =
     return {"id": str(sub.id), "serial_no": sub.serial_no}
 
 
+@router.get("/recovery/public-key")
+def recovery_public_key():
+    """Public RSA key used by any survey device to encrypt an offline backup.
+    Null when the feature isn't configured."""
+    if not recovery_enabled():
+        return {"public_key": None}
+    return {"public_key": normalize_pem(settings.SURVEY_RECOVERY_PUBLIC_KEY)}
+
+
 @router.post("/survey/recover")
 def public_survey_recover(body: dict, request: Request, db: Session = Depends(get_db)):
     """Recover offline-backup capsules (.fgresp files). No auth — the capsule can
@@ -135,11 +144,13 @@ def public_survey_recover(body: dict, request: Request, db: Session = Depends(ge
     results = []
     for i, envelope in enumerate(capsules):
         try:
-            data_json = decrypt_capsule(envelope)
+            payload = decrypt_capsule(envelope)
         except CapsuleError as e:
             results.append({"index": i, "status": "error", "detail": str(e)})
             continue
 
+        # Payload is { data_json, ... }; tolerate a bare data_json for safety.
+        data_json = payload.get("data_json", payload) if isinstance(payload, dict) else payload
         token = (envelope or {}).get("token")
         form = db.query(Form).filter(Form.public_token == token, Form.is_public == True).first()
         if not form:

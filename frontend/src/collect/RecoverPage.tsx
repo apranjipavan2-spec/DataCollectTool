@@ -25,8 +25,8 @@ export default function RecoverPage() {
     const parseErrors: Result[] = []
     for (const file of Array.from(files)) {
       try {
-        capsules.push(await parseCapsuleFile(file))
-        names.push(file.name)
+        const parsed = await parseCapsuleFile(file)
+        for (const c of parsed) { capsules.push(c); names.push(file.name) }
       } catch {
         parseErrors.push({ name: file.name, status: 'error', detail: 'not a valid backup file' })
       }

@@ -12,12 +12,19 @@
 
 export interface Capsule {
   v: number
-  id: string
-  token: string
+  id: string             // == the submission local_id (used for dedup)
+  token?: string         // public survey routing (public flow)
+  form_id?: string       // authenticated routing (enumerator flow)
   alg: string
   ek: string   // base64 RSA-OAEP-wrapped AES key
   iv: string   // base64 12-byte nonce
-  ct: string   // base64 ciphertext + tag
+  ct: string   // base64 ciphertext + tag (the encrypted payload)
+}
+
+export interface CapsuleMeta {
+  id: string
+  token?: string
+  form_id?: string
 }
 
 function pemToDer(pem: string): ArrayBuffer {
@@ -38,9 +45,12 @@ function toB64(buf: ArrayBuffer | Uint8Array): string {
   return btoa(s)
 }
 
-export async function encryptCapsule(
-  token: string, publicKeyPem: string, dataJson: unknown, id: string,
-): Promise<Blob> {
+/** Encrypt `payload` (the sensitive data) into a capsule. Routing fields in
+ *  `meta` (id + token or form_id) stay in the envelope so the server can route
+ *  before decrypting. Returns the capsule envelope object. */
+export async function makeCapsule(
+  publicKeyPem: string, payload: unknown, meta: CapsuleMeta,
+): Promise<Capsule> {
   const pubKey = await crypto.subtle.importKey(
     'spki', pemToDer(publicKeyPem),
     { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt'],
@@ -49,16 +59,29 @@ export async function encryptCapsule(
     { name: 'AES-GCM', length: 256 }, true, ['encrypt'],
   )
   const iv = crypto.getRandomValues(new Uint8Array(12))
-  const plaintext = new TextEncoder().encode(JSON.stringify(dataJson))
+  const plaintext = new TextEncoder().encode(JSON.stringify(payload))
   const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, plaintext)
   const rawAes = await crypto.subtle.exportKey('raw', aesKey)
   const ek = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, pubKey, rawAes)
 
-  const capsule: Capsule = {
-    v: 1, id, token, alg: 'RSA-OAEP-256+A256GCM',
+  return {
+    v: 1, id: meta.id, token: meta.token, form_id: meta.form_id,
+    alg: 'RSA-OAEP-256+A256GCM',
     ek: toB64(ek), iv: toB64(iv), ct: toB64(ct),
   }
-  return new Blob([JSON.stringify(capsule)], { type: 'application/octet-stream' })
+}
+
+/** Encrypt a single response into a downloadable `.fgresp` Blob. */
+export async function encryptCapsule(
+  publicKeyPem: string, payload: unknown, meta: CapsuleMeta,
+): Promise<Blob> {
+  const capsule = await makeCapsule(publicKeyPem, payload, meta)
+  return capsuleFileBlob([capsule])
+}
+
+/** Bundle one or more capsules into a single `.fgresp` file the recover endpoints accept. */
+export function capsuleFileBlob(capsules: Capsule[]): Blob {
+  return new Blob([JSON.stringify({ capsules })], { type: 'application/octet-stream' })
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {
@@ -70,6 +93,11 @@ export function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url)
 }
 
-export async function parseCapsuleFile(file: File): Promise<Capsule> {
-  return JSON.parse(await file.text())
+/** Read a .fgresp file → the capsules inside. Accepts both a bundle
+ *  ({ capsules: [...] }) and a single bare capsule for forward/backward safety. */
+export async function parseCapsuleFile(file: File): Promise<Capsule[]> {
+  const parsed = JSON.parse(await file.text())
+  if (Array.isArray(parsed?.capsules)) return parsed.capsules
+  if (parsed?.ct) return [parsed]
+  throw new Error('not a valid backup file')
 }

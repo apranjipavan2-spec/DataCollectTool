@@ -1110,3 +1110,75 @@ def assign_backcheck_form(
         "backcheck_required": True,
         "backcheck_form_id": str(sub.backcheck_form_id) if sub.backcheck_form_id else None,
     }
+
+
+@router.post("/recover")
+def recover_submissions(body: dict, user=Depends(require_enumerator), db: Session = Depends(get_db)):
+    """Recover encrypted offline-backup capsules (.fgresp) for authenticated
+    submissions. Decrypts each with the server private key, validates the form is
+    in the caller's org, dedups by (form_id, local_id) so a response already synced
+    normally is not duplicated, and stores the rest attributed to the uploader.
+
+    Media rides inline in data_json (as captured on-device) — this is a last-resort
+    recovery path, so preserving the data outranks the normal media pipeline."""
+    from app.core.survey_crypto import decrypt_capsule, recovery_enabled, CapsuleError
+    from sqlalchemy import func as _func
+
+    if not recovery_enabled():
+        raise HTTPException(status_code=503, detail="Offline recovery is not enabled on this server")
+    capsules = body.get("capsules")
+    if not isinstance(capsules, list) or not capsules:
+        raise HTTPException(status_code=400, detail="No capsules provided")
+    if len(capsules) > 500:
+        raise HTTPException(status_code=413, detail="Too many capsules in one request (max 500)")
+
+    tenant_id = user["tenant_id"]
+    uploader = user["sub"]
+    results = []
+    for i, env in enumerate(capsules):
+        try:
+            payload = decrypt_capsule(env)
+        except CapsuleError as e:
+            results.append({"index": i, "status": "error", "detail": str(e)})
+            continue
+
+        payload = payload if isinstance(payload, dict) else {"data_json": payload}
+        data_json = payload.get("data_json", {})
+        form_id = (env or {}).get("form_id")
+        local_id = (env or {}).get("id")
+
+        form = db.query(Form).filter(Form.id == form_id, Form.tenant_id == tenant_id).first() if form_id else None
+        if not form:
+            results.append({"index": i, "status": "error", "detail": "form not found in your organization"})
+            continue
+
+        if local_id:
+            existing = db.query(Submission).filter(
+                Submission.form_id == form.id, Submission.local_id == str(local_id),
+            ).first()
+            if existing:
+                results.append({"index": i, "status": "duplicate", "id": str(existing.id)})
+                continue
+
+        max_serial = db.query(_func.coalesce(_func.max(Submission.serial_no), 0)).filter(
+            Submission.form_id == form.id
+        ).scalar() or 0
+        sub = Submission(
+            form_id=form.id,
+            tenant_id=tenant_id,
+            enumerator_id=uploader,
+            data_json={**data_json, "_recovered": True},
+            gps_open=payload.get("gps_open"),
+            gps_submit=payload.get("gps_submit"),
+            status="submitted",
+            form_version=int(payload.get("form_version") or form.version or 1),
+            serial_no=max_serial + 1,
+            local_id=str(local_id) if local_id else None,
+        )
+        db.add(sub)
+        db.commit()
+        db.refresh(sub)
+        results.append({"index": i, "status": "saved", "id": str(sub.id), "serial_no": sub.serial_no})
+
+    saved = sum(1 for r in results if r["status"] == "saved")
+    return {"saved": saved, "total": len(results), "results": results}

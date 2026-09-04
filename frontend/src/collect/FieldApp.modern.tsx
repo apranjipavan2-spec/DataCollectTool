@@ -12,6 +12,7 @@ import Sidebar from '@/components/Sidebar'
 import { getNavItems } from '@/lib/navigation'
 import BeneficiaryListScreen, { type RosterEntry } from './BeneficiaryListScreen'
 import EmojiIcon from '@/components/EmojiIcon'
+import { makeCapsule, capsuleFileBlob, downloadBlob, parseCapsuleFile, type Capsule } from './surveyCrypto'
 
 function _haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000
@@ -121,6 +122,8 @@ export default function FieldApp() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
+  const [recoveryPubKey, setRecoveryPubKey] = useState<string | null>(null)
+  const recoverInputRef = useRef<HTMLInputElement>(null)
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [myStats, setMyStats] = useState<{ today: number; total: number } | null>(null)
@@ -262,6 +265,60 @@ export default function FieldApp() {
   }, [])
 
   useEffect(() => { syncRef.current = syncToServer }, [syncToServer])
+
+  // Fetch the offline-backup public key once (null when the feature is disabled).
+  useEffect(() => {
+    api.get('/recovery/public-key')
+      .then(r => setRecoveryPubKey(r.data.public_key ?? null))
+      .catch(() => setRecoveryPubKey(null))
+  }, [])
+
+  // Export every unsynced submission as ONE encrypted .fgresp backup file. The
+  // file can only be decrypted by the server, and survives clearing the app.
+  const handleBackup = async () => {
+    if (!recoveryPubKey) return
+    try {
+      const store = await getStorage()
+      const outbox = await store.getOutbox()
+      if (outbox.length === 0) { setSyncMsg('Nothing to back up'); setTimeout(() => setSyncMsg(''), 3000); return }
+      const capsules: Capsule[] = []
+      for (const s of outbox) {
+        capsules.push(await makeCapsule(
+          recoveryPubKey,
+          { data_json: s.data, form_version: s.formVersion, gps_open: s.gpsOpen ?? null, gps_submit: s.gpsSubmit ?? null },
+          { id: s.id, form_id: s.formId },
+        ))
+      }
+      const stamp = new Date().toISOString().slice(0, 10)
+      downloadBlob(capsuleFileBlob(capsules), `fieldgovern-backup-${stamp}-${capsules.length}.fgresp`)
+      setSyncMsg(`✓ Saved encrypted backup of ${capsules.length} response(s)`)
+      setTimeout(() => setSyncMsg(''), 4000)
+    } catch (e) {
+      console.error('[FieldApp] backup failed', e)
+      setSyncMsg('Backup failed')
+    }
+  }
+
+  // Recover submissions from uploaded .fgresp file(s): server decrypts + stores.
+  const handleRecoverFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setSyncMsg('Recovering…')
+    const capsules: Capsule[] = []
+    for (const f of Array.from(files)) {
+      try { capsules.push(...await parseCapsuleFile(f)) } catch { /* skip non-capsule file */ }
+    }
+    if (capsules.length === 0) { setSyncMsg('No valid backup files'); return }
+    try {
+      const { data } = await api.post('/submissions/recover', { capsules }, { timeout: 120000 })
+      const dupes = data.total - data.saved
+      setSyncMsg(`✓ Recovered ${data.saved}${dupes > 0 ? ` (${dupes} already had)` : ''}`)
+      setTimeout(() => setSyncMsg(''), 5000)
+      loadFormsRef.current?.()
+    } catch (e: any) {
+      setSyncMsg(e?.response?.data?.detail ?? 'Recovery failed')
+    }
+    if (recoverInputRef.current) recoverInputRef.current.value = ''
+  }
 
   // ── Load drafts from local storage ─────────────────────────────────────
   const loadDrafts = useCallback(async () => {
@@ -1187,6 +1244,20 @@ export default function FieldApp() {
                 <span>{refreshing ? '⏳' : '↻'}</span>
                 <span className="hidden sm:inline">Refresh</span>
               </button>
+              {recoveryPubKey && (
+                <>
+                  <button
+                    onClick={() => recoverInputRef.current?.click()}
+                    className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-catalan-hover border border-catalan-border text-catalan-textMuted hover:text-catalan-primary hover:border-catalan-primary/50 transition-all"
+                    title="Recover responses from a saved .fgresp backup file"
+                  >
+                    <span><EmojiIcon e="🛟" /></span>
+                    <span className="hidden sm:inline">Recover</span>
+                  </button>
+                  <input ref={recoverInputRef} type="file" accept=".fgresp,application/octet-stream" multiple className="hidden"
+                    onChange={e => handleRecoverFiles(e.target.files)} />
+                </>
+              )}
             </div>
           </div>
 
@@ -1208,6 +1279,15 @@ export default function FieldApp() {
                   className="text-catalan-error bg-catalan-error/10 px-3 py-1 rounded-full border border-catalan-error/30 hover:bg-catalan-error/20 transition-colors text-xs disabled:opacity-50"
                 >
                   {retryingMedia ? '⏳' : `${failedMediaCount} failed`}
+                </button>
+              )}
+              {recoveryPubKey && outboxCount > 0 && (
+                <button
+                  onClick={handleBackup}
+                  className="text-catalan-primary bg-catalan-primary/10 px-3 py-1 rounded-full border border-catalan-primary/30 hover:bg-catalan-primary/20 transition-colors text-xs font-medium"
+                  title="Save an encrypted backup file of unsynced responses to this device"
+                >
+                  <EmojiIcon e="💾" /> Backup
                 </button>
               )}
               {syncMsg && <span className="text-catalan-info text-xs">{syncMsg}</span>}
