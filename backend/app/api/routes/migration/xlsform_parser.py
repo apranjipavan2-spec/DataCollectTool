@@ -117,6 +117,15 @@ def _best_label(row: dict, lang_hint: str = "") -> str:
     return row.get("name", "")
 
 
+def _best_hindi_label(row: dict) -> str:
+    """Pick a Hindi label column value, if the sheet has one."""
+    candidates = ["label::hindi (hi)", "label::hindi", "label::hi"]
+    for key in candidates:
+        if row.get(key):
+            return row[key]
+    return ""
+
+
 def _best_hint(row: dict) -> str:
     for k, v in row.items():
         if k.startswith("hint") and v:
@@ -155,9 +164,12 @@ def _build_choices(choices_rows: list[dict]) -> dict[str, list[dict]]:
         list_name = row.get("list_name") or row.get("list name", "")
         name = row.get("name", "")
         label = _best_label(row)
+        label_hi = _best_hindi_label(row)
         if not list_name or not name:
             continue
         opt = {"value": name, "label": label or name}
+        if label_hi:
+            opt["label_hi"] = label_hi
         for k, v in row.items():
             if k in _CHOICE_RESERVED or k.startswith("label") or not v:
                 continue
@@ -238,6 +250,7 @@ def parse_xlsform(file_bytes: bytes, filename: str = "") -> dict:
 
         name = row.get("name", "").strip()
         label = _best_label(row)
+        label_hi = _best_hindi_label(row)
         hint = _best_hint(row)
         required = _bool(row.get("required", ""))
         relevant = row.get("relevant", "")
@@ -319,6 +332,8 @@ def parse_xlsform(file_bytes: bytes, filename: str = "") -> dict:
             "label": label or name,
             "required": required,
         }
+        if label_hi:
+            field["label_hi"] = label_hi
 
         if hint:
             field["hint"] = hint
