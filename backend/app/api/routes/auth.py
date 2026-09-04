@@ -165,13 +165,23 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     """Authenticate with phone/email + password. Returns 2fa_required if tenant has 2FA enabled."""
     lookup = body.identifier or body.phone or ""
     normalized = normalize_phone(lookup)
-    user = db.query(User).filter(
-        or_(User.phone == lookup, User.phone == normalized, User.email == lookup),
-        User.is_active == True,
-    ).first()
-    if not user or not user.password_hash:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    if not verify_password(body.password, user.password_hash):
+    match = or_(User.phone == lookup, User.phone == normalized, User.email == lookup)
+    # A phone is ACTIVE in at most one org (enforced by uq_users_active_phone), so
+    # login deterministically resolves to that org — a user active in one org can
+    # never log into another. Deactivation is what frees the phone for another org.
+    user = db.query(User).filter(match, User.is_active == True).first()
+    if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
+        # No ACTIVE account accepted these credentials. If a DEACTIVATED account
+        # matches the password, say so plainly instead of a misleading "invalid
+        # credentials" — that's exactly the "you were deactivated from that org"
+        # case. Only revealed after a correct password, so it's not an enumeration
+        # oracle.
+        for cand in db.query(User).filter(match, User.is_active == False).all():
+            if cand.password_hash and verify_password(body.password, cand.password_hash):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Your account has been deactivated by your organization's admin. Ask them to reactivate it, or to add you if you have moved organizations.",
+                )
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     # User-level TOTP 2FA check (takes priority over tenant OTP flow)
