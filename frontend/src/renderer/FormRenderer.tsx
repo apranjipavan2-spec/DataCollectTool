@@ -518,11 +518,11 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
             </button>
           ) : null}
           {isLast ? (
-            <div className="flex-[2] flex flex-col gap-2">
+            <>
               <button
                 onClick={handleSubmit}
                 disabled={submitting}
-                className={`w-full bg-catalan-success text-catalan-bg rounded-xl py-4 text-base font-bold min-h-[56px] active:scale-[0.98] transition-all ${submitting ? 'cursor-wait opacity-70' : 'cursor-pointer hover:brightness-110'}`}
+                className={`flex-1 bg-catalan-success text-catalan-bg rounded-xl py-4 text-base font-bold min-h-[64px] active:scale-[0.98] transition-all ${submitting ? 'cursor-wait opacity-70' : 'cursor-pointer hover:brightness-110'}`}
               >
                 {submitting ? 'Submitting…' : 'Submit ✓'}
               </button>
@@ -530,13 +530,13 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
                 <button
                   onClick={handleSubmitAndDownload}
                   disabled={submitting}
-                  className={`w-full bg-green-800 text-white rounded-xl py-3 text-[15px] font-semibold min-h-[52px] active:scale-[0.98] transition-all ${submitting ? 'cursor-wait opacity-70' : 'cursor-pointer hover:bg-green-900'}`}
+                  className={`flex-[1.6] bg-green-800 text-white rounded-xl px-3 py-3 text-sm font-semibold min-h-[64px] leading-tight whitespace-normal active:scale-[0.98] transition-all ${submitting ? 'cursor-wait opacity-70' : 'cursor-pointer hover:bg-green-900'}`}
                   title="Submit to the server AND save an encrypted backup file to this device"
                 >
                   <EmojiIcon e="💾" /> Submit &amp; download form
                 </button>
               )}
-            </div>
+            </>
           ) : showManualNext ? (
             <button
               onClick={goNext}
