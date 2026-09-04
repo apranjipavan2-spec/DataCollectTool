@@ -28,6 +28,8 @@ interface Form {
   version: number
   status: string
   updated_at: string
+  is_public?: boolean
+  public_token?: string | null
 }
 
 interface Submission {
@@ -1088,6 +1090,7 @@ export default function Dashboard() {
     try {
       const { data } = await api.post(`/forms/${form.id}/make-public`)
       setSharePublicUrl(window.location.origin + data.public_url)
+      setForms(prev => prev.map(f => f.id === form.id ? { ...f, is_public: true, public_token: data.token } : f))
       toast.success('Survey link created')
     } catch (err: any) {
       toast.error(apiErrorMessage(err, 'Failed to make public'))
@@ -1101,7 +1104,8 @@ export default function Dashboard() {
     try {
       await api.post(`/forms/${form.id}/make-private`)
       setSharePublicUrl(null)
-      toast.success('Survey link deactivated')
+      setForms(prev => prev.map(f => f.id === form.id ? { ...f, is_public: false, public_token: null } : f))
+      toast.success('Survey link deactivated — the old link no longer works')
     } catch {
       toast.error('Failed to make private')
     } finally {
@@ -2608,11 +2612,17 @@ export default function Dashboard() {
                                 </span>
                                 {['org_admin'].includes(user.role) && (
                                   <button
-                                    onClick={() => { setShareForm(form); setSharePublicUrl(null) }}
-                                    className="text-xs text-catalan-primary hover:underline"
-                                    title="Share as public survey"
+                                    onClick={() => {
+                                      setShareForm(form)
+                                      // If the form is already public, show its live link + Deactivate straight away.
+                                      setSharePublicUrl(form.is_public && form.public_token
+                                        ? `${window.location.origin}/survey/${form.public_token}`
+                                        : null)
+                                    }}
+                                    className={`text-xs hover:underline ${form.is_public ? 'text-catalan-success font-medium' : 'text-catalan-primary'}`}
+                                    title={form.is_public ? 'Public link is LIVE — click to view or deactivate' : 'Share as public survey'}
                                   >
-                                    Share
+                                    {form.is_public ? '● Public' : 'Share'}
                                   </button>
                                 )}
                                 {['org_admin'].includes(user.role) && (
