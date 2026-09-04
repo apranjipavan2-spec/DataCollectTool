@@ -91,6 +91,14 @@ export default function PublicSurveyPage() {
     }
   }
 
+  // Submit AND download an encrypted backup in one action (last-question button).
+  // Submits first (which sets backup.current to the submission's real id), then
+  // downloads the file with that same id so a later recovery dedups cleanly.
+  const handleSubmitAndDownload = async (draft: SubmissionDraft) => {
+    await handleSubmit(draft)
+    await saveBackup()
+  }
+
   // Submit: guarantee the response is saved locally, THEN upload (with retry).
   const handleSubmit = async (draft: SubmissionDraft) => {
     if (!token) return
@@ -229,6 +237,7 @@ export default function PublicSurveyPage() {
             schema={schema}
             onSave={handleSave}
             onSubmit={handleSubmit}
+            onSubmitAndDownload={recoveryPubKey ? handleSubmitAndDownload : undefined}
             initialDraft={initialDraft ?? undefined}
           />
         )}

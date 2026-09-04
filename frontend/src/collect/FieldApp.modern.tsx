@@ -1152,6 +1152,20 @@ export default function FieldApp() {
             schema={activeForm.schema}
             onSave={handleSave}
             onSubmit={async (draft) => { await handleSubmit(draft); clearProg() }}
+            onSubmitAndDownload={recoveryPubKey && activeForm ? async (draft) => {
+              // Save an encrypted backup file of THIS response, then submit. Same
+              // id as the outbox record so a later recovery dedups cleanly.
+              try {
+                const cap = await makeCapsule(
+                  recoveryPubKey,
+                  { data_json: draft.values, form_version: draft.formVersion, gps_open: draft.gpsOpen ?? null, gps_submit: draft.gpsSubmit ?? null },
+                  { id: draft.id, form_id: activeForm.meta.id },
+                )
+                const safe = (activeForm.meta.title || 'form').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '')
+                downloadBlob(capsuleFileBlob([cap]), `${safe}-response-${draft.id.slice(0, 8)}.fgresp`)
+              } catch (e) { console.error('[FieldApp] submit+download backup failed', e) }
+              await handleSubmit(draft); clearProg()
+            } : undefined}
             initialDraft={resumingDraft ?? (rosterInitialValues ? {
               id: uuidv4(),
               formVersion: activeForm.meta.version,

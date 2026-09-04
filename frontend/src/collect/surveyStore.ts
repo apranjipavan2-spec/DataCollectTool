@@ -68,8 +68,7 @@ export async function clearDraft(token: string): Promise<void> {
 
 /** Persist a completed response locally. Returns its local id. Throws only if
  *  storage itself is unavailable (caller must then keep the data in memory). */
-export async function enqueueSubmission(token: string, values: Record<string, unknown>): Promise<string> {
-  const id = uuidv4()
+export async function enqueueSubmission(token: string, values: Record<string, unknown>, id: string = uuidv4()): Promise<string> {
   await db.pending.put({
     id, token, kind: 'submission', values,
     updatedAt: new Date().toISOString(), attempts: 0,

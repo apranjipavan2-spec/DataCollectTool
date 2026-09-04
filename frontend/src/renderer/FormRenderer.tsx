@@ -23,6 +23,7 @@ interface Props {
   schema: FormSchema
   onSave:   (draft: SubmissionDraft) => Promise<void>   // auto-save (debounced)
   onSubmit: (draft: SubmissionDraft) => Promise<void>   // final submit
+  onSubmitAndDownload?: (draft: SubmissionDraft) => Promise<void>  // submit + save encrypted backup file
   onCancel?: () => void                                  // exit form collection
   initialDraft?: SubmissionDraft
 }
@@ -83,7 +84,7 @@ function seedAutoNow(schema: FormSchema): Record<string, unknown> {
   return values
 }
 
-export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initialDraft }: Props) {
+export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDownload, onCancel, initialDraft }: Props) {
   const purpose = schema.settings?.purpose as string | undefined
   const [consentGiven, setConsentGiven] = useState(!purpose || !!initialDraft?.consentTimestamp)
 
@@ -270,15 +271,14 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
     }
   }
 
-  const handleSubmit = async () => {
-    // Validate current field first
+  // Build the final draft (validate current field, capture GPS, stamp timing +
+  // audio audit). Returns null if validation fails.
+  const buildFinalDraft = async (): Promise<SubmissionDraft | null> => {
     if (currentField) {
       const err = validate(currentField, draft.values[currentField.name])
-      if (err) { setErrors(e => ({ ...e, [currentField.name]: err })); return }
+      if (err) { setErrors(e => ({ ...e, [currentField.name]: err })); return null }
     }
-    setSubmitting(true)
     const gpsSubmit = await captureGps()
-    // QC: stamp interview timing + stop the audio audit (both ride data_json; backend skips via _internal / media pipeline)
     const startedMs = draft.startedAt ? Date.parse(draft.startedAt) : Date.now()
     const _duration_sec = Math.max(0, Math.round((Date.now() - startedMs) / 1000))
     const auditUri = await stopAudit()
@@ -290,8 +290,24 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
     }
     const final: SubmissionDraft = { ...draft, values: valuesWithMeta, gpsSubmit, status: 'outbox' }
     setDraft(final)
-    try { await onSubmit(final) }
-    finally { setSubmitting(false) }
+    return final
+  }
+
+  const handleSubmit = async () => {
+    setSubmitting(true)
+    try {
+      const final = await buildFinalDraft()
+      if (final) await onSubmit(final)
+    } finally { setSubmitting(false) }
+  }
+
+  const handleSubmitAndDownload = async () => {
+    if (!onSubmitAndDownload) return
+    setSubmitting(true)
+    try {
+      const final = await buildFinalDraft()
+      if (final) await onSubmitAndDownload(final)
+    } finally { setSubmitting(false) }
   }
 
   const isLast = page === allFields.length - 1
@@ -502,13 +518,25 @@ export default function FormRenderer({ schema, onSave, onSubmit, onCancel, initi
             </button>
           ) : null}
           {isLast ? (
-            <button
-              onClick={handleSubmit}
-              disabled={submitting}
-              className={`flex-[2] bg-catalan-success text-catalan-bg rounded-xl py-4 text-base font-bold min-h-[56px] active:scale-[0.98] transition-all ${submitting ? 'cursor-wait opacity-70' : 'cursor-pointer hover:brightness-110'}`}
-            >
-              {submitting ? 'Submitting…' : 'Submit ✓'}
-            </button>
+            <div className="flex-[2] flex flex-col gap-2">
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className={`w-full bg-catalan-success text-catalan-bg rounded-xl py-4 text-base font-bold min-h-[56px] active:scale-[0.98] transition-all ${submitting ? 'cursor-wait opacity-70' : 'cursor-pointer hover:brightness-110'}`}
+              >
+                {submitting ? 'Submitting…' : 'Submit ✓'}
+              </button>
+              {onSubmitAndDownload && (
+                <button
+                  onClick={handleSubmitAndDownload}
+                  disabled={submitting}
+                  className={`w-full bg-catalan-primary text-white rounded-xl py-3 text-[15px] font-semibold min-h-[52px] active:scale-[0.98] transition-all ${submitting ? 'cursor-wait opacity-70' : 'cursor-pointer hover:brightness-110'}`}
+                  title="Submit to the server AND save an encrypted backup file to this device"
+                >
+                  <EmojiIcon e="💾" /> Submit &amp; download form
+                </button>
+              )}
+            </div>
           ) : showManualNext ? (
             <button
               onClick={goNext}
