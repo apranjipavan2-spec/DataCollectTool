@@ -48,6 +48,7 @@ def public_survey_info(token: str, db: Session = Depends(get_db)):
 
 
 def _rate_limit(token: str, request: Request, limit: int = 10) -> None:
+    """Hourly count cap (used by recovery). Kept for bulk endpoints."""
     client_ip = request.client.host if request.client else "unknown"
     r = _get_redis()
     if r:
@@ -57,6 +58,26 @@ def _rate_limit(token: str, request: Request, limit: int = 10) -> None:
             r.expire(rl_key, 3600)
         if count > limit:
             raise HTTPException(status_code=429, detail="Too many submissions. Please try again later.")
+
+
+def _throttle_interval(key: str, request: Request, seconds: int = 15) -> None:
+    """Min-interval throttle: at most one submission per `seconds` per IP.
+
+    Blocks rapid bot spam while letting steady field collection through. Pairs
+    with the client's 15s auto-retry — a throttled submission is never lost, it
+    just lands on the next retry once the window clears. No-op if Redis is down.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    r = _get_redis()
+    if r:
+        rl_key = f"rl:pubint:{key}:{client_ip}"
+        # SET NX EX succeeds only if no submission from this IP in the last window.
+        allowed = r.set(rl_key, "1", nx=True, ex=seconds)
+        if not allowed:
+            raise HTTPException(
+                status_code=429,
+                detail="Please wait a few seconds before submitting again — your response is saved and will send automatically.",
+            )
 
 
 def _persist_submission(db: Session, form: Form, data_json: dict, local_id: str | None):
@@ -109,7 +130,7 @@ def public_survey_submit(token: str, body: dict, request: Request, db: Session =
     if not form:
         raise HTTPException(status_code=404, detail="Survey not found or no longer active")
 
-    _rate_limit(token, request)
+    _throttle_interval(token, request, seconds=15)  # ≤1 submission / 15s per IP
 
     data_json = body.get("data_json", body)
     local_id = body.get("local_id")
