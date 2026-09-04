@@ -30,6 +30,8 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     language_pref: Optional[str] = None
+    role: Optional[str] = None          # org_admin only
+    is_active: Optional[bool] = None     # org_admin only — activate/deactivate
 
 
 @router.get("/me")
@@ -43,13 +45,21 @@ def get_me(user=Depends(get_current_user), db: Session = Depends(get_db)):
 
 
 @router.get("/")
-def list_users(page: int = 1, page_size: int = 50, user=Depends(require_supervisor), db: Session = Depends(get_db)):
+def list_users(page: int = 1, page_size: int = 50, include_inactive: bool = True,
+               user=Depends(require_supervisor), db: Session = Depends(get_db)):
+    """All users in the caller's org. Deactivated users are included by default
+    (active first) so an admin can see and reactivate them — previously they were
+    hidden entirely, which made an already-registered phone look 'missing'."""
     page_size = min(page_size, 200)
-    q = db.query(User).filter(User.tenant_id == user["tenant_id"], User.is_active == True)
+    q = db.query(User).filter(User.tenant_id == user["tenant_id"])
+    if not include_inactive:
+        q = q.filter(User.is_active == True)
     total = q.count()
-    users = q.order_by(User.name).offset((page - 1) * page_size).limit(page_size).all()
+    users = (q.order_by(User.is_active.desc(), User.name)
+             .offset((page - 1) * page_size).limit(page_size).all())
     return {
-        "items": [{"id": str(u.id), "name": u.name, "phone": u.phone, "role": u.role, "email": u.email} for u in users],
+        "items": [{"id": str(u.id), "name": u.name, "phone": u.phone, "role": u.role,
+                   "email": u.email, "is_active": bool(u.is_active)} for u in users],
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -92,8 +102,13 @@ def create_user(request: Request, body: UserCreate, user=Depends(require_org_adm
                 existing.password_hash = hash_password(body.password)
             db.commit()
             db.refresh(existing)
-            return {"id": str(existing.id), "phone": existing.phone, "role": existing.role, "email": existing.email}
-        raise HTTPException(status_code=400, detail="Phone already registered")
+            return {"id": str(existing.id), "phone": existing.phone, "role": existing.role, "email": existing.email, "is_active": True}
+        # Same tenant + already active → it's already in their team (just not found
+        # because the caller was looking at a filtered view). Point them to it.
+        if existing.tenant_id == user["tenant_id"]:
+            raise HTTPException(status_code=400, detail=f"This phone already belongs to {existing.name or 'a user'} in your team — check the Team list.")
+        # Different tenant → the number is registered under another organization.
+        raise HTTPException(status_code=400, detail="This phone number is already registered under a different organization account. Ask the person to use a different number, or contact support to move the account.")
     new_user = User(
         tenant_id=user["tenant_id"],
         phone=phone,
@@ -245,6 +260,20 @@ def update_user(user_id: str, body: UserUpdate, user=Depends(get_current_user), 
     if body.language_pref is not None:
         target.language_pref = body.language_pref
 
+    # Role + activation are admin-only, tenant-scoped changes.
+    if body.role is not None:
+        if not is_admin:
+            raise HTTPException(status_code=403, detail="Only an admin can change roles")
+        if body.role not in VALID_ROLES:
+            raise HTTPException(status_code=400, detail=f"Invalid role — must be one of {', '.join(sorted(VALID_ROLES))}")
+        target.role = body.role
+    if body.is_active is not None:
+        if not is_admin:
+            raise HTTPException(status_code=403, detail="Only an admin can activate or deactivate users")
+        if str(target.tenant_id) != str(user["tenant_id"]):
+            raise HTTPException(status_code=403, detail="Not authorised to update this user")
+        target.is_active = body.is_active
+
     db.commit()
     db.refresh(target)
     return {
@@ -254,6 +283,7 @@ def update_user(user_id: str, body: UserUpdate, user=Depends(get_current_user), 
         "role": target.role,
         "email": target.email,
         "language_pref": target.language_pref,
+        "is_active": bool(target.is_active),
     }
 
 

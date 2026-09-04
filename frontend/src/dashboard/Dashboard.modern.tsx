@@ -78,6 +78,7 @@ interface TeamMember {
   name: string
   phone: string
   role: string
+  is_active?: boolean
 }
 
 interface Assignment {
@@ -1329,13 +1330,23 @@ export default function Dashboard() {
   }
 
   const handleDeactivate = async (member: TeamMember) => {
-    if (!confirm(`Deactivate ${member.name}? They will no longer be able to log in.`)) return
+    if (!confirm(`Deactivate ${member.name}? They will no longer be able to log in, but stay in your team list and can be reactivated anytime.`)) return
     try {
       await api.delete(`/users/${member.id}`)
-      setTeam(t => t.filter(m => m.id !== member.id))
+      setTeam(t => t.map(m => m.id === member.id ? { ...m, is_active: false } : m))
       toast.success(`${member.name} deactivated`)
     } catch {
       toast.error('Failed to deactivate user')
+    }
+  }
+
+  const handleActivate = async (member: TeamMember) => {
+    try {
+      await api.patch(`/users/${member.id}`, { is_active: true })
+      setTeam(t => t.map(m => m.id === member.id ? { ...m, is_active: true } : m))
+      toast.success(`${member.name} reactivated`)
+    } catch (err: any) {
+      toast.error(apiErrorMessage(err, 'Failed to reactivate user'))
     }
   }
 
@@ -3211,10 +3222,14 @@ export default function Dashboard() {
                       ) : (
                         paginatedTeam.map(member => {
                           const subCount = summary?.by_enumerator?.find(e => e.enumerator_id === member.id)?.count ?? submissions.filter(s => s.enumerator_id === member.id).length
+                          const inactive = member.is_active === false
                           return (
-                            <tr key={member.id} className="border-b border-catalan-border hover:bg-catalan-hover transition-colors">
+                            <tr key={member.id} className={`border-b border-catalan-border hover:bg-catalan-hover transition-colors ${inactive ? 'opacity-50' : ''}`}>
                               <td className="px-3 py-2">
-                                <div className="font-medium text-catalan-text">{member.name}</div>
+                                <div className="font-medium text-catalan-text flex items-center gap-2">
+                                  {member.name}
+                                  {inactive && <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-catalan-error/10 text-catalan-error border border-catalan-error/30">Inactive</span>}
+                                </div>
                                 <div className="text-xs font-mono text-catalan-textMuted">{member.id.slice(0, 8)}…</div>
                               </td>
                               <td className="px-3 py-2 font-mono text-xs text-catalan-text">{member.phone}</td>
@@ -3222,7 +3237,7 @@ export default function Dashboard() {
                               <td className="px-3 py-2 text-catalan-text">{subCount}</td>
                               <td className="px-3 py-2">
                                 <div className="flex items-center gap-2">
-                                  {member.role === 'enumerator' && (
+                                  {member.role === 'enumerator' && !inactive && (
                                     <button
                                       onClick={() => handleGenerateQr(member)}
                                       disabled={generatingQr === member.id}
@@ -3232,12 +3247,22 @@ export default function Dashboard() {
                                       {generatingQr === member.id ? '…' : 'QR'}
                                     </button>
                                   )}
-                                  <button
-                                    onClick={() => handleDeactivate(member)}
-                                    className="text-xs px-2 py-1 rounded border border-catalan-error/30 text-catalan-error hover:bg-catalan-error/10 transition-colors"
-                                  >
-                                    Deactivate
-                                  </button>
+                                  {inactive ? (
+                                    <button
+                                      onClick={() => handleActivate(member)}
+                                      className="text-xs px-2 py-1 rounded border border-catalan-success/40 text-catalan-success hover:bg-catalan-success/10 transition-colors"
+                                      title="Reactivate — restores login access"
+                                    >
+                                      Activate
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleDeactivate(member)}
+                                      className="text-xs px-2 py-1 rounded border border-catalan-error/30 text-catalan-error hover:bg-catalan-error/10 transition-colors"
+                                    >
+                                      Deactivate
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>

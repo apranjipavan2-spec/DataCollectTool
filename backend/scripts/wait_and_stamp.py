@@ -142,20 +142,38 @@ def detect_and_stamp():
         else:
             stamp = "0046"
 
-        fresh = not has_alembic or not current_rev
-        behind = _rev_behind(current_rev, stamp)
+        # `alembic upgrade` requires EXACTLY one row whose value string-matches the
+        # revision it expects. Any deviation makes the version UPDATE fail with
+        # "expected to match one row ... 0 found" and aborts the whole upgrade:
+        #   - 0 rows or >1 rows (a partial/aborted prior run left it dirty)
+        #   - a stored value with stray whitespace/newline ('0045\n' != '0045')
+        #   - a rev behind the true schema (a column added by hand, never tracked)
+        # Detect all of these and normalize to the schema-detected stamp. This is
+        # forward-only in effect (the ladder reflects true schema) and safe because
+        # every migration is idempotent (ADD COLUMN / CREATE INDEX IF NOT EXISTS).
+        row_count = 0
+        if has_alembic:
+            cur.execute("SELECT COUNT(*) FROM alembic_version")
+            row_count = (cur.fetchone() or [0])[0] or 0
 
-        if fresh or behind:
-            if behind:
-                # Recorded revision lags the real schema (e.g. a column was added
-                # by hand and never tracked). Left alone, `alembic upgrade head`
-                # would try to re-apply an already-present migration and fail with
-                # "expected to match one row ... 0 found". Forward-correct the stamp
-                # so upgrade resumes from the true schema state. Never moves
-                # backward, so no already-applied migration is re-run.
-                print(f"alembic_version '{current_rev}' is BEHIND schema-detected '{stamp}' -- forward-correcting the stamp")
-            else:
-                print(f"DB has tables but no alembic tracking — stamping to {stamp}")
+        # Is the recorded rev legitimately AHEAD of the detected schema? If so, leave
+        # it — a newer migration is tracked and we must not roll it backward.
+        ahead = False
+        try:
+            if current_rev is not None:
+                ahead = int(str(current_rev).strip()) > int(stamp)
+        except (ValueError, TypeError):
+            ahead = False
+
+        in_sync = has_alembic and row_count == 1 and current_rev == stamp
+
+        if ahead:
+            print(f"alembic_version '{current_rev}' is AHEAD of schema-detected '{stamp}' — leaving as-is")
+        elif in_sync:
+            print(f"Alembic tracking OK at rev: {current_rev} (schema-detected {stamp})")
+        else:
+            print(f"alembic_version needs normalizing (rows={row_count}, current={current_rev!r}) "
+                  f"— rewriting to schema-detected '{stamp}'")
             if not has_alembic:
                 cur.execute(
                     "CREATE TABLE alembic_version ("
@@ -165,8 +183,6 @@ def detect_and_stamp():
             cur.execute("DELETE FROM alembic_version")
             cur.execute("INSERT INTO alembic_version (version_num) VALUES (%s)", (stamp,))
             print(f"Stamped to {stamp} — alembic upgrade head will apply remaining migrations.")
-        else:
-            print(f"Alembic tracking OK at rev: {current_rev} (schema-detected {stamp})")
     else:
         print("No tenants table yet — leaving alembic to run migrations from base.")
 
