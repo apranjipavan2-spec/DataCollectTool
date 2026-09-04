@@ -13,6 +13,7 @@ import { getNavItems } from '@/lib/navigation'
 import BeneficiaryListScreen, { type RosterEntry } from './BeneficiaryListScreen'
 import EmojiIcon from '@/components/EmojiIcon'
 import { makeCapsule, capsuleFileBlob, downloadBlob, parseCapsuleFile, type Capsule } from './surveyCrypto'
+import { buildQA } from './responseRecord'
 
 function _haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000
@@ -1158,7 +1159,15 @@ export default function FieldApp() {
               try {
                 const cap = await makeCapsule(
                   recoveryPubKey,
-                  { data_json: draft.values, form_version: draft.formVersion, gps_open: draft.gpsOpen ?? null, gps_submit: draft.gpsSubmit ?? null },
+                  {
+                    data_json: draft.values,
+                    qa: buildQA(activeForm.schema, draft.values),   // full question + answer detail
+                    form_title: activeForm.meta.title,
+                    form_version: draft.formVersion,
+                    gps_open: draft.gpsOpen ?? null,
+                    gps_submit: draft.gpsSubmit ?? null,
+                    saved_at: new Date().toISOString(),
+                  },
                   { id: draft.id, form_id: activeForm.meta.id },
                 )
                 const safe = (activeForm.meta.title || 'form').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '')

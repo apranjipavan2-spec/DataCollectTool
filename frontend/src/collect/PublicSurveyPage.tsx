@@ -9,6 +9,7 @@ import {
   enqueueSubmission, flush,
 } from './surveyStore'
 import { encryptCapsule, downloadBlob } from './surveyCrypto'
+import { buildQA } from './responseRecord'
 
 export default function PublicSurveyPage() {
   const { token } = useParams<{ token: string }>()
@@ -91,27 +92,45 @@ export default function PublicSurveyPage() {
     }
   }
 
-  // Submit AND download an encrypted backup in one action (last-question button).
-  // Submits first (which sets backup.current to the submission's real id), then
-  // downloads the file with that same id so a later recovery dedups cleanly.
+  // Submit AND download in one action (last-question button). Per requirement:
+  // DOWNLOAD FIRST — a full questions+answers record, encrypted — so the response
+  // is safely on the device even if the network fails, THEN submit to the server.
+  // The file's id == the submission id, so a later recovery dedups cleanly.
   const handleSubmitAndDownload = async (draft: SubmissionDraft) => {
-    await handleSubmit(draft)
-    await saveBackup()
+    if (!token) return
+    const id = crypto.randomUUID()
+    if (recoveryPubKey && schema) {
+      try {
+        const payload = {
+          data_json: draft.values,
+          qa: buildQA(schema, draft.values),      // full question + answer detail
+          form_title: schema.title,
+          saved_at: new Date().toISOString(),
+        }
+        const blob = await encryptCapsule(recoveryPubKey, payload, { id, token })
+        const safe = (formTitle || 'survey').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '')
+        downloadBlob(blob, `${safe}-response-${id.slice(0, 8)}.fgresp`)
+        setBackupSaved(true)
+      } catch (e) {
+        console.error('[PublicSurvey] backup encryption failed', e)
+      }
+    }
+    await handleSubmit(draft, id)   // then submit, sharing the same id
   }
 
   // Submit: guarantee the response is saved locally, THEN upload (with retry).
-  const handleSubmit = async (draft: SubmissionDraft) => {
+  const handleSubmit = async (draft: SubmissionDraft, presetId?: string) => {
     if (!token) return
     let submissionId: string | null = null
     try {
-      submissionId = await enqueueSubmission(token, draft.values)
+      submissionId = await enqueueSubmission(token, draft.values, presetId)
       await clearDraft(token)
     } catch (e) {
       console.error('[PublicSurvey] local save failed', e)
     }
 
     // Remember what we'd need to encrypt as a device backup for this response.
-    const backupId = submissionId ?? crypto.randomUUID()
+    const backupId = submissionId ?? presetId ?? crypto.randomUUID()
     backup.current = { id: backupId, values: draft.values }
     setBackupSaved(false)
 
