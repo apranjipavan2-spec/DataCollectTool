@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 
 from app.core.database import get_db
 from app.core.deps import require_role
+from app.core.config import settings
+from app.core.survey_crypto import decrypt_capsule, recovery_enabled, normalize_pem, CapsuleError
 from app.models.form import Form
 from app.models.submission import Submission
 
@@ -39,18 +41,13 @@ def public_survey_info(token: str, db: Session = Depends(get_db)):
         "title": form.title,
         "json_schema": form.json_schema,
         "form_id": str(form.id),
+        # Present only when offline-backup is configured; the page uses it to
+        # encrypt a downloadable recovery file. Absent → page skips the feature.
+        "recovery_public_key": normalize_pem(settings.SURVEY_RECOVERY_PUBLIC_KEY) if recovery_enabled() else None,
     }
 
 
-@router.post("/survey/{token}/submit")
-def public_survey_submit(token: str, body: dict, request: Request, db: Session = Depends(get_db)):
-    form = db.query(Form).filter(
-        Form.public_token == token,
-        Form.is_public == True,
-    ).first()
-    if not form:
-        raise HTTPException(status_code=404, detail="Survey not found or no longer active")
-
+def _rate_limit(token: str, request: Request, limit: int = 10) -> None:
     client_ip = request.client.host if request.client else "unknown"
     r = _get_redis()
     if r:
@@ -58,14 +55,28 @@ def public_survey_submit(token: str, body: dict, request: Request, db: Session =
         count = r.incr(rl_key)
         if count == 1:
             r.expire(rl_key, 3600)
-        if count > 10:
+        if count > limit:
             raise HTTPException(status_code=429, detail="Too many submissions. Please try again later.")
+
+
+def _persist_submission(db: Session, form: Form, data_json: dict, local_id: str | None):
+    """Create a public submission, idempotent on (form_id, local_id).
+
+    Returns (submission, created). If a submission with the same local_id already
+    exists for this form, it is returned unchanged — so a retried upload OR a
+    recovered backup file for the same response never creates a duplicate."""
+    if local_id:
+        existing = db.query(Submission).filter(
+            Submission.form_id == form.id,
+            Submission.local_id == str(local_id),
+        ).first()
+        if existing:
+            return existing, False
 
     max_serial = db.query(func.max(Submission.serial_no)).filter(
         Submission.form_id == form.id
     ).scalar() or 0
 
-    data_json = body.get("data_json", body)
     sub = Submission(
         form_id=form.id,
         tenant_id=form.tenant_id,
@@ -74,6 +85,7 @@ def public_survey_submit(token: str, body: dict, request: Request, db: Session =
         status="submitted",
         form_version=str(form.version),
         serial_no=max_serial + 1,
+        local_id=str(local_id) if local_id else None,
     )
     db.add(sub)
     db.commit()
@@ -85,8 +97,67 @@ def public_survey_submit(token: str, body: dict, request: Request, db: Session =
             sync_submission(form, sub)
         except Exception as e:
             logger.error("Sheets sync failed for submission %s: %s", sub.id, e, exc_info=True)
+    return sub, True
 
+
+@router.post("/survey/{token}/submit")
+def public_survey_submit(token: str, body: dict, request: Request, db: Session = Depends(get_db)):
+    form = db.query(Form).filter(
+        Form.public_token == token,
+        Form.is_public == True,
+    ).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Survey not found or no longer active")
+
+    _rate_limit(token, request)
+
+    data_json = body.get("data_json", body)
+    local_id = body.get("local_id")
+    sub, _ = _persist_submission(db, form, data_json, local_id)
     return {"id": str(sub.id), "serial_no": sub.serial_no}
+
+
+@router.post("/survey/recover")
+def public_survey_recover(body: dict, request: Request, db: Session = Depends(get_db)):
+    """Recover offline-backup capsules (.fgresp files). No auth — the capsule can
+    only be decrypted with our private key, which proves it originated from us."""
+    if not recovery_enabled():
+        raise HTTPException(status_code=503, detail="Offline recovery is not enabled on this server")
+
+    capsules = body.get("capsules")
+    if not isinstance(capsules, list) or not capsules:
+        raise HTTPException(status_code=400, detail="No capsules provided")
+    if len(capsules) > 200:
+        raise HTTPException(status_code=413, detail="Too many capsules in one request (max 200)")
+
+    _rate_limit("recover", request, limit=60)  # bulk device recovery is legitimate
+
+    results = []
+    for i, envelope in enumerate(capsules):
+        try:
+            data_json = decrypt_capsule(envelope)
+        except CapsuleError as e:
+            results.append({"index": i, "status": "error", "detail": str(e)})
+            continue
+
+        token = (envelope or {}).get("token")
+        form = db.query(Form).filter(Form.public_token == token, Form.is_public == True).first()
+        if not form:
+            results.append({"index": i, "status": "error", "detail": "survey not found or inactive"})
+            continue
+
+        capsule_id = (envelope or {}).get("id")
+        data_json = {**data_json, "_recovered": True}
+        sub, created = _persist_submission(db, form, data_json, capsule_id)
+        results.append({
+            "index": i,
+            "status": "saved" if created else "duplicate",
+            "id": str(sub.id),
+            "serial_no": sub.serial_no,
+        })
+
+    saved = sum(1 for r in results if r["status"] == "saved")
+    return {"saved": saved, "total": len(results), "results": results}
 
 
 @router.post("/forms/{form_id}/make-public")

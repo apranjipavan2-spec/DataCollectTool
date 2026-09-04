@@ -91,7 +91,13 @@ export async function flush(token: string): Promise<number> {
   const items = await db.pending.where('token').equals(token).and(r => r.kind === 'submission').toArray()
   for (const item of items) {
     try {
-      await axios.post(`/api/v1/survey/${token}/submit`, { data_json: item.values })
+      // local_id = the record id, so a retry OR a recovered backup file for the
+      // same response is deduped server-side (never double-counted). 12s timeout
+      // so a stalled/slow network is treated as "not uploaded" and the caller can
+      // fall back to the encrypted device backup.
+      await axios.post(`/api/v1/survey/${token}/submit`,
+        { data_json: item.values, local_id: item.id },
+        { timeout: 12000 })
       await db.pending.delete(item.id)                 // confirmed — safe to drop
     } catch (err: any) {
       await db.pending.update(item.id, { attempts: item.attempts + 1 })

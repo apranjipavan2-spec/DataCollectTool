@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     VAPID_PRIVATE_KEY: str = ""
     VAPID_CLAIM_EMAIL: str = "mailto:admin@fieldgovern.app"
 
+    # Public-survey offline backup: browser encrypts a response file with the
+    # public key; only the server private key can decrypt it on recovery.
+    # PEM strings (SPKI public / PKCS8 private). Unset = feature disabled.
+    SURVEY_RECOVERY_PUBLIC_KEY: str = ""
+    SURVEY_RECOVERY_PRIVATE_KEY: str = ""
+
     # Email / SMTP
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587

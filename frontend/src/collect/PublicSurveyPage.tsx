@@ -8,6 +8,7 @@ import {
   requestPersistence, saveDraft, loadDraft, clearDraft,
   enqueueSubmission, flush,
 } from './surveyStore'
+import { encryptCapsule, downloadBlob } from './surveyCrypto'
 
 export default function PublicSurveyPage() {
   const { token } = useParams<{ token: string }>()
@@ -21,6 +22,11 @@ export default function PublicSurveyPage() {
   const [uploadState, setUploadState] = useState<'uploaded' | 'pending'>('uploaded')
   // Rare double-failure (storage AND network both down): keep the values here and retry.
   const memoryFallback = useRef<Record<string, unknown> | null>(null)
+  // Offline backup: server's RSA public key (if the feature is enabled) + the data
+  // needed to (re)build the encrypted .fgresp file for this response.
+  const [recoveryPubKey, setRecoveryPubKey] = useState<string | null>(null)
+  const backup = useRef<{ id: string; values: Record<string, unknown> } | null>(null)
+  const [backupSaved, setBackupSaved] = useState(false)
 
   // Load form + restore any autosaved draft, and flush leftover pending uploads.
   useEffect(() => {
@@ -32,6 +38,7 @@ export default function PublicSurveyPage() {
       .then(async r => {
         setSchema(r.data.json_schema as FormSchema)
         setFormTitle(r.data.title)
+        setRecoveryPubKey(r.data.recovery_public_key ?? null)
         const values = await loadDraft(token).catch(() => null)
         if (values) {
           setInitialDraft({
@@ -70,42 +77,73 @@ export default function PublicSurveyPage() {
     await saveDraft(token, draft.values)
   }
 
+  // Build + download the encrypted backup file for the current response.
+  const saveBackup = async () => {
+    if (!token || !recoveryPubKey || !backup.current) return
+    try {
+      const { id, values } = backup.current
+      const blob = await encryptCapsule(token, recoveryPubKey, values, id)
+      const safe = (formTitle || 'survey').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '')
+      downloadBlob(blob, `${safe}-response-${id.slice(0, 8)}.fgresp`)
+      setBackupSaved(true)
+    } catch (e) {
+      console.error('[PublicSurvey] backup encryption failed', e)
+    }
+  }
+
   // Submit: guarantee the response is saved locally, THEN upload (with retry).
   const handleSubmit = async (draft: SubmissionDraft) => {
     if (!token) return
-    let stored = false
+    let submissionId: string | null = null
     try {
-      await enqueueSubmission(token, draft.values)
+      submissionId = await enqueueSubmission(token, draft.values)
       await clearDraft(token)
-      stored = true
     } catch (e) {
       console.error('[PublicSurvey] local save failed', e)
     }
 
-    if (!stored) {
+    // Remember what we'd need to encrypt as a device backup for this response.
+    const backupId = submissionId ?? crypto.randomUUID()
+    backup.current = { id: backupId, values: draft.values }
+    setBackupSaved(false)
+
+    if (!submissionId) {
       // Storage unavailable — hold the data in memory and try a direct upload.
       try {
-        await axios.post(`/api/v1/survey/${token}/submit`, { data_json: draft.values })
+        await axios.post(`/api/v1/survey/${token}/submit`,
+          { data_json: draft.values, local_id: backupId }, { timeout: 12000 })
         setUploadState('uploaded')
-        setSubmitted(true)
-        return
       } catch {
-        // Both failed: never lose it. Keep in memory; the retry loop recovers it.
+        // Both failed: never lose it. Keep in memory; retry loop recovers it.
         memoryFallback.current = draft.values
         setUploadState('pending')
-        setSubmitted(true)
-        return
+        void autoBackup()
       }
+      setSubmitted(true)
+      return
     }
 
     // Stored safely. Show success immediately; upload in the background.
     setSubmitted(true)
     try {
       const remaining = await flush(token)
-      setUploadState(remaining === 0 ? 'uploaded' : 'pending')
+      if (remaining === 0) {
+        setUploadState('uploaded')
+      } else {
+        setUploadState('pending')
+        void autoBackup()   // slow/offline/failed → proactively save the backup file
+      }
     } catch {
       setUploadState('pending')
+      void autoBackup()
     }
+  }
+
+  // Best-effort automatic download when the upload didn't complete. The visible
+  // "Save backup file" button on the success screen is the reliable fallback if a
+  // browser blocks this programmatic download.
+  const autoBackup = async () => {
+    if (recoveryPubKey && !backupSaved) await saveBackup()
   }
 
   if (loading) {
@@ -142,6 +180,32 @@ export default function PublicSurveyPage() {
               Your response is <span className="font-semibold text-catalan-text">saved on this device</span> and
               will upload automatically once you have a connection. You can safely leave this page open.
             </p>
+          )}
+
+          {/* Encrypted device backup — the strong safety net when the network is
+              poor. Prominent while the upload is still pending; a quiet optional
+              link once it's confirmed. Only shown if the server enabled recovery. */}
+          {recoveryPubKey && backup.current && (
+            <div className="mt-6">
+              {uploaded ? (
+                <button onClick={saveBackup}
+                  className="text-xs text-catalan-textMuted hover:text-catalan-primary underline">
+                  {backupSaved ? 'Backup saved ✓' : 'Save a backup copy (optional)'}
+                </button>
+              ) : (
+                <>
+                  <button onClick={saveBackup}
+                    className="w-full bg-catalan-primary text-white rounded-xl py-3 text-sm font-bold hover:brightness-110 active:scale-[0.98] transition-all">
+                    <EmojiIcon e="💾" /> {backupSaved ? 'Backup file saved — keep it safe' : 'Save backup file to this device'}
+                  </button>
+                  <p className="text-xs text-catalan-textMuted mt-2">
+                    Keep this file. If your answers don’t upload, open the{' '}
+                    <a href="/survey/recover" className="text-catalan-primary underline">Recover page</a>{' '}
+                    later and upload it — your data stays safe.
+                  </p>
+                </>
+              )}
+            </div>
           )}
         </div>
       </div>

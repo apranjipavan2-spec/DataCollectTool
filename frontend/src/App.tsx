@@ -41,6 +41,7 @@ const SuperAdminMonitor = lazy(() => import('@/admin/SuperAdminMonitor'))
 const MigrationPage   = lazy(() => import('@/migration/MigrationPage'))
 const FieldMapPage    = lazy(() => import('@/map/FieldMapPage'))
 const PublicSurveyPage   = lazy(() => import('@/collect/PublicSurveyPage'))
+const RecoverPage        = lazy(() => import('@/collect/RecoverPage'))
 const SubscriptionPage   = lazy(() => import('@/admin/SubscriptionPage'))
 const AdminPayments      = lazy(() => import('@/admin/AdminPayments'))
 const PricingPage        = lazy(() => import('@/pages/PricingPage'))
@@ -247,6 +248,10 @@ export default function App() {
                 <RequireAuth roles={['org_admin', 'supervisor']}>
                   <LazyRoute><FieldMapPage /></LazyRoute>
                 </RequireAuth>
+              } />
+
+              <Route path="/survey/recover" element={
+                <LazyRoute><RecoverPage /></LazyRoute>
               } />
 
               <Route path="/survey/:token" element={
