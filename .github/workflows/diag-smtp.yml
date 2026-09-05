@@ -1,0 +1,29 @@
+name: Diagnose SMTP
+
+# Read-only: shows which SMTP_* keys exist in the server .env (password masked)
+# and the app container's recent email/SMTP log lines, to debug email delivery.
+on:
+  workflow_dispatch:
+
+jobs:
+  diag:
+    name: Inspect SMTP config + logs
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Inspect via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            cd /opt/fieldgovern
+            echo "=== SMTP keys in .env (SMTP_PASSWORD masked) ==="
+            grep -E '^SMTP_|^APP_URL=' .env | sed -E 's/^(SMTP_PASSWORD)=.*/\1=<hidden, length below>/' || echo "NO SMTP KEYS FOUND"
+            echo -n "SMTP_PASSWORD length: "
+            grep -E '^SMTP_PASSWORD=' .env | sed -E 's/^SMTP_PASSWORD=//' | tr -d '\n' | wc -c
+            echo ""
+            echo "=== app email/SMTP log lines (last 500 scanned) ==="
+            docker compose logs --tail=500 app 2>&1 | grep -iE 'smtp|email|mail|verif|53[0-9]| auth' | tail -40 || echo "no matching log lines"
