@@ -153,10 +153,18 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
     } as FormField
   }, [currentField, language, draft.values])
 
-  // Capture GPS on mount
+  // Only capture device location when the form actually asks for it (has a GPS
+  // question). Otherwise we never touch geolocation — no silent tracking.
+  const hasGpsField = useMemo(
+    () => getAllFieldsInOrder(schema.sections).some(f => f.type === 'gps'),
+    [schema],
+  )
+
+  // Capture GPS on mount — only if the form has a GPS question
   useEffect(() => {
+    if (!hasGpsField) return
     captureGps().then(gps => setDraft(d => ({ ...d, gpsOpen: gps })))
-  }, [])
+  }, [hasGpsField])
 
   // QC: start a compressed background audio audit when enabled (never blocks collection)
   useEffect(() => {
@@ -281,7 +289,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
       const err = validate(currentField, draft.values[currentField.name])
       if (err) { setErrors(e => ({ ...e, [currentField.name]: err })); return null }
     }
-    const gpsSubmit = await captureGps()
+    const gpsSubmit = hasGpsField ? await captureGps() : null
     const startedMs = draft.startedAt ? Date.parse(draft.startedAt) : Date.now()
     const _duration_sec = Math.max(0, Math.round((Date.now() - startedMs) / 1000))
     const auditUri = await stopAudit()

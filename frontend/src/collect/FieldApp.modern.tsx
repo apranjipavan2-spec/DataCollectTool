@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import api, { getStoredUser } from '@/lib/api'
 import { homeForRole } from '@/auth/RequireAuth'
 import type { FormSchema } from '@/types/form'
+import { getAllFieldsInOrder } from '@/lib/formUtils'
 import FormRenderer, { type SubmissionDraft } from '@/renderer/FormRenderer'
 import { getStorage } from '@/storage'
 import { v4 as uuidv4 } from 'uuid'
@@ -159,6 +160,7 @@ export default function FieldApp() {
   const bgGpsWatchId = useRef<number | null>(null)
   const bestGpsRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
+  const [activeFormHasGps, setActiveFormHasGps] = useState(false)
   // ── Sync to server ─────────────────────────────────────────
   const syncToServer = useCallback(async () => {
     setSyncMsg('Syncing…')
@@ -763,21 +765,27 @@ export default function FieldApp() {
     } else {
       setProgramContext(null); setSelectedLocationId('')
     }
-    // Start background GPS watch — tracks best (highest accuracy) fix
+    // Background GPS watch — only when the form has a GPS question. No GPS
+    // question → we never start geolocation, so nothing is captured automatically.
     bestGpsRef.current = null
     setGpsAccuracy(null)
     if (bgGpsWatchId.current !== null) navigator.geolocation?.clearWatch(bgGpsWatchId.current)
-    bgGpsWatchId.current = navigator.geolocation?.watchPosition(
-      (pos) => {
-        const { latitude: lat, longitude: lng, accuracy } = pos.coords
-        if (!bestGpsRef.current || accuracy < bestGpsRef.current.accuracy) {
-          bestGpsRef.current = { lat, lng, accuracy }
-          setGpsAccuracy(accuracy)
-        }
-      },
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 10000 }
-    ) ?? null
+    bgGpsWatchId.current = null
+    const formHasGps = getAllFieldsInOrder(schema.sections).some(f => f.type === 'gps')
+    setActiveFormHasGps(formHasGps)
+    if (formHasGps) {
+      bgGpsWatchId.current = navigator.geolocation?.watchPosition(
+        (pos) => {
+          const { latitude: lat, longitude: lng, accuracy } = pos.coords
+          if (!bestGpsRef.current || accuracy < bestGpsRef.current.accuracy) {
+            bestGpsRef.current = { lat, lng, accuracy }
+            setGpsAccuracy(accuracy)
+          }
+        },
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 10000 }
+      ) ?? null
+    }
 
     setScreen('collecting')
   }
@@ -1131,7 +1139,8 @@ export default function FieldApp() {
             <span><EmojiIcon e="📊" /> Arm: {assignedArm}</span>
           </div>
         )}
-        {/* GPS accuracy indicator */}
+        {/* GPS accuracy indicator — only shown when the form captures GPS */}
+        {activeFormHasGps && (
         <div className={`px-4 py-1.5 text-xs shrink-0 z-50 flex items-center gap-2 transition-colors ${
           gpsAccuracy === null
             ? 'bg-catalan-textMuted/10 text-catalan-textMuted'
@@ -1143,6 +1152,7 @@ export default function FieldApp() {
           {gpsAccuracy !== null && <span className="font-medium">±{Math.round(gpsAccuracy)}m</span>}
           {gpsAccuracy !== null && gpsAccuracy > 30 && <span className="text-[10px] opacity-75">· Move to open sky for better accuracy</span>}
         </div>
+        )}
         {geofenceWarning && (
           <div className="bg-catalan-warning/20 border-b border-catalan-warning/40 text-catalan-warning px-4 py-2 text-xs shrink-0 z-50 flex items-center gap-2">
             <span><EmojiIcon e="⚠" /> You are outside the designated survey area. Submissions will be flagged.</span>
