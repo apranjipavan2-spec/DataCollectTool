@@ -20,12 +20,33 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+# Runtime (request-path) engine. When APP_DATABASE_URL is set it points at the
+# restricted, NON-superuser role `fieldgovern_app` so PostgreSQL RLS is actually
+# enforced on every request. Migrations and seed scripts keep using `engine`/
+# `SessionLocal` (the superuser DATABASE_URL) because seeding is cross-tenant and
+# must bypass RLS. Unset APP_DATABASE_URL = identical to before (no behavior change).
+_app_db_url = normalize_db_url(settings.APP_DATABASE_URL) if settings.APP_DATABASE_URL else _db_url
+if settings.APP_DATABASE_URL:
+    runtime_engine = create_engine(
+        _app_db_url,
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
+        pool_recycle=1800,
+    )
+    RuntimeSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=runtime_engine)
+    logger.info("Request path uses restricted runtime DB role (RLS enforced).")
+else:
+    runtime_engine = engine
+    RuntimeSessionLocal = SessionLocal
+
+
 class Base(DeclarativeBase):
     pass
 
 
 def get_db():
-    db = SessionLocal()
+    db = RuntimeSessionLocal()
     try:
         yield db
     finally:

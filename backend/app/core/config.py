@@ -34,10 +34,19 @@ def _parse_cors(raw: str) -> List[str]:
 
 class Settings(BaseSettings):
     DATABASE_URL: str = _resolve_database_url()
+    # Request-path DB URL — the restricted, non-superuser role (fieldgovern_app) so
+    # RLS is enforced on every request. Unset = fall back to DATABASE_URL (no RLS
+    # enforcement, since the bootstrap user is a superuser). Migrations/seeds always
+    # use DATABASE_URL. See migration 0048 and backend/.env.example.
+    APP_DATABASE_URL: str = ""
+    # Hard-delete guard. When False (default) the recycle-bin purge paths do not
+    # physically delete rows — client data is never lost. DPDP erasure requests are
+    # served by anonymize, not deletion. Set True only for deliberate ops cleanup.
+    ALLOW_HARD_DELETE: bool = False
     REDIS_URL: str = "redis://localhost:6379"
     JWT_SECRET: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_MINUTES: int = 60 * 2
+    JWT_EXPIRE_MINUTES: int = 0  # 0 = access tokens never expire (logout-only). Set >0 to re-enable a TTL.
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_S3_BUCKET: str = "fieldgovern-media"

@@ -88,6 +88,12 @@ def restore_item(entity_type: str, item_id: str,
 def purge_item(entity_type: str, item_id: str,
                user: dict = Depends(require_org_admin), db: Session = Depends(get_db)):
     """Permanently delete one item from the bin (irreversible)."""
+    from app.core.config import settings
+    if not settings.ALLOW_HARD_DELETE:
+        raise HTTPException(
+            status_code=403,
+            detail="Hard delete is disabled. Client data is retained; use anonymize for erasure.",
+        )
     model, row = _get_row(db, entity_type, item_id, user["tenant_id"])
     if entity_type == "shared_file":
         _remove_disk_file(row)
@@ -108,7 +114,14 @@ def _remove_disk_file(shared_file_row) -> None:
 # ── Scheduled purge (called by the scheduler) ─────────────────────────────────
 
 def purge_expired() -> int:
-    """Hard-delete every binned row older than RETENTION_DAYS. Returns count purged."""
+    """Hard-delete every binned row older than RETENTION_DAYS. Returns count purged.
+
+    No-op unless ALLOW_HARD_DELETE is set — by default client data is never
+    physically removed, only kept soft-deleted in the bin.
+    """
+    from app.core.config import settings
+    if not settings.ALLOW_HARD_DELETE:
+        return 0
     cutoff = datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)
     purged = 0
     db = SessionLocal()

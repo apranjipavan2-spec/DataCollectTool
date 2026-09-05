@@ -6,8 +6,11 @@ from app.core.config import settings
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+    # JWT_EXPIRE_MINUTES <= 0 → non-expiring access token (session ends only on
+    # explicit logout). Omitting `exp` means jose never raises on expiry.
+    if settings.JWT_EXPIRE_MINUTES > 0:
+        expire = datetime.utcnow() + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
+        to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
 

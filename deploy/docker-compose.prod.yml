@@ -21,7 +21,15 @@ services:
     restart: always
     env_file: .env
     environment:
+      # DATABASE_URL = superuser: runs migrations + seeds (must bypass RLS to seed
+      # across tenants). Keep as-is.
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # APP_DATABASE_URL = restricted role for the request path so PostgreSQL RLS is
+      # actually enforced (superusers bypass RLS). Enable AFTER a staging run — RLS
+      # will start filtering any admin/analytics query that reads tenant tables
+      # without a tenant context. Set APP_DB_PASSWORD in .env, then uncomment:
+      # APP_DATABASE_URL: postgresql://fieldgovern_app:${APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # APP_DB_PASSWORD: ${APP_DB_PASSWORD}
       PORT: "8000"
     volumes:
       - uploads:/app/uploads
