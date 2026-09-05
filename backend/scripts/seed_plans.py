@@ -233,6 +233,20 @@ PLANS = [
 # ─────────────────────────────────────────────────────────────────────────────────────
 UNIFIED_PLANS = [
     dict(
+        id="fg_trial", segment="unified", tier="trial", name="Free Trial", sort_order=0,
+        description="15-day full-feature trial. Data collection + full AI suite.",
+        price_inr=0, price_usd_cents=0,
+        submissions_limit=1000,  storage_limit_mb=1024,
+        active_forms_limit=10,   ai_reports_per_month=20, api_calls_per_month=2000,
+        max_org_admins=2,        max_supervisors=None,    max_enumerators=None,
+        asr_minutes_limit=60,    translation_chars=36000,
+        ai_cleaning=True, ai_writer=True, ai_smart_builder=True,
+        ai_interpret=True, ai_analyzer=True, map_view=True,
+        panel_study=True, spss_export=True, api_write=True,
+        webhooks=False, two_fa=False, sso=False, audit_log=False,
+        advanced_rbac=False, white_label=False, on_premise=False, priority_support=False,
+    ),
+    dict(
         id="fg_free", segment="unified", tier="free", name="Free", sort_order=1,
         description="For individuals and small pilots.",
         price_inr=0, price_usd_cents=0,

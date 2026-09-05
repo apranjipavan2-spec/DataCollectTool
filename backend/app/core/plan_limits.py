@@ -14,6 +14,26 @@ Monthly counters (submissions, AI reports, API calls) reset on the 1st of each U
 
 # Hardcoded fallback — used when no unified Plan row exists in the DB.
 PLAN_LIMITS: dict[str, dict] = {
+    # 15-day trial — full feature access, modest caps to bound abuse cost.
+    "trial": {
+        "submissions_per_month": 1_000,
+        "active_forms":          10,
+        "storage_mb":            1_024,
+        "ai_reports_per_month":  20,
+        "api_calls_per_month":   2_000,
+        "admins":                2,
+        "users":                -1,
+    },
+    # Post-trial lockout — collection + AI blocked (0 = not allowed). Reads still work.
+    "expired": {
+        "submissions_per_month": 0,
+        "active_forms":          0,
+        "storage_mb":            0,
+        "ai_reports_per_month":  0,
+        "api_calls_per_month":   0,
+        "admins":                1,
+        "users":                -1,
+    },
     "free": {
         "submissions_per_month": 300,
         "active_forms":          2,

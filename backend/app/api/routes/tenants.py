@@ -106,8 +106,13 @@ def get_my_usage(user=Depends(get_current_user), db: Session = Depends(get_db)):
     ai_reports_used = (usage_rec.ai_reports_used or 0) if usage_rec else 0
     api_calls_used  = (getattr(usage_rec, "api_calls_used", 0) or 0) if usage_rec else 0
 
+    from app.models.billing import Subscription
+    sub = db.query(Subscription).filter(Subscription.tenant_id == tid).first()
+
     return {
         "plan_tier": tenant.plan_tier,
+        "subscription_status": sub.status if sub else None,
+        "trial_end": sub.trial_end.isoformat() if sub and sub.trial_end else None,
         "limits": limits,
         "usage": {
             "submissions_this_month": subs_used,
