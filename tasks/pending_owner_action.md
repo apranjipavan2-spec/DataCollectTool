@@ -4,7 +4,9 @@ Items only you (owner/ops) can complete. Code side is done and validated; these
 are decisions, secrets, server settings, and paperwork. See
 `deploy/SECURITY_DPDP_RUNBOOK.md` for full context.
 
-Status: created 2026-09-05 · nothing pushed to git yet.
+Status: created 2026-09-05 · code MERGED to main via PR #13 (2026-09-05).
+The items below are the ONLY remaining steps, and none can be done from a dev
+machine — they need the prod server / hosting console + a maintenance window.
 
 > **DEFERRED (owner decision 2026-09-05):** platform has active live users, so
 > these changes are held until a low-traffic window / planned maintenance.
