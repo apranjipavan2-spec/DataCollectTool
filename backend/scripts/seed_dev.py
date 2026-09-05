@@ -182,6 +182,15 @@ _PATCHES = [
     )""",
     "CREATE INDEX IF NOT EXISTS ix_submission_drafts_tenant_id ON submission_drafts (tenant_id)",
     "CREATE INDEX IF NOT EXISTS ix_submission_drafts_enumerator_id ON submission_drafts (enumerator_id)",
+    # 0049 — soft-delete now also covers submissions, drafts, and push subs
+    *[
+        f"ALTER TABLE {t} ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"
+        for t in ("submissions", "submission_drafts", "push_subscriptions")
+    ],
+    *[
+        f"CREATE INDEX IF NOT EXISTS ix_{t}_deleted_at ON {t} (deleted_at)"
+        for t in ("submissions", "submission_drafts", "push_subscriptions")
+    ],
 ]
 
 from sqlalchemy import text as _text

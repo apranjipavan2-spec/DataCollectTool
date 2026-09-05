@@ -2,9 +2,10 @@ from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, f
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 import uuid
 from app.core.database import Base
+from app.core.soft_delete import SoftDeleteMixin
 
 
-class Submission(Base):
+class Submission(Base, SoftDeleteMixin):
     __tablename__ = "submissions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

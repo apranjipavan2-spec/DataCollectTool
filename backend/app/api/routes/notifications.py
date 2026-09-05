@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import require_enumerator, require_supervisor
+from app.core.soft_delete import soft_delete
 from app.models.push_subscription import PushSubscription
 
 logger = logging.getLogger(__name__)
@@ -54,8 +55,9 @@ def subscribe(
     db: Session = Depends(get_db),
 ):
     """Save a Web Push subscription for the current user."""
-    # Upsert: if same endpoint exists for this user, update keys
-    existing = db.query(PushSubscription).filter(
+    # Upsert: if same endpoint exists for this user, update keys. include_deleted
+    # so re-subscribing un-bins a soft-deleted row instead of colliding on the key.
+    existing = db.query(PushSubscription).execution_options(include_deleted=True).filter(
         PushSubscription.user_id == user["sub"],
         PushSubscription.endpoint == body.endpoint,
     ).first()
@@ -63,6 +65,7 @@ def subscribe(
     if existing:
         existing.p256dh = body.keys.p256dh
         existing.auth = body.keys.auth
+        existing.deleted_at = None
     else:
         db.add(PushSubscription(
             tenant_id=user["tenant_id"],
@@ -82,13 +85,15 @@ def unsubscribe(
     user=Depends(require_enumerator),
     db: Session = Depends(get_db),
 ):
-    """Remove a push subscription."""
-    deleted = db.query(PushSubscription).filter(
+    """Soft-delete a push subscription (kept in the 360-day bin, hidden from sends)."""
+    sub = db.query(PushSubscription).filter(
         PushSubscription.user_id == user["sub"],
         PushSubscription.endpoint == body.endpoint,
-    ).delete()
-    db.commit()
-    return {"status": "unsubscribed", "removed": deleted}
+    ).first()
+    if sub:
+        soft_delete(sub)
+        db.commit()
+    return {"status": "unsubscribed", "removed": 1 if sub else 0}
 
 
 @router.get("/vapid-public-key")

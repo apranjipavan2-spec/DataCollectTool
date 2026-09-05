@@ -2,9 +2,10 @@ from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, func, Uniq
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 import uuid
 from app.core.database import Base
+from app.core.soft_delete import SoftDeleteMixin
 
 
-class SubmissionDraft(Base):
+class SubmissionDraft(Base, SoftDeleteMixin):
     """A half-filled form saved server-side when the enumerator taps Save & Exit.
 
     Deliberately kept in its own table (not `submissions`) so drafts never leak

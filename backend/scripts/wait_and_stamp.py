@@ -141,8 +141,12 @@ def detect_and_stamp():
             stamp = "0045"
         elif not table_exists(cur, "submission_drafts"):
             stamp = "0046"
-        else:
+        elif not col_exists(cur, "submissions", "deleted_at"):
+            # drafts table exists but our 0049 column doesn't → schema is at 0047/0048.
+            # Stamp the lower rung; alembic re-runs 0048 (idempotent) then 0049.
             stamp = "0047"
+        else:
+            stamp = "0049"
 
         # `alembic upgrade` requires EXACTLY one row whose value string-matches the
         # revision it expects. Any deviation makes the version UPDATE fail with
