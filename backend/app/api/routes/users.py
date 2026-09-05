@@ -32,6 +32,7 @@ class UserUpdate(BaseModel):
     language_pref: Optional[str] = None
     role: Optional[str] = None          # org_admin only
     is_active: Optional[bool] = None     # org_admin only — activate/deactivate
+    password: Optional[str] = None       # set a new password (self, or org_admin for tenant users)
 
 
 @router.get("/me")
@@ -273,6 +274,14 @@ def update_user(user_id: str, body: UserUpdate, user=Depends(get_current_user), 
         if str(target.tenant_id) != str(user["tenant_id"]):
             raise HTTPException(status_code=403, detail="Not authorised to update this user")
         target.is_active = body.is_active
+
+    if body.password is not None:
+        # Admins may reset any tenant user's password; anyone may change their own.
+        if not is_self and str(target.tenant_id) != str(user["tenant_id"]):
+            raise HTTPException(status_code=403, detail="Not authorised to update this user")
+        if len(body.password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        target.password_hash = hash_password(body.password)
 
     db.commit()
     db.refresh(target)

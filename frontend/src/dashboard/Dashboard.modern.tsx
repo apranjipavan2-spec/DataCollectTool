@@ -1350,6 +1350,18 @@ export default function Dashboard() {
     }
   }
 
+  const handleResetPassword = async (member: TeamMember) => {
+    const pw = prompt(`Set a new password for ${member.name} (min 6 characters). They'll use it on their next login:`)
+    if (pw === null) return
+    if (pw.length < 6) { toast.warning('Password must be at least 6 characters'); return }
+    try {
+      await api.patch(`/users/${member.id}`, { password: pw })
+      toast.success(`Password updated for ${member.name}`)
+    } catch (err: any) {
+      toast.error(apiErrorMessage(err, 'Failed to update password'))
+    }
+  }
+
   const handleGenerateQr = async (member: TeamMember) => {
     setGeneratingQr(member.id)
     try {
@@ -3245,6 +3257,15 @@ export default function Dashboard() {
                                       title="Generate QR login code"
                                     >
                                       {generatingQr === member.id ? '…' : 'QR'}
+                                    </button>
+                                  )}
+                                  {user.role === 'org_admin' && !inactive && (
+                                    <button
+                                      onClick={() => handleResetPassword(member)}
+                                      className="text-xs px-2 py-1 rounded border border-catalan-border text-catalan-textMuted hover:bg-catalan-hover transition-colors"
+                                      title="Set a new password for this user"
+                                    >
+                                      Password
                                     </button>
                                   )}
                                   {inactive ? (
