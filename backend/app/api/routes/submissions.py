@@ -7,6 +7,7 @@ from app.core.database import get_db
 from app.core.deps import get_current_user, require_enumerator, require_supervisor
 from app.core.rate_limit import limiter
 from app.models.submission import Submission
+from app.models.submission_draft import SubmissionDraft
 from app.models.submission_history import SubmissionHistory
 from app.models.form import Form
 from app.models.user import User
@@ -702,6 +703,81 @@ def bulk_update_submissions(
 
 
 # ── Named sub-routes — must be before /{submission_id} to avoid being captured ─
+
+class DraftUpsert(BaseModel):
+    local_id: str                       # client draft UUID (upsert key)
+    form_id: str
+    form_version: Optional[int] = None
+    data_json: dict
+    gps_open: Optional[Any] = None
+    gps_submit: Optional[Any] = None
+    local_created_at: Optional[str] = None
+
+
+@router.put("/draft")
+def upsert_draft(body: DraftUpsert, user=Depends(require_enumerator), db: Session = Depends(get_db)):
+    """Best-effort server backup of a half-filled form (Save & Exit). Upsert by
+    (enumerator, local_id). Never counts toward quota/dashboards — lives in its
+    own table. Returns quietly so the client can fire-and-forget."""
+    lca = None
+    if body.local_created_at:
+        try:
+            lca = datetime.fromisoformat(body.local_created_at)
+        except ValueError:
+            pass
+    draft = db.query(SubmissionDraft).filter(
+        SubmissionDraft.enumerator_id == user["sub"],
+        SubmissionDraft.local_id == body.local_id,
+    ).first()
+    if draft:
+        draft.data_json = body.data_json
+        draft.form_version = body.form_version
+        draft.gps_open = body.gps_open
+        draft.gps_submit = body.gps_submit
+    else:
+        draft = SubmissionDraft(
+            tenant_id=user["tenant_id"],
+            enumerator_id=user["sub"],
+            form_id=body.form_id,
+            form_version=body.form_version,
+            local_id=body.local_id,
+            data_json=body.data_json,
+            gps_open=body.gps_open,
+            gps_submit=body.gps_submit,
+            local_created_at=lca,
+        )
+        db.add(draft)
+    db.commit()
+    return {"id": str(draft.id), "local_id": draft.local_id}
+
+
+@router.get("/drafts")
+def list_my_drafts(user=Depends(require_enumerator), db: Session = Depends(get_db)):
+    """The caller's own server-backed drafts (for cross-device recovery)."""
+    rows = db.query(SubmissionDraft).filter(
+        SubmissionDraft.enumerator_id == user["sub"],
+    ).order_by(SubmissionDraft.updated_at.desc()).limit(200).all()
+    return [{
+        "local_id": d.local_id,
+        "form_id": str(d.form_id),
+        "form_version": d.form_version,
+        "data_json": d.data_json,
+        "gps_open": d.gps_open,
+        "gps_submit": d.gps_submit,
+        "local_created_at": d.local_created_at.isoformat() if d.local_created_at else None,
+        "updated_at": d.updated_at.isoformat() if d.updated_at else None,
+    } for d in rows]
+
+
+@router.delete("/draft/{local_id}", status_code=204)
+def delete_draft(local_id: str, user=Depends(require_enumerator), db: Session = Depends(get_db)):
+    """Remove a server draft (deleted locally, or superseded)."""
+    db.query(SubmissionDraft).filter(
+        SubmissionDraft.enumerator_id == user["sub"],
+        SubmissionDraft.local_id == local_id,
+    ).delete()
+    db.commit()
+
 
 @router.get("/my-backchecks")
 def get_my_backchecks(user=Depends(require_enumerator), db: Session = Depends(get_db)):

@@ -165,6 +165,23 @@ _PATCHES = [
             "webhooks", "submission_comments",
         )
     ],
+    # 0047 — server-side draft backups (Save & Exit). Isolated from `submissions`.
+    """CREATE TABLE IF NOT EXISTS submission_drafts (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        tenant_id UUID NOT NULL REFERENCES tenants(id),
+        enumerator_id UUID NOT NULL REFERENCES users(id),
+        form_id UUID NOT NULL REFERENCES forms(id),
+        form_version INTEGER,
+        local_id VARCHAR NOT NULL,
+        data_json JSONB NOT NULL,
+        gps_open JSONB,
+        gps_submit JSONB,
+        local_created_at TIMESTAMPTZ,
+        updated_at TIMESTAMPTZ DEFAULT now(),
+        CONSTRAINT uq_draft_enum_local UNIQUE (enumerator_id, local_id)
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_submission_drafts_tenant_id ON submission_drafts (tenant_id)",
+    "CREATE INDEX IF NOT EXISTS ix_submission_drafts_enumerator_id ON submission_drafts (enumerator_id)",
 ]
 
 from sqlalchemy import text as _text

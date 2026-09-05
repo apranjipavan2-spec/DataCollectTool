@@ -328,12 +328,39 @@ export default function FieldApp() {
       const store = await getStorage()
       const cached = await store.listFormCache()
       const allDrafts: DraftEntry[] = []
+      const localIds = new Set<string>()
       for (const form of cached) {
         const subs = await store.listSubmissions(form.id, 'draft')
         for (const s of subs) {
+          localIds.add(s.id)
           allDrafts.push({ id: s.id, formId: form.id, formTitle: form.title, updatedAt: s.updatedAt })
         }
       }
+
+      // Cross-device recovery: pull server-backed drafts and hydrate any that
+      // aren't on this device (e.g. phone lost/reinstalled). Best-effort — offline is fine.
+      try {
+        const { data: serverDrafts } = await api.get<Array<{
+          local_id: string; form_id: string; form_version: number
+          data_json: Record<string, unknown>; gps_open: unknown; gps_submit: unknown
+          local_created_at: string | null; updated_at: string | null
+        }>>('/submissions/drafts')
+        for (const sd of serverDrafts) {
+          if (localIds.has(sd.local_id)) continue
+          const form = cached.find(f => f.id === sd.form_id)
+          if (!form) continue   // form schema not cached on this device → can't resume yet
+          const updatedAt = sd.updated_at ?? new Date().toISOString()
+          await store.saveSubmission({
+            id: sd.local_id, formId: sd.form_id, formVersion: sd.form_version,
+            data: sd.data_json,
+            gpsOpen: (sd.gps_open ?? undefined) as any, gpsSubmit: (sd.gps_submit ?? undefined) as any,
+            status: 'draft', createdAt: sd.local_created_at ?? updatedAt, updatedAt,
+          })
+          localIds.add(sd.local_id)
+          allDrafts.push({ id: sd.local_id, formId: sd.form_id, formTitle: form.title, updatedAt })
+        }
+      } catch { /* offline or no server drafts — show local only */ }
+
       allDrafts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       setDrafts(allDrafts)
     } finally {
@@ -366,6 +393,7 @@ export default function FieldApp() {
   const deleteDraft = async (id: string) => {
     const store = await getStorage()
     await store.deleteSubmission(id)
+    api.delete(`/submissions/draft/${id}`).catch(() => {})  // best-effort server cleanup
     setDrafts(prev => prev.filter(d => d.id !== id))
   }
 
@@ -1152,6 +1180,20 @@ export default function FieldApp() {
           <FormRenderer
             schema={activeForm.schema}
             onSave={handleSave}
+            onSaveExit={(draft) => {
+              // Fire-and-forget server backup of the half-filled form. Never blocks
+              // exit; failures (offline) are fine — the local draft is the source of truth.
+              if (!activeForm) return
+              api.put('/submissions/draft', {
+                local_id: draft.id,
+                form_id: activeForm.meta.id,
+                form_version: draft.formVersion,
+                data_json: draft.values,
+                gps_open: draft.gpsOpen ?? null,
+                gps_submit: draft.gpsSubmit ?? null,
+                local_created_at: draft.startedAt,
+              }).catch(() => {})
+            }}
             onSubmit={async (draft) => { await handleSubmit(draft); clearProg() }}
             onSubmitAndDownload={recoveryPubKey && activeForm ? async (draft) => {
               // Save an encrypted backup file of THIS response, then submit. Same

@@ -11,6 +11,7 @@ from app.core.database import get_db
 from app.core.deps import require_enumerator
 from app.core.rate_limit import limiter
 from app.models.submission import Submission
+from app.models.submission_draft import SubmissionDraft
 from app.models.media_file import MediaFile
 from app.models.form import Form
 from app.models.sync_log import SyncLog
@@ -297,6 +298,12 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
         )
         db.add(sub)
         db.flush()  # get sub.id before commit
+
+        # The response is now a real submission — drop any server-side draft backup.
+        db.query(SubmissionDraft).filter(
+            SubmissionDraft.enumerator_id == user["sub"],
+            SubmissionDraft.local_id == item.local_id,
+        ).delete()
 
         if roster_id:
             from app.models.roster import RespondentRoster

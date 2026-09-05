@@ -24,6 +24,7 @@ interface Props {
   onSave:   (draft: SubmissionDraft) => Promise<void>   // auto-save (debounced)
   onSubmit: (draft: SubmissionDraft) => Promise<void>   // final submit
   onSubmitAndDownload?: (draft: SubmissionDraft) => Promise<void>  // submit + save encrypted backup file
+  onSaveExit?: (draft: SubmissionDraft) => void          // fire-and-forget server draft backup on Save & Exit
   onCancel?: () => void                                  // exit form collection
   initialDraft?: SubmissionDraft
 }
@@ -84,7 +85,7 @@ function seedAutoNow(schema: FormSchema): Record<string, unknown> {
   return values
 }
 
-export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDownload, onCancel, initialDraft }: Props) {
+export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDownload, onSaveExit, onCancel, initialDraft }: Props) {
   const purpose = schema.settings?.purpose as string | undefined
   const [consentGiven, setConsentGiven] = useState(!purpose || !!initialDraft?.consentTimestamp)
 
@@ -263,7 +264,9 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
   const handleSaveExit = async () => {
     setSaveExitError('')
     try {
-      await onSave({ ...draft, status: 'draft' })
+      const d = { ...draft, status: 'draft' as const }
+      await onSave(d)
+      onSaveExit?.(d)   // best-effort server backup (must not block exit)
       onCancel?.()
     } catch (e) {
       console.error('[FormRenderer] Save & Exit failed', e)
