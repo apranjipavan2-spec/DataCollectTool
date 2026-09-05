@@ -492,6 +492,24 @@ export default function FieldApp() {
     }
   }
 
+  // Save & Exit while editing an existing submission: persist the partial edit
+  // to the server (no validation — partial is allowed). Fires only on Save & Exit,
+  // not on the 300ms autosave, so we don't PATCH on every keystroke.
+  const handleEditSaveExit = (draft: SubmissionDraft) => {
+    const target = editingSubmission
+    if (!target) return
+    api.patch(`/submissions/${target.id}/data`, { data_json: draft.values })
+      .then(() => {
+        setMyHistory(prev => prev.map(s => s.id === target.id ? { ...s, ...draft.values } : s))
+        setEditMsg('✓ Changes saved')
+        setTimeout(() => setEditMsg(''), 3000)
+      })
+      .catch(() => {
+        setEditMsg('Could not save changes — check your connection and try again')
+        setTimeout(() => setEditMsg(''), 5000)
+      })
+  }
+
   // Auto-sync on reconnect
   useEffect(() => {
     const goOnline = () => { setIsOffline(false); syncRef.current?.() }
@@ -710,6 +728,11 @@ export default function FieldApp() {
     setGeofenceWarning(false)
     setRosterInitialValues(initialValues ?? null)
 
+    // Single source of truth: does this form ask for GPS? Nothing touches
+    // geolocation (geofence warning OR background watch) unless it does.
+    const formHasGps = getAllFieldsInOrder(schema.sections).some(f => f.type === 'gps')
+    setActiveFormHasGps(formHasGps)
+
     // Arm assignment
     const randCfg = schema.settings?.randomization
     if (randCfg?.enabled && (randCfg.arms?.length ?? 0) > 0) {
@@ -725,9 +748,10 @@ export default function FieldApp() {
       } catch { }
     }
 
-    // Geofence check (client-side warning only)
+    // Geofence check (client-side warning only) — only when the form has a GPS
+    // question, so we never silently read location on a form that doesn't ask for it.
     const geoCfg = schema.settings?.geofence
-    if (geoCfg?.enabled && geoCfg.lat != null && geoCfg.lng != null && geoCfg.radius_meters) {
+    if (formHasGps && geoCfg?.enabled && geoCfg.lat != null && geoCfg.lng != null && geoCfg.radius_meters) {
       navigator.geolocation?.getCurrentPosition(pos => {
         const dist = _haversineM(geoCfg.lat!, geoCfg.lng!, pos.coords.latitude, pos.coords.longitude)
         if (dist > geoCfg.radius_meters!) setGeofenceWarning(true)
@@ -764,8 +788,6 @@ export default function FieldApp() {
     setGpsAccuracy(null)
     if (bgGpsWatchId.current !== null) navigator.geolocation?.clearWatch(bgGpsWatchId.current)
     bgGpsWatchId.current = null
-    const formHasGps = getAllFieldsInOrder(schema.sections).some(f => f.type === 'gps')
-    setActiveFormHasGps(formHasGps)
     if (formHasGps) {
       bgGpsWatchId.current = navigator.geolocation?.watchPosition(
         (pos) => {
@@ -1101,6 +1123,7 @@ export default function FieldApp() {
         <FormRenderer
           schema={activeForm.schema}
           onSave={async () => {}}
+          onSaveExit={handleEditSaveExit}
           onSubmit={handleEditSubmit}
           initialDraft={editDraft}
           onCancel={() => { setScreen('history'); setEditingSubmission(null); setActiveForm(null) }}
