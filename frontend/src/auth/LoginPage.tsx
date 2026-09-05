@@ -363,7 +363,7 @@ export default function LoginPage() {
                   onMouseEnter={e => (e.currentTarget.style.color = '#4f46e5')}
                   onMouseLeave={e => (e.currentTarget.style.color = '#6366f1')}
                 >
-                  Request a demo account
+                  Start free trial
                 </button>
                 <span style={{ color: '#e2e8f0' }}>·</span>
                 <button

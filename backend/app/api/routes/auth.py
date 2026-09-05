@@ -47,6 +47,7 @@ class RegisterRequest(BaseModel):
     password: str
     segment: str = "ngo"   # ngo | govt | research | corporate
     phone: Optional[str] = None
+    turnstile_token: Optional[str] = None
 
 
 class SendOTPRequest(BaseModel):
@@ -229,6 +230,13 @@ def register(request: Request, body: RegisterRequest, db: Session = Depends(get_
     """Create a new tenant + org_admin from self-serve signup. Sends email verification."""
     segment = body.segment if body.segment in VALID_SEGMENTS else "ngo"
 
+    # Spam guards: bot check + disposable-email block (both graceful if unconfigured)
+    from app.core.signup_guard import verify_turnstile, is_disposable_email
+    if not verify_turnstile(body.turnstile_token, request.client.host if request.client else None):
+        raise HTTPException(status_code=400, detail="Bot verification failed. Please try again.")
+    if is_disposable_email(body.email):
+        raise HTTPException(status_code=422, detail="Please use a permanent email address to start a trial.")
+
     # Validate uniqueness
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
@@ -243,8 +251,8 @@ def register(request: Request, body: RegisterRequest, db: Session = Depends(get_
     from app.models.tenant import Tenant
     from app.models.billing import Subscription
 
-    # Create tenant
-    tenant = Tenant(name=body.org_name, plan_tier="free")
+    # Create tenant on the 15-day trial tier (full features until trial_end)
+    tenant = Tenant(name=body.org_name, plan_tier="trial")
     if hasattr(tenant, "app_name"):
         tenant.app_name = body.org_name
     db.add(tenant)
@@ -266,20 +274,21 @@ def register(request: Request, body: RegisterRequest, db: Session = Depends(get_
     db.add(admin)
     db.flush()
 
-    # Assign the unified free plan; fall back to any available free plan if seed hasn't run yet
+    # Assign the unified trial plan (full features); fall back if seed hasn't run yet
     from app.models.billing import Plan as BillingPlan
-    free_plan = (
-        db.query(BillingPlan).filter(BillingPlan.id == "fg_free").first()
-        or db.query(BillingPlan).filter(BillingPlan.tier == "free", BillingPlan.is_active == True).first()
+    trial_plan = (
+        db.query(BillingPlan).filter(BillingPlan.id == "fg_trial").first()
+        or db.query(BillingPlan).filter(BillingPlan.tier == "trial", BillingPlan.is_active == True).first()
+        or db.query(BillingPlan).filter(BillingPlan.id == "fg_free").first()
     )
-    initial_plan_id = free_plan.id if free_plan else f"{segment}_free"
+    initial_plan_id = trial_plan.id if trial_plan else f"{segment}_free"
     trial_sub = Subscription(
         tenant_id=tenant.id,
         plan_id=initial_plan_id,
         billing_cycle="monthly",
         status="trialing",
         trial_start=datetime.now(timezone.utc),
-        trial_end=datetime.now(timezone.utc) + timedelta(days=30),
+        trial_end=datetime.now(timezone.utc) + timedelta(days=15),
     )
     db.add(trial_sub)
     db.commit()
