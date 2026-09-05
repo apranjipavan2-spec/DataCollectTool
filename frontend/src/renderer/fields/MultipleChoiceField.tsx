@@ -1,7 +1,5 @@
-import React from 'react'
 import type { FormField } from '@/types/form'
 import { labelCls, hintCls, optionBtnCls, requiredCls } from './styles'
-import EmojiIcon from '@/components/EmojiIcon'
 
 interface Props { field: FormField; value: string[]; onChange: (v: string[]) => void }
 

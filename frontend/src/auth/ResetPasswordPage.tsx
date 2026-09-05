@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import api from '@/lib/api'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Input, Alert } from '@/components/ui'

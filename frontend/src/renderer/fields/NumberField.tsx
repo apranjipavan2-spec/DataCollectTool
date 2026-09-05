@@ -1,4 +1,3 @@
-import React from 'react'
 import type { FormField } from '@/types/form'
 import { labelCls, hintCls, numberInputCls, fieldHintCls, requiredCls } from './styles'
 

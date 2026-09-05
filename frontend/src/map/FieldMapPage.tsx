@@ -155,7 +155,7 @@ export default function FieldMapPage() {
     })
 
     if (visiblePins.length > 0) {
-      const latlngs = visiblePins.filter(p => p.lat && p.lng).map(p => [p.lat, p.lng])
+      const latlngs = visiblePins.filter(p => p.lat && p.lng).map(p => [p.lat, p.lng] as [number, number])
       if (latlngs.length) map.fitBounds(latlngs, { padding: [40, 40] })
     }
   }, [pins, filterEnum, filterStatus, selectPin])

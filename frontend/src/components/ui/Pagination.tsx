@@ -1,4 +1,3 @@
-import React from 'react'
 
 interface PaginationProps {
   /** Current page number (1-indexed) */

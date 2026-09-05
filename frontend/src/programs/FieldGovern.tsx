@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import api, { getStoredUser } from '@/lib/api'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
@@ -12,17 +12,6 @@ import EmojiIcon from '@/components/EmojiIcon'
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ColHeader { id: string; label: string; type: string; options: { value: string; label: string }[] }
-
-interface AnalyzerData {
-  program_id: string; program_name: string; scheme: string
-  is_panel_study: boolean; total_submissions: number
-  trend: { date: string; count: number }[]
-  status_counts: Record<string, number>
-  enumerators: { name: string; count: number }[]
-  wave_counts: { name: string; wave_number: number | null; count: number; form_id: string | null }[]
-  column_headers: ColHeader[]
-  quality: { total: number; flagged: number; approved: number; violations: number; quality_score: number }
-}
 
 interface CleanerItem {
   id: string; enumerator_name: string; form_title: string; status: string
@@ -770,7 +759,6 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 
 export default function FieldGovern() {
   const { programId } = useParams<{ programId: string }>()
-  const navigate = useNavigate()
   const user = getStoredUser()
   const [tab, setTab] = useState<Tab>('analyzer')
   const [progName, setProgName] = useState('')

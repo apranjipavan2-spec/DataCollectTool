@@ -1,5 +1,4 @@
 import React from 'react'
-import EmojiIcon from '@/components/EmojiIcon'
 
 interface AlertProps {
   type?: 'info' | 'success' | 'warning' | 'error'

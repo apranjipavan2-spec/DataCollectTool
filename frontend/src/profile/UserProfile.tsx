@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api, { getStoredUser, storeUser } from '@/lib/api'
 import { getNavItems } from '@/lib/navigation'

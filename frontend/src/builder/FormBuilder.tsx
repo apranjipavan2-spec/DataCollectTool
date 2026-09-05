@@ -1,9 +1,8 @@
-import React, { useState, useCallback } from 'react'
-import type { FormSchema, FormSection, FormField, FieldType } from '@/types/form'
+import { useState, useCallback } from 'react'
+import type { FormSchema, FormField, FieldType } from '@/types/form'
 import { newField, newSection, newSchema, updateFieldInSchema } from '@/lib/formUtils'
 import FieldTypeMenu from './FieldTypeMenu'
 import FieldEditor from './FieldEditor'
-import { v4 as uuidv4 } from 'uuid'
 import api from '@/lib/api'
 
 const FIELD_TYPE_ICONS: Record<string, string> = {

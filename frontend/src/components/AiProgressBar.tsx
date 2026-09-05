@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import type { AiJob, AiJobStatus } from '@/lib/useAiJob'
-import EmojiIcon from '@/components/EmojiIcon'
 
 interface Props {
   job: AiJob | null

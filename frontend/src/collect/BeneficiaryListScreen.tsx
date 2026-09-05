@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import api from '@/lib/api'
 import EmojiIcon from '@/components/EmojiIcon'
 
@@ -32,7 +32,7 @@ interface Props {
   userId: string
 }
 
-export default function BeneficiaryListScreen({ formTitle, formId, onSelect, onBack, userId }: Props) {
+export default function BeneficiaryListScreen({ formTitle, formId, onSelect, onBack }: Props) {
   const [districts, setDistricts] = useState<LocationOption[]>([])
   const [talukas, setTalukas] = useState<LocationOption[]>([])
   const [selectedDistrict, setSelectedDistrict] = useState('')

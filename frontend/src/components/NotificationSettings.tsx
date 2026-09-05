@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { subscribeToPush, unsubscribeFromPush } from '@/lib/pushNotifications'
 import { Button } from '@/components/ui'
 import EmojiIcon from '@/components/EmojiIcon'

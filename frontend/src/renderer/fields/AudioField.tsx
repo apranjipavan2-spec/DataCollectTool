@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import type { FormField } from '@/types/form'
 import { labelCls, hintCls, captureButtonCls, recordingButtonCls, fieldErrorCls, fieldHintCls, requiredCls } from './styles'
 import EmojiIcon from '@/components/EmojiIcon'

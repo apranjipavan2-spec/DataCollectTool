@@ -101,7 +101,7 @@ function Badge({ label, cls }: { label: string; cls: string }) {
 // ── Modals ────────────────────────────────────────────────────────────────────
 
 function ProgramModal({ initial, onSave, onClose }: {
-  initial?: Partial<Program>; onSave: (d: Record<string, string>) => Promise<void>; onClose: () => void
+  initial?: Partial<Program>; onSave: (d: Record<string, unknown>) => Promise<void>; onClose: () => void
 }) {
   const [d, setD] = useState({ name: '', scheme_name: '', description: '', status: 'active', start_date: '', end_date: '', ...initial })
   const [saving, setSaving] = useState(false)
@@ -140,7 +140,7 @@ function ProgramModal({ initial, onSave, onClose }: {
 }
 
 function LocationModal({ initial, onSave, onClose }: {
-  initial?: Partial<Location>; onSave: (d: Record<string, string>) => Promise<void>; onClose: () => void
+  initial?: Partial<Location>; onSave: (d: Record<string, unknown>) => Promise<void>; onClose: () => void
 }) {
   const [d, setD] = useState({ state: '', district: '', block: '', village: '', ...initial })
   const [saving, setSaving] = useState(false)
@@ -506,7 +506,7 @@ export default function ProgramsPage() {
 
   // ── CRUD ────────────────────────────────────────────────────────────────────
 
-  const saveProgram = async (d: Record<string, string>) => {
+  const saveProgram = async (d: Record<string, unknown>) => {
     if (editingProg?.id) await api.patch(`/programs/${editingProg.id}`, d)
     else await api.post('/programs/', d)
     setShowProgModal(false); setEditingProg(null)
@@ -520,7 +520,7 @@ export default function ProgramsPage() {
     await load(); toast.success('Program deleted')
   }
 
-  const saveLocation = async (d: Record<string, string>) => {
+  const saveLocation = async (d: Record<string, unknown>) => {
     if (editingLoc?.id) await api.patch(`/programs/locations/${editingLoc.id}`, d)
     else await api.post('/programs/locations', d)
     setShowLocModal(false); setEditingLoc(null); await load(); toast.success('Location saved')

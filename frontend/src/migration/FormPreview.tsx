@@ -1,4 +1,4 @@
-import type { ParsedSchema, ParseWarning } from './MigrationPage'
+import type { ParsedSchema } from './MigrationPage'
 import EmojiIcon from '@/components/EmojiIcon'
 
 interface Props {

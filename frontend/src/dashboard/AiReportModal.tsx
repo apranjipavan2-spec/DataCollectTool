@@ -2,7 +2,6 @@ import { useEffect } from 'react'
 import api from '@/lib/api'
 import { useAiJob } from '@/lib/useAiJob'
 import AiProgressBar from '@/components/AiProgressBar'
-import EmojiIcon from '@/components/EmojiIcon'
 
 interface Props {
   formId: string

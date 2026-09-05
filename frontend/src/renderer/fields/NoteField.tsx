@@ -1,4 +1,3 @@
-import React from 'react'
 import type { FormField } from '@/types/form'
 
 interface Props { field: FormField }

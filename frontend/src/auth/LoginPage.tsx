@@ -39,19 +39,6 @@ function FeatureIcon({ name, className = '', style }: { name: string; className?
   )
 }
 
-function Logo({ size = 40, className = '' }: { size?: number; className?: string }) {
-  return (
-    <img
-      src="/logo-icon.png"
-      alt="FieldGovern"
-      width={size}
-      height={size}
-      className={`object-contain flex-shrink-0 ${className}`}
-      style={{ width: size, height: size }}
-    />
-  )
-}
-
 const LOGIN_STYLES = `
   @keyframes float-orb {
     0%, 100% { transform: translateY(0px) scale(1); }

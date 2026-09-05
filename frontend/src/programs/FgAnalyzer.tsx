@@ -8,7 +8,6 @@ import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
-import LineChart from '@/components/charts/LineChart'
 import BarChart from '@/components/charts/BarChart'
 import { BatchRenameModal } from './BatchRenameModal'
 import {
@@ -58,97 +57,6 @@ const btnPr = 'px-4 py-2 bg-catalan-primary text-catalan-bg rounded-lg text-sm f
 const btnSe = 'px-3 py-1.5 text-sm border border-catalan-border rounded-lg text-catalan-text hover:bg-catalan-hover transition-colors disabled:opacity-40'
 const sel   = 'border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text focus:ring-2 focus:ring-catalan-primary outline-none'
 const inp   = 'border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text placeholder:text-catalan-textMuted focus:ring-2 focus:ring-catalan-primary outline-none'
-
-function StatCard({ label, value, color = 'text-catalan-primary' }: { label: string; value: string | number; color?: string }) {
-  return (
-    <div className={card}>
-      <div className={`text-2xl font-bold ${color}`}>{value}</div>
-      <div className="text-sm text-catalan-text mt-0.5">{label}</div>
-    </div>
-  )
-}
-
-// ── Overview tab ─────────────────────────────────────────────────────────────
-
-function OverviewTab({ summary, fullData }: { summary: ProgramSummary; fullData: AnalyzerData | null }) {
-  const d = fullData ?? summary
-  const quality_score = fullData ? fullData.quality.quality_score : summary.quality_score
-  const flagged = fullData ? fullData.quality.flagged : summary.flagged
-  const violations = fullData ? fullData.quality.violations : summary.violations
-  const trend = d.trend ?? []
-  const status_counts = d.status_counts ?? {}
-  const enumerators = d.enumerators ?? []
-  const wave_counts = d.wave_counts ?? []
-  const statusBars = Object.entries(status_counts).map(([k, v]) => ({ label: k, value: v as number }))
-  const enumBars   = enumerators.slice(0, 15).map(e => ({ label: e.name, value: e.count }))
-
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Total Submissions" value={d.total_submissions} />
-        <StatCard label="Quality Score" value={`${quality_score}%`}
-          color={quality_score >= 80 ? 'text-green-400' : quality_score >= 60 ? 'text-catalan-warning' : 'text-catalan-error'} />
-        <StatCard label="Flagged" value={flagged} color="text-catalan-warning" />
-        <StatCard label="QC Violations" value={violations} color="text-catalan-error" />
-      </div>
-
-      {trend.length > 0 && (
-        <div className={card}>
-          <div className={sh}>Submission Trend (Daily)</div>
-          <LineChart data={trend} height={200} />
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {statusBars.length > 0 && (
-          <div className={card}>
-            <div className={sh}>Status Breakdown</div>
-            <BarChart data={statusBars} height={160} />
-          </div>
-        )}
-        {enumBars.length > 0 && (
-          <div className={card}>
-            <div className={sh}>Enumerator Performance (Top 15)</div>
-            <BarChart data={enumBars} height={Math.max(160, enumBars.length * 34 + 8)} />
-          </div>
-        )}
-      </div>
-
-      {wave_counts.length > 0 && (
-        <div className={card}>
-          <div className={sh}>Questionnaire / Wave Breakdown</div>
-          <div className="divide-y divide-catalan-border">
-            {wave_counts.map((w, i) => (
-              <div key={i} className="flex items-center justify-between py-2.5">
-                <div>
-                  <span className="text-sm font-medium text-catalan-text">{w.name}</span>
-                  {w.wave_number != null && <span className="ml-2 text-xs text-catalan-textMuted">Wave {w.wave_number}</span>}
-                </div>
-                <span className="text-sm font-bold text-catalan-primary">{w.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className={card}>
-        <div className={sh}>Form Fields ({fullData ? fullData.column_headers.length : summary.column_count ?? 0})</div>
-        {fullData ? (
-          <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
-            {fullData.column_headers.map(c => (
-              <span key={c.id} title={`id: ${c.id} | type: ${c.type}`}
-                className="px-2 py-0.5 text-xs bg-catalan-hover border border-catalan-border rounded text-catalan-textMuted">
-                {c.label}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-catalan-textMuted">Load Column Data in the Tabulator tab to see field names.</p>
-        )}
-      </div>
-    </div>
-  )
-}
 
 // ── Tabulator tab ─────────────────────────────────────────────────────────────
 

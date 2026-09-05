@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import api from '@/lib/api'
-import { Button, Card } from '@/components/ui'
+import { Button } from '@/components/ui'
 import EmojiIcon from '@/components/EmojiIcon'
 
 // ── Types ──────────────────────────────────────────────────────────────────

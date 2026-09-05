@@ -66,11 +66,9 @@ export default function SubscriptionPage() {
 
   const [plans,     setPlans]     = useState<Plan[]>([])
   const [cycle,     setCycle]     = useState('monthly')
-  const [loading,   setLoading]   = useState(false)
-  const [paymentCfg, setPaymentCfg] = useState<Record<string, string>>({})
+  const [, setPaymentCfg] = useState<Record<string, string>>({})
 
   // Payment flow state
-  const [selectedPlan,  setSelectedPlan]  = useState<Plan | null>(null)
   const [paymentDetail, setPaymentDetail] = useState<PaymentDetails | null>(null)
   const [utrInput,      setUtrInput]      = useState('')
   const [submittingUTR, setSubmittingUTR] = useState(false)
@@ -89,19 +87,6 @@ export default function SubscriptionPage() {
   // Show the single unified plan set (Free / Starter / Growth / Pro) — the same
   // plans the marketing pricing page renders. 'custom' is shown as the CTA card.
   const displayPlans = plans.filter(p => p.segment === 'unified' && p.tier !== 'custom')
-
-  const requestPayment = async (plan: Plan) => {
-    setLoading(true)
-    try {
-      const res = await api.post('/billing/request', { plan_id: plan.id, billing_cycle: cycle })
-      setSelectedPlan(plan)
-      setPaymentDetail(res.data)
-      setUtrSubmitted(false)
-      setUtrInput('')
-    } catch (e: any) {
-      toast.error(e.response?.data?.detail || 'Failed to create payment request')
-    } finally { setLoading(false) }
-  }
 
   const submitUTR = async () => {
     if (!paymentDetail || !utrInput.trim()) return

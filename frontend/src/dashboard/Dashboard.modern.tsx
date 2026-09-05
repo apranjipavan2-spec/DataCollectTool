@@ -7,7 +7,7 @@ import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
-import { Card, Button, Modal, Loading, Alert, Pagination, DashboardSkeleton } from '@/components/ui'
+import { Card, Button, Modal, Alert, Pagination, DashboardSkeleton } from '@/components/ui'
 import BarChart from '@/components/charts/BarChart'
 import LineChart from '@/components/charts/LineChart'
 import AuditLog from '@/components/AuditLog'
@@ -743,7 +743,7 @@ export default function Dashboard() {
     is_active: boolean; created_at: string; secret: string | null
   }
   const [webhooks, setWebhooks] = useState<WebhookItem[]>([])
-  const [loadingWebhooks, setLoadingWebhooks] = useState(false)
+  const [loadingWebhooks] = useState(false)
   const [showWebhookForm, setShowWebhookForm] = useState(false)
   const [newWebhook, setNewWebhook] = useState({ name: '', url: '', secret: '', events: [] as string[] })
   const [savingWebhook, setSavingWebhook] = useState(false)
@@ -758,7 +758,7 @@ export default function Dashboard() {
   // Integrations — API Keys
   interface ApiKeyItem { id: string; name: string; created_at: string; last_used_at: string | null; is_active: boolean }
   const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>([])
-  const [loadingApiKeys, setLoadingApiKeys] = useState(false)
+  const [loadingApiKeys] = useState(false)
   const [showApiKeyForm, setShowApiKeyForm] = useState(false)
   const [showNewFormWizard, setShowNewFormWizard] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
@@ -1433,7 +1433,7 @@ export default function Dashboard() {
     }
     setSavingSchedule(true)
     try {
-      const { data } = await api.post('/schedules/', newSchedule)
+      await api.post('/schedules/', newSchedule)
       toast.success('Schedule created')
       setShowScheduleForm(false)
       setNewSchedule({ form_id: '', enumerator_id: '', start_date: '', end_date: '', location: '', target_count: 0, notes: '', program_questionnaire_id: '', location_id: '' })
@@ -1450,20 +1450,6 @@ export default function Dashboard() {
       setSchedules(s => s.filter(x => x.id !== id))
       toast.success('Schedule cancelled')
     } catch { toast.error('Failed to cancel schedule') }
-  }
-
-  const loadWebhooks = async () => {
-    setLoadingWebhooks(true)
-    try { const { data } = await api.get('/webhooks/'); setWebhooks(data.items ?? []) }
-    catch { toast.error('Failed to load webhooks') }
-    finally { setLoadingWebhooks(false) }
-  }
-
-  const loadApiKeys = async () => {
-    setLoadingApiKeys(true)
-    try { const { data } = await api.get('/api-keys/'); setApiKeys(data ?? []) }
-    catch { toast.error('Failed to load API keys') }
-    finally { setLoadingApiKeys(false) }
   }
 
   const handleCreateWebhook = async () => {
@@ -2147,7 +2133,7 @@ export default function Dashboard() {
                         : 'Click to load submissions list'}
                     </p>
                     <button
-                      onClick={loadSubmissions}
+                      onClick={() => loadSubmissions()}
                       disabled={subsLoading}
                       className="px-6 py-2.5 bg-catalan-primary text-catalan-bg rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 transition-opacity"
                     >
@@ -2247,7 +2233,7 @@ export default function Dashboard() {
                               <div className="flex items-center gap-1 flex-wrap">
                                 <StatusBadge status={sub.status} />
                                 {sub.has_violations && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-yellow-700 bg-yellow-100"><EmojiIcon e="⚠" /> Violations</span>}
-                                {sub.data_json?.['_duplicate_suspect'] && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-orange-700 bg-orange-100">Dup?</span>}
+                                {!!sub.data_json?.['_duplicate_suspect'] && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-orange-700 bg-orange-100">Dup?</span>}
                                 {sub.backcheck_required && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-blue-700 bg-blue-100"><EmojiIcon e="🔍" /> Back-Check</span>}
                                 {(() => {
                                   const d = sub.data_json?.['_duration_sec']

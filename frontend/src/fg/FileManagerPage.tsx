@@ -9,7 +9,7 @@ import EmojiIcon from '@/components/EmojiIcon'
 
 interface ToolProject {
   id: string; tool: string; name: string; program_id: string | null
-  data: Record<string, unknown>; created_at: string; updated_at: string
+  data: { csv_content?: string; content?: string; row_count?: number; [key: string]: unknown }; created_at: string; updated_at: string
   shared_with?: string[]
 }
 
@@ -169,7 +169,7 @@ export default function FileManagerPage() {
   }
 
   function downloadCsv(proj: ToolProject) {
-    const blob = new Blob([proj.data.csv_content], { type: 'text/csv' })
+    const blob = new Blob([proj.data.csv_content ?? ''], { type: 'text/csv' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
     a.download = `${proj.name}.csv`
@@ -357,8 +357,6 @@ export default function FileManagerPage() {
   ]
 
   const isLoading = section === 'submissions' ? loadingSub : loadingProj
-  const selectedSubsList = submissions.filter(s => selectedSubs.has(s.id))
-  const selectedProjsList = visibleProjects.filter(p => selectedProjs.has(p.id))
 
   return (
     <div className="flex h-screen bg-catalan-bg">

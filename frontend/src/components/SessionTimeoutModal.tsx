@@ -8,7 +8,6 @@
  * - Auto-dismisses when remaining hits 0 (parent handles logout)
  */
 
-import React, { useEffect, useRef } from 'react'
 
 interface Props {
   /** Seconds remaining until auto-logout */

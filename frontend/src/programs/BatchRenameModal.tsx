@@ -4,19 +4,9 @@ import { useToast } from '../lib/ToastContext'
 import EmojiIcon from '@/components/EmojiIcon'
 
 interface ColHeader { id: string; label: string; type: string; options: any[] }
-export interface SavedTabulation {
-  id: string
-  title: string
-  description: string
-  groupby_field: string
-  value_field: string
-  aggregation: string
-  rows: any[]
-  is_cross_tab?: boolean
-  sub_keys?: string[]
-  column_labels?: Record<string, string>
-  [key: string]: any
-}
+// Single canonical definition lives in fgStorage — re-export so existing imports keep working.
+import type { SavedTabulation } from '../lib/fgStorage'
+export type { SavedTabulation }
 
 type Status = 'pending' | 'running' | 'done' | 'error' | 'skipped'
 interface RowState {
@@ -178,7 +168,7 @@ export function BatchRenameModal({ saved, programId, programName, cols, onClose,
 
           {/* Status list */}
           <div className="space-y-1">
-            {rowStates.slice(0, 15).map((rs, i) => (
+            {rowStates.slice(0, 15).map((rs) => (
               <div key={rs.id} className="text-xs flex items-center gap-2 p-2 bg-catalan-surface rounded hover:bg-catalan-hover">
                 {rs.status === 'done' && <span className="text-catalan-success">✓</span>}
                 {rs.status === 'running' && <span className="text-catalan-primary animate-spin">⟳</span>}
@@ -223,7 +213,6 @@ export function BatchRenameModal({ saved, programId, programName, cols, onClose,
                   max="5000"
                   step="100"
                   className="w-16 px-2 py-1 text-xs border rounded"
-                  disabled={phase === 'running'}
                 />
                 <span className="text-catalan-textMuted">ms</span>
               </div>
@@ -263,7 +252,7 @@ export function BatchRenameModal({ saved, programId, programName, cols, onClose,
                 </button>
               </>
             )}
-            {(phase === 'cancelled' || phase === 'idle') && phase !== 'done' && (
+            {(phase === 'cancelled' || phase === 'idle') && (
               <button
                 onClick={onClose}
                 className="px-4 py-2 bg-catalan-surface hover:bg-catalan-hover rounded text-sm font-medium"

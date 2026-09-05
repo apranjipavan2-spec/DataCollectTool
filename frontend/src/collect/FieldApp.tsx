@@ -10,7 +10,7 @@ import { compressImage } from '@/utils/imageCompress'
 type Screen = 'list' | 'drafts' | 'collecting' | 'submitted'
 
 interface FormMeta { id: string; title: string; version: number }
-interface Schedule { id: string; form_title: string; status: string; due_date: string | null; location: string | null; program_name: string | null }
+interface Schedule { id: string; form_title: string; status: string; due_date: string | null; location: string | null; program_name: string | null; start_date: string | null; end_date: string | null; target_count: number; notes: string | null }
 
 export default function FieldApp() {
   const [screen, setScreen]           = useState<Screen>('list')
@@ -20,7 +20,7 @@ export default function FieldApp() {
   const [mediaQueueCount, setMediaQueueCount] = useState(0)
   const [loading, setLoading]         = useState(true)
   const [syncMsg, setSyncMsg]         = useState('')
-  const [isOffline, setIsOffline]     = useState(!navigator.onLine)
+  const [, setIsOffline] = useState(!navigator.onLine)
   const [schedules, setSchedules]   = useState<Schedule[]>([])
   const syncRef = useRef<() => Promise<void>>()   // stable ref so online/SW handlers always call latest
   const { language, setLanguage } = useLanguage()

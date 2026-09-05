@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import type { FormField } from '@/types/form'
 import { labelCls, hintCls, captureButtonCls, fieldErrorCls, requiredCls } from './styles'
 import EmojiIcon from '@/components/EmojiIcon'

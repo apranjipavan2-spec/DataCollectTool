@@ -301,16 +301,6 @@ export default function FormBuilder() {
   const updateField = useCallback((sectionId: string, fieldId: string, patch: Partial<FormField>) =>
     setSchema(s => updateFieldInSchema(s, sectionId, fieldId, patch)), [])
 
-  const moveField = (sectionId: string, fieldId: string, dir: -1 | 1) =>
-    updateSections(sectionId, sec => {
-      const idx = sec.fields.findIndex(f => f.id === fieldId)
-      const next = idx + dir
-      if (next < 0 || next >= sec.fields.length) return sec
-      const fields = [...sec.fields]
-      ;[fields[idx], fields[next]] = [fields[next], fields[idx]]
-      return { ...sec, fields }
-    })
-
   const moveFieldToIndex = (srcSecId: string, srcFieldId: string, dstSecId: string, dstFieldId: string) => {
     if (srcFieldId === dstFieldId) return
     let draggedField: FormField | null = null
@@ -351,9 +341,9 @@ export default function FormBuilder() {
     return (MAP[t] as FieldType) ?? 'text'
   }
 
-  const toOptions = (opts?: string[]): FieldOption[] | undefined => {
+  const toOptions = (opts?: { value: string; label: string }[]): FieldOption[] | undefined => {
     if (!opts || opts.length === 0) return undefined
-    return opts.map(o => ({ value: o, label: o }))
+    return opts.map(o => ({ value: o.value, label: o.label }))
   }
 
   const handleDownloadMyForm = async () => {
@@ -383,7 +373,7 @@ export default function FormBuilder() {
         id: uuidv4(),
         title: sec.title || 'Section',
         fields: (sec.fields ?? []).map((f: RawImportField): FormField => {
-          const ft = toFieldType(f.type)
+          const ft = toFieldType(f.type ?? '')
           const opts = toOptions(f.options)
           return {
             id: uuidv4(),
@@ -884,7 +874,7 @@ export default function FormBuilder() {
       {showAiBuilder && (
         <AiFormBuilderModal
           onClose={() => setShowAiBuilder(false)}
-          onFormGenerated={(generatedFormId, title) => {
+          onFormGenerated={(generatedFormId) => {
             setShowAiBuilder(false)
             // Navigate to the newly generated form for editing
             window.location.href = `/builder?formId=${generatedFormId}`
