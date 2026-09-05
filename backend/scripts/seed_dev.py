@@ -184,6 +184,51 @@ _PATCHES = [
     "CREATE INDEX IF NOT EXISTS ix_submission_drafts_enumerator_id ON submission_drafts (enumerator_id)",
 ]
 
+# 0048 — restricted runtime role + empty-context-bypass RLS policies. Mirrors the
+# migration so the safety net keeps enforcement correct even if alembic is skipped.
+# Critical: without the empty-context bypass, enabling APP_DATABASE_URL would lock
+# out login (pre-auth user lookups run with no tenant context). See migration 0048.
+_UNSET = "COALESCE(current_setting('app.current_tenant', true), '') = ''"
+_MATCH = "tenant_id::text = current_setting('app.current_tenant', true)"
+_SHARED = ("NULLIF(current_setting('app.current_tenant', true), '')::uuid "
+           "= ANY(COALESCE(shared_with_tenants, ARRAY[]::uuid[]))")
+_STRICT_TABLES = ("users", "forms", "submissions", "media_files", "cleaning_flags",
+                  "sync_log", "form_assignments", "programs")
+_SHARED_TABLES = ("user_tool_projects", "shared_files")
+
+_PATCHES += [
+    """DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'fieldgovern_app') THEN
+            CREATE ROLE fieldgovern_app LOGIN NOINHERIT;
+        END IF;
+    END $$""",
+    "ALTER ROLE fieldgovern_app NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE",
+    "GRANT USAGE ON SCHEMA public TO fieldgovern_app",
+    "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO fieldgovern_app",
+    "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO fieldgovern_app",
+    "ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER IN SCHEMA public "
+    "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO fieldgovern_app",
+    "ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER IN SCHEMA public "
+    "GRANT USAGE, SELECT ON SEQUENCES TO fieldgovern_app",
+]
+for _t in _STRICT_TABLES:
+    _expr = f"{_UNSET} OR {_MATCH}"
+    _PATCHES += [
+        f"ALTER TABLE {_t} ENABLE ROW LEVEL SECURITY",
+        f"ALTER TABLE {_t} FORCE ROW LEVEL SECURITY",
+        f"DROP POLICY IF EXISTS tenant_isolation ON {_t}",
+        f"CREATE POLICY tenant_isolation ON {_t} USING ({_expr}) WITH CHECK ({_expr})",
+    ]
+for _t in _SHARED_TABLES:
+    _PATCHES += [
+        f"ALTER TABLE {_t} ENABLE ROW LEVEL SECURITY",
+        f"ALTER TABLE {_t} FORCE ROW LEVEL SECURITY",
+        f"DROP POLICY IF EXISTS tenant_isolation ON {_t}",
+        f"CREATE POLICY tenant_isolation ON {_t} "
+        f"USING ({_UNSET} OR {_MATCH} OR {_SHARED}) WITH CHECK ({_UNSET} OR {_MATCH})",
+    ]
+
 from sqlalchemy import text as _text
 with engine.begin() as _conn:
     for _sql in _PATCHES:

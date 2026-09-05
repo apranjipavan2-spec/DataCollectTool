@@ -103,6 +103,10 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        # Ignore env vars that aren't declared fields (e.g. DEEPSEEK_API_KEY /
+        # DEEPSEEK_MODEL, which main.py reads directly via os.environ). Without this
+        # pydantic-settings rejects them and the app crashes on startup.
+        extra = "ignore"
 
 
 settings = Settings()
