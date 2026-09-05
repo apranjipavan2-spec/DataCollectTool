@@ -96,14 +96,37 @@ jobs:
       # ── Deploy the main app (always) ────────────────────────────────────────
       - name: Deploy app via SSH
         uses: appleboy/ssh-action@v1
+        env:
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           command_timeout: 20m
+          envs: SMTP_PASSWORD
           script: |
             set -e
             cd /opt/fieldgovern
+
+            # ── SMTP config: upsert into .env (non-secret values inline; password
+            # from the SMTP_PASSWORD GitHub secret). Safe: only rewrites the named
+            # keys, every other .env line is preserved. Skips a key if its value is
+            # empty so a missing secret never blanks an existing value.
+            upsert() {
+              key="$1"; val="$2"; [ -z "$val" ] && return 0
+              touch .env
+              grep -v "^${key}=" .env > .env.tmp 2>/dev/null || true
+              echo "${key}=${val}" >> .env.tmp
+              mv .env.tmp .env
+            }
+            upsert SMTP_HOST       "smtp.gmail.com"
+            upsert SMTP_PORT       "587"
+            upsert SMTP_USE_TLS    "true"
+            upsert SMTP_USER       "pallavi_ceo@fieldgovern.com"
+            upsert SMTP_PASSWORD   "$SMTP_PASSWORD"
+            upsert SMTP_FROM_EMAIL "noreply@fieldgovern.com"
+            upsert SMTP_FROM_NAME  "FieldGovern"
+            upsert APP_URL         "https://app.fieldgovern.com"
 
             # Login + pull the freshly-built image. The VPS's route to ghcr
             # (Fastly) intermittently TLS-handshake-times-out or resets, so retry
@@ -122,7 +145,7 @@ jobs:
               sleep 15
             done
             [ "$ok" = 1 ] || { echo "ERROR: image pull failed after 6 attempts"; exit 1; }
-            docker compose up -d --no-deps app
+            docker compose up -d --no-deps --force-recreate app
 
             # DB migrations + idempotent seeds
             docker compose exec -T app sh -c "alembic upgrade head 2>&1"
