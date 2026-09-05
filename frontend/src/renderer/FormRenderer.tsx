@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { FormSchema, FormField, FormSection } from '@/types/form'
 import { shouldShow, shouldShowSection, evalFormula, getAllFieldsInOrder, filterOptions } from '@/lib/formUtils'
 import { v4 as uuidv4 } from 'uuid'

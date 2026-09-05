@@ -424,23 +424,11 @@ export default function FieldApp() {
     }
   }
 
-  const loadBackchecks = async () => {
-    setBackcheckLoading(true)
-    try {
-      const { data } = await api.get('/submissions/my-backchecks')
-      setBackchecks(data)
-    } catch {
-      setBackchecks([])
-    } finally {
-      setBackcheckLoading(false)
-    }
-  }
-
   const openBackcheckForm = async (task: BackcheckTask) => {
     setSyncMsg('Loading back-check form…')
     try {
       const { data } = await api.get<{ json_schema: FormSchema }>(`/forms/${task.backcheck_form_id}`)
-      const meta: FormMeta = { id: task.backcheck_form_id, title: task.backcheck_form_title, version: data.version ?? 1 }
+      const meta: FormMeta = { id: task.backcheck_form_id, title: task.backcheck_form_title, version: data.json_schema?.version ?? 1 }
       // Pre-fill context from original submission
       const initialValues: Record<string, unknown> = {
         _backcheck_for: task.original_submission_id,
@@ -747,12 +735,17 @@ export default function FieldApp() {
     }
 
     if (schedCtx?.programContext) {
-      const pc = schedCtx.programContext
-      const lc = schedCtx.locationContext ?? {}
+      const pc = schedCtx.programContext as {
+        program_id?: string; program_name?: string; scheme_name?: string; questionnaire_id?: string
+        participant_type_id?: string; participant_type_name?: string; location_id?: string
+      }
+      const lc = (schedCtx.locationContext ?? {}) as {
+        location_id?: string; district?: string; block?: string; village?: string
+      }
       const locId = schedCtx.locationId ?? pc.location_id ?? lc.location_id ?? ''
       setProgramContext({
-        program_id: pc.program_id, program_name: pc.program_name, scheme_name: pc.scheme_name,
-        questionnaire_id: pc.questionnaire_id, participant_type_name: pc.participant_type_name,
+        program_id: pc.program_id ?? '', program_name: pc.program_name ?? '', scheme_name: pc.scheme_name ?? '',
+        questionnaire_id: pc.questionnaire_id ?? '', participant_type_name: pc.participant_type_name ?? '',
         location_id: locId, location_district: lc.district ?? '', location_block: lc.block ?? '', location_village: lc.village ?? '',
       })
       setSelectedLocationId(locId)
