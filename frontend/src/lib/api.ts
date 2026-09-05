@@ -195,6 +195,7 @@ export interface RegisterData {
   password: string
   segment: string
   phone?: string
+  turnstile_token?: string
 }
 
 export async function registerTenant(data: RegisterData) {

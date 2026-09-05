@@ -77,6 +77,7 @@
       --border: #e2e8f0;
       --shadow: 0 4px 24px rgba(14,165,233,0.08);
       --shadow-lg: 0 20px 60px rgba(14,165,233,0.15);
+      --announce-h: 40px;
     }
     *{box-sizing:border-box;margin:0;padding:0}
     html{font-family:'Inter',sans-serif;color:var(--text);background:var(--bg)}
@@ -117,7 +118,7 @@
     .reveal-scale{opacity:0;transform:scale(0.9);transition:all 0.6s cubic-bezier(.16,1,.3,1)}
     .reveal-scale.visible{opacity:1;transform:scale(1)}
     /* NAV */
-    nav{position:fixed;top:0;width:100%;z-index:100;padding:0 24px;height:68px;display:flex;align-items:center;justify-content:space-between;transition:all 0.3s}
+    nav{position:fixed;top:var(--announce-h);width:100%;z-index:100;padding:0 24px;height:68px;display:flex;align-items:center;justify-content:space-between;transition:all 0.3s}
     nav.scrolled{background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);box-shadow:0 2px 20px rgba(0,0,0,0.06);border-bottom:1px solid var(--border)}
     .nav-logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.2rem;color:var(--text);text-decoration:none}
     .logo-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--accent));display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:0.85rem;box-shadow:0 4px 12px rgba(14,165,233,0.4)}
@@ -131,7 +132,7 @@
     .btn-outline{border:2px solid var(--brand);color:var(--brand);border-radius:10px;padding:10px 22px;font-weight:600;font-size:0.9rem;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:transparent;transition:all 0.3s}
     .btn-outline:hover{background:var(--brand);color:white;transform:translateY(-2px)}
     /* HERO */
-    .hero{min-height:100vh;display:flex;align-items:center;padding:100px 24px 60px;position:relative;overflow:hidden;background:linear-gradient(160deg,#f0f9ff 0%,#ffffff 40%,#faf5ff 100%)}
+    .hero{min-height:100vh;display:flex;align-items:center;padding:calc(100px + var(--announce-h)) 24px 60px;position:relative;overflow:hidden;background:linear-gradient(160deg,#f0f9ff 0%,#ffffff 40%,#faf5ff 100%)}
     .hero-bg-blob{position:absolute;width:600px;height:600px;filter:blur(80px);opacity:0.25;border-radius:50%;pointer-events:none}
     .blob1{top:-100px;right:-100px;background:radial-gradient(circle,var(--brand),transparent);animation:float 6s ease-in-out infinite}
     .blob2{bottom:-100px;left:-100px;background:radial-gradient(circle,var(--accent-light),transparent);animation:float 8s ease-in-out infinite reverse}
@@ -502,7 +503,7 @@
     .hamburger.open span:nth-child(2){opacity:0}
     .hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
     /* MOBILE NAV MENU */
-    #mobileMenu{display:none;position:fixed;top:64px;left:0;right:0;background:white;border-bottom:2px solid var(--border);box-shadow:0 12px 40px rgba(0,0,0,0.12);z-index:98;padding:8px 0}
+    #mobileMenu{display:none;position:fixed;top:calc(68px + var(--announce-h));left:0;right:0;background:white;border-bottom:2px solid var(--border);box-shadow:0 12px 40px rgba(0,0,0,0.12);z-index:98;padding:8px 0}
     #mobileMenu.open{display:block}
     #mobileMenu a{display:flex;align-items:center;padding:14px 24px;color:var(--text2);font-weight:500;font-size:0.95rem;text-decoration:none;border-bottom:1px solid var(--border);transition:background 0.15s,color 0.15s}
     #mobileMenu a:last-child{border-bottom:none}
@@ -524,7 +525,7 @@
       #pipeline .diff-grid{grid-template-columns:1fr !important}
       .partner-showcase{grid-template-columns:1fr}
       section{padding:56px 16px}
-      .hero{padding:80px 16px 48px}
+      .hero{padding:calc(80px + var(--announce-h)) 16px 48px}
       .hero-cta .btn-outline{display:none}
       .proof-strip{padding:20px 16px}
       .footer-grid{grid-template-columns:1fr}
@@ -536,10 +537,55 @@
     .ei:hover{transform:scale(1.18) rotate(-3deg)}
     a:hover .ei,button:hover .ei,[class*='card']:hover .ei{transform:scale(1.15)}
     @media(prefers-reduced-motion:reduce){.ei{transition:none}}
+    /* ANNOUNCEMENT / TRIAL BAR */
+    .announce{position:fixed;top:0;left:0;right:0;height:var(--announce-h);z-index:101;display:flex;align-items:center;justify-content:center;gap:18px;padding:0 44px 0 16px;background:linear-gradient(90deg,var(--brand),var(--accent));color:#fff;font-size:0.82rem;font-weight:600;text-align:center}
+    .announce a{color:#fff;text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
+    .announce .ann-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#bbf7d0;margin-right:6px;vertical-align:middle;animation:pulse 2s infinite}
+    .announce .sep{opacity:0.5}
+    .announce .ann-trial{white-space:nowrap}
+    .announce .ann-x{position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:#fff;opacity:0.7;font-size:1.15rem;line-height:1;cursor:pointer}
+    .announce .ann-x:hover{opacity:1}
+    @media(max-width:720px){.announce{font-size:0.72rem;gap:0}.announce .ann-news,.announce .sep{display:none}}
+    /* DPDP CLAUSE GRID */
+    .dpdp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:36px}
+    .dpdp-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:22px;box-shadow:var(--shadow);transition:transform .3s,box-shadow .3s}
+    .dpdp-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+    .dpdp-sec{display:inline-block;font-weight:800;font-size:0.72rem;letter-spacing:.03em;color:var(--brand-dark);background:linear-gradient(135deg,rgba(14,165,233,0.1),rgba(124,58,237,0.1));border:1px solid rgba(14,165,233,0.2);border-radius:999px;padding:3px 10px;margin-bottom:12px}
+    .dpdp-card h3{font-size:1.02rem;font-weight:700;margin-bottom:8px;color:var(--text)}
+    .dpdp-req{font-size:0.82rem;color:var(--text3);font-style:italic;margin-bottom:10px;line-height:1.5}
+    .dpdp-impl{font-size:0.86rem;color:var(--text2);line-height:1.55}
+    .dpdp-impl b{color:var(--brand-dark)}
+    @media(max-width:900px){.dpdp-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:640px){.dpdp-grid{grid-template-columns:1fr}}
+    /* COST CALCULATOR */
+    .calc-wrap{max-width:760px;margin:36px auto 0;background:linear-gradient(160deg,#f0f9ff,#ffffff 55%,#faf5ff);border:1px solid rgba(14,165,233,0.2);border-radius:20px;padding:30px;box-shadow:var(--shadow-lg)}
+    .calc-intro{font-size:0.9rem;color:var(--text3);margin-bottom:20px}
+    .calc-sliders{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:24px}
+    .calc-slider label{display:flex;justify-content:space-between;font-size:0.72rem;text-transform:uppercase;letter-spacing:.04em;font-weight:700;color:var(--text3);margin-bottom:10px}
+    .calc-slider label b{color:var(--brand-dark);font-size:0.86rem;text-transform:none;letter-spacing:0}
+    .calc-slider input[type=range]{width:100%;accent-color:var(--brand)}
+    .calc-rows{display:flex;flex-direction:column;gap:8px}
+    .calc-line{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-radius:10px;background:#fff;border:1px solid var(--border);font-size:0.9rem}
+    .calc-line span:first-child{font-weight:600;color:var(--text2)}
+    .calc-line span:last-child{font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
+    .calc-line.hi{background:rgba(16,185,129,0.08);border-color:rgba(16,185,129,0.3)}
+    .calc-line.hi span{color:#047857}
+    .calc-savings{margin-top:18px;display:flex;justify-content:space-between;align-items:center;background:var(--green);border-radius:14px;padding:16px 20px;color:#fff}
+    .calc-savings .cs-right{text-align:right}
+    .calc-savings .cs-label{font-size:0.68rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600;opacity:0.85}
+    .calc-savings .cs-val{font-size:1.6rem;font-weight:900;font-variant-numeric:tabular-nums}
+    .calc-note{margin-top:14px;text-align:center;font-size:0.74rem;color:var(--text3);line-height:1.5}
+    @media(max-width:640px){.calc-sliders{grid-template-columns:1fr;gap:16px}}
   </style>
   <script defer data-domain="fieldgovern.com" src="https://plausible.io/js/script.js"></script>
 </head>
 <body>
+<div class="announce" id="announceBar">
+  <span class="ann-news"><span class="ann-dot"></span>New: Smart Table Builder + Per-Table AI Interpretation — live</span>
+  <span class="sep">·</span>
+  <span class="ann-trial"><strong>15-day free trial</strong> — full features, no credit card. <a href="https://app.fieldgovern.com/register">Start free trial →</a></span>
+  <button class="ann-x" aria-label="Dismiss" onclick="dismissAnnounce()">×</button>
+</div>
 <nav id="navbar">
   <a href="#" class="nav-logo">
     <img src="assets/logo-wide.png" alt="FieldGovern" style="height:40px;width:auto;mix-blend-mode:multiply"/>
@@ -1044,6 +1090,96 @@
   </div>
 </section>
 
+<section id="dpdp" class="features-bg">
+  <div class="section-inner">
+    <div class="text-center reveal">
+      <div class="section-tag"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> DPDP Act 2023</div>
+      <h2 class="section-title">Compliance built in — not bolted on</h2>
+      <p class="section-sub">FieldGovern maps directly to India's Digital Personal Data Protection Act. These are the safeguards live in the platform today.</p>
+    </div>
+    <div class="dpdp-grid">
+      <div class="dpdp-card reveal delay-1">
+        <span class="dpdp-sec">§6 · Consent</span>
+        <h3>Consent capture per respondent</h3>
+        <p class="dpdp-req">Personal data may only be processed with free, specific, informed consent of the data principal.</p>
+        <p class="dpdp-impl">Every submission records <b>consent given + a consent timestamp</b> before data is kept. Admins can pull a per-form <b>consent log</b> for accountability.</p>
+      </div>
+      <div class="dpdp-card reveal delay-2">
+        <span class="dpdp-sec">§12 · Access &amp; Correction</span>
+        <h3>Versioned corrections</h3>
+        <p class="dpdp-req">Data principals can request access to their data and correction of inaccurate records.</p>
+        <p class="dpdp-impl">Authorised admins can access and correct submission data on request. Every edit is <b>versioned and audit-logged</b> — records are never silently overwritten.</p>
+      </div>
+      <div class="dpdp-card reveal delay-3">
+        <span class="dpdp-sec">§12(b) · Erasure</span>
+        <h3>Right to be forgotten</h3>
+        <p class="dpdp-req">Data principals can request erasure of their personal data, subject to legal exceptions.</p>
+        <p class="dpdp-impl">An <b>anonymisation-based erasure</b> path removes personal identifiers from a respondent's submissions while preserving aggregate integrity. The erasure event is recorded in the audit trail.</p>
+      </div>
+      <div class="dpdp-card reveal delay-1">
+        <span class="dpdp-sec">§8 · Reasonable Safeguards</span>
+        <h3>Tenant isolation &amp; encryption</h3>
+        <p class="dpdp-req">Data Fiduciaries must protect personal data with reasonable security safeguards.</p>
+        <p class="dpdp-impl">Every organisation's data is isolated at the database layer with <b>PostgreSQL Row-Level Security</b>. Passwords are bcrypt-hashed; sessions use signed JWTs; transport is TLS.</p>
+      </div>
+      <div class="dpdp-card reveal delay-2">
+        <span class="dpdp-sec">§8 · Accountability</span>
+        <h3>Append-only audit trail</h3>
+        <p class="dpdp-req">Data Fiduciaries must maintain records of processing activities for accountability.</p>
+        <p class="dpdp-impl">Key actions — logins, form edits, submissions, exports, role changes, corrections, erasures — are written to an <b>append-only audit log</b> with actor and timestamp.</p>
+      </div>
+      <div class="dpdp-card reveal delay-3">
+        <span class="dpdp-sec">§17 · Data Residency</span>
+        <h3>India-hosted by default</h3>
+        <p class="dpdp-req">Cross-border transfer of personal data is restricted to permitted countries.</p>
+        <p class="dpdp-impl">FieldGovern runs on <b>India-based infrastructure</b> by default. Personal data does not leave the deployment region unless an organisation explicitly opts in.</p>
+      </div>
+    </div>
+    <div class="text-center reveal" style="margin-top:28px">
+      <a href="dpdp-compliance.html" class="btn-outline">Read the full DPDP breakdown →</a>
+    </div>
+  </div>
+</section>
+
+<section id="calculator">
+  <div class="section-inner">
+    <div class="text-center reveal">
+      <div class="section-tag"><svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/></svg> Cost Calculator</div>
+      <h2 class="section-title">See what you'd save</h2>
+      <p class="section-sub">Compare your current tool's annual cost against FieldGovern Pro — with unlimited enumerators included.</p>
+    </div>
+    <div class="calc-wrap reveal">
+      <p class="calc-intro">Adjust the sliders to model your project's total cost across platforms.</p>
+      <div class="calc-sliders">
+        <div class="calc-slider">
+          <label>Active forms <b id="calcFormsOut">20</b></label>
+          <input type="range" id="calcForms" min="1" max="100" value="20" oninput="fgCalc()"/>
+        </div>
+        <div class="calc-slider">
+          <label>Submissions / month <b id="calcSubsOut">5,000</b></label>
+          <input type="range" id="calcSubs" min="500" max="25000" step="500" value="5000" oninput="fgCalc()"/>
+        </div>
+        <div class="calc-slider">
+          <label>Project duration <b id="calcMonthsOut">6 months</b></label>
+          <input type="range" id="calcMonths" min="1" max="24" value="6" oninput="fgCalc()"/>
+        </div>
+      </div>
+      <div class="calc-rows" id="calcRows"></div>
+      <div class="calc-savings">
+        <div>
+          <div class="cs-label">Your savings vs SurveyCTO</div>
+          <div class="cs-val" id="calcSaveVal">—</div>
+        </div>
+        <div class="cs-right">
+          <div class="cs-label">Lower</div>
+          <div class="cs-val" id="calcSavePct">—</div>
+        </div>
+      </div>
+      <p class="calc-note">Estimates based on plan list prices (SurveyCTO / Qualtrics converted at ~₹83/$). Paper estimate assumes ~₹8/response for entry &amp; logistics plus ₹3,000/form setup. Your actual cost may vary — contact us for a quote.</p>
+    </div>
+  </div>
+</section>
+
 <section class="demo-cta-bg">
   <div class="section-inner text-center">
     <div class="reveal">
@@ -1183,6 +1319,41 @@
 </footer>
 
 <script>
+  // Announcement bar dismiss (persists for the session)
+  function dismissAnnounce(){
+    document.documentElement.style.setProperty('--announce-h','0px');
+    var b=document.getElementById('announceBar'); if(b) b.style.display='none';
+    try{ sessionStorage.setItem('fg_announce_dismissed','1'); }catch(e){}
+  }
+  try{ if(sessionStorage.getItem('fg_announce_dismissed')==='1') dismissAnnounce(); }catch(e){}
+  // Interactive cost calculator — model total project cost across platforms.
+  function fgCalc(){
+    var fEl=document.getElementById('calcForms'); if(!fEl) return;
+    var forms=+fEl.value, subs=+document.getElementById('calcSubs').value, months=+document.getElementById('calcMonths').value;
+    document.getElementById('calcFormsOut').textContent=forms;
+    document.getElementById('calcSubsOut').textContent=subs.toLocaleString('en-IN');
+    document.getElementById('calcMonthsOut').textContent=months+(months===1?' month':' months');
+    // Monthly list prices (INR). SurveyCTO/Qualtrics converted at ~₹83/$.
+    var fg=24999*months;                                   // FieldGovern Pro
+    var surveycto=52000*months;                            // SurveyCTO higher tier (~$625/mo)
+    var qualtrics=125000*months;                           // Qualtrics (~$1,500/mo)
+    var paper=(subs*months*8)+(forms*3000);                // ₹8/response entry+logistics + ₹3k/form setup
+    var rows=[
+      {name:'FieldGovern Pro',cost:fg,hi:true},
+      {name:'SurveyCTO (Pro tier)',cost:surveycto},
+      {name:'Qualtrics',cost:qualtrics},
+      {name:'Paper + manual entry',cost:paper}
+    ];
+    var html='';
+    rows.forEach(function(r){
+      html+='<div class="calc-line'+(r.hi?' hi':'')+'"><span>'+r.name+'</span><span>₹'+r.cost.toLocaleString('en-IN')+'</span></div>';
+    });
+    document.getElementById('calcRows').innerHTML=html;
+    var save=Math.max(0,surveycto-fg), pct=surveycto>0?Math.round(save/surveycto*100):0;
+    document.getElementById('calcSaveVal').textContent='₹'+save.toLocaleString('en-IN');
+    document.getElementById('calcSavePct').textContent=pct+'%';
+  }
+  window.addEventListener('DOMContentLoaded', fgCalc);
   // Navbar scroll effect
   const navbar = document.getElementById('navbar');
   window.addEventListener('scroll', () => {

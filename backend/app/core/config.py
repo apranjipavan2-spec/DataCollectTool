@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     # Google OAuth (free — register at console.cloud.google.com)
     GOOGLE_CLIENT_ID: str = ""
 
+    # Cloudflare Turnstile — bot protection on self-serve signup (free).
+    # Unset = signup CAPTCHA check is skipped (dev). Set the secret in prod.
+    TURNSTILE_SECRET: str = ""
+
     # Sentry error monitoring
     SENTRY_DSN: str = ""
 

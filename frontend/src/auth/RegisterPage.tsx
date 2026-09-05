@@ -1,13 +1,98 @@
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { registerTenant } from '@/lib/api'
 
 const WA_NUMBER = '918088709011'
-const WA_MESSAGE = encodeURIComponent(
-  'Hi Pallavi, I would like to request a demo account for FieldGovern. Could you please share the login credentials?'
-)
-const WA_LINK = `https://wa.me/${WA_NUMBER}?text=${WA_MESSAGE}`
+const WA_LINK = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(
+  'Hi Pallavi, I need help setting up my FieldGovern trial account.'
+)}`
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
+
+const SEGMENTS = [
+  { value: 'ngo', label: 'NGO / Social Impact' },
+  { value: 'govt', label: 'Government' },
+  { value: 'research', label: 'Research / Academia' },
+  { value: 'corporate', label: 'Corporate / CSR' },
+]
+
+// Load the Turnstile widget only if a site key is configured (matches the
+// backend, which skips verification when TURNSTILE_SECRET is unset).
+declare global {
+  interface Window { turnstile?: { render: (el: HTMLElement, opts: Record<string, unknown>) => string } }
+}
 
 export default function RegisterPage() {
   const navigate = useNavigate()
+  const [form, setForm] = useState({
+    org_name: '', admin_name: '', email: '', phone: '', password: '', segment: 'ngo',
+  })
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+  const captchaRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!TURNSTILE_SITE_KEY) return
+    const script = document.createElement('script')
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
+    script.async = true
+    script.defer = true
+    script.onload = () => {
+      if (window.turnstile && captchaRef.current) {
+        window.turnstile.render(captchaRef.current, {
+          sitekey: TURNSTILE_SITE_KEY,
+          callback: (token: string) => setCaptchaToken(token),
+        })
+      }
+    }
+    document.body.appendChild(script)
+    return () => { document.body.removeChild(script) }
+  }, [])
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }))
+
+  const submit = async () => {
+    setError('')
+    if (!form.org_name.trim() || !form.admin_name.trim() || !form.email.trim() || !form.password) {
+      setError('Please fill in all required fields.')
+      return
+    }
+    if (form.password.length < 6) {
+      setError('Password must be at least 6 characters.')
+      return
+    }
+    if (TURNSTILE_SITE_KEY && !captchaToken) {
+      setError('Please complete the verification challenge.')
+      return
+    }
+    setLoading(true)
+    try {
+      await registerTenant({
+        org_name: form.org_name.trim(),
+        admin_name: form.admin_name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        segment: form.segment,
+        phone: form.phone.trim() || undefined,
+        turnstile_token: captchaToken || undefined,
+      })
+      setDone(true)
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setError(detail || 'Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const input: React.CSSProperties = {
+    width: '100%', padding: '10px 14px', borderRadius: '12px',
+    border: '1px solid #e2e8f0', fontSize: '14px', outline: 'none', background: '#fff',
+  }
+  const labelCls = 'block text-xs font-semibold mb-1.5'
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6"
@@ -18,66 +103,94 @@ export default function RegisterPage() {
           <img src="/logo-wide.png" alt="FieldGovern" className="h-9 w-auto object-contain mx-auto" />
         </div>
 
-        <div className="rounded-3xl p-8 text-center"
+        <div className="rounded-3xl p-8"
              style={{ background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 20px 60px rgba(0,0,0,0.06)' }}>
 
-          {/* WhatsApp icon */}
-          <div className="w-16 h-16 mx-auto mb-5 rounded-2xl flex items-center justify-center"
-               style={{ background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.25)' }}>
-            <svg className="w-8 h-8" viewBox="0 0 24 24" fill="#25D366">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-            </svg>
-          </div>
-
-          <h1 className="text-2xl font-bold mb-2" style={{ color: '#1e293b' }}>Get started with FieldGovern</h1>
-          <p className="text-sm mb-6" style={{ color: '#64748b' }}>
-            We're currently onboarding users personally to ensure the best experience.
-            Message us on WhatsApp and we'll set up your free trial account right away.
-          </p>
-
-          {/* Steps */}
-          <div className="text-left mb-7 space-y-3">
-            {[
-              { n: '1', text: 'Tap the button below to open WhatsApp' },
-              { n: '2', text: 'Send the pre-filled message — add your org name if you like' },
-              { n: '3', text: 'Receive your login credentials within a few hours' },
-            ].map(s => (
-              <div key={s.n} className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white"
-                      style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', marginTop: '1px' }}>
-                  {s.n}
-                </span>
-                <p className="text-sm" style={{ color: '#475569' }}>{s.text}</p>
+          {done ? (
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-5 rounded-2xl flex items-center justify-center"
+                   style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)' }}>
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="#6366f1" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
               </div>
-            ))}
-          </div>
+              <h1 className="text-2xl font-bold mb-2" style={{ color: '#1e293b' }}>Check your email</h1>
+              <p className="text-sm mb-6" style={{ color: '#64748b' }}>
+                We've sent a verification link to <strong style={{ color: '#1e293b' }}>{form.email}</strong>.
+                Click it to activate your 15-day free trial.
+              </p>
+              <button onClick={() => navigate('/login')}
+                      className="w-full py-3 rounded-xl font-bold text-sm text-white"
+                      style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                Back to Sign in
+              </button>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold mb-1 text-center" style={{ color: '#1e293b' }}>Start your free trial</h1>
+              <p className="text-sm mb-6 text-center" style={{ color: '#64748b' }}>
+                15 days, full features, no card required.
+              </p>
 
-          {/* WhatsApp CTA */}
-          <a
-            href={WA_LINK}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2.5 w-full py-3.5 rounded-xl font-bold text-sm text-white transition-all duration-200 active:scale-[0.98]"
-            style={{ background: '#25D366', boxShadow: '0 4px 14px rgba(37,211,102,0.35)' }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#20b958')}
-            onMouseLeave={e => (e.currentTarget.style.background = '#25D366')}
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="white">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-            </svg>
-            Request Demo Account on WhatsApp
-          </a>
+              {error && (
+                <div className="mb-4 px-4 py-3 rounded-xl text-sm"
+                     style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' }}>
+                  {error}
+                </div>
+              )}
 
-          <p className="text-xs mt-5" style={{ color: '#94a3b8' }}>
-            Already have credentials?{' '}
-            <button
-              onClick={() => navigate('/login')}
-              className="font-semibold transition-colors"
-              style={{ color: '#6366f1' }}
-            >
-              Sign in
-            </button>
-          </p>
+              <div className="space-y-3.5">
+                <div>
+                  <label className={labelCls} style={{ color: '#475569' }}>Organization name *</label>
+                  <input style={input} value={form.org_name} onChange={set('org_name')} placeholder="Your organization" />
+                </div>
+                <div>
+                  <label className={labelCls} style={{ color: '#475569' }}>Your name *</label>
+                  <input style={input} value={form.admin_name} onChange={set('admin_name')} placeholder="Full name" />
+                </div>
+                <div>
+                  <label className={labelCls} style={{ color: '#475569' }}>Organization type</label>
+                  <select style={input} value={form.segment} onChange={set('segment')}>
+                    {SEGMENTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls} style={{ color: '#475569' }}>Work email *</label>
+                  <input style={input} type="email" value={form.email} onChange={set('email')} placeholder="you@organization.org" />
+                </div>
+                <div>
+                  <label className={labelCls} style={{ color: '#475569' }}>Phone (optional)</label>
+                  <input style={input} value={form.phone} onChange={set('phone')} placeholder="+91…" />
+                </div>
+                <div>
+                  <label className={labelCls} style={{ color: '#475569' }}>Password *</label>
+                  <input style={input} type="password" value={form.password} onChange={set('password')} placeholder="At least 6 characters" />
+                </div>
+
+                {TURNSTILE_SITE_KEY && <div ref={captchaRef} className="flex justify-center pt-1" />}
+
+                <button
+                  onClick={submit}
+                  disabled={loading}
+                  className="w-full py-3.5 rounded-xl font-bold text-sm text-white transition-all active:scale-[0.98] disabled:opacity-60"
+                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}
+                >
+                  {loading ? 'Creating your account…' : 'Start free trial'}
+                </button>
+              </div>
+
+              <p className="text-xs mt-5 text-center" style={{ color: '#94a3b8' }}>
+                Already have an account?{' '}
+                <button onClick={() => navigate('/login')} className="font-semibold" style={{ color: '#6366f1' }}>
+                  Sign in
+                </button>
+                {' · '}
+                <a href={WA_LINK} target="_blank" rel="noopener noreferrer" className="font-semibold" style={{ color: '#6366f1' }}>
+                  Need help?
+                </a>
+              </p>
+            </>
+          )}
 
         </div>
       </div>

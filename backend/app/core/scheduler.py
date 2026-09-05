@@ -87,6 +87,34 @@ def _run_monthly_usage_reset():
         db.close()
 
 
+def _run_trial_expiry():
+    """Lock tenants whose 15-day trial has ended: collection + AI stop, reads stay."""
+    from app.core.database import SessionLocal
+    from app.models.billing import Subscription
+    from app.models.tenant import Tenant
+    from datetime import datetime, timezone
+
+    logger.info("[Scheduler] Trial expiry check starting")
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        subs = db.query(Subscription).filter(
+            Subscription.status == "trialing",
+            Subscription.trial_end < now,
+        ).all()
+        for sub in subs:
+            sub.status = "expired"
+            t = db.query(Tenant).filter(Tenant.id == sub.tenant_id).first()
+            if t:
+                t.plan_tier = "expired"
+        db.commit()
+        logger.info("[Scheduler] Trial expiry done — %d tenants locked", len(subs))
+    except Exception:
+        logger.exception("[Scheduler] Trial expiry job failed")
+    finally:
+        db.close()
+
+
 def _run_bin_purge():
     """Hard-delete recycle-bin items past the 360-day retention window."""
     from app.api.routes.bin import purge_expired
@@ -146,8 +174,18 @@ def start_scheduler():
         misfire_grace_time=3600,
     )
 
+    # Trial expiry — daily at 02:00 UTC
+    _scheduler.add_job(
+        _run_trial_expiry,
+        CronTrigger(hour=2, minute=0),
+        id="trial_expiry",
+        name="15-day Trial Expiry Lockout",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
     _scheduler.start()
-    logger.info("[Scheduler] Started — daily digest @ 07:00 UTC, monthly usage reset @ 1st 00:30 UTC, scheduled reports @ :00 each hour, bin purge @ 03:15 UTC")
+    logger.info("[Scheduler] Started — daily digest @ 07:00 UTC, monthly usage reset @ 1st 00:30 UTC, scheduled reports @ :00 each hour, bin purge @ 03:15 UTC, trial expiry @ 02:00 UTC")
 
 
 def stop_scheduler():
