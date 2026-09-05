@@ -41,8 +41,13 @@ def get_current_user(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="X-Tenant-ID override is read-only. Remove the header to write in your own tenant.",
                 )
-            tenant_id = override
-            payload = {**payload, "tenant_id": override, "_tenant_override": True}
+            # Scope RLS to the single tenant being inspected (read-only).
+            set_tenant_context(db, override)
+            return {**payload, "tenant_id": override, "_tenant_override": True}
+        # No override: platform-wide access. Empty context = RLS bypass branch, so
+        # cross-tenant monitoring dashboards keep working under the restricted role.
+        set_tenant_context(db, "")
+        return payload
     set_tenant_context(db, tenant_id)
     return payload
 
