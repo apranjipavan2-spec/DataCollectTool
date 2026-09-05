@@ -6,6 +6,14 @@ are decisions, secrets, server settings, and paperwork. See
 
 Status: created 2026-09-05 · nothing pushed to git yet.
 
+> **DEFERRED (owner decision 2026-09-05):** platform has active live users, so
+> these changes are held until a low-traffic window / planned maintenance.
+> NOT urgent-unsafe: tenant isolation already works via app-code filters today;
+> the items below are defense-in-depth + compliance, not an open hole.
+> Sequence when resuming: (a) seconds of downtime — encrypted backups, then
+> DB isolation (#1), then sslmode=require; (b) real downtime, announce first —
+> volume encryption (#2 first row) only.
+
 ---
 
 ## 1. Turn ON database-level tenant isolation  ⚠️ highest value
