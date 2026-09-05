@@ -63,7 +63,7 @@ function evaluateCondition(c: SkipCondition, values: Record<string, unknown>): b
     case 'lt':           return Number(val) < Number(cmp)
     case 'gte':          return Number(val) >= Number(cmp)
     case 'lte':          return Number(val) <= Number(cmp)
-    case 'contains':     return String(val ?? '').includes(String(cmp))
+    case 'contains':     return containsAny(val, cmp)
     case 'is_empty':     return val === undefined || val === null || val === ''
     case 'is_not_empty': return val !== undefined && val !== null && val !== ''
     case 'age_gte':      return ageMeetsThreshold(val, cmp) === true
@@ -94,6 +94,18 @@ function ageMeetsThreshold(dob: unknown, threshold: unknown): boolean | null {
   const ref = raw[3] ? new Date(raw[3]) : new Date()
   const refDate = isNaN(ref.getTime()) ? new Date() : ref
   return refDate >= at
+}
+
+/**
+ * "contains" match. If `cmp` has commas, each piece is an OR alternative:
+ * "lundra,mainpat" matches when the value contains lundra OR mainpat.
+ * Case-insensitive; blank pieces (trailing comma) are ignored.
+ */
+function containsAny(val: unknown, cmp: unknown): boolean {
+  const hay = String(val ?? '').toLowerCase()
+  const needles = String(cmp ?? '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+  if (needles.length === 0) return false
+  return needles.some(n => hay.includes(n))
 }
 
 function toNumber(x: unknown): number {
