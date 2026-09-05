@@ -1,5 +1,31 @@
 # FieldGovern — Task Board
 
+## DPDP Act 2023 — compliance backlog (added 2026-09-05)
+Source: comparison with the Next.js redesign's 9-clause mapping. Split into what
+we already ship vs what we still need to build. Website `#dpdp` section only
+claims the LIVE items — do not add website claims for backlog items until built.
+
+### ✅ Live today (verified in code)
+- **§6 Consent capture** — `submission.consent_given` + `consent_timestamp`; per-form `/forms/{id}/consent-log`
+- **§12 Access & correction** — admin-mediated `PATCH /submissions/{id}/data`, versioned + audit-logged (not self-service yet)
+- **§12(b) Erasure** — anonymisation via `POST /submissions/{id}/anonymize`
+- **§8 Safeguards** — PostgreSQL RLS tenant isolation (0048), bcrypt, JWT, TLS
+- **§13 Audit trail** — `models/audit_log.py`
+- **§17 Data residency** — India-hosted by default (deployment)
+
+### 🔨 To implement (ranked)
+1. **§6(4) Purpose limitation** — mandatory Purpose field per form; shown at consent; stored with submissions; surfaced in audit log
+2. **§11 Notice of Data Collection** — auto-generated notice (English + regional language) at consent step: fields, purpose, retention, recipients, rights
+3. **Retention period per form + auto-purge** — declare retention on form; scheduler purges/anonymises at end of window (reuse `scheduler.py` pattern)
+4. **§12(b) Self-service erasure request** — verified data-principal erasure endpoint that finds all submissions across forms/projects; consent withdrawal auto-triggers it
+5. **§12 Respondent Portal** — data principal views their own submissions (by phone/email/ID hash) + requests corrections (upgrade from admin-mediated)
+6. **Richer consent types** — audio + signature consent (currently boolean only); store consent artefact
+7. **§16 Children's data** — form-level Child Data Flag → verified parental consent step; POCSO mode; confirm no ad SDKs
+8. **§17 Cross-border opt-in** — explicit tenant-level toggle + audit log for any cross-border transfer (off by default)
+9. **§8(5) Breach notification** — 72-hour runbook, anomalous-access detection, DPB + data-principal notification templates, incident log
+10. **Respondent Rights officer role** — optional role on Custom plan
+
+
 ## ✅ Just shipped — TableForge Phase 6 (Causal + Power + Codebook + AI Summary + Mixed-LM + Roster)
 
 - **Causal** `routers/causal.py`: `/api/causal/did` (DiD OLS with `treatment:post` interaction), `/api/causal/psm` (logit-propensity + 1-NN matching + SMD balance), `/api/causal/mixed_lm` (random-intercept mixed-effects via `statsmodels.mixedlm`, optional random slope, returns ICC + fixed effects)
