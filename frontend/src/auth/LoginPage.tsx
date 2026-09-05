@@ -636,6 +636,23 @@ export default function LoginPage() {
                   Having trouble? Contact your supervisor or administrator.
                 </p>
               )}
+
+              {!showDemo && (
+                <div className="mt-5 pt-4 text-center" style={{ borderTop: '1px solid #f1f5f9' }}>
+                  <p className="text-sm" style={{ color: '#64748b' }}>
+                    New to FieldGovern?{' '}
+                    <button
+                      onClick={() => navigate('/register')}
+                      className="font-semibold transition-colors"
+                      style={{ color: '#6366f1' }}
+                      onMouseEnter={e => (e.currentTarget.style.color = '#4f46e5')}
+                      onMouseLeave={e => (e.currentTarget.style.color = '#6366f1')}
+                    >
+                      Register for a free 15-day trial →
+                    </button>
+                  </p>
+                </div>
+              )}
             </div>
             </>)}
           </div>
