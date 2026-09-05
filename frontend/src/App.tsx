@@ -4,10 +4,7 @@ import RequireAuth, { homeForRole } from '@/auth/RequireAuth'
 import { LanguageProvider } from '@/i18n/LanguageContext'
 import { ToastProvider } from '@/lib/ToastContext'
 import { ThemeProvider } from '@/lib/ThemeContext'
-import { useSessionTimeout } from '@/lib/useSessionTimeout'
-import { saveFormDraft, loadFormDraft } from '@/lib/formDraft'
-import { logout, getStoredUser } from '@/lib/api'
-import SessionTimeoutModal from '@/components/SessionTimeoutModal'
+import { getStoredUser } from '@/lib/api'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { HelpProvider } from '@/help/HelpContext'
 import HelpPanel from '@/help/HelpPanel'
@@ -91,37 +88,6 @@ function RoleHome() {
   return <Navigate to={user ? homeForRole(user.role) : '/login'} replace />
 }
 
-function SessionTimeoutManager() {
-  const user = getStoredUser()
-
-  // Re-touch whichever draft was last being edited (via the active-draft
-  // pointer), preserving its own formId — re-saving under a hardcoded `null`
-  // would silently reassign an in-progress *existing* form's draft to the
-  // "new form" bucket, orphaning it from the form it actually belongs to.
-  const touchActiveDraft = () => {
-    const draft = loadFormDraft()
-    if (draft) saveFormDraft(draft.schema, draft.formId)
-  }
-  const handleExpire = () => { touchActiveDraft(); logout() }
-
-  const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000
-
-  const { remaining, isWarning, extend } = useSessionTimeout({
-    warnAfterMs:   THREE_DAYS_MS - 5 * 60 * 1000,
-    expireAfterMs: THREE_DAYS_MS,
-    onExpire: handleExpire,
-  })
-
-  if (!user || !isWarning) return null
-
-  return (
-    <SessionTimeoutModal
-      remaining={remaining}
-      onExtend={extend}
-      onLogout={() => { touchActiveDraft(); logout() }}
-    />
-  )
-}
 
 function LazyRoute({ children }: { children: React.ReactNode }) {
   return (
@@ -142,7 +108,6 @@ export default function App() {
           <HelpProvider>
           <BrowserRouter>
             <SubscriptionProvider>
-            <SessionTimeoutManager />
             <FloatingContact />
             <SubscriptionBanner />
             <UpgradeModal />
