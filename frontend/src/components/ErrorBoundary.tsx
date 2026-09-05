@@ -20,6 +20,12 @@ interface Props {
   fallback?: (error: Error, reset: () => void) => React.ReactNode
 }
 
+/** True for the "failed to load a lazy chunk" errors that follow a redeploy. */
+function isChunkLoadError(error: Error): boolean {
+  const msg = `${error?.name ?? ''} ${error?.message ?? ''}`
+  return /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|ChunkLoadError/i.test(msg)
+}
+
 interface State {
   error: Error | null
   errorInfo: string
@@ -36,6 +42,17 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
+    // Stale-chunk error after a deploy (lazy import of a hash that no longer
+    // exists). Reload once to fetch the fresh build instead of showing the
+    // scary dialog. Guarded against reload loops.
+    if (isChunkLoadError(error)) {
+      const last = Number(sessionStorage.getItem('fg-preload-reload-at') || 0)
+      if (Date.now() - last > 10_000) {
+        sessionStorage.setItem('fg-preload-reload-at', String(Date.now()))
+        window.location.reload()
+        return
+      }
+    }
     this.setState({ errorInfo: info.componentStack ?? '' })
     console.error('[ErrorBoundary]', error, info)
     // Report to Sentry if configured (no-ops when DSN is absent)

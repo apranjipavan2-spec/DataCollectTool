@@ -36,6 +36,18 @@ if (POSTHOG_KEY) {
   })
 }
 
+// Stale-chunk recovery: after a deploy, a tab opened on the old build may try to
+// lazy-load a chunk hash that no longer exists on the server. Vite fires
+// `vite:preloadError` — reload once to pull the fresh index + chunks instead of
+// showing an error. The 10s guard prevents a reload loop if the fetch keeps failing.
+window.addEventListener('vite:preloadError', () => {
+  const last = Number(sessionStorage.getItem('fg-preload-reload-at') || 0)
+  if (Date.now() - last > 10_000) {
+    sessionStorage.setItem('fg-preload-reload-at', String(Date.now()))
+    window.location.reload()
+  }
+})
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>

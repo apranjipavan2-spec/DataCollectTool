@@ -65,6 +65,9 @@ export default function FormBuilder() {
   const [draft, setDraft]                 = useState<FormDraft | null>(null)
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const isInitRef        = useRef(true)
+  // Latest schema/formId for the flush-on-leave handler (avoids re-registering
+  // listeners on every keystroke).
+  const latestRef        = useRef({ schema: null as FormSchema | null, formId: null as string | null })
 
   // ── Translate state ──────────────────────────────────────────────────────
   const [showTranslate, setShowTranslate] = useState(false)
@@ -192,6 +195,11 @@ export default function FormBuilder() {
           setFormId(formIdFromUrl)
           setSelectedSection(loaded.sections[0]?.id ?? '')
           setSelectedField(null)
+          // Unsaved local edits from a prior session (crash, stale-chunk reload,
+          // closed tab before Save) survive in localStorage. A save clears the
+          // draft, so a lingering one means real unsaved changes — offer to restore.
+          const localDraft = loadFormDraft(formIdFromUrl)
+          if (localDraft && localDraft.schema?.sections?.length) setDraft(localDraft)
         })
         .catch(err => setFormLoadError(err.response?.data?.detail ?? 'Failed to load form'))
         .finally(() => { setFormLoading(false); isInitRef.current = false })
@@ -203,12 +211,32 @@ export default function FormBuilder() {
   }, [formIdFromUrl])
 
   // ── Auto-save draft ───────────────────────────────────────────────────────
+  latestRef.current = { schema, formId }
   useEffect(() => {
     if (isInitRef.current || formLoading) return
     clearTimeout(autoSaveTimerRef.current)
     autoSaveTimerRef.current = setTimeout(() => saveFormDraft(schema, formId), 2000)
     return () => clearTimeout(autoSaveTimerRef.current)
   }, [schema, formId, formLoading])
+
+  // Flush the draft immediately when the user leaves — closing/reloading the tab,
+  // switching tabs (mobile backgrounding), OR navigating to another in-app page
+  // (unmount). This closes the up-to-2s window the debounce would otherwise lose,
+  // so "clicking something else" can never drop the latest edits.
+  useEffect(() => {
+    const flush = () => {
+      if (isInitRef.current || !latestRef.current.schema) return
+      saveFormDraft(latestRef.current.schema, latestRef.current.formId)
+    }
+    const onHide = () => { if (document.visibilityState === 'hidden') flush() }
+    window.addEventListener('beforeunload', flush)
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      flush()   // in-app navigation / component unmount
+      window.removeEventListener('beforeunload', flush)
+      document.removeEventListener('visibilitychange', onHide)
+    }
+  }, [])
 
   // ── Draft handlers ────────────────────────────────────────────────────────
   const handleRestoreDraft = () => {
