@@ -56,7 +56,7 @@ def restore(obj) -> None:
 # present of _LABEL_ATTRS, so we don't hard-code each model's naming column.
 
 _LABEL_ATTRS = ("name", "title", "label", "original_filename", "display_name",
-                "filename", "url", "event")
+                "filename", "url", "event", "serial_no")
 
 
 def label_for(obj) -> str:
@@ -79,8 +79,10 @@ def _build_registry() -> dict:
     from app.models.location import Location
     from app.models.scheduled_report import ScheduledReport
     from app.models.webhook import Webhook
+    from app.models.submission import Submission
 
     return {
+        "submission":       (Submission,                  "Submission"),
         "respondent":       (RespondentRoster,            "Respondent"),
         "shared_file":      (SharedFile,                  "Shared file"),
         "assignment":       (FormAssignment,              "Form assignment"),

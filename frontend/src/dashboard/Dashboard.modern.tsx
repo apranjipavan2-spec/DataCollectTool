@@ -218,13 +218,15 @@ function CommentsThread({ submissionId }: { submissionId: string }) {
 // ── Submission Detail Modal ────────────────────────────────────────────────
 
 function SubmissionDetailModal({
-  sub, forms, onClose, onFlag, isEnumerator = false,
+  sub, forms, onClose, onFlag, isEnumerator = false, canDelete = false, onDelete,
 }: {
   sub: SubDetail
   forms: Form[]
   onClose: () => void
   onFlag: (id: string, status: string, note: string) => Promise<void>
   isEnumerator?: boolean
+  canDelete?: boolean
+  onDelete?: (id: string) => Promise<void>
 }) {
   const formTitle = forms.find(f => f.id === sub.form_id)?.title ?? 'Unknown Form'
   const [flagNote, setFlagNote] = useState(sub.flag_note ?? '')
@@ -259,6 +261,13 @@ function SubmissionDetailModal({
     if (!rejectReason.trim()) return
     setBusy(true)
     try { await onFlag(sub.id, 'rejected', rejectReason.trim()) } finally { setBusy(false) }
+  }
+
+  const handleDelete = async () => {
+    if (!onDelete) return
+    if (!window.confirm('Move this submission to the Recycle Bin? It stays recoverable there for 360 days.')) return
+    setBusy(true)
+    try { await onDelete(sub.id) } finally { setBusy(false) }
   }
 
   return (
@@ -463,6 +472,20 @@ function SubmissionDetailModal({
           <div className="text-xs font-medium text-catalan-textMuted uppercase tracking-wider mb-2">Audit Trail</div>
           <AuditLog submissionId={sub.id} />
         </div>
+
+        {/* Danger zone — org_admin only */}
+        {canDelete && onDelete && (
+          <div className="px-5 py-3 border-t border-catalan-border flex items-center justify-between">
+            <span className="text-xs text-catalan-textMuted">Recoverable from the Recycle Bin for 360 days.</span>
+            <button
+              onClick={handleDelete}
+              disabled={busy}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-catalan-danger/20 text-catalan-danger border border-catalan-danger/30 disabled:opacity-50 transition-colors"
+            >
+              {busy ? '…' : 'Move to Bin'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1535,6 +1558,13 @@ export default function Dashboard() {
             setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status } : s))
             setDetailSub(d => d ? { ...d, status, flag_note: note || null } : null)
             toast.success(`Submission ${status}`)
+          }}
+          canDelete={user.role === 'org_admin' || user.role === 'master_admin'}
+          onDelete={async (id) => {
+            await api.delete(`/submissions/${id}`)
+            setSubmissions(prev => prev.filter(s => s.id !== id))
+            setDetailSub(null)
+            toast.success('Moved to Recycle Bin')
           }}
         />
       )}

@@ -299,7 +299,9 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
         db.add(sub)
         db.flush()  # get sub.id before commit
 
-        # The response is now a real submission — drop any server-side draft backup.
+        # The response is now a real submission — hard-delete the redundant draft
+        # backup. No data is lost (it lives on as the submission), and keeping a
+        # duplicate PII copy in the bin would work against DPDP data-minimization.
         db.query(SubmissionDraft).filter(
             SubmissionDraft.enumerator_id == user["sub"],
             SubmissionDraft.local_id == item.local_id,

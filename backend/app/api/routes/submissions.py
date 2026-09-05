@@ -4,8 +4,9 @@ from pydantic import BaseModel
 from typing import Any, Literal, Optional
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.deps import get_current_user, require_enumerator, require_supervisor
+from app.core.deps import get_current_user, require_enumerator, require_supervisor, require_org_admin
 from app.core.rate_limit import limiter
+from app.core.soft_delete import soft_delete
 from app.models.submission import Submission
 from app.models.submission_draft import SubmissionDraft
 from app.models.submission_history import SubmissionHistory
@@ -725,7 +726,9 @@ def upsert_draft(body: DraftUpsert, user=Depends(require_enumerator), db: Sessio
             lca = datetime.fromisoformat(body.local_created_at)
         except ValueError:
             pass
-    draft = db.query(SubmissionDraft).filter(
+    # include_deleted so a re-saved draft reuses (and un-bins) any soft-deleted
+    # row for the same (enumerator, local_id) instead of colliding on the unique key.
+    draft = db.query(SubmissionDraft).execution_options(include_deleted=True).filter(
         SubmissionDraft.enumerator_id == user["sub"],
         SubmissionDraft.local_id == body.local_id,
     ).first()
@@ -734,6 +737,7 @@ def upsert_draft(body: DraftUpsert, user=Depends(require_enumerator), db: Sessio
         draft.form_version = body.form_version
         draft.gps_open = body.gps_open
         draft.gps_submit = body.gps_submit
+        draft.deleted_at = None
     else:
         draft = SubmissionDraft(
             tenant_id=user["tenant_id"],
@@ -771,12 +775,14 @@ def list_my_drafts(user=Depends(require_enumerator), db: Session = Depends(get_d
 
 @router.delete("/draft/{local_id}", status_code=204)
 def delete_draft(local_id: str, user=Depends(require_enumerator), db: Session = Depends(get_db)):
-    """Remove a server draft (deleted locally, or superseded)."""
-    db.query(SubmissionDraft).filter(
+    """Soft-delete a server draft (deleted locally, or superseded)."""
+    draft = db.query(SubmissionDraft).filter(
         SubmissionDraft.enumerator_id == user["sub"],
         SubmissionDraft.local_id == local_id,
-    ).delete()
-    db.commit()
+    ).first()
+    if draft:
+        soft_delete(draft)
+        db.commit()
 
 
 @router.get("/my-backchecks")
@@ -1119,6 +1125,25 @@ def anonymize_submission(
     sub.data_json = {"anonymized": True, "anonymized_at": datetime.now(timezone.utc).isoformat()}
     db.commit()
     return {"id": str(sub.id), "status": "anonymized"}
+
+
+# ── Soft-delete to Recycle Bin — org_admin only ──────────────────────────────
+
+@router.delete("/{submission_id}", status_code=204)
+def delete_submission(
+    submission_id: str,
+    user=Depends(require_org_admin),
+    db: Session = Depends(get_db),
+):
+    """Send a submission to the 360-day Recycle Bin. Restorable from /bin; never
+    hard-deleted. The soft-delete listener then hides it from every list/export."""
+    sub = db.query(Submission).filter(
+        Submission.id == submission_id, Submission.tenant_id == user["tenant_id"]
+    ).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    soft_delete(sub)
+    db.commit()
 
 
 # ── Flag back-check — supervisor+ ────────────────────────────────────────────
