@@ -17,9 +17,10 @@ router = APIRouter()
 
 class FGImportBody(BaseModel):
     fg_base_url: str
-    program_id: str
     token: str
+    program_id: Optional[str] = None
     questionnaire_id: Optional[str] = None
+    form_id: Optional[str] = None  # form-first import: pull one form's responses directly
 
 
 @router.post("/api/import-from-fg")
@@ -33,9 +34,17 @@ async def import_from_fg(body: FGImportBody):
 
             internal_base = os.environ.get("FG_INTERNAL_URL", "").rstrip("/")
             base = internal_base if internal_base else body.fg_base_url.rstrip("/")
-            url = f"{base}/api/v1/fg/programs/{body.program_id}/export.xlsx"
-            if body.questionnaire_id:
-                url += f"?questionnaire_id={body.questionnaire_id}"
+            if body.form_id:
+                # Form-first import: pull a single form's submissions directly,
+                # no program membership required.
+                url = f"{base}/api/v1/export/{body.form_id}/xlsx"
+            elif body.program_id:
+                url = f"{base}/api/v1/fg/programs/{body.program_id}/export.xlsx"
+                if body.questionnaire_id:
+                    url += f"?questionnaire_id={body.questionnaire_id}"
+            else:
+                yield f"data: {json.dumps({'step': 'error', 'message': 'No form or program specified', 'percent': 0})}\n\n"
+                return
 
             yield f"data: {json.dumps({'step': 'downloading', 'message': 'Downloading data from server…', 'percent': 15})}\n\n"
 
@@ -50,7 +59,8 @@ async def import_from_fg(body: FGImportBody):
             yield f"data: {json.dumps({'step': 'saving', 'message': f'Downloaded {file_size // 1024} KB — saving…', 'percent': 40})}\n\n"
 
             dataset_id = str(uuid.uuid4())
-            filename = f"fg_program_{body.program_id}.xlsx"
+            source_id = body.form_id or body.program_id
+            filename = f"fg_{'form' if body.form_id else 'program'}_{source_id}.xlsx"
             tmp_path = CACHE_DIR / f"{dataset_id}.xlsx"
             tmp_path.write_bytes(resp.content)
 
@@ -108,7 +118,7 @@ async def import_from_fg(body: FGImportBody):
             audit_logs[dataset_id] = []
             annotations[dataset_id] = {}
             column_type_overrides[dataset_id] = {}
-            add_audit_log(dataset_id, "fg_import", f"Imported from FieldGovern program {body.program_id}: {row_count} rows")
+            add_audit_log(dataset_id, "fg_import", f"Imported from FieldGovern {'form' if body.form_id else 'program'} {source_id}: {row_count} rows")
             datasets.persist(dataset_id)
 
             result = {
@@ -164,6 +174,19 @@ async def proxy_fg_programs(body: FGBaseBody):
         resp = await client.get(url, headers={"Authorization": f"Bearer {body.token}"})
     if resp.status_code != 200:
         raise HTTPException(resp.status_code, "FieldGovern programs fetch failed")
+    return resp.json()
+
+
+@router.post("/api/fg/forms")
+async def proxy_fg_forms(body: FGBaseBody):
+    """List all of the tenant's forms (program membership not required)."""
+    import httpx
+    base, verify = _fg_base(body.fg_base_url)
+    url = f"{base}/api/v1/forms/"
+    async with httpx.AsyncClient(timeout=30, verify=verify) as client:
+        resp = await client.get(url, headers={"Authorization": f"Bearer {body.token}"})
+    if resp.status_code != 200:
+        raise HTTPException(resp.status_code, "FieldGovern forms fetch failed")
     return resp.json()
 
 

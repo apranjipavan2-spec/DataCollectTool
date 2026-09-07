@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { fgListPrograms, fgListQuestionnaires, importFromFg, fgListUserProjects, listProjects, FgProgressEvent, listServerFiles, uploadToServer, loadServerFile, deleteServerFile, renameProject, deleteProject, isSuperAdmin, ServerFile } from '../api';
+import { fgListPrograms, fgListForms, fgListQuestionnaires, importFromFg, fgListUserProjects, listProjects, FgProgressEvent, listServerFiles, uploadToServer, loadServerFile, deleteServerFile, renameProject, deleteProject, isSuperAdmin, ServerFile } from '../api';
 
 interface FgContext { fgUrl: string; token: string; programId?: string }
 
@@ -17,6 +17,7 @@ interface Props {
 }
 
 interface Program { id: string; name: string; scheme_name: string }
+interface FgForm { id: string; title: string; version: number; status: string; updated_at: string }
 interface Questionnaire { questionnaire_id: string; name: string; form_title: string }
 interface RecentProject { id: string; name: string; updated_at: string; program_id?: string }
 interface LocalProject { name: string; path: string; created: string; version_count: number; source_file?: string }
@@ -93,6 +94,8 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
   const dragRef = useRef<HTMLDivElement>(null);
 
   const [programs, setPrograms]             = useState<Program[]>([]);
+  const [forms, setForms]                   = useState<FgForm[]>([]);
+  const [selForm, setSelForm]               = useState('');
   const [questionnaires, setQuestionnaires] = useState<Questionnaire[]>([]);
   const [selProgram, setSelProgram]         = useState('');
   const [selQ, setSelQ]                     = useState('');
@@ -178,6 +181,7 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
   useEffect(() => {
     if (!fgContext) return;
     fgListPrograms(fgContext.fgUrl, fgContext.token).then(setPrograms).catch(() => {});
+    fgListForms(fgContext.fgUrl, fgContext.token).then(setForms).catch(() => {});
     if (fgContext.programId) setSelProgram(fgContext.programId);
     fgListUserProjects(fgContext.fgUrl, fgContext.token, 'analyzer')
       .then((projs: any[]) => {
@@ -195,11 +199,12 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
   }, [fgContext, selProgram]);
 
   const handleFgLoad = async () => {
-    if (!fgContext || !selProgram) return;
+    if (!fgContext || (!selForm && !selProgram)) return;
     setFgLoading(true); setFgError(''); setFgProgress(null);
     try {
       const meta = await importFromFg(
-        fgContext.fgUrl, fgContext.token, selProgram, selQ || undefined,
+        fgContext.fgUrl, fgContext.token,
+        selForm ? { formId: selForm } : { programId: selProgram, questionnaireId: selQ || undefined },
         (ev) => setFgProgress(ev),
       );
       onDatasetLoaded?.(meta);
@@ -227,6 +232,7 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
   };
 
   const selectedProgName = programs.find(p => p.id === selProgram)?.name;
+  const selectedFormName = forms.find(f => f.id === selForm)?.title;
 
   const serverFilesSection = serverFiles.length > 0 || !loading ? (
     <>
@@ -324,9 +330,34 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
             <div style={s.colLeft}>
               <div style={s.sectionTitle}>Load Data</div>
 
+              {/* Form-first: pick any of your forms and load its responses directly. */}
               <div style={{ marginBottom: 16 }}>
-                <div style={s.label}>Program</div>
-                <select style={s.select} value={selProgram} onChange={e => setSelProgram(e.target.value)}>
+                <div style={s.label}>Form</div>
+                <select
+                  style={s.select}
+                  value={selForm}
+                  onChange={e => { setSelForm(e.target.value); if (e.target.value) { setSelProgram(''); setSelQ(''); } }}
+                >
+                  <option value="">Select a form…</option>
+                  {forms.map(f => (
+                    <option key={f.id} value={f.id}>
+                      {f.title}{f.status ? ` — ${f.status}` : ''}{f.version ? ` (v${f.version})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={s.divider}>
+                <div style={s.dividerLine} />
+                <span style={s.dividerText}>or by program</span>
+                <div style={s.dividerLine} />
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <div style={s.label}>Program{' '}
+                  <span style={{ color: '#475569', textTransform: 'none', fontWeight: 400 }}>(optional)</span>
+                </div>
+                <select style={s.select} value={selProgram} onChange={e => { setSelProgram(e.target.value); if (e.target.value) setSelForm(''); }}>
                   <option value="">Select a program…</option>
                   {programs.map(p => (
                     <option key={p.id} value={p.id}>
@@ -354,11 +385,11 @@ export function WelcomeScreen({ onFileUpload, onProjectImport, onDatasetLoaded, 
               )}
 
               <button
-                style={{ ...s.btnPrimary, opacity: selProgram && !fgLoading ? 1 : 0.4 }}
-                disabled={!selProgram || fgLoading}
+                style={{ ...s.btnPrimary, opacity: (selForm || selProgram) && !fgLoading ? 1 : 0.4 }}
+                disabled={(!selForm && !selProgram) || fgLoading}
                 onClick={handleFgLoad}
               >
-                {fgLoading ? 'Loading data…' : `Load${selectedProgName ? ` "${selectedProgName}"` : ''} →`}
+                {fgLoading ? 'Loading data…' : `Load${selectedFormName ? ` "${selectedFormName}"` : selectedProgName ? ` "${selectedProgName}"` : ''} →`}
               </button>
 
               {fgError && <div style={s.errorMsg}>{fgError}</div>}

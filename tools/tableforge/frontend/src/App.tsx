@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DatasetMeta, TableConfig, TableResult, ColumnInfo, ValueField, DropZoneType, TableSection, NumberingConfig, ManualColumnDef } from './types';
-import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg, getColumnRoles, bulkSetColumnRoles, saveStudyDesign, cleanerApi, buildCleanerUrl, setFgAuth, getUserHeaders, getFgLoginUrl } from './api';
+import { API_BASE, uploadFile, tabulate, listMetrics, listBins, saveProject, listProjects, refreshDataset, changeColumnType, dryRunColumnType, getColumnTypeHints, detectAnomalies, logAuditEvent, importFromFg, getColumnRoles, bulkSetColumnRoles, saveStudyDesign, cleanerApi, buildCleanerUrl, getCapturedFgAuth, getUserHeaders, getFgLoginUrl } from './api';
 import { combineResults, BatteryConfig } from './lib/combineResults';
 import { SourcePanel } from './components/SourcePanel';
 import { DropZones } from './components/DropZones';
@@ -520,16 +520,13 @@ export default function App() {
   // with a program_id query param would silently re-pull the dataset
   // every time, surprising users who only wanted to open a saved project.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const fgUrl = params.get('fg_url');
-    const programId = params.get('program_id');
-    const token = params.get('token');
-    if (!fgUrl || !token) return;
-    setFgContext({ fgUrl, token, programId: programId || undefined });
-    setFgAuth(token, fgUrl);   // route the verified token to project API calls
-    // Strip query params from the URL bar — keeps the JWT out of browser history
-    // and the address clean on startup.
-    window.history.replaceState(null, '', window.location.pathname);
+    // api.ts captures token/fg_url/program_id at module load and strips the URL
+    // before this effect runs — so read from that captured store, not the (now
+    // empty) query string, otherwise fgContext is always null and the tool shows
+    // "Sign in via FieldGovern" even when launched with a valid token.
+    const captured = getCapturedFgAuth();
+    if (!captured) return;
+    setFgContext({ fgUrl: captured.fgUrl, token: captured.token, programId: captured.programId });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -908,7 +905,7 @@ export default function App() {
     if (fgContext?.programId && Array.isArray(data.tables) && data.tables.length > 0) {
       setLoading(true); setLoadingMsg('Refreshing data from FieldGovern…');
       try {
-        const meta = await importFromFg(fgContext.fgUrl, fgContext.token, fgContext.programId, data.questionnaire_id || undefined);
+        const meta = await importFromFg(fgContext.fgUrl, fgContext.token, { programId: fgContext.programId, questionnaireId: data.questionnaire_id || undefined });
         const colNames = (meta.columns || []).map((c: any) => c.name);
         const mismatches: ReconcileState['mismatches'] = [];
         for (const t of data.tables as TableConfig[]) {

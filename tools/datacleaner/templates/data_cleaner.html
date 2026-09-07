@@ -2176,11 +2176,14 @@ if (_fgUrl) {
 }
 let   DATA_FILENAME = '';          // updated after load
 
-async function fgLoadData(programId, questionnaireId) {
-  if (!_fgUrl || !_fgToken || !programId) return;
+async function fgLoadData(opts) {
+  const { programId, questionnaireId, formId } = opts || {};
+  if (!_fgUrl || !_fgToken || (!programId && !formId)) return;
   showLoading('Loading data from FieldGovern…');
   try {
-    const body = { fg_base_url: _fgUrl, program_id: programId, token: _fgToken };
+    const body = { fg_base_url: _fgUrl, token: _fgToken };
+    if (formId) body.form_id = formId;
+    if (programId) body.program_id = programId;
     if (questionnaireId) body.questionnaire_id = questionnaireId;
     const res = await fetch(BASE_URL + '/api/load-from-fg', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2236,19 +2239,30 @@ async function fgLoadData(programId, questionnaireId) {
     }
   } catch (e) { progError = 'Could not reach FieldGovern: ' + e; }
 
+  // Fetch all forms (form-first: no program membership required)
+  let forms = [];
+  try {
+    const rf = await fetch(BASE_URL + '/api/fg/forms', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken }),
+    });
+    const fp = await rf.json();
+    if (Array.isArray(fp)) forms = fp;
+  } catch {}
+
   const box = document.getElementById('fgSelector');
   if (!box) return;
 
   // No programs → tell the user why, but don't dead-end them: Save to Account,
   // History, and AI Correction all work from an uploaded file with no Program
   // needed, so give that path back instead of leaving them stuck.
-  if (!programs.length) {
+  if (!programs.length && !forms.length) {
     const note = document.createElement('div');
     note.className = 'fg-field';
     note.style.cssText = 'font-size:13px;color:#b45309;line-height:1.5';
     note.innerHTML = progError
-      ? `⚠️ Couldn't load programs: ${progError}. You can still upload a file below and use "Save to Account".`
-      : '⚠️ No data-collection Programs found for this account. (This is separate from any TableForge/Cleaner "Projects" you\'ve saved — the platform/master-admin account has no Programs of its own by design.) You can still upload a file below and use "Save to Account" — it doesn\'t require a Program.';
+      ? `⚠️ Couldn't load your forms: ${progError}. You can still upload a file below and use "Save to Account".`
+      : '⚠️ No forms or Programs found for this account. You can still upload a file below and use "Save to Account".';
     box.appendChild(note);
     if (progError) toast(progError, 'error');
     if (uploadZone) uploadZone.style.display = '';
@@ -2256,10 +2270,26 @@ async function fgLoadData(programId, questionnaireId) {
     return;
   }
 
+  // Form field — pick any of your forms and load its responses directly.
+  let selFormId = '';
+  const formField = document.createElement('div');
+  formField.className = 'fg-field';
+  formField.style.display = forms.length ? 'block' : 'none';
+  formField.innerHTML = '<label>Form</label>';
+  const formSel = document.createElement('select');
+  formSel.className = 'fg-select';
+  formSel.innerHTML = '<option value="">Select a form…</option>' +
+    forms.map(f => `<option value="${f.id}">${f.title}${f.status ? ' — ' + f.status : ''}${f.version ? ' (v' + f.version + ')' : ''}</option>`).join('');
+  formField.appendChild(formSel);
+  box.appendChild(formField);
+
   // Program field
   const progField = document.createElement('div');
   progField.className = 'fg-field';
-  progField.innerHTML = '<label>Program</label>';
+  progField.style.display = programs.length ? 'block' : 'none';
+  progField.innerHTML = forms.length
+    ? '<label>Program <span style="text-transform:none;font-weight:400;opacity:.7">(optional)</span></label>'
+    : '<label>Program</label>';
   const progSel = document.createElement('select');
   progSel.className = 'fg-select';
   progSel.innerHTML = '<option value="">Select a program…</option>' +
@@ -2290,12 +2320,30 @@ async function fgLoadData(programId, questionnaireId) {
   errDiv.style.cssText = 'color:#f87171;font-size:12px;margin-top:8px;display:none;padding:8px 10px;background:rgba(248,113,113,.08);border-radius:6px;';
   box.appendChild(errDiv);
 
+  formSel.addEventListener('change', function () {
+    selFormId = this.value || '';
+    if (selFormId) {
+      // Form and program are mutually exclusive — clear program selection.
+      progSel.value = '';
+      _fgProgramId = null;
+      qSel.innerHTML = '<option value="">All questionnaires</option>';
+      qField.style.display = 'none';
+      const name = forms.find(f => f.id === selFormId)?.title || '';
+      btn.disabled = false;
+      btn.textContent = `Load "${name}" →`;
+    } else if (!progSel.value) {
+      btn.disabled = true;
+      btn.textContent = 'Load Data →';
+    }
+  });
+
   progSel.addEventListener('change', async function () {
     _fgProgramId = this.value || null;
+    if (this.value) { selFormId = ''; formSel.value = ''; }
     qSel.innerHTML = '<option value="">All questionnaires</option>';
     qField.style.display = 'none';
-    btn.disabled = !this.value;
-    if (!this.value) { btn.textContent = 'Load Data →'; return; }
+    btn.disabled = !this.value && !selFormId;
+    if (!this.value) { btn.textContent = selFormId ? btn.textContent : 'Load Data →'; return; }
     const name = programs.find(p => p.id === this.value)?.name || '';
     btn.textContent = `Load "${name}" →`;
     try {
@@ -2320,12 +2368,15 @@ async function fgLoadData(programId, questionnaireId) {
     errDiv.style.display = 'none';
     btn.disabled = true; btn.textContent = 'Loading…';
     try {
-      await fgLoadData(progSel.value, qSel.value || null);
+      if (selFormId) await fgLoadData({ formId: selFormId });
+      else await fgLoadData({ programId: progSel.value, questionnaireId: qSel.value || null });
     } catch (e) {
       errDiv.textContent = e.message || 'Load failed';
       errDiv.style.display = 'block';
       btn.disabled = false;
-      const name = programs.find(p => p.id === progSel.value)?.name || '';
+      const name = selFormId
+        ? (forms.find(f => f.id === selFormId)?.title || '')
+        : (programs.find(p => p.id === progSel.value)?.name || '');
       btn.textContent = `Load "${name}" →`;
     }
   });

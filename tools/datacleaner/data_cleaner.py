@@ -1634,6 +1634,22 @@ def proxy_fg_programs():
         return jsonify(error=str(e)), 502
 
 
+@app.route("/api/fg/forms", methods=["POST"])
+def proxy_fg_forms():
+    """List all of the tenant's forms (program membership not required)."""
+    body = request.json or {}
+    fg_base_url = body.get("fg_base_url", "").rstrip("/")
+    token = body.get("token", "")
+    if not fg_base_url or not token:
+        return jsonify(error="fg_base_url and token required"), 400
+    try:
+        resp = _requests.get(f"{fg_base_url}/api/v1/forms/",
+                             headers={"Authorization": f"Bearer {token}"}, timeout=30)
+        return jsonify(resp.json()), resp.status_code
+    except Exception as e:
+        return jsonify(error=str(e)), 502
+
+
 @app.route("/api/fg/questionnaires", methods=["POST"])
 def proxy_fg_questionnaires():
     body = request.json or {}
@@ -1846,12 +1862,17 @@ def load_from_fg():
     program_id = body.get("program_id", "")
     token = body.get("token", "")
     questionnaire_id = body.get("questionnaire_id", "")
-    if not fg_base_url or not program_id or not token:
-        return jsonify(error="fg_base_url, program_id, and token are required"), 400
+    form_id = body.get("form_id", "")
+    if not fg_base_url or not token or (not program_id and not form_id):
+        return jsonify(error="fg_base_url, token, and a form_id or program_id are required"), 400
 
-    url = f"{fg_base_url}/api/v1/fg/programs/{program_id}/export.xlsx"
-    if questionnaire_id:
-        url += f"?questionnaire_id={questionnaire_id}"
+    if form_id:
+        # Form-first: pull a single form's responses directly, no program needed.
+        url = f"{fg_base_url}/api/v1/export/{form_id}/xlsx"
+    else:
+        url = f"{fg_base_url}/api/v1/fg/programs/{program_id}/export.xlsx"
+        if questionnaire_id:
+            url += f"?questionnaire_id={questionnaire_id}"
     try:
         resp = _requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=120)
         if resp.status_code != 200:
@@ -1859,7 +1880,7 @@ def load_from_fg():
     except _requests.RequestException as e:
         return jsonify(error=f"Could not reach FieldGovern: {e}"), 502
 
-    filename = f"fg_program_{program_id}.xlsx"
+    filename = f"fg_{'form' if form_id else 'program'}_{form_id or program_id}.xlsx"
     copy_path = COPIES_DIR / f"COPY_{filename}"
     copy_path.write_bytes(resp.content)
 

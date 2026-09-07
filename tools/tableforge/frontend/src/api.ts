@@ -7,9 +7,11 @@ export const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, '') + '/api';
 // leaked the super-admin's projects across users on a shared browser.
 let _fgToken: string | null = null;
 let _fgBaseUrl: string | null = null;
+let _fgProgramId: string | null = null;
 
 const FG_TOKEN_KEY = 'tf_fg_token';
 const FG_BASE_KEY = 'tf_fg_base';
+const FG_PROGRAM_KEY = 'tf_fg_program';
 
 // Capture the token from the launch URL at module load — before <App> strips the
 // query string — so the first request already carries it. Persist it to
@@ -22,9 +24,12 @@ const FG_BASE_KEY = 'tf_fg_base';
     if (t) {
       _fgToken = t;
       _fgBaseUrl = p.get('fg_url');
+      _fgProgramId = p.get('program_id');
       try {
         sessionStorage.setItem(FG_TOKEN_KEY, t);
         if (_fgBaseUrl) sessionStorage.setItem(FG_BASE_KEY, _fgBaseUrl);
+        if (_fgProgramId) sessionStorage.setItem(FG_PROGRAM_KEY, _fgProgramId);
+        else sessionStorage.removeItem(FG_PROGRAM_KEY);
       } catch { /* storage disabled */ }
       // Strip the token (and other handoff params) from the address bar at the
       // earliest possible moment — before React mounts — so the JWT doesn't sit
@@ -35,6 +40,7 @@ const FG_BASE_KEY = 'tf_fg_base';
     } else {
       _fgToken = sessionStorage.getItem(FG_TOKEN_KEY);
       _fgBaseUrl = sessionStorage.getItem(FG_BASE_KEY);
+      _fgProgramId = sessionStorage.getItem(FG_PROGRAM_KEY);
     }
   } catch { /* no-op */ }
 })();
@@ -63,6 +69,14 @@ export function hasValidToken(): boolean {
 }
 
 export function clearFgAuth() { setFgAuth(null, null); }
+
+// FG launch context captured at module load (before <App> mounts and before the
+// URL query string is stripped). App reads this instead of window.location.search,
+// which is already cleared by initFgAuth() by the time React's effects run.
+export function getCapturedFgAuth(): { token: string; fgUrl: string; programId?: string } | null {
+  if (!_fgToken || !_fgBaseUrl) return null;
+  return { token: _fgToken, fgUrl: _fgBaseUrl, programId: _fgProgramId || undefined };
+}
 
 // Where to send an unauthenticated visitor to log in — the main FieldGovern app.
 export function getFgLoginUrl(): string {
@@ -479,6 +493,16 @@ export async function fgListPrograms(fgUrl: string, token: string) {
   return res.json() as Promise<{ id: string; name: string; scheme_name: string }[]>;
 }
 
+export async function fgListForms(fgUrl: string, token: string) {
+  const res = await fetch(`${API_BASE}/fg/forms`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fg_base_url: fgUrl, token }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json() as Promise<{ id: string; title: string; version: number; status: string; updated_at: string }[]>;
+}
+
 export async function fgListQuestionnaires(fgUrl: string, token: string, programId: string) {
   const res = await fetch(`${API_BASE}/fg/questionnaires`, {
     method: 'POST',
@@ -537,11 +561,14 @@ export interface FgProgressEvent {
 }
 
 export async function importFromFg(
-  fgUrl: string, token: string, programId: string, questionnaireId?: string,
+  fgUrl: string, token: string,
+  source: { programId?: string; questionnaireId?: string; formId?: string },
   onProgress?: (ev: FgProgressEvent) => void,
 ) {
-  const body: any = { fg_base_url: fgUrl, program_id: programId, token };
-  if (questionnaireId) body.questionnaire_id = questionnaireId;
+  const body: any = { fg_base_url: fgUrl, token };
+  if (source.formId) body.form_id = source.formId;
+  if (source.programId) body.program_id = source.programId;
+  if (source.questionnaireId) body.questionnaire_id = source.questionnaireId;
   const res = await fetch(`${API_BASE}/import-from-fg`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
