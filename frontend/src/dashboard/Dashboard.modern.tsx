@@ -27,6 +27,7 @@ interface Form {
   title: string
   version: number
   status: string
+  created_at?: string
   updated_at: string
   is_public?: boolean
   public_token?: string | null
@@ -2598,6 +2599,7 @@ export default function Dashboard() {
                       <th className="text-left px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Version</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Status</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Assigned To</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Created</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Updated</th>
                       <th className="px-3 py-2 text-xs font-medium text-catalan-textMuted uppercase tracking-wider">Actions</th>
                     </tr>
@@ -2605,7 +2607,7 @@ export default function Dashboard() {
                   <tbody>
                     {forms.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-10 text-catalan-textMuted text-sm">
+                        <td colSpan={7} className="text-center py-10 text-catalan-textMuted text-sm">
                           No forms yet — <button onClick={() => setShowNewFormWizard(true)} className="text-catalan-primary hover:underline">create one</button>
                         </td>
                       </tr>
@@ -2626,14 +2628,17 @@ export default function Dashboard() {
                                   </>
                               }
                             </td>
-                            <td className="px-3 py-2 text-catalan-textMuted text-xs">
-                              {form.updated_at ? new Date(form.updated_at).toLocaleDateString() : '—'}
+                            <td className="px-3 py-2 text-catalan-textMuted text-xs whitespace-nowrap">
+                              {form.created_at ? new Date(form.created_at).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—'}
+                            </td>
+                            <td className="px-3 py-2 text-catalan-textMuted text-xs whitespace-nowrap">
+                              {form.updated_at ? new Date(form.updated_at).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—'}
                             </td>
                             <td className="px-3 py-2">
                               {isEnumerator ? (
                                 <span className="text-xs text-catalan-textMuted">Read-only</span>
                               ) : (
-                              <div className="flex gap-3">
+                              <div className="flex gap-2 whitespace-nowrap">
                                 <a href={`/builder?id=${form.id}`} className="text-xs text-catalan-primary hover:underline">Edit</a>
                                 {form.version > 1 && (
                                   <a href={`/builder?id=${form.id}&tab=versions`} className="text-xs text-catalan-warning hover:underline">
@@ -2670,7 +2675,7 @@ export default function Dashboard() {
                                     className="text-xs text-catalan-primary hover:underline"
                                     title="Download as XLSForm (.xlsx) — re-importable"
                                   >
-                                    XLSForm
+                                    XLS
                                   </button>
                                 )}
                                 {['org_admin'].includes(user.role) && (
@@ -2679,7 +2684,7 @@ export default function Dashboard() {
                                     className={`text-xs hover:underline ${form.status === 'active' ? 'text-catalan-warning' : 'text-catalan-success'}`}
                                     title={form.status === 'active' ? 'Unpublish (back to draft)' : 'Publish so enumerators can collect'}
                                   >
-                                    {form.status === 'active' ? 'Unpublish' : 'Publish'}
+                                    {form.status === 'active' ? 'Unpub' : 'Pub'}
                                   </button>
                                 )}
                                 {['org_admin'].includes(user.role) && (

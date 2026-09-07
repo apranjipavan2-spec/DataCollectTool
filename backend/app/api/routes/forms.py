@@ -199,9 +199,9 @@ def list_forms(
         ).subquery()
         q = q.filter(Form.id.in_(assigned_ids))
 
-    forms = q.options(load_only(Form.id, Form.title, Form.version, Form.status, Form.updated_at, Form.allow_enumerator_edit, Form.is_public, Form.public_token)).order_by(Form.title).all()
+    forms = q.options(load_only(Form.id, Form.title, Form.version, Form.status, Form.created_at, Form.updated_at, Form.allow_enumerator_edit, Form.is_public, Form.public_token)).order_by(Form.title).all()
     return [{"id": str(f.id), "title": f.title, "version": f.version,
-             "status": f.status, "updated_at": f.updated_at,
+             "status": f.status, "created_at": f.created_at, "updated_at": f.updated_at,
              "allow_enumerator_edit": f.allow_enumerator_edit,
              "is_public": bool(f.is_public),
              "public_token": f.public_token if f.is_public else None} for f in forms]
