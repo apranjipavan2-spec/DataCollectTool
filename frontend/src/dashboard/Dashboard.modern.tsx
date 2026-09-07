@@ -2160,7 +2160,7 @@ export default function Dashboard() {
                   <div className="flex flex-col items-center justify-center py-12 gap-4">
                     <p className="text-catalan-textMuted text-sm text-center">
                       {summary
-                        ? `${summary.total.toLocaleString()} submissions available — click to load the list`
+                        ? `${(summary.total ?? 0).toLocaleString()} submissions available — click to load the list`
                         : 'Click to load submissions list'}
                     </p>
                     <button
@@ -2168,7 +2168,7 @@ export default function Dashboard() {
                       disabled={subsLoading}
                       className="px-6 py-2.5 bg-catalan-primary text-catalan-bg rounded-lg font-medium text-sm hover:opacity-90 disabled:opacity-50 transition-opacity"
                     >
-                      {subsLoading ? 'Loading…' : `Load Submissions${summary ? ` (${summary.total.toLocaleString()})` : ''}`}
+                      {subsLoading ? 'Loading…' : `Load Submissions${summary ? ` (${(summary.total ?? 0).toLocaleString()})` : ''}`}
                     </button>
                   </div>
                 </Card>
