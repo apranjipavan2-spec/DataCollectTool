@@ -42,6 +42,18 @@ const FG_PROGRAM_KEY = 'tf_fg_program';
       _fgBaseUrl = sessionStorage.getItem(FG_BASE_KEY);
       _fgProgramId = sessionStorage.getItem(FG_PROGRAM_KEY);
     }
+    // Same-origin bootstrap: if there was no launch handoff but the main
+    // FieldGovern app is already logged in on this origin, adopt its token so
+    // opening /analyzer/ directly (bookmark, refresh, sidebar link) authenticates
+    // instead of dead-ending at "Sign in via FieldGovern". Served same-origin in
+    // production (/analyzer/), so this localStorage read is the main app's own.
+    if (!_fgToken) {
+      const lt = localStorage.getItem('fp_token');
+      if (lt) {
+        _fgToken = lt;
+        if (!_fgBaseUrl) _fgBaseUrl = window.location.origin;
+      }
+    }
   } catch { /* no-op */ }
 })();
 

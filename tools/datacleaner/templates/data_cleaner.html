@@ -2120,10 +2120,20 @@ if (_tfUrl && _tfHandoffId) {
 
 // ── FieldGovern integration ───────────────────────────────────────────────────
 const _fgParams    = new URLSearchParams(window.location.search);
-const _fgUrl       = _fgParams.get('fg_url');
+let   _fgUrl       = _fgParams.get('fg_url');
 let   _fgToken     = _fgParams.get('token');
 const _fgProgId    = _fgParams.get('program_id');
 let   _fgProgramId = _fgProgId;   // updated when user selects a program
+
+// Same-origin bootstrap: with no launch handoff, adopt the main FieldGovern
+// app's existing login (fp_token in localStorage) so opening /cleaner/ directly
+// authenticates instead of dead-ending at the upload-only screen.
+if (!_fgToken) {
+  try {
+    const _lt = localStorage.getItem('fp_token');
+    if (_lt) { _fgToken = _lt; if (!_fgUrl) _fgUrl = window.location.origin; }
+  } catch (e) {}
+}
 
 // The token handed off at launch expires after 2h (JWT_EXPIRE_MINUTES) with no
 // way for this page to renew it on its own. But Cleaner is served same-origin
