@@ -616,6 +616,12 @@ def create_submission(request: Request, body: SubmissionCreate, background_tasks
             if not _sub_result["allowed"]:
                 raise HTTPException(status_code=402, detail=_sub_result["reason"])
 
+    form = db.query(Form).filter(
+        Form.id == body.form_id, Form.tenant_id == user["tenant_id"]
+    ).first()
+    if not form or form.status != "active":
+        raise HTTPException(status_code=409, detail="This form is no longer accepting submissions")
+
     try:
         sub = Submission(
             tenant_id=user["tenant_id"],

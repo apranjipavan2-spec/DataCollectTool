@@ -235,6 +235,10 @@ def create_form(request: Request, body: FormCreate, user=Depends(require_org_adm
 @router.get("/{form_id}")
 def get_form(form_id: str, user=Depends(require_enumerator), db: Session = Depends(get_db)):
     form = _get_form_for_tenant(db, form_id, user["tenant_id"])
+    # Enumerators can't open a form that isn't published — draft/archived
+    # forms must stay invisible to data collection, even to load question 1.
+    if user.get("role") == "enumerator" and form.status != "active":
+        raise HTTPException(status_code=404, detail="Form not found")
     return {"id": str(form.id), "title": form.title, "json_schema": form.json_schema,
             "version": form.version, "status": form.status}
 

@@ -254,6 +254,13 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
             results.append({"local_id": item.local_id, "server_id": str(existing.id), "status": "duplicate"})
             continue
 
+        form_obj_for_val = db.query(Form).filter(
+            Form.id == item.form_id, Form.tenant_id == user["tenant_id"]
+        ).first()
+        if not form_obj_for_val or form_obj_for_val.status != "active":
+            results.append({"local_id": item.local_id, "status": "rejected", "reason": "form_not_active"})
+            continue
+
         serial_counter += 1
         next_serial = serial_counter
 
@@ -317,8 +324,7 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
                 roster_entry.status = "completed"
 
         # Validation rules
-        form_obj_for_val = db.query(Form).filter(Form.id == item.form_id).first()
-        if form_obj_for_val and form_obj_for_val.json_schema:
+        if form_obj_for_val.json_schema:
             violations = _run_validation(form_obj_for_val.json_schema, data_for_storage)
             if violations:
                 data = dict(sub.data_json or {})
