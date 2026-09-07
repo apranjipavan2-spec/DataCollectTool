@@ -740,6 +740,24 @@ def export_xlsx(
                 all_keys.append(k)
                 seen.add(k)
 
+    # No submissions yet? Still emit the form's structure — the standard metadata
+    # columns plus each field from the schema — so the header row isn't empty. The
+    # analyzer needs the columns to appear even before any data is collected.
+    if not all_keys:
+        all_keys = [
+            "submission_id", "enumerator_id", "enumerator_name", "form_version",
+            "status", "gps_open_lat", "gps_open_lng", "gps_open_accuracy",
+            "gps_submit_lat", "gps_submit_lng", "gps_submit_accuracy",
+            "local_created_at", "server_received_at",
+        ]
+        seen = set(all_keys)
+        for section in (form.json_schema or {}).get("sections", []):
+            for f in section.get("fields", []):
+                fid = f.get("id")
+                if fid and fid not in seen:
+                    all_keys.append(fid)
+                    seen.add(fid)
+
     # ── Create workbook ──────────────────────────────────────────────────
     wb = openpyxl.Workbook()
     ws = wb.active
