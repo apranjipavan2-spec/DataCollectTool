@@ -64,10 +64,11 @@ def _new_state():
         "max_history": 20,
         "column_types": {},   # col_name -> type_name
         "active_filters": {}, # col_name -> {type, val1, val2}
+        "column_labels": {},  # col_name (raw field name) -> human label, display-only
     }
 
 _PERSIST_KEYS = ("df", "original_df", "filename", "copy_path",
-                 "sheet_name", "column_types", "active_filters")
+                 "sheet_name", "column_types", "active_filters", "column_labels")
 
 def _state_path(sid):
     return COPIES_DIR / f"state_{sid}.pkl"
@@ -633,6 +634,7 @@ def info():
                    undo_count=len(DATA["history"]),
                    column_types=DATA["column_types"],
                    active_filters=DATA["active_filters"],
+                   column_labels=DATA.get("column_labels", {}),
                    completeness_stats=buckets)
 
 
@@ -1819,6 +1821,7 @@ def load_from_tableforge():
     DATA["redo_stack"] = []
     DATA["column_types"] = {}
     DATA["active_filters"] = {}
+    DATA["column_labels"] = {}
     _save_state()
     mark_state_dirty()
 
@@ -1852,6 +1855,30 @@ def save_to_tableforge():
         return jsonify(ok=True, rows=len(df), cols=len(df.columns))
     except _requests.RequestException as e:
         return jsonify(error=f"Could not reach TableForge: {e}"), 502
+
+
+def _fetch_fg_column_labels(fg_base_url, form_id, token):
+    """Best-effort name -> label map for display only (never used to rename df columns).
+
+    Keyed by field `name` (not `id`) — submission data is keyed by name.
+    Uses the form's current published schema; not the version active when
+    older submissions were collected (acceptable simplification here).
+    """
+    try:
+        resp = _requests.get(f"{fg_base_url}/api/v1/forms/{form_id}",
+                              headers={"Authorization": f"Bearer {token}"}, timeout=15)
+        if resp.status_code != 200:
+            return {}
+        schema = (resp.json() or {}).get("json_schema") or {}
+        labels = {}
+        for section in schema.get("sections", []):
+            for f in section.get("fields", []):
+                fname = f.get("name", "")
+                if fname:
+                    labels[fname] = f.get("label", fname)
+        return labels
+    except Exception:
+        return {}
 
 
 @app.route("/api/load-from-fg", methods=["POST"])
@@ -1901,11 +1928,13 @@ def load_from_fg():
     DATA["history"] = []
     DATA["column_types"] = {}
     DATA["active_filters"] = {}
+    # Display-only name->label map (only resolvable for a single form, not a whole program export)
+    DATA["column_labels"] = _fetch_fg_column_labels(fg_base_url, form_id, token) if form_id else {}
     _save_state()
     mark_state_dirty()
 
     return jsonify(ok=True, filename=filename, rows=len(df), cols=len(df.columns),
-                   columns=df.columns.tolist())
+                   columns=df.columns.tolist(), column_labels=DATA["column_labels"])
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────

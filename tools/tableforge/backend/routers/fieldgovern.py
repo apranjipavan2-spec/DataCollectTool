@@ -15,6 +15,32 @@ from ..shared import (datasets, custom_metrics, custom_bins, audit_logs, annotat
 router = APIRouter()
 
 
+async def _fetch_fg_column_labels(base: str, form_id: str, token: str, verify: bool) -> dict:
+    """Best-effort name -> label map for display only (never used to rename df columns).
+
+    Keyed by field `name` (not `id`) — submission/export data is keyed by name.
+    Uses the form's current published schema; not necessarily the version
+    active when older submissions were collected (acceptable simplification).
+    """
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=15.0, verify=verify) as client:
+            resp = await client.get(f"{base}/api/v1/forms/{form_id}",
+                                     headers={"Authorization": f"Bearer {token}"})
+        if resp.status_code != 200:
+            return {}
+        schema = (resp.json() or {}).get("json_schema") or {}
+        labels = {}
+        for section in schema.get("sections", []):
+            for f in section.get("fields", []):
+                fname = f.get("name", "")
+                if fname:
+                    labels[fname] = f.get("label", fname)
+        return labels
+    except Exception:
+        return {}
+
+
 class FGImportBody(BaseModel):
     fg_base_url: str
     token: str
@@ -77,6 +103,11 @@ async def import_from_fg(body: FGImportBody):
             col_count = len(df.columns)
             yield f"data: {json.dumps({'step': 'extracting', 'message': f'Extracting {col_count} columns from {row_count} rows…', 'percent': 70})}\n\n"
 
+            # Display-only name->label map (only resolvable for a single form, not a whole program export)
+            column_labels = {}
+            if body.form_id:
+                column_labels = await _fetch_fg_column_labels(base, body.form_id, body.token, bool(not internal_base))
+
             columns = []
             for i, col in enumerate(df.columns):
                 dtype = str(df[col].dtype)
@@ -102,12 +133,15 @@ async def import_from_fg(body: FGImportBody):
                         })
                     except Exception:
                         pass
-                columns.append({
+                col_entry = {
                     "name": col,
                     "type": col_type,
                     "sample_values": [str(v) for v in sample_values],
                     "stats": sanitize_for_json(stats),
-                })
+                }
+                if col in column_labels:
+                    col_entry["label"] = column_labels[col]
+                columns.append(col_entry)
 
             pct = 70 + int((i + 1) / col_count * 20) if col_count > 0 else 90
             yield f"data: {json.dumps({'step': 'finalizing', 'message': f'Building dataset ({row_count} rows, {col_count} columns)…', 'percent': 92})}\n\n"

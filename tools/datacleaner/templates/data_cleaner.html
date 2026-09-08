@@ -569,7 +569,11 @@ input, select, textarea { font-family: inherit; }
 // ── State ────────────────────────────────────────────────
 let isProcessing = false;
 let columns = [];
+let columnLabels = {}; // raw field name -> human label, display-only (never touches data)
 let activeCol = null;
+
+// Display label for a column; falls back to the raw name when no label is known.
+function colLabel(name) { return columnLabels[name] || name; }
 let aiSelectedCols = new Set();
 let uvItems = [];        // current unique-value items for the selected column
 let uvSortKey = 'count'; // 'value' | 'count' | 'pct'
@@ -807,6 +811,7 @@ async function loadInfo() {
   const data = await api('info');
   if (!data) return;
   columns = data.columns;
+  columnLabels = data.column_labels || {};
   document.getElementById('fileInfo').innerHTML = `<strong>${data.filename}</strong><br>${data.rows} rows · ${columns.length} columns<br><span style="color:var(--green);font-size:11px;">Working on copy — original untouched</span>`;
 
   // Render global filter pills
@@ -862,17 +867,20 @@ async function loadInfo() {
     const segments = c.name.split(' > ');
     const mainName = segments.pop();
     const parentHtml = segments.map(s => `<span class="col-segment">${s}</span>`).join('');
-    
+    const label = columnLabels[c.name];
+    const rawNameHtml = label ? `<span class="col-raw-name" style="font-size:9px;color:var(--text3);display:block;">${mainName}</span>` : '';
+
     const hasFilter = (activeFilters && activeFilters[c.name]) ? `<span style="color:var(--cyan); margin-left:2px; font-size:9px;">📐</span>` : '';
-    
+
     el.innerHTML = `
       <div class="col-text" title="${c.name}">
         ${parentHtml}
         <div class="col-main-name">
           <span class="col-meta">[${colIdx}]</span>
-          <span>${mainName}</span>
+          <span>${label || mainName}</span>
           ${hasFilter}
         </div>
+        ${rawNameHtml}
       </div>
       ${c.missing > 0 ? `<span class="badge missing" title="Missing values">${c.missing} ∅</span>` : `<span class="badge" title="Unique values">${c.unique}</span>`}
     `;
@@ -889,7 +897,8 @@ function updateAIUI() {
   const aiControls = document.getElementById('aiControls');
   const aiNoColMsg = document.getElementById('aiNoColMsg');
   if (activeCol) {
-    aiCol.textContent = activeCol;
+    aiCol.textContent = colLabel(activeCol);
+    aiCol.title = activeCol;
     aiControls.style.display = 'block';
     aiNoColMsg.style.display = 'none';
   } else {
@@ -908,7 +917,8 @@ function updateAIUI() {
       
       const chip = document.createElement('div');
       chip.className = 'col-chip' + (aiContextCols.has(c.name) ? ' selected' : '');
-      chip.textContent = c.name;
+      chip.textContent = colLabel(c.name);
+      chip.title = c.name;
       chip.onclick = () => {
         if (aiContextCols.has(c.name)) aiContextCols.delete(c.name);
         else aiContextCols.add(c.name);
@@ -1232,10 +1242,10 @@ async function selectColumn(colName) {
   
   // Update cross-validation labels/dropdowns after injection
   const crossLabel = document.getElementById('crossCol1Label');
-  if (crossLabel) crossLabel.textContent = colName;
+  if (crossLabel) crossLabel.textContent = colLabel(colName);
   const crossCol2Dropdown = document.getElementById('crossCol2');
   if (crossCol2Dropdown) {
-      crossCol2Dropdown.innerHTML = columns.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+      crossCol2Dropdown.innerHTML = columns.map(c => `<option value="${c.name}" title="${c.name}">${colLabel(c.name)}</option>`).join('');
   }
 
   renderUVTable();
@@ -1686,7 +1696,7 @@ async function loadPreview(page = 1) {
   const data = await api(`preview?page=${page}&per_page=50`);
   if (!data) return;
   let html = '<div class="preview-table-wrap"><table class="preview-table"><thead><tr>';
-  data.columns.forEach(c => { html += `<th>${c}</th>`; });
+  data.columns.forEach(c => { html += `<th title="${c}">${colLabel(c)}</th>`; });
   html += '</tr></thead><tbody>';
   data.rows.forEach(row => {
     html += '<tr>';

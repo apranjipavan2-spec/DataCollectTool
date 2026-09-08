@@ -118,18 +118,22 @@ def _sanitize_stata_colname(name: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _build_label_maps(form_schema: dict) -> tuple[dict, dict]:
-    """Returns (id_to_label, id_to_option_labels) from a form json_schema."""
-    id_to_label: dict = {}
-    id_to_options: dict = {}
+    """Returns (name_to_label, name_to_option_labels) from a form json_schema.
+
+    Keyed by field `name` (not `id`) — submission data_json and exported rows
+    are keyed by name, so a lookup by id never matches.
+    """
+    name_to_label: dict = {}
+    name_to_options: dict = {}
     for section in (form_schema or {}).get("sections", []):
         for f in section.get("fields", []):
-            fid = f.get("id", "")
-            if fid:
-                id_to_label[fid] = f.get("label", fid)
+            fname = f.get("name", "")
+            if fname:
+                name_to_label[fname] = f.get("label", fname)
                 opts = f.get("options", [])
                 if opts:
-                    id_to_options[fid] = {o.get("value", ""): o.get("label", o.get("value", "")) for o in opts}
-    return id_to_label, id_to_options
+                    name_to_options[fname] = {o.get("value", ""): o.get("label", o.get("value", "")) for o in opts}
+    return name_to_label, name_to_options
 
 
 @router.get("/{form_id}/csv")
@@ -569,7 +573,7 @@ def export_spss(
     if not raw_fields and schema.get("sections"):
         for sec in schema["sections"]:
             raw_fields.extend(sec.get("fields", []))
-    variable_labels = {f.get("id", ""): f.get("label", f.get("id", "")) for f in raw_fields if f.get("id")}
+    variable_labels = {f.get("name", ""): f.get("label", f.get("name", "")) for f in raw_fields if f.get("name")}
 
     col_renames: dict = {}
     used_names: set = set()
@@ -753,10 +757,10 @@ def export_xlsx(
         seen = set(all_keys)
         for section in (form.json_schema or {}).get("sections", []):
             for f in section.get("fields", []):
-                fid = f.get("id")
-                if fid and fid not in seen:
-                    all_keys.append(fid)
-                    seen.add(fid)
+                fname = f.get("name")
+                if fname and fname not in seen:
+                    all_keys.append(fname)
+                    seen.add(fname)
 
     # ── Create workbook ──────────────────────────────────────────────────
     wb = openpyxl.Workbook()

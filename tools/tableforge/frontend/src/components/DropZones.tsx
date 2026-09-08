@@ -95,6 +95,9 @@ export function DropZones({ table, columns, draggedField, onDrop, onRemove, onAg
     return i >= 0 ? i + 1 : -1;
   };
 
+  // Display-only label from the FieldGovern form schema; falls back to the raw field name.
+  const getColLabel = (field: string): string => columns.find(c => c.name === field)?.label || field;
+
   const handleContextMenu = (e: React.MouseEvent, zone: DropZoneType, field: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -227,7 +230,7 @@ export function DropZones({ table, columns, draggedField, onDrop, onRemove, onAg
                           }}
                         >{getColNumber(field)}</span>
                       )}
-                      <span className="chip-name" title={field}>{field}</span>
+                      <span className="chip-name" title={field}>{getColLabel(field)}</span>
                       {valConfig && (
                         <>
                           <select className="agg-select" value={valConfig.agg}

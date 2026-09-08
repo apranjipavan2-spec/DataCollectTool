@@ -13,6 +13,8 @@ import LineChart from '@/components/charts/LineChart'
 import AuditLog from '@/components/AuditLog'
 import AiReportModal from '@/dashboard/AiReportModal'
 import EmojiIcon from '@/components/EmojiIcon'
+import { getAllFieldsInOrder } from '@/lib/formUtils'
+import type { FormSchema } from '@/types/form'
 const RosterTab = lazy(() => import('@/dashboard/RosterTab'))
 const AnalyticsTab  = lazy(() => import('@/dashboard/AnalyticsTab'))
 const ScorecardTab  = lazy(() => import('@/dashboard/ScorecardTab'))
@@ -236,6 +238,20 @@ function SubmissionDetailModal({
   const [busy, setBusy] = useState(false)
   const [bcFormId, setBcFormId] = useState(sub.backcheck_form_id ?? '')
   const [savingBcForm, setSavingBcForm] = useState(false)
+  const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    api.get(`/forms/${sub.form_id}/versions/${sub.form_version}`)
+      .then(r => {
+        const schema: FormSchema = r.data.json_schema
+        const map: Record<string, string> = {}
+        for (const f of getAllFieldsInOrder(schema.sections)) {
+          if (f.label) map[f.name] = f.label
+        }
+        setFieldLabels(map)
+      })
+      .catch(() => {})
+  }, [sub.form_id, sub.form_version])
 
   const isFlagged = sub.status === 'flagged'
   const isReviewed = sub.status === 'approved' || sub.status === 'rejected'
@@ -458,7 +474,10 @@ function SubmissionDetailModal({
             <div className="space-y-3">
               {Object.entries(sub.data_json).filter(([key]) => !key.startsWith('_')).map(([key, val]) => (
                 <div key={key} className="border-b border-catalan-border pb-2">
-                  <div className="text-xs text-catalan-textMuted mb-1">{key}</div>
+                  <div className="text-xs text-catalan-textMuted mb-1">
+                    {fieldLabels[key] ?? key}
+                    {fieldLabels[key] && <span className="opacity-50 font-mono"> · {key}</span>}
+                  </div>
                   <div className="text-sm text-catalan-text">{renderFieldValue(val, sub.media?.find(m => m.field_name === key))}</div>
                 </div>
               ))}

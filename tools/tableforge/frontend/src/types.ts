@@ -1,5 +1,6 @@
 export interface ColumnInfo {
   name: string;
+  label?: string; // human-readable form-field label (FieldGovern schema), display-only — never used as the data key
   type: 'numeric' | 'text' | 'date' | 'boolean' | 'multi_choice';
   sample_values: string[];
   stats: {

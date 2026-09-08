@@ -30,7 +30,8 @@ export function ColPicker({ allColumns, available, selected, onToggle, label, he
     const q = search.toLowerCase().trim();
     if (!q) return available;
     return available.filter(c =>
-      c.name.toLowerCase().includes(q) || String(indexMap[c.name] ?? '').includes(q)
+      c.name.toLowerCase().includes(q) || (c.label || '').toLowerCase().includes(q) ||
+      String(indexMap[c.name] ?? '').includes(q)
     );
   }, [available, search, indexMap]);
 
@@ -66,8 +67,9 @@ export function ColPicker({ allColumns, available, selected, onToggle, label, he
           const idx = indexMap[col.name] ?? 0;
           const isSelected = selected.includes(col.name);
           const selOrder = selected.indexOf(col.name);
+          const label = col.label;
           return (
-            <label key={col.name} style={{
+            <label key={col.name} title={label ? `${label} (${col.name})` : col.name} style={{
               display: 'flex', alignItems: 'center', gap: 5, padding: '4px 6px',
               borderRadius: 3, cursor: 'pointer', fontSize: 11,
               background: isSelected ? 'rgba(59,130,246,0.12)' : 'transparent',
@@ -96,7 +98,12 @@ export function ColPicker({ allColumns, available, selected, onToggle, label, he
                 {TYPE_ICON[col.type] || '?'}
               </span>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                {col.name}
+                {label || col.name}
+                {label && (
+                  <span style={{ display: 'block', fontSize: 8, color: 'rgba(255,255,255,0.35)', fontFamily: 'monospace' }}>
+                    {col.name}
+                  </span>
+                )}
               </span>
               {isSelected && selOrder >= 0 && (
                 <span style={{
@@ -137,13 +144,17 @@ export function ColOptions({
     () => Object.fromEntries(allColumns.map((c, i) => [c.name, i + 1])),
     [allColumns],
   );
+  const labelMap = useMemo(
+    () => Object.fromEntries(allColumns.filter(c => c.label).map(c => [c.name, c.label as string])),
+    [allColumns],
+  );
   const names = available.map(c => (typeof c === 'string' ? c : c.name));
   return (
     <>
       {placeholder !== undefined && <option value="">{placeholder}</option>}
       {names.map(c => (
-        <option key={c} value={c}>
-          #{indexMap[c] ?? '?'}  {c}
+        <option key={c} value={c} title={c}>
+          #{indexMap[c] ?? '?'}  {labelMap[c] || c}
         </option>
       ))}
     </>

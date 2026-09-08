@@ -77,8 +77,8 @@ interface HistoryRecord {
   cleaning_summary: { total?: number; skipped?: number; cols_high_missing?: Record<string, number> }
 }
 
-function TabulationCard({ tab, onDelete, onUpdate, programId }: {
-  tab: SavedTabulation; onDelete: () => void; onUpdate: (t: SavedTabulation) => Promise<void> | void; programId: string
+function TabulationCard({ tab, onDelete, onUpdate, programId, cols }: {
+  tab: SavedTabulation; onDelete: () => void; onUpdate: (t: SavedTabulation) => Promise<void> | void; programId: string; cols?: ColHeader[]
 }) {
   const toast = useToast()
   const [expanded, setExpanded] = useState(false)
@@ -103,7 +103,9 @@ function TabulationCard({ tab, onDelete, onUpdate, programId }: {
   // Side-by-side compare state (set when re-generating over an existing interpretation)
   const [pendingInterpretation, setPendingInterpretation] = useState<string | null>(null)
 
-  const colLabels: Record<string, string> = { ...tab.column_labels, ...editColLabels }
+  const schemaLabels: Record<string, string> = {}
+  for (const c of cols ?? []) schemaLabels[c.id] = c.label
+  const colLabels: Record<string, string> = { ...schemaLabels, ...tab.column_labels, ...editColLabels }
   const lbl = (k: string) => (k && colLabels[k]) || k || ''
 
   const submitFeedback = async (vote: 'up' | 'down') => {
@@ -1136,7 +1138,7 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
             </div>
           </div>
           {saved.map(tab => (
-            <TabulationCard key={tab.id} tab={tab} programId={programId}
+            <TabulationCard key={tab.id} tab={tab} programId={programId} cols={cols}
               onDelete={async () => { await deleteTabulation(programId, tab.id); await reload() }}
               onUpdate={handleTabUpdate} />
           ))}
@@ -1805,7 +1807,7 @@ export default function FgAnalyzer() {
                             <div className={sh}>Recent Tabulations</div>
                             <div className="space-y-4">
                               {savedTabs.map(t => (
-                                <TabulationCard key={t.id} tab={t} programId={programId}
+                                <TabulationCard key={t.id} tab={t} programId={programId} cols={data ? (data as AnalyzerData).column_headers : undefined}
                                   onDelete={async () => { await deleteTabulation(programId, t.id); await loadSaved(programId) }}
                                   onUpdate={async (updated) => {
                                     setSavedTabs(prev => prev.map(x => x.id === updated.id ? updated : x))
