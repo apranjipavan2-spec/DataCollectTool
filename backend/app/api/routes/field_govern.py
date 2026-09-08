@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_role
-from app.api.routes.export import _flatten, _build_enumerator_map
+from app.api.routes.export import _flatten, _build_enumerator_map, _field_key
 from app.models.form import Form
 from app.models.program import Program, ProgramQuestionnaire, ProgramAnalysis
 from app.models.submission import Submission
@@ -375,7 +375,7 @@ def _get_analyzer_data_inner(program_id, user, db):
         if form and form.json_schema:
             for section in form.json_schema.get("sections", []):
                 for field in section.get("fields", []):
-                    col_id = field.get("id", "")
+                    col_id = _field_key(field)
                     col_label = field.get("label", col_id)
                     col_type = field.get("type", "text")
                     if col_id and col_id not in seen_cols:
@@ -1387,7 +1387,7 @@ async def _run_ai_generation(
             if not (form and form.json_schema): continue
             for section in form.json_schema.get("sections", []):
                 for field in section.get("fields", []):
-                    col_id = field.get("id", "")
+                    col_id = _field_key(field)
                     col_type = field.get("type", "text")
                     if not col_id or col_id in seen_cols: continue
                     seen_cols.add(col_id)
@@ -1681,8 +1681,8 @@ def get_cleaner_data(
         for form in forms.values():
             for section in (form.json_schema or {}).get("sections", []):
                 for f in section.get("fields", []):
-                    if f.get("type") in ("number", "decimal") and f.get("id"):
-                        fid = f["id"]
+                    fid = _field_key(f)
+                    if f.get("type") in ("number", "decimal") and fid:
                         val = (s.data_json or {}).get(fid)
                         try:
                             numeric_fields.setdefault(fid, []).append(float(val))
@@ -1726,7 +1726,7 @@ def get_cleaner_data(
         # 3. Missing required fields
         if form and s.data_json:
             required_ids = [
-                f.get("id") for section in form.json_schema.get("sections", [])
+                _field_key(f) for section in form.json_schema.get("sections", [])
                 for f in section.get("fields", [])
                 if f.get("required") and f.get("type") not in ("section_header", "info")
             ]

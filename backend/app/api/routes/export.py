@@ -117,17 +117,28 @@ def _sanitize_stata_colname(name: str) -> str:
 # CSV export
 # ---------------------------------------------------------------------------
 
+def _field_key(field: dict) -> str:
+    """The data_json key a schema field actually corresponds to.
+
+    Modern schemas (form builder, XLSForm import) give every field a random
+    UUID `id` plus a separate mnemonic `name` — data_json is keyed by `name`.
+    Some older/seed schemas have no `name` at all and use `id` as the
+    mnemonic key directly, so fall back to `id` when `name` is absent.
+    """
+    return field.get("name") or field.get("id", "")
+
+
 def _build_label_maps(form_schema: dict) -> tuple[dict, dict]:
     """Returns (name_to_label, name_to_option_labels) from a form json_schema.
 
-    Keyed by field `name` (not `id`) — submission data_json and exported rows
-    are keyed by name, so a lookup by id never matches.
+    Keyed by the field's actual data_json key (see _field_key) — a lookup by
+    the schema's internal `id` alone never matches modern-schema forms.
     """
     name_to_label: dict = {}
     name_to_options: dict = {}
     for section in (form_schema or {}).get("sections", []):
         for f in section.get("fields", []):
-            fname = f.get("name", "")
+            fname = _field_key(f)
             if fname:
                 name_to_label[fname] = f.get("label", fname)
                 opts = f.get("options", [])
@@ -573,7 +584,7 @@ def export_spss(
     if not raw_fields and schema.get("sections"):
         for sec in schema["sections"]:
             raw_fields.extend(sec.get("fields", []))
-    variable_labels = {f.get("name", ""): f.get("label", f.get("name", "")) for f in raw_fields if f.get("name")}
+    variable_labels = {_field_key(f): f.get("label", _field_key(f)) for f in raw_fields if _field_key(f)}
 
     col_renames: dict = {}
     used_names: set = set()
@@ -757,7 +768,7 @@ def export_xlsx(
         seen = set(all_keys)
         for section in (form.json_schema or {}).get("sections", []):
             for f in section.get("fields", []):
-                fname = f.get("name")
+                fname = _field_key(f)
                 if fname and fname not in seen:
                     all_keys.append(fname)
                     seen.add(fname)
