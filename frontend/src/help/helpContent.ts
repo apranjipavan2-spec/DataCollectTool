@@ -130,7 +130,7 @@ export const HELP_SECTIONS: HelpSection[] = [
           { icon: '📍', text: 'GPS — captures latitude, longitude, and accuracy automatically.' },
           { icon: '📷', text: 'Photo — captures or uploads an image, auto-compressed to ~200KB.' },
           { icon: '🎙️', text: 'Audio — records up to 30s voice note at ~100KB.' },
-          { icon: '▦', text: 'Barcode / QR — scan product codes or asset tags.' },
+          { icon: '▦', text: 'Barcode / QR — enter product codes or asset tags.' },
         ],
         elementId: 'field-type-menu',
         page: '/builder',

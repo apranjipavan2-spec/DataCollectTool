@@ -17,7 +17,7 @@ const FIELD_TYPES: { type: FieldType; label: string; icon: string; description: 
   { type: 'gps',             label: 'GPS',             icon: '📍', description: 'Capture coordinates' },
   { type: 'photo',           label: 'Photo',           icon: '📷', description: 'Camera capture or gallery' },
   { type: 'audio',           label: 'Audio',           icon: '🎙', description: 'Voice recording' },
-  { type: 'barcode',         label: 'Barcode / QR',    icon: '▦',  description: 'Scan a barcode' },
+  { type: 'barcode',         label: 'Barcode / QR',    icon: '▦',  description: 'Enter a barcode or code' },
   { type: 'calculated',      label: 'Calculated',      icon: '∑',  description: 'Auto-compute from other fields' },
   { type: 'repeat_group',    label: 'Repeat Group',    icon: '⟳',  description: 'Repeatable set of fields' },
   { type: 'note',            label: 'Note',            icon: 'ℹ',  description: 'Instructional text only' },
