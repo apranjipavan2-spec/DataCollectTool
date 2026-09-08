@@ -241,9 +241,14 @@ function SubmissionDetailModal({
   const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({})
 
   useEffect(() => {
+    // Prefer the historical version snapshot (matches the schema active when this
+    // submission was collected); forms imported via Excel/Word never got a
+    // FormVersion row, so fall back to the current published schema.
     api.get(`/forms/${sub.form_id}/versions/${sub.form_version}`)
+      .catch(() => api.get(`/forms/${sub.form_id}`))
       .then(r => {
         const schema: FormSchema = r.data.json_schema
+        if (!schema?.sections) return
         const map: Record<string, string> = {}
         for (const f of getAllFieldsInOrder(schema.sections)) {
           if (f.label) map[f.name] = f.label
