@@ -1,5 +1,22 @@
 # FieldGovern — Task Board
 
+## Broken local test infra (found 2026-09-08, not fixed)
+`cd backend && pytest` currently cannot run from a fresh DB at all:
+- `app/models/__init__.py` never imports `app.models.location` (`Location`), so
+  `Base.metadata.create_all()` can't resolve `respondent_roster.location_id`'s FK.
+- `Tenant.notification_config`/`ai_config` `server_default` is malformed
+  (`'''{}'''::jsonb` — triple-quoted), fails on real Postgres DDL.
+- Running real Alembic migrations against a truly fresh DB also fails partway
+  (`ALTER TABLE submission_comments` — table doesn't exist yet at that point in
+  history) — the migration chain assumes some out-of-band bootstrap step.
+Worked around ad hoc (see L024) to verify a specific bug; suite itself still broken.
+
+## Residual from L024 (id vs name tabulation fix, 2026-09-08)
+Tabulations saved *before* the fix still persist the old (broken) UUID
+`groupby_field`/`value_field`. They won't auto-correct — need to be rebuilt/re-run
+in the Analyzer to pick up real data. No migration written for existing saved
+tabulations; flag if a user reports an old saved table still showing all-missing.
+
 ## DPDP Act 2023 — compliance backlog (added 2026-09-05)
 Source: comparison with the Next.js redesign's 9-clause mapping. Split into what
 we already ship vs what we still need to build. Website `#dpdp` section only
