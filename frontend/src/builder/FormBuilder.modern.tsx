@@ -533,6 +533,22 @@ export default function FormBuilder() {
     }
   }
 
+  // Reload the form after a version-history restore (server already bumped
+  // the version and snapshotted it — pull the fresh schema back down).
+  const handleVersionRestored = async () => {
+    if (!formId) return
+    try {
+      const { data } = await api.get(`/forms/${formId}`)
+      const loaded: FormSchema = { ...(data.json_schema ?? data), version: data.version }
+      setSchema(loaded)   // recorded on the undo stack like any other change — undo reverts the restore too
+      setSelectedSection(loaded.sections[0]?.id ?? '')
+      setSelectedField(null)
+      toast.success(`Restored — now v${data.version}`)
+    } catch {
+      toast.error('Restored on server, but failed to reload — refresh the page')
+    }
+  }
+
   // ── Recursive left panel renderers ────────────────────────────────────────
   // Auto question numbers in document order — recomputed on every render, so they
   // update immediately when fields are reordered or added/removed.
@@ -933,7 +949,7 @@ export default function FormBuilder() {
             {/* Main Area */}
             <div className="flex-1 overflow-hidden">
               {showVersions && formId ? (
-                <VersionHistoryPanel formId={formId} currentVersion={schema.version} onClose={() => setShowVersions(false)} />
+                <VersionHistoryPanel formId={formId} currentVersion={schema.version} onClose={() => setShowVersions(false)} onRestored={handleVersionRestored} />
               ) : currentField ? (
                 <div className="h-full overflow-y-auto">
                   <FieldEditor

@@ -337,6 +337,33 @@ def list_form_versions(
     ]
 
 
+@router.get("/{form_id}/version-diffs")
+def list_form_version_diffs(
+    form_id: str,
+    user=Depends(require_enumerator),
+    db: Session = Depends(get_db),
+):
+    """Return an added/removed/renamed/type-change summary for each version vs.
+    the one immediately before it — powers the "what changed" note on each
+    version-history timeline entry without the cost of a full submission-
+    migration preview (see /migrate for that)."""
+    _get_form_for_tenant(db, form_id, user["tenant_id"])
+
+    versions = (
+        db.query(FormVersion)
+        .filter(FormVersion.form_id == form_id)
+        .order_by(FormVersion.version.asc())
+        .all()
+    )
+    result = []
+    prev_schema: Optional[dict[str, Any]] = None
+    for v in versions:
+        diff = _compute_schema_diff(prev_schema, v.json_schema) if prev_schema is not None else None
+        result.append({"version": v.version, "diff": diff})
+        prev_schema = v.json_schema
+    return list(reversed(result))
+
+
 @router.get("/{form_id}/versions/{version}")
 def get_form_version(
     form_id: str,
@@ -362,6 +389,77 @@ def get_form_version(
         "json_schema": fv.json_schema,
         "created_at": fv.created_at,
     }
+
+
+@router.post("/{form_id}/versions/{version}/restore")
+def restore_form_version(
+    form_id: str,
+    version: int,
+    user=Depends(require_org_admin),
+    db: Session = Depends(get_db),
+):
+    """Roll the form's live schema back to an older snapshot.
+
+    Non-destructive: this doesn't delete or overwrite the versions in between —
+    it bumps the version counter and snapshots the old schema as a brand-new
+    version on top of history, so the restore itself becomes undoable too.
+    """
+    form = _get_form_for_tenant(db, form_id, user["tenant_id"])
+
+    fv = (
+        db.query(FormVersion)
+        .filter(FormVersion.form_id == form_id, FormVersion.version == version)
+        .first()
+    )
+    if not fv:
+        raise HTTPException(status_code=404, detail=f"Version {version} not found")
+    if version == form.version:
+        raise HTTPException(status_code=400, detail="That is already the current version")
+
+    form.version += 1
+    form.json_schema = fv.json_schema
+    _snapshot_version(db, form)
+    db.commit()
+    db.refresh(form)
+    return {"id": str(form.id), "version": form.version, "restored_from": version}
+
+
+# ── Version retention ────────────────────────────────────────────────────────
+
+VERSION_RETENTION_DAYS = 182       # ~6 months
+VERSION_RETENTION_MIN_KEEP = 20    # always keep at least this many, regardless of age
+
+
+def purge_old_form_versions() -> int:
+    """Delete FormVersion snapshots older than 6 months, per form — but always
+    keep each form's most recent 20 versions (which also guarantees the
+    current/latest version is never purged) no matter how old they are.
+
+    Called by the daily scheduler job; see app/core/scheduler.py.
+    """
+    from datetime import datetime, timedelta, timezone
+    from app.core.database import SessionLocal
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=VERSION_RETENTION_DAYS)
+    db = SessionLocal()
+    purged = 0
+    try:
+        form_ids = [row[0] for row in db.query(FormVersion.form_id).distinct().all()]
+        for fid in form_ids:
+            versions = (
+                db.query(FormVersion)
+                .filter(FormVersion.form_id == fid)
+                .order_by(FormVersion.version.desc())
+                .all()
+            )
+            for v in versions[VERSION_RETENTION_MIN_KEEP:]:
+                if v.created_at and v.created_at < cutoff:
+                    db.delete(v)
+                    purged += 1
+        db.commit()
+    finally:
+        db.close()
+    return purged
 
 
 # ── Submission migration preview ─────────────────────────────────────────────

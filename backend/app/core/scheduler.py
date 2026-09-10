@@ -126,6 +126,18 @@ def _run_bin_purge():
         logger.exception("[Scheduler] Recycle-bin purge failed")
 
 
+def _run_form_version_purge():
+    """Purge form-version history older than 6 months (keeps each form's most
+    recent 20 versions, and therefore its latest version, regardless of age)."""
+    from app.api.routes.forms import purge_old_form_versions
+    logger.info("[Scheduler] Form version purge starting")
+    try:
+        purged = purge_old_form_versions()
+        logger.info("[Scheduler] Form version purge done — %d old versions removed", purged)
+    except Exception:
+        logger.exception("[Scheduler] Form version purge failed")
+
+
 def start_scheduler():
     """Start the background scheduler. Call once on app startup."""
     global _scheduler
@@ -184,8 +196,18 @@ def start_scheduler():
         misfire_grace_time=3600,
     )
 
+    # Form-version history purge — daily at 03:45 UTC
+    _scheduler.add_job(
+        _run_form_version_purge,
+        CronTrigger(hour=3, minute=45),
+        id="form_version_purge",
+        name="Form Version 6-month Retention Purge",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
     _scheduler.start()
-    logger.info("[Scheduler] Started — daily digest @ 07:00 UTC, monthly usage reset @ 1st 00:30 UTC, scheduled reports @ :00 each hour, bin purge @ 03:15 UTC, trial expiry @ 02:00 UTC")
+    logger.info("[Scheduler] Started — daily digest @ 07:00 UTC, monthly usage reset @ 1st 00:30 UTC, scheduled reports @ :00 each hour, bin purge @ 03:15 UTC, trial expiry @ 02:00 UTC, form version purge @ 03:45 UTC")
 
 
 def stop_scheduler():

@@ -42,12 +42,19 @@ interface Props {
   formId: string
   currentVersion: number
   onClose: () => void
+  onRestored: () => void
 }
 
-export default function VersionHistoryPanel({ formId, currentVersion, onClose }: Props) {
+export default function VersionHistoryPanel({ formId, currentVersion, onClose, onRestored }: Props) {
   const [versions, setVersions] = useState<VersionSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [changeNotes, setChangeNotes] = useState<Record<number, SchemaDiff | null>>({})
+
+  // Restore state
+  const [restoreConfirm, setRestoreConfirm] = useState<number | null>(null)
+  const [restoring, setRestoring] = useState(false)
+  const [restoreError, setRestoreError] = useState('')
 
   // Diff state
   const [compareFrom, setCompareFrom] = useState<number | null>(null)
@@ -67,7 +74,7 @@ export default function VersionHistoryPanel({ formId, currentVersion, onClose }:
   const [versionSchema, setVersionSchema] = useState<Record<string, unknown> | null>(null)
   const [schemaLoading, setSchemaLoading] = useState(false)
 
-  useEffect(() => {
+  const loadVersions = () => {
     setLoading(true)
     api.get(`/forms/${formId}/versions`)
       .then(({ data }) => {
@@ -80,7 +87,45 @@ export default function VersionHistoryPanel({ formId, currentVersion, onClose }:
       })
       .catch(err => setError(err.response?.data?.detail ?? 'Failed to load versions'))
       .finally(() => setLoading(false))
-  }, [formId])
+
+    api.get(`/forms/${formId}/version-diffs`)
+      .then(({ data }) => {
+        const notes: Record<number, SchemaDiff | null> = {}
+        for (const row of data as { version: number; diff: SchemaDiff | null }[]) notes[row.version] = row.diff
+        setChangeNotes(notes)
+      })
+      .catch(() => {})
+  }
+
+  useEffect(loadVersions, [formId])
+
+  const restoreVersion = (version: number) => {
+    setRestoring(true)
+    setRestoreError('')
+    api.post(`/forms/${formId}/versions/${version}/restore`)
+      .then(() => {
+        setRestoreConfirm(null)
+        setExpandedVersion(null)
+        setVersionSchema(null)
+        loadVersions()
+        onRestored()
+      })
+      .catch(err => setRestoreError(err.response?.data?.detail ?? 'Failed to restore version'))
+      .finally(() => setRestoring(false))
+  }
+
+  const summarizeDiff = (diff: SchemaDiff | null | undefined): string => {
+    if (diff === undefined) return ''
+    if (diff === null) return 'Initial version'
+    if (isEmpty(diff)) return 'No field changes'
+    const parts: string[] = []
+    if (diff.added.length) parts.push(`+${diff.added.length} added`)
+    if (diff.removed.length) parts.push(`−${diff.removed.length} removed`)
+    const renamedCount = Object.keys(diff.renamed).length
+    if (renamedCount) parts.push(`${renamedCount} renamed`)
+    if (diff.type_changes.length) parts.push(`${diff.type_changes.length} type change${diff.type_changes.length !== 1 ? 's' : ''}`)
+    return parts.join(' · ')
+  }
 
   const loadDiff = () => {
     if (compareFrom == null || compareTo == null) return
@@ -211,12 +256,46 @@ export default function VersionHistoryPanel({ formId, currentVersion, onClose }:
                             {new Date(v.created_at).toLocaleDateString()} {new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
-                        <button
-                          onClick={() => loadVersionSchema(v.version)}
-                          className="text-xs text-catalan-primary hover:underline mt-1"
-                        >
-                          {isExpanded ? 'Hide schema' : 'View schema'}
-                        </button>
+                        {changeNotes[v.version] !== undefined && (
+                          <p className="text-xs text-catalan-textMuted mt-0.5">
+                            {summarizeDiff(changeNotes[v.version])}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-3 mt-1">
+                          <button
+                            onClick={() => loadVersionSchema(v.version)}
+                            className="text-xs text-catalan-primary hover:underline"
+                          >
+                            {isExpanded ? 'Hide schema' : 'View schema'}
+                          </button>
+                          {!isCurrent && (
+                            <button
+                              onClick={() => { setRestoreConfirm(v.version); setRestoreError('') }}
+                              className="text-xs text-catalan-warning hover:underline"
+                            >
+                              Restore this version
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Restore confirm */}
+                        {restoreConfirm === v.version && (
+                          <div className="mt-2 bg-catalan-warning/5 border border-catalan-warning/30 rounded-lg px-3 py-2 space-y-2">
+                            <p className="text-xs text-catalan-text">
+                              Restore v{v.version}? This makes it the new current version (v{currentVersion + 1}) — nothing in between is deleted.
+                            </p>
+                            {restoreError && <p className="text-xs text-catalan-error">{restoreError}</p>}
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => restoreVersion(v.version)} disabled={restoring}
+                                className="bg-catalan-warning text-white hover:bg-catalan-warning/90">
+                                {restoring ? 'Restoring…' : 'Yes, restore'}
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setRestoreConfirm(null)} disabled={restoring}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Expanded schema view */}
                         {isExpanded && (
