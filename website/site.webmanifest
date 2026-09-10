@@ -1,0 +1,12 @@
+{
+  "name": "FieldGovern — Offline-First Field Data & AI Analysis",
+  "short_name": "FieldGovern",
+  "description": "India's offline-first data collection and AI-powered analysis platform for NGOs, researchers, and government M&E teams.",
+  "start_url": "https://app.fieldgovern.com/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0ea5e9",
+  "icons": [
+    { "src": "/assets/logo-icon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
