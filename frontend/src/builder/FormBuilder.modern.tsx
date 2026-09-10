@@ -933,8 +933,8 @@ export default function FormBuilder() {
                   </span>
                 )}
                 <span className="inline-flex items-center gap-1">
-                  <Button variant="secondary" size="sm" onClick={handleUndo} disabled={!canUndo} title="Undo (Ctrl+Z)">↶</Button>
-                  <Button variant="secondary" size="sm" onClick={handleRedo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">↷</Button>
+                  <Button variant="secondary" size="sm" onClick={handleUndo} disabled={!canUndo} title="Undo (Ctrl+Z)">↶ Undo</Button>
+                  <Button variant="secondary" size="sm" onClick={handleRedo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">↷ Redo</Button>
                 </span>
                 <Button variant="secondary" size="sm" onClick={() => setShowForms(true)} title="My Forms">📂</Button>
                 <Button variant="secondary" size="sm" onClick={() => setShowTranslate(true)} title="Translate form labels">🌐</Button>
