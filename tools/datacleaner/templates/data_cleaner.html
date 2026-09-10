@@ -286,6 +286,13 @@ input, select, textarea { font-family: inherit; }
 }
 .global-loading-overlay .spinner { width: 40px; height: 40px; border-width: 4px; border-top-color: var(--accent); margin-bottom: 16px; }
 
+/* ── Checkpoint countdown (after Save to Account) ─────────────── */
+.checkpoint-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  margin-right: 5px; background: #fbbf24; animation: checkpoint-pulse 1s ease-in-out infinite;
+}
+@keyframes checkpoint-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+
 /* ── Global Filter Bar ────────────────────────────────────────── */
 .filter-bar {
   padding: 10px 24px; background: var(--bg2); border-bottom: 1px solid var(--border);
@@ -1591,7 +1598,7 @@ async function doSaveToAccount() {
     _toolProjectId = json.id || _toolProjectId;
     _toolProjectName = name;
     _dirty = false;
-    setAutosaveStatus('Saved just now');
+    _startCheckpointCountdown();
     toast('Saved to your account ✓');
   } catch (e) {
     setAutosaveStatus('Not saved — check your connection or log in again', true);
@@ -1611,6 +1618,34 @@ function setAutosaveStatus(text, isWarning) {
   el.textContent = text;
   el.style.color = isWarning ? '#f87171' : 'var(--text3)';
   el.style.display = (_fgUrl && _fgToken) ? 'block' : 'none';
+}
+
+// Backend only turns a save into a permanent checkpoint once 120s have passed
+// since the last one (see MIN_SECONDS_BETWEEN_VERSIONS in user_tool_projects.py)
+// — anything saved inside that window can be silently overwritten with no
+// history entry. This counts down visibly so it's obvious when it's safe to
+// re-upload, restore, or otherwise risk clobbering the just-saved version.
+let _checkpointTimer = null;
+function _renderCheckpointCountdown(remaining) {
+  const el = document.getElementById('autosaveStatus');
+  if (!el) return;
+  el.style.display = 'block';
+  if (remaining > 0) {
+    const m = Math.floor(remaining / 60), s = String(remaining % 60).padStart(2, '0');
+    el.innerHTML = `<span class="checkpoint-dot"></span>Checkpoint saved — wait ${m}:${s} before uploading or restoring`;
+  } else {
+    el.innerHTML = `<span style="color:#4ade80;">✓</span> Safe to upload or restore now`;
+  }
+}
+function _startCheckpointCountdown() {
+  if (_checkpointTimer) clearInterval(_checkpointTimer);
+  let remaining = 120;
+  _renderCheckpointCountdown(remaining);
+  _checkpointTimer = setInterval(() => {
+    remaining--;
+    _renderCheckpointCountdown(remaining);
+    if (remaining <= 0) clearInterval(_checkpointTimer);
+  }, 1000);
 }
 
 async function _postSaveToAccount(name, autosave) {
@@ -1640,7 +1675,7 @@ async function _autosaveTick() {
     _toolProjectId = json.id || _toolProjectId;
     _toolProjectName = name;
     _dirty = false;
-    setAutosaveStatus('Autosaved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    _startCheckpointCountdown();
   } catch (e) {
     setAutosaveStatus('Not saved — check your connection or log in again', true);
   }

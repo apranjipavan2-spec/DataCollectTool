@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -12,9 +12,35 @@ router = APIRouter()
 
 # Version history is kept inline in the JSONB `data` blob under "_history" —
 # capped in count and throttled in time so autosave ticks don't blow up the
-# row with near-identical snapshots.
+# row with near-identical snapshots. Throttling coalesces into the latest
+# history slot rather than dropping the change outright, so a save inside the
+# window is never lost — it just doesn't consume an extra slot.
 MAX_HISTORY_VERSIONS = 12
 MIN_SECONDS_BETWEEN_VERSIONS = 120
+
+
+def _coalesce_history(history: list, old_data: dict, now: datetime | None = None) -> list:
+    """Record old_data as a checkpoint, or coalesce it into the latest slot if
+    still inside the throttle window — a changed save is never silently lost,
+    it just doesn't consume an extra history slot when saves come in fast."""
+    now = now or datetime.now(timezone.utc)
+    entry = {
+        "snapshot": old_data,
+        "saved_at": now.isoformat(),
+        "autosave": old_data.get("_autosave", False),
+    }
+    due = True
+    if history:
+        last_saved_at = history[-1].get("saved_at")
+        if last_saved_at:
+            try:
+                elapsed = (now - datetime.fromisoformat(last_saved_at)).total_seconds()
+                due = elapsed >= MIN_SECONDS_BETWEEN_VERSIONS
+            except Exception:
+                due = True
+    if due:
+        return (history + [entry])[-MAX_HISTORY_VERSIONS:]
+    return history[:-1] + [entry]
 
 
 class ProjectIn(BaseModel):
@@ -82,21 +108,7 @@ def upsert_project(body: ProjectIn, user=Depends(require_supervisor), db: Sessio
         history = old_data.pop("_history", [])
         changed = old_data.get("csv_content") != new_data.get("csv_content")
         if changed:
-            last_saved_at = history[-1]["saved_at"] if history else None
-            due = True
-            if last_saved_at:
-                try:
-                    elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(last_saved_at)).total_seconds()
-                    due = elapsed >= MIN_SECONDS_BETWEEN_VERSIONS
-                except Exception:
-                    due = True
-            if due:
-                history.append({
-                    "snapshot": old_data,
-                    "saved_at": datetime.now(timezone.utc).isoformat(),
-                    "autosave": old_data.get("_autosave", False),
-                })
-                history = history[-MAX_HISTORY_VERSIONS:]
+            history = _coalesce_history(history, old_data)
         new_data["_history"] = history
         existing.program_id = body.program_id
         existing.data = new_data
@@ -210,3 +222,24 @@ def restore_project_version(project_id: str, index: int, user=Depends(require_su
     proj.data = new_data
     db.commit()
     return {"restored": True, "data": target}
+
+
+if __name__ == "__main__":
+    # Self-check: a save inside the 120s throttle window must still be
+    # captured (coalesced), never silently dropped.
+    t0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    h1 = _coalesce_history([], {"csv_content": "A"}, now=t0)
+    assert len(h1) == 1 and h1[0]["snapshot"]["csv_content"] == "A"
+
+    t1 = t0 + timedelta(seconds=30)  # inside the window
+    h2 = _coalesce_history(h1, {"csv_content": "B"}, now=t1)
+    assert len(h2) == 1, "should coalesce, not add a slot, inside the window"
+    assert h2[0]["snapshot"]["csv_content"] == "B", "change B must not be dropped"
+
+    t2 = t1 + timedelta(seconds=150)  # past the window
+    h3 = _coalesce_history(h2, {"csv_content": "C"}, now=t2)
+    assert len(h3) == 2, "past the window, C should get its own slot"
+    assert [e["snapshot"]["csv_content"] for e in h3] == ["B", "C"]
+
+    print("OK: throttle coalesces intermediate saves instead of dropping them")
