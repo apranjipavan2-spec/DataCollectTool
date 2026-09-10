@@ -51,6 +51,7 @@ SESSION_DIRTY = set()    # sids whose state needs saving
 SESSION_SEEN = {}        # sid -> last-access epoch (for idle eviction)
 REGISTRY_LOCK = threading.Lock()
 SESSION_TTL = 24 * 3600  # drop idle sessions from memory after 24h (disk copy kept for later restore)
+RETENTION_SECONDS = 5 * 24 * 3600  # working_copies files untouched this long get deleted
 
 def _new_state():
     return {
@@ -114,8 +115,24 @@ def _save_state():
     """Legacy helper — marks the current session dirty."""
     mark_state_dirty()
 
+def _cleanup_expired_files():
+    """Delete working_copies files (state/log/exports) untouched for RETENTION_SECONDS.
+
+    Active sessions keep re-touching their state_*.pkl / log_*.jsonl every save,
+    so their mtime never ages out — only truly abandoned sessions and old
+    exports get swept.
+    """
+    cutoff = time.time() - RETENTION_SECONDS
+    for p in COPIES_DIR.iterdir():
+        try:
+            if p.is_file() and p.stat().st_mtime < cutoff:
+                p.unlink()
+        except Exception as e:
+            print(f"Error cleaning up {p}: {e}")
+
 def _save_state_loop():
-    """Background thread: persist dirty sessions and evict idle ones."""
+    """Background thread: persist dirty sessions, evict idle ones, sweep old files."""
+    last_cleanup = 0.0
     while True:
         time.sleep(2.0)
         if SESSION_DIRTY:
@@ -142,6 +159,9 @@ def _save_state_loop():
                 SESSIONS.pop(sid, None)
                 SESSION_LOCKS.pop(sid, None)
                 SESSION_SEEN.pop(sid, None)
+        if now - last_cleanup > 3600:  # sweep for expired files once an hour
+            _cleanup_expired_files()
+            last_cleanup = now
 
 threading.Thread(target=_save_state_loop, daemon=True).start()
 
@@ -152,6 +172,17 @@ def signal_handler(sig, frame):
 
 signal.signal(signal.SIGINT, signal_handler)
 
+def _append_edit_log(sid: str, desc: str):
+    """Append-only record of what was done and when — survives even if the
+    in-memory undo stack (capped at 20) has rolled the operation off, and even
+    if the edit is never explicitly saved/exported. Swept by _cleanup_expired_files
+    once idle for RETENTION_SECONDS."""
+    try:
+        with open(COPIES_DIR / f"log_{sid}.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"ts": time.time(), "desc": desc}) + "\n")
+    except Exception as e:
+        print(f"Error writing edit log for {sid}: {e}")
+
 def _push_undo(desc: str):
     """Snapshot current df for undo; clears redo stack."""
     if DATA["df"] is not None:
@@ -159,6 +190,9 @@ def _push_undo(desc: str):
         DATA["redo_stack"].clear()
         if len(DATA["history"]) > DATA["max_history"]:
             DATA["history"].pop(0)
+    sid = getattr(g, "sid", None)
+    if sid:
+        _append_edit_log(sid, desc)
     _save_state()
 
 def _df():
@@ -1942,4 +1976,4 @@ if __name__ == "__main__":
     # Per-session state is now restored lazily on first request (see get_state)
     PORT = int(os.environ.get("PORT", 5050))
     print(f"\n  Data Cleaner running at http://localhost:{PORT}\n")
-    app.run(debug=False, use_reloader=False, host="0.0.0.0", port=PORT)
+    app.run(debug=False, use_reloader=False, threaded=True, host="0.0.0.0", port=PORT)

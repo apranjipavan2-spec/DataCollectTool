@@ -1971,7 +1971,7 @@ function filterColumns() {
 // failed/error response can't replace the app and wipe state) ──
 async function _downloadExport(fmt, extraParams = '') {
   try {
-    const res = await fetch(`/api/export?format=${fmt}${extraParams}`);
+    const res = await fetch(`${BASE_URL}/api/export?format=${fmt}${extraParams}`);
     if (!res.ok) {
       let msg = 'Export failed';
       try { msg = (await res.json()).error || msg; } catch (e) {}

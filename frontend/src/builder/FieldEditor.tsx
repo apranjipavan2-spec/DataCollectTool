@@ -900,7 +900,7 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
           </div>
           <div className="space-y-2 mb-3">
             {(field.options ?? []).map((opt, i) => (
-              <div key={opt.value || i} className="flex gap-2 items-center">
+              <div key={i} className="flex gap-2 items-center">
                 {/* min-w-0 lets the flex-1 label box actually shrink/grow; value box is
                     a fixed width with flex-shrink-0 so it can't steal the label's width */}
                 <input className={`${inputCls} flex-1 min-w-0`} value={opt.label} placeholder="Option label" onChange={e => updateOption(i, { label: e.target.value })} />
@@ -945,7 +945,7 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
               {!!field.choiceFilter?.length && (field.options ?? []).length > 0 && (
                 <div className="space-y-2">
                   {(field.options ?? []).map((opt, i) => (
-                    <div key={opt.value || i} className="flex flex-wrap gap-2 items-center text-xs bg-catalan-hover border border-catalan-border rounded-lg px-2.5 py-2">
+                    <div key={i} className="flex flex-wrap gap-2 items-center text-xs bg-catalan-hover border border-catalan-border rounded-lg px-2.5 py-2">
                       <span className="font-medium text-catalan-text flex-shrink-0">{opt.label || opt.value || `Option ${i + 1}`}:</span>
                       {field.choiceFilter!.map(cf => {
                         const parent = parentChoiceFields.find(p => p.name === cf.field)
