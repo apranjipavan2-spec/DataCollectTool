@@ -710,6 +710,21 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
   const addOption    = () => onChange({ options: [...(field.options ?? []), { value: `option_${Date.now()}`, label: '' }] })
   const removeOption = (i: number) => onChange({ options: (field.options ?? []).filter((_, idx) => idx !== i) })
 
+  // Cascading select: attr is just the parent field's name, used as a key on this
+  // field's own options (e.g. a District option carries { state: "up" }).
+  const addCascadeParent = (parentName: string) => {
+    if (!parentName || field.choiceFilter?.some(cf => cf.field === parentName)) return
+    onChange({ choiceFilter: [...(field.choiceFilter ?? []), { attr: parentName, field: parentName }] })
+  }
+  const removeCascadeParent = (parentName: string) => {
+    const next = (field.choiceFilter ?? []).filter(cf => cf.field !== parentName)
+    onChange({ choiceFilter: next.length ? next : undefined })
+  }
+  const updateOptionCascadeValue = (i: number, attr: string, value: string) => {
+    const options = (field.options ?? []).map((o, idx) => idx === i ? { ...o, [attr]: value } : o)
+    onChange({ options })
+  }
+
   const handleTypeChange = (newType: FieldType) => {
     if (newType === field.type) return
     const patch: Partial<FormField> = { type: newType, skipLogic: undefined }
@@ -737,6 +752,10 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
     traverse(sections)
     return result
   })()
+
+  // Only single_choice fields make sense as a cascade parent — their value is a
+  // single option value that can be matched against option[attr].
+  const parentChoiceFields = prevFields.filter(f => f.type === 'single_choice')
 
   return (
     <div className="p-5 sm:p-6 max-w-2xl">
@@ -892,6 +911,64 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
           </div>
           <button onClick={addOption} className="text-xs px-3 py-2 rounded-lg border border-dashed border-catalan-border text-catalan-primary hover:border-catalan-primary hover:bg-catalan-primary/5 transition-colors w-full">+ Add Option</button>
           {(field.options ?? []).length === 0 && <p className="text-xs text-catalan-warning mt-2">Add at least one option.</p>}
+        </div>
+      )}
+
+      {/* Cascading — show only options that match an earlier single-choice answer (e.g. State → District) */}
+      {(field.type === 'single_choice' || field.type === 'multiple_choice') && (
+        <div className={groupCls}>
+          <label className={labelCls}>Cascading <span className="text-catalan-textMuted/60 normal-case font-normal">(optional)</span></label>
+          {parentChoiceFields.length === 0 ? (
+            <p className="text-xs text-catalan-textMuted italic">Add a preceding single-choice question first to cascade from it (e.g. State → District).</p>
+          ) : (
+            <>
+              <p className="text-xs text-catalan-textMuted mb-2">Only show options here that match the answer picked in an earlier question.</p>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {(field.choiceFilter ?? []).map(cf => {
+                  const parent = parentChoiceFields.find(p => p.name === cf.field)
+                  return (
+                    <span key={cf.field} className="flex items-center gap-1.5 text-xs bg-catalan-primary/10 border border-catalan-primary/20 text-catalan-primary px-2.5 py-1 rounded-lg">
+                      Cascades from "{parent?.label || cf.field}"
+                      <button onClick={() => removeCascadeParent(cf.field)} className="hover:text-catalan-error">✕</button>
+                    </span>
+                  )
+                })}
+                {parentChoiceFields.some(p => !(field.choiceFilter ?? []).some(cf => cf.field === p.name)) && (
+                  <select value="" onChange={e => addCascadeParent(e.target.value)} className={`${inputCls} !w-auto text-xs`}>
+                    <option value="">+ Add parent question…</option>
+                    {parentChoiceFields.filter(p => !(field.choiceFilter ?? []).some(cf => cf.field === p.name)).map(p => (
+                      <option key={p.id} value={p.name}>{p.label || p.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              {!!field.choiceFilter?.length && (field.options ?? []).length > 0 && (
+                <div className="space-y-2">
+                  {(field.options ?? []).map((opt, i) => (
+                    <div key={opt.value || i} className="flex flex-wrap gap-2 items-center text-xs bg-catalan-hover border border-catalan-border rounded-lg px-2.5 py-2">
+                      <span className="font-medium text-catalan-text flex-shrink-0">{opt.label || opt.value || `Option ${i + 1}`}:</span>
+                      {field.choiceFilter!.map(cf => {
+                        const parent = parentChoiceFields.find(p => p.name === cf.field)
+                        return (
+                          <select
+                            key={cf.field}
+                            value={(opt as Record<string, unknown>)[cf.attr] as string ?? ''}
+                            onChange={e => updateOptionCascadeValue(i, cf.attr, e.target.value)}
+                            className={`${inputCls} !w-auto !py-1`}
+                          >
+                            <option value="">{parent?.label || cf.field}: (none)</option>
+                            {(parent?.options ?? []).map(po => (
+                              <option key={po.value} value={po.value}>{po.label || po.value}</option>
+                            ))}
+                          </select>
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
