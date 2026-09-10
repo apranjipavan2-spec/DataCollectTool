@@ -65,6 +65,13 @@ export default function FormBuilder() {
   const [draft, setDraft]                 = useState<FormDraft | null>(null)
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const isInitRef        = useRef(true)
+  // ── Undo/redo ─────────────────────────────────────────────────────────────
+  const undoStackRef     = useRef<FormSchema[]>([])
+  const redoStackRef     = useRef<FormSchema[]>([])
+  const skipHistoryRef   = useRef(false)   // true while an undo/redo-triggered setSchema is in flight
+  const prevSchemaRef    = useRef<FormSchema>(schema)
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
   // Latest schema/formId for the flush-on-leave handler (avoids re-registering
   // listeners on every keystroke).
   const latestRef        = useRef({ schema: null as FormSchema | null, formId: null as string | null })
@@ -237,6 +244,55 @@ export default function FormBuilder() {
       document.removeEventListener('visibilitychange', onHide)
     }
   }, [])
+
+  // Record each schema change onto the undo stack, skipping the initial load
+  // and any change caused by undo/redo itself (so undo doesn't create a redo
+  // entry that just re-triggers itself).
+  useEffect(() => {
+    if (isInitRef.current) { prevSchemaRef.current = schema; return }
+    if (skipHistoryRef.current) { skipHistoryRef.current = false; prevSchemaRef.current = schema; return }
+    undoStackRef.current.push(prevSchemaRef.current)
+    if (undoStackRef.current.length > 100) undoStackRef.current.shift()
+    redoStackRef.current = []
+    prevSchemaRef.current = schema
+    setCanUndo(true)
+    setCanRedo(false)
+  }, [schema])
+
+  const handleUndo = useCallback(() => {
+    if (undoStackRef.current.length === 0) return
+    const prev = undoStackRef.current.pop()!
+    redoStackRef.current.push(prevSchemaRef.current)
+    skipHistoryRef.current = true
+    setSchema(prev)
+    setCanUndo(undoStackRef.current.length > 0)
+    setCanRedo(true)
+  }, [])
+
+  const handleRedo = useCallback(() => {
+    if (redoStackRef.current.length === 0) return
+    const next = redoStackRef.current.pop()!
+    undoStackRef.current.push(prevSchemaRef.current)
+    skipHistoryRef.current = true
+    setSchema(next)
+    setCanRedo(redoStackRef.current.length > 0)
+    setCanUndo(true)
+  }, [])
+
+  // Ctrl/Cmd+Z / Ctrl/Cmd+Shift+Z (or Ctrl+Y) — ignored while typing in a text
+  // field so the browser's native field-level undo still works there.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (document.activeElement as HTMLElement | null)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (!(e.ctrlKey || e.metaKey)) return
+      const key = e.key.toLowerCase()
+      if (key === 'z' && !e.shiftKey) { e.preventDefault(); handleUndo() }
+      else if (key === 'y' || (key === 'z' && e.shiftKey)) { e.preventDefault(); handleRedo() }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [handleUndo, handleRedo])
 
   // ── Draft handlers ────────────────────────────────────────────────────────
   const handleRestoreDraft = () => {
@@ -416,16 +472,24 @@ export default function FormBuilder() {
 
       if (sections.length === 0) { toast.error('No fields found in this Excel file'); return }
 
-      const imported: FormSchema = { title: data.title || file.name.replace(/\.[^.]+$/, ''), version: 1, sections }
+      // When a form is already open (formId set), merge the re-imported fields into
+      // it rather than detaching into a new form — keeps existing submissions intact,
+      // since Save will PUT to this same formId instead of POSTing a new one.
+      const imported: FormSchema = formId
+        ? { title: schema.title, version: schema.version, sections }
+        : { title: data.title || file.name.replace(/\.[^.]+$/, ''), version: 1, sections }
       setSchema(imported)
-      setFormId(null)
       setSelectedSection(sections[0].id)
       setSelectedField(null)
       setDraft(null)
       clearFormDraft(formId)
       const totalFields = sections.reduce((n, s) => n + s.fields.length, 0)
       setImportSummary({ title: imported.title, sections: sections.length, fields: totalFields })
-      toast.success(`Imported: ${sections.length} sections, ${totalFields} fields`)
+      toast.success(
+        formId
+          ? `Imported ${sections.length} sections, ${totalFields} fields — click Save to update this form`
+          : `Imported: ${sections.length} sections, ${totalFields} fields`
+      )
     } catch (err: any) {
       toast.error(err.response?.data?.detail ?? 'Import failed — check the file format')
     } finally {
@@ -449,10 +513,12 @@ export default function FormBuilder() {
     setSaveError('')
     try {
       if (formId) {
-        await api.put(`/forms/${formId}`, { title: schema.title, json_schema: schema })
+        const { data } = await api.put(`/forms/${formId}`, { title: schema.title, json_schema: schema })
+        setSchema(s => ({ ...s, version: data.version }))
       } else {
         const { data } = await api.post('/forms/', { title: schema.title, json_schema: schema })
         setFormId(data.id)
+        setSchema(s => ({ ...s, version: data.version }))
       }
       setSaved(true)
       clearFormDraft(formId)
@@ -850,6 +916,10 @@ export default function FormBuilder() {
                     </Button>
                   </span>
                 )}
+                <span className="inline-flex items-center gap-1">
+                  <Button variant="secondary" size="sm" onClick={handleUndo} disabled={!canUndo} title="Undo (Ctrl+Z)">↶</Button>
+                  <Button variant="secondary" size="sm" onClick={handleRedo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">↷</Button>
+                </span>
                 <Button variant="secondary" size="sm" onClick={() => setShowForms(true)} title="My Forms">📂</Button>
                 <Button variant="secondary" size="sm" onClick={() => setShowTranslate(true)} title="Translate form labels">🌐</Button>
                 <Button variant="secondary" size="sm" onClick={() => window.location.href = '/collect'} title="Preview form">👁</Button>
