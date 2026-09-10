@@ -1826,9 +1826,22 @@ def load_account_project():
     except Exception as e:
         return jsonify(error=f"Could not parse saved project: {e}"), 400
 
-    _push_undo("Load from account")
+    copy_path = COPIES_DIR / f"ACCT_{filename}"
+    try:
+        copy_path.write_text(csv_content, encoding="utf-8")
+    except Exception:
+        copy_path = None
+
     DATA["df"] = df
+    DATA["original_df"] = df.copy()
     DATA["filename"] = filename
+    DATA["copy_path"] = str(copy_path) if copy_path else None
+    DATA["sheet_name"] = None
+    DATA["history"] = []
+    DATA["redo_stack"] = []
+    DATA["column_types"] = {}
+    DATA["active_filters"] = {}
+    DATA["column_labels"] = {}
     _save_state()
     mark_state_dirty()
     return jsonify(ok=True, rows=len(df), cols=len(df.columns), columns=df.columns.tolist(), filename=filename)
