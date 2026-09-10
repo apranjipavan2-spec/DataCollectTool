@@ -1795,6 +1795,45 @@ def account_history_restore():
     return jsonify(ok=True, rows=len(df), cols=len(df.columns), columns=df.columns.tolist())
 
 
+@app.route("/api/account-projects", methods=["POST"])
+def account_projects():
+    """List this user's saved cleaner projects (proxied from FieldGovern), so a
+    project saved in a past session can be found again — not just one saved
+    earlier in the current tab (which is all `_toolProjectId` remembers)."""
+    body = request.json or {}
+    fg_base_url = body.get("fg_base_url", "").rstrip("/")
+    token = body.get("token", "")
+    if not fg_base_url or not token:
+        return jsonify(error="fg_base_url and token required"), 400
+    try:
+        resp = _requests.get(f"{fg_base_url}/api/v1/tool-projects/?tool=cleaner",
+                             headers={"Authorization": f"Bearer {token}"}, timeout=30)
+        return jsonify(resp.json()), resp.status_code
+    except Exception as e:
+        return jsonify(error=str(e)), 502
+
+
+@app.route("/api/account-projects/load", methods=["POST"])
+def load_account_project():
+    """Load a previously saved account project's data into the working dataset."""
+    body = request.json or {}
+    csv_content = (body.get("data") or {}).get("csv_content", "")
+    filename = (body.get("data") or {}).get("filename") or "cleaned_data.csv"
+    if not csv_content:
+        return jsonify(error="Saved project has no data"), 400
+    try:
+        df = _read_csv_smart(io.StringIO(csv_content))
+    except Exception as e:
+        return jsonify(error=f"Could not parse saved project: {e}"), 400
+
+    _push_undo("Load from account")
+    DATA["df"] = df
+    DATA["filename"] = filename
+    _save_state()
+    mark_state_dirty()
+    return jsonify(ok=True, rows=len(df), cols=len(df.columns), columns=df.columns.tolist(), filename=filename)
+
+
 @app.route("/api/fg/user-projects/save", methods=["POST"])
 def proxy_save_fg_project():
     body = request.json or {}

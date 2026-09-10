@@ -379,6 +379,22 @@ input, select, textarea { font-family: inherit; }
   </div>
 </div>
 
+<!-- Load from Account Modal -->
+<div class="modal-overlay" id="loadProjectsModal">
+  <div class="modal" style="max-width: 480px;">
+    <div class="modal-header">
+      <span>Load from Account</span>
+      <button class="btn btn-sm btn-secondary" onclick="closeLoadProjects()">Close</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px; color:var(--text2); margin-bottom:12px;">Files previously saved to your FieldGovern account. Loading one replaces your current working file — save first if you want to keep it.</p>
+      <div id="loadProjectsList" style="max-height:360px; overflow-y:auto;">
+        <div style="padding:20px; color:var(--text3); font-size:12px; text-align:center;">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- History Modal -->
 <div class="modal-overlay" id="historyModal">
   <div class="modal" style="max-width: 480px;">
@@ -436,6 +452,7 @@ input, select, textarea { font-family: inherit; }
       <button class="btn btn-success btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doExport('csv')">⬇ CSV</button>
       <button class="btn btn-success btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doExport('excel')">⬇ XLS</button>
       <button id="saveToAccountBtn" class="btn btn-primary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; margin-top:4px; display:none;" onclick="doSaveToAccount()" title="Save cleaned data to your FieldGovern account">💾 Save to Account</button>
+      <button id="loadFromAccountBtn" class="btn btn-secondary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; display:none;" onclick="openLoadProjects()" title="Load a file you previously saved to your FieldGovern account">📂 Load from Account</button>
       <div id="autosaveStatus" style="flex:2; min-width:100%; display:none; font-size:11px; color:var(--text3); text-align:center; padding:2px 0;"></div>
       <button id="historyBtn" class="btn btn-secondary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; display:none;" onclick="openHistory()" title="View and restore previous saved versions of this file">🕐 History</button>
       <button id="saveToServerBtn" class="btn btn-primary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; margin-top:4px; display:none;" onclick="doSaveToServer()" title="Save cleaned data back to server file (shared with Analyzer)">💾 Save to Server</button>
@@ -1691,6 +1708,75 @@ async function restoreHistoryVersion(index) {
   }
 }
 
+// ── Load from Account (files saved in a past session) ────────
+function openLoadProjects() {
+  if (!_fgUrl || !_fgToken) { toast('Not connected to FieldGovern', true); return; }
+  document.getElementById('loadProjectsModal').classList.add('open');
+  loadProjectsList();
+}
+function closeLoadProjects() {
+  document.getElementById('loadProjectsModal').classList.remove('open');
+}
+let _accountProjects = [];
+async function loadProjectsList() {
+  const list = document.getElementById('loadProjectsList');
+  list.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:12px;text-align:center;">Loading…</div>';
+  try {
+    const res = await fetch(BASE_URL + '/api/account-projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken }),
+    });
+    const projects = await res.json();
+    if (!res.ok) throw new Error((projects && projects.error) || 'Could not load saved files');
+    _accountProjects = Array.isArray(projects) ? projects : [];
+    if (!_accountProjects.length) {
+      list.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:12px;text-align:center;">No files saved to your account yet.</div>';
+      return;
+    }
+    list.innerHTML = _accountProjects.map((p, i) => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-size:13px; color:var(--text);">${p.name}</div>
+          <div style="font-size:11px; color:var(--text3);">${new Date(p.updated_at).toLocaleString()} · ${p.data?.row_count ?? '?'} rows · ${p.data?.col_count ?? '?'} cols</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="doLoadProject(${i})">Load</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    list.innerHTML = `<div style="padding:20px;color:var(--red);font-size:12px;text-align:center;">${e.message}</div>`;
+  }
+}
+async function doLoadProject(i) {
+  const p = _accountProjects[i];
+  if (!p) return;
+  if (!window.confirm(`Load "${p.name}"? Your current working file will be replaced.`)) return;
+  closeLoadProjects();
+  showLoading('Loading saved file…');
+  try {
+    const res = await fetch(BASE_URL + '/api/account-projects/load', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: p.data }),
+    });
+    const json = await res.json();
+    hideLoading();
+    if (!res.ok) throw new Error(json.error || 'Load failed');
+    _toolProjectId = p.id;
+    _toolProjectName = p.name;
+    _dirty = false;
+    DATA_FILENAME = json.filename || p.name;
+    toast(`Loaded "${p.name}" — ${json.rows} rows, ${json.cols} columns`);
+    const wc = document.getElementById('welcomeCard');
+    if (wc) wc.style.display = 'none';
+    await loadInfo();
+    if (columns.length > 0) selectColumn(columns[0].name);
+  } catch (e) {
+    hideLoading();
+    toast(e.message || 'Load failed', true);
+  }
+}
+
 // ── Preview ──────────────────────────────────────────────
 async function loadPreview(page = 1) {
   const data = await api(`preview?page=${page}&per_page=50`);
@@ -2234,6 +2320,8 @@ async function fgLoadData(opts) {
   if (saveBtn) saveBtn.style.display = '';
   const historyBtn = document.getElementById('historyBtn');
   if (historyBtn) historyBtn.style.display = '';
+  const loadFromAccountBtn = document.getElementById('loadFromAccountBtn');
+  if (loadFromAccountBtn) loadFromAccountBtn.style.display = '';
   setAutosaveStatus('Autosave on — every 60s once you save once');
 
   // Hide the file upload zone — FG context is the primary data source
