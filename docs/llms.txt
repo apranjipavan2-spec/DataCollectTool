@@ -1,0 +1,43 @@
+# FieldGovern
+
+> India's offline-first field data collection and AI-powered analysis platform for NGOs,
+> researchers, and government M&E teams. Collect data with zero internet on Android, iOS,
+> and web; auto-sync when back online; analyze, cross-tabulate, and write reports with AI —
+> at roughly 1/3 the cost of SurveyCTO. DPDP Act 2023 compliant.
+
+Homepage: https://www.fieldgovern.com/
+
+## Product
+- [Features](https://www.fieldgovern.com/features.html): Offline PWA, AI cleaning, AI report writing, back-check, skip logic, versioning.
+- [Pricing](https://www.fieldgovern.com/pricing.html): Free tier plus paid plans from ₹6,999/month, UPI billing.
+- [Use Cases](https://www.fieldgovern.com/use-cases.html): M&E, baseline-endline, impact evaluation, panel studies, CAPI/CATI surveys.
+- [Integrations](https://www.fieldgovern.com/integrations.html)
+- [Security](https://www.fieldgovern.com/security.html)
+- [Demo](https://www.fieldgovern.com/demo.html)
+
+## Compare
+- [FieldGovern vs SurveyCTO, KoboToolbox, ODK & CommCare](https://www.fieldgovern.com/compare.html)
+- [SurveyCTO alternative](https://www.fieldgovern.com/surveycto-alternative.html)
+- [KoboToolbox alternative](https://www.fieldgovern.com/kobotoolbox-alternative.html)
+- [ODK alternative](https://www.fieldgovern.com/odk-alternative.html)
+- [CommCare alternative](https://www.fieldgovern.com/commcare-alternative.html)
+- [Google Forms alternative](https://www.fieldgovern.com/googleforms-alternative.html)
+- [SurveyMonkey alternative](https://www.fieldgovern.com/surveymonkey-alternative.html)
+- [Qualtrics alternative](https://www.fieldgovern.com/qualtrics-alternative.html)
+- [Magpi alternative](https://www.fieldgovern.com/magpi-alternative.html)
+
+## Compliance
+- [DPDP Act 2023 compliance](https://www.fieldgovern.com/dpdp-compliance.html)
+- [DPDP-compliant survey software in India](https://www.fieldgovern.com/dpdp-compliant-survey-software.html)
+- [Data Processing Agreement template](https://www.fieldgovern.com/dpa-template.html)
+
+## Guides
+- [Best survey app in India 2026](https://www.fieldgovern.com/best-survey-app-india.html)
+- [Best offline survey app for India](https://www.fieldgovern.com/offline-survey-app-india.html)
+- [Best CAPI software for India](https://www.fieldgovern.com/capi-software-india.html)
+- [Best survey tool for NGOs in India](https://www.fieldgovern.com/survey-tool-for-ngos-india.html)
+- [Blog](https://www.fieldgovern.com/blog/): DPDP, offline data collection, panel studies, tool comparisons.
+
+## Company
+- [About](https://www.fieldgovern.com/about.html): Built by Pavankumar Deshetty in partnership with Dataworx (Bengaluru).
+- [Partners](https://www.fieldgovern.com/partners.html)
