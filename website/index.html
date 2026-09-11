@@ -1335,12 +1335,24 @@
     document.getElementById('calcSubsOut').textContent=subs.toLocaleString('en-IN');
     document.getElementById('calcMonthsOut').textContent=months+(months===1?' month':' months');
     // Monthly list prices (INR). SurveyCTO/Qualtrics converted at ~₹83/$.
-    var fg=24999*months;                                   // FieldGovern Pro
+    // FieldGovern: pick the cheapest published tier that actually covers the
+    // selected forms + submissions, instead of always pricing at Pro.
+    var fgTiers=[
+      {name:'FieldGovern Free',price:0,subs:300,forms:2},
+      {name:'FieldGovern Starter',price:6999,subs:2000,forms:8},
+      {name:'FieldGovern Growth',price:12999,subs:5000,forms:20},
+      {name:'FieldGovern Pro',price:24999,subs:25000,forms:100}
+    ];
+    var fgTier=fgTiers[fgTiers.length-1];
+    for(var t=0;t<fgTiers.length;t++){
+      if(subs<=fgTiers[t].subs && forms<=fgTiers[t].forms){ fgTier=fgTiers[t]; break; }
+    }
+    var fg=fgTier.price*months;                            // FieldGovern (tier matched to inputs)
     var surveycto=52000*months;                            // SurveyCTO higher tier (~$625/mo)
     var qualtrics=125000*months;                           // Qualtrics (~$1,500/mo)
     var paper=(subs*months*8)+(forms*3000);                // ₹8/response entry+logistics + ₹3k/form setup
     var rows=[
-      {name:'FieldGovern Pro',cost:fg,hi:true},
+      {name:fgTier.name,cost:fg,hi:true},
       {name:'SurveyCTO (Pro tier)',cost:surveycto},
       {name:'Qualtrics',cost:qualtrics},
       {name:'Paper + manual entry',cost:paper}
