@@ -575,7 +575,13 @@
     .calc-savings .cs-right{text-align:right}
     .calc-savings .cs-label{font-size:0.74rem;text-transform:uppercase;letter-spacing:.04em;font-weight:700;opacity:0.9}
     .calc-savings .cs-val{font-size:2.6rem;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.1;margin-top:2px}
-    @media(max-width:640px){.calc-savings .cs-val{font-size:1.9rem}}
+    .calc-savings .cs-badge{display:inline-flex;align-items:center;gap:10px;font-size:1.8rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#fde047;margin-bottom:2px;animation:savedPulse 1.8s ease-in-out infinite}
+    .calc-savings .ping-dot{position:relative;width:11px;height:11px;border-radius:50%;background:#fde047;flex:none}
+    .calc-savings .ping-dot::before{content:'';position:absolute;inset:0;border-radius:50%;background:#fde047;animation:pingRing 1.6s cubic-bezier(0,0,.2,1) infinite}
+    @keyframes savedPulse{0%,100%{transform:scale(1);text-shadow:0 0 0 rgba(253,224,71,0)}50%{transform:scale(1.07);text-shadow:0 0 16px rgba(253,224,71,.8)}}
+    @keyframes pingRing{0%{transform:scale(1);opacity:.7}75%,100%{transform:scale(2.8);opacity:0}}
+    @media(prefers-reduced-motion:reduce){.calc-savings .cs-badge,.calc-savings .ping-dot::before{animation:none}}
+    @media(max-width:640px){.calc-savings .cs-val{font-size:1.9rem}.calc-savings .cs-badge{font-size:1.35rem}}
     .calc-note{margin-top:14px;text-align:center;font-size:0.74rem;color:var(--text3);line-height:1.5}
     @media(max-width:640px){.calc-sliders{grid-template-columns:1fr;gap:16px}}
   </style>
@@ -1169,8 +1175,9 @@
       <div class="calc-rows" id="calcRows"></div>
       <div class="calc-savings">
         <div>
-          <div class="cs-label">Your savings vs SurveyCTO</div>
+          <div class="cs-badge"><span class="ping-dot"></span>Saved</div>
           <div class="cs-val" id="calcSaveVal">—</div>
+          <div class="cs-label">vs SurveyCTO</div>
         </div>
         <div class="cs-right">
           <div class="cs-label">Lower</div>
