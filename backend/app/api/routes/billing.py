@@ -26,9 +26,13 @@ router = APIRouter(prefix="/billing", tags=["billing"])
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
-CYCLE_DISCOUNT     = {"monthly": 0, "6month": 0, "annual": 0, "3year": 0}
-CYCLE_MONTHS       = {"monthly": 1, "6month": 6, "annual": 12, "3year": 36}
-CYCLE_BONUS_MONTHS = {"monthly": 0, "6month": 0, "annual": 2,  "3year": 6}
+CYCLE_DISCOUNT     = {"monthly": 0, "3month": 0, "6month": 0, "annual": 0, "3year": 0}
+CYCLE_MONTHS       = {"monthly": 1, "3month": 3, "6month": 6, "annual": 12, "3year": 36}
+CYCLE_BONUS_MONTHS = {"monthly": 0, "3month": 0, "6month": 0, "annual": 2,  "3year": 6}
+
+# Starter-tier plans price each cycle as a flat monthly rate (steeper discount for
+# longer commitments) instead of the bonus-months model used by Growth/Pro/Enterprise.
+STARTER_CYCLE_RATE = {"monthly": 7999, "3month": 7999, "6month": 7499, "annual": 6999, "3year": 6999}
 
 _PAYMENT_DEFAULTS = {
     "upi_id":         "fieldgovernindia@upi",
@@ -87,10 +91,14 @@ def _order_ref() -> str:
 def _calc_amount(plan: Plan, billing_cycle: str) -> int:
     """Return total amount in INR for the chosen billing cycle.
 
-    paid_months = total_months - bonus_months (e.g. annual: pay 10, get 12)
-    price_discount reduces the per-month amount on top (currently 0 for all cycles).
+    Starter-tier plans: flat per-cycle monthly rate x months (STARTER_CYCLE_RATE) —
+    a genuinely lower rate for longer commitments, not a "pay X get Y free" framing.
+    All other tiers: paid_months = total_months - bonus_months (e.g. annual: pay 10, get 12).
     """
-    months      = CYCLE_MONTHS.get(billing_cycle, 1)
+    months = CYCLE_MONTHS.get(billing_cycle, 1)
+    if plan.tier == "starter":
+        rate = STARTER_CYCLE_RATE.get(billing_cycle, plan.price_inr)
+        return int(rate * months)
     bonus       = CYCLE_BONUS_MONTHS.get(billing_cycle, 0)
     discount    = CYCLE_DISCOUNT.get(billing_cycle, 0)
     paid_months = months - bonus
@@ -161,8 +169,11 @@ def list_plans(db: Session = Depends(get_db)):
             "billing": {
                 cycle: {
                     "months": CYCLE_MONTHS[cycle],
-                    "bonus_months": CYCLE_BONUS_MONTHS[cycle],
-                    "paid_months": CYCLE_MONTHS[cycle] - CYCLE_BONUS_MONTHS[cycle],
+                    "bonus_months": 0 if p.tier == "starter" else CYCLE_BONUS_MONTHS[cycle],
+                    "paid_months": (
+                        CYCLE_MONTHS[cycle] if p.tier == "starter"
+                        else CYCLE_MONTHS[cycle] - CYCLE_BONUS_MONTHS[cycle]
+                    ),
                     "price_discount_pct": disc,
                     "total_inr": _calc_amount(p, cycle),
                     "monthly_effective_inr": (
@@ -727,7 +738,7 @@ def public_pricing(db: Session = Depends(get_db)):
             {
                 "tier": tier,
                 "limits": PLAN_LIMITS.get(tier, {}),
-                "price_inr": {"free": 0, "starter": 6999, "growth": 12999, "pro": 24999, "custom": 0}.get(tier, 0),
+                "price_inr": {"free": 0, "starter": 7999, "growth": 12999, "pro": 24999, "custom": 0}.get(tier, 0),
             }
             for tier in ["free", "starter", "growth", "pro", "custom"]
         ]

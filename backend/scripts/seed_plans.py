@@ -26,8 +26,8 @@ PLANS = [
     ),
     dict(
         id="ngo_starter", segment="ngo", tier="starter", name="NGO Starter", sort_order=11,
-        description="AI cleaning + unlimited FG Writer reports. Priced below Kobo Community ($88/mo).",
-        price_inr=6499, price_usd_cents=7800,
+        description="AI cleaning + unlimited FG Writer reports. All-in INR pricing with GST invoicing.",
+        price_inr=7999, price_usd_cents=7800,
         submissions_limit=5000, storage_limit_mb=1024,
         max_org_admins=3, max_supervisors=10, max_enumerators=None,
         asr_minutes_limit=10, translation_chars=6000,
@@ -80,8 +80,8 @@ PLANS = [
     ),
     dict(
         id="govt_department", segment="govt", tier="starter", name="Government — Department", sort_order=21,
-        description="AI cleaning · Audit log · RBAC · GPS fraud detection. At par with Kobo Professional ($166/mo).",
-        price_inr=13799, price_usd_cents=16600,
+        description="AI cleaning · Audit log · RBAC · GPS fraud detection. Well below Kobo Professional ($166/mo).",
+        price_inr=7999, price_usd_cents=16600,
         submissions_limit=25000, storage_limit_mb=None,
         max_org_admins=5, max_supervisors=None, max_enumerators=None,
         asr_minutes_limit=120, translation_chars=72000,
@@ -134,8 +134,8 @@ PLANS = [
     ),
     dict(
         id="research_plan", segment="research", tier="starter", name="Research", sort_order=31,
-        description="AI cleaning · Panel study · Attrition tracking · SPSS/Stata export. Half the price of SurveyCTO ($299/mo).",
-        price_inr=13799, price_usd_cents=16600,
+        description="AI cleaning · Panel study · Attrition tracking · SPSS/Stata export. Under a third of SurveyCTO's price ($299/mo).",
+        price_inr=7999, price_usd_cents=16600,
         submissions_limit=25000, storage_limit_mb=None,
         max_org_admins=5, max_supervisors=None, max_enumerators=None,
         asr_minutes_limit=120, translation_chars=72000,
@@ -188,8 +188,8 @@ PLANS = [
     ),
     dict(
         id="corp_business", segment="corporate", tier="starter", name="Business", sort_order=41,
-        description="AI cleaning · Smart Builder · GPS fraud detection · Photo audit. At par with Kobo Professional ($166/mo).",
-        price_inr=13799, price_usd_cents=16600,
+        description="AI cleaning · Smart Builder · GPS fraud detection · Photo audit. Well below Kobo Professional ($166/mo).",
+        price_inr=7999, price_usd_cents=16600,
         submissions_limit=25000, storage_limit_mb=None,
         max_org_admins=5, max_supervisors=None, max_enumerators=None,
         asr_minutes_limit=120, translation_chars=72000,
@@ -263,7 +263,7 @@ UNIFIED_PLANS = [
     dict(
         id="fg_starter", segment="unified", tier="starter", name="Starter", sort_order=2,
         description="For small teams running active surveys.",
-        price_inr=6999, price_usd_cents=8400,
+        price_inr=7999, price_usd_cents=8400,
         submissions_limit=2000,  storage_limit_mb=500,
         active_forms_limit=8,    ai_reports_per_month=8,  api_calls_per_month=3000,
         max_org_admins=2,        max_supervisors=None,    max_enumerators=None,
