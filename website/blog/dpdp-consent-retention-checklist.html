@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SPLVXJJ7GN"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag("js", new Date());
+    gtag("config", "G-SPLVXJJ7GN");
+  </script>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Consent &amp; Data Retention Under DPDP: A Checklist — FieldGovern</title>
+  <meta name="description" content="How to design a DPDP-compliant consent screen and build a real data retention schedule for field surveys — with a sample retention table and step-by-step checklist."/>
+  <link rel="canonical" href="https://www.fieldgovern.com/blog/dpdp-consent-retention-checklist.html"/>
+  <link rel="icon" href="/assets/logo-icon.png" type="image/png"/>
+  <link rel="manifest" href="/site.webmanifest"/>
+  <meta name="robots" content="index,follow"/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:url" content="https://www.fieldgovern.com/blog/dpdp-consent-retention-checklist.html"/>
+  <meta property="og:title" content="Consent &amp; Data Retention Under DPDP: A Practical Checklist"/>
+  <meta property="og:description" content="How to design a DPDP-compliant consent screen and build a real data retention schedule for field surveys — with a sample retention table and step-by-step checklist."/>
+  <meta property="og:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
+  <meta property="og:site_name" content="FieldGovern"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="Consent &amp; Data Retention Under DPDP: A Practical Checklist"/>
+  <meta name="twitter:description" content="How to design a DPDP-compliant consent screen and build a real data retention schedule for field surveys — with a sample retention table and step-by-step checklist."/>
+  <meta name="twitter:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Consent & Data Retention Under DPDP: A Practical Checklist","datePublished":"2026-07-29","dateModified":"2026-07-29","author":{"@type":"Organization","name":"FieldGovern"},"publisher":{"@type":"Organization","name":"FieldGovern","url":"https://www.fieldgovern.com"}}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <script defer data-domain="fieldgovern.com" src="https://plausible.io/js/script.js"></script>
+  <style>
+    :root{--brand:#0ea5e9;--brand-dark:#0369a1;--bg:#ffffff;--bg2:#f8fafc;--bg3:#f1f5f9;--text:#0f172a;--text2:#334155;--text3:#64748b;--border:#e2e8f0}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{font-family:'Inter',sans-serif;color:var(--text);background:var(--bg)}
+    body{overflow-x:hidden;max-width:100vw}
+    a{color:var(--brand)}
+    nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.95);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:0 1.5rem}
+    .nav-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:64px}
+    .nav-logo{font-weight:800;font-size:1.2rem;color:var(--text);text-decoration:none}
+    .hero{background:linear-gradient(135deg,#0369a1 0%,#0ea5e9 100%);color:#fff;padding:4rem 1.5rem 3rem;text-align:center}
+    .hero .tag{display:inline-block;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:.3rem .9rem;font-size:.8rem;font-weight:600;margin-bottom:1rem}
+    .hero h1{font-size:clamp(1.75rem,4vw,2.75rem);font-weight:900;line-height:1.2;max-width:800px;margin:0 auto .75rem}
+    .hero p{opacity:.9;max-width:680px;margin:.5rem auto 0;font-size:1rem}
+    .hero .meta{opacity:.7;font-size:.85rem;margin-top:1rem}
+    article{max-width:780px;margin:0 auto;padding:3rem 1.5rem}
+    article h2{font-size:1.4rem;font-weight:800;margin:2.5rem 0 .75rem;color:var(--text)}
+    article h3{font-size:1.1rem;font-weight:700;margin:1.75rem 0 .5rem;color:var(--text)}
+    article p{color:var(--text2);line-height:1.8;margin-bottom:1rem;font-size:.97rem}
+    article ul,article ol{padding-left:1.5rem;margin-bottom:1rem}
+    article li{color:var(--text2);line-height:1.8;margin-bottom:.4rem;font-size:.97rem}
+    article strong{color:var(--text)}
+    article img{max-width:100%;border-radius:10px;border:1px solid var(--border);margin:1.5rem 0;display:block}
+    figcaption{font-size:.82rem;color:var(--text3);text-align:center;margin-top:-1rem;margin-bottom:1.5rem}
+    .table-wrap{overflow-x:auto;margin:1.5rem 0}
+    table{width:100%;border-collapse:collapse;font-size:.88rem}
+    th{background:var(--bg3);font-weight:700;text-align:left;padding:.65rem 1rem;border:1px solid var(--border)}
+    td{padding:.6rem 1rem;border:1px solid var(--border);color:var(--text2);vertical-align:top}
+    .cta-box{background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff;border-radius:16px;padding:2.5rem 2rem;text-align:center;margin:3rem 0}
+    .cta-box h2{color:#fff;font-size:1.5rem;margin-bottom:.5rem;margin-top:0}
+    .cta-box p{color:rgba(255,255,255,.85);margin-bottom:1.25rem}
+    .btn{display:inline-block;padding:.8rem 1.75rem;border-radius:8px;font-weight:700;font-size:.9rem;text-decoration:none}
+    .btn-white{background:#fff;color:var(--brand-dark)}
+    .related{background:var(--bg2);border-radius:12px;padding:1.5rem;margin:2rem 0}
+    .related h3{font-size:.95rem;font-weight:700;margin-bottom:.75rem;color:var(--text)}
+    .related ul{list-style:none;padding:0}
+    .related li{margin-bottom:.4rem}
+    .warning-box{background:#fef3c7;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:1rem 1.25rem;margin:1.5rem 0}
+    .warning-box strong{color:#92400e}
+    .warning-box p{color:#78350f;margin:0}
+    .checklist-item{display:flex;align-items:flex-start;gap:.75rem;padding:.6rem 0;border-bottom:1px solid var(--border)}
+    .checklist-item:last-child{border-bottom:none}
+    .check-num{background:var(--brand);color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0;margin-top:.1rem}
+    footer{background:var(--bg3);border-top:1px solid var(--border);padding:2rem 1.5rem;text-align:center;font-size:.85rem;color:var(--text3);margin-top:4rem}
+    @media(max-width:640px){.nav-links{display:none}}
+  </style>
+</head>
+<body>
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="/">FieldGovern</a>
+    <div class="nav-links" style="display:flex;gap:1.5rem;font-size:.9rem">
+      <a href="/blog/">Blog</a>
+      <a href="/features.html">Features</a>
+      <a href="/pricing.html">Pricing</a>
+      <a href="https://app.fieldgovern.com" style="color:var(--brand);font-weight:600">Get Started</a>
+    </div>
+  </div>
+</nav>
+
+<div class="hero">
+  <span class="tag">Compliance</span>
+  <h1>Consent &amp; Data Retention Under DPDP: A Practical Checklist</h1>
+  <p>Two mechanics that make or break DPDP compliance in practice: a consent screen respondents actually understand, and a retention schedule that survives an audit. Here's how to build both.</p>
+  <div class="meta">By FieldGovern · July 2026 · 11 min read</div>
+</div>
+
+<article>
+
+  <p><strong>Disclaimer: This article is educational and does not constitute legal advice. Consult a qualified legal professional for advice specific to your organisation.</strong></p>
+
+  <p>Our earlier post, <a href="dpdp-act-2023-field-research.html">DPDP Act 2023 for Field Researchers</a>, covers the Act end to end — Data Fiduciary obligations, Data Principal rights, penalty tiers, and a 30-day compliance checklist. If you haven't read it, start there; it's the foundation this post builds on.</p>
+
+  <p>This post goes deeper on two mechanics that post only summarised, because they are where most organisations actually get stuck: designing a consent screen that holds up to scrutiny, and building a retention schedule that survives both a DPDP audit and a funder's grant closeout review. Both sound simple in principle and turn out to be full of operational detail once you try to implement them across a real field team.</p>
+
+  <h2>Designing a Consent Screen That Actually Holds Up</h2>
+
+  <p>A consent checkbox is not consent under DPDP. The Act defines valid consent as free, specific, informed, unconditional, and unambiguous — with a clear affirmative action attached to each purpose. In practice, that means four design decisions, each of which has real operational consequences for a field team.</p>
+
+  <h3>1. Language and localisation</h3>
+  <p>Consent captured in a language the respondent doesn't read fluently is not informed consent — full stop. If your enumeration is happening in rural Bihar, a consent screen in English satisfies nobody except a lawyer reviewing the form afterward. Build the consent screen in every language your field team enumerates in, not just the languages your head office uses for reporting.</p>
+  <p>Two practical notes from real deployments: first, back-translate your consent text (translate to the local language, then have a different person translate it back to English) before you go to field — direct machine translation of legal-sounding phrases like "processing" or "data fiduciary" often produces nonsense in regional languages. Second, for respondents who are not literate, the enumerator must read the consent notice aloud and record an audio or verbal-consent marker rather than relying on a screen the respondent cannot read themselves. FieldGovern's Form Builder supports AI-assisted translation into Hindi, Kannada, Telugu, and other Indian languages specifically so consent text doesn't get left in English by default.</p>
+
+  <h3>2. Granularity per purpose</h3>
+  <p>"I consent to this study" is a single blanket permission and, per the Act's specificity requirement, is too broad the moment your study does more than one thing with the data. A baseline-endline evaluation that also shares anonymised data with a funder for their own reporting is two purposes, not one. A health survey that also flags severe cases for referral to a partner clinic is two purposes.</p>
+  <p>The fix is to break consent into distinct, separately affirmed questions — one per purpose — rather than one omnibus checkbox:</p>
+  <ul>
+    <li>Consent to participate and answer survey questions</li>
+    <li>Consent to share de-identified responses with the funder/donor for reporting</li>
+    <li>Consent to be re-contacted for a future follow-up wave</li>
+    <li>Consent to referral (where the survey identifies a need — e.g., a malnourished child, a case of gender-based violence) to a named third-party service</li>
+  </ul>
+  <p>A respondent may say yes to the first and no to the third. Your form logic needs to handle that gracefully — recording the response but suppressing the recontact-eligible flag rather than treating a partial "no" as a reason to discard the whole record.</p>
+
+  <h3>3. Timestamp and consent ID capture</h3>
+  <p>Consent that isn't independently verifiable is difficult to defend in a Data Protection Board inquiry. Two fields should be captured automatically — never entered manually by the enumerator, since manual entry is trivially falsifiable:</p>
+  <ul>
+    <li><strong>Consent timestamp</strong> — the exact device time the consent question was answered, captured by the app, not typed in.</li>
+    <li><strong>Consent ID</strong> — a unique identifier generated at the moment of consent, stored in a record that is separate from (but linkable to) the respondent's substantive answers. This is what lets you prove, later, that a specific person consented to a specific version of a specific purpose statement on a specific date — which matters enormously if your consent language changes mid-study.</li>
+  </ul>
+  <p>If your survey tool doesn't generate these automatically, you are relying on enumerators to remember to fill in a timestamp field by hand in the field — which does not happen reliably at scale, and which an auditor will notice immediately.</p>
+
+  <img src="../assets/blog/form-builder-ai.png" alt="FieldGovern Form Builder showing form design canvas used to build DPDP-compliant consent screens with per-purpose questions"/>
+  <figcaption>Structuring consent as separate, purpose-specific questions inside the form itself — not a single blanket checkbox.</figcaption>
+
+  <h3>4. A clear withdrawal mechanism — and what happens operationally when someone withdraws</h3>
+  <p>The Act requires that withdrawing consent be as easy as giving it. In practice this means publishing a specific, low-friction channel: a phone number or SMS shortcode the respondent can use, printed on a leave-behind card, or a request routed through the field supervisor. "Contact our office" is not specific enough to count as easy.</p>
+  <p>The part most study designs skip is what happens operationally once a withdrawal request actually arrives mid-study. This needs to be a documented procedure, not an improvised decision made by whoever answers the phone:</p>
+  <ol>
+    <li><strong>Log the request</strong> — date, respondent (via consent ID, not name, where possible), and channel it came through.</li>
+    <li><strong>Stop active processing</strong> — flag the respondent's record so it is excluded from any in-progress analysis, dashboard, or export going forward.</li>
+    <li><strong>Decide what "withdrawal" means for existing data.</strong> Under DPDP, withdrawal is prospective — it doesn't automatically erase data already lawfully processed, but the respondent can separately request erasure, and many organisations choose to treat the two requests as bundled by default for a cleaner respondent experience.</li>
+    <li><strong>Erase or de-identify</strong> the record within your committed response window (document this window in your Privacy Notice — 30 days is a common, defensible choice).</li>
+    <li><strong>Document the closure</strong> — confirm to the respondent (where contact is possible) that the request was actioned, and log the closure date for audit purposes.</li>
+    <li><strong>Account for it in analysis.</strong> If the study is mid-fieldwork, note the attrition in your data quality log so a withdrawn respondent doesn't silently show up as a "non-response" with an unclear cause when someone reviews the dataset six months later.</li>
+  </ol>
+  <p>This is exactly the kind of scenario that panel studies need to plan for at design stage, not discover mid-fieldwork — see our <a href="panel-study-india-guide.html">panel study guide</a> for how attrition and re-contact interact with consent withdrawal across multiple waves.</p>
+
+  <h2>Building a Real Data Retention Schedule</h2>
+
+  <p>Data minimisation under DPDP doesn't only govern what you collect — it also governs how long you keep it. "We'll just keep everything forever, it might be useful" is no longer a neutral default; it is itself a compliance risk, because retaining personal data beyond the purpose for which it was collected is a violation even if nothing is ever misused.</p>
+
+  <h3>Raw PII vs. anonymised aggregate data</h3>
+  <p>The single most useful design decision most field research teams can make is to separate, structurally, two categories of data that are often stored together in one flat spreadsheet:</p>
+  <ul>
+    <li><strong>Raw personal data</strong> — respondent name, phone number, exact GPS coordinates, photographs, household ID linked to identity. This is what DPDP regulates directly, and what carries retention risk.</li>
+    <li><strong>Anonymised or aggregated data</strong> — response values with all direct and indirect identifiers stripped or generalised (e.g., GPS rounded to block/village level, age bucketed into ranges), such that re-identification is not reasonably possible. Once genuinely anonymised, this data falls outside DPDP's scope.</li>
+  </ul>
+  <p>The practical implication: retain raw PII for the shortest period that is operationally necessary, then either delete it or irreversibly anonymise it — while the anonymised aggregate can be retained far longer for research, audit, and donor reporting purposes without the same regulatory exposure. Treating these as one undifferentiated dataset with one retention rule is how organisations end up either deleting data a funder needs, or keeping PII years longer than the Act allows.</p>
+
+  <h3>The tension: DPDP minimisation vs. funder audit retention</h3>
+  <p>This is the part that catches most NGOs and research units off guard: DPDP pushes you toward deletion, but your grant agreement may require retention. Many donor and government grant agreements specify a minimum audit-retention period — commonly 3 to 7 years after project closure — during which records, including underlying data, must be available for audit. CSR-funded programmes in particular often carry contractual retention clauses that predate DPDP and were never written with a data-minimisation law in mind.</p>
+  <p>Resolving this tension is not a matter of picking one rule over the other — it's a matter of applying the right rule to the right layer of data:</p>
+  <ul>
+    <li>The <strong>funder's audit retention clause</strong> almost always concerns evidence that the work was done and the numbers are real — it is satisfied by anonymised aggregate data, response counts, and audit trails, not by keeping respondents' names and phone numbers on file for seven years.</li>
+    <li>The <strong>DPDP minimisation obligation</strong> applies specifically to personal data — so raw PII gets the short retention window, anonymised data gets the long one.</li>
+  </ul>
+  <p>State this split explicitly in your data management plan and, ideally, in your funder agreement itself, so there's no ambiguity six years later about whether "keep the data" meant the spreadsheet with names in it or the anonymised dataset.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Data type</th>
+          <th>Retention period</th>
+          <th>Rationale</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Respondent name, phone number, exact address</td>
+          <td>Delete within a defined grace period (e.g., 90 days) after study closure</td>
+          <td>DPDP minimisation — no ongoing purpose once fieldwork and validation are complete</td>
+        </tr>
+        <tr>
+          <td>Consent records (consent ID, timestamp, purpose version)</td>
+          <td>Retain for the funder's audit window (e.g., 5 years), stored separately from response data</td>
+          <td>Evidence of lawful processing; low re-identification risk if response data is unlinked</td>
+        </tr>
+        <tr>
+          <td>Photos/audio with identifiable faces or voices</td>
+          <td>Delete or blur/anonymise within 90 days unless explicit extended consent was captured</td>
+          <td>High-sensitivity biometric-adjacent data under DPDP</td>
+        </tr>
+        <tr>
+          <td>Precise GPS coordinates</td>
+          <td>Generalise to village/block level after data cleaning is complete; delete precise points</td>
+          <td>Indirect identifier; precision beyond analysis need is unnecessary risk</td>
+        </tr>
+        <tr>
+          <td>Anonymised response data (no direct/indirect identifiers)</td>
+          <td>Retain per funder's specified audit window (commonly 3-7 years)</td>
+          <td>Outside DPDP's personal-data scope once genuinely anonymised</td>
+        </tr>
+        <tr>
+          <td>Audit logs / submission edit history</td>
+          <td>Retain for the audit window; not personal data on its own if user IDs are internal staff, not respondents</td>
+          <td>Required to demonstrate data integrity during grant closeout — see our <a href="audit-trail-dpdp-donor-compliance.html">audit trail post</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="warning-box">
+    <strong>"Anonymised" has a real bar to clear.</strong>
+    <p>Removing a name column is not anonymisation if GPS coordinates, a rare combination of caste/age/village, or a photo still make the respondent identifiable. If you can re-identify a "anonymised" record by cross-referencing two or three remaining fields, it is still personal data under DPDP, and the short retention clock still applies to it.</p>
+  </div>
+
+  <h2>Step-by-Step: Building a Retention Policy</h2>
+
+  <div class="checklist-item">
+    <div class="check-num">1</div>
+    <div><strong>Inventory every field that carries personal data.</strong> Go form by form, field by field. Tag each as direct identifier (name, phone), indirect identifier (precise GPS, rare demographic combination), or non-identifying.</div>
+  </div>
+  <div class="checklist-item">
+    <div class="check-num">2</div>
+    <div><strong>Map each field to a purpose.</strong> If a field doesn't serve a documented purpose, it shouldn't have been collected — flag it for removal from future form versions, not just for retention planning.</div>
+  </div>
+  <div class="checklist-item">
+    <div class="check-num">3</div>
+    <div><strong>Check every active grant agreement for an audit-retention clause.</strong> Note the specific duration and what evidence it actually requires — usually aggregate/response data and audit trails, rarely raw PII.</div>
+  </div>
+  <div class="checklist-item">
+    <div class="check-num">4</div>
+    <div><strong>Set two retention clocks per dataset, not one.</strong> A short clock for raw PII (tied to study purpose completion), a long clock for the anonymised/aggregate layer and consent/audit records (tied to funder requirements).</div>
+  </div>
+  <div class="checklist-item">
+    <div class="check-num">5</div>
+    <div><strong>Define your anonymisation method in writing.</strong> Specify exactly how identifiers get stripped or generalised (GPS rounding, age bucketing, name removal, photo blurring) so it's a repeatable procedure, not an ad hoc judgment call each time.</div>
+  </div>
+  <div class="checklist-item">
+    <div class="check-num">6</div>
+    <div><strong>Automate deletion where you can.</strong> Manual deletion schedules get missed. Wherever your tooling supports it, set retention rules as system policy rather than a calendar reminder someone has to act on.</div>
+  </div>
+  <div class="checklist-item">
+    <div class="check-num">7</div>
+    <div><strong>Publish the schedule in your Privacy Notice.</strong> Respondents have a right to know how long you'll hold their data — state actual periods, not "as long as necessary."</div>
+  </div>
+  <div class="checklist-item">
+    <div class="check-num">8</div>
+    <div><strong>Review annually.</strong> New grants bring new retention clauses; closed studies should trigger a retention review, not sit untouched in storage indefinitely.</div>
+  </div>
+
+  <p>None of this needs to be manual busywork forever. A survey platform that separates raw response storage from your reporting layer, timestamps consent automatically, and keeps a structured audit trail of who accessed or changed what makes both halves of this — the consent design and the retention schedule — dramatically easier to actually operate day to day, rather than just document on paper. See our companion post on <a href="audit-trail-dpdp-donor-compliance.html">why your M&amp;E tool needs an audit trail</a> for how the audit-log layer of this fits together with donor compliance specifically.</p>
+
+  <div class="cta-box">
+    <h2>Consent and Retention, Built Into the Form</h2>
+    <p>FieldGovern captures consent timestamps and IDs automatically, supports AI translation for local-language consent screens, and keeps a structured audit log so your retention policy is enforceable, not just written down.</p>
+    <a href="https://app.fieldgovern.com" class="btn btn-white">Explore Compliance Features</a>
+  </div>
+
+  <div class="related">
+    <h3>Related Articles</h3>
+    <ul>
+      <li><a href="dpdp-act-2023-field-research.html">DPDP Act 2023 for Field Researchers: Consent, Data Rights, and What You Must Do Now</a></li>
+      <li><a href="audit-trail-dpdp-donor-compliance.html">Why Your M&amp;E Tool Needs an Audit Trail (DPDP + Donor Compliance)</a></li>
+      <li><a href="panel-study-india-guide.html">Running a Panel Study in India: Attrition, Tracking, and the Right Tools</a></li>
+      <li><a href="state-wise-data-collection-compliance-india.html">State-Wise Data Collection Compliance in India</a></li>
+    </ul>
+  </div>
+</article>
+
+<footer>
+  <p>© 2026 Dataworx · FieldGovern · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · <a href="/dpdp-compliance.html">DPDP</a></p>
+</footer>
+<script defer src="/assets/trial-cta.js"></script>
+</body>
+</html>
