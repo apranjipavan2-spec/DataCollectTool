@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SPLVXJJ7GN"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag("js", new Date());
+    gtag("config", "G-SPLVXJJ7GN");
+  </script>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>From Raw Data to Report: The Missing Middle Step — FieldGovern</title>
+  <meta name="description" content="Most teams jump from raw survey data straight to narrative, or drown in manual Excel cross-tabs. Here's the tabulation step that closes the gap — and the three failure modes it prevents."/>
+  <link rel="canonical" href="https://www.fieldgovern.com/blog/raw-survey-data-to-report.html"/>
+  <link rel="icon" href="/assets/logo-icon.png" type="image/png"/>
+  <link rel="manifest" href="/site.webmanifest"/>
+  <meta name="robots" content="index,follow"/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:url" content="https://www.fieldgovern.com/blog/raw-survey-data-to-report.html"/>
+  <meta property="og:title" content="From Raw Survey Data to Report: The Missing Middle Step"/>
+  <meta property="og:description" content="Most teams jump from raw survey data straight to narrative, or drown in manual Excel cross-tabs. Here's the tabulation step that closes the gap — and the three failure modes it prevents."/>
+  <meta property="og:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
+  <meta property="og:site_name" content="FieldGovern"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="From Raw Survey Data to Report: The Missing Middle Step"/>
+  <meta name="twitter:description" content="Most teams jump from raw survey data straight to narrative, or drown in manual Excel cross-tabs. Here's the tabulation step that closes the gap — and the three failure modes it prevents."/>
+  <meta name="twitter:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"From Raw Survey Data to Report: The Missing Middle Step","datePublished":"2026-09-02","dateModified":"2026-09-02","author":{"@type":"Organization","name":"FieldGovern"},"publisher":{"@type":"Organization","name":"FieldGovern","url":"https://www.fieldgovern.com"}}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <script defer data-domain="fieldgovern.com" src="https://plausible.io/js/script.js"></script>
+  <style>
+    :root{--brand:#0ea5e9;--brand-dark:#0369a1;--bg:#ffffff;--bg2:#f8fafc;--bg3:#f1f5f9;--text:#0f172a;--text2:#334155;--text3:#64748b;--border:#e2e8f0}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{font-family:'Inter',sans-serif;color:var(--text);background:var(--bg)}
+    body{overflow-x:hidden;max-width:100vw}
+    a{color:var(--brand)}
+    nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.95);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:0 1.5rem}
+    .nav-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:64px}
+    .nav-logo{font-weight:800;font-size:1.2rem;color:var(--text);text-decoration:none}
+    .hero{background:linear-gradient(135deg,#0369a1 0%,#0ea5e9 100%);color:#fff;padding:4rem 1.5rem 3rem;text-align:center}
+    .hero .tag{display:inline-block;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:.3rem .9rem;font-size:.8rem;font-weight:600;margin-bottom:1rem}
+    .hero h1{font-size:clamp(1.75rem,4vw,2.75rem);font-weight:900;line-height:1.2;max-width:800px;margin:0 auto .75rem}
+    .hero p{opacity:.9;max-width:680px;margin:.5rem auto 0;font-size:1rem}
+    .hero .meta{opacity:.7;font-size:.85rem;margin-top:1rem}
+    article{max-width:780px;margin:0 auto;padding:3rem 1.5rem}
+    article h2{font-size:1.4rem;font-weight:800;margin:2.5rem 0 .75rem;color:var(--text)}
+    article h3{font-size:1.1rem;font-weight:700;margin:1.75rem 0 .5rem;color:var(--text)}
+    article p{color:var(--text2);line-height:1.8;margin-bottom:1rem;font-size:.97rem}
+    article ul,article ol{padding-left:1.5rem;margin-bottom:1rem}
+    article li{color:var(--text2);line-height:1.8;margin-bottom:.4rem;font-size:.97rem}
+    article strong{color:var(--text)}
+    article img{max-width:100%;border-radius:10px;border:1px solid var(--border);margin:1.5rem 0;display:block}
+    figcaption{font-size:.82rem;color:var(--text3);text-align:center;margin-top:-1rem;margin-bottom:1.5rem}
+    .table-wrap{overflow-x:auto;margin:1.5rem 0}
+    table{width:100%;border-collapse:collapse;font-size:.88rem}
+    th{background:var(--bg3);font-weight:700;text-align:left;padding:.65rem 1rem;border:1px solid var(--border)}
+    td{padding:.6rem 1rem;border:1px solid var(--border);color:var(--text2);vertical-align:top}
+    .cta-box{background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff;border-radius:16px;padding:2.5rem 2rem;text-align:center;margin:3rem 0}
+    .cta-box h2{color:#fff;font-size:1.5rem;margin-bottom:.5rem;margin-top:0}
+    .cta-box p{color:rgba(255,255,255,.85);margin-bottom:1.25rem}
+    .btn{display:inline-block;padding:.8rem 1.75rem;border-radius:8px;font-weight:700;font-size:.9rem;text-decoration:none}
+    .btn-white{background:#fff;color:var(--brand-dark)}
+    .related{background:var(--bg2);border-radius:12px;padding:1.5rem;margin:2rem 0}
+    .related h3{font-size:.95rem;font-weight:700;margin-bottom:.75rem;color:var(--text)}
+    .related ul{list-style:none;padding:0}
+    .related li{margin-bottom:.4rem}
+    .warning-box{background:#fef3c7;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:1rem 1.25rem;margin:1.5rem 0}
+    .warning-box strong{color:#92400e}
+    .warning-box p{color:#78350f;margin:0}
+    .checklist-item{display:flex;align-items:flex-start;gap:.75rem;padding:.6rem 0;border-bottom:1px solid var(--border)}
+    .checklist-item:last-child{border-bottom:none}
+    .check-num{background:var(--brand);color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0;margin-top:.1rem}
+    footer{background:var(--bg3);border-top:1px solid var(--border);padding:2rem 1.5rem;text-align:center;font-size:.85rem;color:var(--text3);margin-top:4rem}
+    @media(max-width:640px){.nav-links{display:none}}
+  </style>
+</head>
+<body>
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="/">FieldGovern</a>
+    <div class="nav-links" style="display:flex;gap:1.5rem;font-size:.9rem">
+      <a href="/blog/">Blog</a>
+      <a href="/features.html">Features</a>
+      <a href="/pricing.html">Pricing</a>
+      <a href="https://app.fieldgovern.com" style="color:var(--brand);font-weight:600">Get Started</a>
+    </div>
+  </div>
+</nav>
+
+<div class="hero">
+  <span class="tag">Reporting</span>
+  <h1>From Raw Survey Data to Report: The Missing Middle Step</h1>
+  <p>Between "we collected 2,400 responses" and "here is our final report" sits a step most teams either rush or skip entirely — and it's the step that decides whether your findings are true.</p>
+  <div class="meta">By FieldGovern · September 2026 · 11 min read</div>
+</div>
+
+<article>
+
+  <p>Ask any field team how they get from raw survey data to a finished report, and you'll usually hear one of two answers. The first: "We export to Excel and someone builds pivot tables for a week." The second, more worrying answer: "The field coordinator writes up what she remembers from the field visits." Both answers point to the same missing piece — a proper, disciplined tabulation and analysis step that sits between data collection and the narrative document a donor, ministry, or board actually reads.</p>
+
+  <p>This middle step doesn't have a catchy name, which is part of why it gets skipped. It isn't "cleaning" (that should already be done). It isn't "writing" (that comes after). It's the work of turning a spreadsheet of rows and columns into a small set of defensible, interpretable numbers — cross-tabs, frequency distributions, subgroup comparisons — that a report can actually stand on. Skip it, or do it carelessly, and you get one of two failure modes: reports that took three weeks to produce because someone was manually filtering and pivoting the same dataset a dozen different ways, or reports that took three hours to produce because someone wrote a narrative straight from memory and gut feel, with numbers bolted on afterward to make it look rigorous.</p>
+
+  <h2>The four-stage pipeline that actually works</h2>
+
+  <p>Every credible survey report — whether it's a district-level education baseline or a CSR program endline for a donor board — passes through the same four stages, in the same order. Reordering or merging them is where reports go wrong.</p>
+
+  <ol>
+    <li><strong>Clean.</strong> Deduplicate respondents, resolve inconsistent category labels, flag and handle outliers and out-of-range values, confirm required fields aren't silently missing.</li>
+    <li><strong>Tabulate / cross-tabulate.</strong> Turn cleaned rows into frequency tables and cross-tabs — the specific question of "what does the data say" broken down by the subgroups that matter (district, gender, age band, arm/control, round).</li>
+    <li><strong>Interpret.</strong> Read the tabulated numbers against sample size, variance, and known confounders. Decide what's actually a finding versus what's noise.</li>
+    <li><strong>Narrate.</strong> Write the report — prose, context, recommendations — anchored to the specific tabulated numbers from stage 2, verified in stage 3.</li>
+  </ol>
+
+  <p>The step teams cut is almost always stage 2 combined with stage 3 — tabulation and interpretation. It's tedious, it requires someone comfortable with a spreadsheet or statistical tool, and under deadline pressure it's the easiest thing to compress into "eyeball the raw data and write what seems true." That compression is exactly where bad reports come from.</p>
+
+  <h2>Failure mode one: the average that hides its own outliers</h2>
+
+  <p>The most common way a rushed report goes wrong is reporting a mean without ever looking at the distribution behind it. Say a livelihoods program tracks household monthly income across 340 respondents in a district, and the average comes out to ₹14,200 — a number that looks like solid progress against a ₹9,000 baseline. Written into a report as-is, that's a strong headline. But if five households in the sample report incomes above ₹80,000 (data entry errors, a misunderstood question, or genuinely atypical outlier households), those five rows alone can pull a district-wide mean up by fifteen to twenty percent. The honest number — median income, or a trimmed mean with the outliers flagged and either corrected or excluded with a documented reason — might show income barely moved.</p>
+
+  <p>This isn't a hypothetical edge case; it's close to the default behavior of income, expenditure, and any self-reported numeric field in field surveys. A tabulation step that includes a basic outlier check — flagging values beyond a few standard deviations, or simply sorting the column and eyeballing the top and bottom 1% — catches this before it becomes a headline number in a donor report. Skipping straight from raw export to narrative means the outlier check never happens, because nobody stopped to look at the distribution before writing "average income increased by 58%."</p>
+
+  <h2>Failure mode two: findings dressed up from noise</h2>
+
+  <p>The second failure mode is subtler and more common in reports written by people who are good writers but not trained in survey statistics. A cross-tab shows that respondents in one block reported a slightly higher rate of latrine usage than respondents in a neighboring block — say 71% versus 64%. Written into a narrative, that seven-point gap becomes "Block B shows notably stronger sanitation outcomes than Block A, suggesting the community mobilization approach used there is more effective." The trouble is that if each block only has 40-50 respondents, a seven-point gap is well within the range you'd expect from random sampling noise alone — it isn't a "finding," it's normal variance around what might be an identical true rate in both blocks.</p>
+
+  <p>Proper tabulation practice — even something as basic as checking cell sizes before writing a comparative claim, or running a quick significance check when the sample allows it — prevents this. When the underlying tabulation is saved and visible, anyone reviewing the report before it goes out can trace the "notably stronger" claim back to n=44 and n=47 cells and ask the obvious question: is this actually a finding? When the narrative was written straight from a general impression of the raw export, that check never happens, because there's no saved tabulation to check it against.</p>
+
+  <h2>Failure mode three: causation smuggled into a cross-tab</h2>
+
+  <p>The third and most damaging failure mode is drawing a causal claim from what is, structurally, a purely descriptive cross-tab. A cross-tab of "training attendance" by "business revenue growth" might show that respondents who attended more training sessions also report higher revenue growth. That's a real, defensible descriptive finding. What a rushed report often does is upgrade it silently to "the training program drove revenue growth" — a causal claim the cross-tab cannot support on its own, because respondents who attend more training sessions may simply be more motivated, better resourced, or more engaged entrepreneurs to begin with, independent of the training itself.</p>
+
+  <div class="warning-box">
+    <strong>The tell to watch for</strong>
+    <p>If a report sentence uses "drove," "caused," "led to," or "resulted in" and the underlying evidence is a two-variable cross-tab from a single round of observational data, that's a claim the data hasn't earned. A defensible version reads: "Respondents who attended more training sessions also reported higher revenue growth (a descriptive association); this survey design cannot establish whether training caused the difference."</p>
+  </div>
+
+  <p>This distinction matters enormously in evaluation contexts, where a government reviewer or academic referee will read a causal claim and immediately ask about the counterfactual, selection effects, and confounding — questions a purely cross-sectional cross-tab cannot answer. Interpretation is the stage where someone with survey-methods literacy sits with the tabulated numbers and decides which claims the design actually supports, before a single sentence of narrative gets written.</p>
+
+  <h2>What a saved tabulation-to-narrative handoff actually looks like</h2>
+
+  <img src="../assets/blog/writer-report-styles.png" alt="FG Writer report-style picker showing Field Survey, Progress, Research, Government, NGO-Donor, and Medical report formats"/>
+  <figcaption>Choosing a report style still starts from the same underlying tabulated numbers — the format changes, the evidence doesn't.</figcaption>
+
+  <p>The practical fix for all three failure modes is the same: don't let tabulation and narrative live in separate tools connected only by copy-paste. When a cross-tab is built in one spreadsheet, screenshotted or manually retyped into a Word document, and then edited by two more people before it reaches a final report, every one of those handoffs is a place where the number drifts from the source, the outlier gets forgotten, or the sample size caveat gets dropped for the sake of a cleaner sentence.</p>
+
+  <p>FieldGovern's Analyzer module (TableForge) is built specifically to keep this handoff intact. Cross-tabs and frequency tables built in Analyzer — including AI-suggested tables that flag the subgroup breakdowns worth checking — carry their sample sizes and source filters with them. When those same tabulations feed directly into FG Writer's report generator, the narrative is drafted against the actual saved numbers, not a screenshot or a half-remembered figure from three weeks earlier. Writer offers six report styles — Field Survey, Progress, Research, Government, NGO-Donor, and Medical — but every style pulls from the same underlying tabulation, so switching the audience-facing format doesn't mean re-deriving the numbers from scratch or risking a mismatch between the version a donor sees and the version a government reviewer sees.</p>
+
+  <p>That matters more than it sounds. A program that reports different topline numbers to a state department and to a funder — not from dishonesty, but because two different people manually cross-tabbed the same raw data slightly differently — creates exactly the kind of credibility problem that undermines an otherwise strong program. Anchoring every report style to one saved tabulation closes that gap structurally, rather than relying on someone remembering to double-check.</p>
+
+  <h2>A practical checklist before any report goes out</h2>
+
+  <div class="checklist-item"><div class="check-num">1</div><div><strong>Distribution checked, not just the mean.</strong> Every numeric headline figure (income, distance, time, score) has had its distribution eyeballed for outliers before it's quoted.</div></div>
+  <div class="checklist-item"><div class="check-num">2</div><div><strong>Cell sizes visible on every cross-tab.</strong> No subgroup comparison is written into prose without the reader being able to see the n behind each side of the comparison.</div></div>
+  <div class="checklist-item"><div class="check-num">3</div><div><strong>Causal language matched to design.</strong> "Drove," "caused," "resulted in" appear only where the survey design (experimental, panel with baseline) can actually support them — otherwise, descriptive language.</div></div>
+  <div class="checklist-item"><div class="check-num">4</div><div><strong>Every quoted number traces to a saved tabulation.</strong> Not a screenshot, not someone's recollection of a number from an earlier draft — a tabulation that still exists and can be re-run.</div></div>
+  <div class="checklist-item"><div class="check-num">5</div><div><strong>Consistent numbers across report versions.</strong> The donor version and the government version of the same report cite the same topline figures, because both were generated from the same source tabulation.</div></div>
+
+  <h2>Why Excel-only pipelines break down as programs scale</h2>
+
+  <p>Excel is a genuinely capable tool for tabulation, and plenty of small, well-run field programs get by on it. The problem isn't Excel itself — it's what happens to an Excel-based tabulation workflow as a program grows past a single round, a single district, or a single analyst. A pivot table built for a 300-respondent pilot round works fine when one person owns the file and remembers every filter they applied. The same approach becomes fragile once a program scales to multiple rounds, multiple districts, and multiple people touching the workbook, because nothing about a spreadsheet enforces that the cross-tab someone builds in month three uses the same cleaning rules and the same outlier handling as the one built in month one.</p>
+
+  <p>In practice this shows up as version drift: three analysts each maintain their own copy of "the" cross-tab workbook, each slightly out of sync with the latest data pull, and nobody is quite sure which version fed the last report that went to the donor. It also shows up as silent filter carryover — a filter applied for one specific cross-tab (say, restricting to female-headed households) accidentally stays active when the same pivot table is reused for a different, unrelated breakdown two weeks later, quietly producing a wrong number that looks entirely plausible. Neither failure is a skills problem with the analyst; both are structural problems with using a general-purpose spreadsheet as a system of record for tabulations that multiple reports and multiple people depend on. A tabulation tool that saves each cross-tab as a named, dated, re-runnable object — rather than a mutable pivot table living inside one person's local file — removes both failure modes by construction, not by asking people to be more careful.</p>
+
+  <h2>Why this is a workflow problem, not a skills problem</h2>
+
+  <p>It's tempting to frame all three failure modes above as a training gap — "our team just needs a statistics refresher." That's rarely the real bottleneck. Most M&E officers and field coordinators in India's NGO and government evaluation ecosystem know, in principle, that outliers distort averages and that small cells produce noisy comparisons. The actual problem is time pressure combined with tooling that makes the careful path slower than the careless one. When building a clean cross-tab in Excel takes forty-five minutes of pivot-table wrangling per subgroup, and a report is due in two days, the corner that gets cut is exactly the outlier check and the cell-size sanity check — not because anyone decided accuracy doesn't matter, but because the tool made the rigorous path expensive.</p>
+
+  <p>The fix, accordingly, isn't a longer methods training — it's a tabulation-to-narrative pipeline where the rigorous path and the fast path are the same path. When cross-tabs are one click away from a shared dataset, and a report draft is one more click from a saved cross-tab, the corner-cutting incentive disappears because there's no longer a slower, more careful alternative being skipped under deadline pressure. That's the actual argument for treating tabulation as a first-class step in the pipeline, with dedicated tooling, rather than a manual task squeezed between "data collection is done" and "the report is due Friday."</p>
+
+  <div class="cta-box">
+    <h2>Stop losing the middle step</h2>
+    <p>Build cross-tabs in Analyzer, then generate a report from FG Writer that's anchored to the same saved numbers — no copy-paste, no drift between drafts.</p>
+    <a href="https://app.fieldgovern.com" class="btn btn-white">Start Free Trial</a>
+  </div>
+
+  <div class="related">
+    <h3>Related Articles</h3>
+    <ul>
+      <li><a href="automating-me-dashboards-without-data-team.html">Automating M&amp;E Dashboards Without a Data Team</a></li>
+      <li><a href="writing-evaluation-reports-faster-with-ai.html">Writing Evaluation Reports Faster: Where AI Actually Helps</a></li>
+      <li><a href="data-cleaning-survey-data-second-pass.html">Data Cleaning: Why Your Survey Data Needs a Second Pass</a></li>
+      <li><a href="panel-study-india-guide.html">Running a Panel Study in India</a></li>
+    </ul>
+  </div>
+</article>
+
+<footer>
+  <p>© 2026 Dataworx · FieldGovern · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · <a href="/dpdp-compliance.html">DPDP</a></p>
+</footer>
+<script defer src="/assets/trial-cta.js"></script>
+</body>
+</html>

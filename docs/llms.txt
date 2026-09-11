@@ -36,7 +36,7 @@ Homepage: https://www.fieldgovern.com/
 - [Best offline survey app for India](https://www.fieldgovern.com/offline-survey-app-india.html)
 - [Best CAPI software for India](https://www.fieldgovern.com/capi-software-india.html)
 - [Best survey tool for NGOs in India](https://www.fieldgovern.com/survey-tool-for-ngos-india.html)
-- [Blog](https://www.fieldgovern.com/blog/): DPDP, offline data collection, panel studies, tool comparisons.
+- [Blog](https://www.fieldgovern.com/blog/): DPDP compliance, data cleaning & fraud detection, offline-first architecture, RCT/baseline-endline/panel-study design, M&E dashboards, AI report writing, Made-in-India data sovereignty, tool comparisons.
 
 ## Company
 - [About](https://www.fieldgovern.com/about.html): Built by Pavankumar Deshetty in partnership with Dataworx (Bengaluru).
