@@ -9,7 +9,7 @@ Homepage: https://www.fieldgovern.com/
 
 ## Product
 - [Features](https://www.fieldgovern.com/features.html): Offline PWA, AI cleaning, AI report writing, back-check, skip logic, versioning.
-- [Pricing](https://www.fieldgovern.com/pricing.html): Free tier plus paid plans from ₹6,999/month, UPI billing.
+- [Pricing](https://www.fieldgovern.com/pricing.html): Free tier plus paid plans from ₹7,999/month, UPI billing.
 - [Use Cases](https://www.fieldgovern.com/use-cases.html): M&E, baseline-endline, impact evaluation, panel studies, CAPI/CATI surveys.
 - [Integrations](https://www.fieldgovern.com/integrations.html)
 - [Security](https://www.fieldgovern.com/security.html)

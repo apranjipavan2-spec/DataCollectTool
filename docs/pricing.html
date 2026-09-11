@@ -11,21 +11,21 @@
   </script>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Pricing — FieldGovern | Free + plans from ₹6,999/mo, UPI</title>
+  <title>Pricing — FieldGovern | Free + plans from ₹7,999/mo, UPI</title>
   <link rel="icon" href="assets/logo-icon.png" type="image/png"/>
   <link rel="manifest" href="/site.webmanifest"/>
-  <meta name="description" content="Free forever, 3 paid plans from ₹6,999/month, plus pay-as-you-go Custom pricing. 15-day full-feature trial. Offline-first, AI-powered, DPDP-compliant. Pay by UPI."/>
+  <meta name="description" content="Free forever, 3 paid plans from ₹7,999/month, plus pay-as-you-go Custom pricing. 15-day full-feature trial. Offline-first, AI-powered, DPDP-compliant. Pay by UPI."/>
   <link rel="canonical" href="https://www.fieldgovern.com/pricing.html"/>
   <meta name="robots" content="index,follow"/>
   <meta property="og:type" content="website"/>
   <meta property="og:url" content="https://www.fieldgovern.com/pricing.html"/>
-  <meta property="og:title" content="Pricing (2026) — FieldGovern | Free forever, plans from ₹6,999/mo"/>
-  <meta property="og:description" content="Free forever · Starter / Growth / Pro from ₹6,999/mo · pay-as-you-go Custom pricing · 15-day full trial. Pay by UPI. Introductory discount live."/>
+  <meta property="og:title" content="Pricing (2026) — FieldGovern | Free forever, plans from ₹7,999/mo"/>
+  <meta property="og:description" content="Free forever · Starter / Growth / Pro from ₹7,999/mo · pay-as-you-go Custom pricing · 15-day full trial. Pay by UPI. Introductory discount live."/>
   <meta property="og:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
   <meta property="og:site_name" content="FieldGovern"/>
   <meta name="twitter:card" content="summary_large_image"/>
   <meta name="twitter:title" content="Pricing (2026) — FieldGovern"/>
-  <meta name="twitter:description" content="Free forever · plans from ₹6,999/mo · pay-as-you-go Custom pricing · UPI billing."/>
+  <meta name="twitter:description" content="Free forever · plans from ₹7,999/mo · pay-as-you-go Custom pricing · UPI billing."/>
   <meta name="twitter:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
 
   <script type="application/ld+json">
@@ -39,7 +39,7 @@
     "url": "https://www.fieldgovern.com/pricing.html",
     "offers": [
       {"@type": "Offer", "name": "Free", "price": "0", "priceCurrency": "INR", "availability": "https://schema.org/InStock", "url": "https://www.fieldgovern.com/pricing.html"},
-      {"@type": "Offer", "name": "Starter", "price": "6999", "priceCurrency": "INR", "priceValidUntil": "2026-12-31", "availability": "https://schema.org/InStock", "url": "https://www.fieldgovern.com/pricing.html"},
+      {"@type": "Offer", "name": "Starter", "price": "7999", "priceCurrency": "INR", "priceValidUntil": "2026-12-31", "availability": "https://schema.org/InStock", "url": "https://www.fieldgovern.com/pricing.html"},
       {"@type": "Offer", "name": "Growth", "price": "12999", "priceCurrency": "INR", "priceValidUntil": "2026-12-31", "availability": "https://schema.org/InStock", "url": "https://www.fieldgovern.com/pricing.html"},
       {"@type": "Offer", "name": "Pro", "price": "24999", "priceCurrency": "INR", "priceValidUntil": "2026-12-31", "availability": "https://schema.org/InStock", "url": "https://www.fieldgovern.com/pricing.html"}
     ]
@@ -141,7 +141,7 @@
     .cta-enterprise:hover{background:#1e293b}
 
     /* BILLING CYCLE PRICES */
-    .price-monthly,.price-6month,.price-annual,.price-3year{display:none}
+    .price-monthly,.price-3month,.price-6month,.price-annual,.price-3year{display:none}
 
     /* FREE (STUDENT) HIGHLIGHT */
     .plan-card.free-hl{border-color:#34d399;box-shadow:0 4px 24px rgba(16,185,129,.18)}
@@ -170,7 +170,7 @@
     .mh-name{font-size:1.05rem;font-weight:900;color:var(--text)}
     .mh-price{font-size:1.25rem;font-weight:900;color:var(--text);margin-top:2px;line-height:1.1}
     .mh-price small{font-size:.6rem;font-weight:600;color:var(--text3)}
-    .mh-price .price-6month,.mh-price .price-annual,.mh-price .price-3year{display:none}
+    .mh-price .price-3month,.mh-price .price-6month,.mh-price .price-annual,.mh-price .price-3year{display:none}
     .mh-tag{font-size:.66rem;color:var(--text3);line-height:1.3;margin:5px auto 9px;max-width:160px;min-height:2.5em}
     /* left feature column with compact descriptions */
     table.matrix td.row-h{text-align:left;background:var(--bg2);position:sticky;left:0;z-index:1;padding:11px 16px}
@@ -344,6 +344,9 @@
       <span class="cy-label">Monthly</span>
       <span class="cy-save">standard</span>
     </button>
+    <button class="cycle-btn" data-cycle="3month" onclick="setCycle('3month')">
+      <span class="cy-label">3 Months</span>
+    </button>
     <button class="cycle-btn" data-cycle="6month" onclick="setCycle('6month')">
       <span class="cy-label">6 Months</span>
     </button>
@@ -397,21 +400,21 @@
           <th class="col-fg">
             <div class="mh-badge ph">·</div>
             <div class="mh-name">Starter</div>
-            <div class="mh-price"><span class="price-monthly" id="price-starter-monthly">₹6,999</span><span class="price-6month" id="price-starter-6month">₹6,999</span><span class="price-annual" id="price-starter-annual">₹5,833</span><span class="price-3year" id="price-starter-3year">₹5,833</span> <small>/mo</small></div>
+            <div class="mh-price"><span class="price-monthly" id="price-starter-monthly">₹7,999</span><span class="price-3month" id="price-starter-3month">₹7,999</span><span class="price-6month" id="price-starter-6month">₹7,499</span><span class="price-annual" id="price-starter-annual">₹6,999</span><span class="price-3year" id="price-starter-3year">₹6,999</span> <small>/mo</small></div>
             <div class="mh-tag">Small teams &amp; pilots</div>
             <a href="https://app.fieldgovern.com/login" class="mx-cta pri">Get Started</a>
           </th>
           <th class="col-fg">
             <div class="mh-badge pop">Most popular</div>
             <div class="mh-name">Growth</div>
-            <div class="mh-price"><span class="price-monthly" id="price-growth-monthly">₹12,999</span><span class="price-6month" id="price-growth-6month">₹12,999</span><span class="price-annual" id="price-growth-annual">₹10,833</span><span class="price-3year" id="price-growth-3year">₹10,833</span> <small>/mo</small></div>
+            <div class="mh-price"><span class="price-monthly" id="price-growth-monthly">₹12,999</span><span class="price-3month" id="price-growth-3month">₹12,999</span><span class="price-6month" id="price-growth-6month">₹12,999</span><span class="price-annual" id="price-growth-annual">₹10,833</span><span class="price-3year" id="price-growth-3year">₹10,833</span> <small>/mo</small></div>
             <div class="mh-tag">Growing research &amp; M&amp;E teams</div>
             <a href="https://app.fieldgovern.com/login" class="mx-cta pri">Get Started</a>
           </th>
           <th class="col-fg">
             <div class="mh-badge ph">·</div>
             <div class="mh-name">Pro</div>
-            <div class="mh-price"><span class="price-monthly" id="price-pro-monthly">₹24,999</span><span class="price-6month" id="price-pro-6month">₹24,999</span><span class="price-annual" id="price-pro-annual">₹20,833</span><span class="price-3year" id="price-pro-3year">₹20,833</span> <small>/mo</small></div>
+            <div class="mh-price"><span class="price-monthly" id="price-pro-monthly">₹24,999</span><span class="price-3month" id="price-pro-3month">₹24,999</span><span class="price-6month" id="price-pro-6month">₹24,999</span><span class="price-annual" id="price-pro-annual">₹20,833</span><span class="price-3year" id="price-pro-3year">₹20,833</span> <small>/mo</small></div>
             <div class="mh-tag">High-volume, multi-project teams</div>
             <a href="https://app.fieldgovern.com/login" class="mx-cta pri">Get Started</a>
           </th>
@@ -497,7 +500,7 @@
   <div class="faq-list" style="max-width:720px;margin:0 auto">
     <details class="faq-item">
       <summary>How is FieldGovern different from KoboToolbox?</summary>
-      <p>KoboToolbox collects data — FieldGovern collects and analyses it. Every paid plan includes AI Data Cleaning (with audit trail), FG Writer for donor reports, Smart Builder for cross-tabs, and panel study tracking. On KoboToolbox these require a separate data analyst costing ₹30,000–₹50,000/month. FieldGovern includes them from ₹6,999/month.</p>
+      <p>KoboToolbox collects data — FieldGovern collects and analyses it. Every paid plan includes AI Data Cleaning (with audit trail), FG Writer for donor reports, Smart Builder for cross-tabs, and panel study tracking. On KoboToolbox these require a separate data analyst costing ₹30,000–₹50,000/month. FieldGovern includes them from ₹7,999/month.</p>
     </details>
     <details class="faq-item">
       <summary>Do I need a credit card to start?</summary>
@@ -556,7 +559,7 @@
       <div style="margin-top:16px"><a href="compare.html" style="display:inline-flex;align-items:center;gap:6px;padding:11px 22px;background:linear-gradient(135deg,var(--brand),var(--accent));color:white;border-radius:10px;font-weight:700;font-size:.9rem;text-decoration:none">See the full comparison →</a></div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
-      <a href="surveycto-alternative.html" style="display:block;padding:18px;background:white;border:1px solid #e2e8f0;border-radius:12px;text-decoration:none;color:#0f172a"><div style="font-weight:700;font-size:1rem;margin-bottom:4px">vs SurveyCTO</div><div style="color:#64748b;font-size:0.85rem">~$165/mo USD → from ₹6,999/mo INR with UPI</div></a>
+      <a href="surveycto-alternative.html" style="display:block;padding:18px;background:white;border:1px solid #e2e8f0;border-radius:12px;text-decoration:none;color:#0f172a"><div style="font-weight:700;font-size:1rem;margin-bottom:4px">vs SurveyCTO</div><div style="color:#64748b;font-size:0.85rem">~$165/mo USD → from ₹7,999/mo INR with UPI</div></a>
       <a href="kobotoolbox-alternative.html" style="display:block;padding:18px;background:white;border:1px solid #e2e8f0;border-radius:12px;text-decoration:none;color:#0f172a"><div style="font-weight:700;font-size:1rem;margin-bottom:4px">vs KoboToolbox</div><div style="color:#64748b;font-size:0.85rem">Free OSS vs paid — why pay?</div></a>
       <a href="odk-alternative.html" style="display:block;padding:18px;background:white;border:1px solid #e2e8f0;border-radius:12px;text-decoration:none;color:#0f172a"><div style="font-weight:700;font-size:1rem;margin-bottom:4px">vs ODK</div><div style="color:#64748b;font-size:0.85rem">Self-host cost vs managed SaaS TCO</div></a>
       <a href="commcare-alternative.html" style="display:block;padding:18px;background:white;border:1px solid #e2e8f0;border-radius:12px;text-decoration:none;color:#0f172a"><div style="font-weight:700;font-size:1rem;margin-bottom:4px">vs CommCare</div><div style="color:#64748b;font-size:0.85rem">Enterprise pricing vs India-first plans</div></a>
@@ -633,16 +636,10 @@
       btn.classList.toggle('active', btn.dataset.cycle === cycle);
     });
     // Show/hide price spans
-    document.querySelectorAll('.price-monthly,.price-6month,.price-annual,.price-3year').forEach(el => {
+    document.querySelectorAll('.price-monthly,.price-3month,.price-6month,.price-annual,.price-3year').forEach(el => {
       el.style.display = 'none';
     });
-    document.querySelectorAll('.price-' + cycle.replace('month','6month').replace('3year','3year')).forEach(el => {
-      el.style.display = 'block';
-    });
-    // Fix: handle the 6month key properly
-    const cls = cycle === '6month' ? '.price-6month' : cycle === '3year' ? '.price-3year' : cycle === 'annual' ? '.price-annual' : '.price-monthly';
-    document.querySelectorAll('.price-monthly,.price-6month,.price-annual,.price-3year').forEach(el => el.style.display='none');
-    document.querySelectorAll(cls).forEach(el => el.style.display='inline-block');
+    document.querySelectorAll('.price-' + cycle).forEach(el => el.style.display = 'inline-block');
   }
 
   // Init: show monthly prices
@@ -668,7 +665,7 @@
         var p = byTier[tier];
         if (!p) return;
         // Update prices per billing cycle
-        ['monthly', '6month', 'annual', '3year'].forEach(function(cycle) {
+        ['monthly', '3month', '6month', 'annual', '3year'].forEach(function(cycle) {
           var el = document.getElementById('price-' + tier + '-' + cycle);
           if (el && p.billing && p.billing[cycle] && p.billing[cycle].monthly_effective_inr) {
             el.textContent = _fmtPrice(p.billing[cycle].monthly_effective_inr);
