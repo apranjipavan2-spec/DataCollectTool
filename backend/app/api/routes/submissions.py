@@ -561,6 +561,17 @@ def get_enumerator_scorecard(
 
 # ── Potential duplicates ──────────────────────────────────────────────────────
 
+def _canonical_value(v):
+    """Recursively normalize a JSON value into something hashable/comparable.
+    dict-valued answers (e.g. a `gps`-type question storing {lat,lng,accuracy})
+    and list-valued answers (multi-select) aren't hashable as-is."""
+    if isinstance(v, dict):
+        return tuple(sorted((str(k), _canonical_value(vv)) for k, vv in v.items()))
+    if isinstance(v, list):
+        return tuple(sorted(str(_canonical_value(x)) for x in v))
+    return v
+
+
 def _content_fingerprint(data_json: dict) -> tuple:
     """Canonical, order-independent key for 'are these answers identical'.
 
@@ -568,14 +579,7 @@ def _content_fingerprint(data_json: dict) -> tuple:
     _duration_sec, etc.) so only actual question answers are compared.
     """
     d = data_json or {}
-    items = []
-    for k, v in d.items():
-        if k.startswith("_"):
-            continue
-        # Lists (multi-select) aren't hashable/orderable as-is — normalize.
-        if isinstance(v, list):
-            v = tuple(sorted(str(x) for x in v))
-        items.append((k, v))
+    items = [(k, _canonical_value(v)) for k, v in d.items() if not k.startswith("_")]
     return tuple(sorted(items, key=lambda kv: kv[0]))
 
 
