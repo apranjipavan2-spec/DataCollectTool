@@ -5,11 +5,16 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ..shared import (datasets, custom_metrics, custom_bins, sanitize_for_json, apply_metrics_and_bins, BASE_DIR)
+from ..shared import (datasets, custom_metrics, custom_bins, sanitize_for_json, apply_metrics_and_bins, BASE_DIR, PROJECTS_DIR)
 
 router = APIRouter()
 
-AI_CONFIG_FILE = BASE_DIR / "ai_config.json"
+# PROJECTS_DIR is a mounted volume (tableforge_data) that survives container
+# rebuilds; BASE_DIR does not. Every deploy that touches tools/ rebuilds this
+# image, so a config file living directly under BASE_DIR was being silently
+# wiped on every deploy, breaking every AI feature until someone re-entered
+# the key via AI Settings.
+AI_CONFIG_FILE = PROJECTS_DIR / "ai_config.json"
 
 
 def _load_ai_cfg() -> dict:
