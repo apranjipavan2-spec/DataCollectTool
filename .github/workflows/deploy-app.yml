@@ -147,6 +147,10 @@ jobs:
             [ "$ok" = 1 ] || { echo "ERROR: image pull failed after 6 attempts"; exit 1; }
             docker compose up -d --no-deps --force-recreate app
 
+            # Fresh DB backup before migrating — belt-and-suspenders alongside
+            # the nightly 2am cron (deploys don't wait for the next cron run).
+            /opt/fieldgovern/backup-db.sh
+
             # DB migrations + idempotent seeds
             docker compose exec -T app sh -c "alembic upgrade head 2>&1"
             docker compose exec -T app sh -c "python -m scripts.seed_plans 2>&1"

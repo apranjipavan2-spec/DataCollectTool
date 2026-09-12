@@ -165,7 +165,8 @@ export function SourcePanel({
 
   const filtered = columns.filter(c => {
     const num = colNumMap.get(c.name) || 0;
-    const matchesName = !search || c.name.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const matchesName = !search || c.name.toLowerCase().includes(q) || (c.label || '').toLowerCase().includes(q);
     const matchesNum = !colNumSearch || String(num) === colNumSearch.trim() || String(num).startsWith(colNumSearch.trim());
     return matchesName && matchesNum;
   });
@@ -228,7 +229,12 @@ export function SourcePanel({
           {colNumMap.get(col.name)}
         </span>
         <span className="col-name">
-          <HighlightText text={col.name} search={search} />
+          <HighlightText text={col.label || col.name} search={search} />
+          {col.label && (
+            <span style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.35)', fontFamily: 'monospace' }}>
+              <HighlightText text={col.name} search={search} />
+            </span>
+          )}
         </span>
         {showZoneBadge && zone && (
           <span className="col-zone-badge" style={{ background: zoneColors[zone], color: '#fff' }}>
@@ -253,7 +259,8 @@ export function SourcePanel({
         {selected.has(col.name) && <span className="col-selected-check">✓</span>}
         {hoveredCol === col.name && !selected.has(col.name) && editingDesc !== col.name && (
           <div className="col-tooltip">
-            <div><strong>{col.name}</strong> ({col.type})</div>
+            <div><strong>{col.label || col.name}</strong> ({col.type})</div>
+            {col.label && <div style={{ fontFamily: 'monospace', fontSize: 10, opacity: 0.6 }}>{col.name}</div>}
             <div>{col.stats.unique} unique · {col.stats.nulls} nulls</div>
             {col.stats.min != null && <div>Range: {col.stats.min} – {col.stats.max}</div>}
             <div className="sample-vals">

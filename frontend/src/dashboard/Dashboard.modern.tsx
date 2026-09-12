@@ -14,7 +14,8 @@ import AuditLog from '@/components/AuditLog'
 import AiReportModal from '@/dashboard/AiReportModal'
 import EmojiIcon from '@/components/EmojiIcon'
 import { getAllFieldsInOrder } from '@/lib/formUtils'
-import type { FormSchema } from '@/types/form'
+import { resolveAnswer } from '@/collect/responseRecord'
+import type { FormSchema, FormField } from '@/types/form'
 const RosterTab = lazy(() => import('@/dashboard/RosterTab'))
 const AnalyticsTab  = lazy(() => import('@/dashboard/AnalyticsTab'))
 const ScorecardTab  = lazy(() => import('@/dashboard/ScorecardTab'))
@@ -238,7 +239,7 @@ function SubmissionDetailModal({
   const [busy, setBusy] = useState(false)
   const [bcFormId, setBcFormId] = useState(sub.backcheck_form_id ?? '')
   const [savingBcForm, setSavingBcForm] = useState(false)
-  const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({})
+  const [fieldMap, setFieldMap] = useState<Record<string, FormField>>({})
 
   useEffect(() => {
     // Prefer the historical version snapshot (matches the schema active when this
@@ -249,11 +250,11 @@ function SubmissionDetailModal({
       .then(r => {
         const schema: FormSchema = r.data.json_schema
         if (!schema?.sections) return
-        const map: Record<string, string> = {}
+        const map: Record<string, FormField> = {}
         for (const f of getAllFieldsInOrder(schema.sections)) {
-          if (f.label) map[f.name] = f.label
+          if (f.label) map[f.name] = f
         }
-        setFieldLabels(map)
+        setFieldMap(map)
       })
       .catch(() => {})
   }, [sub.form_id, sub.form_version])
@@ -477,15 +478,20 @@ function SubmissionDetailModal({
             <p className="text-sm text-catalan-textMuted text-center py-4">No data</p>
           ) : (
             <div className="space-y-3">
-              {Object.entries(sub.data_json).filter(([key]) => !key.startsWith('_')).map(([key, val]) => (
-                <div key={key} className="border-b border-catalan-border pb-2">
-                  <div className="text-xs text-catalan-textMuted mb-1">
-                    {fieldLabels[key] ?? key}
-                    {fieldLabels[key] && <span className="opacity-50 font-mono"> · {key}</span>}
+              {Object.entries(sub.data_json).filter(([key]) => !key.startsWith('_')).map(([key, val]) => {
+                const field = fieldMap[key]
+                const isChoice = field?.options && (field.type === 'single_choice' || field.type === 'multiple_choice')
+                const displayVal = (isChoice && val !== null && val !== undefined) ? resolveAnswer(field, val) : val
+                return (
+                  <div key={key} className="border-b border-catalan-border pb-2">
+                    <div className="text-xs text-catalan-textMuted mb-1">
+                      {field?.label ?? key}
+                      {field?.label && <span className="opacity-50 font-mono"> · {key}</span>}
+                    </div>
+                    <div className="text-sm text-catalan-text">{renderFieldValue(displayVal, sub.media?.find(m => m.field_name === key))}</div>
                   </div>
-                  <div className="text-sm text-catalan-text">{renderFieldValue(val, sub.media?.find(m => m.field_name === key))}</div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

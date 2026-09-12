@@ -1967,6 +1967,22 @@ def _fetch_fg_column_labels(fg_base_url, form_id, token):
         return {}
 
 
+def _fetch_fg_program_column_labels(fg_base_url, program_id, token):
+    """Merged name -> label map across every form linked to a program."""
+    try:
+        resp = _requests.get(f"{fg_base_url}/api/v1/programs/{program_id}/questionnaires",
+                              headers={"Authorization": f"Bearer {token}"}, timeout=15)
+        if resp.status_code != 200:
+            return {}
+        form_ids = {q["form_id"] for q in (resp.json() or []) if q.get("form_id")}
+        merged = {}
+        for fid in form_ids:
+            merged.update(_fetch_fg_column_labels(fg_base_url, fid, token))
+        return merged
+    except Exception:
+        return {}
+
+
 @app.route("/api/load-from-fg", methods=["POST"])
 def load_from_fg():
     """Fetch program submissions from FieldGovern; supports optional questionnaire_id filter."""
@@ -1981,11 +1997,13 @@ def load_from_fg():
 
     if form_id:
         # Form-first: pull a single form's responses directly, no program needed.
-        url = f"{fg_base_url}/api/v1/export/{form_id}/xlsx"
+        # decode_values=true so choice-field cells show option labels (e.g. "Male")
+        # instead of raw codes — headers stay as field codes (label map is separate).
+        url = f"{fg_base_url}/api/v1/export/{form_id}/xlsx?decode_values=true"
     else:
-        url = f"{fg_base_url}/api/v1/fg/programs/{program_id}/export.xlsx"
+        url = f"{fg_base_url}/api/v1/fg/programs/{program_id}/export.xlsx?decode_values=true"
         if questionnaire_id:
-            url += f"?questionnaire_id={questionnaire_id}"
+            url += f"&questionnaire_id={questionnaire_id}"
     try:
         resp = _requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=120)
         if resp.status_code != 200:
@@ -2014,8 +2032,11 @@ def load_from_fg():
     DATA["history"] = []
     DATA["column_types"] = {}
     DATA["active_filters"] = {}
-    # Display-only name->label map (only resolvable for a single form, not a whole program export)
-    DATA["column_labels"] = _fetch_fg_column_labels(fg_base_url, form_id, token) if form_id else {}
+    # Display-only name->label map
+    if form_id:
+        DATA["column_labels"] = _fetch_fg_column_labels(fg_base_url, form_id, token)
+    else:
+        DATA["column_labels"] = _fetch_fg_program_column_labels(fg_base_url, program_id, token)
     _save_state()
     mark_state_dirty()
 

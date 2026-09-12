@@ -41,6 +41,29 @@ async def _fetch_fg_column_labels(base: str, form_id: str, token: str, verify: b
         return {}
 
 
+async def _fetch_fg_program_column_labels(base: str, program_id: str, token: str, verify: bool) -> dict:
+    """Merged name -> label map across every form linked to a program.
+
+    A program can span multiple questionnaires/forms; merge each form's
+    labels the same way the single-form path does, so program-based loads
+    get the same header labels as form-first loads.
+    """
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=15.0, verify=verify) as client:
+            resp = await client.get(f"{base}/api/v1/programs/{program_id}/questionnaires",
+                                     headers={"Authorization": f"Bearer {token}"})
+        if resp.status_code != 200:
+            return {}
+        form_ids = {q["form_id"] for q in (resp.json() or []) if q.get("form_id")}
+        merged: dict = {}
+        for fid in form_ids:
+            merged.update(await _fetch_fg_column_labels(base, fid, token, verify))
+        return merged
+    except Exception:
+        return {}
+
+
 class FGImportBody(BaseModel):
     fg_base_url: str
     token: str
@@ -62,12 +85,14 @@ async def import_from_fg(body: FGImportBody):
             base = internal_base if internal_base else body.fg_base_url.rstrip("/")
             if body.form_id:
                 # Form-first import: pull a single form's submissions directly,
-                # no program membership required.
-                url = f"{base}/api/v1/export/{body.form_id}/xlsx"
+                # no program membership required. decode_values=true so choice-field
+                # cells show option labels (e.g. "Male") instead of raw codes ("1") —
+                # headers stay as field codes, matching the separate label map below.
+                url = f"{base}/api/v1/export/{body.form_id}/xlsx?decode_values=true"
             elif body.program_id:
-                url = f"{base}/api/v1/fg/programs/{body.program_id}/export.xlsx"
+                url = f"{base}/api/v1/fg/programs/{body.program_id}/export.xlsx?decode_values=true"
                 if body.questionnaire_id:
-                    url += f"?questionnaire_id={body.questionnaire_id}"
+                    url += f"&questionnaire_id={body.questionnaire_id}"
             else:
                 yield f"data: {json.dumps({'step': 'error', 'message': 'No form or program specified', 'percent': 0})}\n\n"
                 return
@@ -103,10 +128,12 @@ async def import_from_fg(body: FGImportBody):
             col_count = len(df.columns)
             yield f"data: {json.dumps({'step': 'extracting', 'message': f'Extracting {col_count} columns from {row_count} rows…', 'percent': 70})}\n\n"
 
-            # Display-only name->label map (only resolvable for a single form, not a whole program export)
+            # Display-only name->label map
             column_labels = {}
             if body.form_id:
                 column_labels = await _fetch_fg_column_labels(base, body.form_id, body.token, bool(not internal_base))
+            elif body.program_id:
+                column_labels = await _fetch_fg_program_column_labels(base, body.program_id, body.token, bool(not internal_base))
 
             columns = []
             for i, col in enumerate(df.columns):

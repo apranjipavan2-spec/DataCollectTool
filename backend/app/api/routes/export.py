@@ -35,18 +35,24 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 def _flatten(data: dict, parent_key: str = "", sep: str = "__") -> dict:
-    """Recursively flatten nested dicts/lists into dot-separated keys."""
+    """Recursively flatten nested dicts/lists into dot-separated keys.
+
+    Scalar lists (multi-select answers) collapse into one comma-joined
+    column under the question's own key, so exported columns match the
+    form's question count. Lists of dicts (repeat groups) still explode
+    one column set per index since each entry has its own sub-fields.
+    """
     items: dict = {}
     for k, v in data.items():
         key = f"{parent_key}{sep}{k}" if parent_key else k
         if isinstance(v, dict):
             items.update(_flatten(v, key, sep))
         elif isinstance(v, list):
-            for i, elem in enumerate(v):
-                if isinstance(elem, dict):
+            if v and all(isinstance(elem, dict) for elem in v):
+                for i, elem in enumerate(v):
                     items.update(_flatten(elem, f"{key}__{i}", sep))
-                else:
-                    items[f"{key}__{i}"] = elem
+            else:
+                items[key] = ", ".join(str(elem) for elem in v)
         else:
             items[key] = v
     return items
@@ -147,6 +153,27 @@ def _build_label_maps(form_schema: dict) -> tuple[dict, dict]:
     return name_to_label, name_to_options
 
 
+def _decode_row_values(rows: list[dict], name_to_options: dict) -> list[dict]:
+    """Decode choice-field values to their option labels, in place on copies.
+
+    Values are plain strings after `_flatten` — including multi-select answers,
+    which `_flatten` already comma-joins under the field's own key. Splitting on
+    ", " and decoding each token independently handles both single- and
+    multi-select uniformly. Column keys are never touched here.
+    """
+    if not name_to_options:
+        return rows
+    decoded = []
+    for row in rows:
+        new_row = dict(row)
+        for k, opts in name_to_options.items():
+            v = new_row.get(k)
+            if isinstance(v, str) and v:
+                new_row[k] = ", ".join(opts.get(part.strip(), part.strip()) for part in v.split(", "))
+        decoded.append(new_row)
+    return decoded
+
+
 @router.get("/{form_id}/csv")
 def export_csv(
     form_id: str,
@@ -177,19 +204,9 @@ def export_csv(
 
     if labels:
         id_to_label, id_to_options = _build_label_maps(form.json_schema or {})
-        # Remap row keys → labels; decode choice values
-        labeled_rows = []
-        for row in rows:
-            new_row: dict = {}
-            for k, v in row.items():
-                col = id_to_label.get(k, k)
-                if k in id_to_options and isinstance(v, str):
-                    v = id_to_options[k].get(v, v)
-                elif k in id_to_options and isinstance(v, list):
-                    v = "; ".join(id_to_options[k].get(i, i) for i in v)
-                new_row[col] = v
-            labeled_rows.append(new_row)
-        rows = labeled_rows
+        rows = _decode_row_values(rows, id_to_options)
+        # Remap row keys → labels
+        rows = [{id_to_label.get(k, k): v for k, v in row.items()} for row in rows]
 
     all_keys: list[str] = []
     seen: set[str] = set()
@@ -722,6 +739,7 @@ def export_xlsx(
     date_from: Optional[datetime] = Query(None),
     date_to: Optional[datetime] = Query(None),
     status: Optional[str] = Query(None),
+    decode_values: bool = Query(False, description="Decode choice-field values to option labels; column headers stay as field codes"),
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
@@ -745,6 +763,10 @@ def export_xlsx(
     subs = _query_submissions(db, form_id, user["tenant_id"], date_from, date_to, status)
     enum_map = _build_enumerator_map(db, user["tenant_id"])
     rows_dicts = _build_rows(subs, enum_map)
+
+    if decode_values:
+        _, id_to_options = _build_label_maps(form.json_schema or {})
+        rows_dicts = _decode_row_values(rows_dicts, id_to_options)
 
     # Build unified column list
     all_keys: list[str] = []

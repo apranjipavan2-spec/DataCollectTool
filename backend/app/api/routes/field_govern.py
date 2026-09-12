@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_role
-from app.api.routes.export import _flatten, _build_enumerator_map, _field_key
+from app.api.routes.export import _flatten, _build_enumerator_map, _field_key, _build_label_maps, _decode_row_values
 from app.models.form import Form
 from app.models.program import Program, ProgramQuestionnaire, ProgramAnalysis
 from app.models.submission import Submission
@@ -746,6 +746,25 @@ def execute_tabulation(
         raise HTTPException(500, f"Tabulation error: {e}")
 
 
+def _merged_program_options(db, program_id, tenant_id) -> dict:
+    """Field name -> {code: label} merged across every form linked to a program.
+
+    Used to decode choice-field response values (tabulation group labels,
+    program-level exports) so viewers see "Male" instead of raw code "1".
+    """
+    merged: dict = {}
+    for q in db.query(ProgramQuestionnaire).filter(
+        ProgramQuestionnaire.program_id == program_id,
+        ProgramQuestionnaire.tenant_id == tenant_id,
+        ProgramQuestionnaire.form_id.isnot(None),
+    ).all():
+        form = db.query(Form).filter(Form.id == q.form_id).first()
+        if form and form.json_schema:
+            _, opts = _build_label_maps(form.json_schema)
+            merged.update(opts)
+    return merged
+
+
 def _execute_tabulation_inner(program_id, body, user, db):
     prog = db.query(Program).filter(
         Program.id == program_id, Program.tenant_id == user["tenant_id"]
@@ -766,11 +785,13 @@ def _execute_tabulation_inner(program_id, body, user, db):
     value_field = body.value_field
     aggregation = body.aggregation
     secondary_groupby = body.secondary_groupby or ""
+    options_map = _merged_program_options(db, program_id, user["tenant_id"])
 
-    def _str_val(raw):
+    def _str_val(raw, field_name=""):
+        opts = options_map.get(field_name, {})
         if isinstance(raw, list):
-            return ", ".join(str(v) for v in raw)
-        return str(raw) if raw is not None else "__missing__"
+            return ", ".join(opts.get(str(v), str(v)) for v in raw)
+        return opts.get(str(raw), str(raw)) if raw is not None else "__missing__"
 
     # Cross-tabulation path
     if secondary_groupby:
@@ -778,8 +799,8 @@ def _execute_tabulation_inner(program_id, body, user, db):
         for s in subs:
             if not s.data_json or not isinstance(s.data_json, dict):
                 continue
-            g1 = _str_val(s.data_json.get(groupby_field, "__missing__"))
-            g2 = _str_val(s.data_json.get(secondary_groupby, "__missing__"))
+            g1 = _str_val(s.data_json.get(groupby_field, "__missing__"), groupby_field)
+            g2 = _str_val(s.data_json.get(secondary_groupby, "__missing__"), secondary_groupby)
             cross[g1][g2] += 1
         sub_keys = sorted({k for row in cross.values() for k in row})
         rows = []
@@ -812,7 +833,7 @@ def _execute_tabulation_inner(program_id, body, user, db):
     for s in subs:
         if not s.data_json or not isinstance(s.data_json, dict):
             continue
-        group_val = _str_val(s.data_json.get(groupby_field, "__missing__"))
+        group_val = _str_val(s.data_json.get(groupby_field, "__missing__"), groupby_field)
         if value_field == "*" or aggregation == "count":
             groups[group_val].append(1)
         else:
@@ -1290,23 +1311,25 @@ def delete_tabulation(
 
 # ── AI Auto-Generate: background job ─────────────────────────────────────────
 
-def _execute_config_rows(config: dict, subs: list) -> dict:
+def _execute_config_rows(config: dict, subs: list, options_map: dict | None = None) -> dict:
     """Execute one tabulation config against Submission objects, return rows."""
     groupby_field = config.get("groupby_field", "")
     value_field   = config.get("value_field", "*")
     aggregation   = config.get("aggregation", "count")
     secondary     = config.get("secondary_groupby", "")
     show_pct      = config.get("show_percent", False)
+    options_map   = options_map or {}
 
-    def _sv(raw):
-        if isinstance(raw, list): return ", ".join(str(v) for v in raw)
-        return str(raw) if raw is not None else "__missing__"
+    def _sv(raw, field_name=""):
+        opts = options_map.get(field_name, {})
+        if isinstance(raw, list): return ", ".join(opts.get(str(v), str(v)) for v in raw)
+        return opts.get(str(raw), str(raw)) if raw is not None else "__missing__"
 
     if secondary:
         cross: dict = defaultdict(lambda: defaultdict(int))
         for s in subs:
             if not s.data_json or not isinstance(s.data_json, dict): continue
-            cross[_sv(s.data_json.get(groupby_field, "__missing__"))][_sv(s.data_json.get(secondary, "__missing__"))] += 1
+            cross[_sv(s.data_json.get(groupby_field, "__missing__"), groupby_field)][_sv(s.data_json.get(secondary, "__missing__"), secondary)] += 1
         sub_keys = sorted({k for row in cross.values() for k in row})
         rows = []
         for g1, d in sorted(cross.items()):
@@ -1322,7 +1345,7 @@ def _execute_config_rows(config: dict, subs: list) -> dict:
     groups: dict = defaultdict(list)
     for s in subs:
         if not s.data_json or not isinstance(s.data_json, dict): continue
-        gv = _sv(s.data_json.get(groupby_field, "__missing__"))
+        gv = _sv(s.data_json.get(groupby_field, "__missing__"), groupby_field)
         if value_field == "*" or aggregation == "count":
             groups[gv].append(1)
         else:
@@ -1475,9 +1498,10 @@ async def _run_ai_generation(
             _fail_analysis(db, analysis_id, "AI could not generate valid tabulations for this dataset."); return
 
         # Execute each config to get rows
+        options_map = _merged_program_options(db, program_id, tenant_id)
         table_configs = []
         for cfg in valid:
-            rd = _execute_config_rows(cfg, subs)
+            rd = _execute_config_rows(cfg, subs, options_map)
             table_configs.append({
                 "id": str(_uuid.uuid4()),
                 "title": cfg.get("title", f"{cfg.get('groupby_field', '')} breakdown"),
@@ -1614,9 +1638,10 @@ def refresh_analysis(
         Submission.tenant_id == user["tenant_id"],
     ).all()
 
+    options_map = _merged_program_options(db, program_id, user["tenant_id"])
     new_configs = []
     for cfg in rec.table_configs:
-        result = _execute_config_rows(cfg, subs)
+        result = _execute_config_rows(cfg, subs, options_map)
         new_configs.append({**cfg, **result})
 
     rec.table_configs = new_configs
@@ -1923,6 +1948,7 @@ async def generate_program_report(
 def export_program_xlsx(
     program_id: str,
     questionnaire_id: Optional[str] = None,
+    decode_values: bool = False,
     user: dict = Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
@@ -1968,6 +1994,9 @@ def export_program_xlsx(
                 **{k: (str(v) if not isinstance(v, (str, int, float, bool, type(None))) else v)
                    for k, v in flat.items()},
             })
+
+        if decode_values and rows:
+            rows = _decode_row_values(rows, _merged_program_options(db, pid_uuid, user["tenant_id"]))
 
         if not rows:
             df = pd.DataFrame(columns=["serial_no", "submission_id", "enumerator_name", "status", "received_at", "household_id"])

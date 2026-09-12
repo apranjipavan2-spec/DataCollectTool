@@ -8,7 +8,7 @@ import type { FormSchema, FormField } from '@/types/form'
 
 export interface QAItem { name: string; question: string; answer: string }
 
-function resolveAnswer(field: FormField, value: unknown): string {
+export function resolveAnswer(field: FormField, value: unknown): string {
   if (value === null || value === undefined || value === '') return ''
   // Map choice values back to their human labels.
   if (field.options && (field.type === 'single_choice' || field.type === 'multiple_choice')) {

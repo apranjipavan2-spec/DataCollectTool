@@ -623,6 +623,14 @@ def create_submission(request: Request, body: SubmissionCreate, background_tasks
         raise HTTPException(status_code=409, detail="This form is no longer accepting submissions")
 
     try:
+        # A form's program link isn't in the request body — derive it server-side so
+        # program-filtered queries (export, analyzer, dashboards) see this submission.
+        from app.models.program import ProgramQuestionnaire
+        pq = db.query(ProgramQuestionnaire).filter(
+            ProgramQuestionnaire.form_id == body.form_id,
+            ProgramQuestionnaire.tenant_id == user["tenant_id"],
+        ).first()
+
         sub = Submission(
             tenant_id=user["tenant_id"],
             form_id=body.form_id,
@@ -632,6 +640,9 @@ def create_submission(request: Request, body: SubmissionCreate, background_tasks
             gps_open=body.gps_open,
             gps_submit=body.gps_submit,
             local_created_at=datetime.fromisoformat(body.local_created_at) if body.local_created_at else None,
+            program_id=pq.program_id if pq else None,
+            questionnaire_id=pq.id if pq else None,
+            participant_type_id=pq.participant_type_id if pq else None,
         )
         db.add(sub)
         db.commit()
