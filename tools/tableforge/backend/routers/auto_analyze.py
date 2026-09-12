@@ -52,8 +52,26 @@ def _safe_n(s: pd.Series) -> int:
     return int(s.notna().sum())
 
 
+def _relabel_dummy(name: str, predictor_cols: list[str], col_labels: dict[str, str]) -> str:
+    """Coefficient-table row names are either a raw predictor id (numeric
+    predictors pass through pd.get_dummies untouched) or a one-hot dummy
+    pandas names "{raw_col}_{category}" — match against the known predictor
+    list (longest id first, since ids can themselves contain "_") so a
+    Gender dummy reads "Gender of respondent: Male" instead of "q1_0_Male"."""
+    if name in ("const", "(Intercept)"):
+        return "(Intercept)"
+    for p in sorted(predictor_cols, key=len, reverse=True):
+        label = col_labels.get(p, p)
+        if name == p:
+            return label
+        if name.startswith(p + "_"):
+            return f"{label}: {name[len(p) + 1:]}"
+    return name
+
+
 def _exec_descriptive(df: pd.DataFrame, params: dict) -> dict:
     cols = params["cols"]
+    col_labels = params.get("col_labels") or {}
     headers = ["Column", "N", "Mean", "SD", "Median", "Min", "Max", "Missing"]
     rows = []
     for c in cols:
@@ -62,7 +80,7 @@ def _exec_descriptive(df: pd.DataFrame, params: dict) -> dict:
         s = df[c]
         s_num = pd.to_numeric(s, errors="coerce")
         rows.append([
-            c, _safe_n(s),
+            col_labels.get(c, c), _safe_n(s),
             iu.safe_round(s_num.mean()), iu.safe_round(s_num.std(ddof=1)),
             iu.safe_round(s_num.median()),
             iu.safe_round(s_num.min()), iu.safe_round(s_num.max()),
@@ -373,13 +391,14 @@ def _exec_logistic(df: pd.DataFrame, params: dict) -> dict:
     params_v = res.params
     pvals = res.pvalues
     conf = res.conf_int()
+    col_labels = params.get("col_labels") or {}
     headers = ["Predictor", "Coef", "OR", "OR CI", "p"]
     rows = []
     for name in params_v.index:
         coef = params_v[name]
         or_val = math.exp(coef)
         lo, hi = math.exp(conf.loc[name, 0]), math.exp(conf.loc[name, 1])
-        rows.append([str(name), iu.safe_round(coef), iu.safe_round(or_val),
+        rows.append([_relabel_dummy(str(name), preds, col_labels), iu.safe_round(coef), iu.safe_round(or_val),
                      f"[{iu.safe_round(lo)}, {iu.safe_round(hi)}]", iu.safe_round(pvals[name], 6)])
     return {
         "table": {"headers": headers, "rows": rows},
@@ -412,11 +431,12 @@ def _exec_multiple_regression(df: pd.DataFrame, params: dict) -> dict:
     except Exception as e:
         return {"table": {"headers": [], "rows": []}, "test": {},
                 "interpretation": f"OLS error: {e}", "warnings": [str(e)]}
+    col_labels = params.get("col_labels") or {}
     headers = ["Predictor", "Coef", "SE", "t", "p", "CI low", "CI high"]
     conf = res.conf_int()
     rows = []
     for name in res.params.index:
-        rows.append([str(name), iu.safe_round(res.params[name]),
+        rows.append([_relabel_dummy(str(name), preds, col_labels), iu.safe_round(res.params[name]),
                      iu.safe_round(res.bse[name]), iu.safe_round(res.tvalues[name]),
                      iu.safe_round(res.pvalues[name], 6),
                      iu.safe_round(conf.loc[name, 0]), iu.safe_round(conf.loc[name, 1])])
@@ -438,8 +458,9 @@ def _exec_reliability(df: pd.DataFrame, params: dict) -> dict:
         return {"table": {"headers": [], "rows": []}, "test": {},
                 "interpretation": "Reliability needs ≥2 items and ≥5 complete cases", "warnings": []}
     alpha, item_rest = iu.cronbach_alpha(sub)
+    col_labels = params.get("col_labels") or {}
     headers = ["Item", "Item-rest r"]
-    rows = [[c, iu.safe_round(r)] for c, r in zip(sub.columns, item_rest)]
+    rows = [[col_labels.get(c, c), iu.safe_round(r)] for c, r in zip(sub.columns, item_rest)]
     return {
         "table": {"headers": headers, "rows": rows},
         "test": {"stat": iu.safe_round(alpha), "effect_size": {"alpha": iu.safe_round(alpha)}},
@@ -570,8 +591,11 @@ def _exec_cramers_matrix(df: pd.DataFrame, params: dict) -> dict:
 
 
 def _exec_multinomial_logistic(df: pd.DataFrame, params: dict) -> dict:
-    r = _multinomial_logistic_impl(df, params["outcome_col"], params["predictor_cols"], params.get("alpha", 0.05))
-    return {"table": {"headers": r["headers"], "rows": r["rows"]}, "test": {},
+    preds = params["predictor_cols"]
+    col_labels = params.get("col_labels") or {}
+    r = _multinomial_logistic_impl(df, params["outcome_col"], preds, params.get("alpha", 0.05))
+    rows = [[_relabel_dummy(str(row[0]), preds, col_labels), *row[1:]] for row in r["rows"]]
+    return {"table": {"headers": r["headers"], "rows": rows}, "test": {},
             "interpretation": r.get("interpretation", ""), "warnings": []}
 
 
@@ -582,8 +606,11 @@ def _exec_did(df: pd.DataFrame, params: dict) -> dict:
 
 
 def _exec_psm(df: pd.DataFrame, params: dict) -> dict:
-    r = _psm_compute(df, params["treatment_col"], params["outcome_col"], params["covariates"])
-    return {"table": {"headers": r["headers"], "rows": r["rows"]}, "test": r.get("test", {}),
+    covariates = params["covariates"]
+    col_labels = params.get("col_labels") or {}
+    r = _psm_compute(df, params["treatment_col"], params["outcome_col"], covariates)
+    rows = [[_relabel_dummy(str(row[0]), covariates, col_labels), *row[1:]] for row in r["rows"]]
+    return {"table": {"headers": r["headers"], "rows": rows}, "test": r.get("test", {}),
             "interpretation": r.get("interpretation", ""), "warnings": r.get("warnings", [])}
 
 

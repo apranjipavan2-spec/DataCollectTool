@@ -118,7 +118,7 @@ def plan_battery(
 
     # 1) Descriptives for every outcome
     for o in outcome_cols:
-        add("descriptive", o, None, {"cols": [o]}, f"Descriptive summary — {L(o)}")
+        add("descriptive", o, None, {"cols": [o], "col_labels": {o: L(o)}}, f"Descriptive summary — {L(o)}")
 
     # 2) Pre/post pairs from study design — paired tests across all pairs
     pairs = design.get("pre_post_pairs", []) or []
@@ -271,11 +271,12 @@ def plan_battery(
         if len(num_or_bin) >= 2:
             if o_scale == "binary":
                 add("logistic_regression", o, num_or_bin,
-                    {"outcome_col": o, "predictor_cols": num_or_bin},
+                    {"outcome_col": o, "predictor_cols": num_or_bin, "col_labels": {p: L(p) for p in num_or_bin}},
                     f"Logistic regression — {L(o)} ~ {' + '.join(L(p) for p in num_or_bin)}")
             elif o_scale in ("continuous", "likert"):
                 add("multiple_regression", o, num_or_bin,
-                    {"outcome_col": o, "predictor_cols": num_or_bin, "weight_col": weight_col},
+                    {"outcome_col": o, "predictor_cols": num_or_bin, "weight_col": weight_col,
+                     "col_labels": {p: L(p) for p in num_or_bin}},
                     f"Multiple regression — {L(o)} ~ {' + '.join(L(p) for p in num_or_bin)}")
 
         # 4b) Multinomial logistic — categorical outcome with 3+ classes gets only
@@ -285,7 +286,8 @@ def plan_battery(
         if o_scale == "categorical" and used_predictors and int(df[o].dropna().nunique()) >= 3:
             covariate_cols = [p for p, _ in used_predictors]
             add("multinomial_logistic", o, covariate_cols,
-                {"outcome_col": o, "predictor_cols": covariate_cols, "alpha": 0.05},
+                {"outcome_col": o, "predictor_cols": covariate_cols, "alpha": 0.05,
+                 "col_labels": {p: L(p) for p in covariate_cols}},
                 f"Multinomial logistic — {L(o)} ~ {' + '.join(L(p) for p in covariate_cols)}")
 
         # 4c) Causal add-ons — only fire when the researcher has explicitly tagged
@@ -302,7 +304,8 @@ def plan_battery(
             psm_covariates = [p for p in predictor_cols if p not in (treatment_col, post_col, o)][:8]
             if psm_covariates:
                 add("psm", o, psm_covariates,
-                    {"treatment_col": treatment_col, "outcome_col": o, "covariates": psm_covariates},
+                    {"treatment_col": treatment_col, "outcome_col": o, "covariates": psm_covariates,
+                     "col_labels": {p: L(p) for p in psm_covariates}},
                     f"Propensity Score Matching — {L(o)} ~ {L(treatment_col)}")
 
     # 5) If any outcome group is Likert items (≥3 items tagged), add reliability
@@ -310,7 +313,7 @@ def plan_battery(
                     if (r or {}).get("scale") == "likert" and c in df.columns]
     if len(likert_items) >= 3:
         add("reliability", None, likert_items,
-            {"item_cols": likert_items},
+            {"item_cols": likert_items, "col_labels": {c: L(c) for c in likert_items}},
             f"Cronbach's α — {len(likert_items)} Likert items")
 
     # 6) Full matrices — one overview table each, not per-outcome, so they add
