@@ -205,10 +205,21 @@ jobs:
             docker rm -f analyzer cleaner 2>/dev/null || true
             # FG_INTERNAL_URL is REQUIRED: analyzer verifies caller tokens against
             # the app's /api/v1/users/me; without it every authed request 401s.
+            # Every one of these dirs holds state the app expects to survive a
+            # restart (parquet_cache: the loaded-dataset rehydration store that
+            # backs "Run Full Analysis" etc — without this mount, every deploy
+            # silently wipes whatever dataset users have loaded, surfacing as
+            # "Dataset not found"; library/metrics: saved reusable metric
+            # definitions; uploads: source files re-read on "reload latest").
             docker run -d --name analyzer --network "$NGINX_NET" --restart unless-stopped \
               -e FG_INTERNAL_URL=http://app:8000 \
               -v fg_tableforge_data:/app/projects \
               -v fg_tableforge_exports:/app/exports \
+              -v fg_tableforge_parquet:/app/parquet_cache \
+              -v fg_tableforge_cache:/app/cache \
+              -v fg_tableforge_metrics:/app/metrics \
+              -v fg_tableforge_library:/app/library \
+              -v fg_tableforge_uploads:/app/uploads \
               fieldgovern-analyzer:latest
             docker run -d --name cleaner --network "$NGINX_NET" --restart unless-stopped \
               -v fg_cleaner_data:/app/working_copies \
