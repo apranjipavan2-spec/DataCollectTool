@@ -855,13 +855,26 @@ async def stat_multitest_correction(req: MultitestRequest):
 async def stat_multinomial_logistic(config: InferConfig):
     """Multinomial logistic regression — outcome with 3+ unordered classes."""
     try:
-        from sklearn.linear_model import LogisticRegression
-        from sklearn.preprocessing import LabelEncoder
-        from scipy.stats import norm as sp_norm
-
         df = _prepare(config)
         y_col = config.columns[0]
         x_cols = config.columns[1:]
+        if not x_cols:
+            raise HTTPException(400, "Select at least one predictor column (columns 2+)")
+        return _multinomial_logistic_impl(df, y_col, x_cols, float(config.alpha or 0.05))
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(400, f"Multinomial logistic error: {e}")
+
+
+def _multinomial_logistic_impl(df: pd.DataFrame, y_col: str, x_cols: list[str], alpha: float = 0.05) -> dict:
+    """Pure compute — reused by the manual Statistics-tab endpoint above and by
+    the auto-battery executor (auto_analyze.py) so both run the identical model."""
+    try:
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.preprocessing import LabelEncoder
+        from scipy.stats import norm as sp_norm
         if not x_cols:
             raise HTTPException(400, "Select at least one predictor column (columns 2+)")
 
@@ -873,7 +886,7 @@ async def stat_multinomial_logistic(config: InferConfig):
         if len(classes) == 2:
             raise HTTPException(400, "Outcome has only 2 classes — use Logistic Regression instead")
 
-        _a = float(config.alpha or 0.05)
+        _a = alpha
         reference = classes[0]  # lowest alphabetical = reference
 
         # Encode predictors: numeric stays numeric, categorical → dummies (drop_first)

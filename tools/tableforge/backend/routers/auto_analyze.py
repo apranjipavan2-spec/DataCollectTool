@@ -26,6 +26,8 @@ from ..shared import datasets, column_roles, study_designs, apply_metrics_and_bi
 from . import inferential_utils as iu
 from .test_chooser import plan_battery
 from .ai import _call_llm, _load_ai_cfg, _match_col
+from .inferential import _multinomial_logistic_impl
+from .causal import _did_compute, _psm_compute
 
 
 router = APIRouter()
@@ -508,6 +510,78 @@ def _exec_mr_by_group(df: pd.DataFrame, params: dict) -> dict:
     }
 
 
+def _exec_correlation_matrix(df: pd.DataFrame, params: dict) -> dict:
+    cols = [c for c in params["cols"] if c in df.columns]
+    sub = df[cols].apply(pd.to_numeric, errors="coerce")
+    valid = [c for c in cols if sub[c].notna().sum() >= 3]
+    if len(valid) < 2:
+        return {"table": {"headers": [], "rows": []}, "test": {},
+                "interpretation": "Need ≥2 numeric columns with data", "warnings": []}
+    corr = sub[valid].corr(method="pearson").round(4)
+    headers = [""] + list(corr.columns)
+    rows = [[str(idx)] + [None if pd.isna(v) else round(float(v), 4) for v in row]
+            for idx, row in corr.iterrows()]
+    pairs = [(valid[i], valid[j], corr.loc[valid[i], valid[j]])
+             for i in range(len(valid)) for j in range(i + 1, len(valid))]
+    strong = sorted([p for p in pairs if abs(p[2]) >= 0.5], key=lambda x: -abs(x[2]))
+    interp = (f"Strongest correlation: {strong[0][0]} ↔ {strong[0][1]} (r={strong[0][2]:.3f})."
+              if strong else "No strong pairwise correlations (|r|≥0.5) among the selected variables.")
+    return {"table": {"headers": headers, "rows": rows}, "test": {}, "interpretation": interp, "warnings": []}
+
+
+def _exec_cramers_matrix(df: pd.DataFrame, params: dict) -> dict:
+    from scipy.stats import chi2_contingency
+    cols = [c for c in params["cols"] if c in df.columns]
+    if len(cols) < 2:
+        return {"table": {"headers": [], "rows": []}, "test": {},
+                "interpretation": "Need ≥2 categorical columns", "warnings": []}
+    n = len(cols)
+    v: list[list] = [[None] * n for _ in range(n)]
+    pairs = []
+    for i in range(n):
+        v[i][i] = 1.0
+        for j in range(i + 1, n):
+            sub = df[[cols[i], cols[j]]].dropna().astype(str)
+            if len(sub) < 5:
+                continue
+            ct = pd.crosstab(sub[cols[i]], sub[cols[j]])
+            if ct.shape[0] < 2 or ct.shape[1] < 2:
+                continue
+            chi2, p, _, _ = chi2_contingency(ct)
+            v[i][j] = v[j][i] = round(float(iu.cramers_v(chi2, len(sub), ct.shape[0], ct.shape[1])), 4)
+            pairs.append((i, j))
+    headers = [""] + cols
+    rows = []
+    for i, c in enumerate(cols):
+        row = [c]
+        for j in range(n):
+            row.append("—" if i == j else ("n/a" if v[i][j] is None else v[i][j]))
+        rows.append(row)
+    strong = sorted([(cols[i], cols[j], v[i][j]) for (i, j) in pairs if v[i][j] is not None and v[i][j] >= 0.3],
+                     key=lambda x: -x[2])
+    interp = (f"Strongest association: {strong[0][0]} ↔ {strong[0][1]} (V={strong[0][2]:.3f})."
+              if strong else "No medium-to-strong categorical associations (V≥0.3) found.")
+    return {"table": {"headers": headers, "rows": rows}, "test": {}, "interpretation": interp, "warnings": []}
+
+
+def _exec_multinomial_logistic(df: pd.DataFrame, params: dict) -> dict:
+    r = _multinomial_logistic_impl(df, params["outcome_col"], params["predictor_cols"], params.get("alpha", 0.05))
+    return {"table": {"headers": r["headers"], "rows": r["rows"]}, "test": {},
+            "interpretation": r.get("interpretation", ""), "warnings": []}
+
+
+def _exec_did(df: pd.DataFrame, params: dict) -> dict:
+    r = _did_compute(df, params["treatment_col"], params["post_col"], params["outcome_col"])
+    return {"table": {"headers": r["headers"], "rows": r["rows"]}, "test": r.get("test", {}),
+            "interpretation": r.get("interpretation", ""), "warnings": r.get("warnings", [])}
+
+
+def _exec_psm(df: pd.DataFrame, params: dict) -> dict:
+    r = _psm_compute(df, params["treatment_col"], params["outcome_col"], params["covariates"])
+    return {"table": {"headers": r["headers"], "rows": r["rows"]}, "test": r.get("test", {}),
+            "interpretation": r.get("interpretation", ""), "warnings": r.get("warnings", [])}
+
+
 EXECUTORS = {
     "descriptive": _exec_descriptive,
     "chi2": _exec_chi2,
@@ -524,6 +598,11 @@ EXECUTORS = {
     "multiple_regression": _exec_multiple_regression,
     "reliability": _exec_reliability,
     "mr_by_group": _exec_mr_by_group,
+    "correlation_matrix": _exec_correlation_matrix,
+    "cramers_matrix": _exec_cramers_matrix,
+    "multinomial_logistic": _exec_multinomial_logistic,
+    "did": _exec_did,
+    "psm": _exec_psm,
 }
 
 
@@ -874,16 +953,24 @@ range, never as real respondent data.
 Columns:
 {json.dumps(col_meta, default=str)}
 
-Group these columns into 2 to 6 logical analysis sections that make sense
+Group these columns into 2 to 4 logical analysis sections that make sense
 for social-science survey research (for example: "Demographics vs
 Attitudes", "Awareness vs Behavior", "Background vs Outcomes"). A column can
 appear in more than one section if it's genuinely relevant to both. For each
 section recommend:
 - label: a short section name
 - rationale: one sentence explaining why these columns belong together
-- outcome_cols: the column id(s) being explained or measured (the dependent
-  variable(s) — a section may have more than one)
-- predictor_cols: the column id(s) that might explain the outcome(s)
+- outcome_cols: at most 3 column id(s) being explained or measured (the
+  dependent variable(s) — pick the ones that matter most, not everything
+  that could qualify)
+- predictor_cols: at most 5 column id(s) that most plausibly explain the
+  outcome(s) — be selective, not exhaustive. Every outcome × predictor pair
+  becomes a separate statistical test, so a long predictor list produces a
+  wall of low-value tests. Do NOT include administrative/geographic
+  identifier columns (district, block, GP/gram panchayat, village name,
+  or similar location codes) as predictors — they have too many categories
+  to compare meaningfully and belong in a map/filter view, not a test
+  battery.
 
 Respect any "existing_role" already tagged (outcome/treatment/demographic)
 as a strong hint. Only use column ids exactly as given above — never invent
@@ -908,11 +995,11 @@ one. Respond with ONLY valid JSON in this shape:
         return {"groups": []}
 
     groups = []
-    for g in (result.get("groups") or [])[:6]:
+    for g in (result.get("groups") or [])[:4]:
         outcomes = [_match_col(c, actual_cols) for c in (g.get("outcome_cols") or [])]
-        outcomes = [c for c in outcomes if c in actual_cols][:10]
+        outcomes = [c for c in outcomes if c in actual_cols][:3]
         predictors = [_match_col(c, actual_cols) for c in (g.get("predictor_cols") or [])]
-        predictors = [c for c in predictors if c in actual_cols][:15]
+        predictors = [c for c in predictors if c in actual_cols][:5]
         if not outcomes:
             continue
         groups.append({

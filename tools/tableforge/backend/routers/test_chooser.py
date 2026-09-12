@@ -146,6 +146,20 @@ def plan_battery(
                 continue
             p_role = roles.get(p, {})
             p_scale = infer_scale(df[p], p_role)
+
+            # Guard against degenerate/uninformative pairings before running
+            # anything: a 1-category column has nothing to compare, and a
+            # 50+ category column (village/GP names etc.) produces a huge,
+            # unreadable crosstab instead of a real answer.
+            if p_scale in ("categorical", "binary"):
+                p_nunique = int(df[p].dropna().nunique())
+                if p_nunique < 2:
+                    skip(o, p, f"'{p}' has only one category present — nothing to compare.")
+                    continue
+                if p_nunique > 12:
+                    skip(o, p, f"'{p}' has {p_nunique} categories — too many for a meaningful pairwise comparison (max 12).")
+                    continue
+
             used_predictors.append((p, p_scale))
             specs_before = len(specs)
 
@@ -246,6 +260,33 @@ def plan_battery(
                     {"outcome_col": o, "predictor_cols": num_or_bin, "weight_col": weight_col},
                     f"Multiple regression — {o} ~ {' + '.join(num_or_bin)}")
 
+        # 4b) Multinomial logistic — categorical outcome with 3+ classes gets only
+        # pairwise chi2/anova above (one predictor at a time); a 3+-class outcome
+        # also deserves a single multivariate model across all its predictors,
+        # same way binary/continuous outcomes get logistic/multiple regression.
+        if o_scale == "categorical" and used_predictors and int(df[o].dropna().nunique()) >= 3:
+            covariate_cols = [p for p, _ in used_predictors]
+            add("multinomial_logistic", o, covariate_cols,
+                {"outcome_col": o, "predictor_cols": covariate_cols, "alpha": 0.05},
+                f"Multinomial logistic — {o} ~ {' + '.join(covariate_cols)}")
+
+        # 4c) Causal add-ons — only fire when the researcher has explicitly tagged
+        # a treatment column in Study Design; otherwise every outcome would get
+        # a DiD/PSM test with no real treatment/control structure behind it.
+        if treatment_col and treatment_col in df.columns and o_scale in ("continuous", "likert") and o != treatment_col:
+            post_col = design.get("panel_wave_col")
+            if post_col and post_col in df.columns and post_col not in (o, treatment_col) \
+                    and int(df[post_col].dropna().nunique()) == 2:
+                add("did", o, [treatment_col, post_col],
+                    {"treatment_col": treatment_col, "post_col": post_col, "outcome_col": o},
+                    f"Difference-in-Differences — {o} ~ {treatment_col} × {post_col}")
+
+            psm_covariates = [p for p in predictor_cols if p not in (treatment_col, post_col, o)][:8]
+            if psm_covariates:
+                add("psm", o, psm_covariates,
+                    {"treatment_col": treatment_col, "outcome_col": o, "covariates": psm_covariates},
+                    f"Propensity Score Matching — {o} ~ {treatment_col}")
+
     # 5) If any outcome group is Likert items (≥3 items tagged), add reliability
     likert_items = [c for c, r in roles.items()
                     if (r or {}).get("scale") == "likert" and c in df.columns]
@@ -253,5 +294,23 @@ def plan_battery(
         add("reliability", None, likert_items,
             {"item_cols": likert_items},
             f"Cronbach's α — {len(likert_items)} Likert items")
+
+    # 6) Full matrices — one overview table each, not per-outcome, so they add
+    # at most 2 extra tables to the whole battery regardless of how many
+    # outcomes/predictors were picked.
+    matrix_pool = list(dict.fromkeys([*outcome_cols, *predictor_cols]))
+    numeric_pool = [c for c in matrix_pool if infer_scale(df[c], roles.get(c)) in ("continuous", "likert")]
+    if len(numeric_pool) >= 2:
+        add("correlation_matrix", None, numeric_pool,
+            {"cols": numeric_pool},
+            f"Correlation Matrix — {len(numeric_pool)} numeric variables")
+
+    cat_pool = [c for c in matrix_pool
+                if infer_scale(df[c], roles.get(c)) in ("categorical", "binary")
+                and 2 <= int(df[c].dropna().nunique()) <= 12]
+    if len(cat_pool) >= 2:
+        add("cramers_matrix", None, cat_pool,
+            {"cols": cat_pool},
+            f"Cramér's V Matrix — {len(cat_pool)} categorical variables")
 
     return {"specs": specs, "skipped": skipped}

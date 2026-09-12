@@ -4,7 +4,21 @@ import { runAutoBattery, planBattery, aiSuggestPlan, BatteryProgress, SkippedCol
 import { ColPicker } from './ColPicker';
 import { ProjectFilterBanner } from './ProjectFilterBanner';
 import { STAT_TITLES } from './StatisticalTables';
+import { adaptMatrixToHeatmap } from './Chart';
 import { combineResults, buildBatteryRecipe, BatteryConfig } from '../lib/combineResults';
+
+type StatChart = { kind: 'heatmap'; data: any; title?: string; height?: number };
+
+// Only chi2 result tables are a clean row×column matrix a heatmap can render;
+// other kinds (t-test, ANOVA, regression coefficient tables, ...) have no
+// canonical chart form here, so chart insertion stays table-only for them.
+function buildChartForResult(r: any): StatChart | null {
+  if (r?.kind !== 'chi2' || !r.table?.headers?.length) return null;
+  const data = adaptMatrixToHeatmap(r.table.headers, r.table.rows, 'sequential');
+  return data
+    ? { kind: 'heatmap', data, title: 'Cross-tab heatmap (counts)', height: Math.max(240, data.yLabels.length * 32 + 60) }
+    : null;
+}
 
 // A handful of battery `kind` values don't have a STAT_TITLES entry (that map
 // is keyed by the Statistics-tab stat type, not every battery executor).
@@ -18,7 +32,7 @@ interface Props {
   columnRoles?: Record<string, ColumnRole>;
   projectFilters?: Record<string, string[]>;
   onClose: () => void;
-  onPromote?: (label: string, headers: string[], rows: any[][], interpretation: string, recipe?: Omit<BatteryConfig, 'datasetId' | 'computedAt'>) => void;
+  onPromote?: (label: string, headers: string[], rows: any[][], interpretation: string, recipe?: Omit<BatteryConfig, 'datasetId' | 'computedAt'>, chart?: StatChart, chartOnly?: boolean) => void;
   onPackReady?: (pack: any[]) => void;
 }
 
@@ -212,10 +226,11 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
     return out;
   }, [results]);
 
-  const promote = (r: any) => {
+  const promote = (r: any, mode: 'table' | 'chart' | 'both' = 'table') => {
     if (!onPromote || !r?.table) return;
     const recipe = buildBatteryRecipe(r.kind, correction, [r]);
-    onPromote(r.label, r.table.headers || [], r.table.rows || [], r.interpretation || '', recipe);
+    const chart = mode === 'table' ? undefined : buildChartForResult(r) || undefined;
+    onPromote(r.label, r.table.headers || [], r.table.rows || [], r.interpretation || '', recipe, chart, mode === 'chart');
   };
 
   const combineGroup = (kind: string) => {
@@ -286,12 +301,27 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
             <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 6 }}>
               {r.interpretation}
             </div>
-            {onPromote && r.table?.headers?.length > 0 && (
-              <button className="btn-small" onClick={(e) => { e.stopPropagation(); promote(r); }}
-                style={{ fontSize: 10 }}>
-                → Promote to project
-              </button>
-            )}
+            {onPromote && r.table?.headers?.length > 0 && (() => {
+              const chart = buildChartForResult(r);
+              return (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button className="btn-small" style={{ fontSize: 10 }}
+                    onClick={(e) => { e.stopPropagation(); promote(r, 'table'); }}>
+                    📋 Insert table
+                  </button>
+                  <button className="btn-small" style={{ fontSize: 10, opacity: chart ? 1 : 0.5 }}
+                    disabled={!chart} onClick={(e) => { e.stopPropagation(); promote(r, 'chart'); }}
+                    title={chart ? 'Insert as a chart-only card' : 'No chart available for this test'}>
+                    📊 Insert chart
+                  </button>
+                  <button className="btn-small" style={{ fontSize: 10, opacity: chart ? 1 : 0.5 }}
+                    disabled={!chart} onClick={(e) => { e.stopPropagation(); promote(r, 'both'); }}
+                    title={chart ? 'Insert one card showing both table and chart' : 'No chart available for this test'}>
+                    📋📊 Insert both
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>

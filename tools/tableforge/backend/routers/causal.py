@@ -79,15 +79,26 @@ def difference_in_differences(config: DiDConfig):
     The interaction coefficient is the average treatment effect on the treated (ATT)
     under the parallel-trends assumption.
     """
+    df = _load_df(config.dataset_id, config.filters)
+    result = _did_compute(df, config.treatment_col, config.post_col, config.outcome_col,
+                           config.treatment_value, config.post_value)
+    add_audit_log(config.dataset_id, "causal_did",
+                  f"DiD: outcome={config.outcome_col} treat={config.treatment_col} post={config.post_col}")
+    return result
+
+
+def _did_compute(df: pd.DataFrame, treatment_col: str, post_col: str, outcome_col: str,
+                  treatment_value: str | None = None, post_value: str | None = None) -> dict:
+    """Pure compute — reused by the manual Causal endpoint above and by the
+    auto-battery executor (auto_analyze.py) so both run the identical model."""
     try:
-        df = _load_df(config.dataset_id, config.filters)
-        for c in [config.treatment_col, config.post_col, config.outcome_col]:
+        for c in [treatment_col, post_col, outcome_col]:
             if c not in df.columns:
                 raise HTTPException(400, f"Column not found: {c}")
 
-        t = _coerce_binary(df[config.treatment_col], config.treatment_value)
-        p = _coerce_binary(df[config.post_col], config.post_value)
-        y = pd.to_numeric(df[config.outcome_col], errors="coerce")
+        t = _coerce_binary(df[treatment_col], treatment_value)
+        p = _coerce_binary(df[post_col], post_value)
+        y = pd.to_numeric(df[outcome_col], errors="coerce")
         mask = y.notna() & t.notna() & p.notna()
         t, p, y = t[mask], p[mask], y[mask]
         if len(y) < 8:
@@ -145,9 +156,6 @@ def difference_in_differences(config: DiDConfig):
         if min(m_ct_pre[1], m_ct_post[1], m_tr_pre[1], m_tr_post[1]) < 30:
             warnings.append(f"Small cells (min N = {min(m_ct_pre[1], m_ct_post[1], m_tr_pre[1], m_tr_post[1])}); SE may be unstable.")
 
-        add_audit_log(config.dataset_id, "causal_did",
-                      f"DiD: outcome={config.outcome_col} treat={config.treatment_col} post={config.post_col} ATT={ate:.4f} p={p_val:.4f}")
-
         return sanitize_for_json({
             "headers": headers, "rows": rows,
             "row_count": len(rows), "col_count": len(headers),
@@ -176,21 +184,32 @@ def propensity_score_matching(config: PSMConfig):
     Returns the ATT estimate on the matched sample plus a balance table comparing
     standardized mean differences before vs after matching.
     """
+    df = _load_df(config.dataset_id, config.filters)
+    result = _psm_compute(df, config.treatment_col, config.outcome_col, config.covariates,
+                           config.treatment_value, config.k, config.caliper)
+    add_audit_log(config.dataset_id, "causal_psm",
+                  f"PSM: outcome={config.outcome_col} treat={config.treatment_col}")
+    return result
+
+
+def _psm_compute(df: pd.DataFrame, treatment_col: str, outcome_col: str, covariates: list[str],
+                  treatment_value: str | None = None, k: int = 1, caliper: float | None = None) -> dict:
+    """Pure compute — reused by the manual Causal endpoint above and by the
+    auto-battery executor (auto_analyze.py) so both run the identical model."""
     try:
-        if not config.covariates:
+        if not covariates:
             raise HTTPException(400, "PSM requires at least one covariate")
-        df = _load_df(config.dataset_id, config.filters)
-        needed = [config.treatment_col, config.outcome_col, *config.covariates]
+        needed = [treatment_col, outcome_col, *covariates]
         for c in needed:
             if c not in df.columns:
                 raise HTTPException(400, f"Column not found: {c}")
 
-        t = _coerce_binary(df[config.treatment_col], config.treatment_value)
-        y = pd.to_numeric(df[config.outcome_col], errors="coerce")
+        t = _coerce_binary(df[treatment_col], treatment_value)
+        y = pd.to_numeric(df[outcome_col], errors="coerce")
 
         # Build covariate matrix: numeric cast for each, one-hot for non-numeric (top categories)
         cov_frame = pd.DataFrame(index=df.index)
-        for cov in config.covariates:
+        for cov in covariates:
             s = df[cov]
             num = pd.to_numeric(s, errors="coerce")
             if num.notna().sum() >= 0.6 * len(s):
@@ -223,7 +242,7 @@ def propensity_score_matching(config: PSMConfig):
             d = np.abs(lp_control - lp[ti])
             j = int(np.argmin(d))
             dist = float(d[j])
-            if config.caliper is not None and dist > config.caliper:
+            if caliper is not None and dist > caliper:
                 continue
             matches.append((ti, int(control_idx[j]), dist))
 
@@ -273,9 +292,6 @@ def propensity_score_matching(config: PSMConfig):
         worst = max((abs(r[2]) for r in balance_rows[:-2] if isinstance(r[2], (int, float))), default=0)
         if worst >= 0.25:
             warnings.append(f"Some covariates remain imbalanced after matching (max |SMD| = {worst:.2f}); consider a wider covariate set or different specification.")
-
-        add_audit_log(config.dataset_id, "causal_psm",
-                      f"PSM: outcome={config.outcome_col} treat={config.treatment_col} ATT={att:.4f} matches={len(matches)}")
 
         return sanitize_for_json({
             "headers": headers, "rows": balance_rows,

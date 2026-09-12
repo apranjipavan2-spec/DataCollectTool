@@ -2885,7 +2885,7 @@ export default function App() {
           projectFilters={projectFilters}
           onPackReady={(pack) => setLastAnalysisPack(pack)}
           onClose={() => setModal(null)}
-          onPromote={(label, headers, rows, interpretation, recipe) => {
+          onPromote={(label, headers, rows, interpretation, recipe, chart, chartOnly) => {
             const id = String(Date.now() + Math.floor(Math.random() * 1000));
             pushUndo();
             const empty = createEmptyTable(id, label.slice(0, 30));
@@ -2899,12 +2899,16 @@ export default function App() {
             if (recipe) {
               (empty as any)._batteryConfig = { ...recipe, datasetId: dataset?.dataset_id, computedAt: new Date().toISOString() };
             }
+            if (chart) {
+              empty.chartConfig = { statChart: chart, chart_only: !!chartOnly };
+            }
             setTables(prev => [...prev, empty]);
             setResults(prev => {
               const next = new Map(prev);
               next.set(id, { headers, rows, row_count: rows.length, col_count: headers.length });
               return next;
             });
+            if (chart && !chartOnly) setPreviewTab('chart');
           }}
         />
       )}
