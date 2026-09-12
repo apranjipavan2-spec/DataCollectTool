@@ -1431,6 +1431,13 @@ def export():
     orig_name = DATA["filename"] or "cleaned_data"
     base = os.path.splitext(orig_name)[0]
 
+    # Exported files should read like the questionnaire, not the raw field
+    # codes — rename only the write-out copy so diffing/comments below (which
+    # key off orig_df's raw column names) are unaffected; renaming preserves
+    # column order, so position-based cell lookups (col_to_idx) still line up.
+    col_labels = DATA.get("column_labels") or {}
+    df_export = df.rename(columns=lambda c: col_labels.get(c, c)) if col_labels else df
+
     if fmt == "excel":
         import openpyxl as xl
         from openpyxl.styles import PatternFill
@@ -1445,7 +1452,7 @@ def export():
         if orig_df is not None and include_comments:
             # Tracked export with yellow highlights and "Was: ..." comments
             with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-                df.to_excel(writer, index=False)
+                df_export.to_excel(writer, index=False)
                 wb = writer.book
                 ws = writer.sheets["Sheet1"]
                 yellow = PatternFill(start_color="FFFFCC", end_color="FFFFCC", fill_type="solid")
@@ -1474,7 +1481,7 @@ def export():
                         cell.comment = Comment(f"Was: {was}", "Data Cleaner")
         else:
             # Plain export (no tracking)
-            df.to_excel(buf, index=False, engine="openpyxl")
+            df_export.to_excel(buf, index=False, engine="openpyxl")
 
         buf.seek(0)
         # Also save to working_copies on disk
@@ -1491,11 +1498,11 @@ def export():
     else:
         out_name = f"{base}_cleaned.csv"
         buf = io.BytesIO()
-        df.to_csv(buf, index=False)
+        df_export.to_csv(buf, index=False)
         buf.seek(0)
         # Also save to working_copies
         disk_path = COPIES_DIR / out_name
-        df.to_csv(disk_path, index=False)
+        df_export.to_csv(disk_path, index=False)
         return send_file(buf, as_attachment=True,
                          download_name=out_name,
                          mimetype="text/csv")

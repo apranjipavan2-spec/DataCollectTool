@@ -2,10 +2,10 @@ import os
 import json
 import re as _re
 from typing import Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from ..shared import (datasets, custom_metrics, custom_bins, sanitize_for_json, apply_metrics_and_bins, BASE_DIR, PROJECTS_DIR)
+from ..shared import (datasets, custom_metrics, custom_bins, sanitize_for_json, apply_metrics_and_bins, BASE_DIR, PROJECTS_DIR, require_identity)
 
 router = APIRouter()
 
@@ -169,6 +169,15 @@ AI_MODELS = {
 }
 
 
+def _require_master_admin(identity: dict = Depends(require_identity)) -> dict:
+    """Viewing status (has_key/provider/model, never the key itself) stays open
+    to every logged-in user — other AI features check it to show a friendly
+    "ask your admin" message. Changing or clearing the key is restricted."""
+    if identity.get("role") != "master_admin":
+        raise HTTPException(403, "Only a super admin can change the AI provider configuration.")
+    return identity
+
+
 @router.get("/api/ai/config")
 async def get_ai_config():
     cfg = _load_ai_cfg()
@@ -182,7 +191,7 @@ async def get_ai_config():
 
 
 @router.post("/api/ai/config")
-async def set_ai_config(body: dict):
+async def set_ai_config(body: dict, _admin: dict = Depends(_require_master_admin)):
     # Load existing config to preserve API key if not re-entered
     existing = {}
     if AI_CONFIG_FILE.exists():
@@ -194,6 +203,13 @@ async def set_ai_config(body: dict):
     data = {"provider": provider, "api_key": api_key, "model": model}
     AI_CONFIG_FILE.write_text(json.dumps(data))
     return {"status": "ok", "provider": provider, "model": model}
+
+
+@router.delete("/api/ai/config")
+async def delete_ai_config(_admin: dict = Depends(_require_master_admin)):
+    if AI_CONFIG_FILE.exists():
+        AI_CONFIG_FILE.unlink()
+    return {"status": "ok", "cleared": True}
 
 
 class AIPolishRequest(BaseModel):

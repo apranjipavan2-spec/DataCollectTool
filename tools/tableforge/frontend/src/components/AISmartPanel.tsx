@@ -331,6 +331,18 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
     finally { setLoading(false); }
   };
 
+  const handleRemoveConfig = async () => {
+    if (!window.confirm('Remove the saved AI provider and API key? Every AI feature in TableForge will stop working until it is reconfigured.')) return;
+    setLoading(true); setError('');
+    try {
+      const res = await fetch(`${API_BASE}/ai/config`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await res.text());
+      setConfigProvider(''); setConfigModel(''); setConfigApiKey(''); setConfigHasKey(false);
+      setAiResult({ status: 'AI configuration removed.' });
+    } catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+
   const renderContent = () => {
     switch (mode) {
       case 'polish':
@@ -877,9 +889,17 @@ export function AISmartPanel({ mode, table, tables, allResults, dataset, result,
                     placeholder="Select a provider first" className="fdrop-input" style={{ width: '100%' }} />
                 )}
               </div>
-              <button className="btn-primary" onClick={handleSaveConfig} disabled={loading} style={{ marginTop: 12 }}>
-                {loading ? 'Saving...' : 'Save Configuration'}
-              </button>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button className="btn-primary" onClick={handleSaveConfig} disabled={loading}>
+                  {loading ? 'Saving...' : 'Save Configuration'}
+                </button>
+                {configHasKey && (
+                  <button style={{ color: '#f87171', border: '1px solid #f87171', background: 'none', borderRadius: 6, padding: '0 12px', cursor: 'pointer' }}
+                    onClick={handleRemoveConfig} disabled={loading}>
+                    Remove API Key
+                  </button>
+                )}
+              </div>
             </div>
             {aiResult?.status && <div className="success-msg" style={{ marginTop: 10 }}>{aiResult.status}</div>}
           </div>

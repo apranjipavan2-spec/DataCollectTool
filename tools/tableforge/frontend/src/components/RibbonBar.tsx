@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TableConfig, NumberFormat, ConditionalFormat, ColumnInfo, TableResult } from '../types';
-import { API_BASE, fgListUserProjects, fgArchiveProject, fgRestoreProject } from '../api';
+import { API_BASE, fgListUserProjects, fgArchiveProject, fgRestoreProject, isSuperAdmin } from '../api';
 
 interface FgContext { fgUrl: string; token: string; programId?: string }
 
@@ -1511,9 +1511,11 @@ function AISmartRibbon({ table, dataset, onAction, onUpdate }: { table: TableCon
       <RGroup label="AI Report">
         <RBtn icon="📄" label="Generate Report" onClick={() => onAction('ai-report')} disabled={!dataset} />
       </RGroup>
-      <RGroup label="Settings">
-        <RBtn icon="⚙" label="AI Config" onClick={() => onAction('ai-config')} />
-      </RGroup>
+      {isSuperAdmin() && (
+        <RGroup label="Settings">
+          <RBtn icon="⚙" label="AI Config" onClick={() => onAction('ai-config')} />
+        </RGroup>
+      )}
     </>
   );
 }

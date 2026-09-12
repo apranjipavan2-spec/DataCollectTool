@@ -928,6 +928,7 @@ export interface AutoAnalyzeConfig {
   correction?: 'fdr_bh' | 'bonferroni' | 'holm' | 'none';
   use_design?: boolean;
   filters?: Record<string, string[]>;
+  column_labels?: Record<string, string>;
 }
 
 export async function planBattery(config: AutoAnalyzeConfig) {

@@ -92,7 +92,7 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
     try {
       const r = await planBattery({
         dataset_id: datasetId, outcome_cols: outcomes, predictor_cols: predictors,
-        correction, use_design: useDesign, filters: projectFilters || {},
+        correction, use_design: useDesign, filters: projectFilters || {}, column_labels: columnLabelMap,
       }) as any;
       setPlan(r.plan);
       setSkippedColumns(r.skipped || []);
@@ -111,7 +111,7 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
     setProgress({ idx: 0, total: 0, label: 'Preparing…' });
     try {
       await runAutoBattery(
-        { dataset_id: datasetId, outcome_cols: outcomes, predictor_cols: predictors, correction, use_design: useDesign, filters: projectFilters || {} },
+        { dataset_id: datasetId, outcome_cols: outcomes, predictor_cols: predictors, correction, use_design: useDesign, filters: projectFilters || {}, column_labels: columnLabelMap },
         (e: BatteryProgress) => {
           if (e.step === 'start') {
             setProgress({ idx: 0, total: e.total || 0, label: 'Starting…' });
@@ -167,7 +167,7 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
       for (const g of groups) {
         setProgress({ idx: 0, total: 0, label: `${g.label}: preparing…` });
         await runAutoBattery(
-          { dataset_id: datasetId, outcome_cols: g.outcome_cols, predictor_cols: g.predictor_cols, correction, use_design: useDesign, filters: projectFilters || {} },
+          { dataset_id: datasetId, outcome_cols: g.outcome_cols, predictor_cols: g.predictor_cols, correction, use_design: useDesign, filters: projectFilters || {}, column_labels: columnLabelMap },
           (e: BatteryProgress) => {
             if (e.step === 'progress') {
               setProgress({ idx: e.idx || 0, total: e.total || 0, label: `${g.label}: ${e.label || ''}` });
@@ -231,6 +231,20 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
     const recipe = buildBatteryRecipe(r.kind, correction, [r]);
     const chart = mode === 'table' ? undefined : buildChartForResult(r) || undefined;
     onPromote(r.label, r.table.headers || [], r.table.rows || [], r.interpretation || '', recipe, chart, mode === 'chart');
+  };
+
+  // One-click bulk insert: every result with a real table goes in, plus its
+  // chart when the result shape supports one (chi2 crosstabs today) — same
+  // rule as the per-row "Insert both" button, just applied to the whole pack.
+  const eligibleResults = useMemo(() => (results || []).filter(r => r?.table?.headers?.length > 0), [results]);
+
+  const promoteAll = () => {
+    if (!onPromote || !eligibleResults.length) return;
+    for (const r of eligibleResults) {
+      const recipe = buildBatteryRecipe(r.kind, correction, [r]);
+      const chart = buildChartForResult(r) || undefined;
+      onPromote(r.label, r.table.headers || [], r.table.rows || [], r.interpretation || '', recipe, chart, false);
+    }
   };
 
   const combineGroup = (kind: string) => {
@@ -486,8 +500,15 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
 
           {groupedBySection ? (
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
-                Pack — {results?.length} tests across {Object.keys(groupedBySection).length} sections · correction = {correction}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  Pack — {results?.length} tests across {Object.keys(groupedBySection).length} sections · correction = {correction}
+                </div>
+                {onPromote && eligibleResults.length > 0 && (
+                  <button className="btn-primary" style={{ fontSize: 12 }} onClick={promoteAll}>
+                    ⬇ Insert All {eligibleResults.length} to Project
+                  </button>
+                )}
               </div>
               {Object.entries(groupedBySection).map(([section, byOutcome]) => (
                 <div key={section} style={{ marginBottom: 20, padding: 10, border: '1px solid var(--border, #334155)', borderRadius: 6 }}>
@@ -495,7 +516,7 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
                   {Object.entries(byOutcome).map(([outcome, items]) => (
                     <div key={outcome} style={{ marginBottom: 16 }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent, #3b82f6)', marginBottom: 6 }}>
-                        Outcome: {outcome} <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>({items.length} tests)</span>
+                        Outcome: {columnLabelMap[outcome] || outcome} <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>({items.length} tests)</span>
                       </div>
                       {items.map(renderResultCard)}
                     </div>
@@ -505,8 +526,15 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
             </div>
           ) : grouped && (
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
-                Pack — {results?.length} tests · correction = {correction}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  Pack — {results?.length} tests · correction = {correction}
+                </div>
+                {onPromote && eligibleResults.length > 0 && (
+                  <button className="btn-primary" style={{ fontSize: 12 }} onClick={promoteAll}>
+                    ⬇ Insert All {eligibleResults.length} to Project
+                  </button>
+                )}
               </div>
 
               {groupedByKind && Object.values(groupedByKind).some(g => g.length > 1) && (
@@ -527,7 +555,7 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
               {Object.entries(grouped).map(([outcome, items]) => (
                 <div key={outcome} style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent, #3b82f6)', marginBottom: 6 }}>
-                    Outcome: {outcome} <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>({items.length} tests)</span>
+                    Outcome: {columnLabelMap[outcome] || outcome} <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>({items.length} tests)</span>
                   </div>
                   {items.map(renderResultCard)}
                 </div>

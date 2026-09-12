@@ -40,6 +40,7 @@ class AutoAnalyzeConfig(BaseModel):
     correction: str = "fdr_bh"           # fdr_bh | bonferroni | holm | none
     use_design: bool = True              # use saved StudyDesign if present
     filters: dict = {}
+    column_labels: dict[str, str] = {}   # raw col id -> human label, for test titles
 
 
 # ───────────────────────── Executors ─────────────────────────
@@ -512,19 +513,21 @@ def _exec_mr_by_group(df: pd.DataFrame, params: dict) -> dict:
 
 def _exec_correlation_matrix(df: pd.DataFrame, params: dict) -> dict:
     cols = [c for c in params["cols"] if c in df.columns]
+    col_labels = params.get("col_labels") or {}
+    lbl = lambda c: col_labels.get(c, c)
     sub = df[cols].apply(pd.to_numeric, errors="coerce")
     valid = [c for c in cols if sub[c].notna().sum() >= 3]
     if len(valid) < 2:
         return {"table": {"headers": [], "rows": []}, "test": {},
                 "interpretation": "Need ≥2 numeric columns with data", "warnings": []}
     corr = sub[valid].corr(method="pearson").round(4)
-    headers = [""] + list(corr.columns)
-    rows = [[str(idx)] + [None if pd.isna(v) else round(float(v), 4) for v in row]
+    headers = [""] + [lbl(c) for c in corr.columns]
+    rows = [[lbl(str(idx))] + [None if pd.isna(v) else round(float(v), 4) for v in row]
             for idx, row in corr.iterrows()]
     pairs = [(valid[i], valid[j], corr.loc[valid[i], valid[j]])
              for i in range(len(valid)) for j in range(i + 1, len(valid))]
     strong = sorted([p for p in pairs if abs(p[2]) >= 0.5], key=lambda x: -abs(x[2]))
-    interp = (f"Strongest correlation: {strong[0][0]} ↔ {strong[0][1]} (r={strong[0][2]:.3f})."
+    interp = (f"Strongest correlation: {lbl(strong[0][0])} ↔ {lbl(strong[0][1])} (r={strong[0][2]:.3f})."
               if strong else "No strong pairwise correlations (|r|≥0.5) among the selected variables.")
     return {"table": {"headers": headers, "rows": rows}, "test": {}, "interpretation": interp, "warnings": []}
 
@@ -532,6 +535,8 @@ def _exec_correlation_matrix(df: pd.DataFrame, params: dict) -> dict:
 def _exec_cramers_matrix(df: pd.DataFrame, params: dict) -> dict:
     from scipy.stats import chi2_contingency
     cols = [c for c in params["cols"] if c in df.columns]
+    col_labels = params.get("col_labels") or {}
+    lbl = lambda c: col_labels.get(c, c)
     if len(cols) < 2:
         return {"table": {"headers": [], "rows": []}, "test": {},
                 "interpretation": "Need ≥2 categorical columns", "warnings": []}
@@ -550,16 +555,16 @@ def _exec_cramers_matrix(df: pd.DataFrame, params: dict) -> dict:
             chi2, p, _, _ = chi2_contingency(ct)
             v[i][j] = v[j][i] = round(float(iu.cramers_v(chi2, len(sub), ct.shape[0], ct.shape[1])), 4)
             pairs.append((i, j))
-    headers = [""] + cols
+    headers = [""] + [lbl(c) for c in cols]
     rows = []
     for i, c in enumerate(cols):
-        row = [c]
+        row = [lbl(c)]
         for j in range(n):
             row.append("—" if i == j else ("n/a" if v[i][j] is None else v[i][j]))
         rows.append(row)
     strong = sorted([(cols[i], cols[j], v[i][j]) for (i, j) in pairs if v[i][j] is not None and v[i][j] >= 0.3],
                      key=lambda x: -x[2])
-    interp = (f"Strongest association: {strong[0][0]} ↔ {strong[0][1]} (V={strong[0][2]:.3f})."
+    interp = (f"Strongest association: {lbl(strong[0][0])} ↔ {lbl(strong[0][1])} (V={strong[0][2]:.3f})."
               if strong else "No medium-to-strong categorical associations (V≥0.3) found.")
     return {"table": {"headers": headers, "rows": rows}, "test": {}, "interpretation": interp, "warnings": []}
 
@@ -620,7 +625,7 @@ async def plan_only(config: AutoAnalyzeConfig):
             df = df[df[col].astype(str).isin([str(v) for v in vals])]
     roles = column_roles.get(config.dataset_id, {})
     design = study_designs.get(config.dataset_id, {}) if config.use_design else {}
-    planned = plan_battery(df, config.outcome_cols, config.predictor_cols, roles, design)
+    planned = plan_battery(df, config.outcome_cols, config.predictor_cols, roles, design, config.column_labels)
     return {"plan": planned["specs"], "skipped": planned["skipped"], "total": len(planned["specs"]), "design_used": bool(design)}
 
 
@@ -637,7 +642,7 @@ async def auto_battery(config: AutoAnalyzeConfig):
             df = df[df[col].astype(str).isin([str(v) for v in vals])]
     roles = column_roles.get(config.dataset_id, {})
     design = study_designs.get(config.dataset_id, {}) if config.use_design else {}
-    planned = plan_battery(df, config.outcome_cols, config.predictor_cols, roles, design)
+    planned = plan_battery(df, config.outcome_cols, config.predictor_cols, roles, design, config.column_labels)
     plan = planned["specs"]
     plan_skipped = planned["skipped"]
 

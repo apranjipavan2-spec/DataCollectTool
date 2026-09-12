@@ -62,22 +62,40 @@ def _is_paired_binary(s1: pd.Series, s2: pd.Series) -> bool:
 
 # ───────────────────────── Battery planner ─────────────────────────
 
+def _short_label(text: str, max_len: int = 42) -> str:
+    """Question labels are often bilingual ("English | Hindi") and long —
+    prefer the English half for a scannable test title, then truncate."""
+    eng = text.split(" | ")[0].strip() if " | " in text else text
+    return eng if len(eng) <= max_len else eng[: max_len - 1].rstrip() + "…"
+
+
 def plan_battery(
     df: pd.DataFrame,
     outcome_cols: list[str],
     predictor_cols: list[str] | None,
     roles: dict[str, dict],
     design: dict | None,
+    column_labels: dict[str, str] | None = None,
 ) -> dict:
     """Return the analysis specs to execute, plus which outcome/predictor
     pairs were considered but produced no test and why.
 
     {"specs": [{id, kind, outcome, predictors, params, label}, ...],
      "skipped": [{outcome, predictor, reason}, ...]}
+
+    `outcome`/`predictors`/`params` always carry raw column ids (needed to
+    re-run the exact spec later) — only the human-facing `label` string (and
+    skip reasons) substitute in `column_labels` when available, so the UI
+    never has to show a bare question id like "q2_1".
     """
     design = design or {}
     predictor_cols = [c for c in (predictor_cols or []) if c in df.columns]
     outcome_cols = [c for c in outcome_cols if c in df.columns]
+
+    def L(col: str | None) -> str:
+        if not col:
+            return col or ""
+        return _short_label((column_labels or {}).get(col, col))
 
     specs: list[dict] = []
     skipped: list[dict] = []
@@ -100,7 +118,7 @@ def plan_battery(
 
     # 1) Descriptives for every outcome
     for o in outcome_cols:
-        add("descriptive", o, None, {"cols": [o]}, f"Descriptive summary — {o}")
+        add("descriptive", o, None, {"cols": [o]}, f"Descriptive summary — {L(o)}")
 
     # 2) Pre/post pairs from study design — paired tests across all pairs
     pairs = design.get("pre_post_pairs", []) or []
@@ -110,14 +128,14 @@ def plan_battery(
             if _is_paired_continuous(df[pre], df[post]):
                 add("paired_ttest", post, [pre],
                     {"pre_col": pre, "post_col": post},
-                    f"Paired t-test — {pre} vs {post}")
+                    f"Paired t-test — {L(pre)} vs {L(post)}")
                 add("wilcoxon", post, [pre],
                     {"pre_col": pre, "post_col": post},
-                    f"Wilcoxon signed-rank — {pre} vs {post}")
+                    f"Wilcoxon signed-rank — {L(pre)} vs {L(post)}")
             if _is_paired_binary(df[pre], df[post]):
                 add("mcnemar", post, [pre],
                     {"pre_col": pre, "post_col": post},
-                    f"McNemar — {pre} vs {post}")
+                    f"McNemar — {L(pre)} vs {L(post)}")
 
     treatment_col = design.get("treatment_col")
     weight_col = design.get("weight_col")
@@ -135,7 +153,7 @@ def plan_battery(
             if group and group in df.columns:
                 add("mr_by_group", o, [group],
                     {"mr_col": o, "group_col": group, "correction": "fdr_bh"},
-                    f"Multi-response by {group} — {o}")
+                    f"Multi-response by {L(group)} — {L(o)}")
             else:
                 skip(o, None, "Multi-response column needs a treatment/group column to compare against (none set in Study Design and no predictor selected).")
             continue
@@ -154,10 +172,10 @@ def plan_battery(
             if p_scale in ("categorical", "binary"):
                 p_nunique = int(df[p].dropna().nunique())
                 if p_nunique < 2:
-                    skip(o, p, f"'{p}' has only one category present — nothing to compare.")
+                    skip(o, p, f"'{L(p)}' has only one category present — nothing to compare.")
                     continue
                 if p_nunique > 12:
-                    skip(o, p, f"'{p}' has {p_nunique} categories — too many for a meaningful pairwise comparison (max 12).")
+                    skip(o, p, f"'{L(p)}' has {p_nunique} categories — too many for a meaningful pairwise comparison (max 12).")
                     continue
 
             used_predictors.append((p, p_scale))
@@ -168,12 +186,12 @@ def plan_battery(
                 if p_scale in ("binary", "categorical"):
                     add("chi2", o, [p],
                         {"row": o, "col": p},
-                        f"Chi-square + Cramér's V — {o} × {p}")
+                        f"Chi-square + Cramér's V — {L(o)} × {L(p)}")
                 elif p_scale in ("continuous", "likert"):
                     # treat outcome as group, predictor as numeric
                     add("ttest", o, [p],
                         {"value_col": p, "group_col": o},
-                        f"t-test (Mann-Whitney fallback) — {p} by {o}")
+                        f"t-test (Mann-Whitney fallback) — {L(p)} by {L(o)}")
 
             # likert outcome (treat as ordinal for non-parametric)
             elif o_scale == "likert":
@@ -182,57 +200,57 @@ def plan_battery(
                     if n_groups == 2:
                         add("mann_whitney", o, [p],
                             {"value_col": o, "group_col": p},
-                            f"Mann-Whitney — {o} by {p}")
+                            f"Mann-Whitney — {L(o)} by {L(p)}")
                     elif n_groups >= 3:
                         add("kruskal", o, [p],
                             {"value_col": o, "group_col": p},
-                            f"Kruskal-Wallis — {o} by {p}")
+                            f"Kruskal-Wallis — {L(o)} by {L(p)}")
                 elif p_scale == "continuous":
                     add("spearman", o, [p],
                         {"x_col": p, "y_col": o},
-                        f"Spearman — {p} ~ {o}")
+                        f"Spearman — {L(p)} ~ {L(o)}")
                 elif p_scale == "likert":
                     add("spearman", o, [p],
                         {"x_col": p, "y_col": o},
-                        f"Spearman — {p} ~ {o}")
+                        f"Spearman — {L(p)} ~ {L(o)}")
 
             # continuous outcome
             elif o_scale == "continuous":
                 if p_scale == "binary":
                     add("ttest", o, [p],
                         {"value_col": o, "group_col": p},
-                        f"t-test — {o} by {p}")
+                        f"t-test — {L(o)} by {L(p)}")
                 elif p_scale == "categorical":
                     n_groups = int(df[p].nunique(dropna=True))
                     if n_groups == 2:
                         add("ttest", o, [p],
                             {"value_col": o, "group_col": p},
-                            f"t-test — {o} by {p}")
+                            f"t-test — {L(o)} by {L(p)}")
                     elif n_groups >= 3:
                         add("anova", o, [p],
                             {"value_col": o, "group_col": p, "posthoc": "tukey"},
-                            f"ANOVA + Tukey HSD — {o} by {p}")
+                            f"ANOVA + Tukey HSD — {L(o)} by {L(p)}")
                 elif p_scale in ("continuous", "likert"):
                     add("pearson", o, [p],
                         {"x_col": p, "y_col": o},
-                        f"Pearson — {p} ~ {o}")
+                        f"Pearson — {L(p)} ~ {L(o)}")
 
             # categorical outcome
             elif o_scale == "categorical":
                 if p_scale in ("binary", "categorical"):
                     add("chi2", o, [p],
                         {"row": o, "col": p},
-                        f"Chi-square + Cramér's V — {o} × {p}")
+                        f"Chi-square + Cramér's V — {L(o)} × {L(p)}")
                 elif p_scale in ("continuous", "likert"):
                     n_groups = int(df[o].nunique(dropna=True))
                     if n_groups == 2:
                         add("ttest", o, [p],
                             {"value_col": p, "group_col": o},
-                            f"t-test — {p} by {o}")
+                            f"t-test — {L(p)} by {L(o)}")
                     elif n_groups >= 3:
                         add("anova", o, [p],
                             {"value_col": p, "group_col": o, "posthoc": "tukey"},
-                            f"ANOVA + Tukey HSD — {p} by {o}")
+                            f"ANOVA + Tukey HSD — {L(p)} by {L(o)}")
 
             # Every branch above only calls add() for scale combinations with a
             # valid test, or group counts of 2+ (needed to compare anything).
@@ -242,9 +260,9 @@ def plan_battery(
                 if o_scale == "multi_response" or p_scale == "multi_response":
                     skip(o, p, "Multi-response columns can't be paired directly with another column this way.")
                 elif o_scale == "continuous" and p_scale in ("categorical", "binary") and int(df[p].nunique(dropna=True)) < 2:
-                    skip(o, p, f"'{p}' has fewer than 2 groups after removing missing values — nothing to compare.")
+                    skip(o, p, f"'{L(p)}' has fewer than 2 groups after removing missing values — nothing to compare.")
                 elif o_scale == "categorical" and p_scale in ("continuous", "likert") and int(df[o].nunique(dropna=True)) < 2:
-                    skip(o, p, f"'{o}' has fewer than 2 groups after removing missing values — nothing to compare.")
+                    skip(o, p, f"'{L(o)}' has fewer than 2 groups after removing missing values — nothing to compare.")
                 else:
                     skip(o, p, f"No applicable test for a {o_scale} outcome vs. a {p_scale} predictor.")
 
@@ -254,11 +272,11 @@ def plan_battery(
             if o_scale == "binary":
                 add("logistic_regression", o, num_or_bin,
                     {"outcome_col": o, "predictor_cols": num_or_bin},
-                    f"Logistic regression — {o} ~ {' + '.join(num_or_bin)}")
+                    f"Logistic regression — {L(o)} ~ {' + '.join(L(p) for p in num_or_bin)}")
             elif o_scale in ("continuous", "likert"):
                 add("multiple_regression", o, num_or_bin,
                     {"outcome_col": o, "predictor_cols": num_or_bin, "weight_col": weight_col},
-                    f"Multiple regression — {o} ~ {' + '.join(num_or_bin)}")
+                    f"Multiple regression — {L(o)} ~ {' + '.join(L(p) for p in num_or_bin)}")
 
         # 4b) Multinomial logistic — categorical outcome with 3+ classes gets only
         # pairwise chi2/anova above (one predictor at a time); a 3+-class outcome
@@ -268,7 +286,7 @@ def plan_battery(
             covariate_cols = [p for p, _ in used_predictors]
             add("multinomial_logistic", o, covariate_cols,
                 {"outcome_col": o, "predictor_cols": covariate_cols, "alpha": 0.05},
-                f"Multinomial logistic — {o} ~ {' + '.join(covariate_cols)}")
+                f"Multinomial logistic — {L(o)} ~ {' + '.join(L(p) for p in covariate_cols)}")
 
         # 4c) Causal add-ons — only fire when the researcher has explicitly tagged
         # a treatment column in Study Design; otherwise every outcome would get
@@ -279,13 +297,13 @@ def plan_battery(
                     and int(df[post_col].dropna().nunique()) == 2:
                 add("did", o, [treatment_col, post_col],
                     {"treatment_col": treatment_col, "post_col": post_col, "outcome_col": o},
-                    f"Difference-in-Differences — {o} ~ {treatment_col} × {post_col}")
+                    f"Difference-in-Differences — {L(o)} ~ {L(treatment_col)} × {L(post_col)}")
 
             psm_covariates = [p for p in predictor_cols if p not in (treatment_col, post_col, o)][:8]
             if psm_covariates:
                 add("psm", o, psm_covariates,
                     {"treatment_col": treatment_col, "outcome_col": o, "covariates": psm_covariates},
-                    f"Propensity Score Matching — {o} ~ {treatment_col}")
+                    f"Propensity Score Matching — {L(o)} ~ {L(treatment_col)}")
 
     # 5) If any outcome group is Likert items (≥3 items tagged), add reliability
     likert_items = [c for c, r in roles.items()
@@ -302,7 +320,7 @@ def plan_battery(
     numeric_pool = [c for c in matrix_pool if infer_scale(df[c], roles.get(c)) in ("continuous", "likert")]
     if len(numeric_pool) >= 2:
         add("correlation_matrix", None, numeric_pool,
-            {"cols": numeric_pool},
+            {"cols": numeric_pool, "col_labels": {c: L(c) for c in numeric_pool}},
             f"Correlation Matrix — {len(numeric_pool)} numeric variables")
 
     cat_pool = [c for c in matrix_pool
@@ -310,7 +328,7 @@ def plan_battery(
                 and 2 <= int(df[c].dropna().nunique()) <= 12]
     if len(cat_pool) >= 2:
         add("cramers_matrix", None, cat_pool,
-            {"cols": cat_pool},
+            {"cols": cat_pool, "col_labels": {c: L(c) for c in cat_pool}},
             f"Cramér's V Matrix — {len(cat_pool)} categorical variables")
 
     return {"specs": specs, "skipped": skipped}
