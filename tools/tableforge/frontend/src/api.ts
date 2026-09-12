@@ -934,6 +934,17 @@ export async function planBattery(config: AutoAnalyzeConfig) {
   return postStat('/analyze/plan', config);
 }
 
+export interface AISuggestedGroup {
+  label: string;
+  rationale: string;
+  outcome_cols: string[];
+  predictor_cols: string[];
+}
+
+export async function aiSuggestPlan(datasetId: string, columnLabels: Record<string, string>): Promise<{ groups: AISuggestedGroup[] }> {
+  return postStat('/analyze/ai-suggest-plan', { dataset_id: datasetId, column_labels: columnLabels });
+}
+
 export interface SkippedColumn {
   outcome: string | null;
   predictor: string | null;

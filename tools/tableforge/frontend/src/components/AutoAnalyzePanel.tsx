@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnInfo, ColumnRole, TableResult } from '../types';
-import { runAutoBattery, planBattery, BatteryProgress, SkippedColumn } from '../api';
+import { runAutoBattery, planBattery, aiSuggestPlan, BatteryProgress, SkippedColumn, AISuggestedGroup } from '../api';
 import { ColPicker } from './ColPicker';
 import { ProjectFilterBanner } from './ProjectFilterBanner';
 import { STAT_TITLES } from './StatisticalTables';
@@ -36,12 +36,18 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
   const [showSkipped, setShowSkipped] = useState(false);
 
   const [running, setRunning] = useState(false);
+  const [runningSections, setRunningSections] = useState(false);
   const [progress, setProgress] = useState<{ idx: number; total: number; label: string }>({ idx: 0, total: 0, label: '' });
   const [results, setResults] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiGroups, setAiGroups] = useState<AISuggestedGroup[] | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+
   const allCols = useMemo(() => columns.map(c => c.name), [columns]);
+  const columnLabelMap = useMemo(() => Object.fromEntries(columns.map(c => [c.name, c.label || c.name])), [columns]);
 
   // Auto-pick outcomes / predictors from column_roles
   const detectedOutcomes = useMemo(
@@ -112,6 +118,60 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
     }
   };
 
+  const doAISuggest = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const r = await aiSuggestPlan(datasetId, columnLabelMap);
+      setAiGroups(r.groups || []);
+    } catch (e: any) {
+      setAiError(e.message);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // Prefill the existing manual pickers — reuses the normal single-run flow
+  // unchanged, the user can still edit before clicking Run Full Analysis.
+  const useGroup = (g: AISuggestedGroup) => {
+    setOutcomes(g.outcome_cols);
+    setPredictors(g.predictor_cols);
+    setPlan(null);
+    setResults(null);
+    setSkippedColumns([]);
+  };
+
+  // Runs each AI-suggested section as its own independent battery (own
+  // multi-testing correction family — different logical questions needn't
+  // share one), tagging every result with its section for grouped display.
+  const runAllSections = async (groups: AISuggestedGroup[]) => {
+    setRunningSections(true);
+    setError(null);
+    setResults(null);
+    const combined: any[] = [];
+    try {
+      for (const g of groups) {
+        setProgress({ idx: 0, total: 0, label: `${g.label}: preparing…` });
+        await runAutoBattery(
+          { dataset_id: datasetId, outcome_cols: g.outcome_cols, predictor_cols: g.predictor_cols, correction, use_design: useDesign, filters: projectFilters || {} },
+          (e: BatteryProgress) => {
+            if (e.step === 'progress') {
+              setProgress({ idx: e.idx || 0, total: e.total || 0, label: `${g.label}: ${e.label || ''}` });
+            } else if (e.step === 'done') {
+              for (const r of (e.results || [])) combined.push({ ...r, _section: g.label });
+            }
+          },
+        );
+      }
+      setResults(combined);
+      if (onPackReady) onPackReady(combined);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setRunningSections(false);
+    }
+  };
+
   const grouped = useMemo(() => {
     if (!results) return null;
     const out: Record<string, any[]> = {};
@@ -133,6 +193,21 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
     for (const r of results) {
       if (!r.table?.headers?.length) continue;
       (out[r.kind] = out[r.kind] || []).push(r);
+    }
+    return out;
+  }, [results]);
+
+  // Only set when results came from "Run all sections" — nests by section
+  // then outcome. The single-run flow (plain doRun) never tags _section, so
+  // it keeps using the flat `grouped`-by-outcome view below unchanged.
+  const groupedBySection = useMemo(() => {
+    if (!results || !results.some(r => r._section)) return null;
+    const out: Record<string, Record<string, any[]>> = {};
+    for (const r of results) {
+      const sec = r._section || '(no section)';
+      const byOutcome = out[sec] = out[sec] || {};
+      const key = r.outcome || '(no outcome)';
+      (byOutcome[key] = byOutcome[key] || []).push(r);
     }
     return out;
   }, [results]);
@@ -239,6 +314,51 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
 
           <ProjectFilterBanner filters={projectFilters} context="battery" />
 
+          <div style={{ marginBottom: 12 }}>
+            <button className="btn-small" onClick={doAISuggest} disabled={aiLoading}>
+              {aiLoading ? '✨ Thinking…' : '✨ AI Suggest Plan'}
+            </button>
+            <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-dim)' }}>
+              New to this? Let AI read the questions and propose what to compare — review before running.
+            </span>
+            {aiError && <div style={{ marginTop: 4, fontSize: 11, color: '#ef4444' }}>{aiError}</div>}
+          </div>
+
+          {aiGroups && aiGroups.length === 0 && (
+            <div style={{ marginBottom: 12, fontSize: 11, color: 'var(--text-dim)' }}>
+              AI couldn't propose a plan for this dataset — pick outcomes/predictors manually below.
+            </div>
+          )}
+
+          {aiGroups && aiGroups.length > 0 && (
+            <div style={{ marginBottom: 16, padding: 10, background: 'var(--bg-alt, #1e293b)', borderRadius: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>
+                  AI-suggested sections — review before running, edit anytime:
+                </div>
+                <button className="btn-small" onClick={() => runAllSections(aiGroups)} disabled={running || runningSections}>
+                  {runningSections ? `Running ${progress.idx}/${progress.total}…` : `Run all ${aiGroups.length} sections`}
+                </button>
+              </div>
+              {aiGroups.map((g, i) => (
+                <div key={i} style={{ padding: 8, marginBottom: 6, background: 'var(--bg, #0f172a)', borderRadius: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700 }}>{g.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{g.rationale}</div>
+                      <div style={{ fontSize: 10 }}>
+                        <strong>Outcomes:</strong> {g.outcome_cols.map(c => columnLabelMap[c] || c).join(', ')}
+                        &nbsp;·&nbsp;
+                        <strong>Predictors:</strong> {g.predictor_cols.length ? g.predictor_cols.map(c => columnLabelMap[c] || c).join(', ') : '(none)'}
+                      </div>
+                    </div>
+                    <button className="btn-small" onClick={() => useGroup(g)}>Use this →</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <ColPicker
               allColumns={columns}
@@ -275,11 +395,11 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
 
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <button className="btn-small" onClick={doPlan}
-              disabled={planLoading || running || outcomes.length === 0}>
+              disabled={planLoading || running || runningSections || outcomes.length === 0}>
               {planLoading ? 'Planning…' : 'Preview plan'}
             </button>
             <button className="btn-primary" onClick={doRun}
-              disabled={running || outcomes.length === 0}>
+              disabled={running || runningSections || outcomes.length === 0}>
               {running ? `Running ${progress.idx}/${progress.total}…` : '⚡ Run Full Analysis'}
             </button>
           </div>
@@ -320,7 +440,7 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
             </div>
           )}
 
-          {running && (
+          {(running || runningSections) && (
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 11, marginBottom: 4 }}>
                 {progress.idx}/{progress.total} · <span style={{ color: 'var(--text-dim)' }}>{progress.label}</span>
@@ -334,7 +454,26 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
             </div>
           )}
 
-          {grouped && (
+          {groupedBySection ? (
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
+                Pack — {results?.length} tests across {Object.keys(groupedBySection).length} sections · correction = {correction}
+              </div>
+              {Object.entries(groupedBySection).map(([section, byOutcome]) => (
+                <div key={section} style={{ marginBottom: 20, padding: 10, border: '1px solid var(--border, #334155)', borderRadius: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📂 {section}</div>
+                  {Object.entries(byOutcome).map(([outcome, items]) => (
+                    <div key={outcome} style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent, #3b82f6)', marginBottom: 6 }}>
+                        Outcome: {outcome} <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>({items.length} tests)</span>
+                      </div>
+                      {items.map(renderResultCard)}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : grouped && (
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
                 Pack — {results?.length} tests · correction = {correction}

@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import json
 import math
+import random
+import re as _re
 import traceback
 import numpy as np
 import pandas as pd
@@ -23,7 +25,7 @@ from scipy import stats as sp_stats
 from ..shared import datasets, column_roles, study_designs, apply_metrics_and_bins, sanitize_for_json, add_audit_log
 from . import inferential_utils as iu
 from .test_chooser import plan_battery
-from .ai import _call_llm, _load_ai_cfg
+from .ai import _call_llm, _load_ai_cfg, _match_col
 
 
 router = APIRouter()
@@ -785,3 +787,140 @@ Rules:
         "n_significant": n_sig,
         "audience": config.audience,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# AI Suggest Plan — column-level-only privacy sampling + outcome/predictor
+# grouping. AI never sees a real row: it only needs label + type + a small
+# vocabulary of example values to make a semantic judgment call. The actual
+# statistics still run on real data through the existing plan_battery engine
+# above — this only decides what to compare to what.
+# ═══════════════════════════════════════════════════════════════════════════
+
+_SENSITIVE_KEYWORDS = (
+    "name", "phone", "mobile", "email", "address", "aadhaar", "aadhar",
+    "contact", "gps", "location", "passport", "account", "voter", "ration",
+)
+
+
+def _is_sensitive_column(col_id: str, label: str, role: dict | None) -> bool:
+    if role and role.get("role") in ("id", "geographic"):
+        return True
+    text = f"{col_id} {label}".lower()
+    return any(kw in text for kw in _SENSITIVE_KEYWORDS)
+
+
+def _privacy_safe_examples(series: pd.Series, col_id: str, label: str, role: dict | None, n: int = 5) -> list:
+    """Independently-sampled, per-column example values only — never intact
+    rows. No single reconstructable "fake respondent" ever exists in what
+    gets sent, since values across different columns are never paired."""
+    if _is_sensitive_column(col_id, label, role):
+        return ["[REDACTED]"]
+    vals = list(series.dropna().unique())
+    if not vals:
+        return []
+    sample = random.sample(vals, min(n, len(vals)))
+    if pd.api.types.is_numeric_dtype(series):
+        out = []
+        for v in sample:
+            try:
+                v = float(v)
+                jittered = v * (1 + random.uniform(-0.15, 0.15))
+                out.append(round(jittered, 2))
+            except (TypeError, ValueError):
+                out.append(str(v)[:40])
+        return out
+    return [str(v)[:40] for v in sample]
+
+
+class AISuggestPlanConfig(BaseModel):
+    dataset_id: str
+    column_labels: dict[str, str] = {}   # raw col id -> human label (frontend already has these loaded)
+
+
+@router.post("/api/analyze/ai-suggest-plan")
+async def ai_suggest_plan(config: AISuggestPlanConfig):
+    """AI proposes 2-6 outcome/predictor groupings ("sections") from column
+    labels + types + a privacy-safe value sample — never auto-run, always
+    returned for the user to review, edit, or discard before anything
+    executes on real data."""
+    if config.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    df = datasets[config.dataset_id]["df"]
+    roles = column_roles.get(config.dataset_id, {})
+    actual_cols = list(df.columns)
+
+    col_meta = []
+    for col in actual_cols:
+        role = roles.get(col)
+        label = config.column_labels.get(col, col)
+        col_meta.append({
+            "id": col,
+            "label": label,
+            "type": "numeric" if pd.api.types.is_numeric_dtype(df[col]) else "text",
+            "existing_role": role.get("role") if role else None,
+            "example_values": _privacy_safe_examples(df[col], col, label, role),
+        })
+
+    cfg = _load_ai_cfg()
+    prompt = f"""You are designing a statistical analysis plan for a survey dataset.
+
+Below is every question (column) with its label, data type, any role already
+tagged by the researcher, and a FEW EXAMPLE VALUES. The example values have
+already been anonymized/perturbed for privacy (numbers are jittered,
+identifying fields redacted) — treat them only as a guide to format and
+range, never as real respondent data.
+
+Columns:
+{json.dumps(col_meta, default=str)}
+
+Group these columns into 2 to 6 logical analysis sections that make sense
+for social-science survey research (for example: "Demographics vs
+Attitudes", "Awareness vs Behavior", "Background vs Outcomes"). A column can
+appear in more than one section if it's genuinely relevant to both. For each
+section recommend:
+- label: a short section name
+- rationale: one sentence explaining why these columns belong together
+- outcome_cols: the column id(s) being explained or measured (the dependent
+  variable(s) — a section may have more than one)
+- predictor_cols: the column id(s) that might explain the outcome(s)
+
+Respect any "existing_role" already tagged (outcome/treatment/demographic)
+as a strong hint. Only use column ids exactly as given above — never invent
+one. Respond with ONLY valid JSON in this shape:
+{{"groups": [{{"label": "...", "rationale": "...", "outcome_cols": ["..."], "predictor_cols": ["..."]}}]}}
+"""
+
+    try:
+        raw = await _call_llm(cfg, prompt)
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(502, f"AI suggest-plan failed: {e}")
+
+    match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+    if not match:
+        return {"groups": []}
+    try:
+        result = json.loads(match.group())
+    except Exception:
+        return {"groups": []}
+
+    groups = []
+    for g in (result.get("groups") or [])[:6]:
+        outcomes = [_match_col(c, actual_cols) for c in (g.get("outcome_cols") or [])]
+        outcomes = [c for c in outcomes if c in actual_cols][:10]
+        predictors = [_match_col(c, actual_cols) for c in (g.get("predictor_cols") or [])]
+        predictors = [c for c in predictors if c in actual_cols][:15]
+        if not outcomes:
+            continue
+        groups.append({
+            "label": str(g.get("label", "Untitled section"))[:80],
+            "rationale": str(g.get("rationale", ""))[:300],
+            "outcome_cols": outcomes,
+            "predictor_cols": predictors,
+        })
+
+    add_audit_log(config.dataset_id, "ai_suggest_plan", f"AI suggested {len(groups)} analysis section(s)")
+    return {"groups": groups}
