@@ -26,6 +26,47 @@ function humanKindLabel(kind: string): string {
   return STAT_TITLES[kind] || kind.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
 }
 
+// Battery results carry the actual test numbers (statistic, df, p, CI, effect
+// size) in a separate `test` object — the `table` is just the descriptive
+// breakdown (group means, crosstab counts, ...). Promoting only `table` drops
+// the numbers a researcher actually needs, so append them as a footer block
+// on the table that gets inserted into the project.
+function statsFooterRows(test: any, width: number): any[][] {
+  if (!test || typeof test !== 'object' || Object.keys(test).length === 0) return [];
+  const w = Math.max(width, 2);
+  const pad = (cells: any[]) => {
+    const row = cells.slice(0, w);
+    while (row.length < w) row.push('');
+    return row;
+  };
+  const lines: [string, string][] = [];
+  if (test.stat !== undefined && test.stat !== null) lines.push(['Test statistic', String(test.stat)]);
+  if (test.df !== undefined && test.df !== null) lines.push(['df', Array.isArray(test.df) ? test.df.join(', ') : String(test.df)]);
+  if (test.p_raw !== undefined && test.p_raw !== null) lines.push(['p (raw)', String(test.p_raw)]);
+  if (test.p_adj !== undefined && test.p_adj !== null) lines.push(['p (adjusted)', String(test.p_adj)]);
+  if (test.sig) lines.push(['Significance', String(test.sig)]);
+  if (test.se !== undefined && test.se !== null) lines.push(['SE', String(test.se)]);
+  if (Array.isArray(test.ci) && test.ci.length === 2) lines.push(['95% CI', `[${test.ci[0]}, ${test.ci[1]}]`]);
+  if (test.fisher_p !== undefined && test.fisher_p !== null) lines.push(["Fisher's exact p", String(test.fisher_p)]);
+  if (test.welch !== undefined) lines.push(['Welch correction', test.welch ? 'Yes' : 'No']);
+  if (test.effect_size && typeof test.effect_size === 'object') {
+    for (const [k, v] of Object.entries(test.effect_size)) {
+      if (k === 'interpretation' || v === null || v === undefined) continue;
+      const nice = k.replace(/_/g, ' ');
+      lines.push([nice.charAt(0).toUpperCase() + nice.slice(1), typeof v === 'object' ? JSON.stringify(v) : String(v)]);
+    }
+  }
+  if (!lines.length) return [];
+  return [pad(['']), pad(['Statistical summary']), ...lines.map(l => pad(l))];
+}
+
+function withStatsFooter(r: any): { headers: string[]; rows: any[][] } {
+  const headers: string[] = r.table?.headers || [];
+  const rows: any[][] = r.table?.rows || [];
+  const footer = statsFooterRows(r.test, headers.length);
+  return { headers, rows: footer.length ? [...rows, ...footer] : rows };
+}
+
 interface Props {
   datasetId: string;
   columns: ColumnInfo[];
@@ -230,7 +271,8 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
     if (!onPromote || !r?.table) return;
     const recipe = buildBatteryRecipe(r.kind, correction, [r]);
     const chart = mode === 'table' ? undefined : buildChartForResult(r) || undefined;
-    onPromote(r.label, r.table.headers || [], r.table.rows || [], r.interpretation || '', recipe, chart, mode === 'chart');
+    const { headers, rows } = withStatsFooter(r);
+    onPromote(r.label, headers, rows, r.interpretation || '', recipe, chart, mode === 'chart');
   };
 
   // One-click bulk insert: every result with a real table goes in, plus its
@@ -243,7 +285,8 @@ export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, project
     for (const r of eligibleResults) {
       const recipe = buildBatteryRecipe(r.kind, correction, [r]);
       const chart = buildChartForResult(r) || undefined;
-      onPromote(r.label, r.table.headers || [], r.table.rows || [], r.interpretation || '', recipe, chart, false);
+      const { headers, rows } = withStatsFooter(r);
+      onPromote(r.label, headers, rows, r.interpretation || '', recipe, chart, false);
     }
   };
 
