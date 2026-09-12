@@ -338,6 +338,7 @@ def _get_analyzer_data_inner(program_id, user, db):
     subs = db.query(Submission).filter(
         Submission.program_id == program_id,
         Submission.tenant_id == user["tenant_id"],
+        Submission.is_duplicate == False,  # noqa: E712
     ).order_by(Submission.server_received_at.desc()).limit(20000).all()
 
     # Enumerator performance — load only relevant users
@@ -775,6 +776,7 @@ def _execute_tabulation_inner(program_id, body, user, db):
     query = db.query(Submission).filter(
         Submission.program_id == program_id,
         Submission.tenant_id == user["tenant_id"],
+        Submission.is_duplicate == False,  # noqa: E712
     )
     if body.form_ids:
         query = query.filter(Submission.form_id.in_(body.form_ids))
@@ -1966,6 +1968,7 @@ def export_program_xlsx(
     q = db.query(Submission).filter(
         Submission.program_id == pid_uuid,
         Submission.tenant_id == user["tenant_id"],
+        Submission.is_duplicate == False,  # noqa: E712
     )
     if questionnaire_id:
         try:

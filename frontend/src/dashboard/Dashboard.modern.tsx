@@ -13,9 +13,9 @@ import LineChart from '@/components/charts/LineChart'
 import AuditLog from '@/components/AuditLog'
 import AiReportModal from '@/dashboard/AiReportModal'
 import EmojiIcon from '@/components/EmojiIcon'
-import { getAllFieldsInOrder } from '@/lib/formUtils'
 import { resolveAnswer } from '@/collect/responseRecord'
-import type { FormSchema, FormField } from '@/types/form'
+import { useFormFieldMap } from '@/lib/useFormFieldMap'
+import { DuplicateCompareModal } from '@/dashboard/DuplicateCompareModal'
 const RosterTab = lazy(() => import('@/dashboard/RosterTab'))
 const AnalyticsTab  = lazy(() => import('@/dashboard/AnalyticsTab'))
 const ScorecardTab  = lazy(() => import('@/dashboard/ScorecardTab'))
@@ -48,7 +48,34 @@ interface Submission {
   has_violations?: boolean
   backcheck_required?: boolean
   duplicate_suspect?: boolean
+  is_duplicate?: boolean
+  duplicate_of?: string | null
   data_json?: Record<string, unknown>
+}
+
+export interface DuplicateGroupSub {
+  id: string
+  serial_no: number | null
+  status: string
+  completeness: number
+  duration_sec: number | null
+  server_received_at: string | null
+  has_violations: boolean
+  backcheck_completed: boolean
+}
+
+export interface DuplicateGroup {
+  tier: 'exact' | 'possible' | 'identifier_match'
+  enumerator_id: string | null
+  enumerator_name: string
+  form_id: string
+  form_title: string
+  day: string
+  count: number
+  submission_ids: string[]
+  recommended_keep_id: string
+  submissions: DuplicateGroupSub[]
+  matched_fields?: string[]
 }
 
 interface SubmissionSummary {
@@ -239,25 +266,7 @@ function SubmissionDetailModal({
   const [busy, setBusy] = useState(false)
   const [bcFormId, setBcFormId] = useState(sub.backcheck_form_id ?? '')
   const [savingBcForm, setSavingBcForm] = useState(false)
-  const [fieldMap, setFieldMap] = useState<Record<string, FormField>>({})
-
-  useEffect(() => {
-    // Prefer the historical version snapshot (matches the schema active when this
-    // submission was collected); forms imported via Excel/Word never got a
-    // FormVersion row, so fall back to the current published schema.
-    api.get(`/forms/${sub.form_id}/versions/${sub.form_version}`)
-      .catch(() => api.get(`/forms/${sub.form_id}`))
-      .then(r => {
-        const schema: FormSchema = r.data.json_schema
-        if (!schema?.sections) return
-        const map: Record<string, FormField> = {}
-        for (const f of getAllFieldsInOrder(schema.sections)) {
-          if (f.label) map[f.name] = f
-        }
-        setFieldMap(map)
-      })
-      .catch(() => {})
-  }, [sub.form_id, sub.form_version])
+  const fieldMap = useFormFieldMap(sub.form_id, sub.form_version)
 
   const isFlagged = sub.status === 'flagged'
   const isReviewed = sub.status === 'approved' || sub.status === 'rejected'
@@ -759,11 +768,11 @@ export default function Dashboard() {
 
   // Duplicates view
   const [showDuplicates, setShowDuplicates] = useState(false)
-  interface DuplicateGroup {
-    enumerator_name: string; form_title: string; day: string; count: number; submission_ids: string[]
-  }
   const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([])
   const [loadingDuplicates, setLoadingDuplicates] = useState(false)
+  const [compareGroup, setCompareGroup] = useState<DuplicateGroup | null>(null)
+  const [showMarkedDuplicates, setShowMarkedDuplicates] = useState(false)
+  const [bulkResolvingExact, setBulkResolvingExact] = useState(false)
 
   // Form templates
   const [formsSubTab, setFormsSubTab] = useState<'my-forms' | 'templates'>('my-forms')
@@ -1182,7 +1191,112 @@ export default function Dashboard() {
     }
   }
 
-  const loadSubmissions = async (page = 1) => {
+  // After a duplicate group is resolved (or a row restored), refresh everything
+  // that could show a stale count: the group list, the KPI tiles, and whichever
+  // submissions view is currently loaded.
+  const refreshAfterDuplicateChange = () => {
+    handleLoadDuplicates()
+    api.get('/submissions/summary').then(r => setSummary(r.data)).catch(() => {})
+    if (subsLoaded) loadSubmissions(subPage)
+  }
+
+  const handleRestoreDuplicate = async (id: string) => {
+    try {
+      await api.post('/submissions/duplicates/unmark', { submission_ids: [id] })
+      toast.success('Restored — no longer marked as duplicate')
+      refreshAfterDuplicateChange()
+    } catch {
+      toast.error('Failed to restore submission')
+    }
+  }
+
+  const handleResolveAllExact = async (exact: DuplicateGroup[]) => {
+    setBulkResolvingExact(true)
+    try {
+      await Promise.all(exact.map(group =>
+        api.post('/submissions/duplicates/resolve', {
+          keep_id: group.recommended_keep_id,
+          duplicate_ids: group.submission_ids.filter(id => id !== group.recommended_keep_id),
+        }).catch(() => {})
+      ))
+      const total = exact.reduce((n, g) => n + g.count - 1, 0)
+      toast.success(`Auto-resolved ${exact.length} groups — marked ${total} as duplicate`)
+      refreshAfterDuplicateChange()
+    } finally {
+      setBulkResolvingExact(false)
+    }
+  }
+
+  const renderDuplicateGroups = (groups: DuplicateGroup[]) => {
+    const exact = groups.filter(g => g.tier === 'exact')
+    const identifierMatch = groups.filter(g => g.tier === 'identifier_match')
+    const possible = groups.filter(g => g.tier === 'possible')
+    const renderGroup = (group: DuplicateGroup, i: number) => (
+      <div key={i} className="flex items-center justify-between p-3 bg-catalan-hover rounded border border-catalan-warning/30">
+        <div>
+          <span className="text-sm font-medium text-catalan-text">{group.enumerator_name}</span>
+          <span className="text-xs text-catalan-textMuted mx-2">·</span>
+          <span className="text-sm text-catalan-textMuted">{group.form_title}</span>
+          <span className="text-xs text-catalan-textMuted mx-2">·</span>
+          <span className="text-xs text-catalan-textMuted">{group.day}</span>
+          {group.matched_fields && (
+            <>
+              <span className="text-xs text-catalan-textMuted mx-2">·</span>
+              <span className="text-xs text-catalan-textMuted">matched on {group.matched_fields.join(', ')}</span>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-catalan-warning bg-catalan-warning/10 px-2 py-0.5 rounded">
+            {group.count}×
+          </span>
+          <button className="text-xs text-catalan-primary hover:underline" onClick={() => setCompareGroup(group)}>
+            {group.tier === 'exact' ? 'Auto-resolve →' : 'Compare & Resolve →'}
+          </button>
+        </div>
+      </div>
+    )
+    if (exact.length === 0 && identifierMatch.length === 0 && possible.length === 0) {
+      return <div className="text-sm text-catalan-success py-4 text-center">No potential duplicates found</div>
+    }
+    return (
+      <div className="space-y-4">
+        {exact.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-catalan-text">
+                Exact Duplicates — identical answers, safe to auto-resolve
+              </p>
+              {exact.length > 1 && (
+                <Button variant="secondary" size="sm" disabled={bulkResolvingExact} onClick={() => handleResolveAllExact(exact)}>
+                  {bulkResolvingExact ? 'Resolving…' : `Resolve all ${exact.length} exact`}
+                </Button>
+              )}
+            </div>
+            <div className="space-y-2">{exact.map(renderGroup)}</div>
+          </div>
+        )}
+        {identifierMatch.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-catalan-text mb-2">
+              Identifier Matches — same respondent identifier, other answers differ
+            </p>
+            <div className="space-y-2">{identifierMatch.map(renderGroup)}</div>
+          </div>
+        )}
+        {possible.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-catalan-text mb-2">
+              Possible Duplicates — same enumerator/form/day, answers differ
+            </p>
+            <div className="space-y-2">{possible.map(renderGroup)}</div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const loadSubmissions = async (page = 1, dupOnly = showMarkedDuplicates) => {
     setSubsLoading(true)
     try {
       const params = new URLSearchParams({ page_size: String(SUB_PAGE_SIZE), page: String(page), slim: 'true' })
@@ -1190,6 +1304,7 @@ export default function Dashboard() {
       if (search) params.set('q', search)
       if (dateFrom) params.set('date_from', dateFrom)
       if (dateTo) params.set('date_to', dateTo)
+      if (dupOnly) params.set('duplicate_only', 'true')
       const r = await api.get(`/submissions/?${params}`)
       const items = r.data.items ?? r.data.submissions ?? []
       setSubmissions(items)
@@ -1632,6 +1747,14 @@ export default function Dashboard() {
           formId={aiReportForm.id}
           formTitle={aiReportForm.title}
           onClose={() => setAiReportForm(null)}
+        />
+      )}
+
+      {compareGroup && (
+        <DuplicateCompareModal
+          group={compareGroup}
+          onClose={() => setCompareGroup(null)}
+          onResolved={refreshAfterDuplicateChange}
         />
       )}
 
@@ -2114,6 +2237,14 @@ export default function Dashboard() {
                     >
                       <EmojiIcon e="🔍" /> Back-Check
                     </Button>
+                    <Button
+                      variant={showMarkedDuplicates ? 'primary' : 'secondary'}
+                      size="sm"
+                      onClick={() => { const next = !showMarkedDuplicates; setShowMarkedDuplicates(next); loadSubmissions(1, next) }}
+                      title="Show submissions confirmed as duplicates (excluded from stats and exports)"
+                    >
+                      <EmojiIcon e="🗂" /> Marked Duplicate
+                    </Button>
                   </div>}
                 </div>
               </Card>
@@ -2123,40 +2254,13 @@ export default function Dashboard() {
                 <Card title="Potential Duplicate Submissions">
                   {loadingDuplicates ? (
                     <div className="text-sm text-catalan-textMuted py-4 text-center">Loading…</div>
-                  ) : duplicates.length === 0 ? (
-                    <div className="text-sm text-catalan-success py-4 text-center">No potential duplicates found</div>
                   ) : (
-                    <div className="space-y-2">
+                    <>
                       <p className="text-xs text-catalan-textMuted mb-3">
                         Groups where the same enumerator submitted the same form more than once on the same day.
                       </p>
-                      {duplicates.map((group, i) => (
-                        <div key={i} className="flex items-center justify-between p-3 bg-catalan-hover rounded border border-catalan-warning/30">
-                          <div>
-                            <span className="text-sm font-medium text-catalan-text">{group.enumerator_name}</span>
-                            <span className="text-xs text-catalan-textMuted mx-2">·</span>
-                            <span className="text-sm text-catalan-textMuted">{group.form_title}</span>
-                            <span className="text-xs text-catalan-textMuted mx-2">·</span>
-                            <span className="text-xs text-catalan-textMuted">{group.day}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs font-bold text-catalan-warning bg-catalan-warning/10 px-2 py-0.5 rounded">
-                              {group.count}×
-                            </span>
-                            <button
-                              className="text-xs text-catalan-primary hover:underline"
-                              onClick={() => {
-                                setShowDuplicates(false)
-                                setSelectedIds(new Set(group.submission_ids))
-                                setTab('submissions')
-                              }}
-                            >
-                              View all →
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                      {renderDuplicateGroups(duplicates)}
+                    </>
                   )}
                 </Card>
               )}
@@ -2295,6 +2399,7 @@ export default function Dashboard() {
                                 <StatusBadge status={sub.status} />
                                 {sub.has_violations && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-yellow-700 bg-yellow-100"><EmojiIcon e="⚠" /> Violations</span>}
                                 {!!sub.data_json?.['_duplicate_suspect'] && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-orange-700 bg-orange-100">Dup?</span>}
+                                {sub.is_duplicate && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-red-700 bg-red-100">Duplicate</span>}
                                 {sub.backcheck_required && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-blue-700 bg-blue-100"><EmojiIcon e="🔍" /> Back-Check</span>}
                                 {(() => {
                                   const d = sub.data_json?.['_duration_sec']
@@ -2310,6 +2415,15 @@ export default function Dashboard() {
                             <td className="px-3 py-2 text-xs" onClick={e => e.stopPropagation()}>
                               <div className="flex items-center gap-2">
                                 <button className="text-catalan-primary hover:underline" onClick={() => openDetail(sub.id)}>View →</button>
+                                {!isEnumerator && sub.is_duplicate && (
+                                  <button
+                                    className="text-catalan-textMuted hover:text-catalan-text border border-catalan-border rounded px-1.5 py-0.5 hover:border-catalan-primary/50 transition-colors"
+                                    onClick={() => handleRestoreDuplicate(sub.id)}
+                                    title="Restore — no longer treat as a duplicate"
+                                  >
+                                    Restore
+                                  </button>
+                                )}
                                 {!isEnumerator && !sub.backcheck_required && (
                                   <button
                                     className="text-catalan-textMuted hover:text-catalan-text border border-catalan-border rounded px-1.5 py-0.5 hover:border-catalan-primary/50 transition-colors"
@@ -2379,7 +2493,7 @@ export default function Dashboard() {
                   page={subPage}
                   pageSize={SUB_PAGE_SIZE}
                   total={subsTotal}
-                  onChange={p => { loadSubmissions(p); setSelectedIds(new Set()) }}
+                  onChange={p => { loadSubmissions(p, showMarkedDuplicates); setSelectedIds(new Set()) }}
                 />
               </Card>}
             </div>
@@ -2466,42 +2580,14 @@ export default function Dashboard() {
                     <option value="">All forms</option>
                     {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
                   </select>
-                  <Button variant="secondary" size="sm" onClick={handleLoadDuplicates} disabled={loadingDuplicates}>
+                  <Button variant="secondary" size="sm" onClick={() => { setShowDuplicates(true); handleLoadDuplicates() }} disabled={loadingDuplicates}>
                     {loadingDuplicates ? 'Scanning…' : 'Scan for Duplicates'}
                   </Button>
                 </div>
                 {loadingDuplicates ? (
                   <div className="text-sm text-catalan-textMuted py-4 text-center">Scanning…</div>
-                ) : duplicates.length === 0 && showDuplicates ? (
-                  <div className="text-sm text-catalan-success py-4 text-center">No duplicates found</div>
-                ) : duplicates.length > 0 ? (
-                  <div className="space-y-2">
-                    {duplicates.map((group, i) => (
-                      <div key={i} className="flex items-center justify-between p-3 bg-catalan-hover rounded border border-catalan-warning/30">
-                        <div>
-                          <span className="text-sm font-medium text-catalan-text">{group.enumerator_name}</span>
-                          <span className="text-xs text-catalan-textMuted mx-2">·</span>
-                          <span className="text-sm text-catalan-textMuted">{group.form_title}</span>
-                          <span className="text-xs text-catalan-textMuted mx-2">·</span>
-                          <span className="text-xs text-catalan-textMuted">{group.day}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-bold text-catalan-warning bg-catalan-warning/10 px-2 py-0.5 rounded">
-                            {group.count}× duplicates
-                          </span>
-                          <button
-                            className="text-xs text-catalan-primary hover:underline"
-                            onClick={() => {
-                              setSelectedIds(new Set(group.submission_ids))
-                              setTab('submissions')
-                            }}
-                          >
-                            Review →
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                ) : showDuplicates ? (
+                  renderDuplicateGroups(duplicates)
                 ) : null}
               </Card>
 

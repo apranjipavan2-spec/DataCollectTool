@@ -82,6 +82,8 @@ def list_submissions(
     page_size: int = 50,
     backcheck_required: Optional[bool] = None,
     has_violations: Optional[bool] = None,
+    duplicate_only: bool = False,
+    ids: Optional[str] = None,
     slim: bool = False,
     user=Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -94,6 +96,19 @@ def list_submissions(
         query = db.query(Submission, User.name).outerjoin(
             User, Submission.enumerator_id == User.id
         ).filter(Submission.tenant_id == user["tenant_id"])
+        if ids:
+            # Targeted fetch by id (e.g. duplicate-group compare view) — return
+            # exactly what's asked, not silently filtered by duplicate status.
+            import uuid as _uuid
+            try:
+                id_list = [_uuid.UUID(i.strip()) for i in ids.split(",") if i.strip()]
+            except ValueError:
+                raise HTTPException(400, "Invalid id in ids list")
+            query = query.filter(Submission.id.in_(id_list))
+        else:
+            # Confirmed duplicates are hidden from the default view — the "Marked
+            # Duplicate" filter (duplicate_only=true) is the only way to see them.
+            query = query.filter(Submission.is_duplicate == (True if duplicate_only else False))
         if role == "enumerator":
             query = query.filter(Submission.enumerator_id == user["sub"])
         if form_id:
@@ -138,11 +153,14 @@ def list_submissions(
                     "id": str(s.id),
                     "form_id": str(s.form_id),
                     "form_title": form_title_map.get(s.form_id, ""),
+                    "form_version": s.form_version,
                     "enumerator_id": str(s.enumerator_id) if s.enumerator_id else None,
                     "enumerator_name": name or "Unknown",
                     "status": s.status,
                     "serial_no": s.serial_no,
                     "duplicate_suspect": bool((s.data_json or {}).get("_duplicate_suspect") == "true" or (s.data_json or {}).get("_duplicate_suspect") is True),
+                    "is_duplicate": bool(s.is_duplicate),
+                    "duplicate_of": str(s.duplicate_of) if s.duplicate_of else None,
                     **({"data_json": s.data_json} if not slim else {}),
                     "has_violations": bool(s.has_violations),
                     "backcheck_required": bool(s.backcheck_required),
@@ -178,7 +196,10 @@ def get_submissions_summary(
     from sqlalchemy import func, case, cast, Boolean
     from sqlalchemy.dialects.postgresql import JSONB
 
-    base = db.query(Submission).filter(Submission.tenant_id == user["tenant_id"])
+    base = db.query(Submission).filter(
+        Submission.tenant_id == user["tenant_id"],
+        Submission.is_duplicate == False,  # noqa: E712 — confirmed duplicates never count toward stats
+    )
     if form_id:
         base = base.filter(Submission.form_id == form_id)
     if program_id:
@@ -540,66 +561,328 @@ def get_enumerator_scorecard(
 
 # ── Potential duplicates ──────────────────────────────────────────────────────
 
+def _content_fingerprint(data_json: dict) -> tuple:
+    """Canonical, order-independent key for 'are these answers identical'.
+
+    Drops internal `_`-prefixed bookkeeping keys (_duplicate_suspect, _gps_*,
+    _duration_sec, etc.) so only actual question answers are compared.
+    """
+    d = data_json or {}
+    items = []
+    for k, v in d.items():
+        if k.startswith("_"):
+            continue
+        # Lists (multi-select) aren't hashable/orderable as-is — normalize.
+        if isinstance(v, list):
+            v = tuple(sorted(str(x) for x in v))
+        items.append((k, v))
+    return tuple(sorted(items, key=lambda kv: kv[0]))
+
+
+def _completeness(data_json: dict) -> int:
+    """Count of answered (non-null, non-empty) question fields."""
+    d = data_json or {}
+    return sum(
+        1 for k, v in d.items()
+        if not k.startswith("_") and v is not None and v != "" and v != []
+    )
+
+
+def _recommend_keep(subs: list[Submission]) -> str:
+    """Deterministic 'which one is probably correct' heuristic: a submission
+    with QC violations or that hasn't passed a backcheck loses to a clean/
+    backchecked one regardless of completeness; ties broken by most answered
+    fields, then longer interview duration, then submitted first. No AI call
+    — instant and explainable."""
+    def sort_key(s: Submission):
+        violated = 1 if s.has_violations else 0
+        not_backchecked = 0 if s.backcheck_completed else 1
+        completeness = _completeness(s.data_json)
+        duration = (s.data_json or {}).get("_duration_sec") or 0
+        try:
+            duration = float(duration)
+        except (TypeError, ValueError):
+            duration = 0.0
+        received = s.server_received_at or datetime.min.replace(tzinfo=timezone.utc)
+        return (violated, not_backchecked, -completeness, -duration, received)
+    return str(sorted(subs, key=sort_key)[0].id)
+
+
+def _identifier_fields(form_schema: dict) -> list[str]:
+    """Field names marked is_identifier=True in the form schema (Form Builder)
+    — together they form a composite 'respondent identifier' key."""
+    from app.api.routes.export import _field_key
+    names = []
+    for section in (form_schema or {}).get("sections", []):
+        for f in section.get("fields", []):
+            if f.get("is_identifier"):
+                name = _field_key(f)
+                if name:
+                    names.append(name)
+    return names
+
+
+def _identifier_fingerprint(data_json: dict, identifier_fields: list[str]):
+    """Composite key from the identifier fields' answers, exact-match only
+    (case/whitespace-normalized). None if any identifier field is unanswered
+    — nothing to match on."""
+    d = data_json or {}
+    values = []
+    for name in identifier_fields:
+        v = d.get(name)
+        if v is None or v == "":
+            return None
+        values.append(str(v).strip().lower())
+    return tuple(values)
+
+
+def _pool_enumerator_day(members: list[Submission], user_map: dict) -> tuple[str, str, Optional[str]]:
+    """Describe a group's enumerator/day for display. Exact-content and
+    identifier-match groups can legitimately span multiple enumerators/days
+    (that's the point — they're not scoped to a single day/enumerator pool),
+    so fall back to a count when the group isn't uniform."""
+    enum_ids = {s.enumerator_id for s in members}
+    single_enum_id = next(iter(enum_ids)) if len(enum_ids) == 1 else None
+    enum_name = user_map.get(str(single_enum_id), "Unknown") if len(enum_ids) == 1 else f"{len(enum_ids)} enumerators"
+    days = {s.local_created_at.date().isoformat() if s.local_created_at else "unknown" for s in members}
+    day_desc = next(iter(days)) if len(days) == 1 else f"{len(days)} days"
+    return enum_name, day_desc, (str(single_enum_id) if single_enum_id else None)
+
+
+def _sub_summary(s: Submission) -> dict:
+    return {
+        "id": str(s.id),
+        "serial_no": s.serial_no,
+        "status": s.status,
+        "completeness": _completeness(s.data_json),
+        "duration_sec": (s.data_json or {}).get("_duration_sec"),
+        "server_received_at": s.server_received_at.isoformat() if s.server_received_at else None,
+        "has_violations": bool(s.has_violations),
+        "backcheck_completed": bool(s.backcheck_completed),
+    }
+
+
 @router.get("/potential-duplicates")
 def list_potential_duplicates(
     form_id: Optional[str] = None,
     user=Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
-    """Return groups of submissions that appear to be duplicates.
+    """Return groups of submissions that appear to be duplicates, split into:
 
-    A 'potential duplicate' is any submission where the same enumerator
-    submitted the same form more than once on the same calendar day.
+    - tier="exact": every question answer is byte-for-byte identical, checked
+      across the WHOLE form (not just a same-day/same-enumerator pool) — near-
+      zero false positive rate, safe to auto-resolve with one click.
+    - tier="identifier_match": the form has one or more questions marked as a
+      duplicate identifier in Form Builder; this submission's identifier
+      field(s) exactly match another's even though other answers differ —
+      almost always the same respondent surveyed twice, possibly on a
+      different day or by a different enumerator.
+    - tier="possible": same enumerator, same form, same day, but neither of
+      the above — needs a supervisor to compare side by side.
+
+    Already-resolved (is_duplicate=True) and dismissed
+    (duplicate_dismissed_at set) submissions are excluded, so a group
+    shrinks/disappears as it gets cleaned up.
     """
-    from sqlalchemy import func, cast, Date
+    from sqlalchemy import func
 
-    q = (
-        db.query(
-            Submission.enumerator_id,
-            Submission.form_id,
-            cast(Submission.local_created_at, Date).label("day"),
-            func.count(Submission.id).label("cnt"),
-            func.array_agg(Submission.id).label("ids"),
-        )
-        .filter(Submission.tenant_id == user["tenant_id"])
+    tenant_id = user["tenant_id"]
+    live_filter = (
+        Submission.tenant_id == tenant_id,
+        Submission.is_duplicate == False,  # noqa: E712
+        Submission.duplicate_dismissed_at.is_(None),
     )
+
     if form_id:
-        q = q.filter(Submission.form_id == form_id)
-
-    q = (
-        q.group_by(
-            Submission.enumerator_id,
-            Submission.form_id,
-            cast(Submission.local_created_at, Date),
+        form_ids = [form_id]
+    else:
+        rows = (
+            db.query(Submission.form_id)
+            .filter(*live_filter)
+            .group_by(Submission.form_id)
+            .having(func.count(Submission.id) > 1)
+            .all()
         )
-        .having(func.count(Submission.id) > 1)
-        .order_by(func.count(Submission.id).desc())
-        .limit(200)
-    )
-
-    rows = q.all()
+        form_ids = [str(r.form_id) for r in rows]
 
     user_map = {
         str(u.id): u.name or u.phone
-        for u in db.query(User).filter(User.tenant_id == user["tenant_id"]).all()
+        for u in db.query(User).filter(User.tenant_id == tenant_id).all()
     }
-    form_map = {
-        str(f.id): f.title
-        for f in db.query(Form).filter(Form.tenant_id == user["tenant_id"]).all()
-    }
+    forms_by_id = {
+        str(f.id): f for f in db.query(Form).filter(Form.tenant_id == tenant_id, Form.id.in_(form_ids)).all()
+    } if form_ids else {}
 
-    return [
-        {
-            "enumerator_id": str(row.enumerator_id) if row.enumerator_id else None,
-            "enumerator_name": user_map.get(str(row.enumerator_id), "Unknown"),
-            "form_id": str(row.form_id),
-            "form_title": form_map.get(str(row.form_id), "Unknown"),
-            "day": str(row.day),
-            "count": row.cnt,
-            "submission_ids": [str(sid) for sid in (row.ids or [])],
-        }
-        for row in rows
-    ]
+    groups = []
+    for fid in form_ids:
+        form = forms_by_id.get(fid)
+        subs = db.query(Submission).filter(Submission.form_id == fid, *live_filter).all()
+        if len(subs) < 2:
+            continue
+
+        identifier_fields = _identifier_fields(form.json_schema if form else {})
+        base_fields = {"form_id": fid, "form_title": form.title if form else "Unknown"}
+        used_ids: set = set()
+
+        # Tier 1: exact content match, anywhere in the form.
+        by_fingerprint: dict = {}
+        for s in subs:
+            by_fingerprint.setdefault(_content_fingerprint(s.data_json), []).append(s)
+        for members in by_fingerprint.values():
+            if len(members) < 2:
+                continue
+            used_ids.update(s.id for s in members)
+            enum_name, day_desc, enum_id = _pool_enumerator_day(members, user_map)
+            groups.append({
+                **base_fields, "tier": "exact",
+                "enumerator_id": enum_id, "enumerator_name": enum_name, "day": day_desc,
+                "count": len(members),
+                "submission_ids": [str(s.id) for s in members],
+                "recommended_keep_id": _recommend_keep(members),
+                "submissions": [_sub_summary(s) for s in members],
+            })
+
+        # Tier 2: identifier-field composite match (only if configured).
+        remaining = [s for s in subs if s.id not in used_ids]
+        if identifier_fields:
+            by_identifier: dict = {}
+            for s in remaining:
+                key = _identifier_fingerprint(s.data_json, identifier_fields)
+                if key is not None:
+                    by_identifier.setdefault(key, []).append(s)
+            for members in by_identifier.values():
+                if len(members) < 2:
+                    continue
+                used_ids.update(s.id for s in members)
+                enum_name, day_desc, enum_id = _pool_enumerator_day(members, user_map)
+                groups.append({
+                    **base_fields, "tier": "identifier_match",
+                    "enumerator_id": enum_id, "enumerator_name": enum_name, "day": day_desc,
+                    "count": len(members),
+                    "submission_ids": [str(s.id) for s in members],
+                    "recommended_keep_id": _recommend_keep(members),
+                    "submissions": [_sub_summary(s) for s in members],
+                    "matched_fields": identifier_fields,
+                })
+
+        # Tier 3: same enumerator + same day fallback.
+        remaining = [s for s in subs if s.id not in used_ids]
+        by_day: dict = {}
+        for s in remaining:
+            day = s.local_created_at.date().isoformat() if s.local_created_at else "unknown"
+            by_day.setdefault((s.enumerator_id, day), []).append(s)
+        for (enum_id, day), members in by_day.items():
+            if len(members) < 2:
+                continue
+            groups.append({
+                **base_fields, "tier": "possible",
+                "enumerator_id": str(enum_id) if enum_id else None,
+                "enumerator_name": user_map.get(str(enum_id), "Unknown"), "day": day,
+                "count": len(members),
+                "submission_ids": [str(s.id) for s in members],
+                "recommended_keep_id": _recommend_keep(members),
+                "submissions": [_sub_summary(s) for s in members],
+            })
+
+    groups.sort(key=lambda g: (-g["count"], g["tier"]))
+    return groups[:200]
+
+
+class DuplicateResolveIn(BaseModel):
+    keep_id: str
+    duplicate_ids: list[str]
+
+
+@router.post("/duplicates/resolve")
+def resolve_duplicates(
+    body: DuplicateResolveIn,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Confirm which submission is canonical; mark the rest as duplicate."""
+    import uuid as _uuid
+    try:
+        keep_uuid = _uuid.UUID(body.keep_id)
+        dup_uuids = [_uuid.UUID(i) for i in body.duplicate_ids]
+    except ValueError:
+        raise HTTPException(400, "Invalid submission id format")
+
+    keep = db.query(Submission).filter(
+        Submission.id == keep_uuid, Submission.tenant_id == user["tenant_id"]
+    ).first()
+    if not keep:
+        raise HTTPException(404, "Kept submission not found")
+
+    dups = db.query(Submission).filter(
+        Submission.id.in_(dup_uuids), Submission.tenant_id == user["tenant_id"]
+    ).all()
+    if len(dups) != len(dup_uuids):
+        raise HTTPException(404, "One or more duplicate submissions not found")
+
+    keep.is_duplicate = False
+    keep.duplicate_of = None
+    for d in dups:
+        d.is_duplicate = True
+        d.duplicate_of = keep.id
+    db.commit()
+    return {"kept": str(keep.id), "marked_duplicate": [str(d.id) for d in dups]}
+
+
+class DuplicateUnmarkIn(BaseModel):
+    submission_ids: list[str]
+
+
+@router.post("/duplicates/unmark")
+def unmark_duplicates(
+    body: DuplicateUnmarkIn,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Restore confirmed-duplicate submission(s) back to normal — undoes /resolve."""
+    import uuid as _uuid
+    try:
+        ids = [_uuid.UUID(i) for i in body.submission_ids]
+    except ValueError:
+        raise HTTPException(400, "Invalid submission id format")
+
+    subs = db.query(Submission).filter(
+        Submission.id.in_(ids), Submission.tenant_id == user["tenant_id"]
+    ).all()
+    for s in subs:
+        s.is_duplicate = False
+        s.duplicate_of = None
+    db.commit()
+    return {"restored": [str(s.id) for s in subs]}
+
+
+class DuplicateDismissIn(BaseModel):
+    submission_ids: list[str]
+
+
+@router.post("/duplicates/dismiss")
+def dismiss_duplicates(
+    body: DuplicateDismissIn,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Mark a reviewed group as NOT actually duplicates (false positive —
+    e.g. different respondents coincidentally surveyed by the same enumerator
+    on the same day). Permanently excludes these submissions from future
+    duplicate grouping so the same coincidence doesn't keep resurfacing."""
+    import uuid as _uuid
+    try:
+        ids = [_uuid.UUID(i) for i in body.submission_ids]
+    except ValueError:
+        raise HTTPException(400, "Invalid submission id format")
+
+    subs = db.query(Submission).filter(
+        Submission.id.in_(ids), Submission.tenant_id == user["tenant_id"]
+    ).all()
+    for s in subs:
+        s.duplicate_dismissed_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"dismissed": [str(s.id) for s in subs]}
 
 
 # ── Create submission ─────────────────────────────────────────────────────────

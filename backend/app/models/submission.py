@@ -37,3 +37,8 @@ class Submission(Base, SoftDeleteMixin):
     backcheck_completed = Column(Boolean, default=False, nullable=True)
     roster_id = Column(UUID(as_uuid=True), ForeignKey('respondent_roster.id'), nullable=True)
     household_id = Column(String(500), nullable=True)   # panel study respondent key
+    # Duplicate marking (migration 0051) — confirmed via supervisor compare-and-resolve,
+    # distinct from the data_json["_duplicate_suspect"] auto-heuristic
+    is_duplicate = Column(Boolean, default=False, nullable=False)
+    duplicate_of = Column(UUID(as_uuid=True), ForeignKey("submissions.id", ondelete="SET NULL"), nullable=True)
+    duplicate_dismissed_at = Column(DateTime(timezone=True), nullable=True)  # reviewed, confirmed NOT a duplicate

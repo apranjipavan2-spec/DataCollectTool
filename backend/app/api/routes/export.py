@@ -70,6 +70,7 @@ def _query_submissions(
     q = db.query(Submission).filter(
         Submission.form_id == form_id,
         Submission.tenant_id == tenant_id,
+        Submission.is_duplicate == False,  # noqa: E712 — confirmed duplicates excluded from every export
     )
     if date_from:
         q = q.filter(Submission.local_created_at >= date_from)

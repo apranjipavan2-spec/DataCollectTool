@@ -804,6 +804,22 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
         {field.required && <span className="text-xs text-catalan-error bg-catalan-error/10 px-2 py-0.5 rounded">Must be answered</span>}
       </div>
 
+      {/* Duplicate identifier toggle */}
+      <div className={`${groupCls} flex items-center gap-3`}>
+        <button
+          onClick={() => onChange({ is_identifier: !field.is_identifier })}
+          className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none ${field.is_identifier ? 'bg-catalan-primary' : 'bg-catalan-hover border border-catalan-border'}`}
+        >
+          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${field.is_identifier ? 'translate-x-5' : 'translate-x-0'}`} />
+        </button>
+        <span className="text-sm text-catalan-text">Use as Duplicate Identifier</span>
+      </div>
+      {field.is_identifier && (
+        <p className="text-xs text-catalan-textMuted -mt-2 mb-2">
+          Combine with other identifier fields (e.g. name + village) to catch the same respondent surveyed twice, even on a different day or by a different enumerator.
+        </p>
+      )}
+
       {/* Date / Time — auto-fill with current date/time */}
       {(field.type === 'date' || field.type === 'time') && (
         <div className={`${groupCls} flex items-center gap-3`}>

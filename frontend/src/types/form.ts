@@ -53,6 +53,7 @@ export interface FormField {
   label: string          // display label
   hint?: string
   required?: boolean
+  is_identifier?: boolean      // part of the composite "respondent identifier" key used for duplicate detection
   options?: FieldOption[]      // for single_choice / multiple_choice
   min?: number                 // number / decimal / rating
   max?: number
