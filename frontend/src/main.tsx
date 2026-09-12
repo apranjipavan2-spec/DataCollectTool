@@ -48,6 +48,21 @@ window.addEventListener('vite:preloadError', () => {
   }
 })
 
+// Service worker auto-update: the SW now calls skipWaiting() unconditionally
+// on every deploy, so a new version activates and takes control (clientsClaim)
+// without waiting for every tab to close. Reload once when that happens so
+// this tab picks up the fresh bundle right away, instead of running on stale
+// JS until it happens to hit vite:preloadError above.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    const last = Number(sessionStorage.getItem('fg-sw-reload-at') || 0)
+    if (Date.now() - last > 10_000) {
+      sessionStorage.setItem('fg-sw-reload-at', String(Date.now()))
+      window.location.reload()
+    }
+  })
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>

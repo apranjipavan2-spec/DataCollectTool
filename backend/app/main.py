@@ -251,7 +251,14 @@ if static_dir.exists():
     def serve_spa(full_path: str):
         # Serve exact static asset if it exists (JS, CSS, images)
         file_path = static_dir / full_path
-        if file_path.is_file():
-            return FileResponse(str(file_path))
-        # All other routes → React SPA index.html
-        return FileResponse(str(static_dir / "index.html"))
+        if file_path.is_file() and file_path.name != "index.html":
+            # Vite content-hashes filenames under assets/ — a given name's
+            # content never changes, so it's safe (and fast) to cache forever.
+            headers = {"Cache-Control": "public, max-age=31536000, immutable"} if "/assets/" in full_path else None
+            return FileResponse(str(file_path), headers=headers)
+        # All other routes → React SPA index.html. This references the
+        # current content-hashed bundle by name, so it must always be
+        # revalidated — an uncached-header FileResponse lets browsers apply
+        # heuristic caching and keep serving a stale index.html (pointing at
+        # an already-replaced JS bundle) after a deploy until a hard refresh.
+        return FileResponse(str(static_dir / "index.html"), headers={"Cache-Control": "no-cache, must-revalidate"})

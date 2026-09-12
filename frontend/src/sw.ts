@@ -17,7 +17,14 @@ import { registerRoute } from 'workbox-routing'
 import { CacheFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 
-// Take control of all clients immediately after activation (pairs with skipWaiting below)
+// Activate a new SW version immediately instead of waiting for every open tab
+// to close (the previous behavior — SKIP_WAITING was only ever sent by an app
+// message that nothing sent, so updates silently never took effect for
+// sessions left open across a deploy). Pairs with clientsClaim() below and the
+// controllerchange reload listener in main.tsx.
+self.skipWaiting()
+
+// Take control of all clients immediately after activation
 clientsClaim()
 
 // ── Precache app shell (populated by vite-plugin-pwa at build time) ──────────

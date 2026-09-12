@@ -106,15 +106,33 @@ for _r in (
 
 # Serve frontend static files (production)
 STATIC_DIR = BASE_DIR / "static"
+
+
+class _ImmutableStaticFiles(StaticFiles):
+    """Vite content-hashes these filenames, so a given name's content never
+    changes — safe to cache forever, unlike index.html below."""
+    def file_response(self, *args, **kwargs):
+        resp = super().file_response(*args, **kwargs)
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
+
+_NO_CACHE_HEADERS = {"Cache-Control": "no-cache, must-revalidate"}
+
 if STATIC_DIR.exists() and (STATIC_DIR / "assets").exists():
-    app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")
+    app.mount("/assets", _ImmutableStaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")
 
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         file_path = STATIC_DIR / full_path
-        if file_path.is_file():
+        if file_path.is_file() and file_path.name != "index.html":
             return FileResponse(file_path)
-        return FileResponse(STATIC_DIR / "index.html")
+        # index.html references the current content-hashed bundle by name —
+        # it must always be revalidated. Without this, browsers apply
+        # heuristic caching to a plain FileResponse and keep serving a stale
+        # index.html (pointing at an old, already-replaced JS bundle) after
+        # a deploy until the user hard-refreshes.
+        return FileResponse(STATIC_DIR / "index.html", headers=_NO_CACHE_HEADERS)
 
 # Health check endpoint
 @app.get("/health")
