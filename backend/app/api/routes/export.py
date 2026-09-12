@@ -796,6 +796,25 @@ def export_xlsx(
                     all_keys.append(fname)
                     seen.add(fname)
 
+    if decode_values:
+        # Tool-driven load (Cleaner/TableForge) — they read cell VALUES via
+        # pandas and never see the styling below, so the per-cell openpyxl
+        # formatting (the human-download path further down) is pure wasted
+        # time — it turned a ~530-row form into a 40+ second request. Bulk
+        # write via pandas instead, the same fast path export_program_xlsx
+        # already uses for program-level pulls.
+        df = pd.DataFrame(rows_dicts, columns=all_keys) if rows_dicts else pd.DataFrame(columns=all_keys)
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Submissions")
+        buf.seek(0)
+        safe_title = "".join(c for c in form.title if c.isalnum() or c in " _-")
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{safe_title}.xlsx"'},
+        )
+
     # ── Create workbook ──────────────────────────────────────────────────
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -812,6 +831,7 @@ def export_xlsx(
     fill_odd  = PatternFill(start_color="1E1E2E", end_color="1E1E2E", fill_type="solid")
     fill_even = PatternFill(start_color="181825", end_color="181825", fill_type="solid")
     cell_font = Font(name="Calibri", color="CDD6F4", size=10)
+    cell_align = Alignment(vertical="center")  # shared — constructing this per-cell was the bottleneck
 
     # Write headers
     for col_idx, key in enumerate(all_keys, start=1):
@@ -824,7 +844,9 @@ def export_xlsx(
     ws.row_dimensions[1].height = 22
     ws.freeze_panes = "A2"
 
-    # Write data rows
+    # Write data rows — track each column's max string length in the same pass
+    # instead of a separate O(rows × cols) re-scan for auto-sizing afterward.
+    col_max_len = {key: len(str(key)) for key in all_keys}
     for row_idx, row_dict in enumerate(rows_dicts, start=2):
         fill = fill_odd if row_idx % 2 == 0 else fill_even
         for col_idx, key in enumerate(all_keys, start=1):
@@ -832,16 +854,19 @@ def export_xlsx(
             # Coerce None to empty string for display
             if val is None:
                 val = ""
-            cell = ws.cell(row=row_idx, column=col_idx, value=str(val) if not isinstance(val, (int, float)) else val)
+            s = str(val) if not isinstance(val, (int, float)) else val
+            cell = ws.cell(row=row_idx, column=col_idx, value=s)
             cell.font = cell_font
             cell.fill = fill
-            cell.alignment = Alignment(vertical="center")
+            cell.alignment = cell_align
+            val_len = len(str(val))
+            if val_len > col_max_len[key]:
+                col_max_len[key] = val_len
 
     # Auto-size columns (cap at 50 chars wide)
     for col_idx, key in enumerate(all_keys, start=1):
         col_letter = get_column_letter(col_idx)
-        max_len = max(len(str(key)), *(len(str(r.get(key, "") or "")) for r in rows_dicts) if rows_dicts else [0])
-        ws.column_dimensions[col_letter].width = min(max_len + 2, 50)
+        ws.column_dimensions[col_letter].width = min(col_max_len[key] + 2, 50)
 
     # ── Stream response ──────────────────────────────────────────────────
     buf = io.BytesIO()
