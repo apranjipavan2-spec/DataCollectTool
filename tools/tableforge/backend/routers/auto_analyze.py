@@ -69,6 +69,63 @@ def _relabel_dummy(name: str, predictor_cols: list[str], col_labels: dict[str, s
     return name
 
 
+_STAT_NICE_LABELS = {
+    "n": "N", "stat": "Test statistic", "df": "df", "p_raw": "p-value", "p_adj": "p (adjusted)",
+    "sig": "Significance", "se": "SE", "ci": "95% CI", "fisher_p": "Fisher's exact p",
+    "welch": "Welch correction", "levene_p": "Levene's p (variance homogeneity)",
+}
+_STAT_KEY_ORDER = ["n", "stat", "df", "p_raw", "p_adj", "sig", "se", "ci", "fisher_p", "welch", "levene_p"]
+
+
+def _stat_footer_rows(headers: list[str], test: dict, label: str = "Statistical summary") -> list[list]:
+    """Bake the actual test numbers (statistic, df, p, CI, effect size, N —
+    whatever the manual Statistics-tab dialog for this test would show) onto
+    the table itself as footer rows, the same way _stat_crosstab_impl etc. do
+    in stats.py. Without this, a table's headers/rows are only the
+    descriptive breakdown (group means, crosstab counts) and the actual test
+    result lived only in a separate `test` object that most consumers never
+    render — https://github issue: "chi-square/t/p/CI missing from tables"."""
+    if not test:
+        return []
+    width = max(len(headers), 2)
+
+    def pad(cells: list) -> list:
+        row = list(cells)[:width]
+        row += [""] * (width - len(row))
+        return row
+
+    def fmt(v) -> str:
+        if isinstance(v, (list, tuple)):
+            return ", ".join(str(x) for x in v)
+        if isinstance(v, bool):
+            return "Yes" if v else "No"
+        return str(v)
+
+    lines: list[tuple[str, str]] = []
+    for key in _STAT_KEY_ORDER:
+        v = test.get(key)
+        if v is None:
+            continue
+        if key == "ci" and isinstance(v, (list, tuple)) and len(v) == 2:
+            lines.append(("95% CI", f"[{v[0]}, {v[1]}]"))
+        else:
+            lines.append((_STAT_NICE_LABELS.get(key, key), fmt(v)))
+    effect = test.get("effect_size")
+    if isinstance(effect, dict):
+        for k, v in effect.items():
+            if k == "interpretation" or v is None:
+                continue
+            lines.append((k.replace("_", " ").capitalize(), fmt(v)))
+    handled = set(_STAT_KEY_ORDER) | {"effect_size"}
+    for k, v in test.items():
+        if k in handled or v is None:
+            continue
+        lines.append((k.replace("_", " ").capitalize(), fmt(v)))
+    if not lines:
+        return []
+    return [pad([""]), pad([label])] + [pad([k, v]) for k, v in lines]
+
+
 def _exec_descriptive(df: pd.DataFrame, params: dict) -> dict:
     cols = params["cols"]
     col_labels = params.get("col_labels") or {}
@@ -112,13 +169,16 @@ def _exec_chi2(df: pd.DataFrame, params: dict) -> dict:
             pass
     headers = ["", *map(str, ct.columns)]
     rows = [[str(idx), *[int(x) for x in row]] for idx, row in ct.iterrows()]
+    test = {
+        "stat": iu.safe_round(chi2), "df": int(dof), "p_raw": iu.safe_round(p, 6),
+        "effect_size": {"cramers_v": iu.safe_round(v), "interpretation": iu.interpret_v(v)},
+        "fisher_p": iu.safe_round(fisher_p, 6) if fisher_p is not None else None,
+        "n": n,
+    }
+    rows = rows + _stat_footer_rows(headers, test)
     return {
         "table": {"headers": headers, "rows": rows},
-        "test": {
-            "stat": iu.safe_round(chi2), "df": int(dof), "p_raw": iu.safe_round(p, 6),
-            "effect_size": {"cramers_v": iu.safe_round(v), "interpretation": iu.interpret_v(v)},
-            "fisher_p": iu.safe_round(fisher_p, 6) if fisher_p is not None else None,
-        },
+        "test": test,
         "interpretation": f"χ²({dof})={iu.safe_round(chi2)}, p={iu.safe_round(p, 4)}, Cramér's V={iu.safe_round(v)} ({iu.interpret_v(v)}).",
         "warnings": ["small expected counts"] if (expected < 5).any() else [],
     }
@@ -146,15 +206,18 @@ def _exec_ttest(df: pd.DataFrame, params: dict) -> dict:
         [str(groups[0]), len(a), iu.safe_round(a.mean()), iu.safe_round(a.std(ddof=1))],
         [str(groups[1]), len(b), iu.safe_round(b.mean()), iu.safe_round(b.std(ddof=1))],
     ]
+    test = {
+        "stat": iu.safe_round(t_stat), "p_raw": iu.safe_round(t_p, 6),
+        "df": len(a) + len(b) - 2,
+        "welch": welch,
+        "effect_size": {"cohens_d": iu.safe_round(d), "interpretation": iu.interpret_d(d)},
+        "ci": [iu.safe_round(ci[0]), iu.safe_round(ci[1])],
+        "n": len(a) + len(b),
+    }
+    rows = rows + _stat_footer_rows(headers, test)
     return {
         "table": {"headers": headers, "rows": rows},
-        "test": {
-            "stat": iu.safe_round(t_stat), "p_raw": iu.safe_round(t_p, 6),
-            "df": len(a) + len(b) - 2,
-            "welch": welch,
-            "effect_size": {"cohens_d": iu.safe_round(d), "interpretation": iu.interpret_d(d)},
-            "ci": [iu.safe_round(ci[0]), iu.safe_round(ci[1])],
-        },
+        "test": test,
         "interpretation": f"{'Welch' if welch else 'Student'}'s t={iu.safe_round(t_stat)}, p={iu.safe_round(t_p, 4)}, Cohen's d={iu.safe_round(d)} ({iu.interpret_d(d)}).",
         "warnings": ["unequal variances → Welch"] if welch else [],
     }
@@ -179,10 +242,12 @@ def _exec_mann_whitney(df: pd.DataFrame, params: dict) -> dict:
         [str(groups[0]), len(a), iu.safe_round(np.median(a)), iu.safe_round(np.percentile(a, 75) - np.percentile(a, 25))],
         [str(groups[1]), len(b), iu.safe_round(np.median(b)), iu.safe_round(np.percentile(b, 75) - np.percentile(b, 25))],
     ]
+    test = {"stat": iu.safe_round(u), "p_raw": iu.safe_round(p, 6),
+             "effect_size": {"rank_biserial_r": iu.safe_round(r)}, "n": len(a) + len(b)}
+    rows = rows + _stat_footer_rows(headers, test)
     return {
         "table": {"headers": headers, "rows": rows},
-        "test": {"stat": iu.safe_round(u), "p_raw": iu.safe_round(p, 6),
-                 "effect_size": {"rank_biserial_r": iu.safe_round(r)}},
+        "test": test,
         "interpretation": f"U={iu.safe_round(u)}, p={iu.safe_round(p, 4)}, rank-biserial r={iu.safe_round(r)}.",
         "warnings": [],
     }
@@ -212,14 +277,16 @@ def _exec_anova(df: pd.DataFrame, params: dict) -> dict:
     rows = []
     for g_name, g in zip(sub[g_col].unique(), grouped):
         rows.append([str(g_name), len(g), iu.safe_round(g.mean()), iu.safe_round(g.std(ddof=1))])
+    test = {"stat": iu.safe_round(f_stat), "df": [df_b, n_total - len(grouped)],
+             "p_raw": iu.safe_round(p, 6),
+             "effect_size": {"eta_squared": iu.safe_round(eta2),
+                             "omega_squared": iu.safe_round(omega2),
+                             "interpretation": iu.interpret_eta(eta2)},
+             "levene_p": iu.safe_round(levene_p, 4), "n": n_total}
+    rows = rows + _stat_footer_rows(headers, test)
     return {
         "table": {"headers": headers, "rows": rows},
-        "test": {"stat": iu.safe_round(f_stat), "df": [df_b, n_total - len(grouped)],
-                 "p_raw": iu.safe_round(p, 6),
-                 "effect_size": {"eta_squared": iu.safe_round(eta2),
-                                 "omega_squared": iu.safe_round(omega2),
-                                 "interpretation": iu.interpret_eta(eta2)},
-                 "levene_p": iu.safe_round(levene_p, 4)},
+        "test": test,
         "interpretation": f"F({df_b},{n_total - len(grouped)})={iu.safe_round(f_stat)}, p={iu.safe_round(p, 4)}, η²={iu.safe_round(eta2)} ({iu.interpret_eta(eta2)}).",
         "warnings": ["unequal variances (Levene p<0.05)"] if levene_p < 0.05 else [],
     }
@@ -240,10 +307,12 @@ def _exec_kruskal(df: pd.DataFrame, params: dict) -> dict:
     headers = ["Group", "N", "Median"]
     rows = [[str(g_name), len(g), iu.safe_round(np.median(g))]
             for g_name, g in zip(sub[g_col].unique(), grouped)]
+    test = {"stat": iu.safe_round(h), "df": len(grouped) - 1, "p_raw": iu.safe_round(p, 6),
+             "effect_size": {"eta_squared_h": iu.safe_round(eta_h)}, "n": n_total}
+    rows = rows + _stat_footer_rows(headers, test)
     return {
         "table": {"headers": headers, "rows": rows},
-        "test": {"stat": iu.safe_round(h), "df": len(grouped) - 1, "p_raw": iu.safe_round(p, 6),
-                 "effect_size": {"eta_squared_h": iu.safe_round(eta_h)}},
+        "test": test,
         "interpretation": f"H={iu.safe_round(h)}, p={iu.safe_round(p, 4)}, η²_H={iu.safe_round(eta_h)}.",
         "warnings": [],
     }
@@ -263,7 +332,7 @@ def _exec_pearson(df: pd.DataFrame, params: dict) -> dict:
                   "rows": [[len(x), iu.safe_round(r), iu.safe_round(p, 6),
                             iu.safe_round(ci[0]), iu.safe_round(ci[1])]]},
         "test": {"stat": iu.safe_round(r), "p_raw": iu.safe_round(p, 6),
-                 "effect_size": {"r": iu.safe_round(r)}, "ci": [iu.safe_round(ci[0]), iu.safe_round(ci[1])]},
+                 "effect_size": {"r": iu.safe_round(r)}, "ci": [iu.safe_round(ci[0]), iu.safe_round(ci[1])], "n": len(x)},
         "interpretation": f"Pearson r={iu.safe_round(r)}, p={iu.safe_round(p, 4)}, 95% CI [{iu.safe_round(ci[0])}, {iu.safe_round(ci[1])}].",
         "warnings": [],
     }
@@ -281,7 +350,7 @@ def _exec_spearman(df: pd.DataFrame, params: dict) -> dict:
         "table": {"headers": ["N", "ρ", "p"],
                   "rows": [[len(x), iu.safe_round(rho), iu.safe_round(p, 6)]]},
         "test": {"stat": iu.safe_round(rho), "p_raw": iu.safe_round(p, 6),
-                 "effect_size": {"rho": iu.safe_round(rho)}},
+                 "effect_size": {"rho": iu.safe_round(rho)}, "n": len(x)},
         "interpretation": f"Spearman ρ={iu.safe_round(rho)}, p={iu.safe_round(p, 4)}.",
         "warnings": [],
     }
@@ -301,14 +370,17 @@ def _exec_paired_ttest(df: pd.DataFrame, params: dict) -> dict:
     t_stat, p = sp_stats.ttest_rel(a, b)
     dz = iu.cohens_dz(diff)
     ci = iu.ci_paired_diff(diff)
+    headers = ["Stage", "N", "Mean", "SD"]
+    rows = [["Pre", n, iu.safe_round(a.mean()), iu.safe_round(a.std(ddof=1))],
+            ["Post", n, iu.safe_round(b.mean()), iu.safe_round(b.std(ddof=1))],
+            ["Δ", n, iu.safe_round(diff.mean()), iu.safe_round(diff.std(ddof=1))]]
+    test = {"stat": iu.safe_round(t_stat), "df": n - 1, "p_raw": iu.safe_round(p, 6),
+             "effect_size": {"cohens_dz": iu.safe_round(dz), "interpretation": iu.interpret_d(dz)},
+             "ci": [iu.safe_round(ci[0]), iu.safe_round(ci[1])], "n": n}
+    rows = rows + _stat_footer_rows(headers, test)
     return {
-        "table": {"headers": ["Stage", "N", "Mean", "SD"],
-                  "rows": [["Pre", n, iu.safe_round(a.mean()), iu.safe_round(a.std(ddof=1))],
-                           ["Post", n, iu.safe_round(b.mean()), iu.safe_round(b.std(ddof=1))],
-                           ["Δ", n, iu.safe_round(diff.mean()), iu.safe_round(diff.std(ddof=1))]]},
-        "test": {"stat": iu.safe_round(t_stat), "df": n - 1, "p_raw": iu.safe_round(p, 6),
-                 "effect_size": {"cohens_dz": iu.safe_round(dz), "interpretation": iu.interpret_d(dz)},
-                 "ci": [iu.safe_round(ci[0]), iu.safe_round(ci[1])]},
+        "table": {"headers": headers, "rows": rows},
+        "test": test,
         "interpretation": f"Paired t({n-1})={iu.safe_round(t_stat)}, p={iu.safe_round(p, 4)}, d_z={iu.safe_round(dz)} ({iu.interpret_d(dz)}).",
         "warnings": [],
     }
@@ -330,11 +402,14 @@ def _exec_wilcoxon(df: pd.DataFrame, params: dict) -> dict:
         return {"table": {"headers": [], "rows": []}, "test": {},
                 "interpretation": "Wilcoxon failed (all-zero differences?)", "warnings": ["scipy raised"]}
     r = iu.wilcoxon_rb(w, n)
+    headers = ["N", "W", "p", "rank-biserial r"]
+    rows = [[n, iu.safe_round(w), iu.safe_round(p, 6), iu.safe_round(r)]]
+    test = {"stat": iu.safe_round(w), "p_raw": iu.safe_round(p, 6),
+             "effect_size": {"rank_biserial_r": iu.safe_round(r)}, "n": n}
+    rows = rows + _stat_footer_rows(headers, test)
     return {
-        "table": {"headers": ["N", "W", "p", "rank-biserial r"],
-                  "rows": [[n, iu.safe_round(w), iu.safe_round(p, 6), iu.safe_round(r)]]},
-        "test": {"stat": iu.safe_round(w), "p_raw": iu.safe_round(p, 6),
-                 "effect_size": {"rank_biserial_r": iu.safe_round(r)}},
+        "table": {"headers": headers, "rows": rows},
+        "test": test,
         "interpretation": f"W={iu.safe_round(w)}, p={iu.safe_round(p, 4)}, r={iu.safe_round(r)}.",
         "warnings": [],
     }
@@ -360,9 +435,11 @@ def _exec_mcnemar(df: pd.DataFrame, params: dict) -> dict:
                 "interpretation": f"McNemar error: {e}", "warnings": [str(e)]}
     headers = ["", *map(str, ct.columns)]
     rows = [[str(idx), *[int(x) for x in row]] for idx, row in ct.iterrows()]
+    test = {"stat": iu.safe_round(stat), "p_raw": iu.safe_round(p, 6), "n": int(ct.values.sum())}
+    rows = rows + _stat_footer_rows(headers, test)
     return {
         "table": {"headers": headers, "rows": rows},
-        "test": {"stat": iu.safe_round(stat), "p_raw": iu.safe_round(p, 6)},
+        "test": test,
         "interpretation": f"McNemar χ²={iu.safe_round(stat)}, p={iu.safe_round(p, 4)}.",
         "warnings": [],
     }
@@ -400,11 +477,13 @@ def _exec_logistic(df: pd.DataFrame, params: dict) -> dict:
         lo, hi = math.exp(conf.loc[name, 0]), math.exp(conf.loc[name, 1])
         rows.append([_relabel_dummy(str(name), preds, col_labels), iu.safe_round(coef), iu.safe_round(or_val),
                      f"[{iu.safe_round(lo)}, {iu.safe_round(hi)}]", iu.safe_round(pvals[name], 6)])
+    test = {"stat": iu.safe_round(res.llr), "p_raw": iu.safe_round(res.llr_pvalue, 6),
+             "effect_size": {"pseudo_r2": iu.safe_round(res.prsquared)},
+             "df": int(res.df_model), "n": int(len(sub))}
+    rows = rows + _stat_footer_rows(headers, test, label="Overall model fit (LR test)")
     return {
         "table": {"headers": headers, "rows": rows},
-        "test": {"stat": iu.safe_round(res.llr), "p_raw": iu.safe_round(res.llr_pvalue, 6),
-                 "effect_size": {"pseudo_r2": iu.safe_round(res.prsquared)},
-                 "df": int(res.df_model)},
+        "test": test,
         "interpretation": f"Logistic model — LR χ²={iu.safe_round(res.llr)}, p={iu.safe_round(res.llr_pvalue, 4)}, pseudo-R²={iu.safe_round(res.prsquared)}. Outcome '1' = {y_uniq[1]}.",
         "warnings": [],
     }
@@ -440,12 +519,14 @@ def _exec_multiple_regression(df: pd.DataFrame, params: dict) -> dict:
                      iu.safe_round(res.bse[name]), iu.safe_round(res.tvalues[name]),
                      iu.safe_round(res.pvalues[name], 6),
                      iu.safe_round(conf.loc[name, 0]), iu.safe_round(conf.loc[name, 1])])
+    test = {"stat": iu.safe_round(res.fvalue), "p_raw": iu.safe_round(res.f_pvalue, 6),
+             "df": [int(res.df_model), int(res.df_resid)],
+             "effect_size": {"r_squared": iu.safe_round(res.rsquared),
+                             "adj_r_squared": iu.safe_round(res.rsquared_adj)}, "n": int(len(y))}
+    rows = rows + _stat_footer_rows(headers, test, label="Overall model fit (F test)")
     return {
         "table": {"headers": headers, "rows": rows},
-        "test": {"stat": iu.safe_round(res.fvalue), "p_raw": iu.safe_round(res.f_pvalue, 6),
-                 "df": [int(res.df_model), int(res.df_resid)],
-                 "effect_size": {"r_squared": iu.safe_round(res.rsquared),
-                                 "adj_r_squared": iu.safe_round(res.rsquared_adj)}},
+        "test": test,
         "interpretation": f"OLS — F={iu.safe_round(res.fvalue)}, p={iu.safe_round(res.f_pvalue, 4)}, R²={iu.safe_round(res.rsquared)}, adj-R²={iu.safe_round(res.rsquared_adj)}.",
         "warnings": [],
     }
@@ -461,9 +542,11 @@ def _exec_reliability(df: pd.DataFrame, params: dict) -> dict:
     col_labels = params.get("col_labels") or {}
     headers = ["Item", "Item-rest r"]
     rows = [[col_labels.get(c, c), iu.safe_round(r)] for c, r in zip(sub.columns, item_rest)]
+    test = {"stat": iu.safe_round(alpha), "effect_size": {"alpha": iu.safe_round(alpha)}, "n": int(sub.shape[0])}
+    rows = rows + _stat_footer_rows(headers, test, label="Reliability summary")
     return {
         "table": {"headers": headers, "rows": rows},
-        "test": {"stat": iu.safe_round(alpha), "effect_size": {"alpha": iu.safe_round(alpha)}},
+        "test": test,
         "interpretation": f"Cronbach's α = {iu.safe_round(alpha)} on {sub.shape[1]} items, N={sub.shape[0]}.",
         "warnings": [],
     }
@@ -601,7 +684,9 @@ def _exec_multinomial_logistic(df: pd.DataFrame, params: dict) -> dict:
 
 def _exec_did(df: pd.DataFrame, params: dict) -> dict:
     r = _did_compute(df, params["treatment_col"], params["post_col"], params["outcome_col"])
-    return {"table": {"headers": r["headers"], "rows": r["rows"]}, "test": r.get("test", {}),
+    test = r.get("test", {})
+    rows = r["rows"] + _stat_footer_rows(r["headers"], test, label="DiD test statistic")
+    return {"table": {"headers": r["headers"], "rows": rows}, "test": test,
             "interpretation": r.get("interpretation", ""), "warnings": r.get("warnings", [])}
 
 
@@ -610,7 +695,9 @@ def _exec_psm(df: pd.DataFrame, params: dict) -> dict:
     col_labels = params.get("col_labels") or {}
     r = _psm_compute(df, params["treatment_col"], params["outcome_col"], covariates)
     rows = [[_relabel_dummy(str(row[0]), covariates, col_labels), *row[1:]] for row in r["rows"]]
-    return {"table": {"headers": r["headers"], "rows": rows}, "test": r.get("test", {}),
+    test = r.get("test", {})
+    rows = rows + _stat_footer_rows(r["headers"], test, label="PSM test statistic")
+    return {"table": {"headers": r["headers"], "rows": rows}, "test": test,
             "interpretation": r.get("interpretation", ""), "warnings": r.get("warnings", [])}
 
 

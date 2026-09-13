@@ -11,7 +11,6 @@ export interface BatteryResultLike {
   params?: Record<string, any>;
   table?: { headers: string[]; rows: any[][] };
   interpretation?: string;
-  test?: Record<string, any> | null;
 }
 
 export interface BatteryConfig {
@@ -28,20 +27,10 @@ export interface BatteryConfig {
  * auto_analyze.py, one executor function per kind). */
 export function combineResults(results: BatteryResultLike[]): { headers: string[]; rows: any[][]; interpretation: string } {
   const base = results.find(r => r.table?.headers?.length)?.table?.headers || [];
-  // The union table's own columns are just the descriptive breakdown (group
-  // means, crosstab counts) — the test statistic/df/p-values live separately
-  // on each result's `test` object. Append them as trailing columns so
-  // combining variables doesn't throw away the numbers behind each one.
-  const hasStats = results.some(r => r.test && Object.keys(r.test).length > 0);
-  const statHeaders = hasStats ? ['Statistic', 'df', 'p (raw)', 'p (adjusted)', 'Sig'] : [];
-  const headers = ['Variable', ...base, ...statHeaders];
-  const rows = results.flatMap(r => {
-    const t = r.test || {};
-    const statCells = hasStats
-      ? [t.stat ?? '', Array.isArray(t.df) ? t.df.join(', ') : (t.df ?? ''), t.p_raw ?? '', t.p_adj ?? '', t.sig ?? '']
-      : [];
-    return (r.table?.rows || []).map(row => [r.outcome || r.label || '', ...row, ...statCells]);
-  });
+  const headers = ['Variable', ...base];
+  const rows = results.flatMap(r =>
+    (r.table?.rows || []).map(row => [r.outcome || r.label || '', ...row])
+  );
   const interpretation = results
     .map(r => `${r.outcome || r.label || ''}: ${r.interpretation || ''}`)
     .join('\n\n');

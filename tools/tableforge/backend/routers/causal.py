@@ -162,10 +162,11 @@ def _did_compute(df: pd.DataFrame, treatment_col: str, post_col: str, outcome_co
             "table_type": "did",
             "test": {
                 "stat": round(ate / se, 4) if se > 0 else None,
-                "p": round(p_val, 6), "df": int(model.df_resid),
+                "p_raw": round(p_val, 6), "df": int(model.df_resid),
                 "effect_size": {"name": "ATT (DiD)", "value": round(ate, 4)},
                 "ci": [round(ci_lo, 4), round(ci_hi, 4)],
                 "se": round(se, 4),
+                "n": int(len(y)),
             },
             "interpretation": " ".join([s for s in interp_lines if s]),
             "warnings": warnings,
@@ -299,11 +300,12 @@ def _psm_compute(df: pd.DataFrame, treatment_col: str, outcome_col: str, covaria
             "table_type": "psm",
             "test": {
                 "stat": round(z, 4) if not math.isnan(z) else None,
-                "p": round(p_val, 6) if not math.isnan(p_val) else None,
+                "p_raw": round(p_val, 6) if not math.isnan(p_val) else None,
                 "df": None,
                 "effect_size": {"name": "ATT (matched)", "value": round(att, 4)},
                 "ci": [round(ci_lo, 4), round(ci_hi, 4)] if not math.isnan(ci_lo) else None,
                 "se": round(se, 4),
+                "n": int(len(matches)),
             },
             "interpretation": (
                 f"Matched ATT = {att:.4f}, 95% CI [{ci_lo:.4f}, {ci_hi:.4f}], p = {iu.fmt_p(p_val)}. "
