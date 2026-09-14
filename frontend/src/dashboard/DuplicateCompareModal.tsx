@@ -39,6 +39,7 @@ export function DuplicateCompareModal({
   const [loading, setLoading] = useState(group.tier !== 'exact')
   const [keepId, setKeepId] = useState(group.recommended_keep_id)
   const [busy, setBusy] = useState(false)
+  const [hideIdentical, setHideIdentical] = useState(true)
 
   useEffect(() => {
     if (group.tier === 'exact') return
@@ -124,6 +125,19 @@ export function DuplicateCompareModal({
   const recommended = group.submissions.find(s => s.id === group.recommended_keep_id)
   const submissionById = (id: string) => group.submissions.find(s => s.id === id)
 
+  const rowDiffers = useMemo(() => {
+    const map = new Map<string, boolean>()
+    if (!subs) return map
+    for (const key of rows) {
+      const values = subs.map(s => displayValue(fieldMap[key], s.data_json?.[key]))
+      map.set(key, new Set(values).size > 1)
+    }
+    return map
+  }, [rows, subs, fieldMap])
+
+  const identicalCount = rows.length - [...rowDiffers.values()].filter(Boolean).length
+  const visibleRows = hideIdentical ? rows.filter(key => rowDiffers.get(key)) : rows
+
   return (
     <Modal isOpen onClose={onClose}
       title={group.tier === 'identifier_match' ? 'Same Respondent? — Identifier Match' : 'Compare & Resolve Duplicates'}
@@ -150,6 +164,21 @@ export function DuplicateCompareModal({
         <Button variant="ghost" onClick={() => setKeepId(group.recommended_keep_id)}>Use recommendation</Button>
       </div>
 
+      {!loading && subs && subs.length >= 2 && rows.length > 0 && (
+        <div className="flex items-center justify-between mb-2">
+          <label className="flex items-center gap-2 text-xs text-catalan-textMuted cursor-pointer">
+            <input type="checkbox" checked={hideIdentical} onChange={e => setHideIdentical(e.target.checked)} />
+            Hide identical rows
+          </label>
+          {identicalCount > 0 && (
+            <span className="text-xs text-catalan-textMuted">
+              {hideIdentical
+                ? `${identicalCount} identical row${identicalCount === 1 ? '' : 's'} hidden`
+                : `${identicalCount} of ${rows.length} rows are identical across all submissions`}
+            </span>
+          )}
+        </div>
+      )}
       {loading ? (
         <p className="text-sm text-catalan-textMuted text-center py-6">Loading submissions…</p>
       ) : !subs || subs.length < 2 ? (
@@ -188,10 +217,14 @@ export function DuplicateCompareModal({
               </tr>
             </thead>
             <tbody>
-              {rows.map(key => {
+              {visibleRows.length === 0 ? (
+                <tr><td colSpan={subs.length + 1} className="px-3 py-6 text-center text-sm text-catalan-textMuted">
+                  All answers are identical — nothing left to compare.
+                </td></tr>
+              ) : visibleRows.map(key => {
                 const field = fieldMap[key]
                 const values = subs.map(s => displayValue(field, s.data_json?.[key]))
-                const differs = new Set(values).size > 1
+                const differs = rowDiffers.get(key) ?? false
                 return (
                   <tr key={key} className={`border-t border-catalan-border ${differs ? 'bg-catalan-warning/10' : ''}`}>
                     <td className="px-3 py-2 sticky left-0 bg-catalan-surface text-xs text-catalan-textMuted">
