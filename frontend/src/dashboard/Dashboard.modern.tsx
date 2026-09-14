@@ -2209,9 +2209,9 @@ export default function Dashboard() {
                       variant={showDuplicates ? 'primary' : 'secondary'}
                       size="sm"
                       onClick={() => { const next = !showDuplicates; setShowDuplicates(next); if (next) handleLoadDuplicates() }}
-                      title="Show potential duplicate submissions"
+                      title="Scan for and compare/resolve potential duplicate submissions"
                     >
-                      <EmojiIcon e="⚠" /> Dupes
+                      <EmojiIcon e="⚠" /> Duplicate Review
                     </Button>
                     <Button
                       variant={filterViolations ? 'primary' : 'secondary'}
@@ -2225,9 +2225,9 @@ export default function Dashboard() {
                       variant={filterDupSuspect ? 'primary' : 'secondary'}
                       size="sm"
                       onClick={() => { setFilterDupSuspect(v => !v); setSubPage(1) }}
-                      title="Show only suspected duplicate submissions"
+                      title="Filter table to submissions self-flagged as possible duplicates (no comparison — use Duplicate Review for that)"
                     >
-                      <EmojiIcon e="🔁" /> Duplicates
+                      <EmojiIcon e="🔁" /> Suspect Flag
                     </Button>
                     <Button
                       variant={filterBackcheck ? 'primary' : 'secondary'}
@@ -2566,7 +2566,7 @@ export default function Dashboard() {
                 )}
               </Card>
 
-              {/* Duplicate detection */}
+              {/* Duplicate detection — same panel/state as "Duplicate Review" in the Submissions toolbar */}
               <Card title="Duplicate Detection">
                 <p className="text-xs text-catalan-textMuted mb-3">
                   Submissions where the same enumerator submitted the same form more than once on the same day.
