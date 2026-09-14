@@ -432,9 +432,14 @@ export default function FormBuilder() {
 
   const handleDownloadMyForm = async () => {
     try {
-      const res = await api.post('/migration/xlsform/serialize',
-        { title: schema.title, json_schema: schema },
-        { responseType: 'blob' })
+      // formId set → export the live DB record (current saved version), not
+      // this tab's in-memory schema, which may be stale relative to other
+      // tabs/sessions or ahead of it with unsaved edits.
+      const res = formId
+        ? await api.get(`/migration/xlsform/export/${formId}`, { responseType: 'blob' })
+        : await api.post('/migration/xlsform/serialize',
+            { title: schema.title, json_schema: schema },
+            { responseType: 'blob' })
       const url = URL.createObjectURL(res.data)
       const a = document.createElement('a')
       const safe = (schema.title || 'form').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'form'
@@ -450,25 +455,44 @@ export default function FormBuilder() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const { data } = await api.post('/forms/import-excel', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      const sections: FormSection[] = (data.sections ?? []).map((sec: RawImportSection) => ({
-        id: uuidv4(),
-        title: sec.title || 'Section',
-        fields: (sec.fields ?? []).map((f: RawImportField): FormField => {
-          const ft = toFieldType(f.type ?? '')
-          const opts = toOptions(f.options)
-          return {
-            id: uuidv4(),
-            name: f.id || uuidv4(),
-            label: f.label || '',
-            type: ft,
-            required: !!f.required,
-            ...(opts ? { options: opts } : {}),
-          }
-        }),
-      })).filter((s: FormSection) => s.fields.length > 0)
+
+      // XLSForm files (survey/choices/settings sheets) carry question type,
+      // options, and skip logic already in FieldGovern's own shape — try that
+      // parser first so a re-imported/edited XLSForm round-trips correctly.
+      // Files without a 'survey' sheet (plain data sheets) 422 here and fall
+      // back to the header-row heuristic importer below.
+      let sections: FormSection[] = []
+      let title = file.name.replace(/\.[^.]+$/, '')
+      let warnings: string[] = []
+      try {
+        const { data } = await api.post('/migration/xlsform/parse', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        sections = (data.json_schema?.sections ?? []).map((sec: FormSection) => ({ ...sec, id: uuidv4() }))
+        title = data.title || title
+        warnings = data.warnings ?? []
+      } catch {
+        const { data } = await api.post('/forms/import-excel', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        sections = (data.sections ?? []).map((sec: RawImportSection) => ({
+          id: uuidv4(),
+          title: sec.title || 'Section',
+          fields: (sec.fields ?? []).map((f: RawImportField): FormField => {
+            const ft = toFieldType(f.type ?? '')
+            const opts = toOptions(f.options)
+            return {
+              id: uuidv4(),
+              name: f.id || uuidv4(),
+              label: f.label || '',
+              type: ft,
+              required: !!f.required,
+              ...(opts ? { options: opts } : {}),
+            }
+          }),
+        })).filter((s: FormSection) => s.fields.length > 0)
+        title = data.title || title
+      }
 
       if (sections.length === 0) { toast.error('No fields found in this Excel file'); return }
 
@@ -477,7 +501,7 @@ export default function FormBuilder() {
       // since Save will PUT to this same formId instead of POSTing a new one.
       const imported: FormSchema = formId
         ? { title: schema.title, version: schema.version, sections }
-        : { title: data.title || file.name.replace(/\.[^.]+$/, ''), version: 1, sections }
+        : { title, version: 1, sections }
       setSchema(imported)
       setSelectedSection(sections[0].id)
       setSelectedField(null)
@@ -485,6 +509,7 @@ export default function FormBuilder() {
       clearFormDraft(formId)
       const totalFields = sections.reduce((n, s) => n + s.fields.length, 0)
       setImportSummary({ title: imported.title, sections: sections.length, fields: totalFields })
+      warnings.forEach(w => toast.warning(w))
       toast.success(
         formId
           ? `Imported ${sections.length} sections, ${totalFields} fields — click Save to update this form`
