@@ -31,22 +31,38 @@ jobs:
             /opt/fieldgovern/backup-db.sh
 
             echo ""
-            echo "=== 2. Switch cron to every 2 hours ==="
-            # Rewrite the backup-db.sh cron line to 0 */2; leave every other
-            # crontab line (SSL renew, etc) untouched. Idempotent.
+            echo "=== 2. Install/ensure 2-hourly backup cron ==="
+            # Idempotent: replace any existing backup-db cron line with the
+            # 2-hourly schedule, or append it if none exists. Every other
+            # crontab line (SSL renew, etc) is preserved.
             crontab -l 2>/dev/null > /tmp/ct || true
-            sed -i -E 's#^0 2 \* \* \* (.*/backup-db\.sh.*)#0 */2 * * * \1#' /tmp/ct
+            LINE='0 */2 * * * /opt/fieldgovern/backup-db.sh >> /var/log/fieldgovern-backup.log 2>&1'
+            if grep -q 'backup-db\.sh' /tmp/ct; then
+              sed -i -E "s#^.*backup-db\.sh.*#${LINE}#" /tmp/ct
+            else
+              echo "$LINE" >> /tmp/ct
+            fi
             crontab /tmp/ct
             rm -f /tmp/ct
-            echo "Current backup cron line:"
-            crontab -l | grep backup-db || echo "  (no backup cron line found!)"
+            echo "Backup cron now:"
+            crontab -l | grep backup-db || echo "  (STILL no backup cron line!)"
 
             echo ""
-            echo "=== 3. Offsite (R2) status ==="
+            echo "=== 3. What's in the database (read-only, live row counts) ==="
+            docker compose exec -T postgres psql -U fieldgovern -d fieldgovern \
+              -c "SELECT relname AS table, n_live_tup AS rows FROM pg_stat_user_tables ORDER BY n_live_tup DESC;" \
+              || echo "  could not query DB"
+
+            echo ""
+            echo "=== 4. Tool state in Docker volumes (NOT in the DB dump) ==="
+            docker system df -v 2>/dev/null | grep -E 'fg_tableforge|fg_cleaner|VOLUME' || echo "  no fg_ volumes found"
+
+            echo ""
+            echo "=== 5. Offsite (R2) status ==="
             grep -E '^R2_BUCKET=' /opt/fieldgovern/backup-db.sh || echo "  R2_BUCKET line not found"
             if command -v rclone >/dev/null 2>&1; then echo "  rclone: installed"; else echo "  rclone: NOT installed -> offsite is OFF"; fi
 
             echo ""
-            echo "=== 4. Local backups on disk ==="
-            ls -lah /opt/fieldgovern/backups/ | tail -8
+            echo "=== 6. Local backups on disk ==="
+            ls -lah /opt/fieldgovern/backups/ | tail -6
             echo -n "Total backup dir size: "; du -sh /opt/fieldgovern/backups/ | cut -f1
