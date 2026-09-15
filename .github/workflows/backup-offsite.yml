@@ -19,7 +19,7 @@ jobs:
       - name: Configure + run via SSH
         uses: appleboy/ssh-action@v1
         env:
-          GDRIVE_TOKEN: ${{ secrets.GDRIVE_TOKEN }}
+          GDRIVE_TOKEN: ${{ secrets.GDRIVETOKEN }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
