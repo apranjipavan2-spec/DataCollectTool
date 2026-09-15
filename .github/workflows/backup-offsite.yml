@@ -24,7 +24,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 20m
+          command_timeout: 55m
           envs: GDRIVE_TOKEN
           script: |
             set -e
@@ -54,6 +54,8 @@ jobs:
             # unless removed by hand. Only new/changed files upload each run.
             set -uo pipefail
             REMOTE="gdrive:FieldGovern-Backups"
+            # Parallelise: many small photos upload far faster this way.
+            RCOPY="rclone copy --transfers=16 --checkers=16 --drive-chunk-size=32M --fast-list"
             LOG(){ echo "[$(date '+%F %T')] $*"; }
 
             # host path of a container's mount point
@@ -61,7 +63,7 @@ jobs:
 
             # 1. DB dump (local, timestamped) + push every dump to Drive
             /opt/fieldgovern/backup-db.sh || LOG "WARN: backup-db.sh failed"
-            rclone copy /opt/fieldgovern/backups "$REMOTE/db" --include "*.sql.gz" \
+            $RCOPY /opt/fieldgovern/backups "$REMOTE/db" --include "*.sql.gz" \
               && LOG "DB dumps synced to Drive" || LOG "WARN: DB offsite copy failed"
 
             # 2. Photos (app /app/uploads volume). The app runs under docker
@@ -70,7 +72,7 @@ jobs:
             APP_CID=$(docker compose -f /opt/fieldgovern/docker-compose.yml ps -q app 2>/dev/null | head -1)
             MEDIA=$(docker inspect "$APP_CID" -f '{{range .Mounts}}{{if eq .Destination "/app/uploads"}}{{.Source}}{{end}}{{end}}' 2>/dev/null)
             if [ -n "$MEDIA" ] && [ -d "$MEDIA" ]; then
-              rclone copy "$MEDIA" "$REMOTE/media" && LOG "photos synced ($MEDIA)" \
+              $RCOPY "$MEDIA" "$REMOTE/media" && LOG "photos synced ($MEDIA)" \
                 || LOG "WARN: photo copy failed"
             else
               LOG "WARN: could not resolve app /app/uploads volume"
@@ -79,8 +81,8 @@ jobs:
             # 3. Analyzer + Cleaner saved projects
             TF=$(src_of analyzer /app/projects)
             CL=$(src_of cleaner /app/working_copies)
-            [ -n "$TF" ] && [ -d "$TF" ] && { rclone copy "$TF" "$REMOTE/tableforge_projects" && LOG "analyzer projects synced"; } || LOG "WARN: analyzer projects not resolved"
-            [ -n "$CL" ] && [ -d "$CL" ] && { rclone copy "$CL" "$REMOTE/cleaner_projects" && LOG "cleaner projects synced"; } || LOG "WARN: cleaner projects not resolved"
+            [ -n "$TF" ] && [ -d "$TF" ] && { $RCOPY "$TF" "$REMOTE/tableforge_projects" && LOG "analyzer projects synced"; } || LOG "WARN: analyzer projects not resolved"
+            [ -n "$CL" ] && [ -d "$CL" ] && { $RCOPY "$CL" "$REMOTE/cleaner_projects" && LOG "cleaner projects synced"; } || LOG "WARN: cleaner projects not resolved"
 
             LOG "offsite backup complete"
             SCRIPT
