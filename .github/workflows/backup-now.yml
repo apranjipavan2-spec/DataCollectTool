@@ -58,6 +58,12 @@ jobs:
             docker system df -v 2>/dev/null | grep -E 'fg_tableforge|fg_cleaner|VOLUME' || echo "  no fg_ volumes found"
 
             echo ""
+            echo "=== 4b. Media storage backend (where photo bytes live) ==="
+            grep -E '^STORAGE_BACKEND=|^MEDIA_DIR=|^GOOGLE_DRIVE|^GDRIVE|^AWS_|^S3_' .env \
+              | sed -E 's/(KEY|SECRET|TOKEN|PASSWORD)=.*/\1=<hidden>/' \
+              || echo "  STORAGE_BACKEND not set -> defaults to 'drive' (Google Drive)"
+
+            echo ""
             echo "=== 5. Offsite (R2) status ==="
             grep -E '^R2_BUCKET=' /opt/fieldgovern/backup-db.sh || echo "  R2_BUCKET line not found"
             if command -v rclone >/dev/null 2>&1; then echo "  rclone: installed"; else echo "  rclone: NOT installed -> offsite is OFF"; fi
