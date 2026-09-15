@@ -64,8 +64,11 @@ jobs:
             rclone copy /opt/fieldgovern/backups "$REMOTE/db" --include "*.sql.gz" \
               && LOG "DB dumps synced to Drive" || LOG "WARN: DB offsite copy failed"
 
-            # 2. Photos (app /app/uploads volume)
-            MEDIA=$(src_of app /app/uploads)
+            # 2. Photos (app /app/uploads volume). The app runs under docker
+            # compose, so its container isn't literally named "app" — resolve
+            # the real container id via compose, then read its mount.
+            APP_CID=$(docker compose -f /opt/fieldgovern/docker-compose.yml ps -q app 2>/dev/null | head -1)
+            MEDIA=$(docker inspect "$APP_CID" -f '{{range .Mounts}}{{if eq .Destination "/app/uploads"}}{{.Source}}{{end}}{{end}}' 2>/dev/null)
             if [ -n "$MEDIA" ] && [ -d "$MEDIA" ]; then
               rclone copy "$MEDIA" "$REMOTE/media" && LOG "photos synced ($MEDIA)" \
                 || LOG "WARN: photo copy failed"
