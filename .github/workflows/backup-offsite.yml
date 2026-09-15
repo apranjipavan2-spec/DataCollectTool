@@ -90,18 +90,17 @@ jobs:
             chmod +x /opt/fieldgovern/backup-all.sh
             echo "  wrote backup-all.sh"
 
-            echo "=== 4. Point the 2-hourly cron at backup-all.sh ==="
-            crontab -l 2>/dev/null > /tmp/ct || true
+            echo "=== 4. Point the 2-hourly cron at backup-all.sh (dedupe old lines) ==="
             # nice/ionice => backup only uses spare CPU + disk IO; the app
             # always wins under load, so live submissions are never starved.
             LINE='0 */2 * * * nice -n 19 ionice -c 3 /opt/fieldgovern/backup-all.sh >> /var/log/fieldgovern-backup.log 2>&1'
-            if grep -q 'backup-\(db\|all\)\.sh' /tmp/ct; then
-              sed -i -E "s#^.*backup-(db|all)\.sh.*#${LINE}#" /tmp/ct
-            else
-              echo "$LINE" >> /tmp/ct
-            fi
+            # Strip EVERY existing backup line (incl. any corrupted dupes from a
+            # prior sed bug), then add exactly one clean line. grep, not sed, so
+            # the & in 2>&1 is never reinterpreted.
+            crontab -l 2>/dev/null | grep -v 'backup-\(db\|all\)\.sh' > /tmp/ct || true
+            echo "$LINE" >> /tmp/ct
             crontab /tmp/ct; rm -f /tmp/ct
-            echo "Backup cron now:"; crontab -l | grep backup
+            echo "Backup cron now:"; crontab -l | grep backup-all
 
             echo "=== 5. Run a full offsite backup NOW ==="
             /opt/fieldgovern/backup-all.sh
