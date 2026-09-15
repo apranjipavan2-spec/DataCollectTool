@@ -54,8 +54,9 @@ jobs:
             # unless removed by hand. Only new/changed files upload each run.
             set -uo pipefail
             REMOTE="gdrive:FieldGovern-Backups"
-            # Parallelise: many small photos upload far faster this way.
-            RCOPY="rclone copy --transfers=16 --checkers=16 --drive-chunk-size=32M --fast-list"
+            # Modest concurrency for steady-state runs (the big first push is
+            # done). --bwlimit caps upload bandwidth so it never saturates the link.
+            RCOPY="rclone copy --transfers=4 --checkers=4 --drive-chunk-size=16M --fast-list --bwlimit 8M"
             LOG(){ echo "[$(date '+%F %T')] $*"; }
 
             # host path of a container's mount point
@@ -91,7 +92,9 @@ jobs:
 
             echo "=== 4. Point the 2-hourly cron at backup-all.sh ==="
             crontab -l 2>/dev/null > /tmp/ct || true
-            LINE='0 */2 * * * /opt/fieldgovern/backup-all.sh >> /var/log/fieldgovern-backup.log 2>&1'
+            # nice/ionice => backup only uses spare CPU + disk IO; the app
+            # always wins under load, so live submissions are never starved.
+            LINE='0 */2 * * * nice -n 19 ionice -c 3 /opt/fieldgovern/backup-all.sh >> /var/log/fieldgovern-backup.log 2>&1'
             if grep -q 'backup-\(db\|all\)\.sh' /tmp/ct; then
               sed -i -E "s#^.*backup-(db|all)\.sh.*#${LINE}#" /tmp/ct
             else
