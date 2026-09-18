@@ -449,11 +449,84 @@ skipped by choice). Full detail in `tasks/pending_owner_action.md` §1.
       respondent flow that doesn't exist today — real follow-up work, not
       attempted this pass.
 
-### 8. Data-principal rights workflow — `todo`
-Log → verify identity → search respondent across all forms/waves → act (export/correct/
-erase) → close with audit record. SLA tracking (aim 30 days, outer limit 90 days per
-Rules) with overdue alerts. Machine-readable export. Nomination support (nominee acts if
-respondent dies/incapacitated).
+### 8. Data-principal rights workflow — `in-progress` (core built + verified)
+- [x] **New tracked entity — done 2026-09-18.** `data_rights_requests` table
+      (migration `0058`) — this is a genuinely new case-tracking object, not
+      an extension of something existing: request type (access/correction/
+      erasure/portability), requester name/contact, optional nominee
+      name/contact, status (open/verifying/in_progress/closed), identity-
+      verified flag, linked submission ids (JSONB array), resolution note,
+      `sla_due_at` (computed at creation = now + 30 days, the Rules' aim).
+      **Brought under the same DB-level tenant isolation as everything
+      else** — a second migration (`0059`) enables/forces RLS + the
+      `tenant_isolation` policy on it, since RLS enforcement (item 2) is
+      live in prod and a new table created after migration 0048 doesn't
+      inherit that automatically; without this it would've been the one
+      tenant-scoped table with no DB-layer defense-in-depth. Registered in
+      the soft-delete bin registry too, matching every other entity.
+- [x] **Log → verify → search → act → close, end to end — done 2026-09-18.**
+      New `backend/app/api/routes/data_rights.py` (9 endpoints, all
+      `org_admin`+): create, list (with `overdue_only` filter), get,
+      update (status/identity_verified/resolution_note/nominee), search,
+      act, close, delete, and an `overdue-count` badge endpoint.
+      **Search reuses existing infra, not a new identifier concept**: the
+      "find this respondent across all forms/waves" requirement is served
+      by `pii_redact.identifier_field_ids()` — the same `is_identifier`
+      field flag already used to strip PII before AI calls — searched
+      against every one of the tenant's forms via JSONB field lookups;
+      matches accumulate into `linked_submission_ids` across repeated
+      searches rather than overwriting.
+      **Erasure is the third call site now reusing the same core**: `act`
+      with `action=erase` calls the exact `_erase_submission_row()` helper
+      extracted for item 7's consent withdrawal, which itself came from
+      item 9's `anonymize_submission`. One erasure implementation, three
+      entry points (master_admin direct anonymize, org_admin consent
+      withdrawal by ref code, org_admin data-rights erasure), each with
+      its own audit action label so the log stays distinguishable.
+      **Export** (`action=export`) returns a machine-readable JSON bundle
+      of every linked submission's full `data_json` — the portability/
+      access right — downloaded directly from the new admin UI.
+- [x] **SLA tracking + overdue signal — done 2026-09-18.** `_serialize()`
+      computes `is_overdue` (past the 30-day target, not yet closed) and
+      `is_past_outer_limit` (past the 90-day Rules maximum) on every
+      response — pure function, covered by 4 standalone unit tests
+      (`backend/tests/test_data_rights.py`, no DB needed): fresh request
+      not overdue, past-target flagged, past-outer-limit flags both, and
+      critically — a closed request is never flagged overdue regardless of
+      age, so resolved cases don't pollute the alert view. Overdue requests
+      get a visible red badge in the new admin table +
+      `GET /data-rights/overdue-count` for a future dashboard badge.
+- [x] **Admin UI — done 2026-09-18.** New `frontend/src/admin/
+      DataRightsPage.tsx` at `/data-rights` (`org_admin`/`master_admin`,
+      new Sidebar nav entry "Data Rights"): request list with status/SLA
+      badges, a "Log Request" modal, and a detail modal covering identity
+      verification, search, linked-submission chips, export/erase actions,
+      and close.
+- [x] **Nomination support (partial, by design).** Nominee name/contact are
+      captured as fields on the request and editable — enough to record
+      *who* is acting on the respondent's behalf and why, which is the
+      practical need day-to-day. A full "verify nominee's legal standing"
+      workflow (death certificate upload, guardianship proof, etc.) is out
+      of scope — that's a legal/process question for the org's own
+      grievance procedure, not something software can adjudicate.
+- [x] **Verified:** `npx tsc --noEmit` clean; `npm run build` (incl. service
+      worker, 64 precached entries, up from 63) succeeds. Backend:
+      `py_compile` clean on all 8 touched/new files; the full `app.api.
+      router` was actually **imported** (not just compiled) to confirm no
+      runtime-only errors — 9 `/data-rights/*` routes registered correctly.
+      Full pytest suite: 48 passed / 76 skipped / 0 failed (up from 44).
+- [ ] **Not done: proactive overdue alerts (email/push).** Overdue status is
+      visible in the UI and via the count endpoint, but nothing emails or
+      pushes a notification when a request crosses its SLA. The existing
+      digest-email service (`services/digest.py`) sends tenant-wide daily
+      summaries and isn't wired to per-object deadlines like this one —
+      extending it is real follow-up work, not attempted against a system
+      not designed for it, rather than bolting on a parallel one-off
+      notification path.
+- [ ] **Not done: SLA/outer-limit day counts (30/90) are hardcoded
+      constants**, not a per-tenant configurable setting — matches the
+      Rules' own fixed numbers, so not flagged as a real gap, just noted
+      for completeness.
 
 ### 9. Erasure completeness — `in-progress` (data + files done, 2 gaps remain)
 - [x] **Photos, audio, GPS — done 2026-09-18.** `POST /submissions/{id}/anonymize`

@@ -43,6 +43,7 @@ const SubscriptionPage   = lazy(() => import('@/admin/SubscriptionPage'))
 const AdminPayments      = lazy(() => import('@/admin/AdminPayments'))
 const PricingPage        = lazy(() => import('@/pages/PricingPage'))
 const BinPage            = lazy(() => import('@/admin/BinPage'))
+const DataRightsPage     = lazy(() => import('@/admin/DataRightsPage'))
 
 function PageLoader() {
   return (
@@ -242,6 +243,12 @@ export default function App() {
               <Route path="/bin" element={
                 <RequireAuth roles={['org_admin', 'master_admin']}>
                   <LazyRoute><BinPage /></LazyRoute>
+                </RequireAuth>
+              } />
+
+              <Route path="/data-rights" element={
+                <RequireAuth roles={['org_admin', 'master_admin']}>
+                  <LazyRoute><DataRightsPage /></LazyRoute>
                 </RequireAuth>
               } />
 

@@ -80,6 +80,7 @@ def _build_registry() -> dict:
     from app.models.scheduled_report import ScheduledReport
     from app.models.webhook import Webhook
     from app.models.submission import Submission
+    from app.models.data_rights_request import DataRightsRequest
 
     return {
         "submission":       (Submission,                  "Submission"),
@@ -94,6 +95,7 @@ def _build_registry() -> dict:
         "location":         (Location,                    "Location"),
         "scheduled_report": (ScheduledReport,             "Scheduled report"),
         "webhook":          (Webhook,                     "Webhook"),
+        "data_rights_request": (DataRightsRequest,         "Data rights request"),
     }
 
 

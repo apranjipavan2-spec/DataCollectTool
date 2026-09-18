@@ -202,6 +202,30 @@ _PATCHES = [
     "ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS row_hash VARCHAR(64)",
     "ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS prev_hash VARCHAR(64)",
     "CREATE INDEX IF NOT EXISTS ix_audit_log_tenant_id_id ON audit_log (tenant_id, id)",
+    # 0058 — data_rights_requests table (DPDP data-principal rights workflow)
+    """CREATE TABLE IF NOT EXISTS data_rights_requests (
+        id UUID PRIMARY KEY,
+        tenant_id UUID NOT NULL REFERENCES tenants(id),
+        logged_by UUID REFERENCES users(id),
+        request_type VARCHAR NOT NULL,
+        requester_name VARCHAR NOT NULL,
+        requester_contact VARCHAR NOT NULL,
+        nominee_name VARCHAR,
+        nominee_contact VARCHAR,
+        status VARCHAR NOT NULL DEFAULT 'open',
+        identity_verified BOOLEAN NOT NULL DEFAULT FALSE,
+        linked_submission_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+        resolution_note VARCHAR,
+        closed_at TIMESTAMPTZ,
+        closed_by UUID REFERENCES users(id),
+        sla_due_at TIMESTAMPTZ NOT NULL,
+        deleted_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ DEFAULT now()
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_data_rights_requests_tenant_id ON data_rights_requests (tenant_id)",
+    "CREATE INDEX IF NOT EXISTS ix_data_rights_requests_status ON data_rights_requests (tenant_id, status)",
+    "CREATE INDEX IF NOT EXISTS ix_data_rights_requests_sla_due_at ON data_rights_requests (sla_due_at)",
 ]
 
 # 0048 — restricted runtime role + empty-context-bypass RLS policies. Mirrors the
@@ -213,7 +237,7 @@ _MATCH = "tenant_id::text = current_setting('app.current_tenant', true)"
 _SHARED = ("NULLIF(current_setting('app.current_tenant', true), '')::uuid "
            "= ANY(COALESCE(shared_with_tenants, ARRAY[]::uuid[]))")
 _STRICT_TABLES = ("users", "forms", "submissions", "media_files", "cleaning_flags",
-                  "sync_log", "form_assignments", "programs")
+                  "sync_log", "form_assignments", "programs", "data_rights_requests")
 _SHARED_TABLES = ("user_tool_projects", "shared_files")
 
 _PATCHES += [
