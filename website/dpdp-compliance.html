@@ -208,12 +208,12 @@
         </tr>
         <tr>
           <td><strong>S.9 — Children's data</strong><br/>Verifiable parental consent for minors</td>
-          <td>Form-level "minor respondent" flag triggers guardian-consent question. Age-gate logic configurable.</td>
+          <td>Date-of-birth field auto-flags a submission as a minor; a linked guardian-consent question is required. Minor records are hidden from the default view and excluded from AI-facing analysis unless an admin explicitly opts in.</td>
           <td><span class="pill pill-green">Implemented</span></td>
         </tr>
         <tr>
           <td><strong>S.8(4) — Security safeguards</strong><br/>Appropriate technical + organisational measures</td>
-          <td>JWT HS256 + bcrypt. Row-level tenant isolation. TLS everywhere. OPFS encrypted offline storage. Sentry + structured audit log.</td>
+          <td>JWT HS256 + bcrypt. Database-level row-level security enforces tenant isolation via a restricted, non-superuser database role — not application-code filtering alone. TLS 1.2+/HSTS everywhere. OPFS encrypted offline storage. Tamper-evident, hash-chained audit log with anomaly detection.</td>
           <td><span class="pill pill-green">Implemented</span></td>
         </tr>
         <tr>

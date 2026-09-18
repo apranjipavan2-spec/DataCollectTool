@@ -265,14 +265,26 @@ skipped by choice). Full detail in `tasks/pending_owner_action.md` §1.
       describe what donors/use-cases require as a category, not a FieldGovern
       self-claim. Full list is reproducible: `grep -in "DPDP.compliant" website/**/*.html`.
 - [x] **Fixed tenant-isolation wording where found this pass** — see the two FAQ
-      answers above; the big compliance-mapping table on `dpdp-compliance.html`
-      still says "Implemented" for tenant isolation AND children's-data guardian
-      consent, neither of which is actually true yet (items 2 and 13).
-      **Explicit owner decision, 2026-09-18: do NOT touch this further.** Softening
-      more marketing copy right now would hurt positioning/ranking for gaps we're
-      actively closing anyway — the fix is to build items 2 and 13 for real (so
-      the claim becomes true), not to keep walking the copy back. Revisit this
-      specific table once those two items ship.
+      answers above.
+- [x] **`dpdp-compliance.html`'s compliance-mapping table revisited — done
+      2026-09-18, exactly as the deferred decision anticipated.** The two
+      rows flagged back on 2026-09-18 ("Implemented" for tenant isolation
+      and children's-data guardian consent, neither true at the time) are
+      now **actually true** — item 2 (RLS) went live and item 13 (guardian
+      consent) shipped later the same day. Kept the "Implemented" pill on
+      both (correct now) and rewrote the description text on each row to
+      describe the real, built mechanism rather than the vague pre-existing
+      copy: S.9 now says date-of-birth auto-detection + linked guardian
+      consent + hidden-from-default-view enforcement (matching
+      `child_protection.py`); S.8(4) now says database-level RLS via a
+      restricted non-superuser role (matching migration 0048) instead of
+      the generic "row-level tenant isolation" phrase, plus mentions the
+      tamper-evident hash-chained audit log (item 11) that didn't exist
+      when this copy was first written. Scoped to exactly these 2 rows per
+      explicit instruction — the table's other rows (consent withdrawal,
+      breach notification, etc.) weren't touched even though some of them
+      also became more true this session (items 7, 12), since that wasn't
+      what was asked.
 
 ---
 
