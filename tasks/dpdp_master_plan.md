@@ -271,10 +271,50 @@ erase) → close with audit record. SLA tracking (aim 30 days, outer limit 90 da
 Rules) with overdue alerts. Machine-readable export. Nomination support (nominee acts if
 respondent dies/incapacitated).
 
-### 9. Erasure completeness — `todo`
-Current state: anonymisation of submissions exists. Gap: must also cover photos, audio,
-GPS, exports, Google Sheets copies, cached AI outputs, and backups (needs a backup-expiry
-policy so erased data eventually leaves backups too).
+### 9. Erasure completeness — `in-progress` (data + files done, 2 gaps remain)
+- [x] **Photos, audio, GPS — done 2026-09-18.** `POST /submissions/{id}/anonymize`
+      previously only wiped `data_json`, leaving GPS columns (`gps_open`/
+      `gps_submit`, separate top-level columns, never touched) and every
+      uploaded photo/audio file (a `MediaFile` row + a real object in storage)
+      completely untouched. Fixed: now also nulls both GPS columns, and for
+      every `MediaFile` tied to the submission, deletes the actual storage
+      object (`storage.delete(key)`) then the DB row. The storage key isn't
+      stored anywhere on `MediaFile` — reconstructed it using the exact same
+      formula `upload_media()` (`sync.py`) already uses to build it
+      (`{tenant_id}/{submission_id}/{field_name}{ext}`), rather than adding a
+      redundant column. Self-check
+      (`backend/tests/test_erasure.py`, 3 cases) verifies the reconstructed key
+      matches `upload_media`'s own formula byte-for-byte, including the
+      `.bin`-fallback and codec-param-stripping edge cases. File-delete
+      failures are caught and counted but never block the data_json/GPS wipe
+      (the part that matters most must always complete) — failure count is
+      returned in the response and written to a new audit-log entry
+      (`action=submission_anonymized`) so an erasure that partially failed on
+      storage is still visible, not silently "successful."
+- [x] **Exports — verified already fine, no fix needed.** Checked every export
+      route in `export.py`: every one uses `StreamingResponse` / an in-memory
+      buffer, generated fresh from the DB on each request — nothing is cached
+      to disk per submission. Once `data_json` is anonymized, the next export
+      naturally reflects that; there was never a separate stored copy to erase.
+- [x] **Backups — verified an expiry policy already exists, just wasn't
+      documented as satisfying this requirement.** `deploy/backup-db.sh`
+      already prunes local backups after 7 days and (when R2 offsite is
+      configured) R2 copies after 30 days — a real, bounded backup-expiry
+      window, meaning anonymized data ages out of every backup within 30 days
+      max. This already meets the audit's ask; it just needed connecting to
+      the compliance requirement's language, not new engineering.
+- [ ] **Real gap, not fixed: Google Sheets copies.** Once a submission's data
+      is pushed to a customer's Google Sheet (`sheets_sync.py`), FieldGovern
+      has no way to find and blank that specific row — there's no stored
+      mapping from submission → sheet + row. Building one is a real, separate
+      piece of work (needs mapping every synced row, not just future ones).
+- [ ] **Real gap, not fixed: cached AI outputs.** Saved report drafts (AI
+      Writer) or tabulation results that happen to quote a submission's raw
+      free-text answer have no traceable link back to that submission — no
+      way to find "every report that might mention submission X" to redact it.
+      Would need either avoiding raw free-text in saved AI output in the first
+      place, or tracking provenance per generated report — non-trivial,
+      flagged as follow-up rather than half-built.
 
 ### 10. Encryption at rest — `todo`
 Currently TLS + bcrypt only (no data-at-rest encryption described). Add: disk + object

@@ -1438,12 +1438,27 @@ def update_serial_no(
 
 # ── Anonymize (DPDP) — master_admin only ─────────────────────────────────────
 
+def _media_storage_key(m) -> str:
+    """Reconstruct the exact storage key upload_media() used — same formula,
+    no separate column needed since MediaFile already carries every input."""
+    from app.api.routes.sync import _guess_extension
+    ext = _guess_extension(m.mime_type or "")
+    return f"{m.tenant_id}/{m.submission_id}/{m.field_name}{ext}"
+
+
 @router.post("/{submission_id}/anonymize")
 def anonymize_submission(
     submission_id: str,
+    request: Request,
     user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """DPDP erasure. Covers every place this submission's personal data lives:
+    answers (data_json), GPS coordinates, and uploaded photo/audio files —
+    both the storage object and its DB record. Best-effort on file deletion:
+    a storage failure never blocks the data_json/GPS wipe, since that's the
+    part that matters most and must always complete. Logged to the audit
+    trail (erasure is itself an action DPDP expects to be traceable)."""
     if user.get("role") != "master_admin":
         raise HTTPException(status_code=403, detail="Only master_admin can anonymize submissions")
     sub = db.query(Submission).filter(
@@ -1451,9 +1466,37 @@ def anonymize_submission(
     ).first()
     if not sub:
         raise HTTPException(status_code=404, detail="Submission not found")
+
+    from app.models.media_file import MediaFile
+    media_rows = db.query(MediaFile).filter(MediaFile.submission_id == sub.id).all()
+    deleted_count, delete_errors = 0, 0
+    if media_rows:
+        from app.core.storage import get_storage
+        storage = get_storage()
+        for m in media_rows:
+            try:
+                storage.delete(_media_storage_key(m))
+            except Exception:
+                delete_errors += 1  # keep going — DB row removal + data wipe still happen
+            db.delete(m)
+            deleted_count += 1
+
     sub.data_json = {"anonymized": True, "anonymized_at": datetime.now(timezone.utc).isoformat()}
+    sub.gps_open = None
+    sub.gps_submit = None
+
+    from app.models.audit_log import AuditLog
+    db.add(AuditLog(
+        tenant_id=user["tenant_id"], user_id=user.get("sub"),
+        action="submission_anonymized", resource="submission", resource_id=str(sub.id),
+        detail={"media_files_deleted": deleted_count, "media_delete_errors": delete_errors},
+        ip_address=request.client.host if request.client else None,
+    ))
     db.commit()
-    return {"id": str(sub.id), "status": "anonymized"}
+    return {
+        "id": str(sub.id), "status": "anonymized",
+        "media_files_deleted": deleted_count, "media_delete_errors": delete_errors,
+    }
 
 
 # ── Soft-delete to Recycle Bin — org_admin only ──────────────────────────────
