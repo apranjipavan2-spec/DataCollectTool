@@ -30,9 +30,15 @@ def _get_global_ai_cfg(db: Session) -> dict:
 
 
 def _logged_cfg(db: Session, user: dict, feature: str) -> dict:
-    """Get global AI cfg with usage-log context attached for this user + feature."""
+    """Resolve the org's own BYO AI key if configured and enabled, else the
+    platform's shared key — with usage-log context attached for this user + feature."""
+    from app.services.tenant_ai_key import resolve_tenant_byo_cfg, TenantByoMisconfigured
+    try:
+        cfg = resolve_tenant_byo_cfg(db, user.get("tenant_id")) or _get_global_ai_cfg(db)
+    except TenantByoMisconfigured as e:
+        raise HTTPException(400, str(e))
     return ai_service.with_log(
-        _get_global_ai_cfg(db),
+        cfg,
         tenant_id=user.get("tenant_id"),
         user_id=user.get("sub"),
         feature=feature,

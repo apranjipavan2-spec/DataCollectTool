@@ -83,6 +83,32 @@ When an item lands: tick status here, note what was verified, and add a line to
       `website/dpdp-compliance.html` via a small live-fetch script (same pattern
       as `pricing-sync.js`) — updates automatically if the admin changes provider,
       never needs a manual content edit.
+- [x] **BYO (bring-your-own) AI key per org — done + verified 2026-09-18.**
+      User asked whether an org could set its own key instead of using the
+      shared platform one; confirmed the business model first (org brings AND
+      pays for their own key, billed directly by their provider). Built:
+      `backend/app/core/tenant_ai_crypto.py` (Fernet, keyed via HKDF off the
+      already-required `JWT_SECRET` — no new env var), `backend/app/services/
+      tenant_ai_key.py` (resolution: BYO key if enabled+configured → else `{}`
+      so callers fall back to the platform key → but raises
+      `TenantByoMisconfigured` if BYO is ON but broken, so a half-configured
+      org can never silently rack up platform-paid usage while believing
+      they're on their own billing). Wired into both `_logged_cfg` choke
+      points (`ai.py`, `field_govern.py`) covering all 10 AI-route call
+      sites. `GET/PATCH /tenants/ai-config` extended with `byo_enabled/
+      byo_provider/byo_model/byo_api_key` (org_admin only; the key is never
+      returned once stored, only whether one exists). UI: provider picker +
+      key input added to the existing AI Features card in
+      `OrgAdminPanel.modern.tsx`.
+      **Caught and fixed one real bug during review**, before it shipped: a
+      pre-check in `field_govern.py`'s program-report background-job route
+      only checked the platform config, so a tenant with a fully valid BYO
+      key would have been wrongly told "AI not configured" before their job
+      ever got a chance to use it. Fixed to resolve BYO first, same as every
+      other call site.
+      9 standalone unit tests (`backend/tests/test_tenant_ai_key.py`) cover
+      every resolution branch without needing a DB — all pass. Full backend
+      suite re-run clean (26 passed, up from 17). Frontend type-checks clean.
 - [x] **Corrected the exact overclaim the audit named — done 2026-09-18.**
       `website/index.html:1143` said "Personal data does not leave the deployment
       region unless an organisation explicitly opts in" — false, since no per-org

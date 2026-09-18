@@ -476,20 +476,34 @@ def update_security_settings(
 
 class AiConfigUpdate(BaseModel):
     enabled: bool = True
+    byo_enabled: Optional[bool] = None
+    byo_provider: Optional[str] = None
+    # None = leave the stored key untouched; "" = clear it; non-empty = replace it.
+    # Never returned back to the client once stored (see get_ai_config).
+    byo_api_key: Optional[str] = None
+    byo_model: Optional[str] = None
 
 
 @router.get("/ai-config")
 def get_ai_config(user=Depends(get_current_user), db: Session = Depends(get_db)):
-    """Whether this org allows sending data to third-party AI providers
-    (org_admin only). Defaults true — see check_feature() in billing.py for
-    where this is enforced."""
+    """Whether this org allows sending data to third-party AI providers, and
+    whether they're using their own (BYO) API key instead of the platform's
+    shared one (org_admin only). Never returns the actual key value — only
+    whether one is stored. Defaults true for `enabled` — see check_feature()
+    in billing.py for where this is enforced."""
     if user["role"] not in ("master_admin", "org_admin"):
         raise HTTPException(403, "org_admin required")
     tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
     if not tenant:
         raise HTTPException(404, "Tenant not found")
     cfg = tenant.ai_config or {}
-    return {"enabled": cfg.get("enabled", True) is not False}
+    return {
+        "enabled": cfg.get("enabled", True) is not False,
+        "byo_enabled": bool(cfg.get("byo_enabled")),
+        "byo_provider": cfg.get("byo_provider", ""),
+        "byo_configured": bool(cfg.get("byo_api_key_encrypted")),
+        "byo_model": cfg.get("byo_model", ""),
+    }
 
 
 @router.patch("/ai-config")
@@ -498,8 +512,10 @@ def update_ai_config(
     user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Toggle whether this org's data may be sent to third-party AI providers
-    (org_admin only). Turning this off blocks every ai_* feature via
+    """Toggle whether this org's data may be sent to third-party AI providers,
+    and optionally configure a BYO (bring-your-own) API key so the org pays
+    its own provider directly instead of using the platform's shared key
+    (org_admin only). Turning `enabled` off blocks every ai_* feature via
     check_feature() regardless of plan tier."""
     if user["role"] not in ("master_admin", "org_admin"):
         raise HTTPException(403, "org_admin required")
@@ -509,9 +525,32 @@ def update_ai_config(
 
     existing = dict(tenant.ai_config or {})
     existing["enabled"] = body.enabled
+
+    if body.byo_enabled is not None:
+        existing["byo_enabled"] = body.byo_enabled
+    if body.byo_provider is not None:
+        from app.services.tenant_ai_key import BYO_PROVIDERS
+        if body.byo_provider and body.byo_provider not in BYO_PROVIDERS:
+            raise HTTPException(400, f"Unknown provider '{body.byo_provider}'. Must be one of: {', '.join(sorted(BYO_PROVIDERS))}")
+        existing["byo_provider"] = body.byo_provider
+    if body.byo_model is not None:
+        existing["byo_model"] = body.byo_model
+    if body.byo_api_key is not None:
+        if body.byo_api_key == "":
+            existing["byo_api_key_encrypted"] = ""
+        else:
+            from app.core.tenant_ai_crypto import encrypt_api_key
+            existing["byo_api_key_encrypted"] = encrypt_api_key(body.byo_api_key)
+
     tenant.ai_config = existing
     db.commit()
-    return {"enabled": body.enabled}
+    return {
+        "enabled": existing["enabled"],
+        "byo_enabled": bool(existing.get("byo_enabled")),
+        "byo_provider": existing.get("byo_provider", ""),
+        "byo_configured": bool(existing.get("byo_api_key_encrypted")),
+        "byo_model": existing.get("byo_model", ""),
+    }
 
 
 class FormSheetsSyncUpdate(BaseModel):

@@ -79,6 +79,14 @@ function SecurityTab() {
   const [aiEnabled, setAiEnabled] = useState(true)
   const [aiSaving, setAiSaving] = useState(false)
   const [aiSaved, setAiSaved] = useState(false)
+  const [byoEnabled, setByoEnabled] = useState(false)
+  const [byoProvider, setByoProvider] = useState('openai')
+  const [byoConfigured, setByoConfigured] = useState(false)
+  const [byoModel, setByoModel] = useState('')
+  const [byoApiKeyInput, setByoApiKeyInput] = useState('')
+  const [byoSaving, setByoSaving] = useState(false)
+  const [byoSaved, setByoSaved] = useState(false)
+  const [byoError, setByoError] = useState('')
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
@@ -95,7 +103,13 @@ function SecurityTab() {
       .catch(() => {})
       .finally(() => setLoading(false))
     api.get('/tenants/ai-config')
-      .then(({ data }) => setAiEnabled(data.enabled ?? true))
+      .then(({ data }) => {
+        setAiEnabled(data.enabled ?? true)
+        setByoEnabled(data.byo_enabled ?? false)
+        setByoProvider(data.byo_provider || 'openai')
+        setByoConfigured(data.byo_configured ?? false)
+        setByoModel(data.byo_model || '')
+      })
       .catch(() => {})
   }, [])
 
@@ -106,6 +120,34 @@ function SecurityTab() {
       setAiEnabled(data.enabled)
       setAiSaved(true); setTimeout(() => setAiSaved(false), 2000)
     } catch { } finally { setAiSaving(false) }
+  }
+
+  async function toggleByo() {
+    setByoSaving(true); setByoSaved(false); setByoError('')
+    try {
+      const { data } = await api.patch('/tenants/ai-config', { enabled: aiEnabled, byo_enabled: !byoEnabled })
+      setByoEnabled(data.byo_enabled)
+      setByoSaved(true); setTimeout(() => setByoSaved(false), 2000)
+    } catch (e: any) {
+      setByoError(e?.response?.data?.detail ?? 'Failed to update')
+    } finally { setByoSaving(false) }
+  }
+
+  async function saveByoKey() {
+    setByoSaving(true); setByoSaved(false); setByoError('')
+    try {
+      const { data } = await api.patch('/tenants/ai-config', {
+        enabled: aiEnabled,
+        byo_provider: byoProvider,
+        byo_model: byoModel,
+        byo_api_key: byoApiKeyInput,
+      })
+      setByoConfigured(data.byo_configured)
+      setByoApiKeyInput('')
+      setByoSaved(true); setTimeout(() => setByoSaved(false), 2000)
+    } catch (e: any) {
+      setByoError(e?.response?.data?.detail ?? 'Failed to save key')
+    } finally { setByoSaving(false) }
   }
 
   async function toggleQr() {
@@ -232,6 +274,80 @@ function SecurityTab() {
             </button>
           </div>
           {aiSaved && <p className="text-xs text-catalan-success mt-2">✓ Saved</p>}
+
+          {aiEnabled && (
+            <div className="mt-5 pt-5 border-t border-catalan-border">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-catalan-text">Use your own API key (BYO)</p>
+                <button
+                  onClick={toggleByo}
+                  disabled={byoSaving}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${byoEnabled ? 'bg-catalan-primary' : 'bg-catalan-border'} ${byoSaving ? 'opacity-50' : ''}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${byoEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+              <p className="text-xs text-catalan-textMuted mb-3">
+                Off: AI requests use the platform's shared key, billed on your plan. On: requests use
+                your own provider key below, billed directly to your account by that provider.
+              </p>
+              {byoEnabled && (
+                <div className="space-y-3 bg-catalan-bg border border-catalan-border rounded-xl p-4">
+                  <div>
+                    <label className="block text-xs font-medium text-catalan-textMuted uppercase tracking-wider mb-1.5">Provider</label>
+                    <select
+                      value={byoProvider}
+                      onChange={e => setByoProvider(e.target.value)}
+                      className="w-full bg-catalan-surface border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text outline-none focus:border-catalan-primary"
+                    >
+                      <option value="openai">OpenAI</option>
+                      <option value="anthropic">Anthropic (Claude)</option>
+                      <option value="gemini">Google Gemini</option>
+                      <option value="deepseek">DeepSeek</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-catalan-textMuted uppercase tracking-wider mb-1.5">Model (optional)</label>
+                    <input
+                      value={byoModel}
+                      onChange={e => setByoModel(e.target.value)}
+                      placeholder="Leave blank to use the provider's default"
+                      className="w-full bg-catalan-surface border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text outline-none focus:border-catalan-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-catalan-textMuted uppercase tracking-wider mb-1.5">
+                      API Key {byoConfigured && <span className="text-catalan-success normal-case">— a key is currently stored</span>}
+                    </label>
+                    <input
+                      type="password"
+                      value={byoApiKeyInput}
+                      onChange={e => setByoApiKeyInput(e.target.value)}
+                      placeholder={byoConfigured ? 'Enter a new key to replace the stored one' : 'sk-...'}
+                      className="w-full bg-catalan-surface border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text outline-none focus:border-catalan-primary"
+                    />
+                    <p className="text-xs text-catalan-textMuted mt-1">Stored encrypted. Never shown again after saving.</p>
+                  </div>
+                  {byoError && <p className="text-xs text-catalan-error">{byoError}</p>}
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={saveByoKey}
+                      disabled={byoSaving || !byoApiKeyInput}
+                      className="px-4 py-2 text-sm font-medium rounded-lg bg-catalan-primary text-white disabled:opacity-50"
+                    >
+                      {byoSaving ? 'Saving…' : 'Save key'}
+                    </button>
+                    {byoSaved && <span className="text-xs text-catalan-success">✓ Saved</span>}
+                  </div>
+                  {byoEnabled && !byoConfigured && (
+                    <p className="text-xs text-catalan-error">
+                      BYO is on but no key is saved yet — AI requests will fail until you save one.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Card>
 

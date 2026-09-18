@@ -42,9 +42,16 @@ def _get_global_ai_cfg(db: Session) -> dict:
 
 
 def _logged_cfg(db: Session, user: dict, feature: str) -> dict:
-    """Wrap _get_global_ai_cfg with usage-log context (writes one ai_usage_logs row per call)."""
+    """Resolve the org's own BYO AI key if configured and enabled, else the
+    platform's shared key — with usage-log context (writes one ai_usage_logs
+    row per call)."""
+    from app.services.tenant_ai_key import resolve_tenant_byo_cfg, TenantByoMisconfigured
+    try:
+        cfg = resolve_tenant_byo_cfg(db, user.get("tenant_id")) or _get_global_ai_cfg(db)
+    except TenantByoMisconfigured as e:
+        raise HTTPException(400, str(e))
     return ai_service.with_log(
-        _get_global_ai_cfg(db),
+        cfg,
         tenant_id=user.get("tenant_id"),
         user_id=user.get("sub"),
         feature=feature,
@@ -1855,7 +1862,12 @@ async def generate_program_report(
     if not prog:
         raise HTTPException(404, "Program not found")
 
-    if not _get_global_ai_cfg(db).get("api_key"):
+    from app.services.tenant_ai_key import resolve_tenant_byo_cfg, TenantByoMisconfigured
+    try:
+        _precheck_cfg = resolve_tenant_byo_cfg(db, user["tenant_id"]) or _get_global_ai_cfg(db)
+    except TenantByoMisconfigured as e:
+        raise HTTPException(400, str(e))
+    if not _precheck_cfg.get("api_key"):
         raise HTTPException(400, "AI not configured. Contact your platform administrator.")
 
     # Gather all DB data synchronously before returning job_id
