@@ -184,9 +184,32 @@ skipped by choice). Full detail in `tasks/pending_owner_action.md` §1.
       branch (`pre-squash-backup-2026-09-18`) was kept, never pushed — worth
       deciding whether to delete it now that the squash has been live and
       stable for a while.
-- [ ] Remove/rotate any other seed scripts, dev env templates from the public
-      branch; decide public vs private + add explicit licence/SECURITY.md
-      (business decision, not mine to make).
+- [x] **Licence added — done 2026-09-18.** New `LICENSE` file (proprietary,
+      All Rights Reserved) — appropriate since this is a commercial product,
+      not open source; an MIT/Apache licence would have wrongly granted
+      broad reuse rights. Left the exact legal-entity contact line as a
+      placeholder rather than fabricate one.
+- [x] **Repo stays public — explicit owner decision 2026-09-18, with real
+      infra learning along the way.** Attempted making the repo private.
+      Found and fixed one real risk first: the marketing site's GitHub
+      Pages deployment was classic branch-based (`docs/` on `main`), which
+      needs a paid GitHub plan once private — migrated it to Actions-based
+      deployment (`actions/deploy-pages`) and verified the live site first.
+      **That still wasn't enough** — flipping the repo private killed Pages
+      outright regardless of deployment method; Pages itself needs a paid
+      plan for a private repo on this account, full stop. Caught within
+      under 2 minutes (the live site returned 404), reverted to public,
+      re-created the Pages site, restored the custom domain (`cname` had
+      been cleared), and redeployed — verified `www.fieldgovern.com`,
+      `pricing.html`, and the app backend `/health` all back to 200 before
+      reporting. Given the choice (upgrade to GitHub Pro, move the
+      marketing site off Pages entirely, or stay public), owner chose to
+      stay public for now. The Actions-based Pages migration itself is a
+      genuine improvement kept regardless — it's the correct, modern setup
+      and removes ambiguity for whenever privacy is revisited.
+      Removing/rotating other seed-script credential patterns from the
+      public branch (separate from the licence/privacy decision above) —
+      not yet done, real follow-up.
 - [x] **App refuses to start on default JWT secret or open/unset CORS in what
       looks like production — done + verified 2026-09-18.** No existing
       `ENVIRONMENT` variable to key off, and adding one that prod's real `.env`
