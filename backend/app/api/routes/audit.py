@@ -1,7 +1,7 @@
 """Audit log read + CSV export endpoints."""
 import csv
 import io
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -9,9 +9,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, require_role
+from app.core.deps import require_role
 from app.models.audit_log import AuditLog
 from app.models.user import User
+from app.services.audit import verify_audit_chain, detect_anomalies
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 
@@ -31,7 +32,7 @@ def list_audit_log(
     offset: int = 0,
     action: Optional[str] = None,
     user_id: Optional[str] = None,
-    user=Depends(get_current_user),
+    user=Depends(require_role("org_admin", "supervisor")),
     db: Session = Depends(get_db),
 ):
     rows = _rows(db, user["tenant_id"], limit, offset, action, user_id)
@@ -90,3 +91,23 @@ def export_audit_log_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="audit_log_{now}.csv"'},
     )
+
+
+@router.get("/verify-chain")
+def verify_chain(
+    user=Depends(require_role("org_admin")),
+    db: Session = Depends(get_db),
+):
+    """Walk this tenant's audit-log hash chain and report whether it's intact."""
+    return verify_audit_chain(db, user["tenant_id"])
+
+
+@router.get("/anomalies")
+def list_anomalies(
+    since_hours: int = Query(24, le=24 * 30),
+    user=Depends(require_role("org_admin")),
+    db: Session = Depends(get_db),
+):
+    """Repeated failed logins + off-hours access in the given window (default 24h)."""
+    since = datetime.now(timezone.utc) - timedelta(hours=since_hours)
+    return detect_anomalies(db, user["tenant_id"], since=since)

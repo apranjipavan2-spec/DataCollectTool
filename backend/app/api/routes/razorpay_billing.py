@@ -27,7 +27,6 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.billing import Plan, Subscription, UsageRecord
 from app.models.tenant import Tenant
-from app.models.audit_log import AuditLog
 
 logger = logging.getLogger(__name__)
 
@@ -209,12 +208,13 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
         db.add(UsageRecord(tenant_id=tenant_id, period_year=now.year, period_month=now.month))
 
     # Audit
-    db.add(AuditLog(
-        tenant_id=tenant_id,
+    from app.services.audit import write_audit
+    write_audit(
+        db, tenant_id=tenant_id,
         action="subscription_activated_razorpay",
         resource="subscription",
         detail={"plan_id": plan_id, "amount_inr": amount_paise // 100, "billing_cycle": billing_cycle},
-    ))
+    )
     db.commit()
     logger.info("Razorpay: subscription activated for tenant %s plan %s", tenant_id_str, plan_id)
     return {"received": True}

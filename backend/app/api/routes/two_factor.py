@@ -24,7 +24,6 @@ from app.core.deps import get_current_user
 from app.core.security import create_access_token, create_refresh_token, decode_token
 from app.core.config import settings
 from app.models.user import User
-from app.models.audit_log import AuditLog
 
 router = APIRouter(prefix="/2fa", tags=["2fa"])
 
@@ -41,14 +40,11 @@ def _qr_data_url(uri: str) -> str:
 
 
 def _write_audit(db: Session, tenant_id, user_id, action: str, ip: str | None = None):
-    db.add(AuditLog(
-        tenant_id=tenant_id,
-        user_id=user_id,
-        action=action,
-        resource="user",
-        resource_id=str(user_id),
-        ip_address=ip,
-    ))
+    from app.services.audit import write_audit
+    write_audit(
+        db, tenant_id=tenant_id, user_id=user_id, action=action,
+        resource="user", resource_id=str(user_id), ip_address=ip,
+    )
     db.commit()
 
 

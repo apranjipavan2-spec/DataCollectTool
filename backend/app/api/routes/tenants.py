@@ -18,7 +18,6 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_role
-from app.models.audit_log import AuditLog
 from app.core.security import hash_password
 from app.core.plan_limits import PLAN_LIMITS, _limits_for, _limits_for_db
 from app.models.tenant import Tenant
@@ -278,12 +277,13 @@ def update_tenant(
     # When plan_tier changes, sync the Subscription row so both paths stay consistent
     if new_plan_tier and new_plan_tier != tenant.plan_tier:
         old_plan_tier = tenant.plan_tier
-        db.add(AuditLog(
-            tenant_id=tenant.id, user_id=_uuid.UUID(user["sub"]),
+        from app.services.audit import write_audit
+        write_audit(
+            db, tenant_id=tenant.id, user_id=_uuid.UUID(user["sub"]),
             action="master_admin_update_plan", resource="tenant", resource_id=str(tenant.id),
             detail={"before": old_plan_tier, "after": new_plan_tier},
             ip_address=request.client.host if request.client else None,
-        ))
+        )
         from app.models.billing import Subscription, Plan as BillingPlan
         unified_plan = db.query(BillingPlan).filter(
             BillingPlan.segment == "unified",

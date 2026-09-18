@@ -339,11 +339,79 @@ automated. Full detail in `tasks/pending_owner_action.md` §2.
 moving to an India region within days, same server rebuild as the disk-
 encryption fix above.
 
-### 11. Logs — `todo`
-Audit trail exists (append-only) but retention period + tamper-evidence not stated.
-Need: ≥1 year retention, hash-chained or write-once, stored in India; separate 180-day
-ICT log retention in India per CERT-In; NIC/NPL NTP clock sync; alerting on anomalies
-(mass export, off-hours access, repeated failed logins).
+### 11. Logs — `in-progress` (tamper-evidence + anomaly alerts built + verified)
+- [x] **Tamper-evident hash chain — done 2026-09-18.** New
+      `backend/app/services/audit.py`: `write_audit()` is now the single
+      correct way to write an `AuditLog` row — every one of the 6
+      pre-existing direct `AuditLog(...)` constructions across
+      `admin_monitor.py`, `razorpay_billing.py`, `submissions.py`,
+      `tenants.py`, and `two_factor.py` (via its existing `_write_audit`
+      wrapper, signature unchanged) was converted to call it instead; grep
+      confirms zero direct constructions remain outside `audit.py` itself.
+      Each row's `row_hash` (migration `0057`, patched into `seed_dev.py` +
+      `wait_and_stamp.py` per repo convention) is a SHA-256 over the row's
+      own content **plus** the immediately-preceding row's hash, scoped
+      per-tenant — editing or deleting any historical row breaks every
+      later row's hash. `verify_audit_chain(db, tenant_id)` walks the chain
+      and reports `{valid, checked, skipped_unchained, broken_at_id, reason}`;
+      rows written before this migration (`row_hash IS NULL`) are skipped,
+      not falsely flagged as tampered — there's no way to retroactively
+      prove their original content, so verification honestly only covers
+      what's written from here on.
+- [x] **Anomaly detection (2 of 3 named patterns) — done 2026-09-18.**
+      `detect_anomalies(db, tenant_id, since=None)` flags
+      `repeated_failed_logins` (≥5 failures for one user within a rolling
+      30-minute window — sliding, so a burst spanning a bucket boundary is
+      still caught) and `off_hours_access` (successful password checks
+      23:00–06:00 IST). This required a prerequisite fix: **failed logins
+      and successful password checks were never logged at all** before this
+      change — `auth.py`'s `login()` now logs `login_failed` (only when an
+      active user was found but the password was wrong — no tenant to
+      scope an unknown identifier to) and `login_password_verified`
+      (deliberately not "login_success" — logged before any 2FA branch,
+      since a correct password at 2 AM is a meaningful signal regardless of
+      whether 2FA later blocks the session; inline comment documents that
+      logging the fully-completed post-2FA session would need instrumenting
+      `two_factor.py`'s confirm endpoint too, flagged as follow-up, not done).
+- [x] **RBAC gap fixed in passing:** `GET /audit/` had no role restriction —
+      any authenticated user, including `enumerator`, could read the full
+      tenant audit log (IP addresses, action detail). Found while working
+      this item, fixed in the same file rather than deferred: now
+      `require_role("org_admin", "supervisor")`, matching the existing
+      `export.csv` endpoint's `org_admin`-only gate one function below it.
+- [x] **Both functions exposed via API** — `GET /audit/verify-chain` and
+      `GET /audit/anomalies?since_hours=` (default 24, capped at 30 days),
+      both `org_admin`-only, added to the existing `audit.py` router.
+- [x] **Verified:** `audit.py`'s own `__main__` self-check (hand-rolled fake
+      DB, no real DB needed) covers chain creation, hash uniqueness, tamper
+      detection via content mutation, tamper detection via `prev_hash`
+      mutation, correct skip-behaviour for pre-chain legacy rows, and (added
+      this pass) `detect_anomalies` — 5 failed logins in-window flagged with
+      the right count, an off-hours login flagged, a normal daytime login
+      NOT flagged. Ran clean: `audit self-check: OK`. New
+      `backend/tests/test_audit.py` (6 DB-integration cases: chain validity,
+      tamper detection, legacy-row skipping, repeated-failed-logins,
+      daytime-not-flagged) collects cleanly, skips without a test DB
+      (consistent with every other DB-backed test this session). Full
+      backend suite re-run clean: 33 passed, 76 skipped, 0 failed — no
+      regressions. All 9 modified/new files pass `py_compile`.
+- [ ] **Real gap, not fixed: "mass export."** The third named anomaly
+      pattern has no underlying data — no export route (~9 of them) writes
+      an audit entry today. Instrumenting all of them is separate, sizeable
+      follow-up work; intentionally not half-built against data that
+      doesn't exist.
+- [ ] **Not fixed: ≥1 year retention enforcement.** Nothing currently prunes
+      `audit_log` — it grows unbounded, which technically satisfies "≥1
+      year" but doesn't enforce or bound it. No deletion-after-N-years job
+      exists.
+- [ ] **Not fixed: India-region storage for logs**, and **separate 180-day
+      ICT log retention per CERT-In** — both ops/infrastructure-level
+      requirements tied to the same server-region decision already tracked
+      in item 10 (owner committed to an India-region rebuild "in a couple
+      of days" as of 2026-09-18) and `tasks/pending_owner_action.md`, not
+      something this code change addresses.
+- [ ] **Not fixed: NIC/NPL NTP clock sync** — ops-level server config, not
+      verified either way this pass; flagged as open.
 
 ### 12. Breach response — `todo`
 Written incident-response plan: roles, severity levels, contact lists. Timelines: CERT-In

@@ -15,3 +15,7 @@ class AuditLog(Base):
     detail      = Column(JSONB, default=dict, server_default=text("'{}'::jsonb"))
     ip_address  = Column(String(45), nullable=True)
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
+    # Tamper-evidence (migration 0057) — set only by app.services.audit.write_audit();
+    # rows from before that migration have both NULL (see that module's docstring).
+    row_hash    = Column(String(64), nullable=True)
+    prev_hash   = Column(String(64), nullable=True)

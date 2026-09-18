@@ -1485,13 +1485,13 @@ def anonymize_submission(
     sub.gps_open = None
     sub.gps_submit = None
 
-    from app.models.audit_log import AuditLog
-    db.add(AuditLog(
-        tenant_id=user["tenant_id"], user_id=user.get("sub"),
+    from app.services.audit import write_audit
+    write_audit(
+        db, tenant_id=user["tenant_id"], user_id=user.get("sub"),
         action="submission_anonymized", resource="submission", resource_id=str(sub.id),
         detail={"media_files_deleted": deleted_count, "media_delete_errors": delete_errors},
         ip_address=request.client.host if request.client else None,
-    ))
+    )
     db.commit()
     return {
         "id": str(sub.id), "status": "anonymized",

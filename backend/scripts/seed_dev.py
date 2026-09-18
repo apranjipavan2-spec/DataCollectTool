@@ -198,6 +198,10 @@ _PATCHES = [
     "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS is_minor BOOLEAN NOT NULL DEFAULT FALSE",
     "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS guardian_consent_given BOOLEAN",
     "CREATE INDEX IF NOT EXISTS ix_submissions_is_minor ON submissions (is_minor)",
+    # 0057 — audit_log tamper-evident hash chain
+    "ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS row_hash VARCHAR(64)",
+    "ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS prev_hash VARCHAR(64)",
+    "CREATE INDEX IF NOT EXISTS ix_audit_log_tenant_id_id ON audit_log (tenant_id, id)",
 ]
 
 # 0048 — restricted runtime role + empty-context-bypass RLS policies. Mirrors the

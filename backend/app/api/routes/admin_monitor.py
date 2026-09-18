@@ -10,7 +10,6 @@ import uuid as _uuid
 from app.core.database import get_db
 from app.core.deps import require_master_admin
 from app.core.security import hash_password
-from app.models.audit_log import AuditLog
 from app.models.tenant import Tenant
 from app.models.form import Form
 from app.models.program import Program, ProgramQuestionnaire
@@ -245,12 +244,13 @@ def update_tenant_user(
         target.is_active = body.is_active; changed["is_active"] = target.is_active
 
     if changed:
-        db.add(AuditLog(
-            tenant_id=target.tenant_id, user_id=_uuid.UUID(user["sub"]),
+        from app.services.audit import write_audit
+        write_audit(
+            db, tenant_id=target.tenant_id, user_id=_uuid.UUID(user["sub"]),
             action="master_admin_update_user", resource="user", resource_id=str(target.id),
             detail={"changed_fields": list(changed.keys()), "before": before, "after": changed},
             ip_address=request.client.host if request.client else None,
-        ))
+        )
         db.commit()
         db.refresh(target)
 
@@ -272,12 +272,13 @@ def reset_tenant_user_password(
         raise HTTPException(422, "Password must be at least 6 characters")
 
     target.password_hash = hash_password(body.new_password)
-    db.add(AuditLog(
-        tenant_id=target.tenant_id, user_id=_uuid.UUID(user["sub"]),
+    from app.services.audit import write_audit
+    write_audit(
+        db, tenant_id=target.tenant_id, user_id=_uuid.UUID(user["sub"]),
         action="master_admin_reset_password", resource="user", resource_id=str(target.id),
         detail={},  # deliberately no password material, not even a hash
         ip_address=request.client.host if request.client else None,
-    ))
+    )
     db.commit()
     return {"ok": True}
 

@@ -172,6 +172,20 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     # never log into another. Deactivation is what frees the phone for another org.
     user = db.query(User).filter(match, User.is_active == True).first()
     if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
+        # A real active account exists for this identifier but the password was
+        # wrong — log it (scoped to that account's tenant) so repeated attempts
+        # against a specific account are detectable. An identifier matching no
+        # account at all isn't logged here — there's no tenant to scope it to,
+        # and it's a different, lower-signal case (an unknown-number scan, not
+        # an attack on a real account).
+        if user:
+            from app.services.audit import write_audit
+            write_audit(
+                db, tenant_id=user.tenant_id, user_id=user.id, action="login_failed",
+                resource="user", resource_id=str(user.id),
+                ip_address=request.client.host if request.client else None,
+            )
+            db.commit()
         # No ACTIVE account accepted these credentials. If a DEACTIVATED account
         # matches the password, say so plainly instead of a misleading "invalid
         # credentials" — that's exactly the "you were deactivated from that org"
@@ -184,6 +198,20 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
                     detail="Your account has been deactivated by your organization's admin. Ask them to reactivate it, or to add you if you have moved organizations.",
                 )
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # "password_verified", not "login_success" — this fires here whether or not
+    # a 2FA challenge follows below, since it's still a genuine signal worth
+    # having (a correct password at 3am is worth flagging regardless of
+    # whether 2FA then blocks the attempt). Logging the FULL session-issued
+    # moment would also need instrumenting the separate 2FA-confirm endpoints
+    # — a reasonable follow-up, not done here.
+    from app.services.audit import write_audit
+    write_audit(
+        db, tenant_id=user.tenant_id, user_id=user.id, action="login_password_verified",
+        resource="user", resource_id=str(user.id),
+        ip_address=request.client.host if request.client else None,
+    )
+    db.commit()
 
     # User-level TOTP 2FA check (takes priority over tenant OTP flow)
     if getattr(user, "totp_enabled", False) and getattr(user, "totp_secret", None):
