@@ -22,6 +22,8 @@ router = APIRouter()
 
 OTP_EXPIRE_MINUTES = 10
 RESET_TOKEN_EXPIRE_MINUTES = 60
+LOCKOUT_THRESHOLD = 5   # matches audit.py's FAILED_LOGIN_THRESHOLD — same signal, two consumers
+LOCKOUT_MINUTES = 15
 
 
 def _mask_email(email: str) -> str:
@@ -171,6 +173,18 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     # login deterministically resolves to that org — a user active in one org can
     # never log into another. Deactivation is what frees the phone for another org.
     user = db.query(User).filter(match, User.is_active == True).first()
+
+    # Account lockout: check BEFORE attempting password verification — skips
+    # the bcrypt compute (cheap defense against a locked account being used
+    # as a hash-timing oracle) and gives a clear, distinct error rather than
+    # a generic "invalid credentials" that would mask the real cause.
+    if user and user.locked_until and user.locked_until > datetime.now(timezone.utc):
+        remaining_min = max(1, int((user.locked_until - datetime.now(timezone.utc)).total_seconds() // 60) + 1)
+        raise HTTPException(
+            status_code=423,
+            detail=f"Too many failed login attempts. Try again in {remaining_min} minute(s).",
+        )
+
     if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
         # A real active account exists for this identifier but the password was
         # wrong — log it (scoped to that account's tenant) so repeated attempts
@@ -185,6 +199,9 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
                 resource="user", resource_id=str(user.id),
                 ip_address=request.client.host if request.client else None,
             )
+            user.failed_login_count = (user.failed_login_count or 0) + 1
+            if user.failed_login_count >= LOCKOUT_THRESHOLD:
+                user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
             db.commit()
         # No ACTIVE account accepted these credentials. If a DEACTIVATED account
         # matches the password, say so plainly instead of a misleading "invalid
@@ -211,6 +228,9 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
         resource="user", resource_id=str(user.id),
         ip_address=request.client.host if request.client else None,
     )
+    if user.failed_login_count or user.locked_until:
+        user.failed_login_count = 0
+        user.locked_until = None
     db.commit()
 
     # User-level TOTP 2FA check (takes priority over tenant OTP flow)
@@ -224,7 +244,9 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     from app.models.billing import Subscription, Plan as BillingPlan
     tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
     cfg = (tenant.notification_config or {}) if tenant else {}
-    if cfg.get("two_fa_enabled", False):
+    required_roles = cfg.get("two_fa_required_roles") or []
+    two_fa_applies_to_user = cfg.get("two_fa_enabled", False) and (not required_roles or user.role in required_roles)
+    if two_fa_applies_to_user:
         sub = (
             db.query(Subscription)
             .filter(Subscription.tenant_id == user.tenant_id)

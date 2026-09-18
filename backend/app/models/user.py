@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, func, Text
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, func, Text, Integer
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from app.core.database import Base
@@ -26,3 +26,6 @@ class User(Base):
     # TOTP 2FA — added in migration 0038
     totp_secret  = Column(String(64), nullable=True)
     totp_enabled = Column(Boolean, default=False, server_default='false')
+    # Login lockout — added in migration 0060
+    failed_login_count = Column(Integer, nullable=False, default=0, server_default='0')
+    locked_until = Column(DateTime(timezone=True), nullable=True)

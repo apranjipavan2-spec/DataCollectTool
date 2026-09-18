@@ -927,13 +927,72 @@ resubmission (note: duplicate-resubmission UX already has a guard — see `tasks
       code) before calling this `verified`. Still not *mandatory* — a user can
       choose not to enable it; making it required for admins/supervisors is
       the remaining sub-item below.
-- [ ] Make MFA mandatory for admins/supervisors (currently opt-in per user).
-- [ ] SSO (SAML/OIDC) for enterprise/government customers.
-- [ ] Short-lived access tokens + refresh-token rotation + server-side revocation;
-      session timeouts; login rate limiting + lockout.
-- [ ] Least-privilege roles including an analysis-only role without identifier
-      access. FieldGovern staff access to customer data only with customer
-      approval, time-limited, and logged.
+- [x] **MFA-mandatory — mostly already existed, found + completed the
+      missing piece, 2026-09-18.** This bullet's own framing ("currently
+      opt-in per user") turned out to be wrong — checked before building
+      anything and found a **whole separate, already-working mandatory-MFA
+      system**: `tenant.notification_config.two_fa_enabled` already forces
+      email-OTP 2FA for every user in the tenant at login
+      (`auth.py`'s `login()`, gated by a plan feature flag), toggled via
+      the existing Security tab. What was actually missing was
+      **role-scoping** — it was all-or-nothing (every role or none). Added
+      `two_fa_required_roles` (empty = everyone, unchanged default
+      behavior) to `SecuritySettingsUpdate`, `GET/PATCH /tenants/security`,
+      and `login()`'s enforcement check, plus checkboxes in the Security
+      tab to scope it to org_admin/supervisor/enumerator individually — so
+      "mandatory for admins/supervisors" (the literal ask) is now directly
+      settable without forcing OTP friction onto enumerators too.
+- [x] **Login lockout — done 2026-09-18.** Rate limiting on the login
+      endpoint already existed (slowapi, 5/minute) but that's per-IP
+      request throttling, not per-account lockout — a distributed attempt
+      pattern or a shared-IP office would sail through it. Added real
+      per-account lockout: new `users.failed_login_count`/`locked_until`
+      columns (migration `0060`); 5 failed attempts (same threshold
+      `audit.py`'s anomaly detector already uses, for one consistent
+      signal) locks the account for 15 minutes; the lock is checked
+      **before** attempting password verification (skips the bcrypt
+      compute, avoids a timing oracle, gives a clear "try again in N
+      minutes" 423 instead of a misleading "invalid credentials"); the
+      counter resets to zero on the next successful password verification.
+      3 pytest cases (`backend/tests/test_login_lockout.py`): locks after
+      threshold (even the correct password is rejected once locked),
+      successful login resets the counter, an unlocked account behaves
+      normally — collect cleanly, skip without a test DB (consistent with
+      every DB-dependent test this session).
+- [x] **Real finding, flagged not silently fixed: access tokens never
+      expire by default.** `JWT_EXPIRE_MINUTES=0` (session ends only on
+      explicit logout) — directly against "short-lived access tokens."
+      Confirmed the reason this is now safe to change: `frontend/src/lib/
+      api.ts` already has a working silent-refresh interceptor, and
+      `POST /auth/refresh` already rotates the refresh token on every use
+      (both preconditions for short-lived tokens working smoothly were
+      already true, just not switched on). **Deliberately not flipped by
+      this pass** — it's a config-only change affecting every currently
+      active session on a live app with field enumerators mid-collection;
+      recommendation + exact steps + a post-change verification checklist
+      written to `tasks/pending_owner_action.md` §6, same pattern used for
+      the tenant-isolation activation.
+- [x] **Verified:** `py_compile` clean on all 6 touched/new backend files;
+      `app.api.router` actually imported (302 routes, no runtime import
+      errors); `npx tsc --noEmit` clean; `npm run build` succeeds. Full
+      pytest suite: 60 passed / 79 skipped / 0 failed (up from 60 passed /
+      76 skipped — 3 new lockout tests collected, all DB-dependent tests
+      still skip cleanly in this environment).
+- [ ] **Not done: SSO (SAML/OIDC).** Genuinely substantial, separate
+      integration work — not attempted this pass.
+- [ ] **Not done: server-side token revocation.** Refresh-token *rotation*
+      exists (confirmed above); actual server-side revocation (a token
+      blacklist/version so a specific stolen token can be invalidated
+      before its natural expiry) does not. Real gap, needs a revocation
+      store (Redis, already in the stack, would be the natural fit) —
+      sizeable enough to be its own follow-up rather than bolted on here.
+- [ ] **Not done: least-privilege analysis-only role.** A role with
+      submission-read access but `is_identifier` fields always redacted
+      (reusing `pii_redact.redact_row()`, which already exists for exactly
+      this shape of problem) is a clean, buildable scope — flagged as a
+      real, sizeable-enough-to-be-separate follow-up rather than squeezed
+      into this pass. FieldGovern-staff-access-with-customer-approval is a
+      process/contractual control, not something to fake in code.
 
 ---
 

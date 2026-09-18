@@ -72,6 +72,7 @@ export default function OrgAdminPanel() {
 function SecurityTab() {
   const [qrEnabled,    setQrEnabled]    = useState(false)
   const [twoFaEnabled, setTwoFaEnabled] = useState(false)
+  const [twoFaRoles, setTwoFaRoles] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
@@ -104,6 +105,7 @@ function SecurityTab() {
       .then(({ data }) => {
         setQrEnabled(data.qr_login_enabled ?? false)
         setTwoFaEnabled(data.two_fa_enabled ?? false)
+        setTwoFaRoles(data.two_fa_required_roles ?? [])
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -158,7 +160,7 @@ function SecurityTab() {
   async function toggleQr() {
     setSaving(true); setSaved(false)
     try {
-      const { data } = await api.patch('/tenants/security', { qr_login_enabled: !qrEnabled, two_fa_enabled: twoFaEnabled })
+      const { data } = await api.patch('/tenants/security', { qr_login_enabled: !qrEnabled, two_fa_enabled: twoFaEnabled, two_fa_required_roles: twoFaRoles })
       setQrEnabled(data.qr_login_enabled)
       setSaved(true); setTimeout(() => setSaved(false), 2000)
     } catch { } finally { setSaving(false) }
@@ -168,8 +170,21 @@ function SecurityTab() {
     setTwoFaError('')
     setSaving(true)
     try {
-      const { data } = await api.patch('/tenants/security', { qr_login_enabled: qrEnabled, two_fa_enabled: !twoFaEnabled })
+      const { data } = await api.patch('/tenants/security', { qr_login_enabled: qrEnabled, two_fa_enabled: !twoFaEnabled, two_fa_required_roles: twoFaRoles })
       setTwoFaEnabled(data.two_fa_enabled)
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch (e: any) {
+      setTwoFaError(e?.response?.data?.detail ?? 'Failed to update 2FA setting')
+    } finally { setSaving(false) }
+  }
+
+  async function toggleTwoFaRole(role: string) {
+    const next = twoFaRoles.includes(role) ? twoFaRoles.filter(r => r !== role) : [...twoFaRoles, role]
+    setTwoFaError('')
+    setSaving(true)
+    try {
+      const { data } = await api.patch('/tenants/security', { qr_login_enabled: qrEnabled, two_fa_enabled: twoFaEnabled, two_fa_required_roles: next })
+      setTwoFaRoles(data.two_fa_required_roles ?? [])
       setSaved(true); setTimeout(() => setSaved(false), 2000)
     } catch (e: any) {
       setTwoFaError(e?.response?.data?.detail ?? 'Failed to update 2FA setting')
@@ -273,6 +288,25 @@ function SecurityTab() {
                 <a href="/subscription" className="underline ml-1 font-semibold">Upgrade →</a>
               )}
             </p>
+          )}
+          {twoFaEnabled && (
+            <div className="mt-3 p-3 bg-catalan-bg border border-catalan-border rounded-xl">
+              <p className="text-xs font-medium text-catalan-text mb-2">Require for these roles only (leave all unchecked to require for everyone)</p>
+              <div className="flex gap-4 flex-wrap">
+                {['org_admin', 'supervisor', 'enumerator'].map(role => (
+                  <label key={role} className="flex items-center gap-1.5 text-xs text-catalan-text cursor-pointer capitalize">
+                    <input
+                      type="checkbox"
+                      checked={twoFaRoles.includes(role)}
+                      onChange={() => toggleTwoFaRole(role)}
+                      disabled={saving}
+                      className="w-3.5 h-3.5 accent-catalan-primary"
+                    />
+                    {role.replace('_', ' ')}
+                  </label>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </Card>

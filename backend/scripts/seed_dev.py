@@ -226,6 +226,9 @@ _PATCHES = [
     "CREATE INDEX IF NOT EXISTS ix_data_rights_requests_tenant_id ON data_rights_requests (tenant_id)",
     "CREATE INDEX IF NOT EXISTS ix_data_rights_requests_status ON data_rights_requests (tenant_id, status)",
     "CREATE INDEX IF NOT EXISTS ix_data_rights_requests_sla_due_at ON data_rights_requests (sla_due_at)",
+    # 0060 — login lockout (failed_login_count / locked_until on users)
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_count INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ",
 ]
 
 # 0048 — restricted runtime role + empty-context-bypass RLS policies. Mirrors the

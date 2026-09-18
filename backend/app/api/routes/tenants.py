@@ -424,6 +424,7 @@ def update_notification_config(
 class SecuritySettingsUpdate(BaseModel):
     qr_login_enabled: bool = False
     two_fa_enabled: bool = False
+    two_fa_required_roles: Optional[list[str]] = None   # None/empty = every role (current all-or-nothing behavior)
 
 
 @router.get("/security")
@@ -438,6 +439,7 @@ def get_security_settings(user=Depends(get_current_user), db: Session = Depends(
     return {
         "qr_login_enabled": bool(cfg.get("qr_login_enabled", False)),
         "two_fa_enabled": bool(cfg.get("two_fa_enabled", False)),
+        "two_fa_required_roles": cfg.get("two_fa_required_roles") or [],
     }
 
 
@@ -469,9 +471,14 @@ def update_security_settings(
     existing = dict(tenant.notification_config or {})
     existing["qr_login_enabled"] = body.qr_login_enabled
     existing["two_fa_enabled"] = body.two_fa_enabled
+    existing["two_fa_required_roles"] = body.two_fa_required_roles or []
     tenant.notification_config = existing
     db.commit()
-    return {"qr_login_enabled": body.qr_login_enabled, "two_fa_enabled": body.two_fa_enabled}
+    return {
+        "qr_login_enabled": body.qr_login_enabled,
+        "two_fa_enabled": body.two_fa_enabled,
+        "two_fa_required_roles": existing["two_fa_required_roles"],
+    }
 
 
 class AiConfigUpdate(BaseModel):

@@ -96,6 +96,28 @@ pending with an owner-committed timeline, not an open decision to make.
 - [ ] Confirm: stay on ONE server + multi-tenant DB (recommended). Per-client
       DB/VDS only for a future enterprise client who requires and pays for it.
 
+## 6. Short-lived access tokens — recommended, now safe (2026-09-18)
+`JWT_EXPIRE_MINUTES` defaults to `0` (access tokens never expire — the
+session only ends on explicit logout). This is a real gap against item 16 of
+`tasks/dpdp_master_plan.md` ("short-lived access tokens + refresh rotation").
+It was very likely set to 0 deliberately at some point to work around a real
+incident (the Analyzer/Cleaner tools losing autosaved work when a 2-hour
+token silently expired with no refresh) — but that failure mode is now fixed:
+`frontend/src/lib/api.ts` has a working silent-refresh interceptor (401 →
+exchange the stored refresh token → retry), and the refresh endpoint already
+rotates the refresh token on every use.
+
+**Recommendation:** set `JWT_EXPIRE_MINUTES=120` (2 hours) in the server's
+`.env` and redeploy. This is a config-only change (no code change needed —
+`security.py` already branches on this value). Not done automatically here
+because it changes behavior for every currently-active session on a live
+app with real field enumerators mid-collection — worth a deliberate choice
+and a quiet-hours deploy window, not a silent flip. After changing it, spot-
+check: log in fresh, wait past the expiry window, confirm the app keeps
+working without forcing a re-login (the interceptor should handle it
+invisibly) — and separately confirm TableForge/Cleaner tool sessions
+survive the same way, since they read the same `fp_refresh_token`.
+
 ---
 
 ## Decision waiting on you now
