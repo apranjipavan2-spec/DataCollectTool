@@ -54,6 +54,8 @@ export interface FormField {
   hint?: string
   required?: boolean
   is_identifier?: boolean      // part of the composite "respondent identifier" key used for duplicate detection
+  is_dob_for_screening?: boolean   // date field: respondent's DOB, used to auto-flag under-18 submissions
+  is_guardian_consent?: boolean    // this field's answer is the guardian's consent (a truthy answer = consent given)
   options?: FieldOption[]      // for single_choice / multiple_choice
   min?: number                 // number / decimal / rating
   max?: number

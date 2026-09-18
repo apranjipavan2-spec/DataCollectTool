@@ -314,6 +314,11 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
                 data_for_storage["_location_block"]    = _loc.block or ""
                 data_for_storage["_location_village"]  = _loc.village or ""
 
+        from app.services.child_protection import compute_child_protection_status
+        child_status = compute_child_protection_status(
+            form_obj_for_val.json_schema if form_obj_for_val else None, data_for_storage
+        )
+
         sub = Submission(
             tenant_id=user["tenant_id"],
             form_id=item.form_id,
@@ -332,6 +337,8 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
             consent_given=item.consent_given if item.consent_given is not None else True,
             consent_timestamp=consent_ts,
             roster_id=roster_id,
+            is_minor=child_status["is_minor"],
+            guardian_consent_given=child_status["guardian_consent_given"],
         )
         db.add(sub)
         db.flush()  # get sub.id before commit

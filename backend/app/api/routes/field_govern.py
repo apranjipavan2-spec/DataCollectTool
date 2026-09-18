@@ -1393,6 +1393,7 @@ async def _run_ai_generation(
         subs = db.query(Submission).filter(
             Submission.program_id == program_id,
             Submission.tenant_id == tenant_id,
+            Submission.is_minor == False,  # noqa: E712 — children's data never enters an AI call
         ).all()
 
         # Build enriched column headers (categorical cols include values_seen)

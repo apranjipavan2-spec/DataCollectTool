@@ -820,6 +820,43 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
         </p>
       )}
 
+      {/* Child-protection: date-of-birth screening field */}
+      {field.type === 'date' && (
+        <div className={`${groupCls} flex items-center gap-3`}>
+          <button
+            onClick={() => onChange({ is_dob_for_screening: !field.is_dob_for_screening })}
+            className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none ${field.is_dob_for_screening ? 'bg-catalan-primary' : 'bg-catalan-hover border border-catalan-border'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${field.is_dob_for_screening ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+          <span className="text-sm text-catalan-text">Use as Age-Screening Date of Birth</span>
+        </div>
+      )}
+      {field.is_dob_for_screening && (
+        <p className="text-xs text-catalan-textMuted -mt-2 mb-2">
+          Submissions where this date makes the respondent under 18 are automatically flagged: hidden from
+          enumerators' own submission lists, excluded from AI reports, and require a guardian-consent field
+          (add one below with "Use as Guardian Consent" on, gated by skip logic on this field's age).
+        </p>
+      )}
+
+      {/* Child-protection: guardian consent field */}
+      <div className={`${groupCls} flex items-center gap-3`}>
+        <button
+          onClick={() => onChange({ is_guardian_consent: !field.is_guardian_consent })}
+          className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none ${field.is_guardian_consent ? 'bg-catalan-primary' : 'bg-catalan-hover border border-catalan-border'}`}
+        >
+          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${field.is_guardian_consent ? 'translate-x-5' : 'translate-x-0'}`} />
+        </button>
+        <span className="text-sm text-catalan-text">Use as Guardian Consent</span>
+      </div>
+      {field.is_guardian_consent && (
+        <p className="text-xs text-catalan-textMuted -mt-2 mb-2">
+          A "Yes"/affirmative answer here is recorded as guardian consent for a minor respondent. Add skip
+          logic so this only appears when the DOB field's age is under 18 (age_lt operator).
+        </p>
+      )}
+
       {/* Date / Time — auto-fill with current date/time */}
       {(field.type === 'date' || field.type === 'time') && (
         <div className={`${groupCls} flex items-center gap-3`}>

@@ -311,11 +311,60 @@ report ≤6h, customer notice ≤24h (so they can meet their own obligations), B
 report ≤72h. Pre-drafted notification templates, forensic log preservation, tabletop
 exercise twice a year.
 
-### 13. Children & vulnerable groups — `todo`
-Age-screening question at form start; guardian identity + consent required under 18.
-Flag and extra-protect child records: restrict access, disable AI processing by default,
-no photos without specific guardian consent. Guardian-consent option for persons with
-disability.
+### 13. Children & vulnerable groups — `in-progress` (core built + verified)
+- [x] **Age-screening + guardian consent + flag/restrict — done 2026-09-18.**
+      Found the age-check mechanism (`age_gte`/`age_lt` skip-logic operators) already
+      existed in the form schema/renderer — no new client-side gating code needed.
+      Built the missing piece: two new opt-in `FormField` flags,
+      `is_dob_for_screening` and `is_guardian_consent` (exact same UI/toggle pattern
+      as the existing `is_identifier` flag — `FieldEditor.tsx`), so a form builder
+      marks which date field is the DOB and which field captures guardian consent.
+      New `backend/app/services/child_protection.py`
+      (`compute_child_protection_status`) — pure function, form schema + answers in,
+      `{is_minor, guardian_consent_given}` out — wired into **both** submission
+      write paths (`POST /submissions/` and `POST /sync/push`, the two independent
+      code paths that construct `Submission` rows). New columns
+      `Submission.is_minor` / `guardian_consent_given` (migration `0056`, patched
+      into `seed_dev.py` + `wait_and_stamp.py` per repo convention).
+      **Enforcement, not just storage** — two real consumers wired: (1)
+      `GET /submissions/` hides `is_minor=True` rows by default for every role,
+      and **unconditionally** for `enumerator` regardless of any query param
+      (can't be bypassed via `ids=`) — `org_admin`/`supervisor`/`master_admin` can
+      opt in via `include_minors=true`, same pattern as the existing
+      `duplicate_only` filter; (2) the two direct AI-facing submission queries
+      (`ai.py generate_report`, `field_govern.py _run_ai_generation`) now filter
+      `is_minor == False` — a flagged submission's data can never reach either AI
+      report-writing path. Checked every other `Submission` query in
+      `field_govern.py` individually before deciding what to touch — one
+      (`refresh_analysis`) is explicitly non-AI per its own docstring, correctly
+      left alone; `get_cleaner_data` feeds a general human-editable data view, not
+      only AI, so filtering there would wrongly hide minors' records from
+      legitimate manual (non-AI) correction — left alone, flagged as a real
+      follow-up gap below instead of overreaching.
+      Self-check (`child_protection.py`'s own `__main__` block, 9 cases) caught a
+      real bug before shipping: `guardian_consent_given` was defaulting to `False`
+      instead of `None` for adult respondents whose form never showed the consent
+      question — fixed to only evaluate consent when `is_minor` is actually `True`.
+      Pytest suite `backend/tests/test_child_protection.py`: 4 pure-logic cases
+      pass standalone (no DB needed); 4 end-to-end cases (submission creation via
+      HTTP, list-visibility for enumerator/org_admin with/without `include_minors`)
+      collect cleanly but could not run end-to-end here (no test DB in this
+      environment, consistent with every other DB-backed test this session).
+      Full backend suite re-run clean (30 passed, up from 26). Frontend
+      type-checks clean.
+- [ ] **Real follow-up gap, not yet fixed:** the DataCleaner AI-suggestion path
+      (`tools/datacleaner`, a separate microservice operating on arbitrary
+      uploaded datasets) has no concept of `is_minor` at all — plumbing that flag
+      through from FieldGovern to a raw uploaded CSV/Excel dataset is a
+      genuinely separate piece of work, not done in this pass.
+- [ ] Guardian-consent option for persons with disability — not built; the
+      guardian-consent mechanism above is framed around age/minors specifically,
+      not yet generalised to a disability-related guardian flow.
+- [ ] "No photos without specific guardian consent" — achievable today by a form
+      builder using existing skip logic (gate the photo field's visibility on the
+      guardian-consent field), but not enforced/validated server-side as an
+      invariant — an admin has to configure it correctly, nothing stops a
+      misconfigured form from allowing a photo without consent.
 
 ### 14. Processor contract — `todo`
 Publish a DPA template, sub-processor list, and a deletion-certificate process for when a

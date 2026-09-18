@@ -194,6 +194,10 @@ _PATCHES = [
         f"CREATE INDEX IF NOT EXISTS ix_{t}_deleted_at ON {t} (deleted_at)"
         for t in ("submissions", "submission_drafts", "push_subscriptions")
     ],
+    # 0056 — children's-data protection (is_minor / guardian_consent_given)
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS is_minor BOOLEAN NOT NULL DEFAULT FALSE",
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS guardian_consent_given BOOLEAN",
+    "CREATE INDEX IF NOT EXISTS ix_submissions_is_minor ON submissions (is_minor)",
 ]
 
 # 0048 — restricted runtime role + empty-context-bypass RLS policies. Mirrors the

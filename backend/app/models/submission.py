@@ -42,3 +42,7 @@ class Submission(Base, SoftDeleteMixin):
     is_duplicate = Column(Boolean, default=False, nullable=False)
     duplicate_of = Column(UUID(as_uuid=True), ForeignKey("submissions.id", ondelete="SET NULL"), nullable=True)
     duplicate_dismissed_at = Column(DateTime(timezone=True), nullable=True)  # reviewed, confirmed NOT a duplicate
+    # Children's-data protection (migration 0056) — computed from is_dob_for_screening /
+    # is_guardian_consent form fields, see app.services.child_protection
+    is_minor = Column(Boolean, default=False, nullable=False)
+    guardian_consent_given = Column(Boolean, nullable=True)

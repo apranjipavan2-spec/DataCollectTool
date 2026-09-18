@@ -255,7 +255,8 @@ async def generate_report(
         raise HTTPException(404, "Form not found")
 
     subs = db.query(Submission).filter(
-        Submission.form_id == form_id, Submission.tenant_id == user["tenant_id"]
+        Submission.form_id == form_id, Submission.tenant_id == user["tenant_id"],
+        Submission.is_minor == False,  # noqa: E712 — children's data never enters an AI call
     ).limit(50).all()
     from app.api.routes.export import _field_key
     field_schema = [

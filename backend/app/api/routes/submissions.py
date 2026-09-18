@@ -85,6 +85,7 @@ def list_submissions(
     duplicate_only: bool = False,
     ids: Optional[str] = None,
     slim: bool = False,
+    include_minors: bool = False,
     user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -96,6 +97,15 @@ def list_submissions(
         query = db.query(Submission, User.name).outerjoin(
             User, Submission.enumerator_id == User.id
         ).filter(Submission.tenant_id == user["tenant_id"])
+        # Children's-data protection: submissions flagged is_minor are hidden by
+        # default (opt-in via include_minors=true, same pattern as duplicate_only)
+        # and NEVER visible to the enumerator role regardless of any other param —
+        # applied before the `ids=` targeted-fetch branch below so it can't be
+        # bypassed by requesting a minor submission's id directly.
+        if role == "enumerator":
+            query = query.filter(Submission.is_minor == False)  # noqa: E712
+        elif not include_minors:
+            query = query.filter(Submission.is_minor == False)  # noqa: E712
         if ids:
             # Targeted fetch by id (e.g. duplicate-group compare view) — return
             # exactly what's asked, not silently filtered by duplicate status.
@@ -165,6 +175,8 @@ def list_submissions(
                     "has_violations": bool(s.has_violations),
                     "backcheck_required": bool(s.backcheck_required),
                     "consent_given": s.consent_given,
+                    "is_minor": bool(s.is_minor),
+                    "guardian_consent_given": s.guardian_consent_given,
                     "local_created_at": s.local_created_at.isoformat() if s.local_created_at else None,
                     "server_received_at": s.server_received_at.isoformat() if s.server_received_at else None,
                 }
@@ -926,6 +938,9 @@ def create_submission(request: Request, body: SubmissionCreate, background_tasks
             ProgramQuestionnaire.tenant_id == user["tenant_id"],
         ).first()
 
+        from app.services.child_protection import compute_child_protection_status
+        child_status = compute_child_protection_status(form.json_schema, body.data_json)
+
         sub = Submission(
             tenant_id=user["tenant_id"],
             form_id=body.form_id,
@@ -938,6 +953,8 @@ def create_submission(request: Request, body: SubmissionCreate, background_tasks
             program_id=pq.program_id if pq else None,
             questionnaire_id=pq.id if pq else None,
             participant_type_id=pq.participant_type_id if pq else None,
+            is_minor=child_status["is_minor"],
+            guardian_consent_given=child_status["guardian_consent_given"],
         )
         db.add(sub)
         db.commit()
