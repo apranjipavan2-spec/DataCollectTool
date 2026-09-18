@@ -283,13 +283,21 @@ field-level (envelope) encryption for direct identifiers (name, phone, Aadhaar-l
 exact GPS) — never store full Aadhaar numbers. TLS 1.2+, HSTS, secure cookies, scheduled
 key/secret rotation + rotation on staff exit.
 
-**Verified live 2026-09-18 (still open, confirmed real):** disk is not encrypted
-(unmanaged Contabo VPS — needs provisioning a fresh encrypted volume, not a
-retrofit). Backup job itself confirmed genuinely working (69 backups, one full
-restore test passed — 4 tenants recovered correctly into a throwaway DB) but
-**no offsite copy exists** — `R2_BUCKET` was never configured, so all 69 backups
-live only on the same server as the data they protect. Full detail in
-`tasks/pending_owner_action.md` §2.
+**Verified live 2026-09-18 — disk encryption still open, owner has committed a
+timeline.** Disk is not encrypted (unmanaged Contabo VPS, confirmed via `lsblk`
+— no `crypt` layer). Owner's plan: back up, then rebuild the server on a fresh
+encrypted volume, bundled with the region move (item 3's finding below) rather
+than two separate migrations — timeline "a couple of days" as of 2026-09-18.
+
+Backup job itself confirmed genuinely working (69 backups, one full restore
+test passed — 4 tenants recovered correctly into a throwaway DB). Automated
+R2 offsite sync was never configured, but owner has a separate manual process
+(copies to Drive, downloaded periodically) — parked intentionally, not being
+automated. Full detail in `tasks/pending_owner_action.md` §2.
+
+**Region confirmed EU, not India** (§3 of the same file) — owner committed to
+moving to an India region within days, same server rebuild as the disk-
+encryption fix above.
 
 ### 11. Logs — `todo`
 Audit trail exists (append-only) but retention period + tamper-evidence not stated.

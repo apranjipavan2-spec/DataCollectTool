@@ -42,12 +42,15 @@ Net effect: PostgreSQL row-level security is now actually enforced at the databa
 layer, not just relied on via app-code `.filter(tenant_id==...)` calls.
 
 ## 2. Encryption + transport (server/hosting settings)
-- [ ] **Disk encryption — CONFIRMED real gap, 2026-09-18.** `lsblk` on the live
-      server shows plain partitions only, no `crypt` layer anywhere. Since the
-      Docker uploads volume lives on this same disk, this single finding covers
-      both the Postgres data volume and the media/uploads volume — neither is
-      encrypted. Not fixable in place; needs a fresh encrypted volume/server and
-      a migration. See item 2 in the artifact-style plan discussed this session.
+- [ ] **Disk encryption — CONFIRMED real gap, owner has a plan (2026-09-18).**
+      `lsblk` on the live server shows plain partitions only, no `crypt` layer
+      anywhere. Since the Docker uploads volume lives on this same disk, this
+      single finding covers both the Postgres data volume and the media/uploads
+      volume — neither is encrypted. **Owner's plan (stated 2026-09-18, timeline
+      "a couple of days"):** take a fresh backup, then rebuild the server from
+      scratch on an encrypted volume and reconfigure it — bundled with the
+      region move below rather than two separate migrations. Tracked as pending
+      with an owner-committed timeline, not an open unknown.
 - [ ] Force TLS: add `?sslmode=require` to `DATABASE_URL` and `APP_DATABASE_URL`.
       **Not a quick .env edit** — the Postgres container has no TLS certificate
       configured yet; forcing this on without one first just refuses every
@@ -63,21 +66,25 @@ layer, not just relied on via app-code `.filter(tenant_id==...)` calls.
       latest one into a throwaway `fieldgovern_restore_test` database, verified
       real data landed (`SELECT count(*) FROM tenants` → 4, matching production),
       then dropped the test database. The backup mechanism itself works.
-- [ ] **Gap found, not yet fixed: no offsite backup.** `grep R2_BUCKET .env`
-      returned nothing — Cloudflare R2 offsite sync was never configured. All 69
-      backups exist ONLY on this same server. If this VPS is ever lost, every
-      backup is lost with it. Fixing this needs a Cloudflare account + R2 bucket
-      + API credentials — a short setup, but needs your Cloudflare login, not
-      something doable from a terminal alone.
+- [x] **Offsite backup — handled manually, owner's own process (2026-09-18).**
+      `grep R2_BUCKET .env` found no automated R2 sync configured — that specific
+      integration was never set up, and is intentionally parked (not being built).
+      Owner's actual process: backups already land in local storage continuously
+      (confirmed — see the restore test above), and the owner separately moves
+      copies to Drive and downloads them manually on an ongoing basis. Recorded
+      for accuracy: this is a real offsite copy, but a manual/human-dependent one
+      rather than an automated pipeline — worth someone glancing at the Drive
+      folder occasionally to confirm it's staying current, but not tracked here
+      as an open gap needing engineering work.
 
-## 3. Data residency (India) — ⚠️ CONFIRMED NOT India, 2026-09-18
+## 3. Data residency (India) — confirmed gap, owner has committed to fixing it (2026-09-18)
 Checked the Contabo control panel directly while doing item 1: the VPS's region
 shows **EU**, not India (IP `178.238.227.32`). This contradicts DPDP data-
 localisation expectations and several existing marketing claims ("India-hosted
-by default", Mumbai servers). This is now a confirmed fact needing a decision —
-migrate to an India region, or correct the public claims — not an open question
-to go check. Worth folding into the same conversation as item 2 (disk encryption)
-below, since a region move means provisioning a new server anyway.
+by default", Mumbai servers). **Owner's plan, stated 2026-09-18: moving to an
+India region "in a couple of days"** — bundled with the disk-encryption rebuild
+above (item 2), one fresh server instead of two separate migrations. Tracked as
+pending with an owner-committed timeline, not an open decision to make.
 
 ## 4. DPDP paperwork (you own these)
 - [ ] Consent capture text for beneficiary personal data (purpose-limited, withdrawable).
