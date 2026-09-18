@@ -21,31 +21,21 @@ at the database layer (see §2). This is the model paid SaaS uses at scale.
 
 ---
 
-## 2. Tenant isolation at the DB layer (code — DONE, switch to enable)
+## 2. Tenant isolation at the DB layer (code done — LIVE in production since 2026-09-18)
 
 Every tenant table has `FORCE ROW LEVEL SECURITY` with a `tenant_isolation`
-policy. **But a superuser bypasses RLS**, and the app was connecting as the
-Postgres superuser — so isolation rested on app-code filters alone.
-
-Migration `0048` fixes this:
-- completes a restricted, non-superuser role `fieldgovern_app`;
-- rewrites the policies so context-less paths (login, public surveys,
-  master_admin dashboards) still work, while authenticated tenant users get
-  strict isolation.
-
-**To enable enforcement:**
-1. Set a strong `APP_DB_PASSWORD` in `.env`.
-2. Set `APP_DATABASE_URL=postgresql://fieldgovern_app:<APP_DB_PASSWORD>@postgres:5432/fieldgovern`
-   (already wired in `deploy/docker-compose.prod.yml`).
-3. Redeploy. Migrations/seeds keep using the superuser `DATABASE_URL`.
-
-**Smoke-test after enabling:**
-- a normal user logs in and sees ONLY their tenant's submissions;
-- a public survey link submits successfully;
-- the master_admin platform dashboard still lists all tenants.
+policy, enforced via a restricted, non-superuser role `fieldgovern_app` — the
+app no longer connects as the Postgres superuser (which bypasses RLS
+entirely). Verified live via real smoke tests: normal-user tenant isolation
+confirmed, master_admin cross-tenant visibility confirmed. New tables created
+after migration `0048` don't automatically inherit this — see migration
+`0059` for the pattern to extend it (`data_rights_requests` is the current
+example).
 
 Verify the policy logic anytime with `backend/tests/rls_policy_check.sql`
-(needs only Docker — see the header in that file).
+(needs only Docker — see the header in that file), or `GET /audit/
+verify-chain` + `GET /audit/anomalies` for the tamper-evidence + anomaly
+layer built on top of the audit log (item 11 of `tasks/dpdp_master_plan.md`).
 
 ---
 
@@ -83,12 +73,21 @@ Ops must enable:
 
 Compliance is partly process, not code:
 
-1. **Consent:** record consent when collecting personal data from beneficiaries;
-   keep it purpose-limited and withdrawable.
-2. **Breach notification:** have a written path to detect and notify the Data
-   Protection Board of India + affected people, targeting **within 72 hours**.
-3. **Erasure & correction:** honour data-principal requests — use anonymize for
-   erasure; the master_admin/org_admin panels for correction.
+1. **Consent:** itemised, versioned notice + per-purpose consent (photo/audio/
+   GPS/follow-up) is built into form collection — see items 5-6 of
+   `tasks/dpdp_master_plan.md`. Withdrawal by reference code (item 7): org
+   admins can look up and withdraw via Settings → Security → Consent
+   Withdrawal.
+2. **Breach notification:** see the full written plan —
+   `deploy/BREACH_RESPONSE_PLAN.md` — roles, severity levels, the CERT-In
+   ≤6h / customer ≤24h / Board ≤72h timeline, pre-drafted templates, and a
+   forensic-log-preservation checklist. Fill in the contact details there
+   before it's usable.
+3. **Erasure, correction & data-principal rights:** `POST /submissions/{id}/
+   anonymize` (master_admin, single record), consent withdrawal by reference
+   code (org_admin), and the full log/search/act/close workflow at
+   `/data-rights` (org_admin) for access/correction/erasure/portability
+   requests with SLA tracking — item 8 of `tasks/dpdp_master_plan.md`.
 4. **Retention:** define how long data is kept and document it; the recycle bin
    holds soft-deleted items for 360 days (`RETENTION_DAYS`).
 5. **Access & audit:** RBAC is enforced (org_admin/supervisor/enumerator);
@@ -101,9 +100,16 @@ Compliance is partly process, not code:
 | Item | State |
 |------|-------|
 | Multi-tenant, one DB | ✅ in place |
-| DB-layer RLS isolation | ✅ code done — set `APP_DATABASE_URL` to enable |
+| DB-layer RLS isolation | ✅ live in production |
 | No hard delete | ✅ on by default |
 | App-level encryption (pw/2FA/capsules) | ✅ in place |
-| Encryption at rest / TLS / encrypted backups | ⛏ ops to enable |
-| India region residency | ⛏ ops to confirm |
-| Consent / breach / retention docs | ⛏ you to write |
+| TLS 1.2+/HSTS | ✅ in place |
+| Aadhaar minimisation at write time | ✅ in place |
+| Audit-log tamper-evidence + anomaly alerts | ✅ in place |
+| Consent notice + per-purpose consent + withdrawal | ✅ in place |
+| Data-principal rights workflow (`/data-rights`) | ✅ in place |
+| Field-level encryption for name/phone/other identifiers | ⛏ primitive built, not yet wired to live reads/writes |
+| Disk / object-storage / backup encryption | ⛏ ops — owner has a server-rebuild timeline |
+| India region residency | ⛏ ops — owner has a server-rebuild timeline |
+| Breach response plan | ✅ written — `deploy/BREACH_RESPONSE_PLAN.md`, fill in contact details |
+| Retention docs | ⛏ you to write |

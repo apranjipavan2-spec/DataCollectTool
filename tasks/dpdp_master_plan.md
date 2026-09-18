@@ -761,11 +761,41 @@ encryption fix above.
 - [ ] **Not fixed: NIC/NPL NTP clock sync** — ops-level server config, not
       verified either way this pass; flagged as open.
 
-### 12. Breach response — `todo`
-Written incident-response plan: roles, severity levels, contact lists. Timelines: CERT-In
-report ≤6h, customer notice ≤24h (so they can meet their own obligations), Board detailed
-report ≤72h. Pre-drafted notification templates, forensic log preservation, tabletop
-exercise twice a year.
+### 12. Breach response — `in-progress` (plan written, owner input needed to finish)
+- [x] **Full written plan — done 2026-09-18.** New `deploy/BREACH_RESPONSE_PLAN.md`:
+      breach definition + what's explicitly NOT a breach (avoids false-alarm
+      fatigue), 4-level severity classification (P0-P3) with concrete
+      examples, a role table (Incident Commander/Technical Lead/Grievance
+      Officer/Communications/Legal), the full CERT-In ≤6h / customer ≤24h /
+      Board ≤72h timeline, a containment checklist that **cross-references
+      real, built capabilities** rather than generic advice — `GET /audit/
+      verify-chain` to confirm the audit log itself wasn't tampered with
+      during the incident, `GET /audit/anomalies` to scope related
+      suspicious activity, `tasks/pending_owner_action.md` for known
+      credential-rotation steps — a forensic-log-preservation checklist, 3
+      pre-drafted notification templates (CERT-In initial report, customer
+      notice, Board detailed report) with the actual required fields filled
+      in as instructions, and a twice-yearly tabletop-exercise procedure
+      with a place to log findings.
+- [x] **Refreshed the existing runbook while in the area — done 2026-09-18.**
+      `deploy/SECURITY_DPDP_RUNBOOK.md` had drifted stale during this
+      session's own work: §2 still said "code done, switch to enable" for
+      tenant isolation, which has been **live in production** since this
+      session activated it; the quick-status table didn't mention any of
+      items 5/6/7/8/9/10/11/13 shipping. Corrected both, and pointed §5's
+      one-line breach bullet at the new full plan instead of leaving it as
+      a stub next to a real document that now exists.
+- [ ] **Not done — genuinely can't be done from here: contact details.**
+      Every `[name, phone, email]` placeholder in the plan (Incident
+      Commander, Technical Lead, Grievance Officer, Communications, Legal)
+      needs the owner to fill in real people — this isn't something
+      derivable from the codebase, and a document with fabricated contacts
+      would be actively worse than an honest placeholder someone might
+      still fill in.
+- [ ] **Not done: the first tabletop exercise itself.** The procedure exists
+      (§8 of the plan) but running it is a scheduled team activity, not a
+      code or doc deliverable — flagged as the next concrete action once
+      contacts are filled in.
 
 ### 13. Children & vulnerable groups — `in-progress` (core built + verified)
 - [x] **Age-screening + guardian consent + flag/restrict — done 2026-09-18.**
