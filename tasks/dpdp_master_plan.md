@@ -319,11 +319,73 @@ skipped by choice). Full detail in `tasks/pending_owner_action.md` §1.
       in the consent screen. Automatic TTS generation is separate, sizeable
       follow-up work, not attempted against non-existent infrastructure.
 
-### 6. Per-purpose consent — `todo`
-Separate consent items: survey answers / audio / photo / GPS / follow-up contact. Block
-the matching question types if refused. Store notice-version ID, language, consent items,
-timestamp, enumerator ID, device ID with each submission. Support oral consent +
-enumerator attestation (optional audio proof).
+### 6. Per-purpose consent — `in-progress` (core built + verified)
+- [x] **Separate per-purpose consent + blocking — done 2026-09-18.** Consent
+      gate (from item 5) now shows a checkbox per optional purpose the form
+      actually uses — auto-detected from field types present
+      (`photo`/`audio`/`gps`), plus an opt-in "follow-up contact" toggle a
+      form builder can enable (`consent_notice.ask_followup`, since no field
+      type implies it). `FormRenderer`'s `allFields` list — the single place
+      every other part of the renderer (paging, progress bar, validation,
+      submit) already reads from — now filters out any field whose type
+      maps to a declined purpose (`purposeOfFieldType()`), so a declined
+      purpose is genuinely unreachable, not just hidden by convention.
+      GPS capture and the background audio-audit recorder (existing QC
+      feature) both independently check the same declined-purposes set
+      before touching `navigator.geolocation` / `getUserMedia` — a declined
+      purpose is never silently captured behind the respondent's back.
+      "Survey answers" (text/number/choice/etc.) are core and can only be
+      declined by declining the whole form (existing "I Don't Agree" flow),
+      matching the audit's own framing.
+- [x] **Oral consent + enumerator attestation — done 2026-09-18.** Consent
+      screen has a "consent given orally" checkbox; when checked, reuses the
+      existing `AudioField` component (same one used for in-form audio
+      questions) to optionally record proof — zero new recording code
+      written, this is the identical `MediaRecorder` component instantiated
+      once more.
+- [x] **Stored with each submission — done 2026-09-18.** `_consent_purposes`
+      (per-purpose true/false map), `_consent_oral`, `_consent_oral_audio`
+      stamped into `data_json` alongside item 5's `_consent_notice_version`/
+      `_consent_language`/`_consent_given_at` — same established convention.
+      All 6 keys added to `field_govern.py`'s AI-exclusion set (so a
+      respondent's raw oral-consent audio clip can never reach an AI call),
+      and surfaced in both `_sub_summary()` (submissions list) and
+      `GET /forms/{id}/consent-log`. Pre-emptively also excluded
+      `_consent_withdrawn_at` — item 7's key, not written yet, but excluding
+      it now means item 7 doesn't have to touch this set again.
+      **Enumerator ID and language were already captured** (existing
+      `Submission.enumerator_id` column; `_consent_language` from item 5) —
+      no new work needed for those two.
+- [x] **Fixed a real bug found while building this — done 2026-09-18.**
+      `showManualNext`/`currentHasValue` dereferenced `currentField.type`/
+      `.name` unconditionally, before the existing null-check that handles
+      "form has no questions." This was already a latent crash for a
+      genuinely empty form; per-purpose filtering made it **much** more
+      likely to actually fire — any form made entirely of one purpose type
+      (e.g. an all-photo checklist) now legitimately produces an empty
+      `allFields` on the consent screen itself (purposes default to
+      "not yet decided" = filtered out until consent is given), which would
+      have crashed the component on load. Made both null-safe, and replaced
+      the old blunt "This form has no questions" dead-end with a real
+      screen for this specific case: if a respondent declines every purpose
+      the form uses, they can still submit — an empty-answers record that
+      honestly reflects what they declined, rather than being stranded.
+- [x] **Verified:** `npx tsc --noEmit --skipLibCheck` clean; `npm run build`
+      (incl. service worker) succeeds. Backend: `py_compile` clean; full
+      pytest suite 39 passed / 76 skipped / 0 failed (unchanged from item 5
+      — no DB-dependent test added for this item, flagged below).
+- [ ] **Real gap, not fixed: device ID.** No device-identifier capture
+      exists anywhere in the codebase today (checked `Submission` model and
+      both submission-write paths) — storing one is separate, sizeable
+      follow-up work (needs a stable per-device ID scheme, likely
+      `localStorage`-persisted UUID, plus a DB column and both write paths
+      touched), not attempted against non-existent infrastructure.
+- [ ] **Not done: automated test for the purpose-filtering/blocking logic.**
+      `purposeOfFieldType()` and the `allFields` filter are pure functions
+      in principle but currently live inline inside the component rather
+      than as an exported, independently-testable unit — worth extracting
+      if this logic grows more branches; not done this pass since it's
+      still simple enough to verify by direct code trace (documented above).
 
 ### 7. Consent withdrawal — `todo`
 Respondent reference code (printed slip or SMS). Withdrawal as easy as giving consent —

@@ -697,6 +697,8 @@ def consent_log(
                 "consent_notice_version": data.get("_consent_notice_version"),
                 "consent_language": data.get("_consent_language"),
                 "consent_given_at": data.get("_consent_given_at"),
+                "consent_purposes": data.get("_consent_purposes"),
+                "consent_oral": data.get("_consent_oral"),
             })
 
     return results

@@ -97,6 +97,7 @@ export interface ConsentNotice {
   grievance_contact?: string
   board_contact?: string
   audio_url?: string
+  ask_followup?: boolean     // show an opt-in "may we contact you again" purpose, even though no field type implies it
   languages?: Record<string, Partial<Omit<ConsentNotice, 'version' | 'languages'>>>
 }
 

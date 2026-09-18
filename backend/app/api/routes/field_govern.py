@@ -404,7 +404,8 @@ def _get_analyzer_data_inner(program_id, user, db):
 
     # Sample rows for AI tabulation context (strip internal metadata keys)
     _internal = {"_gps_lat", "_gps_lng", "_gps_accuracy", "_duplicate_suspect", "_validation_violations", "_started_at", "_duration_sec", "_audio_audit",
-                 "_consent_notice_version", "_consent_language", "_consent_given_at"}
+                 "_consent_notice_version", "_consent_language", "_consent_given_at",
+                 "_consent_purposes", "_consent_oral", "_consent_oral_audio", "_consent_withdrawn_at"}
     sample_rows = [
         {k: v for k, v in s.data_json.items() if k not in _internal}
         for s in subs[:8] if s.data_json and isinstance(s.data_json, dict)

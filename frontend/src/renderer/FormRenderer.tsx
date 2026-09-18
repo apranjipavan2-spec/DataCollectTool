@@ -54,6 +54,19 @@ export interface SubmissionDraft {
   consentTimestamp?: string
   consentNoticeVersion?: number
   consentLanguage?: string
+  consentPurposes?: Record<string, boolean>   // e.g. {photo: true, audio: false, gps: true, followup: false}
+  consentOral?: boolean
+  consentOralAudio?: string
+}
+
+/** Which per-purpose consent bucket a field type belongs to. Fields not
+ * covered by an optional purpose (text, number, choice, etc.) are core
+ * "survey answers" — never individually blockable, only the whole form. */
+function purposeOfFieldType(type: FormField['type']): 'photo' | 'audio' | 'gps' | 'survey' {
+  if (type === 'photo') return 'photo'
+  if (type === 'audio') return 'audio'
+  if (type === 'gps') return 'gps'
+  return 'survey'
 }
 
 interface GpsCoord { lat: number; lng: number; accuracy: number }
@@ -106,10 +119,32 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
   const hasNotice = !!(noticeCfg?.org_name || noticeCfg?.purpose || purpose)
   const [consentGiven, setConsentGiven] = useState(!hasNotice || !!initialDraft?.consentTimestamp)
 
+  // Which optional purposes this form actually asks about — only show/ask a
+  // toggle for a purpose the form can actually exercise.
+  const formFieldTypes = useMemo(() => new Set(getAllFieldsInOrder(schema.sections).map(f => f.type)), [schema])
+  const relevantPurposes = useMemo(() => {
+    const list: string[] = []
+    if (formFieldTypes.has('photo')) list.push('photo')
+    if (formFieldTypes.has('audio')) list.push('audio')
+    if (formFieldTypes.has('gps')) list.push('gps')
+    if (noticeCfg?.ask_followup) list.push('followup')
+    return list
+  }, [formFieldTypes, noticeCfg?.ask_followup])
+  // Gate-local state — only used while the consent screen is showing; the
+  // respondent's choices are committed into `draft` on Agree (below), which
+  // is what the rest of the session (blocking, auto-save, resume) reads from.
+  const [gatePurposes, setGatePurposes] = useState<Record<string, boolean>>(initialDraft?.consentPurposes ?? {})
+  const [gateOral, setGateOral] = useState(initialDraft?.consentOral ?? false)
+  const [gateOralAudio, setGateOralAudio] = useState<string>(initialDraft?.consentOralAudio ?? '')
+
   const [draft, setDraft] = useState<SubmissionDraft>(() => initialDraft ?? {
     id: uuidv4(), formVersion: schema.version,
     values: seedAutoNow(schema), gpsOpen: null, gpsSubmit: null, status: 'draft', startedAt: new Date().toISOString(),
   })
+  const declinedPurposes = useMemo(
+    () => new Set(relevantPurposes.filter(p => !(draft.consentPurposes?.[p]))),
+    [relevantPurposes, draft.consentPurposes],
+  )
   const [page, setPage]       = useState(0)
   const [errors, setErrors]   = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
@@ -132,7 +167,9 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
         // Skip entire section if its condition says to hide it
         if (!shouldShowSection(sec, draft.values)) continue
         for (const f of sec.fields) {
-          if (shouldShow(f, draft.values)) result.push(f)
+          if (!shouldShow(f, draft.values)) continue
+          if (declinedPurposes.has(purposeOfFieldType(f.type))) continue  // per-purpose consent refused — skip this question type
+          result.push(f)
         }
         if (sec.subsections?.length) traverse(sec.subsections)
       }
@@ -140,7 +177,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
     traverse(schema.sections)
     return result
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schema, draft.values])
+  }, [schema, draft.values, declinedPurposes])
 
   // Auto-compute calculated fields in document order so later calcs can use earlier ones
   const valuesWithCalc = useMemo(() => {
@@ -173,10 +210,11 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
   }, [currentField, language, draft.values])
 
   // Only capture device location when the form actually asks for it (has a GPS
-  // question). Otherwise we never touch geolocation — no silent tracking.
+  // question) AND that purpose wasn't declined at the consent gate. Otherwise
+  // we never touch geolocation — no silent tracking behind a declined consent.
   const hasGpsField = useMemo(
-    () => getAllFieldsInOrder(schema.sections).some(f => f.type === 'gps'),
-    [schema],
+    () => getAllFieldsInOrder(schema.sections).some(f => f.type === 'gps') && !declinedPurposes.has('gps'),
+    [schema, declinedPurposes],
   )
 
   // Capture GPS on mount — only if the form has a GPS question
@@ -190,6 +228,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
     const cfg = schema.settings?.audio_audit as { enabled?: boolean } | undefined
     if (!cfg?.enabled || initialDraft) return  // only fresh sessions
     if (!consentGiven) return  // wait for consent — also ensures mic is granted before we record
+    if (declinedPurposes.has('audio')) return  // respondent declined audio consent — no mic capture of any kind
     let cancelled = false
     ;(async () => {
       try {
@@ -212,7 +251,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
       try { if (auditRecRef.current?.state !== 'inactive') auditRecRef.current?.stop() } catch { }
       auditStreamRef.current?.getTracks().forEach(t => t.stop())
     }
-  }, [consentGiven])
+  }, [consentGiven, declinedPurposes])
 
   // Stop the audit recorder and resolve a compressed data URI (or null)
   const stopAudit = (): Promise<string | null> => new Promise(resolve => {
@@ -320,6 +359,9 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
       ...(draft.consentNoticeVersion != null ? { _consent_notice_version: draft.consentNoticeVersion } : {}),
       ...(draft.consentLanguage ? { _consent_language: draft.consentLanguage } : {}),
       ...(draft.consentTimestamp ? { _consent_given_at: draft.consentTimestamp } : {}),
+      ...(draft.consentPurposes ? { _consent_purposes: draft.consentPurposes } : {}),
+      ...(draft.consentOral ? { _consent_oral: true } : {}),
+      ...(draft.consentOralAudio ? { _consent_oral_audio: draft.consentOralAudio } : {}),
     }
     const final: SubmissionDraft = { ...draft, values: valuesWithMeta, gpsSubmit, status: 'outbox' }
     setDraft(final)
@@ -363,8 +405,11 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
 
   const isLast = page === allFields.length - 1
   // Auto-advance types move on by themselves — a manual Next is redundant (and confusing) on those pages.
-  const showManualNext = isLast || !AUTO_ADVANCE_TYPES.has(currentField.type)
-  const currentHasValue = draft.values[currentField.name] !== '' && draft.values[currentField.name] != null
+  // currentField can be undefined here (empty form, or every field's purpose was declined) —
+  // the consent-gate / no-questions screens below return before these values are ever rendered,
+  // but they're still computed on every render, so must not dereference a possibly-undefined field.
+  const showManualNext = isLast || !currentField || !AUTO_ADVANCE_TYPES.has(currentField.type)
+  const currentHasValue = !!currentField && draft.values[currentField.name] !== '' && draft.values[currentField.name] != null
   const progress = allFields.length > 0 ? ((page + 1) / allFields.length) * 100 : 0
 
   if (hasNotice && !consentGiven) {
@@ -382,6 +427,13 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
     const audioUrl = loc('audio_url')
     const isFullNotice = !!noticeCfg?.org_name
 
+    const PURPOSE_LABELS: Record<string, string> = {
+      photo: 'Take photos as part of this survey',
+      audio: 'Record audio as part of this survey',
+      gps: 'Record this device\'s location',
+      followup: 'Contact you again for follow-up research',
+    }
+
     const agree = () => {
       const ts = new Date().toISOString()
       setConsentGiven(true)
@@ -389,6 +441,9 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
         ...d, consentTimestamp: ts,
         consentNoticeVersion: noticeCfg?.version,
         consentLanguage: language,
+        consentPurposes: gatePurposes,
+        consentOral: gateOral,
+        consentOralAudio: gateOralAudio || undefined,
       }))
     }
 
@@ -441,6 +496,45 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
             )}
           </div>
 
+          {relevantPurposes.length > 0 && (
+            <div className="mb-6 space-y-2 text-left">
+              <p className="text-xs font-medium text-catalan-text uppercase tracking-wider">You may separately agree to:</p>
+              {relevantPurposes.map(p => (
+                <label key={p} className="flex items-center gap-2.5 text-sm text-catalan-text cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!gatePurposes[p]}
+                    onChange={e => setGatePurposes(gp => ({ ...gp, [p]: e.target.checked }))}
+                    className="w-4 h-4 accent-catalan-primary flex-shrink-0"
+                  />
+                  {PURPOSE_LABELS[p] ?? p}
+                </label>
+              ))}
+              <p className="text-xs text-catalan-textMuted">Unchecked items are simply skipped during the survey — the rest still proceeds.</p>
+            </div>
+          )}
+
+          <div className="mb-6 border-t border-catalan-border pt-4 text-left">
+            <label className="flex items-center gap-2.5 text-sm text-catalan-text cursor-pointer">
+              <input
+                type="checkbox"
+                checked={gateOral}
+                onChange={e => setGateOral(e.target.checked)}
+                className="w-4 h-4 accent-catalan-primary flex-shrink-0"
+              />
+              Consent given orally (this notice was read aloud / explained to the respondent)
+            </label>
+            {gateOral && (
+              <div className="mt-3">
+                <AudioField
+                  field={{ id: '_consent_oral_audio', name: '_consent_oral_audio', type: 'audio', label: 'Optional: record proof of oral consent', required: false } as FormField}
+                  value={gateOralAudio || null}
+                  onChange={v => setGateOralAudio(v)}
+                />
+              </div>
+            )}
+          </div>
+
           <button
             type="button"
             onClick={agree}
@@ -459,6 +553,37 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
   }
 
   if (!currentField) {
+    // Two different reasons allFields can be empty: a genuinely question-less
+    // form (rare, nothing to do about it), or every question on this form
+    // belonged to a purpose the respondent just declined (e.g. an all-photo
+    // form where photo consent was refused) — that's a real, valid outcome,
+    // not an error, so let them submit the (empty-answers) record rather
+    // than stranding them on a dead-end screen.
+    const declinedEverything = declinedPurposes.size > 0 && formFieldTypes.size > 0
+    if (declinedEverything) {
+      return (
+        <div className="min-h-screen bg-catalan-bg text-catalan-text font-sans flex flex-col items-center justify-center px-5">
+          <div className="text-center max-w-sm">
+            <div className="text-5xl mb-4"><EmojiIcon e="📋" /></div>
+            <div className="text-base mb-2">No questions to answer</div>
+            <p className="text-sm text-catalan-textMuted mb-6">Every question on this form needed a consent you didn't give. Your response — noting what you declined — can still be recorded.</p>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting}
+              className={`w-full bg-catalan-success text-catalan-bg rounded-xl py-4 text-base font-bold ${submitting ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:brightness-110'}`}
+            >
+              {submitting ? 'Submitting…' : 'Submit ✓'}
+            </button>
+            {onCancel && (
+              <button type="button" onClick={onCancel} className="mt-3 text-sm text-catalan-textMuted hover:text-catalan-text">
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="min-h-screen bg-catalan-bg text-catalan-text font-sans flex items-center justify-center">
         <div className="text-center">

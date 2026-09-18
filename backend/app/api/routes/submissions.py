@@ -675,6 +675,8 @@ def _sub_summary(s: Submission) -> dict:
         "consent_notice_version": (s.data_json or {}).get("_consent_notice_version"),
         "consent_language": (s.data_json or {}).get("_consent_language"),
         "consent_given_at": (s.data_json or {}).get("_consent_given_at"),
+        "consent_purposes": (s.data_json or {}).get("_consent_purposes"),
+        "consent_oral": (s.data_json or {}).get("_consent_oral"),
         "server_received_at": s.server_received_at.isoformat() if s.server_received_at else None,
         "has_violations": bool(s.has_violations),
         "backcheck_completed": bool(s.backcheck_completed),

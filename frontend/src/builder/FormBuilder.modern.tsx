@@ -1343,6 +1343,18 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
                 <input className={inputCls} value={noticeFieldValue('audio_url')} onChange={e => updateNoticeField('audio_url', e.target.value)} placeholder="Link to a pre-recorded audio file for this language" />
                 <p className="text-xs text-catalan-textMuted mt-1">Upload the audio file via Shared Files, then paste its link here.</p>
               </div>
+              <label className="flex items-center gap-2.5 text-sm text-catalan-text cursor-pointer pt-1">
+                <input
+                  type="checkbox"
+                  checked={!!notice.ask_followup}
+                  onChange={e => onChange({ ...schema, settings: { ...schema.settings, consent_notice: { ...notice, ask_followup: e.target.checked || undefined } } })}
+                  className="w-4 h-4 accent-catalan-primary flex-shrink-0"
+                />
+                Separately ask if we may contact the respondent again for follow-up
+              </label>
+              <p className="text-xs text-catalan-textMuted">
+                Photo/audio/GPS purposes are asked automatically whenever this form has a matching question type — no extra setup needed for those.
+              </p>
             </div>
           )}
         </div>
