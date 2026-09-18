@@ -1,0 +1,610 @@
+"""
+Idempotent seed — safe to run on every deploy.
+Creates platform tenant + master admin, plus demo tenant with all 4 roles,
+two sample forms, form assignments, and realistic sample submissions.
+
+Default password for all seed users: test@123
+"""
+import sys, os, random
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+import app.models  # noqa: F401
+from app.core.database import SessionLocal, engine, Base
+from app.core.security import hash_password
+from app.models.tenant import Tenant
+from app.models.user import User
+from app.models.form import Form
+from app.models.form_version import FormVersion
+from app.models.submission import Submission
+from app.models.form_assignment import FormAssignment
+import uuid
+from datetime import datetime, timezone, timedelta
+
+print("Creating tables...")
+Base.metadata.create_all(bind=engine)
+print("Tables ready.")
+
+# ── Schema repair: apply any missing columns/tables that alembic may have missed ──
+# Uses IF NOT EXISTS so this is fully idempotent on every deploy.
+print("Applying schema patches...")
+_PATCHES = [
+    # 0016
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS serial_no INTEGER",
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS allow_enumerator_edit BOOLEAN NOT NULL DEFAULT true",
+    # 0013
+    "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS app_name VARCHAR",
+    # 0014
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR",
+    # 0016 backfill serial_no for existing rows
+    """
+    UPDATE submissions SET serial_no = sub.rn
+    FROM (
+        SELECT id, ROW_NUMBER() OVER (PARTITION BY tenant_id ORDER BY server_received_at ASC, id ASC) AS rn
+        FROM submissions WHERE serial_no IS NULL
+    ) sub WHERE submissions.id = sub.id AND submissions.serial_no IS NULL
+    """,
+    # 0017 — program tables (CREATE TABLE IF NOT EXISTS)
+    """CREATE TABLE IF NOT EXISTS program_locations (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        state VARCHAR DEFAULT '',
+        district VARCHAR NOT NULL DEFAULT '',
+        block VARCHAR DEFAULT '',
+        village VARCHAR DEFAULT '',
+        gps_lat FLOAT,
+        gps_lng FLOAT,
+        created_at TIMESTAMPTZ DEFAULT now()
+    )""",
+    """CREATE TABLE IF NOT EXISTS programs (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        name VARCHAR NOT NULL,
+        scheme_name VARCHAR DEFAULT '',
+        description TEXT DEFAULT '',
+        start_date DATE,
+        end_date DATE,
+        status VARCHAR DEFAULT 'active',
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ DEFAULT now()
+    )""",
+    """CREATE TABLE IF NOT EXISTS program_participant_types (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        program_id UUID NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        name VARCHAR NOT NULL,
+        description TEXT DEFAULT '',
+        sort_order INTEGER DEFAULT 0
+    )""",
+    """CREATE TABLE IF NOT EXISTS program_questionnaires (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        program_id UUID NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+        participant_type_id UUID REFERENCES program_participant_types(id) ON DELETE SET NULL,
+        form_id UUID REFERENCES forms(id) ON DELETE SET NULL,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        name VARCHAR NOT NULL,
+        total_target INTEGER DEFAULT 0,
+        start_date DATE,
+        end_date DATE,
+        status VARCHAR DEFAULT 'active',
+        created_at TIMESTAMPTZ DEFAULT now()
+    )""",
+    """CREATE TABLE IF NOT EXISTS questionnaire_location_targets (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        questionnaire_id UUID NOT NULL REFERENCES program_questionnaires(id) ON DELETE CASCADE,
+        location_id UUID NOT NULL REFERENCES program_locations(id) ON DELETE CASCADE,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        target_count INTEGER DEFAULT 0,
+        deadline DATE,
+        created_at TIMESTAMPTZ DEFAULT now()
+    )""",
+    # 0018
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS program_id UUID REFERENCES programs(id) ON DELETE SET NULL",
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS participant_type_id UUID REFERENCES program_participant_types(id) ON DELETE SET NULL",
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS questionnaire_id UUID REFERENCES program_questionnaires(id) ON DELETE SET NULL",
+    "ALTER TABLE submissions ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES program_locations(id) ON DELETE SET NULL",
+    # shared_files table for master_admin file sharing
+    """CREATE TABLE IF NOT EXISTS shared_files (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        uploaded_by UUID NOT NULL REFERENCES users(id),
+        filename VARCHAR NOT NULL,
+        original_filename VARCHAR NOT NULL,
+        mime_type VARCHAR,
+        file_size_bytes INTEGER,
+        description TEXT DEFAULT '',
+        disk_path VARCHAR NOT NULL,
+        shared_with_tenants UUID[] DEFAULT '{}',
+        is_global BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ DEFAULT now()
+    )""",
+    # 0036
+    "ALTER TABLE shared_files ADD COLUMN IF NOT EXISTS folder VARCHAR DEFAULT ''",
+    "ALTER TABLE shared_files ADD COLUMN IF NOT EXISTS display_name VARCHAR DEFAULT ''",
+    "ALTER TABLE user_tool_projects ADD COLUMN IF NOT EXISTS shared_with_tenants UUID[] DEFAULT '{}'",
+    # 0039 — AI usage logs (per-user AI API call tracking)
+    """CREATE TABLE IF NOT EXISTS ai_usage_logs (
+        id            BIGSERIAL PRIMARY KEY,
+        tenant_id     UUID        NOT NULL,
+        user_id       UUID,
+        feature       VARCHAR(64) NOT NULL,
+        provider      VARCHAR(32) NOT NULL,
+        model         VARCHAR(64),
+        tokens_in     INTEGER     DEFAULT 0,
+        tokens_out    INTEGER     DEFAULT 0,
+        success       BOOLEAN     DEFAULT TRUE,
+        error         TEXT,
+        created_at    TIMESTAMPTZ DEFAULT now()
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_ai_usage_tenant_created ON ai_usage_logs(tenant_id, created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_ai_usage_user_created ON ai_usage_logs(user_id, created_at DESC)",
+    # 0041 — shared_files.tenant_id + RLS on programs/user_tool_projects/shared_files.
+    # Add the column and backfill so fresh databases match migrated ones; the RLS
+    # policies themselves are applied by alembic upgrade.
+    "ALTER TABLE shared_files ADD COLUMN IF NOT EXISTS tenant_id UUID",
+    """UPDATE shared_files f SET tenant_id = u.tenant_id
+       FROM   users u WHERE u.id = f.uploaded_by AND f.tenant_id IS NULL""",
+    # 0044 — soft-archive flag on tool projects (archive instead of delete).
+    "ALTER TABLE user_tool_projects ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ",
+    # 0042 — partial unique indexes on active users (phone, email). Seed data is
+    # already conflict-free; including the indexes here keeps fresh databases
+    # consistent with migrated ones.
+    """CREATE UNIQUE INDEX IF NOT EXISTS uq_users_active_phone
+       ON users (phone)
+       WHERE is_active = TRUE AND phone NOT LIKE 'reg_%'""",
+    """CREATE UNIQUE INDEX IF NOT EXISTS uq_users_active_email
+       ON users (lower(email))
+       WHERE is_active = TRUE AND email IS NOT NULL AND email <> ''""",
+    # 0046 — soft-delete (360-day bin): deleted_at on every hard-deleted table
+    *[
+        f"ALTER TABLE {t} ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"
+        for t in (
+            "respondent_roster", "shared_files", "form_assignments", "programs",
+            "program_locations", "program_participant_types", "program_questionnaires",
+            "questionnaire_location_targets", "locations", "scheduled_reports",
+            "webhooks",
+            # submission_comments intentionally omitted — now a real model (see
+            # app/models/submission_comment.py), created with deleted_at already
+            # included by Base.metadata.create_all() above.
+        )
+    ],
+    # 0047 — server-side draft backups (Save & Exit). Isolated from `submissions`.
+    """CREATE TABLE IF NOT EXISTS submission_drafts (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        tenant_id UUID NOT NULL REFERENCES tenants(id),
+        enumerator_id UUID NOT NULL REFERENCES users(id),
+        form_id UUID NOT NULL REFERENCES forms(id),
+        form_version INTEGER,
+        local_id VARCHAR NOT NULL,
+        data_json JSONB NOT NULL,
+        gps_open JSONB,
+        gps_submit JSONB,
+        local_created_at TIMESTAMPTZ,
+        updated_at TIMESTAMPTZ DEFAULT now(),
+        CONSTRAINT uq_draft_enum_local UNIQUE (enumerator_id, local_id)
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_submission_drafts_tenant_id ON submission_drafts (tenant_id)",
+    "CREATE INDEX IF NOT EXISTS ix_submission_drafts_enumerator_id ON submission_drafts (enumerator_id)",
+    # 0049 — soft-delete now also covers submissions, drafts, and push subs
+    *[
+        f"ALTER TABLE {t} ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"
+        for t in ("submissions", "submission_drafts", "push_subscriptions")
+    ],
+    *[
+        f"CREATE INDEX IF NOT EXISTS ix_{t}_deleted_at ON {t} (deleted_at)"
+        for t in ("submissions", "submission_drafts", "push_subscriptions")
+    ],
+]
+
+# 0048 — restricted runtime role + empty-context-bypass RLS policies. Mirrors the
+# migration so the safety net keeps enforcement correct even if alembic is skipped.
+# Critical: without the empty-context bypass, enabling APP_DATABASE_URL would lock
+# out login (pre-auth user lookups run with no tenant context). See migration 0048.
+_UNSET = "COALESCE(current_setting('app.current_tenant', true), '') = ''"
+_MATCH = "tenant_id::text = current_setting('app.current_tenant', true)"
+_SHARED = ("NULLIF(current_setting('app.current_tenant', true), '')::uuid "
+           "= ANY(COALESCE(shared_with_tenants, ARRAY[]::uuid[]))")
+_STRICT_TABLES = ("users", "forms", "submissions", "media_files", "cleaning_flags",
+                  "sync_log", "form_assignments", "programs")
+_SHARED_TABLES = ("user_tool_projects", "shared_files")
+
+_PATCHES += [
+    """DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'fieldgovern_app') THEN
+            CREATE ROLE fieldgovern_app LOGIN NOINHERIT;
+        END IF;
+    END $$""",
+    "ALTER ROLE fieldgovern_app NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE",
+    "GRANT USAGE ON SCHEMA public TO fieldgovern_app",
+    "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO fieldgovern_app",
+    "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO fieldgovern_app",
+    "ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER IN SCHEMA public "
+    "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO fieldgovern_app",
+    "ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER IN SCHEMA public "
+    "GRANT USAGE, SELECT ON SEQUENCES TO fieldgovern_app",
+]
+for _t in _STRICT_TABLES:
+    _expr = f"{_UNSET} OR {_MATCH}"
+    _PATCHES += [
+        f"ALTER TABLE {_t} ENABLE ROW LEVEL SECURITY",
+        f"ALTER TABLE {_t} FORCE ROW LEVEL SECURITY",
+        f"DROP POLICY IF EXISTS tenant_isolation ON {_t}",
+        f"CREATE POLICY tenant_isolation ON {_t} USING ({_expr}) WITH CHECK ({_expr})",
+    ]
+for _t in _SHARED_TABLES:
+    _PATCHES += [
+        f"ALTER TABLE {_t} ENABLE ROW LEVEL SECURITY",
+        f"ALTER TABLE {_t} FORCE ROW LEVEL SECURITY",
+        f"DROP POLICY IF EXISTS tenant_isolation ON {_t}",
+        f"CREATE POLICY tenant_isolation ON {_t} "
+        f"USING ({_UNSET} OR {_MATCH} OR {_SHARED}) WITH CHECK ({_UNSET} OR {_MATCH})",
+    ]
+
+from sqlalchemy import text as _text
+with engine.begin() as _conn:
+    for _sql in _PATCHES:
+        try:
+            _conn.execute(_text(_sql.strip()))
+        except Exception as _e:
+            print(f"  patch warning (ignored): {_e}")
+print("Schema patches done.")
+
+# ── Fast-path: skip seed data on warm restarts ────────────────────────────────
+# On every container restart (not just first deploy) the seed runs. If the DB
+# already has the Demo Org tenant the data is already in place — exit early so
+# uvicorn can start within the healthcheck window.
+_fast_check_db = SessionLocal()
+try:
+    _already_seeded = _fast_check_db.query(Tenant).filter(Tenant.name == 'Demo Org').first()
+finally:
+    _fast_check_db.close()
+
+if _already_seeded:
+    print("DB already seeded — skipping seed data (warm restart fast-path).")
+    print("\n✓ Seed complete")
+    sys.exit(0)
+
+db = SessionLocal()
+
+DEFAULT_PASSWORD = 'test@123'
+hashed = hash_password(DEFAULT_PASSWORD)
+
+# ── helpers (upsert — always syncs role, name, password, active status) ──────
+
+def get_or_create_tenant(name, plan_tier='starter'):
+    t = db.query(Tenant).filter(Tenant.name == name).first()
+    if t:
+        return t, False
+    t = Tenant(id=uuid.uuid4(), name=name, plan_tier=plan_tier)
+    db.add(t)
+    db.flush()
+    return t, True
+
+def upsert_user(tenant_id, phone, role, name, pw_hash=None):
+    """Create or update a seed user — keeps role/password/name in sync."""
+    u = db.query(User).filter(User.phone == phone).first()
+    if u:
+        u.tenant_id = tenant_id
+        u.role = role
+        u.name = name
+        u.is_active = True
+        if pw_hash:
+            u.password_hash = pw_hash  # always reset seeded passwords
+        return u, False
+    u = User(tenant_id=tenant_id, role=role, phone=phone, name=name,
+             password_hash=pw_hash or hashed, is_active=True)
+    db.add(u)
+    db.flush()
+    return u, True
+
+def get_or_create_form(tenant_id, title, json_schema, created_by):
+    f = db.query(Form).filter(Form.tenant_id == tenant_id, Form.title == title).first()
+    if f:
+        return f, False
+    f = Form(
+        tenant_id=tenant_id,
+        title=title,
+        json_schema=json_schema,
+        version=1,
+        status='active',
+        created_by=created_by,
+    )
+    db.add(f)
+    db.flush()
+    # snapshot version 1
+    fv = FormVersion(form_id=f.id, version=1, json_schema=json_schema)
+    db.add(fv)
+    return f, True
+
+# ── schemas ───────────────────────────────────────────────────────────────────
+
+HOUSEHOLD_SURVEY_SCHEMA = {
+    "title": "Household Survey",
+    "sections": [
+        {
+            "title": "1. Household Identification",
+            "fields": [
+                {"id": "hs_state",     "label": "State",           "type": "select",  "required": True,  "options": ["Karnataka","Maharashtra","Tamil Nadu","Telangana","Andhra Pradesh","Uttar Pradesh","Bihar"]},
+                {"id": "hs_district",  "label": "District",        "type": "text",    "required": True},
+                {"id": "hs_village",   "label": "Village / Ward",  "type": "text",    "required": True},
+                {"id": "hs_gp",        "label": "Gram Panchayat",  "type": "text",    "required": False},
+                {"id": "hs_hh_no",     "label": "Household Number","type": "text",    "required": True},
+                {"id": "hs_gps",       "label": "GPS Location",    "type": "gps",     "required": False},
+            ]
+        },
+        {
+            "title": "2. Head of Household",
+            "fields": [
+                {"id": "hs_hh_name",   "label": "Name of Head",        "type": "text",   "required": True},
+                {"id": "hs_hh_gender", "label": "Gender",               "type": "select", "required": True,  "options": ["Male","Female","Transgender"]},
+                {"id": "hs_hh_age",    "label": "Age (years)",          "type": "number", "required": True},
+                {"id": "hs_hh_edu",    "label": "Education Level",      "type": "select", "required": False, "options": ["Illiterate","Primary","Secondary","Graduate","Post Graduate"]},
+                {"id": "hs_hh_occ",    "label": "Primary Occupation",   "type": "select", "required": False, "options": ["Agriculture","Labour","Business","Government Job","Other"]},
+                {"id": "hs_caste",     "label": "Social Category",      "type": "select", "required": False, "options": ["General","OBC","SC","ST"]},
+                {"id": "hs_mobile",    "label": "Mobile Number",        "type": "text",   "required": False},
+            ]
+        },
+        {
+            "title": "3. Family Composition",
+            "fields": [
+                {"id": "hs_total_members", "label": "Total Family Members",     "type": "number", "required": True},
+                {"id": "hs_male_members",  "label": "Male Members",             "type": "number", "required": False},
+                {"id": "hs_female_members","label": "Female Members",            "type": "number", "required": False},
+                {"id": "hs_children_0_5", "label": "Children (0–5 years)",      "type": "number", "required": False},
+                {"id": "hs_children_6_18","label": "Children (6–18 years)",     "type": "number", "required": False},
+            ]
+        },
+        {
+            "title": "4. Housing & Assets",
+            "fields": [
+                {"id": "hs_house_type",  "label": "House Type",      "type": "select", "required": False, "options": ["Pucca","Semi-Pucca","Kutcha"]},
+                {"id": "hs_toilet",      "label": "Toilet Facility",  "type": "select", "required": False, "options": ["Individual","Community","Open Defecation","None"]},
+                {"id": "hs_water_src",   "label": "Water Source",     "type": "select", "required": False, "options": ["Tap (Piped)","Borewell","Open Well","River/Pond","Tanker"]},
+                {"id": "hs_electricity", "label": "Electricity",      "type": "select", "required": False, "options": ["Yes","No"]},
+                {"id": "hs_smartphone",  "label": "Smartphone in HH", "type": "select", "required": False, "options": ["Yes","No"]},
+                {"id": "hs_photo",       "label": "House Photo",      "type": "photo",  "required": False},
+                {"id": "hs_remarks",     "label": "Remarks",          "type": "textarea","required": False},
+            ]
+        }
+    ],
+    "fields": []
+}
+
+HEALTH_ASSESSMENT_SCHEMA = {
+    "title": "Health Assessment",
+    "sections": [
+        {
+            "title": "1. Respondent Details",
+            "fields": [
+                {"id": "ha_name",    "label": "Respondent Name",  "type": "text",    "required": True},
+                {"id": "ha_age",     "label": "Age",              "type": "number",  "required": True},
+                {"id": "ha_gender",  "label": "Gender",           "type": "select",  "required": True,  "options": ["Male","Female","Other"]},
+                {"id": "ha_village", "label": "Village",          "type": "text",    "required": True},
+                {"id": "ha_gps",     "label": "GPS",              "type": "gps",     "required": False},
+            ]
+        },
+        {
+            "title": "2. Health Status",
+            "fields": [
+                {"id": "ha_chronic",     "label": "Chronic Illness",       "type": "select",   "required": False, "options": ["None","Diabetes","Hypertension","TB","Other"]},
+                {"id": "ha_insurance",   "label": "Health Insurance",      "type": "select",   "required": False, "options": ["Ayushman Bharat","ESIS","Private","None"]},
+                {"id": "ha_last_visit",  "label": "Last Doctor Visit",     "type": "date",     "required": False},
+                {"id": "ha_facility",    "label": "Nearest Health Facility","type": "select",  "required": False, "options": ["PHC","CHC","District Hospital","Private Clinic"]},
+                {"id": "ha_dist_km",     "label": "Distance to Facility (km)","type": "number","required": False},
+            ]
+        },
+        {
+            "title": "3. Nutrition",
+            "fields": [
+                {"id": "ha_meals_per_day","label": "Meals per Day",        "type": "number",  "required": False},
+                {"id": "ha_anemia",       "label": "Anemia (Women/Children)","type": "select","required": False, "options": ["Yes","No","Not Applicable"]},
+                {"id": "ha_malnourished", "label": "Malnourished Child in HH","type": "select","required": False,"options": ["Yes","No"]},
+            ]
+        },
+        {
+            "title": "4. WASH",
+            "fields": [
+                {"id": "ha_handwash",    "label": "Handwashing with Soap",  "type": "select", "required": False, "options": ["Always","Sometimes","Never"]},
+                {"id": "ha_menstrual",   "label": "Menstrual Hygiene (Women)","type": "select","required": False,"options": ["Sanitary Pad","Cloth","Other","Not Applicable"]},
+                {"id": "ha_notes",       "label": "Field Notes",             "type": "textarea","required": False},
+            ]
+        }
+    ],
+    "fields": []
+}
+
+# ── sample data pools ─────────────────────────────────────────────────────────
+
+NAMES = [
+    "Rajesh Kumar","Priya Sharma","Amit Mehta","Sunita Devi","Ravi Reddy",
+    "Lakshmi Bai","Suresh Patil","Kavitha Nair","Mohammed Rafiq","Anita Singh",
+    "Vinod Yadav","Geeta Pillai","Sanjay Guptа","Meera Verma","Arjun Das",
+    "Fatima Shaikh","Ramesh Naidu","Pushpa Kumari","Deepak Joshi","Usha Rani",
+]
+VILLAGES = ["Basavanagudi","Hoskote","Domlur","Malleshwaram","Jayanagar",
+            "Kengeri","Whitefield","Yelahanka","Devanahalli","Sarjapur"]
+DISTRICTS = ["Bengaluru Urban","Bengaluru Rural","Mysuru","Tumkur","Hassan"]
+
+def rand_sub_hs(enum_id, form_id, tenant_id, days_ago):
+    name = random.choice(NAMES)
+    village = random.choice(VILLAGES)
+    district = random.choice(DISTRICTS)
+    members = random.randint(2, 8)
+    male = random.randint(1, members)
+    female = members - male
+    return {
+        "tenant_id": tenant_id,
+        "form_id": form_id,
+        "form_version": 1,
+        "enumerator_id": enum_id,
+        "local_id": str(uuid.uuid4()),
+        "data_json": {
+            "hs_state": "Karnataka",
+            "hs_district": district,
+            "hs_village": village,
+            "hs_hh_no": f"HH-{random.randint(100,999)}",
+            "hs_hh_name": name,
+            "hs_hh_gender": random.choice(["Male","Female"]),
+            "hs_hh_age": random.randint(28, 70),
+            "hs_hh_edu": random.choice(["Illiterate","Primary","Secondary","Graduate"]),
+            "hs_hh_occ": random.choice(["Agriculture","Labour","Business","Government Job","Other"]),
+            "hs_caste": random.choice(["General","OBC","SC","ST"]),
+            "hs_total_members": members,
+            "hs_male_members": male,
+            "hs_female_members": female,
+            "hs_children_0_5": random.randint(0, 2),
+            "hs_children_6_18": random.randint(0, 3),
+            "hs_house_type": random.choice(["Pucca","Semi-Pucca","Kutcha"]),
+            "hs_toilet": random.choice(["Individual","Community","Open Defecation"]),
+            "hs_water_src": random.choice(["Tap (Piped)","Borewell","Open Well"]),
+            "hs_electricity": random.choice(["Yes","No"]),
+            "hs_smartphone": random.choice(["Yes","No"]),
+        },
+        "gps_open": {"lat": 12.9 + random.uniform(-0.5,0.5), "lng": 77.5 + random.uniform(-0.5,0.5), "accuracy": round(random.uniform(5,25),1)},
+        "gps_submit": {"lat": 12.9 + random.uniform(-0.5,0.5), "lng": 77.5 + random.uniform(-0.5,0.5), "accuracy": round(random.uniform(5,25),1)},
+        "status": random.choice(["synced","synced","synced","flagged","approved"]),
+        "local_created_at": datetime.now(timezone.utc) - timedelta(days=days_ago, hours=random.randint(0,8)),
+        "server_received_at": datetime.now(timezone.utc) - timedelta(days=days_ago, hours=random.randint(0,6)),
+    }
+
+def rand_sub_ha(enum_id, form_id, tenant_id, days_ago):
+    name = random.choice(NAMES)
+    village = random.choice(VILLAGES)
+    return {
+        "tenant_id": tenant_id,
+        "form_id": form_id,
+        "form_version": 1,
+        "enumerator_id": enum_id,
+        "local_id": str(uuid.uuid4()),
+        "data_json": {
+            "ha_name": name,
+            "ha_age": random.randint(15, 75),
+            "ha_gender": random.choice(["Male","Female"]),
+            "ha_village": village,
+            "ha_chronic": random.choice(["None","None","None","Diabetes","Hypertension","TB"]),
+            "ha_insurance": random.choice(["Ayushman Bharat","ESIS","None","None"]),
+            "ha_facility": random.choice(["PHC","CHC","District Hospital","Private Clinic"]),
+            "ha_dist_km": random.randint(1, 25),
+            "ha_meals_per_day": random.choice([2, 2, 3, 3, 3]),
+            "ha_anemia": random.choice(["Yes","No","No","Not Applicable"]),
+            "ha_malnourished": random.choice(["Yes","No","No","No"]),
+            "ha_handwash": random.choice(["Always","Always","Sometimes","Never"]),
+        },
+        "gps_open": {"lat": 12.9 + random.uniform(-0.5,0.5), "lng": 77.5 + random.uniform(-0.5,0.5), "accuracy": round(random.uniform(5,25),1)},
+        "gps_submit": {"lat": 12.9 + random.uniform(-0.5,0.5), "lng": 77.5 + random.uniform(-0.5,0.5), "accuracy": round(random.uniform(5,25),1)},
+        "status": random.choice(["synced","synced","synced","flagged","approved"]),
+        "local_created_at": datetime.now(timezone.utc) - timedelta(days=days_ago, hours=random.randint(0,8)),
+        "server_received_at": datetime.now(timezone.utc) - timedelta(days=days_ago, hours=random.randint(0,6)),
+    }
+
+# ── main ──────────────────────────────────────────────────────────────────────
+
+random.seed(42)
+
+# ── Stage 1: tenants + users (committed immediately so login always works) ────
+try:
+    platform_tenant, _ = get_or_create_tenant('FieldGovern Platform', 'enterprise')
+    demo_tenant, _ = get_or_create_tenant('Demo Org', 'professional')
+    dataworx_tenant, _ = get_or_create_tenant('Dataworx', 'starter')
+    db.commit()
+    print("Stage 1a: tenants OK")
+except Exception as e:
+    db.rollback()
+    print(f"Seed error (tenants): {e}")
+    raise
+
+demo_user_specs = [
+    (platform_tenant.id, '+919999990000', 'master_admin', 'Master Admin',        None),
+    # Real production master_admin (+918317390926) deliberately NOT managed by this
+    # demo-seed script — it must never own or reset a real person's credential.
+    # That account's password lives only in the database; rotate it via
+    # Profile -> Security -> Change Password, never here.
+    (demo_tenant.id,     '+919999990001', 'org_admin',    'Admin User',           None),
+    (demo_tenant.id,     '+918123105186', 'org_admin',    'PavanDeshetty',        None),
+    (demo_tenant.id,     '+919999990002', 'supervisor',   'Supervisor User',      None),
+    (demo_tenant.id,     '+919222222222', 'supervisor',   'New Supervisor',       None),
+    (demo_tenant.id,     '+919999990003', 'enumerator',   'Enumerator User',      None),
+    (demo_tenant.id,     '+919999990004', 'enumerator',   'Priya Sharma',         None),
+    (demo_tenant.id,     '+919333333331', 'enumerator',   'BulkUser1',            None),
+    (demo_tenant.id,     '+919333333332', 'enumerator',   'BulkUser2',            None),
+    (demo_tenant.id,     '+919111111111', 'enumerator',   'Test Field Worker',    None),
+]
+dataworx_user_specs = [
+    (dataworx_tenant.id, '+919999991001', 'org_admin',    'Dataworx Admin',   None),
+    (dataworx_tenant.id, '+919999991002', 'supervisor',   'Manjunath',        None),
+    (dataworx_tenant.id, '+919999991003', 'enumerator',   'Ninganna',         None),
+    (dataworx_tenant.id, '+919999991004', 'enumerator',   'Babasaheb',        None),
+    (dataworx_tenant.id, '+919999991005', 'enumerator',   'Rohit',            None),
+]
+
+try:
+    user_objs = {}
+    for tenant_id, phone, role, name, pw in demo_user_specs + dataworx_user_specs:
+        u, created = upsert_user(tenant_id, phone, role, name, pw_hash=pw)
+        user_objs[phone] = u
+        print(f"  {'+ ' if created else '~ '}{phone} ({role})")
+    db.commit()
+    print("Stage 1b: users OK")
+except Exception as e:
+    db.rollback()
+    print(f"Seed error (users): {e}")
+    raise
+
+print(f"\nDefault password  : {DEFAULT_PASSWORD}")
+
+# ── Stage 2: forms + assignments + sample data (non-critical) ─────────────────
+try:
+    enum1    = user_objs['+919999990003']
+    enum2    = user_objs['+919999990004']
+    org_admin = user_objs['+919999990001']
+
+    hs_form, hs_new = get_or_create_form(
+        demo_tenant.id, 'Household Survey', HOUSEHOLD_SURVEY_SCHEMA, org_admin.id
+    )
+    ha_form, ha_new = get_or_create_form(
+        demo_tenant.id, 'Health Assessment', HEALTH_ASSESSMENT_SCHEMA, org_admin.id
+    )
+    db.flush()
+
+    for enum in [enum1, enum2]:
+        for form in [hs_form, ha_form]:
+            exists = db.query(FormAssignment).filter(
+                FormAssignment.form_id == form.id,
+                FormAssignment.enumerator_id == enum.id,
+            ).first()
+            if not exists:
+                db.add(FormAssignment(
+                    tenant_id=demo_tenant.id,
+                    form_id=form.id,
+                    enumerator_id=enum.id,
+                    assigned_by=org_admin.id,
+                ))
+
+    if hs_new:
+        for i in range(35):
+            days_ago = random.randint(0, 30)
+            enum = enum1 if i % 3 != 0 else enum2
+            d = rand_sub_hs(enum.id, hs_form.id, demo_tenant.id, days_ago)
+            db.add(Submission(**d))
+
+    if ha_new:
+        for i in range(25):
+            days_ago = random.randint(0, 30)
+            enum = enum2 if i % 3 != 0 else enum1
+            d = rand_sub_ha(enum.id, ha_form.id, demo_tenant.id, days_ago)
+            db.add(Submission(**d))
+
+    db.commit()
+    print("Stage 2: forms + submissions OK")
+    subs = db.query(Submission).filter(Submission.tenant_id == demo_tenant.id).count()
+    print(f"Submissions     : {subs} total in Demo Org")
+
+except Exception as e:
+    db.rollback()
+    print(f"Stage 2 warning (sample data skipped): {e}")
+
+finally:
+    db.close()
+
+print("\n✓ Seed complete")

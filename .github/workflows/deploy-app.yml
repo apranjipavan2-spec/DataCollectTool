@@ -1,0 +1,237 @@
+name: Build & Deploy App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "Dockerfile"
+      - "deploy/**"
+      - "tools/**"
+      - ".github/workflows/deploy-app.yml"
+  workflow_dispatch:
+
+# Only one deploy at a time; a newer push cancels an in-progress run so we don't
+# pay for two full deploys stacked on top of each other.
+concurrency:
+  group: deploy-app
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ghcr.io/apranjipavan2-spec/datacollecttool
+
+jobs:
+  build-and-push:
+    name: Build Docker image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push (amd64 only — the Contabo VPS is x86_64)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VITE_POSTHOG_KEY=${{ secrets.VITE_POSTHOG_KEY }}
+
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: production
+
+    steps:
+      - name: Checkout (for deploy files)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # need HEAD^ to detect whether tools/ changed
+
+      # Did this push touch tools/? If not, we skip the expensive tool rebuild
+      # (the analyzer/cleaner images) entirely — the running containers keep
+      # serving. Manual runs (workflow_dispatch) always rebuild to be safe.
+      - name: Detect tool changes
+        id: tools
+        run: |
+          CHANGED=true
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && git rev-parse HEAD^ >/dev/null 2>&1; then
+            if git diff --name-only HEAD^ HEAD | grep -q '^tools/'; then CHANGED=true; else CHANGED=false; fi
+          fi
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+          echo "tools changed: $CHANGED"
+
+      # ── Deploy the main app (always) ────────────────────────────────────────
+      - name: Deploy app via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 20m
+          envs: SMTP_PASSWORD
+          script: |
+            set -e
+            cd /opt/fieldgovern
+
+            # ── SMTP config: upsert into .env (non-secret values inline; password
+            # from the SMTP_PASSWORD GitHub secret). Safe: only rewrites the named
+            # keys, every other .env line is preserved. Skips a key if its value is
+            # empty so a missing secret never blanks an existing value.
+            upsert() {
+              key="$1"; val="$2"; [ -z "$val" ] && return 0
+              touch .env
+              grep -v "^${key}=" .env > .env.tmp 2>/dev/null || true
+              echo "${key}=${val}" >> .env.tmp
+              mv .env.tmp .env
+            }
+            upsert SMTP_HOST       "smtp.gmail.com"
+            upsert SMTP_PORT       "587"
+            upsert SMTP_USE_TLS    "true"
+            upsert SMTP_USER       "pallavi_ceo@fieldgovern.com"
+            upsert SMTP_PASSWORD   "$SMTP_PASSWORD"
+            upsert SMTP_FROM_EMAIL "noreply@fieldgovern.com"
+            upsert SMTP_FROM_NAME  "FieldGovern"
+            upsert APP_URL         "https://app.fieldgovern.com"
+
+            # Login + pull the freshly-built image. The VPS's route to ghcr
+            # (Fastly) intermittently TLS-handshake-times-out or resets, so retry
+            # BOTH the login and the pull before giving up.
+            ok=0
+            for i in 1 2 3 4 5 6; do
+              if echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u apranjipavan2-spec --password-stdin; then ok=1; break; fi
+              echo "Login attempt $i failed; retrying in 15s..."
+              sleep 15
+            done
+            [ "$ok" = 1 ] || { echo "ERROR: ghcr login failed after 6 attempts"; exit 1; }
+            ok=0
+            for i in 1 2 3 4 5 6; do
+              if docker compose pull app; then ok=1; break; fi
+              echo "Pull attempt $i failed; retrying in 15s..."
+              sleep 15
+            done
+            [ "$ok" = 1 ] || { echo "ERROR: image pull failed after 6 attempts"; exit 1; }
+            docker compose up -d --no-deps --force-recreate app
+
+            # Fresh DB backup before migrating — belt-and-suspenders alongside
+            # the nightly 2am cron (deploys don't wait for the next cron run).
+            /opt/fieldgovern/backup-db.sh
+
+            # DB migrations + idempotent seeds
+            docker compose exec -T app sh -c "alembic upgrade head 2>&1"
+            docker compose exec -T app sh -c "python -m scripts.seed_plans 2>&1"
+            docker compose exec -T app sh -c "python -m scripts.create_superuser 2>&1"
+
+            # Refresh nginx config and restart it (bind-mount inode must be re-established)
+            curl -fsSL "https://raw.githubusercontent.com/apranjipavan2-spec/DataCollectTool/main/deploy/nginx.conf" \
+              -o /opt/fieldgovern/nginx.conf
+            NGINX_ID=$(docker ps -q -f "name=nginx" | head -1)
+            if [ -n "$NGINX_ID" ]; then docker restart "$NGINX_ID"; fi
+
+            docker image prune -f
+            echo "App deploy complete — $(date)"
+
+      # ── Sync + rebuild the tools ONLY when tools/ changed ───────────────────
+      - name: Sync tool sources to VPS
+        if: steps.tools.outputs.changed == 'true'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "tools/,deploy/docker-compose.prod.yml"
+          target: "/opt/fieldgovern/"
+
+      - name: Rebuild & restart tools via SSH
+        if: steps.tools.outputs.changed == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 20m
+          script: |
+            set -e
+            cd /opt/fieldgovern
+
+            # Build WITH layer cache — only changed layers rebuild (was --no-cache,
+            # which forced a full rebuild every deploy).
+            docker build -t fieldgovern-analyzer:latest /opt/fieldgovern/tools/tableforge
+            docker build -t fieldgovern-cleaner:latest /opt/fieldgovern/tools/datacleaner
+
+            # Attach tools to nginx's network so they survive nginx restarts
+            NGINX_ID=$(docker ps -q -f "name=nginx" | head -1)
+            [ -z "$NGINX_ID" ] && { echo "ERROR: no running nginx container"; docker ps; exit 1; }
+            NGINX_NET=$(docker inspect "$NGINX_ID" \
+              --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' \
+              | tr ' ' '\n' | grep -v '^$' | grep -v '^fg-tools$' | head -1)
+            [ -z "$NGINX_NET" ] && NGINX_NET="fieldgovern_default"
+            echo "Nginx network=$NGINX_NET"
+
+            docker rm -f analyzer cleaner 2>/dev/null || true
+            # FG_INTERNAL_URL is REQUIRED: analyzer verifies caller tokens against
+            # the app's /api/v1/users/me; without it every authed request 401s.
+            # Every one of these dirs holds state the app expects to survive a
+            # restart (parquet_cache: the loaded-dataset rehydration store that
+            # backs "Run Full Analysis" etc — without this mount, every deploy
+            # silently wipes whatever dataset users have loaded, surfacing as
+            # "Dataset not found"; library/metrics: saved reusable metric
+            # definitions; uploads: source files re-read on "reload latest").
+            docker run -d --name analyzer --network "$NGINX_NET" --restart unless-stopped \
+              -e FG_INTERNAL_URL=http://app:8000 \
+              -v fg_tableforge_data:/app/projects \
+              -v fg_tableforge_exports:/app/exports \
+              -v fg_tableforge_parquet:/app/parquet_cache \
+              -v fg_tableforge_cache:/app/cache \
+              -v fg_tableforge_metrics:/app/metrics \
+              -v fg_tableforge_library:/app/library \
+              -v fg_tableforge_uploads:/app/uploads \
+              fieldgovern-analyzer:latest
+            docker run -d --name cleaner --network "$NGINX_NET" --restart unless-stopped \
+              -v fg_cleaner_data:/app/working_copies \
+              fieldgovern-cleaner:latest
+            echo "Tools rebuilt — $(date)"
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 10); do
+            if curl -fsS https://app.fieldgovern.com/health >/dev/null; then
+              echo "Health check passed"; exit 0
+            fi
+            sleep 3
+          done
+          echo "Health check failed"; exit 1

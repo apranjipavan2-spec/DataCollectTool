@@ -1,0 +1,74 @@
+name: Backup DB + set 2-hourly
+
+# One-shot, safe to run anytime — including during live submissions.
+# It ONLY reads the database (pg_dump) and edits the cron schedule.
+# It does NOT restart the app, run migrations, or touch table data.
+#
+#   1. Takes a fresh backup right now (existing /opt/fieldgovern/backup-db.sh)
+#   2. Switches the backup cron from daily (0 2) to every 2 hours (0 */2)
+#   3. Reports whether offsite (Cloudflare R2) is configured + lists backups
+on:
+  workflow_dispatch:
+
+jobs:
+  backup:
+    name: Backup + reschedule
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Run via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            set -e
+            cd /opt/fieldgovern
+
+            echo "=== 1. Fresh backup now (read-only pg_dump) ==="
+            /opt/fieldgovern/backup-db.sh
+
+            echo ""
+            echo "=== 2. Install/ensure 2-hourly backup cron ==="
+            # Idempotent: replace any existing backup-db cron line with the
+            # 2-hourly schedule, or append it if none exists. Every other
+            # crontab line (SSL renew, etc) is preserved.
+            crontab -l 2>/dev/null > /tmp/ct || true
+            LINE='0 */2 * * * /opt/fieldgovern/backup-db.sh >> /var/log/fieldgovern-backup.log 2>&1'
+            if grep -q 'backup-db\.sh' /tmp/ct; then
+              sed -i -E "s#^.*backup-db\.sh.*#${LINE}#" /tmp/ct
+            else
+              echo "$LINE" >> /tmp/ct
+            fi
+            crontab /tmp/ct
+            rm -f /tmp/ct
+            echo "Backup cron now:"
+            crontab -l | grep backup-db || echo "  (STILL no backup cron line!)"
+
+            echo ""
+            echo "=== 3. What's in the database (read-only, live row counts) ==="
+            docker compose exec -T postgres psql -U fieldgovern -d fieldgovern \
+              -c "SELECT relname AS table, n_live_tup AS rows FROM pg_stat_user_tables ORDER BY n_live_tup DESC;" \
+              || echo "  could not query DB"
+
+            echo ""
+            echo "=== 4. Tool state in Docker volumes (NOT in the DB dump) ==="
+            docker system df -v 2>/dev/null | grep -E 'fg_tableforge|fg_cleaner|VOLUME' || echo "  no fg_ volumes found"
+
+            echo ""
+            echo "=== 4b. Media storage backend (where photo bytes live) ==="
+            grep -E '^STORAGE_BACKEND=|^MEDIA_DIR=|^GOOGLE_DRIVE|^GDRIVE|^AWS_|^S3_' .env \
+              | sed -E 's/(KEY|SECRET|TOKEN|PASSWORD)=.*/\1=<hidden>/' \
+              || echo "  STORAGE_BACKEND not set -> defaults to 'drive' (Google Drive)"
+
+            echo ""
+            echo "=== 5. Offsite (R2) status ==="
+            grep -E '^R2_BUCKET=' /opt/fieldgovern/backup-db.sh || echo "  R2_BUCKET line not found"
+            if command -v rclone >/dev/null 2>&1; then echo "  rclone: installed"; else echo "  rclone: NOT installed -> offsite is OFF"; fi
+
+            echo ""
+            echo "=== 6. Local backups on disk ==="
+            ls -lah /opt/fieldgovern/backups/ | tail -6
+            echo -n "Total backup dir size: "; du -sh /opt/fieldgovern/backups/ | cut -f1

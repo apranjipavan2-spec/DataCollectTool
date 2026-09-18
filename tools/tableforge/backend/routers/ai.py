@@ -1,0 +1,1129 @@
+import os
+import json
+import re as _re
+from typing import Optional
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
+
+from ..shared import (datasets, custom_metrics, custom_bins, apply_metrics_and_bins, BASE_DIR, PROJECTS_DIR, require_identity)
+
+router = APIRouter()
+
+# PROJECTS_DIR is a mounted volume (tableforge_data) that survives container
+# rebuilds; BASE_DIR does not. Every deploy that touches tools/ rebuilds this
+# image, so a config file living directly under BASE_DIR was being silently
+# wiped on every deploy, breaking every AI feature until someone re-entered
+# the key via AI Settings.
+AI_CONFIG_FILE = PROJECTS_DIR / "ai_config.json"
+
+
+def _load_ai_cfg() -> dict:
+    """Load AI config from file, env vars, FieldGovern API, or database."""
+    if AI_CONFIG_FILE.exists():
+        try:
+            cfg = json.loads(AI_CONFIG_FILE.read_text())
+            if cfg.get("api_key"):
+                return cfg
+        except Exception:
+            pass
+    # Fallback to env vars
+    provider = os.environ.get("AI_PROVIDER", "")
+    api_key = os.environ.get("AI_API_KEY", "")
+    model = os.environ.get("AI_MODEL", "")
+    if provider and api_key:
+        return {"provider": provider, "api_key": api_key, "model": model}
+    # Fallback: fetch from FieldGovern main app API (when running as sidecar)
+    fg_internal = os.environ.get("FG_INTERNAL_URL", "").rstrip("/")
+    if fg_internal:
+        try:
+            import httpx
+            resp = httpx.get(f"{fg_internal}/api/v1/system-settings/ai_config", timeout=5.0)
+            if resp.status_code == 200:
+                cfg = resp.json()
+                if isinstance(cfg, dict) and "keys" in cfg:
+                    active = cfg.get("active_provider", "")
+                    key_cfg = cfg.get("keys", {}).get(active, {})
+                    if key_cfg.get("api_key"):
+                        return {"provider": active, "api_key": key_cfg["api_key"], "model": key_cfg.get("model", "")}
+                elif isinstance(cfg, dict) and cfg.get("api_key"):
+                    return cfg
+        except Exception:
+            pass
+    # Fallback: try FieldGovern's database directly (when co-deployed)
+    db_url = os.environ.get("DATABASE_URL", "")
+    if db_url:
+        try:
+            from sqlalchemy import create_engine, text
+            engine = create_engine(db_url)
+            with engine.connect() as conn:
+                row = conn.execute(text("SELECT value FROM system_settings WHERE key = 'ai_config'")).fetchone()
+                if row:
+                    cfg = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                    if "keys" in cfg:
+                        active = cfg.get("active_provider", "")
+                        key_cfg = cfg.get("keys", {}).get(active, {})
+                        return {"provider": active, "api_key": key_cfg.get("api_key", ""), "model": key_cfg.get("model", "")}
+                    return cfg
+        except Exception:
+            pass
+    return {}
+
+
+async def _call_llm(cfg: dict, prompt: str) -> str:
+    """Call configured LLM provider."""
+    provider = cfg.get("provider")
+    key = cfg.get("api_key")
+    model = cfg.get("model")
+    if not provider or not key:
+        raise HTTPException(400, "AI not configured. Set AI_PROVIDER and AI_API_KEY env vars or configure via /api/ai/config.")
+
+    LLM_TIMEOUT = 300
+
+    try:
+        if provider == "openai":
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=key, timeout=LLM_TIMEOUT)
+            r = await client.chat.completions.create(
+                model=model or "gpt-4o", messages=[{"role": "user", "content": prompt}], max_tokens=4096,
+            )
+            return r.choices[0].message.content or ""
+
+        elif provider == "anthropic":
+            from anthropic import AsyncAnthropic
+            client = AsyncAnthropic(api_key=key, timeout=LLM_TIMEOUT)
+            r = await client.messages.create(
+                model=model or "claude-sonnet-4-6", max_tokens=4096,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return r.content[0].text
+
+        elif provider == "gemini":
+            import asyncio
+            from google import genai
+            client = genai.Client(api_key=key)
+            r = await asyncio.to_thread(
+                client.models.generate_content,
+                model=model or "gemini-2.5-flash",
+                contents=prompt,
+            )
+            return r.text
+
+        elif provider == "deepseek":
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=key, base_url="https://api.deepseek.com", timeout=LLM_TIMEOUT)
+            r = await client.chat.completions.create(
+                model=model or "deepseek-v4-flash", messages=[{"role": "user", "content": prompt}], max_tokens=8192,
+            )
+            return r.choices[0].message.content or ""
+
+        else:
+            raise HTTPException(400, f"Unsupported AI provider: {provider}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(502, f"AI provider error ({provider}): {str(e)}")
+
+
+def _match_col(name: str, actual_cols: list) -> str:
+    """Best-effort match an AI-returned column name to an actual column."""
+    if name in actual_cols:
+        return name
+    low = {c.lower().strip(): c for c in actual_cols}
+    if name.lower().strip() in low:
+        return low[name.lower().strip()]
+    for c in actual_cols:
+        if name.lower() in c.lower() or c.lower() in name.lower():
+            return c
+    return name
+
+
+def _validate_table_cols(table: dict, actual_cols: list) -> dict:
+    """Fix AI-returned column names to match actual dataset columns."""
+    for key in ("groupby_field", "secondary_groupby", "value_field"):
+        val = table.get(key, "")
+        if val and val != "*":
+            table[key] = _match_col(val, actual_cols)
+    return table
+
+
+AI_MODELS = {
+    "gemini": [
+        {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash (fast, recommended)"},
+        {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro (best quality)"},
+        {"id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash"},
+        {"id": "gemini-1.5-flash", "name": "Gemini 1.5 Flash (legacy)"},
+    ],
+    "openai": [
+        {"id": "gpt-4o", "name": "GPT-4o (recommended)"},
+        {"id": "gpt-4o-mini", "name": "GPT-4o Mini (faster, cheaper)"},
+        {"id": "gpt-4-turbo", "name": "GPT-4 Turbo"},
+    ],
+    "anthropic": [
+        {"id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6 (recommended)"},
+        {"id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5 (fast)"},
+    ],
+    "deepseek": [
+        {"id": "deepseek-chat", "name": "DeepSeek Chat (V3)"},
+        {"id": "deepseek-reasoner", "name": "DeepSeek Reasoner (R1)"},
+    ],
+}
+
+
+def _require_master_admin(identity: dict = Depends(require_identity)) -> dict:
+    """Viewing status (has_key/provider/model, never the key itself) stays open
+    to every logged-in user — other AI features check it to show a friendly
+    "ask your admin" message. Changing or clearing the key is restricted."""
+    if identity.get("role") != "master_admin":
+        raise HTTPException(403, "Only a super admin can change the AI provider configuration.")
+    return identity
+
+
+@router.get("/api/ai/config")
+async def get_ai_config():
+    cfg = _load_ai_cfg()
+    return {
+        "provider": cfg.get("provider", ""),
+        "model": cfg.get("model", ""),
+        "configured": bool(cfg.get("api_key")),
+        "has_key": bool(cfg.get("api_key")),
+        "models": AI_MODELS,
+    }
+
+
+@router.post("/api/ai/config")
+async def set_ai_config(body: dict, _admin: dict = Depends(_require_master_admin)):
+    # Load existing config to preserve API key if not re-entered
+    existing = {}
+    if AI_CONFIG_FILE.exists():
+        try: existing = json.loads(AI_CONFIG_FILE.read_text())
+        except Exception: pass
+    provider = body.get("provider") or existing.get("provider", "")
+    api_key = body.get("api_key") or existing.get("api_key", "")
+    model = body.get("model") or ""
+    data = {"provider": provider, "api_key": api_key, "model": model}
+    AI_CONFIG_FILE.write_text(json.dumps(data))
+    return {"status": "ok", "provider": provider, "model": model}
+
+
+@router.delete("/api/ai/config")
+async def delete_ai_config(_admin: dict = Depends(_require_master_admin)):
+    if AI_CONFIG_FILE.exists():
+        AI_CONFIG_FILE.unlink()
+    return {"status": "ok", "cleared": True}
+
+
+class AIPolishRequest(BaseModel):
+    dataset_id: str
+    table_title: str = ""
+    rows: list = []
+    columns: list = []
+    values: list = []
+    headers: list = []
+    sample_rows: list = []
+    table_filters: dict = {}
+    project_filters: dict = {}
+
+
+@router.post("/api/ai/polish")
+async def ai_polish_table(body: AIPolishRequest):
+    """AI-powered title, subtitle, and column label generation."""
+    cfg = _load_ai_cfg()
+    groupby = body.rows[0] if body.rows else ""
+    value_field = body.values[0].get("field", "*") if body.values else "*"
+    aggregation = body.values[0].get("agg", "count") if body.values else "count"
+    is_cross_tab = len(body.columns) > 0
+    sub_keys = body.columns
+
+    from ..ai_sanitize import column_shape, dummy_rows
+
+    # Build full dataset column context for better title generation — schema
+    # shape only (type + real category labels for genuine low-cardinality
+    # taxonomies), never real free-text/numeric/PII-named values. Title
+    # generation needs to know the domain, not individual respondent content.
+    all_dataset_columns = []
+    shapes: dict = {}
+    if body.dataset_id in datasets:
+        ds = datasets[body.dataset_id]
+        df = ds.get("df")
+        if df is not None:
+            for col in list(df.columns)[:100]:
+                shape = column_shape(df, col)
+                shapes[col] = shape
+                sample = shape.get("categories", [f"<{shape['type']}>"])
+                all_dataset_columns.append(f"{col} ({shape['type']}): {sample}")
+
+    rows_preview = []
+    if shapes:
+        for row in dummy_rows(list(shapes.keys()), shapes, n=min(3, len(body.sample_rows) or 3)):
+            rows_preview.append(" | ".join(f"{k}={v}" for k, v in list(row.items())[:8]))
+
+    all_col_keys = list(dict.fromkeys([groupby] + ([value_field] if value_field != "*" else []) + sub_keys + body.headers))
+    col_keys_json = json.dumps({k: f"clean label for {k}" for k in all_col_keys[:15]})
+
+    dataset_context = ""
+    if all_dataset_columns:
+        dataset_context = (
+            f"\nFull dataset columns (use these to understand the domain and create contextual titles):\n"
+            + "\n".join(f"  - {c}" for c in all_dataset_columns[:60])
+            + "\n"
+        )
+
+    filter_context = ""
+    merged = {**body.project_filters, **body.table_filters}
+    if merged:
+        parts = []
+        for field, values in list(merged.items())[:10]:
+            val_list = ", ".join(str(v) for v in values[:5])
+            parts.append(f"{field}: {val_list}")
+        filter_context = (
+            f"\nActive filters applied to this table:\n"
+            + "\n".join(f"  - {p}" for p in parts)
+            + "\n(Incorporate these filter values into the title for specificity.)\n"
+        )
+
+    prompt = (
+        f"You are a research data analyst. A data tabulation has raw machine-generated names. Clean them up.\n\n"
+        f"{dataset_context}{filter_context}"
+        f"This table uses these fields from the dataset:\n"
+        f"- Row variable (groupby): {groupby}\n"
+        f"- Value/column variable: {value_field}\n"
+        f"- Aggregation: {aggregation}\n"
+        f"- Is cross-tabulation: {is_cross_tab}\n"
+        f"- All row fields: {body.rows}\n"
+        f"- All column fields: {body.columns}\n"
+        f"- All value fields: {json.dumps(body.values[:10])}\n"
+        f"- Column headers in result: {body.headers[:15]}\n"
+        f"- Sample data ({len(rows_preview)} rows):\n" +
+        "\n".join(rows_preview) + "\n\n"
+        f"Return ONLY valid JSON (no markdown, no explanation):\n"
+        f'{{\n'
+        f'  "title": "Human-readable table title",\n'
+        f'  "subtitle": "One sentence: what insight this table provides",\n'
+        f'  "column_labels": {col_keys_json}\n'
+        f'}}\n\n'
+        f"Rules:\n"
+        f"- Title: create a sensible, domain-appropriate title based on the full dataset context and what this table actually analyses\n"
+        f"- Title should NOT just be the column names rephrased — understand what the data represents and name it meaningfully\n"
+        f"- subtitle: describes the insight or finding angle\n"
+        f"- column_labels: map raw field names to clean human-readable labels\n"
+        f"- For '*' use 'Count' or 'Number of Records'\n"
+        f"- For mean aggregation label as 'Average [field meaning]'"
+    )
+    raw = await _call_llm(cfg, prompt)
+    match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+    if match:
+        try:
+            result = json.loads(match.group())
+            if isinstance(result.get("column_labels"), dict):
+                result["column_labels"] = {str(k): str(v) for k, v in result["column_labels"].items()}
+            return result
+        except Exception:
+            pass
+    return {"title": body.table_title, "subtitle": "", "column_labels": {}}
+
+
+class AIInterpretRequest(BaseModel):
+    dataset_id: str
+    table_title: str = ""
+    subtitle: str = ""
+    headers: list = []
+    rows_data: list = []
+    row_fields: list = []
+    column_fields: list = []
+    value_fields: list = []
+    focus: str = ""
+    previous_interpretation: str = ""
+    length: str = "auto"
+    include_recommendations: bool = True
+
+
+@router.post("/api/ai/interpret")
+async def ai_interpret_table(body: AIInterpretRequest):
+    """AI-powered table interpretation — generates narrative analysis."""
+    cfg = _load_ai_cfg()
+
+    # Build table text representation
+    header_line = " | ".join(body.headers[:20])
+    rows_str = "\n".join(
+        " | ".join(str(v) for v in row[:20])
+        for row in body.rows_data[:60]
+    )
+    if len(body.rows_data) > 60:
+        rows_str += f"\n... ({len(body.rows_data) - 60} more rows not shown)"
+
+    default_focus = (
+        "Provide a comprehensive interpretation: identify the standout finding, "
+        "notable patterns or disparities, the highest and lowest values and what they suggest, "
+        "any cross-variable interactions, and practical implications."
+    )
+
+    refinement_block = ""
+    if body.previous_interpretation.strip():
+        refinement_block = (
+            f"\n--- PREVIOUS INTERPRETATION ---\n"
+            f"{body.previous_interpretation.strip()}\n"
+            f"--- END ---\n\n"
+            f"Produce a REFINED interpretation that:\n"
+            f"- Preserves accurate findings from previous version\n"
+            f"- Corrects errors or vague statements\n"
+            f"- Adds missed insights\n"
+            f"- Sharpens language and flow\n"
+            f"Output ONLY the final refined interpretation.\n"
+        )
+
+    length_guide = {
+        "short": "Write 2-3 sentences. Only the top finding and one key pattern.",
+        "medium": "Write 1-2 short paragraphs. Cover the main finding, key patterns, and notable outliers.",
+        "long": "Write a thorough multi-paragraph analysis. Cover all significant findings, patterns, comparisons, and outliers in detail.",
+        "auto": "Be as detailed as the data warrants — more rows/complexity = longer interpretation.",
+    }
+    length_instruction = length_guide.get(body.length, length_guide["auto"])
+
+    rec_instruction = (
+        "- End with practical implication or recommendation\n"
+        if body.include_recommendations
+        else "- Do NOT include recommendations or conclusions — only describe findings and patterns\n"
+    )
+
+    prompt = (
+        f"You are a senior data analyst writing an interpretation for a data table.\n\n"
+        f"Table: {body.table_title}\n"
+        f"{body.subtitle}\n"
+        f"Row dimensions: {body.row_fields}\n"
+        f"Column dimensions: {body.column_fields}\n"
+        f"Value fields: {[v.get('field','') + ' (' + v.get('agg','sum') + ')' for v in body.value_fields]}\n\n"
+        f"Data ({len(body.rows_data)} rows):\n"
+        f"{header_line}\n"
+        f"{'-' * max(len(header_line), 40)}\n"
+        f"{rows_str}\n"
+        f"{refinement_block}\n"
+        f"Analyst focus: {body.focus.strip() if body.focus.strip() else default_focus}\n\n"
+        f"Length: {length_instruction}\n\n"
+        f"Write a data-driven interpretation in flowing prose:\n"
+        f"- Be specific — cite actual numbers from the table\n"
+        f"- State the most important finding first\n"
+        f"- Note outliers, unexpected gaps, or strong patterns\n"
+        f"- For cross-tabs: explain interaction between variables\n"
+        f"- Quantify comparisons (e.g. '3.2x higher', 'gap of 47 points')\n"
+        f"{rec_instruction}"
+        f"- Describe what the data MEANS, not what the table contains"
+    )
+    interpretation = await _call_llm(cfg, prompt)
+    return {"interpretation": interpretation}
+
+
+class AISuggestRequest(BaseModel):
+    dataset_id: str
+    prompt: str = ""
+
+
+@router.post("/api/ai/suggest")
+async def ai_suggest_tables(body: AISuggestRequest):
+    """AI suggests optimal table configurations from the dataset."""
+    cfg = _load_ai_cfg()
+    if body.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    ds = datasets[body.dataset_id]
+    df = ds["df"]
+
+    from ..ai_sanitize import column_shape, dummy_rows
+
+    shapes = {col: column_shape(df, col) for col in df.columns[:80]}
+    cols_info = []
+    for col, shape in shapes.items():
+        cols_info.append({"id": col, "type": shape["type"], "unique": shape["unique"], "sample": shape.get("categories", [])[:2]})
+
+    sample_rows = dummy_rows(list(shapes.keys()), shapes, n=5)
+
+    prompt = (
+        f"You are a research data analyst designing tabulations.\n\n"
+        f"Available columns (use ONLY these ids):\n{json.dumps(cols_info)}\n\n"
+        f"Sample data rows:\n{json.dumps(sample_rows[:3], default=str)}\n\n"
+        f"User request: {body.prompt or 'Suggest the most insightful tabulations for this dataset.'}\n\n"
+        f"For each table decide:\n"
+        f"  - groupby_field: column id to group rows by (required)\n"
+        f"  - value_field: column id to aggregate, or '*' for row count\n"
+        f"  - aggregation: 'count', 'sum', or 'mean'\n"
+        f"  - secondary_groupby: second column for cross-tab, or ''\n"
+        f"  - title: clean human-readable title\n"
+        f"  - description: one sentence explaining insight\n\n"
+        f"Suggest 2-5 tables. Respond with ONLY valid JSON:\n"
+        f'{{"rationale": "...", "tables": [{{"title":"...","groupby_field":"...","value_field":"*","aggregation":"count","secondary_groupby":"","description":"..."}}]}}'
+    )
+    raw = await _call_llm(cfg, prompt)
+    match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+    if match:
+        try:
+            result = json.loads(match.group())
+            actual_cols = list(df.columns)
+            for t in result.get("tables", []):
+                _validate_table_cols(t, actual_cols)
+            return result
+        except Exception:
+            pass
+    return {"rationale": "Could not parse AI response", "tables": []}
+
+
+class AISmartBuildRequest(BaseModel):
+    dataset_id: str
+    selected_columns: list = []
+    query: str = ""
+
+
+@router.post("/api/ai/smart-build")
+async def ai_smart_build(body: AISmartBuildRequest):
+    """AI designs one optimized table from selected columns or NL query."""
+    try:
+        cfg = _load_ai_cfg()
+        if not cfg.get("api_key"):
+            raise HTTPException(400, "AI not configured. Go to AI Settings and add your API key.")
+        if body.dataset_id not in datasets:
+            raise HTTPException(404, "Dataset not found")
+        ds = datasets[body.dataset_id]
+        df = ds["df"]
+
+        if body.selected_columns:
+            cols = [c for c in body.selected_columns if c in df.columns]
+        else:
+            cols = list(df.columns[:30])
+
+        if not cols:
+            raise HTTPException(400, "No valid columns found for analysis")
+
+        from ..ai_sanitize import column_shape, dummy_rows
+
+        shapes = {col: column_shape(df, col) for col in cols[:60]}
+        cols_block = []
+        for col, shape in shapes.items():
+            uniq_vals = shape.get("categories", [])[:6]
+            cols_block.append(f"  - id={col} | type={shape['type']} | unique({shape['unique']}): {uniq_vals}")
+
+        sample_rows = dummy_rows(cols[:30], shapes, n=4)
+
+        task = f'User question: "{body.query.strip()}"\nDesign the best table to answer this.' if body.query.strip() else "Design the most insightful cross-tabulation or aggregation from these columns."
+
+        prompt = (
+            f"You are a research data analyst. Design ONE tabulation table.\n\n"
+            f"Available columns:\n" + "\n".join(cols_block) + f"\n\n"
+            f"Sample data:\n{json.dumps(sample_rows, ensure_ascii=False, default=str)}\n\n"
+            f"{task}\n\n"
+            f"Decide:\n"
+            f"- groupby_field: column id for row grouping\n"
+            f"- secondary_groupby: column id for cross-tab ('' if simple)\n"
+            f"- value_field: column id to aggregate, or '*' for count\n"
+            f"- aggregation: 'count', 'sum', or 'mean'\n"
+            f"- title: clean human-readable title\n"
+            f"- description: one sentence insight\n"
+            f"- column_labels: mapping raw ids to clean names\n\n"
+            f"Only use column ids from list. Respond ONLY valid JSON:\n"
+            f'{{"groupby_field":"","secondary_groupby":"","value_field":"*","aggregation":"count","title":"","description":"","column_labels":{{}}}}'
+        )
+        raw = await _call_llm(cfg, prompt)
+        match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+        if match:
+            try:
+                result = json.loads(match.group())
+                if isinstance(result.get("column_labels"), dict):
+                    result["column_labels"] = {str(k): str(v) for k, v in result["column_labels"].items()}
+                _validate_table_cols(result, list(df.columns))
+                return result
+            except json.JSONDecodeError:
+                raise HTTPException(502, "AI returned invalid JSON. Try again.")
+        raise HTTPException(502, "AI returned empty response. Try again.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Smart Build failed: {str(e)}")
+
+
+class AIAutoGenerateRequest(BaseModel):
+    dataset_id: str
+    table_descriptions: str = ""
+    objectives: str = ""
+    max_tables: int = 20
+    column_descriptions: dict = {}
+    selected_columns: list = []
+    template: str = ""
+
+
+# ── Stage 1: AI analyses all columns and creates a study plan ──
+
+class AIPlanRequest(BaseModel):
+    dataset_id: str
+    objectives: str = ""
+    table_descriptions: str = ""
+    max_tables: int = 20
+    column_descriptions: dict = {}
+    selected_columns: list = []
+
+
+def _detect_multi_choice(series) -> bool:
+    """Check if >30% of non-null values contain commas (multi-choice indicator)."""
+    import pandas as pd
+    non_null = series.dropna().astype(str)
+    if len(non_null) < 5:
+        return False
+    has_comma = non_null.str.contains(',', na=False)
+    return float(has_comma.sum()) / len(non_null) > 0.3
+
+
+def _build_col_metadata(df, target_cols, column_descriptions):
+    """Build compact column metadata for the planning prompt — schema shape
+    only, never real free-text/numeric/PII-named content (see ai_sanitize.py)."""
+    import pandas as pd
+    from ..ai_sanitize import column_shape, dummy_value
+    from ..pii_redact import is_pii_column
+    cols_meta = []
+    for col in target_cols:
+        if col not in df.columns:
+            continue
+        dtype = str(df[col].dtype)
+        is_numeric = "int" in dtype or "float" in dtype
+        is_date = "datetime" in dtype
+        is_mc = False
+        if not is_numeric and not is_date:
+            is_mc = _detect_multi_choice(df[col])
+
+        shape = column_shape(df, col)
+        sample = shape.get("categories") or [dummy_value(shape["type"])]
+
+        entry = {
+            "id": col,
+            "type": "numeric" if is_numeric else ("date" if is_date else ("multi_choice" if is_mc else "categorical")),
+            "unique": shape["unique"],
+            "sample": sample,
+        }
+        if is_mc and not is_pii_column(col):
+            # Multi-choice option tokens (e.g. "A, B" -> ["A","B"]) are a
+            # declared-option-set concept, same taxonomy exception as
+            # column_shape's `categories` — never extracted for a PII column.
+            all_vals = []
+            for v in df[col].dropna().astype(str).head(100):
+                all_vals.extend([p.strip() for p in v.split(',') if p.strip()])
+            entry["multi_choice_values"] = list(set(all_vals))[:15]
+        if col in column_descriptions and column_descriptions[col]:
+            entry["description"] = column_descriptions[col]
+        cols_meta.append(entry)
+    return cols_meta
+
+
+@router.post("/api/ai/auto-generate/plan")
+async def ai_auto_generate_plan(body: AIPlanRequest):
+    """Stage 1: AI analyses all columns and creates a structured study plan.
+
+    Returns a plan with:
+    - Column classifications (demographic, indicator, measure, identifier, multi_choice)
+    - Shared grouping columns that appear across phases
+    - Thematic phases with column assignments and table specs
+    """
+    cfg = _load_ai_cfg()
+    if not cfg.get("api_key"):
+        raise HTTPException(400, "AI not configured. Go to AI Settings and add your API key.")
+    if body.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    ds = datasets[body.dataset_id]
+    df = ds["df"]
+
+    target_cols = body.selected_columns if body.selected_columns else list(df.columns[:200])
+    target_cols = [c for c in target_cols if c in df.columns]
+
+    cols_meta = _build_col_metadata(df, target_cols, body.column_descriptions)
+
+    from ..ai_sanitize import column_shape, dummy_rows
+    sample_cols = target_cols[:20]
+    sample_shapes = {c: column_shape(df, c) for c in sample_cols}
+    sample_rows = dummy_rows(sample_cols, sample_shapes, n=5)
+
+    guidance = ""
+    if body.objectives.strip():
+        guidance += f"\n--- RESEARCH OBJECTIVES ---\n{body.objectives.strip()}\n--- END ---\n\n"
+    if body.table_descriptions.strip():
+        guidance += f"\n--- USER TABLE DESCRIPTIONS ---\n{body.table_descriptions.strip()}\n--- END ---\n\n"
+
+    prompt = (
+        f"You are a senior research data analyst designing a comprehensive tabulation study.\n\n"
+        f"DATASET: {len(df)} rows, {len(target_cols)} columns\n\n"
+        f"ALL COLUMNS:\n{json.dumps(cols_meta, ensure_ascii=False, default=str)}\n\n"
+        f"SAMPLE DATA (first 5 rows, first 20 columns):\n{json.dumps(sample_rows, ensure_ascii=False, default=str)}\n\n"
+        f"{guidance}"
+        f"TASK: Create a structured study plan that organizes these columns into thematic phases.\n\n"
+        f"Step 1 — CLASSIFY each column into ONE role:\n"
+        f"  'demographic': grouping/segmentation variables reused across many tables (district, gender, age group, user type)\n"
+        f"  'indicator': main analysis variables for frequency tables and cross-tabs\n"
+        f"  'numeric_measure': quantitative values for sum/mean aggregation (income, area, count)\n"
+        f"  'multi_choice': columns with comma-separated multiple responses\n"
+        f"  'identifier': IDs, names, dates — skip for tabulation\n\n"
+        f"Step 2 — IDENTIFY shared demographic columns that should be used as groupby across multiple phases.\n\n"
+        f"Step 3 — GROUP related indicator/measure columns into thematic phases (e.g., 'Land Details', 'Income & Livelihood', 'Education', 'Demographics').\n"
+        f"Each phase should have 5-15 columns and produce ~10 tables.\n\n"
+        f"Step 4 — For each phase, specify the tables to create. Each table needs:\n"
+        f"  groupby_field, secondary_groupby (''), value_field, aggregation ('count'|'sum'|'mean'),\n"
+        f"  template ('frequency'|'count_pct_row'|'count_pct_col'|'count_pct_grand'|'average_totals'|'sum_pct_row'|'crosstab_full'),\n"
+        f"  title, description\n\n"
+        f"IMPORTANT RULES:\n"
+        f"- Use EXACT column ids from the list above\n"
+        f"- Do NOT use '*' as value_field — use the groupby_field with 'count'\n"
+        f"- Demographic columns should appear as secondary_groupby in cross-tabs across phases\n"
+        f"- multi_choice columns need frequency tables (count each option)\n"
+        f"- Target ~{body.max_tables} tables total across all phases\n\n"
+        f"Respond with ONLY valid JSON:\n"
+        f'{{"column_classifications": {{"col_id": "demographic|indicator|numeric_measure|multi_choice|identifier", ...}}, '
+        f'"shared_demographics": ["col_id", ...], '
+        f'"phases": [{{"theme": "...", "description": "...", "columns": ["col_id", ...], '
+        f'"tables": [{{"groupby_field": "...", "secondary_groupby": "", "value_field": "...", "aggregation": "count", "template": "frequency", "title": "...", "description": "..."}}]}}]}}'
+    )
+
+    try:
+        raw = await _call_llm(cfg, prompt)
+        match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+        if not match:
+            raise HTTPException(502, "AI returned empty response. Try again.")
+        plan = json.loads(match.group())
+
+        actual_cols = list(df.columns)
+        for phase in plan.get("phases", []):
+            for t in phase.get("tables", []):
+                _validate_table_cols(t, actual_cols)
+                if t.get("value_field") == "*":
+                    t["value_field"] = t.get("groupby_field", "")
+                    t["aggregation"] = "count"
+                if not t.get("template"):
+                    t["template"] = "frequency" if not t.get("secondary_groupby") else "count_pct_row"
+
+        plan["shared_demographics"] = [
+            _match_col(c, actual_cols) for c in plan.get("shared_demographics", [])
+        ]
+
+        total_tables = sum(len(p.get("tables", [])) for p in plan.get("phases", []))
+        plan["summary"] = {
+            "total_columns": len(target_cols),
+            "total_phases": len(plan.get("phases", [])),
+            "total_tables": total_tables,
+            "shared_demographics": plan.get("shared_demographics", []),
+        }
+
+        return plan
+    except HTTPException:
+        raise
+    except json.JSONDecodeError:
+        raise HTTPException(502, "AI returned invalid JSON. Try again.")
+    except Exception as e:
+        raise HTTPException(500, f"Planning failed: {str(e)}")
+
+
+# ── Stage 3: Execute approved phases with SSE streaming ──
+
+class AIExecutePlanRequest(BaseModel):
+    dataset_id: str
+    plan: dict
+    selected_phases: list = []
+    objectives: str = ""
+    table_descriptions: str = ""
+    column_descriptions: dict = {}
+
+
+@router.post("/api/ai/auto-generate/execute")
+async def ai_auto_generate_execute(body: AIExecutePlanRequest):
+    """Stage 3: Execute approved phases from the plan, streaming results via SSE."""
+    from fastapi.responses import StreamingResponse
+
+    cfg = _load_ai_cfg()
+    if not cfg.get("api_key"):
+        raise HTTPException(400, "AI not configured.")
+    if body.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    ds = datasets[body.dataset_id]
+    df = ds["df"]
+
+    plan = body.plan
+    phases = plan.get("phases", [])
+    shared_demos = plan.get("shared_demographics", [])
+    actual_cols = list(df.columns)
+
+    if body.selected_phases:
+        phases = [phases[i] for i in body.selected_phases if i < len(phases)]
+
+    guidance = ""
+    if body.objectives.strip():
+        guidance += f"Research objectives: {body.objectives.strip()}\n\n"
+    if body.table_descriptions.strip():
+        guidance += f"User table descriptions: {body.table_descriptions.strip()}\n\n"
+
+    async def stream():
+        all_tables = []
+
+        yield f"data: {json.dumps({'step': 'start', 'message': f'Executing {len(phases)} phase(s)…', 'phases': len(phases), 'tables': []})}\n\n"
+
+        for phase_idx, phase in enumerate(phases):
+            theme = phase.get("theme", f"Phase {phase_idx + 1}")
+            phase_cols = phase.get("columns", [])
+            phase_tables_spec = phase.get("tables", [])
+
+            all_phase_cols = list(set(shared_demos + phase_cols))
+            all_phase_cols = [c for c in all_phase_cols if c in df.columns]
+
+            from ..ai_sanitize import column_shape, dummy_rows
+            cols_meta = _build_col_metadata(df, all_phase_cols, body.column_descriptions)
+            sample_cols = all_phase_cols[:15]
+            sample_shapes = {c: column_shape(df, c) for c in sample_cols}
+            sample_rows = dummy_rows(sample_cols, sample_shapes, n=5)
+
+            existing_titles = [t.get("title", "") for t in all_tables]
+
+            prompt = (
+                f"You are a senior research data analyst.\n\n"
+                f"PHASE: {theme}\n"
+                f"Phase description: {phase.get('description', '')}\n\n"
+                f"Available columns for this phase (use ONLY these):\n{json.dumps(cols_meta, ensure_ascii=False, default=str)}\n\n"
+                f"Sample data:\n{json.dumps(sample_rows, ensure_ascii=False, default=str)}\n\n"
+                f"{guidance}"
+                f"PLANNED TABLES for this phase (create exactly these, refining if needed):\n"
+                f"{json.dumps(phase_tables_spec, ensure_ascii=False, default=str)}\n\n"
+                f"For each table return: groupby_field, secondary_groupby, value_field, aggregation, template, title, description.\n"
+                f"Do NOT use '*' as value_field. Use groupby_field with 'count'.\n"
+                f"Use EXACT column ids from the available columns list.\n"
+            )
+            if existing_titles:
+                prompt += f"\nAlready created (do NOT repeat): {json.dumps(existing_titles[:50])}\n"
+            prompt += (
+                f"\nTEMPLATES: frequency | count_pct_row | count_pct_col | count_pct_grand | average_totals | sum_pct_row | crosstab_full\n\n"
+                f"Respond ONLY valid JSON:\n"
+                f'{{"tables": [{{"groupby_field":"...","secondary_groupby":"","value_field":"...","aggregation":"count","template":"frequency","title":"...","description":"..."}}]}}'
+            )
+
+            yield f"data: {json.dumps({'step': 'phase', 'phase': phase_idx + 1, 'message': f'Phase {phase_idx + 1}/{len(phases)}: {theme}…', 'tables': []})}\n\n"
+
+            try:
+                raw = await _call_llm(cfg, prompt)
+                match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+                if match:
+                    result = json.loads(match.group())
+                    batch_tables = result.get("tables", [])
+                    for t in batch_tables:
+                        _validate_table_cols(t, actual_cols)
+                        if t.get("value_field") == "*":
+                            t["value_field"] = t.get("groupby_field", "")
+                            t["aggregation"] = "count"
+                        if not t.get("template"):
+                            t["template"] = "frequency" if not t.get("secondary_groupby") else "count_pct_row"
+                        t["phase"] = theme
+                    all_tables.extend(batch_tables)
+                    yield f"data: {json.dumps({'step': 'phase_done', 'phase': phase_idx + 1, 'message': f'{theme} — {len(batch_tables)} tables', 'tables': batch_tables})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'step': 'phase_error', 'phase': phase_idx + 1, 'message': f'{theme}: AI returned empty response', 'tables': []})}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'step': 'phase_error', 'phase': phase_idx + 1, 'message': f'{theme}: {str(e)}', 'tables': []})}\n\n"
+
+        yield f"data: {json.dumps({'step': 'done', 'message': f'Generated {len(all_tables)} tables across {len(phases)} phases', 'tables': all_tables})}\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+# ── Legacy endpoint (redirects to plan+execute for backwards compat) ──
+
+@router.post("/api/ai/auto-generate")
+async def ai_auto_generate(body: AIAutoGenerateRequest):
+    """Backwards-compatible: runs plan + execute in one shot with SSE streaming."""
+    from fastapi.responses import StreamingResponse
+
+    cfg = _load_ai_cfg()
+    if not cfg.get("api_key"):
+        raise HTTPException(400, "AI not configured. Go to AI Settings and add your API key.")
+    if body.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    ds = datasets[body.dataset_id]
+    df = ds["df"]
+
+    target_cols = body.selected_columns if body.selected_columns else list(df.columns[:200])
+    target_cols = [c for c in target_cols if c in df.columns]
+    actual_cols = list(df.columns)
+
+    from ..ai_sanitize import column_shape, dummy_rows
+    cols_meta = _build_col_metadata(df, target_cols, body.column_descriptions)
+    _legacy_sample_cols = target_cols[:20]
+    _legacy_shapes = {c: column_shape(df, c) for c in _legacy_sample_cols}
+    sample_rows = dummy_rows(_legacy_sample_cols, _legacy_shapes, n=5)
+
+    guidance = ""
+    if body.objectives.strip():
+        guidance += f"\n--- RESEARCH OBJECTIVES ---\n{body.objectives.strip()}\n--- END ---\n\n"
+    if body.table_descriptions.strip():
+        guidance += f"\n--- USER TABLE DESCRIPTIONS ---\n{body.table_descriptions.strip()}\n--- END ---\n\n"
+
+    async def stream():
+        yield f"data: {json.dumps({'step': 'planning', 'message': f'Analyzing {len(target_cols)} columns and creating study plan…', 'phases': 0, 'tables': []})}\n\n"
+
+        plan_prompt = (
+            f"You are a senior research data analyst designing a comprehensive tabulation study.\n\n"
+            f"DATASET: {len(df)} rows, {len(target_cols)} columns\n\n"
+            f"ALL COLUMNS:\n{json.dumps(cols_meta, ensure_ascii=False, default=str)}\n\n"
+            f"SAMPLE DATA:\n{json.dumps(sample_rows, ensure_ascii=False, default=str)}\n\n"
+            f"{guidance}"
+            f"Create a study plan: group related columns into thematic phases.\n"
+            f"Identify shared demographic columns (district, gender, user type etc.) for cross-tabs.\n"
+            f"Target ~{body.max_tables} tables across all phases, ~10 tables per phase.\n\n"
+            f"For each phase, specify tables with: groupby_field, secondary_groupby (''), value_field, aggregation, template, title, description.\n"
+            f"TEMPLATES: frequency | count_pct_row | count_pct_col | count_pct_grand | average_totals | sum_pct_row | crosstab_full\n"
+            f"Do NOT use '*' as value_field.\n\n"
+            f"Respond ONLY valid JSON:\n"
+            f'{{"shared_demographics": ["col_id"], "phases": [{{"theme": "...", "columns": ["col_id"], "tables": [{{"groupby_field":"...","secondary_groupby":"","value_field":"...","aggregation":"count","template":"frequency","title":"...","description":"..."}}]}}]}}'
+        )
+
+        try:
+            raw = await _call_llm(cfg, plan_prompt)
+            match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+            if not match:
+                yield f"data: {json.dumps({'step': 'error', 'message': 'AI returned empty response', 'tables': []})}\n\n"
+                return
+            plan = json.loads(match.group())
+        except Exception as e:
+            yield f"data: {json.dumps({'step': 'error', 'message': f'Planning failed: {str(e)}', 'tables': []})}\n\n"
+            return
+
+        phases = plan.get("phases", [])
+        shared_demos = [_match_col(c, actual_cols) for c in plan.get("shared_demographics", [])]
+
+        yield f"data: {json.dumps({'step': 'plan_ready', 'message': f'Plan: {len(phases)} phases, executing…', 'phases': len(phases), 'plan': plan, 'tables': []})}\n\n"
+
+        all_tables = []
+        for phase_idx, phase in enumerate(phases):
+            theme = phase.get("theme", f"Phase {phase_idx + 1}")
+            phase_cols = phase.get("columns", [])
+            phase_tables_spec = phase.get("tables", [])
+
+            all_phase_cols = list(set(shared_demos + phase_cols))
+            all_phase_cols = [c for c in all_phase_cols if c in df.columns]
+
+            phase_meta = _build_col_metadata(df, all_phase_cols, body.column_descriptions)
+            _phase_sample_cols = all_phase_cols[:15]
+            _phase_shapes = {c: column_shape(df, c) for c in _phase_sample_cols}
+            phase_sample = dummy_rows(_phase_sample_cols, _phase_shapes, n=5)
+
+            existing_titles = [t.get("title", "") for t in all_tables]
+
+            exec_prompt = (
+                f"You are a senior research data analyst.\n\n"
+                f"PHASE: {theme}\n\n"
+                f"Available columns:\n{json.dumps(phase_meta, ensure_ascii=False, default=str)}\n\n"
+                f"Sample data:\n{json.dumps(phase_sample, ensure_ascii=False, default=str)}\n\n"
+                f"Create these planned tables (refine as needed):\n{json.dumps(phase_tables_spec, ensure_ascii=False, default=str)}\n\n"
+                f"Return: groupby_field, secondary_groupby, value_field, aggregation, template, title, description.\n"
+                f"Use EXACT column ids. Do NOT use '*' as value_field.\n"
+                f"TEMPLATES: frequency | count_pct_row | count_pct_col | count_pct_grand | average_totals | sum_pct_row | crosstab_full\n"
+            )
+            if existing_titles:
+                exec_prompt += f"\nDo NOT repeat: {json.dumps(existing_titles[:50])}\n"
+            exec_prompt += f'\nRespond ONLY JSON: {{"tables": [...]}}'
+
+            yield f"data: {json.dumps({'step': 'phase', 'phase': phase_idx + 1, 'message': f'Phase {phase_idx + 1}/{len(phases)}: {theme}…', 'tables': []})}\n\n"
+
+            try:
+                raw = await _call_llm(cfg, exec_prompt)
+                match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+                if match:
+                    result = json.loads(match.group())
+                    batch_tables = result.get("tables", [])
+                    for t in batch_tables:
+                        _validate_table_cols(t, actual_cols)
+                        if t.get("value_field") == "*":
+                            t["value_field"] = t.get("groupby_field", "")
+                            t["aggregation"] = "count"
+                        if not t.get("template"):
+                            t["template"] = "frequency" if not t.get("secondary_groupby") else "count_pct_row"
+                        t["phase"] = theme
+                    all_tables.extend(batch_tables)
+                    yield f"data: {json.dumps({'step': 'phase_done', 'phase': phase_idx + 1, 'message': f'{theme} — {len(batch_tables)} tables', 'tables': batch_tables})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'step': 'phase_error', 'phase': phase_idx + 1, 'message': f'{theme}: empty response', 'tables': []})}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'step': 'phase_error', 'phase': phase_idx + 1, 'message': f'{theme}: {str(e)}', 'tables': []})}\n\n"
+
+        yield f"data: {json.dumps({'step': 'done', 'message': f'Generated {len(all_tables)} tables across {len(phases)} phases', 'tables': all_tables})}\n\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+class AICreateColumnRequest(BaseModel):
+    dataset_id: str
+    description: str
+    column_descriptions: dict = {}
+    selected_columns: list = []
+
+
+@router.post("/api/ai/create-column")
+async def ai_create_column(body: AICreateColumnRequest):
+    """AI creates a new computed column (metric or bin) from natural language."""
+    try:
+        cfg = _load_ai_cfg()
+        if not cfg.get("api_key"):
+            raise HTTPException(400, "AI not configured. Go to AI Settings and add your API key.")
+        if body.dataset_id not in datasets:
+            raise HTTPException(404, "Dataset not found")
+        ds = datasets[body.dataset_id]
+        df = ds["df"]
+
+        from ..pii_redact import is_pii_column, redact_values
+
+        if body.selected_columns:
+            pii_selected = [c for c in body.selected_columns if is_pii_column(c)]
+            if pii_selected:
+                raise HTTPException(400, (
+                    f"Can't create a computed column from {', '.join(pii_selected)} — this "
+                    f"looks like a personal-data column (name/phone/email/address/location), "
+                    f"and DPDP compliance means that content never goes to a third-party AI "
+                    f"model. Remove it from your column selection to continue."
+                ))
+            use_cols = [c for c in df.columns if c in body.selected_columns]
+        else:
+            # No explicit selection — this is "show me all columns as context",
+            # so PII-named columns are silently left out rather than blocking
+            # the whole feature for a dataset that merely contains one elsewhere.
+            use_cols = [c for c in df.columns[:80] if not is_pii_column(c)]
+
+        cols_info = []
+        for col in use_cols:
+            dtype = str(df[col].dtype)
+            uniq = int(df[col].nunique())
+            # Real values, content-level-redacted — create-column needs to see
+            # real format (e.g. to build a regex/formula), unlike report-writing
+            # and table-design suggestion which never need real content at all.
+            sample = redact_values(df[col].dropna().head(5).astype(str).tolist(), column_name=col)
+            entry = {
+                "id": col,
+                "type": "numeric" if "int" in dtype or "float" in dtype else "text",
+                "unique": uniq,
+                "sample": sample,
+            }
+            if col in body.column_descriptions and body.column_descriptions[col]:
+                entry["description"] = body.column_descriptions[col]
+            cols_info.append(entry)
+
+        prompt = (
+            f"You are a data engineer. The user wants to create a new computed column.\n"
+            f"Think of it like Excel formulas or Power BI conditional columns.\n\n"
+            f"Available columns:\n{json.dumps(cols_info, indent=1)}\n\n"
+            f"User request: \"{body.description}\"\n\n"
+            f"Decide if this is a METRIC (computation/formula/conditional) or BIN (categorization/grouping).\n\n"
+            f"METRIC types and their required fields:\n"
+            f"  formula: column_a, operator (+,-,*,/), column_b\n"
+            f"  ratio: numerator, denominator\n"
+            f"  percentage: part, whole\n"
+            f"  growth: current, previous, growth_type (percentage|absolute)\n"
+            f"  weighted_average: value_column, weight_column\n"
+            f"  index: base_column, base_value\n"
+            f"  rank: rank_column, rank_order (asc|desc)\n"
+            f"  cumulative: value_column\n"
+            f"  composite: column_a, operator, column_b (for combining metrics)\n"
+            f"  conditional: cond_column, cond_operator (gt|gte|lt|lte|eq|neq|contains|not_contains), cond_value,\n"
+            f"    cond_then_type (literal|column), cond_then_val or cond_then_col,\n"
+            f"    cond_else_type (literal|column), cond_else_val or cond_else_col\n\n"
+            f"For conditional with multiple conditions (nested IF), use metric_type='conditional' for the outer.\n"
+            f"Set cond_else_type='literal' and cond_else_val to a label for the else case.\n\n"
+            f"BIN types: numeric (ranges), text (mapping), group (category collapsing),\n"
+            f"  equal_width (auto bins), quartile, decile\n"
+            f"  For numeric bins use: source_column, bin_type='numeric',\n"
+            f"    ranges: [{{label, lower, upper}}, ...]\n"
+            f"  For text mapping: source_column, bin_type='text',\n"
+            f"    mapping: {{\"original_value\": \"new_label\", ...}}\n"
+            f"  For category grouping: source_column, bin_type='group',\n"
+            f"    group_map: {{\"group_label\": [\"val1\", \"val2\"], ...}}\n\n"
+            f"Return JSON:\n"
+            f'{{"type": "metric"|"bin", "definition": {{...}}}}\n\n'
+            f"IMPORTANT:\n"
+            f"- Use ONLY column ids from the available columns list\n"
+            f"- Always include a 'name' field for the new column\n"
+            f"- For conditional columns, text comparisons: cond_operator='eq' with cond_value as the text\n"
+            f"- Return ONLY valid JSON, nothing else"
+        )
+        raw = await _call_llm(cfg, prompt)
+        match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+        if match:
+            try:
+                result = json.loads(match.group())
+                return result
+            except json.JSONDecodeError:
+                raise HTTPException(502, "AI returned invalid JSON. Try again.")
+        raise HTTPException(502, "AI returned empty response. Try again.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"AI column creation failed: {str(e)}")
+
+
+REPORT_STYLE_PROMPTS = {
+    "progress": "You are writing a field program progress report for NGO/government management. Use clear sections: Executive Summary, Progress Against Targets, Data Quality, Issues & Resolutions, Next Steps. Professional but accessible tone.",
+    "field_survey": "You are writing a field survey report for a research team. Sections: Background, Methodology, Sample Description, Key Findings, Data Quality Assessment, Limitations, Recommendations. Technical but readable.",
+    "research": "You are writing an academic research paper. Sections: Abstract, Introduction, Methods, Results, Discussion, Conclusion. Use formal academic language.",
+    "government": "You are writing an official government administrative report. Sections: Executive Summary, Objectives, Methodology, Findings, Recommendations, Action Points. Formal bureaucratic style.",
+    "ngo": "You are writing an NGO/donor impact report. Sections: Program Overview, Impact Summary, Key Indicators, Challenges, Lessons Learned. Warm but evidence-based tone.",
+    "executive": "You are writing a concise executive summary for leadership. Maximum 2 pages. Focus on key numbers, decisions needed, and actionable next steps.",
+}
+
+
+class AIReportRequest(BaseModel):
+    dataset_id: str
+    tables_data: list = []
+    style: str = "field_survey"
+    custom_context: str = ""
+    filename: str = ""
+
+
+@router.post("/api/ai/report")
+async def ai_generate_report(body: AIReportRequest):
+    """Generate a full report from table data."""
+    cfg = _load_ai_cfg()
+    style_prompt = REPORT_STYLE_PROMPTS.get(body.style, REPORT_STYLE_PROMPTS["field_survey"])
+
+    tables_text = ""
+    for i, t in enumerate(body.tables_data[:10]):
+        title = t.get("title", f"Table {i+1}")
+        headers = t.get("headers", [])
+        rows = t.get("rows", [])
+        tables_text += f"\n### {title}\n"
+        tables_text += " | ".join(str(h) for h in headers) + "\n"
+        tables_text += " | ".join("---" for _ in headers) + "\n"
+        for row in rows[:30]:
+            tables_text += " | ".join(str(v) for v in row) + "\n"
+        if len(rows) > 30:
+            tables_text += f"... ({len(rows) - 30} more rows)\n"
+
+    row_count = 0
+    if body.dataset_id in datasets:
+        row_count = len(datasets[body.dataset_id]["df"])
+
+    prompt = (
+        f"{style_prompt}\n\n"
+        f"Dataset: {body.filename or 'Data Analysis'}\n"
+        f"Total records: {row_count}\n"
+        f"Number of tables analyzed: {len(body.tables_data)}\n\n"
+        f"Tabulation data:\n{tables_text[:10000] if tables_text else 'No tabulation data — use placeholders.'}\n\n"
+        f"Additional context: {body.custom_context or 'None.'}\n\n"
+        f"Generate a complete, professional report in markdown. Use ## for sections, **bold** for key findings. "
+        f"Be specific and data-driven. Mark sections needing human input with [REVIEW NEEDED]."
+    )
+    report = await _call_llm(cfg, prompt)
+    return {"report": report}
+
+
+# AI proxy to FieldGovern (when embedded)
+@router.post("/api/ai/fg-proxy")
+async def ai_fg_proxy(body: dict):
+    """Proxy AI requests to FieldGovern backend when embedded."""
+    import httpx
+    fg_url = body.get("fg_url", "").rstrip("/")
+    token = body.get("token", "")
+    endpoint = body.get("endpoint", "")
+    payload = body.get("payload", {})
+    if not fg_url or not token or not endpoint:
+        raise HTTPException(400, "Missing fg_url, token, or endpoint")
+    internal_base = os.environ.get("FG_INTERNAL_URL", "").rstrip("/")
+    base = internal_base if internal_base else fg_url
+    url = f"{base}{endpoint}"
+    try:
+        async with httpx.AsyncClient(timeout=120.0, verify=bool(not internal_base)) as client:
+            resp = await client.post(url, json=payload, headers={"Authorization": f"Bearer {token}"})
+        if resp.status_code != 200:
+            raise HTTPException(resp.status_code, f"FG returned {resp.status_code}: {resp.text[:200]}")
+        return resp.json()
+    except httpx.RequestError as e:
+        raise HTTPException(502, f"Could not reach FieldGovern: {e}")

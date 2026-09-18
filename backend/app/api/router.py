@@ -1,0 +1,54 @@
+from fastapi import APIRouter
+from app.api.routes import (
+    auth, forms, submissions, users, sync, export, assignments, history,
+    schedules, tenants, notifications, api_keys, webhooks, reports,
+    templates, import_excel, bulk_upload, programs, admin_monitor, ai,
+    field_govern, user_tool_projects, billing, scheduled_reports, results, feedback,
+)
+from app.api.routes.migration.router import router as migration_router
+from app.api.routes import public_survey, roster, analytics, locations, comments, inbox, shared_files
+from app.api.routes import bin as recycle_bin
+from app.api.routes.two_factor import router as two_factor_router
+from app.api.routes.audit import router as audit_router
+from app.api.routes.razorpay_billing import router as razorpay_router
+
+router = APIRouter()
+
+router.include_router(auth.router, prefix="/auth", tags=["auth"])
+router.include_router(forms.router, prefix="/forms", tags=["forms"])
+router.include_router(submissions.router, prefix="/submissions", tags=["submissions"])
+router.include_router(users.router, prefix="/users", tags=["users"])
+router.include_router(sync.router, prefix="/sync", tags=["sync"])
+router.include_router(export.router, prefix="/export", tags=["export"])
+router.include_router(assignments.router, prefix="/assignments", tags=["assignments"])
+router.include_router(history.router, prefix="/history", tags=["history"])
+router.include_router(schedules.router, prefix="/schedules", tags=["schedules"])
+router.include_router(tenants.router, prefix="/tenants", tags=["tenants"])
+router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+router.include_router(api_keys.router)
+router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
+router.include_router(reports.router, prefix="/reports", tags=["reports"])
+router.include_router(templates.router, prefix="/templates", tags=["templates"])
+router.include_router(import_excel.router, prefix="/forms", tags=["forms"])
+router.include_router(bulk_upload.router, prefix="/bulk-upload", tags=["bulk-upload"])
+router.include_router(programs.router, prefix="/programs", tags=["programs"])
+router.include_router(results.router, prefix="/results", tags=["results"])
+router.include_router(feedback.router, tags=["feedback"])
+router.include_router(admin_monitor.router)
+router.include_router(migration_router, prefix="/migration", tags=["migration"])
+router.include_router(public_survey.router, tags=["public-survey"])
+router.include_router(roster.router, prefix="/roster", tags=["roster"])
+router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+router.include_router(ai.router, prefix="/ai", tags=["ai"])
+router.include_router(locations.router, prefix="/locations", tags=["locations"])
+router.include_router(field_govern.router, prefix="/fg", tags=["field-govern"])
+router.include_router(comments.router, tags=["comments"])
+router.include_router(inbox.router, tags=["inbox"])
+router.include_router(user_tool_projects.router, tags=["tool-projects"])
+router.include_router(billing.router, tags=["billing"])
+router.include_router(scheduled_reports.router, tags=["scheduled-reports"])
+router.include_router(shared_files.router, tags=["shared-files"])
+router.include_router(two_factor_router, prefix="/auth", tags=["2fa"])
+router.include_router(audit_router, tags=["audit"])
+router.include_router(razorpay_router, tags=["razorpay"])
+router.include_router(recycle_bin.router, tags=["bin"])

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SPLVXJJ7GN"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag("js", new Date());
+    gtag("config", "G-SPLVXJJ7GN");
+  </script>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Baseline vs Endline Survey Design: Common Mistakes — FieldGovern</title>
+  <meta name="description" content="Five design mistakes that quietly break baseline-to-endline comparability — instrument drift, enumerator bias, missing counterfactuals — plus a lock checklist."/>
+  <link rel="canonical" href="https://www.fieldgovern.com/blog/baseline-endline-survey-design-mistakes.html"/>
+  <link rel="icon" href="/assets/logo-icon.png" type="image/png"/>
+  <link rel="manifest" href="/site.webmanifest"/>
+  <meta name="robots" content="index,follow"/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:url" content="https://www.fieldgovern.com/blog/baseline-endline-survey-design-mistakes.html"/>
+  <meta property="og:title" content="Baseline vs Endline Survey Design: Common Mistakes That Break Comparability"/>
+  <meta property="og:description" content="Five design mistakes that quietly break baseline-to-endline comparability — instrument drift, enumerator bias, missing counterfactuals — plus a lock checklist."/>
+  <meta property="og:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
+  <meta property="og:site_name" content="FieldGovern"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="Baseline vs Endline Survey Design: Common Mistakes That Break Comparability"/>
+  <meta name="twitter:description" content="Five design mistakes that quietly break baseline-to-endline comparability — instrument drift, enumerator bias, missing counterfactuals — plus a lock checklist."/>
+  <meta name="twitter:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Baseline vs Endline Survey Design: Common Mistakes That Break Comparability","datePublished":"2026-08-19","dateModified":"2026-08-19","author":{"@type":"Organization","name":"FieldGovern"},"publisher":{"@type":"Organization","name":"FieldGovern","url":"https://www.fieldgovern.com"}}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <script defer data-domain="fieldgovern.com" src="https://plausible.io/js/script.js"></script>
+  <style>
+    :root{--brand:#0ea5e9;--brand-dark:#0369a1;--bg:#ffffff;--bg2:#f8fafc;--bg3:#f1f5f9;--text:#0f172a;--text2:#334155;--text3:#64748b;--border:#e2e8f0}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{font-family:'Inter',sans-serif;color:var(--text);background:var(--bg)}
+    body{overflow-x:hidden;max-width:100vw}
+    a{color:var(--brand)}
+    nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.95);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:0 1.5rem}
+    .nav-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:64px}
+    .nav-logo{font-weight:800;font-size:1.2rem;color:var(--text);text-decoration:none}
+    .hero{background:linear-gradient(135deg,#0369a1 0%,#0ea5e9 100%);color:#fff;padding:4rem 1.5rem 3rem;text-align:center}
+    .hero .tag{display:inline-block;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:.3rem .9rem;font-size:.8rem;font-weight:600;margin-bottom:1rem}
+    .hero h1{font-size:clamp(1.75rem,4vw,2.75rem);font-weight:900;line-height:1.2;max-width:800px;margin:0 auto .75rem}
+    .hero p{opacity:.9;max-width:680px;margin:.5rem auto 0;font-size:1rem}
+    .hero .meta{opacity:.7;font-size:.85rem;margin-top:1rem}
+    article{max-width:780px;margin:0 auto;padding:3rem 1.5rem}
+    article h2{font-size:1.4rem;font-weight:800;margin:2.5rem 0 .75rem;color:var(--text)}
+    article h3{font-size:1.1rem;font-weight:700;margin:1.75rem 0 .5rem;color:var(--text)}
+    article p{color:var(--text2);line-height:1.8;margin-bottom:1rem;font-size:.97rem}
+    article ul,article ol{padding-left:1.5rem;margin-bottom:1rem}
+    article li{color:var(--text2);line-height:1.8;margin-bottom:.4rem;font-size:.97rem}
+    article strong{color:var(--text)}
+    article img{max-width:100%;border-radius:10px;border:1px solid var(--border);margin:1.5rem 0;display:block}
+    figcaption{font-size:.82rem;color:var(--text3);text-align:center;margin-top:-1rem;margin-bottom:1.5rem}
+    .table-wrap{overflow-x:auto;margin:1.5rem 0}
+    table{width:100%;border-collapse:collapse;font-size:.88rem}
+    th{background:var(--bg3);font-weight:700;text-align:left;padding:.65rem 1rem;border:1px solid var(--border)}
+    td{padding:.6rem 1rem;border:1px solid var(--border);color:var(--text2);vertical-align:top}
+    .cta-box{background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff;border-radius:16px;padding:2.5rem 2rem;text-align:center;margin:3rem 0}
+    .cta-box h2{color:#fff;font-size:1.5rem;margin-bottom:.5rem;margin-top:0}
+    .cta-box p{color:rgba(255,255,255,.85);margin-bottom:1.25rem}
+    .btn{display:inline-block;padding:.8rem 1.75rem;border-radius:8px;font-weight:700;font-size:.9rem;text-decoration:none}
+    .btn-white{background:#fff;color:var(--brand-dark)}
+    .related{background:var(--bg2);border-radius:12px;padding:1.5rem;margin:2rem 0}
+    .related h3{font-size:.95rem;font-weight:700;margin-bottom:.75rem;color:var(--text)}
+    .related ul{list-style:none;padding:0}
+    .related li{margin-bottom:.4rem}
+    .warning-box{background:#fef3c7;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:1rem 1.25rem;margin:1.5rem 0}
+    .warning-box strong{color:#92400e}
+    .warning-box p{color:#78350f;margin:0}
+    .checklist-item{display:flex;align-items:flex-start;gap:.75rem;padding:.6rem 0;border-bottom:1px solid var(--border)}
+    .checklist-item:last-child{border-bottom:none}
+    .check-num{background:var(--brand);color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0;margin-top:.1rem}
+    footer{background:var(--bg3);border-top:1px solid var(--border);padding:2rem 1.5rem;text-align:center;font-size:.85rem;color:var(--text3);margin-top:4rem}
+    @media(max-width:640px){.nav-links{display:none}}
+  </style>
+</head>
+<body>
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="/">FieldGovern</a>
+    <div class="nav-links" style="display:flex;gap:1.5rem;font-size:.9rem">
+      <a href="/blog/">Blog</a>
+      <a href="/features.html">Features</a>
+      <a href="/pricing.html">Pricing</a>
+      <a href="https://app.fieldgovern.com" style="color:var(--brand);font-weight:600">Get Started</a>
+    </div>
+  </div>
+</nav>
+
+<div class="hero">
+  <span class="tag">Research Design</span>
+  <h1>Baseline vs Endline Survey Design: Common Mistakes</h1>
+  <p>An impact estimate is only as trustworthy as the comparison behind it. These are the five design mistakes that quietly break baseline-to-endline comparability — and the discipline that prevents them.</p>
+  <div class="meta">By FieldGovern · August 2026 · 11 min read</div>
+</div>
+
+<article>
+
+  <p>Every impact evaluation rests on a simple promise: the change you measure between baseline and endline reflects the effect of the programme, not the effect of something else that changed along the way. That promise is far more fragile than most teams realise. A baseline and an endline are, in practice, two separate data collection exercises — run months or years apart, often by different field staff, sometimes using a form that has been "lightly updated" in between. Any one of those differences can introduce a gap between what you measured and what you meant to measure, and that gap shows up in your results as if it were programme impact.</p>
+
+  <p>This article walks through the five mistakes we see most often in baseline-endline study design — not exotic statistical errors, but ordinary, avoidable slips in instrument management and fieldwork planning. It closes with a practical checklist for locking a baseline instrument before endline fieldwork begins, which is the single highest-leverage habit a research team can adopt.</p>
+
+  <h2>Why Baseline-Endline Comparisons Break So Easily</h2>
+
+  <p>A household survey instrument is a complex artifact: dozens of questions, each with specific wording, response options, skip logic, and a reference period ("in the last 7 days," "in the last agricultural season"). For a pre-post comparison to be valid, everything about how you ask the question has to stay constant except the thing you're trying to measure — time, and exposure to the programme. In practice, research teams treat the endline as a chance to "improve" the form: fix a typo, reorder some options, add a category someone requested. Each change feels harmless in isolation. Collectively, they erode the comparison the entire evaluation depends on.</p>
+
+  <div class="warning-box">
+    <strong>The comparison, not the data collection, is the deliverable.</strong>
+    <p>A perfectly executed endline survey is worthless for impact measurement if it isn't comparable to the baseline. Data quality at each round is necessary but not sufficient — comparability across rounds is the thing that actually makes the evaluation valid.</p>
+  </div>
+
+  <h2>Five Mistakes That Undermine Impact Evaluation Validity</h2>
+
+  <h3>1. Instrument Drift Between Baseline and Endline</h3>
+  <p>This is the most common and most invisible mistake. Somewhere between baseline and endline, someone edits the form. A question that asked "How many days did you work for wages in the last 7 days?" becomes "in the last month" because a field supervisor felt the shorter recall period produced noisy answers. A response scale that was "Yes / No / Don't Know" at baseline loses the "Don't Know" option at endline because the team wanted cleaner analysis. A five-point satisfaction scale gets relabelled from numbers to words. None of these changes are recorded as a formal decision — they happen in a shared document, get pushed to the field team, and nobody flags that the baseline and endline data are no longer strictly comparable on that indicator.</p>
+  <p>The danger is that instrument drift rarely breaks your analysis outright — it just adds noise or bias that looks exactly like a real programme effect. A shift in a wellbeing scale's midpoint label can move average scores by a meaningful margin with zero change in actual respondent wellbeing.</p>
+
+  <h3>2. Different Enumerators or Different Seasons</h3>
+  <p>Household surveys are administered by people, and people introduce variation. If your baseline enumerator team is different from your endline team — different training cohort, different average experience level, different familiarity with the study area — you introduce an "interviewer effect" that is confounded with time. The same risk applies to timing: if baseline was fielded post-harvest and endline was fielded during the lean season, any indicator sensitive to seasonality (income, food security, migration status) will show a "change" that has nothing to do with your programme.</p>
+  <p>Good practice is to field endline with as much overlap in enumerator team composition as feasible, and to deliberately match the calendar window — same month, same point in the agricultural or academic cycle — rather than simply targeting "12 months after baseline" without checking what that date falls on.</p>
+
+  <h3>3. Missing a True Counterfactual</h3>
+  <p>A pre-post design — measuring the same group before and after a programme, with no comparison group — cannot distinguish programme effect from everything else that changed over the same period: seasonal trends, other programmes operating in the same area, general economic conditions, or simple regression to the mean. Without a control or comparison group that did not receive the programme (ideally through randomisation, or failing that, a credible quasi-experimental design such as matching or difference-in-differences), a change observed between baseline and endline tells you very little about causal impact, no matter how carefully the instrument was administered.</p>
+  <p>This mistake is a design-stage decision, not a fieldwork error, but it interacts with everything else in this article: if you don't have a counterfactual, get the instrument comparability right anyway — donors and academic reviewers will still expect it, and a future re-analysis with a constructed comparison group depends on baseline and endline data being genuinely comparable.</p>
+
+  <h3>4. Indicators Not Pre-Registered Before Data Collection</h3>
+  <p>Without a pre-specified list of primary and secondary indicators, it is tempting — even unconsciously — to report whichever indicators show a statistically significant change at endline, out of the dozens collected. This is the multiple-comparisons problem in practice: test enough outcomes and some will appear significant by chance alone. Pre-registering your primary indicators (on a platform like OSF, AsPredicted, or your funder's own registry) before endline data collection begins, and ideally before baseline, forces the discipline of deciding in advance what "success" looks like — and makes your eventual findings credible to reviewers who will otherwise wonder what else you measured and didn't report.</p>
+
+  <h3>5. Attrition Not Tracked Systematically</h3>
+  <p>If a meaningful share of your baseline respondents cannot be found at endline, and you have not tracked who they are and why they're missing, you cannot rule out differential attrition — a systematic difference between who stayed in your sample and who dropped out. If the people your programme didn't help are also the people most likely to have moved away or stopped responding, your endline sample is quietly biased toward people the programme worked for, and your impact estimate will be inflated. This requires the same wave-status discipline used in panel studies: record a definitive status for every baseline respondent at endline (interviewed, not found, refused, deceased, migrated), not just a completion count.</p>
+
+  <h2>Mistake, Consequence, Fix</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Mistake</th>
+          <th>Consequence</th>
+          <th>Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Instrument drift</td>
+          <td>Apparent change that is really a measurement artifact</td>
+          <td>Version-lock the form; log every deviation with a reason</td>
+        </tr>
+        <tr>
+          <td>Different enumerators/season</td>
+          <td>Interviewer or seasonal effect confounded with time</td>
+          <td>Match enumerator composition and calendar window across rounds</td>
+        </tr>
+        <tr>
+          <td>No counterfactual</td>
+          <td>Cannot separate programme effect from secular trend</td>
+          <td>Build in a control/comparison group at design stage</td>
+        </tr>
+        <tr>
+          <td>Indicators not pre-registered</td>
+          <td>Multiple-comparisons bias; cherry-picked findings</td>
+          <td>Pre-register primary/secondary indicators before endline</td>
+        </tr>
+        <tr>
+          <td>Attrition untracked</td>
+          <td>Silent selection bias in the endline sample</td>
+          <td>Record a definitive wave status for every baseline respondent</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>What "Locking" a Baseline Instrument Actually Means</h2>
+
+  <p>"Lock the instrument" is easy advice to give and hard to operationalise without the right tooling. In practice it means four things happening together:</p>
+
+  <h3>Version Control on the Form</h3>
+  <p>The exact form used at baseline — every question, option, and skip-logic rule — needs to exist as a retrievable, timestamped snapshot, not a Word document someone remembers editing. If your endline form needs a change (and sometimes it legitimately does — a question that made no sense in a new district, for instance), that change should be visible as a diff against the baseline version, not buried in a fresh form nobody compared against the original.</p>
+
+  <img src="../assets/blog/form-builder-ai.png" alt="FieldGovern Form Builder canvas with AI form generation, used for building and version-locking baseline survey instruments"/>
+  <figcaption>FieldGovern's Form Builder keeps every published version of a form, so an endline instrument can be checked against its baseline snapshot before fieldwork starts.</figcaption>
+
+  <p>FieldGovern's Form Builder keeps a full version history for every form — each publish creates a snapshot, and version diffs show exactly what changed between any two versions, question by question. For a baseline-endline study, this means your endline team can pull up the exact baseline version, confirm the wording, response options, and skip logic are unchanged, and if a deviation is genuinely necessary, document it against a specific version rather than losing the change in institutional memory.</p>
+
+  <h3>Freezing Exact Question Wording</h3>
+  <p>Once baseline is fielded, the exact text of every indicator-relevant question should be treated as fixed. If a translation needs correction, that correction should be applied to both the baseline archive and the endline form identically, and logged — not silently patched only in the endline version.</p>
+
+  <h3>Matching Season and Reference Period</h3>
+  <p>Lock the reference period for every recall-based question (income, food consumption, health events) to the same length and, where possible, the same season across rounds. If baseline asked about "the last agricultural season," endline should reference the equivalent season, not a fixed calendar window that happens to land differently.</p>
+
+  <h3>Documenting Any Deviations</h3>
+  <p>When a deviation from the baseline instrument is unavoidable, write down what changed, why, and what it means for comparability of that specific indicator — before fieldwork, not after a reviewer asks. This single habit is what separates a defensible evaluation from one that gets its results questioned during peer review or donor audit.</p>
+
+  <h2>Locking a Baseline Instrument: A Checklist</h2>
+
+  <div class="checklist-item">
+    <div class="check-num">1</div>
+    <div><strong>Publish and snapshot the baseline form.</strong> Treat the exact version used in the field as the canonical reference, retrievable at any time.</div>
+  </div>
+  <div class="checklist-item">
+    <div class="check-num">2</div>
+    <div><strong>Pre-register primary and secondary indicators.</strong> Decide before endline data collection which indicators define "success," and register the plan externally.</div>
+  </div>
+  <div class="checklist-item">
+    <div class="check-num">3</div>
+    <div><strong>Diff the endline form against the baseline version before fieldwork.</strong> Review every change line by line; nothing should be different without a documented reason.</div>
+  </div>
+  <div class="checklist-item">
+    <div class="check-num">4</div>
+    <div><strong>Match enumerator team composition where feasible.</strong> Reuse experienced enumerators across rounds, or at minimum standardise training so interviewer effects don't confound time effects.</div>
+  </div>
+  <div class="checklist-item">
+    <div class="check-num">5</div>
+    <div><strong>Align the fieldwork calendar to the same season or cycle.</strong> Check what your target endline date actually falls on before locking field dates.</div>
+  </div>
+  <div class="checklist-item">
+    <div class="check-num">6</div>
+    <div><strong>Set up a wave-status tracker for every baseline respondent.</strong> Interviewed, not found, refused, migrated, deceased — a definitive status for each, not just a completion count.</div>
+  </div>
+  <div class="checklist-item">
+    <div class="check-num">7</div>
+    <div><strong>Log every deviation with a rationale, timestamped.</strong> If something has to change, the record of why should exist before the data does.</div>
+  </div>
+
+  <p>None of this eliminates the need for good statistical practice — pre-analysis plans, appropriate estimators, robustness checks. But statistics cannot recover a comparison that the instrument itself made impossible. The cheapest place to protect the validity of an impact evaluation is at the point where the endline form gets built, not at the point where the results get written up.</p>
+
+  <div class="cta-box">
+    <h2>Build Your Baseline Once, Lock It, Reuse It</h2>
+    <p>FieldGovern's Form Builder keeps a full version history and diff view for every form, so your endline instrument can be checked against baseline before a single household is visited. Start a free trial to see it on your own study.</p>
+    <a href="https://app.fieldgovern.com" class="btn btn-white">Start Free Trial</a>
+  </div>
+
+  <div class="related">
+    <h3>Related Articles</h3>
+    <ul>
+      <li><a href="rct-data-collection-requirements.html">Running an RCT? What Your Data Collection Tool Needs to Support</a></li>
+      <li><a href="logframe-theory-of-change-indicator-tracking.html">Tracking Indicators Against a Logframe or Theory of Change Without Spreadsheet Chaos</a></li>
+      <li><a href="enumerator-training-quality-control.html">Enumerator Training and Quality Control That Actually Works</a></li>
+      <li><a href="panel-study-india-guide.html">Running a Panel Study in India: Attrition, Tracking, and the Right Tools</a></li>
+    </ul>
+  </div>
+</article>
+
+<footer>
+  <p>© 2026 Dataworx · FieldGovern · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · <a href="/dpdp-compliance.html">DPDP</a></p>
+</footer>
+<script defer src="/assets/trial-cta.js"></script>
+</body>
+</html>

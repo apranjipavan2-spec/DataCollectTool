@@ -1,0 +1,2537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cleaner — FieldGovern</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Base ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0f1117; --bg2: #181b25; --bg3: #1e2230; --bg4: #262b3a;
+  --border: #2e3446; --text: #e1e4ed; --text2: #8b92a8; --text3: #5c6380;
+  --accent: #6366f1; --accent2: #818cf8; --accent-glow: rgba(99,102,241,.15);
+  --green: #34d399; --red: #f87171; --yellow: #fbbf24; --cyan: #22d3ee;
+  --radius: 10px; --transition: .2s ease;
+}
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+button { font-family: inherit; cursor: pointer; border: none; }
+input, select, textarea { font-family: inherit; }
+
+/* ── Layout ────────────────────────────────────────────────────── */
+.app { display: flex; height: 100vh; overflow: hidden; }
+.sidebar { width: 250px; min-width: 250px; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.main-header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; background: var(--bg2); }
+.main-content { flex: 1; overflow-y: auto; padding: 24px; }
+
+/* ── Sidebar ───────────────────────────────────────────────────── */
+.sidebar-header { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.sidebar-header h1 { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.sidebar-header h1 span { font-size: 18px; }
+.sidebar-header .file-info { font-size: 10px; color: var(--text2); margin-top: 4px; line-height: 1.3; }
+.sidebar-section { padding: 8px 16px; }
+.sidebar-section h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text3); margin-bottom: 0; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+.sidebar-section h3::after { content: "▼"; font-size: 7px; transition: transform .2s; margin-left: auto; }
+.sidebar-section.collapsed h3::after { transform: rotate(-90deg); }
+.col-list { flex: 1; overflow-y: auto; padding: 4px 10px; }
+.col-item {
+  padding: 3px 8px; border-radius: 6px; cursor: pointer; font-size: 12px;
+  display: flex; justify-content: space-between; align-items: center;
+  transition: background var(--transition); margin-bottom: 1px; gap: 6px;
+  border: 1px solid transparent;
+}
+.col-item:hover { background: var(--bg3); }
+.col-item.active { 
+  background: var(--accent-glow); color: #fff; border: 1px solid rgba(99,102,241,.3); 
+  border-left: 3px solid var(--accent);
+}
+.col-item .col-text { flex: 1; display: flex; flex-direction: column; gap: 0px; text-align: left; overflow: hidden; }
+.col-item .col-segment { 
+  font-size: 9px; color: var(--text3); font-weight: 400; line-height: 1.1; 
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+}
+.col-item .col-main-name { 
+  font-weight: 700; color: var(--text); line-height: 1.2; font-size: 12px;
+  display: flex; align-items: center; gap: 4px; border-top: none; padding-top: 1px;
+}
+.col-item.active .col-main-name { color: #fff; }
+.col-item .col-meta { font-size: 10px; color: var(--text3); font-weight: 400; flex-shrink: 0; }
+.col-item .badge { font-size: 9px; padding: 1px 5px; border-radius: 8px; background: var(--bg4); color: var(--text2); flex-shrink:0; min-width: 24px; text-align: center; }
+.col-item .badge.missing { background: rgba(248,113,113,.15); color: var(--red); }
+
+/* ── Upload / Welcome ──────────────────────────────────────────── */
+.upload-zone {
+  border: 1px dashed var(--border); border-radius: var(--radius); padding: 24px 28px;
+  text-align: center; transition: border-color var(--transition), background var(--transition);
+  max-width: 480px; margin: 0 auto;
+}
+.upload-zone:hover, .upload-zone.dragover { border-color: var(--accent); background: var(--accent-glow); }
+.upload-zone h2 { font-size: 15px; margin-bottom: 6px; color: var(--text2); }
+.upload-zone p { color: var(--text3); font-size: 12px; margin-bottom: 12px; }
+.upload-zone input { display: none; }
+.upload-btn {
+  padding: 8px 20px; background: var(--bg3); color: var(--text); border-radius: 8px;
+  font-weight: 500; font-size: 13px; border: 1px solid var(--border); transition: background var(--transition);
+}
+.upload-btn:hover { background: var(--bg4); }
+/* welcome card (FG primary) */
+.welcome-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 16px;
+  padding: 36px 32px; max-width: 460px; width: 100%; margin: 60px auto 0;
+}
+.welcome-card h1 { font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+.welcome-card .sub { font-size: 13px; color: var(--text3); margin-bottom: 24px; }
+.fg-field { margin-bottom: 14px; }
+.fg-field label { display: block; font-size: 11px; font-weight: 700; color: var(--text3);
+  letter-spacing: .08em; text-transform: uppercase; margin-bottom: 5px; }
+.fg-select {
+  width: 100%; padding: 10px 34px 10px 12px; border-radius: 8px; font-size: 14px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  outline: none; cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+}
+.fg-select:focus { border-color: var(--accent); }
+.btn-load {
+  width: 100%; padding: 12px; border-radius: 8px; border: none;
+  background: var(--accent); color: #fff; font-size: 14px; font-weight: 700;
+  cursor: pointer; margin-top: 4px; transition: opacity .15s;
+}
+.btn-load:disabled { opacity: .4; cursor: not-allowed; }
+.divider-or { display: flex; align-items: center; gap: 12px; margin: 20px 0; }
+.divider-or::before, .divider-or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.divider-or span { font-size: 12px; color: var(--text3); }
+
+/* ── Buttons ───────────────────────────────────────────────────── */
+.btn {
+  padding: 7px 14px; border-radius: 6px; font-size: 13px; font-weight: 500;
+  transition: all var(--transition); display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--bg4); }
+.btn-success { background: rgba(52,211,153,.15); color: var(--green); border: 1px solid rgba(52,211,153,.2); }
+.btn-success:hover { background: rgba(52,211,153,.25); }
+.btn-danger { background: rgba(248,113,113,.1); color: var(--red); border: 1px solid rgba(248,113,113,.2); }
+.btn-danger:hover { background: rgba(248,113,113,.2); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+/* ── Cards ─────────────────────────────────────────────────────── */
+.card { background: var(--bg2); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+.card-header {
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: space-between;
+}
+.card-body { padding: 18px; }
+
+/* ── Stats strip ───────────────────────────────────────────────── */
+.stats-strip { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.stat-box {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px 18px; flex: 1; min-width: 140px;
+}
+.stat-box .label { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text3); }
+.stat-box .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+.stat-box .value.green { color: var(--green); }
+.stat-box .value.red { color: var(--red); }
+.stat-box .value.cyan { color: var(--cyan); }
+.stat-box .value.yellow { color: var(--yellow); }
+
+/* ── Unique value table ────────────────────────────────────────── */
+.uv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.uv-table th { text-align: left; padding: 10px 12px; color: var(--text2); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+.uv-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.uv-table tr:hover { background: var(--bg3); }
+.uv-table .bar-cell { width: 120px; }
+.uv-bar { height: 6px; border-radius: 3px; background: var(--accent); transition: width var(--transition); }
+.missing-val { color: var(--red); font-style: italic; }
+
+/* ── Action panels ─────────────────────────────────────────────── */
+.panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+@media (max-width: 1200px) { .panels { grid-template-columns: 1fr; } }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 11px; color: var(--text2); margin-bottom: 6px; font-weight: 500; }
+.form-group input, .form-group textarea, .form-group select {
+  width: 100%; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-size: 13px; outline: none;
+  transition: border-color var(--transition);
+}
+.form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
+.checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); }
+.checkbox-row input[type="checkbox"] { accent-color: var(--accent); }
+
+/* ── Data Preview ──────────────────────────────────────────────── */
+.preview-table-wrap { overflow-x: auto; max-height: 400px; overflow-y: auto; }
+.preview-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 12px; }
+.preview-table th {
+  padding: 8px 12px; text-align: left; background: var(--bg3); color: var(--text2);
+  font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
+  position: sticky; top: 0; z-index: 1; border-bottom: 2px solid var(--border);
+}
+.preview-table td { padding: 6px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.preview-table tr:hover td { background: var(--bg3); }
+.null-cell { color: var(--text3); font-style: italic; }
+.pagination { display: flex; align-items: center; gap: 8px; margin-top: 12px; justify-content: center; }
+
+/* ── AI Panel ──────────────────────────────────────────────────── */
+.ai-panel { grid-column: 1 / -1; }
+.ai-suggestions { margin-top: 12px; }
+.ai-suggestion-item {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  border-radius: 6px; background: var(--bg); margin-bottom: 6px;
+  border: 1px solid var(--border); font-size: 13px;
+}
+.ai-suggestion-item .arrow { color: var(--accent); font-weight: 700; }
+.ai-suggestion-item .reason { color: var(--text2); font-size: 12px; margin-left: auto; }
+.ai-suggestion-item input[type="checkbox"] { accent-color: var(--accent); }
+.ai-notes { margin-top: 12px; padding: 12px; background: rgba(34,211,238,.05); border: 1px solid rgba(34,211,238,.15); border-radius: 6px; font-size: 13px; color: var(--cyan); }
+
+/* ── Tabs ──────────────────────────────────────────────────────── */
+.tabs { display: flex; gap: 4px; }
+.tab {
+  padding: 8px 16px; font-size: 13px; font-weight: 500; border-radius: 6px 6px 0 0;
+  background: transparent; color: var(--text2); cursor: pointer;
+  border: 1px solid transparent; border-bottom: none;
+  transition: all var(--transition);
+}
+.tab:hover { color: var(--text); }
+.tab.active { background: var(--bg2); color: var(--accent2); border-color: var(--border); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ── Toast ─────────────────────────────────────────────────────── */
+.toast-container { position: fixed; top: 12px; right: 12px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  padding: 10px 16px; border-radius: 8px; font-size: 12px; font-weight: 500;
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+  animation: slideIn .3s ease; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  display: flex; align-items: center; gap: 8px;
+}
+.toast.success { border-color: rgba(52,211,153,.3); }
+.toast.success::before { content: "✓"; color: var(--green); font-weight: 700; }
+.toast.error { border-color: rgba(248,113,113,.3); }
+.toast.error::before { content: "✕"; color: var(--red); font-weight: 700; }
+
+/* ── Buttons ───────────────────────────────────────────────────── */
+.btn {
+  padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;
+  transition: all var(--transition); display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--bg4); }
+.btn-success { background: rgba(52,211,153,.15); color: var(--green); border: 1px solid rgba(52,211,153,.2); }
+.btn-success:hover { background: rgba(52,211,153,.25); }
+.btn-danger { background: rgba(248,113,113,.1); color: var(--red); border: 1px solid rgba(248,113,113,.2); }
+.btn-danger:hover { background: rgba(248,113,113,.2); }
+.btn-sm { padding: 3px 8px; font-size: 11px; }
+
+/* ── Cards ─────────────────────────────────────────────────────── */
+.card { background: var(--bg2); border-radius: 8px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 0px; }
+.card-header {
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: space-between;
+}
+.card-body { padding: 16px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+/* ── Modal ──────────────────────────────────────────────────────── */
+.modal-overlay {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:9998;
+  align-items:center; justify-content:center;
+}
+.modal-overlay.open { display:flex; }
+.modal {
+  background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+  width:90%; max-width:900px; max-height:85vh; overflow-y:auto;
+  box-shadow: 0 16px 48px rgba(0,0,0,.5);
+}
+.modal-header {
+  padding:18px 24px; border-bottom:1px solid var(--border);
+  font-size:16px; font-weight:700; display:flex; align-items:center; justify-content:space-between;
+}
+.modal-body { padding:20px 24px; }
+.modal-footer { padding:14px 24px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; }
+.raw-preview { overflow-x:auto; max-height:300px; overflow-y:auto; margin:12px 0; }
+.raw-preview table { border-collapse:collapse; font-size:11px; white-space:nowrap; }
+.raw-preview th, .raw-preview td { padding:4px 8px; border:1px solid var(--border); }
+.raw-preview th { background:var(--bg3); color:var(--text2); font-weight:600; }
+.raw-preview tr.header-row { background:rgba(99,102,241,.1); }
+.raw-preview tr.data-row td { color:var(--text2); }
+ 
+/* ── Manual Cell Edit ────────────────────────────────────────── */
+.preview-table td { cursor: cell; position: relative; }
+.preview-table td:hover { background: rgba(99,102,241,.05); }
+.preview-table td[contenteditable="true"] {
+  outline: 2px solid var(--accent); background: var(--bg3); z-index: 10;
+  box-shadow: 0 0 15px var(--accent-glow);
+}
+.preview-table td.editing::after {
+  content: "⏎ to save"; position: absolute; bottom: -18px; right: 0;
+  background: var(--accent); color: white; font-size: 9px; padding: 2px 4px; border-radius: 3px;
+}
+ 
+/* ── Global Loading Overlay ────────────────────────────────────── */
+.global-loading-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(15, 17, 23, 0.8);
+  z-index: 10000; align-items: center; justify-content: center; flex-direction: column;
+  color: var(--text); font-weight: 600; font-size: 16px; backdrop-filter: blur(2px);
+}
+.global-loading-overlay .spinner { width: 40px; height: 40px; border-width: 4px; border-top-color: var(--accent); margin-bottom: 16px; }
+
+/* ── Checkpoint countdown (after Save to Account) ─────────────── */
+.checkpoint-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  margin-right: 5px; background: #fbbf24; animation: checkpoint-pulse 1s ease-in-out infinite;
+}
+@keyframes checkpoint-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+
+/* ── Global Filter Bar ────────────────────────────────────────── */
+.filter-bar {
+  padding: 10px 24px; background: var(--bg2); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 16px; font-size: 13px;
+}
+.filter-pill {
+  padding: 4px 10px; border-radius: 6px; background: var(--bg3); border: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--accent2);
+}
+.filter-pill .remove { cursor: pointer; opacity: 0.6; }
+.filter-pill .remove:hover { opacity: 1; color: var(--red); }
+
+.ai-mission-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
+.mission-btn {
+  padding: 12px; border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--bg3); text-align: center; cursor: pointer; transition: all var(--transition);
+}
+.mission-btn:hover { border-color: var(--accent); background: var(--accent-glow); transform: translateY(-2px); }
+.mission-btn .icon { font-size: 20px; display: block; margin-bottom: 4px; }
+.mission-btn .label { font-size: 12px; font-weight: 500; }
+</style>
+</head>
+<body>
+
+<div class="global-loading-overlay" id="globalLoadingOverlay">
+  <div class="spinner"></div>
+  <div id="globalLoadingText">Processing... Please wait</div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<!-- Sheet Selection Modal -->
+<div class="modal-overlay" id="sheetModal">
+  <div class="modal" style="max-width: 450px;">
+    <div class="modal-header"><span>Select Excel Sheet</span></div>
+    <div class="modal-body">
+      <p style="font-size:13px; color:var(--text2); margin-bottom:16px;">This Excel file contains multiple sheets. Please choose which one to load for cleaning:</p>
+      <div class="form-group">
+        <label>Available Sheets</label>
+        <select id="sheetSelect"></select>
+      </div>
+      <input type="hidden" id="sheetCopyPath">
+      <input type="hidden" id="sheetFilename">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="applySheetSelection()">Load Sheet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Header Config Modal -->
+<div class="modal-overlay" id="headerModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span>Configure Header Rows</span>
+      <button class="btn btn-sm btn-secondary" onclick="closeHeaderModal()">Skip</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Multi-row headers detected. Preview below shows the raw first rows. Specify how many rows make up the header — they'll be merged into composite column names.</p>
+      <div class="form-group" style="max-width:200px;">
+        <label>Number of Header Rows</label>
+        <input type="number" id="headerRowCount" value="5" min="1" max="20" style="text-align:center;">
+      </div>
+      <div id="rawPreview" class="raw-preview"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeHeaderModal()">Skip (use row 1 only)</button>
+      <button class="btn btn-primary" onclick="applyHeaderConfig()">Apply Headers</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal" style="max-width: 450px;">
+    <div class="modal-header"><span>Export Options (Excel)</span></div>
+    <div class="modal-body">
+      <p style="font-size:13px; color:var(--text2); margin-bottom:16px;">Please choose how you'd like to export your cleaned data:</p>
+      <div style="background:var(--bg3); padding:16px; border-radius:10px; border:1px solid var(--border);">
+        <div class="checkbox-row" style="margin-bottom:8px;">
+          <input type="checkbox" id="exportComments" checked> 
+          <label for="exportComments" style="color:var(--text); font-weight:600;">Include Modification Tracking</label>
+        </div>
+        <p style="font-size:11px; color:var(--text3); margin-left:24px;">Automatically highlights changed cells in <span style="color:var(--yellow);">Yellow</span> and adds "Was: [Original]" comments to each modified cell.</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeExportModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmExport()">⬇ Download Excel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Load from Account Modal -->
+<div class="modal-overlay" id="loadProjectsModal">
+  <div class="modal" style="max-width: 480px;">
+    <div class="modal-header">
+      <span>Load from Account</span>
+      <button class="btn btn-sm btn-secondary" onclick="closeLoadProjects()">Close</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px; color:var(--text2); margin-bottom:12px;">Files previously saved to your FieldGovern account. Loading one replaces your current working file — save first if you want to keep it.</p>
+      <div id="loadProjectsList" style="max-height:360px; overflow-y:auto;">
+        <div style="padding:20px; color:var(--text3); font-size:12px; text-align:center;">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- History Modal -->
+<div class="modal-overlay" id="historyModal">
+  <div class="modal" style="max-width: 480px;">
+    <div class="modal-header">
+      <span>Edit History</span>
+      <button class="btn btn-sm btn-secondary" onclick="closeHistory()">Close</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px; color:var(--text2); margin-bottom:12px;">Previous saved versions of this file, including autosaves. Restoring loads that version back into the working file — your current state is saved first, so nothing is lost.</p>
+      <div id="historyList" style="max-height:360px; overflow-y:auto;">
+        <div style="padding:20px; color:var(--text3); font-size:12px; text-align:center;">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+  <!-- ── Sidebar ─────────────────────────────────── -->
+  <div class="sidebar" id="sidebar" style="width: 250px; min-width: 250px;">
+    <div class="sidebar-header">
+      <h1 style="display:flex;align-items:center;gap:7px;">
+        <a id="fgHomeLink" href="/" title="Back to FieldGovern dashboard" style="display:flex;align-items:center;text-decoration:none;">
+          <img src="static/logo-wide.png" alt="FieldGovern" style="height:22px;width:auto;" onerror="this.style.display='none'">
+        </a>
+        <span style="font-size:13px;font-weight:700;color:var(--text2)">· Cleaner</span>
+      </h1>
+      <div class="file-info" id="fileInfo">No file loaded</div>
+    </div>
+    <div class="sidebar-section collapsed" id="completenessToggle" onclick="toggleSection('completenessCard', this)">
+      <h3>Record Completeness</h3>
+    </div>
+    <div id="completenessCard" style="padding: 0 16px 8px; margin-bottom:8px; display: none;">
+      <div id="completenessStats" style="font-size:11px; color:var(--text2); margin-bottom:6px;"></div>
+      <div class="form-group" style="margin-bottom:0; background:var(--bg3); padding:8px; border-radius:8px;">
+        <label style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase;">Filter: Missing Fields ≥</label>
+        <div style="display:flex; gap:4px; align-items:center; margin-top:4px;">
+           <input type="number" id="missThreshold" placeholder="90" style="flex:1; font-size:11px; padding:2px 6px; background:var(--bg); border:1px solid var(--border); color:white; border-radius:4px;">
+           <button class="btn btn-sm btn-primary" onclick="applyMissingFilter()" style="padding:2px 8px;">Apply</button>
+        </div>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <h3>Columns</h3>
+    </div>
+    <div style="padding: 0 16px 8px;">
+      <input type="text" id="colSearch" placeholder="Search by name or #..." oninput="filterColumns()" 
+             style="width:100%; font-size:11px; padding:4px 10px; background:var(--bg3); border:1px solid var(--border); border-radius:6px; color:var(--text); outline:none;">
+    </div>
+    <div class="col-list" id="colList">
+      <div style="padding:20px;color:var(--text3);font-size:12px;text-align:center;">Upload a file to see columns</div>
+    </div>
+    <div style="padding:10px; border-top:1px solid var(--border); display:flex; gap:4px; flex-wrap:wrap;">
+      <button class="btn btn-secondary btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doUndo()" title="Undo last action">↩</button>
+      <button class="btn btn-secondary btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doRedo()" title="Redo last action">↪</button>
+      <button class="btn btn-success btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doExport('csv')">⬇ CSV</button>
+      <button class="btn btn-success btn-sm" style="flex:1; justify-content:center; padding: 4px 0;" onclick="doExport('excel')">⬇ XLS</button>
+      <button id="saveToAccountBtn" class="btn btn-primary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; margin-top:4px; display:none;" onclick="doSaveToAccount()" title="Save cleaned data to your FieldGovern account">💾 Save to Account</button>
+      <button id="loadFromAccountBtn" class="btn btn-secondary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; display:none;" onclick="openLoadProjects()" title="Load a file you previously saved to your FieldGovern account">📂 Load from Account</button>
+      <div id="autosaveStatus" style="flex:2; min-width:100%; display:none; font-size:11px; color:var(--text3); text-align:center; padding:2px 0;"></div>
+      <button id="historyBtn" class="btn btn-secondary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; display:none;" onclick="openHistory()" title="View and restore previous saved versions of this file">🕐 History</button>
+      <button id="saveToServerBtn" class="btn btn-primary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; margin-top:4px; display:none;" onclick="doSaveToServer()" title="Save cleaned data back to server file (shared with Analyzer)">💾 Save to Server</button>
+      <button id="saveToTableforgeBtn" class="btn btn-primary btn-sm" style="flex:2; min-width:100%; justify-content:center; padding: 6px 0; margin-top:4px; display:none; background: linear-gradient(135deg,#a78bfa,#7c3aed);" onclick="doSaveToTableforge()" title="Save cleaned data back to TableForge and return">🧹 Save &amp; Return to TableForge</button>
+    </div>
+  </div>
+
+  <!-- ── Main ────────────────────────────────────── -->
+  <div class="main">
+    <div class="main-header">
+      <div class="tabs" id="mainTabs">
+        <div class="tab active" data-tab="explore">Column Explorer</div>
+        <div class="tab" data-tab="preview">Data Preview</div>
+        <div class="tab" data-tab="ai">AI Correction</div>
+      </div>
+      <div style="margin-left:auto; display:flex; gap:12px; align-items:center;">
+        <div style="position:relative; width:220px;">
+          <input type="text" id="globalSearch" placeholder="🔍 Global Search..." onkeydown="if(event.key==='Enter') doGlobalSearch()" 
+                 style="width:100%; font-size:12px; padding:6px 12px 6px 30px; background:var(--bg3); border:1px solid var(--border); border-radius:12px; color:white; outline:none;">
+          <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); opacity:0.5;">🔍</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="trimAll()">✂ Trim Whitespace</button>
+        <label class="upload-inline btn btn-primary btn-sm" style="margin:0;">
+          📂 Upload File
+          <input type="file" accept=".csv,.xlsx,.xls" onchange="uploadFile(this.files[0])" style="display:none;">
+        </label>
+      </div>
+    </div>
+ 
+    <div class="filter-bar" id="globalFilterBar" style="display:none;">
+      <span style="color:var(--text3); font-weight:600; text-transform:uppercase; font-size:11px;">Active Filters:</span>
+      <div id="filterPills" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+      <button class="btn btn-sm btn-secondary" style="margin-left:auto; font-size:11px;" onclick="clearAllFilters()">Clear All</button>
+    </div>
+
+    <div class="main-content">
+      <!-- Welcome card — FG-first when token present, file-upload otherwise -->
+      <div id="welcomeCard" class="welcome-card">
+        <div style="text-align:center;margin-bottom:24px;">
+          <img src="static/logo-wide.png" alt="FieldGovern" style="height:32px;width:auto;display:block;margin:0 auto 8px;" onerror="this.style.display='none'">
+          <h1>Cleaner</h1>
+          <div class="sub">FieldGovern Data Cleaner</div>
+        </div>
+
+        <!-- FG picker (injected by JS when token present) -->
+        <div id="fgSelector"></div>
+
+        <!-- Divider + file upload (always available) -->
+        <div id="uploadDivider" class="divider-or" style="display:none;"><span>or import a local file</span></div>
+        <div id="uploadZone" class="upload-zone" style="margin:0;">
+          <h2>📂 Drop a file here</h2>
+          <p>CSV, XLSX, XLS — up to 100 MB</p>
+          <label>
+            <span class="upload-btn">Choose File</span>
+            <input type="file" accept=".csv,.xlsx,.xls" onchange="uploadFile(this.files[0])">
+          </label>
+        </div>
+
+        <!-- Server Files -->
+        <div id="serverFilesSection" style="margin-top:16px;display:none;">
+          <div class="divider-or"><span>server files</span></div>
+          <div id="serverFilesList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
+      </div>
+
+      <!-- Explore Tab -->
+      <div id="tabExplore" class="tab-content" style="display:none;">
+        <div id="colStats"></div>
+      </div>
+
+      <!-- Preview Tab -->
+      <div id="tabPreview" class="tab-content" style="display:none;">
+        <div id="previewContent"></div>
+      </div>
+
+      <!-- AI Tab -->
+      <div id="tabAi" class="tab-content" style="display:none;">
+        <div class="card ai-panel">
+          <div class="card-header">🤖 Targeted AI Correction — <strong id="aiActiveCol">Select a Column</strong></div>
+          <div class="card-body">
+            <p style="font-size:13px; color:var(--text2); margin-bottom:14px;">The AI will analyze the selected column and suggest corrections based on your current filters.</p>
+            
+            <div id="aiNoColMsg" style="padding:20px; text-align:center; color:var(--text3); border:1px dashed var(--border); border-radius:8px;">
+              Please select a column in the Explorer to use AI features.
+            </div>
+ 
+            <div id="aiControls" style="display:none;">
+              <div class="sidebar-section" style="padding:0; margin-bottom:12px;"><h3>Cleaning Missions</h3></div>
+              <div class="ai-mission-grid">
+                <div class="mission-btn" onclick="runAiMission('spelling')">
+                  <span class="icon">✏️</span>
+                  <span class="label">Fix Spelling</span>
+                </div>
+                <div class="mission-btn" onclick="runAiMission('casing')">
+                  <span class="icon">🔠</span>
+                  <span class="label">Standardize Casing</span>
+                </div>
+                <div class="mission-btn" onclick="runAiMission('summarize')">
+                  <span class="icon">📝</span>
+                  <span class="label">Summarize Text</span>
+                </div>
+              </div>
+ 
+              <div class="sidebar-section" style="padding:0; margin-top:20px; margin-bottom:12px;"><h3>Context & Instructions</h3></div>
+              <div class="form-group">
+                <label>Reference Columns (Context)</label>
+                <div id="aiContextCols" class="col-select-grid" style="margin-top:4px;"></div>
+                <p style="font-size:11px; color:var(--text3); margin-top:4px;">Select columns the AI should look at to help fix the target column (e.g. use 'Name' to fix 'Sex').</p>
+              </div>
+ 
+              <div class="form-group" style="margin-top:16px;">
+                <label>Custom Instructions (optional)</label>
+                <textarea id="aiPrompt" rows="2" placeholder="e.g. 'Standardize these as Bangalore, Hubli, Mysore only.'"></textarea>
+              </div>
+ 
+              <div style="display:flex; gap:8px; align-items:center; margin-top:12px;">
+                <button class="btn btn-primary" onclick="runAiCorrection()">🤖 Run AI Analysis</button>
+                <span id="aiSpinner" style="display:none;"><span class="spinner"></span> Analyzing…</span>
+              </div>
+            </div>
+            
+            <div class="ai-suggestions" id="aiSuggestions"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────
+let isProcessing = false;
+let columns = [];
+let columnLabels = {}; // raw field name -> human label, display-only (never touches data)
+let activeCol = null;
+
+// Display label for a column; falls back to the raw name when no label is known.
+function colLabel(name) { return columnLabels[name] || name; }
+let aiSelectedCols = new Set();
+let uvItems = [];        // current unique-value items for the selected column
+let uvSortKey = 'count'; // 'value' | 'count' | 'pct'
+let uvSortAsc = false;   // false = descending (biggest first)
+
+// ── Toast ────────────────────────────────────────────────
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ── App Loading State ────────────────────────────────────
+function showLoading(msg = "Processing... Please wait") {
+  isProcessing = true;
+  document.getElementById('globalLoadingText').textContent = msg;
+  document.getElementById('globalLoadingOverlay').style.display = 'flex';
+}
+
+function hideLoading() {
+  isProcessing = false;
+  document.getElementById('globalLoadingOverlay').style.display = 'none';
+}
+
+// ── API Helper ───────────────────────────────────────────
+// BASE_URL handles both standalone (:5050) and path-based (/cleaner/) deploy
+const BASE_URL = window.location.pathname.startsWith('/cleaner') ? '/cleaner' : '';
+async function api(path, opts = {}) {
+  const res = await fetch(BASE_URL + '/api/' + path, opts);
+  const data = await res.json();
+  if (data.error) { toast(data.error, 'error'); return null; }
+  return data;
+}
+async function apiPost(path, body, showSpinner = true) {
+  if (isProcessing && showSpinner) {
+    toast('Please wait for the current operation to finish...', 'error');
+    return null;
+  }
+  if (showSpinner) showLoading();
+  try {
+    const result = await api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (result) _dirty = true;
+    return result;
+  } finally {
+    if (showSpinner) hideLoading();
+  }
+}
+
+// ── Server Files ─────────────────────────────────────────
+async function loadServerFiles() {
+  try {
+    const res = await fetch(BASE_URL + '/api/files');
+    const data = await res.json();
+    const files = data.files || [];
+    const section = document.getElementById('serverFilesSection');
+    const list = document.getElementById('serverFilesList');
+    if (!files.length) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    list.innerHTML = files.map(f => `
+      <button class="upload-btn" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;padding:8px 12px;font-size:13px;" onclick="loadFromServer('${f.id}')">
+        <span>${f.ext === 'csv' || f.ext === 'tsv' ? '📄' : '📊'} ${f.original_name}</span>
+        <span style="font-size:11px;color:var(--text3);">${f.size_mb > 0 ? f.size_mb + ' MB' : Math.round(f.size_bytes/1024) + ' KB'}</span>
+      </button>
+    `).join('');
+  } catch {}
+}
+
+let _activeServerFileId = null;
+
+async function loadFromServer(fileId) {
+  showLoading("Loading file from server...");
+  try {
+    const res = await fetch(BASE_URL + '/api/files/' + fileId + '/load', { method: 'POST' });
+    const data = await res.json();
+    if (data.error) { toast(data.error, 'error'); return; }
+    if (data.needs_sheet_selection) {
+      _activeServerFileId = fileId;
+      const wc = document.getElementById('welcomeCard'); if (wc) wc.style.display = 'none';
+      await showSheetModal(data.sheets, data.copy_path, data.filename);
+      return;
+    }
+    _activeServerFileId = data.server_file_id || fileId;
+    toast(`Loaded ${data.filename} — ${data.rows} rows, ${data.cols} columns`);
+    const wc = document.getElementById('welcomeCard'); if (wc) wc.style.display = 'none';
+    const ssb = document.getElementById('saveToServerBtn');
+    if (ssb) ssb.style.display = '';
+    await refreshAll();
+  } finally { hideLoading(); }
+}
+
+async function doSaveToServer() {
+  if (!_activeServerFileId) { toast('No server file linked', 'error'); return; }
+  showLoading("Saving cleaned data to server...");
+  try {
+    const res = await fetch(BASE_URL + '/api/files/' + _activeServerFileId + '/save-back', { method: 'POST' });
+    const data = await res.json();
+    if (data.error) { toast(data.error, 'error'); return; }
+    toast(data.message || 'Saved to server!');
+  } finally { hideLoading(); }
+}
+
+document.addEventListener('DOMContentLoaded', loadServerFiles);
+
+// ── Upload ───────────────────────────────────────────────
+async function uploadFile(file) {
+  if (!file) return;
+  if (isProcessing) {
+    toast('Please wait for the current operation to finish...', 'error');
+    return;
+  }
+  showLoading("Uploading and reading file... This may take a moment.");
+  let data;
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(BASE_URL + '/api/upload', { method: 'POST', body: form });
+    data = await res.json();
+  } finally {
+    hideLoading();
+  }
+  
+  if (data.error) { toast(data.error, 'error'); return; }
+
+  // If multiple sheets detected, ask the user to select one
+  if (data.needs_sheet_selection) {
+      const _wc = document.getElementById('welcomeCard'); if (_wc) _wc.style.display = 'none';
+      await showSheetModal(data.sheets, data.copy_path, data.filename);
+      return;
+  }
+
+  toast(`Loaded ${data.filename} — ${data.rows} rows, ${data.cols} columns (working copy created)`);
+  const _wc = document.getElementById('welcomeCard'); if (_wc) _wc.style.display = 'none';
+
+  // If multi-row headers detected, show config modal
+  if (data.needs_header_config) {
+    await showHeaderModal();
+  } else {
+    showLoading("Rendering dashboard...");
+    try {
+      await loadInfo();
+      switchTab('explore');
+      if (columns.length > 0) selectColumn(columns[0].name);
+    } finally {
+      hideLoading();
+    }
+  }
+}
+
+// ── Sheet Select Modal ──────────────────────────────────
+async function showSheetModal(sheets, copyPath, filename) {
+  const select = document.getElementById('sheetSelect');
+  select.innerHTML = sheets.map(s => `<option value="${s}">${s}</option>`).join('');
+  document.getElementById('sheetCopyPath').value = copyPath;
+  document.getElementById('sheetFilename').value = filename;
+  document.getElementById('sheetModal').classList.add('open');
+}
+
+async function applySheetSelection() {
+  const sheetName = document.getElementById('sheetSelect').value;
+  const copyPath = document.getElementById('sheetCopyPath').value;
+  const filename = document.getElementById('sheetFilename').value;
+  
+  document.getElementById('sheetModal').classList.remove('open');
+  showLoading(`Loading sheet: ${sheetName}...`);
+  
+  const data = await apiPost('load_sheet', {
+    copy_path: copyPath,
+    sheet_name: sheetName,
+    filename: filename
+  }, false); // don't toggle spinner again since we are showing it
+  
+  hideLoading();
+  
+  if (!data) return; // error handled by apiPost
+  
+  toast(`Loaded ${data.filename} (${sheetName}) — ${data.rows} rows, ${data.cols} columns`);
+  
+  if (data.needs_header_config) {
+    await showHeaderModal();
+  } else {
+    showLoading("Rendering dashboard...");
+    try {
+      await loadInfo();
+      switchTab('explore');
+      if (columns.length > 0) selectColumn(columns[0].name);
+    } finally {
+      hideLoading();
+    }
+  }
+}
+
+// ── Header Config Modal ──────────────────────────────────
+async function showHeaderModal() {
+  document.getElementById('headerModal').classList.add('open');
+  await loadRawPreview();
+}
+function closeHeaderModal() {
+  document.getElementById('headerModal').classList.remove('open');
+  loadInfo().then(() => { switchTab('explore'); if (columns.length > 0) selectColumn(columns[0].name); });
+}
+async function loadRawPreview() {
+  const n = parseInt(document.getElementById('headerRowCount').value) + 3;
+  const data = await api(`preview_headers?rows=${n}`);
+  if (!data) return;
+  const headerN = parseInt(document.getElementById('headerRowCount').value);
+  let html = `<p style="font-size:12px;color:var(--text3);margin-bottom:6px;">Showing first ${data.rows.length} rows of ${data.total_cols} columns (${data.merges_count} merged cell ranges detected)</p>`;
+  html += '<table><tbody>';
+  data.rows.forEach((row, i) => {
+    const cls = i < headerN ? 'header-row' : 'data-row';
+    html += `<tr class="${cls}"><td style="font-weight:700;color:var(--accent2);">${i+1}</td>`;
+    row.forEach(v => { html += `<td>${v || '<span style="color:var(--text3)">—</span>'}</td>`; });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('rawPreview').innerHTML = html;
+}
+async function applyHeaderConfig() {
+  const headerRows = parseInt(document.getElementById('headerRowCount').value);
+  const data = await apiPost('configure_headers', { header_rows: headerRows, separator: ' > ' });
+  if (data) {
+    toast(`Headers configured: ${headerRows} rows merged into ${data.cols} columns`);
+    document.getElementById('headerModal').classList.remove('open');
+    await loadInfo();
+    switchTab('explore');
+    if (columns.length > 0) selectColumn(columns[0].name);
+  }
+}
+// Update preview when row count changes
+document.getElementById('headerRowCount').addEventListener('change', loadRawPreview);
+
+// ── Info / Column List ───────────────────────────────────
+async function loadInfo() {
+  const data = await api('info');
+  if (!data) return;
+  columns = data.columns;
+  columnLabels = data.column_labels || {};
+  document.getElementById('fileInfo').innerHTML = `<strong>${data.filename}</strong><br>${data.rows} rows · ${columns.length} columns<br><span style="color:var(--green);font-size:11px;">Working on copy — original untouched</span>`;
+
+  // Render global filter pills
+  const bar = document.getElementById('globalFilterBar');
+  const pills = document.getElementById('filterPills');
+  pills.innerHTML = '';
+  const activeFilters = data.active_filters || {};
+  const filterKeys = Object.keys(activeFilters);
+  
+  if (filterKeys.length > 0) {
+    bar.style.display = 'flex';
+    filterKeys.forEach(col => {
+      const f = activeFilters[col];
+      let valText = f.type;
+      if (f.type === 'range') valText = `${f.min||'?'}-${f.max||'?'}`;
+      else if (f.type === 'contain') valText = `"${f.value}"`;
+      else if (f.type === 'missing') valText = 'nulls';
+      
+      const pill = document.createElement('div');
+      pill.className = 'filter-pill';
+      const colLabel = col === '__missing_count' ? 'Missing Count' : col;
+      pill.innerHTML = `<span><strong>${colLabel}:</strong> ${valText}</span><span class="remove" onclick="removeColFilter('${col.replace(/'/g, "\\'")}')">✕</span>`;
+      pills.appendChild(pill);
+    });
+  } else {
+    bar.style.display = 'none';
+  }
+  
+  // Update completeness stats if available
+  if (data.completeness_stats) {
+    let statHtml = '';
+    for (const [bucket, count] of Object.entries(data.completeness_stats)) {
+      const pct = Math.round((count / data.rows) * 100);
+      statHtml += `<div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <span>${bucket}</span>
+        <span style="font-weight:600; color:var(--cyan);">${count} (${pct}%)</span>
+      </div>`;
+    }
+    document.getElementById('completenessStats').innerHTML = statHtml;
+  }
+ 
+  // Render column list
+  const list = document.getElementById('colList');
+  list.innerHTML = '';
+  columns.forEach((c, idx) => {
+    const el = document.createElement('div');
+    const colIdx = idx + 1;
+    el.className = 'col-item' + (c.name === activeCol ? ' active' : '');
+    el.setAttribute('data-col', c.name);
+    el.setAttribute('data-idx', colIdx);
+    
+    // Multiple hierarchy support (header > sub-header > col-name)
+    const segments = c.name.split(' > ');
+    const mainName = segments.pop();
+    const parentHtml = segments.map(s => `<span class="col-segment">${s}</span>`).join('');
+    const label = columnLabels[c.name];
+    const rawNameHtml = label ? `<span class="col-raw-name" style="font-size:9px;color:var(--text3);display:block;">${mainName}</span>` : '';
+
+    const hasFilter = (activeFilters && activeFilters[c.name]) ? `<span style="color:var(--cyan); margin-left:2px; font-size:9px;">📐</span>` : '';
+
+    el.innerHTML = `
+      <div class="col-text" title="${c.name}">
+        ${parentHtml}
+        <div class="col-main-name">
+          <span class="col-meta">[${colIdx}]</span>
+          <span>${label || mainName}</span>
+          ${hasFilter}
+        </div>
+        ${rawNameHtml}
+      </div>
+      ${c.missing > 0 ? `<span class="badge missing" title="Missing values">${c.missing} ∅</span>` : `<span class="badge" title="Unique values">${c.unique}</span>`}
+    `;
+    el.onclick = () => selectColumn(c.name);
+    list.appendChild(el);
+  });
+
+  updateAIUI();
+}
+
+// ── Update AI UI ──────────────────────────────────────────
+function updateAIUI() {
+  const aiCol = document.getElementById('aiActiveCol');
+  const aiControls = document.getElementById('aiControls');
+  const aiNoColMsg = document.getElementById('aiNoColMsg');
+  if (activeCol) {
+    aiCol.textContent = colLabel(activeCol);
+    aiCol.title = activeCol;
+    aiControls.style.display = 'block';
+    aiNoColMsg.style.display = 'none';
+  } else {
+    aiCol.textContent = 'Select a Column';
+    aiControls.style.display = 'none';
+    aiNoColMsg.style.display = 'block';
+  }
+
+  // Update AI context columns grid
+  const contextGrid = document.getElementById('aiContextCols');
+  if (contextGrid) {
+    contextGrid.innerHTML = '';
+    columns.forEach(c => {
+      // Don't show target column in context options
+      if (c.name === activeCol) return;
+      
+      const chip = document.createElement('div');
+      chip.className = 'col-chip' + (aiContextCols.has(c.name) ? ' selected' : '');
+      chip.textContent = colLabel(c.name);
+      chip.title = c.name;
+      chip.onclick = () => {
+        if (aiContextCols.has(c.name)) aiContextCols.delete(c.name);
+        else aiContextCols.add(c.name);
+        chip.classList.toggle('selected');
+      };
+      contextGrid.appendChild(chip);
+    });
+  }
+}
+
+// Global state for AI context
+let aiContextCols = new Set();
+
+// ── Select Column ────────────────────────────────────────
+async function selectColumn(colName) {
+  activeCol = colName;
+  
+  // Only switch to explore if we're not on a cleaning tab already
+  const currentTab = document.querySelector('.tab.active')?.dataset.tab;
+  if (currentTab !== 'ai') {
+    switchTab('explore');
+  } else {
+    updateAIUI();
+  }
+
+  // Highlight in sidebar
+  document.querySelectorAll('.col-item').forEach(el => {
+    el.classList.toggle('active', el.getAttribute('data-col') === colName);
+  });
+
+  const data = await api(`unique_values?column=${encodeURIComponent(colName)}`);
+  if (!data) return;
+  const colMeta = columns.find(c => c.name === colName) || {};
+
+  activeCol = colName;
+  uvItems = data.items;
+  uvSortKey = 'value';
+  uvSortAsc = true;
+
+  // Show active filters banner if any
+  let filterBanner = '';
+  if (data.active_filter) {
+    filterBanner = `
+      <div style="background:rgba(255,165,0,0.1); border:1px solid orange; border-radius:8px; padding:10px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="color:orange; font-size:12px;">⚠️ <strong>Filter Active:</strong> Showing a subset of rows for ${colName}.</span>
+        <button class="btn btn-sm btn-secondary" onclick="clearFilter()" style="padding:2px 8px; font-size:11px;">Clear Filter</button>
+      </div>`;
+  }
+
+  let html = filterBanner + `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <h3 style="margin:0; font-size:16px;">Column Explorer — <span style="color:var(--cyan);">${colName}</span></h3>
+    </div>`;
+
+  // Stats strip
+  html += `<div class="stats-strip" style="margin-bottom:12px; gap:12px;">
+    <div class="stat-box" style="padding:10px 14px;"><div class="label">Total Rows</div><div class="value" style="font-size:18px;">${data.total}</div></div>
+    <div class="stat-box" style="padding:10px 14px;"><div class="label">Unique Values</div><div class="value cyan" style="font-size:18px;">${data.unique}</div></div>
+    <div class="stat-box" style="padding:10px 14px;"><div class="label">Missing</div><div class="value ${data.missing > 0 ? 'red' : 'green'}" style="font-size:18px;">${data.missing}</div></div>
+    <div class="stat-box" style="padding:10px 14px;"><div class="label">Data Type</div><div class="value" style="font-size:13px;">${colMeta.dtype || '—'}</div></div>
+  </div>`;
+
+  // Advanced Stats & Histogram
+  if (colMeta.stats && colMeta.stats.mean !== null && !isNaN(colMeta.stats.mean)) {
+      html += `<div class="card" style="margin-bottom:12px;">
+        <div class="card-header" style="padding:8px 12px; font-size:12px;">📈 Descriptive Statistics</div>
+        <div class="card-body" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap:10px; padding:12px;">
+            <div class="stat-mini"><strong>Avg:</strong> ${colMeta.stats.mean}</div>
+            <div class="stat-mini"><strong>Med:</strong> ${colMeta.stats.median}</div>
+            <div class="stat-mini"><strong>Std:</strong> ${colMeta.stats.std}</div>
+            <div class="stat-mini"><strong>Min:</strong> ${colMeta.stats.min}</div>
+            <div class="stat-mini"><strong>Max:</strong> ${colMeta.stats.max}</div>
+            <div class="stat-mini"><strong>Q1:</strong> ${colMeta.stats.q1}</div>
+            <div class="stat-mini"><strong>Q3:</strong> ${colMeta.stats.q3}</div>
+        </div>
+      </div>`;
+  }
+
+  // Swapping Distribution with Validation as per user request
+  html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:8px; height: 350px;">`;
+  
+  // Data Validation & Rules Card (Now moved to top-left slot)
+  html += `
+  <div class="card" style="display:flex; flex-direction:column; margin-bottom:0;">
+    <div class="card-header" style="flex-shrink:0;">
+      <span style="font-weight:600; font-size:12px; color:var(--text); letter-spacing:0.3px;">🛠️ Data Validation & Rules</span>
+      <div style="display:flex; gap:3px; background:var(--bg3); padding:2px; border-radius:6px;">
+        <button class="btn btn-sm btn-primary" id="valTabOutlier" onclick="showValTab('outlier')" style="padding:2px 8px; font-size:10px; border-radius:4px; border:none; box-shadow:none;">Outlier</button>
+        <button class="btn btn-sm btn-secondary" id="valTabFormat" onclick="showValTab('format')" style="padding:2px 8px; font-size:10px; border-radius:4px; background:transparent; border:none; box-shadow:none;">Format</button>
+        <button class="btn btn-sm btn-secondary" id="valTabCross" onclick="showValTab('cross')" style="padding:2px 8px; font-size:10px; border-radius:4px; background:transparent; border:none; box-shadow:none;">Cross-Col</button>
+      </div>
+    </div>
+    <div class="card-body" style="padding:10px; flex:1; overflow-y:auto;">
+      
+      <!-- Outlier Panel -->
+      <div id="valOutlierPanel">
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="font-size:11px; color:var(--text3);">Identifies values far from the mean using Z-Score methodology.</div>
+          <div style="display:flex; gap:6px; align-items:center; background:var(--bg3); padding:6px; border-radius:6px; border:1px solid var(--border);">
+            <label style="font-size:10px; color:var(--text3); margin-bottom:0;">σ Threshold:</label>
+            <input type="number" id="zThreshold" value="3" step="0.5" style="width:36px; text-align:center; font-size:11px; background:transparent; border:none; font-weight:700; color:var(--accent);">
+            <button class="btn btn-primary btn-sm" onclick="doOutlierCheck()" style="padding:2px 8px; font-size:11px;">Analyze</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Format Panel -->
+      <div id="valFormatPanel" style="display:none;">
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <select onchange="applyFormatPreset(this.value)" style="width:100%; padding:4px; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text); font-size:11px;">
+            <option value="">Quick Presets...</option>
+            <option value="^\\d{10}$">Phone (10)</option>
+            <option value="^\\d{12}$">Aadhaar (12)</option>
+            <option value="^[A-Z]{5}[0-9]{4}[A-Z]{1}$">PAN Card</option>
+            <option value="^\\d{6}$">Pin Code</option>
+            <option value="^\\d+$">Numbers Only</option>
+          </select>
+          <div style="display:flex; gap:4px;">
+            <input type="text" id="fmtPattern" placeholder="Regex pattern..." style="flex:1; padding:4px 8px; font-size:11px; background:var(--bg); border:1px solid var(--border); border-radius:4px;">
+            <button class="btn btn-primary btn-sm" onclick="doFormatCheck()" style="padding:4px 10px;">Check</button>
+          </div>
+          <div style="background:rgba(99,102,241,0.05); padding:6px; border-radius:4px; border:1px dashed var(--border);">
+            <div style="font-size:9x; color:var(--cyan); font-weight:600; margin-bottom:2px;">✨ AI Pattern Assistant</div>
+            <div style="display:flex; gap:4px;">
+              <input type="text" id="aiRegexVal" placeholder="Describe pattern..." style="flex:1; font-size:10px; background:transparent; border:none; border-bottom:1px solid var(--border); height:18px;">
+              <button class="btn btn-sm btn-secondary" onclick="generateRegexAI('fmtPattern', 'aiRegexVal')" style="padding:0 6px; font-size:10px;">Build</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Cross-Col Panel -->
+      <div id="valCrossPanel" style="display:none;">
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <div style="display:flex; gap:4px; align-items:center;">
+             <div id="crossCol1Label" style="font-weight:700; font-size:11px; min-width:80px; color:var(--cyan); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${colName}</div>
+             <select id="crossOp" style="width:50px; background:var(--bg); color:white; border:1px solid var(--border); border-radius:4px; padding:4px; font-size:11px; font-weight:700;">
+               <option value=">"> &gt; </option><option value="<"> &lt; </option><option value="=="> == </option><option value="!="> != </option>
+             </select>
+          </div>
+          <select id="crossCol2" style="width:100%; background:var(--bg); color:white; border:1px solid var(--border); border-radius:4px; padding:4px; font-size:11px;">
+            <!-- Populated via JS -->
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="doCrossValidate()" style="padding:4px 12px; margin-top:2px;">Analyze</button>
+        </div>
+      </div>
+      
+      <div id="validationResult" style="margin-top:8px;"></div>
+    </div>
+  </div>`;
+ 
+  html += `<div class="card" style="display:flex; flex-direction:column; margin-bottom:0;">
+    <div class="card-header" style="flex-shrink:0;">
+      <span>Unique Values — <strong title="${colName}" style="display:inline-block; max-width:180px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom;">${colName}</strong></span>
+      <span style="font-size:11px;color:var(--text3);">${data.items.length} values</span>
+    </div>
+    <div class="card-body" style="padding:0; flex:1; overflow-y:auto; overflow-x:hidden;">
+      <div id="uvTableWrap"></div>
+    </div>
+  </div></div>`;
+
+  // Action panels
+  html += '<div class="panels" style="gap:12px;">';
+
+  // Find & Replace panel
+  html += `<div class="card" style="display:flex; flex-direction:column;">
+    <div class="card-header">🔄 Find & Replace</div>
+    <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label style="margin-bottom:2px;">Find Value</label>
+        <input type="text" id="findVal" placeholder="Enter value... (or '(missing)')" style="padding:6px 10px;">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label style="margin-bottom:2px;">Replace With</label>
+        <input type="text" id="replaceVal" placeholder="Enter replacement..." style="padding:6px 10px;">
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="checkbox-row" style="margin-bottom:0;">
+          <input type="checkbox" id="useRegex"> <label for="useRegex" style="margin-bottom:0;">Use Regex</label>
+        </div>
+        <select onchange="applyFindPreset(this.value)" style="background:transparent;border:none;color:var(--cyan);font-size:11px;cursor:pointer;padding:0;">
+          <option value="">Quick Patterns…</option>
+          <option value="^\\d+$">Numbers</option>
+          <option value="^\\s+|\\s+$">Leading/trailing spaces</option>
+          <option value="\\s+">Extra spaces</option>
+          <option value="[^\\d.]">Non-numeric</option>
+          <option value="[^a-zA-Z0-9 ]">Special chars</option>
+        </select>
+      </div>
+      <div class="form-group" style="padding:6px; background:rgba(0,0,0,0.2); border-radius:6px; border:1px dashed var(--border); margin-bottom:0;">
+        <label style="color:var(--cyan);font-size:10px;margin-bottom:2px;">✨ AI Pattern Helper</label>
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="aiRegexFind" placeholder="Describe pattern..." style="flex:1; font-size:11px; padding:4px 8px;">
+          <button class="btn btn-sm btn-secondary" style="padding:4px 8px;" onclick="generateRegexAI('findVal', 'aiRegexFind', 'useRegex')">Build</button>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" style="align-self:flex-start; margin-top:4px;" onclick="doReplace()">Replace All</button>
+    </div>
+  </div>`;
+
+  // Fill & Advanced Clean panel
+  html += `<div class="card" style="display:flex; flex-direction:column;">
+    <div class="card-header">📊 Fill & Quick Clean</div>
+    <div class="card-body" style="display:flex; flex-direction:column; gap:16px;">
+      <div>
+        <label style="font-size:10px; color:var(--text3); text-transform:uppercase; font-weight:700;">Fill Missing Values</label>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
+          <button class="btn btn-sm btn-indigo" onclick="doFillProportional()" ${data.missing === 0 ? 'disabled' : ''}>⚡ Proportional Fill</button>
+          <button class="btn btn-sm btn-secondary" onclick="doFillNA()" ${data.missing === 0 ? 'disabled' : ''}>📝 Fill with 'NA'</button>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid var(--border); padding-top:10px;">
+        <label style="font-size:10px; color:var(--text3); text-transform:uppercase; font-weight:700;">Formatting Fixes & Rounding</label>
+        <div style="display:flex; gap:6px; margin-top:6px; align-items:center; flex-wrap:wrap;">
+           <button class="btn btn-sm btn-secondary" onclick="doTextCase('upper')">🔠 Upper</button>
+           <button class="btn btn-sm btn-secondary" onclick="doTextCase('lower')">🔡 Lower</button>
+           <button class="btn btn-sm btn-secondary" onclick="doTextCase('proper')">Aa Proper</button>
+           <button class="btn btn-sm btn-secondary" onclick="doRemoveSpaces()">✂ Spaces</button>
+           <div style="display:flex; gap:2px; align-items:center; background:var(--bg3); padding:2px; border-radius:6px; border:1px solid var(--border);">
+             <input type="number" id="roundDecimals" value="2" min="0" max="10" style="width:36px; font-size:11px; padding:2px; background:transparent; border:none; text-align:center;">
+             <button class="btn btn-sm btn-indigo" onclick="doRoundValues()" style="padding:2px 6px;">Round</button>
+           </div>
+        </div>
+      </div>
+
+      <div id="quickCleanResult" style="margin-top:4px;"></div>
+    </div>
+  </div>`;
+
+  // Start Bottom Section (Side-by-Side) - Spanning full width of parent grid
+  html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:8px; align-items: start; grid-column: 1 / -1;">`;
+
+  // Left Column - Categorical Mapping
+  html += `<div class="card" style="display:flex; flex-direction:column; height:400px; margin-bottom:0;">
+    <div class="card-header">
+      <span>📋 Categorical Mapping</span>
+      <div style="display:flex; gap:3px;">
+        <button class="btn btn-sm btn-secondary" onclick="applyRecovery()" title="Restore" style="padding:4px 8px;">🛡️ Restore</button>
+        <button class="btn btn-sm btn-primary" onclick="applyCategoryMap()" style="padding:4px 12px;">Apply</button>
+      </div>
+    </div>
+    <div class="card-body" style="padding:0; flex:1; overflow-y:auto;">
+      <div id="catMapTableWrap"></div>
+    </div>
+  </div>`;
+
+  // Right Column - Merged Row & Type Controls
+  const currentFilter = data.active_filter || {};
+  const currentColType = data.column_type || 'Text';
+  
+  html += `<div class="card" style="display:flex; flex-direction:column; height:400px; margin-bottom:0;">
+    <div class="card-header">⚙️ Row & Type Controls</div>
+    <div class="card-body" style="overflow-y:auto; padding:12px;">
+      
+      <!-- Filtering Section -->
+      <div style="margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid var(--border);">
+        <label style="font-size:9px; color:var(--text3); text-transform:uppercase; font-weight:700; display:block; margin-bottom:6px;">📐 Row Filtering</label>
+        <div style="display:flex; gap:6px; align-items:flex-end;">
+          <div style="flex:1;">
+            <select id="filterType" onchange="toggleFilterInputs(this.value)" style="width:100%; padding:4px 8px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:11px;">
+              <option value="" ${!currentFilter.type ? 'selected' : ''}>No Filter</option>
+              <option value="range" ${currentFilter.type==='range'?'selected':''}>Numeric Range</option>
+              <option value="contain" ${currentFilter.type==='contain'?'selected':''}>Text Contains</option>
+              <option value="missing" ${currentFilter.type==='missing'?'selected':''}>Missing / Nulls</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="setFilter()" style="height:28px; padding:0 10px;">Apply</button>
+          ${currentFilter.type ? `<button class="btn btn-sm btn-secondary" style="height:28px; padding:0 6px;" onclick="clearFilter()">Clear</button>` : ''}
+        </div>
+        
+        <div id="filterRangeInputs" style="display:${currentFilter.type==='range'?'flex':'none'}; gap:4px; margin-top:6px;">
+          <input type="number" id="fMin" placeholder="Min" value="${currentFilter.min||''}" style="flex:1; padding:4px; font-size:11px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text);">
+          <input type="number" id="fMax" placeholder="Max" value="${currentFilter.max||''}" style="flex:1; padding:4px; font-size:11px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text);">
+        </div>
+        <div id="filterTextInputs" style="display:${currentFilter.type==='contain'?'block':'none'}; margin-top:6px;">
+          <input type="text" id="fText" placeholder="Search text..." value="${currentFilter.value||''}" style="width:100%; padding:4px; font-size:11px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text);">
+        </div>
+      </div>
+
+      <!-- Data Type Section -->
+      <div style="margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid var(--border);">
+        <label style="font-size:9px; color:var(--text3); text-transform:uppercase; font-weight:700; display:block; margin-bottom:6px;">🛡️ Data Type & Validation</label>
+        <div style="display:flex; gap:6px;">
+          <div style="flex:1;">
+            <select id="colDeclaredType" onchange="setColumnType(this.value)" style="width:100%; padding:4px 8px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:11px;">
+              <option value="Text" ${currentColType==='Text'?'selected':''}>Text (Any)</option>
+              <option value="Number" ${currentColType==='Number'?'selected':''}>Number</option>
+              <option value="Date" ${currentColType==='Date'?'selected':''}>Date</option>
+              <option value="Phone" ${currentColType==='Phone'?'selected':''}>Phone (10 digits)</option>
+              <option value="Aadhaar" ${currentColType==='Aadhaar'?'selected':''}>Aadhaar (12 digits)</option>
+            </select>
+          </div>
+          <button class="btn btn-indigo btn-sm" onclick="scanErrors()" style="height:28px; padding:0 10px;">Scan</button>
+        </div>
+        <div id="errorResult" style="margin-top:4px;"></div>
+      </div>
+
+      <!-- Date Standardizer Section -->
+      <div style="margin-bottom:0;">
+        <label style="font-size:9px; color:var(--text3); text-transform:uppercase; font-weight:700; display:block; margin-bottom:6px;">📅 Date Standardizer</label>
+        <div style="display:flex; gap:6px; align-items:flex-end; flex-wrap:wrap;">
+          <div style="flex:1; min-width:80px;">
+            <select id="dateFormat" style="width:100%; padding:4px 8px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:11px;">
+              <option value="%d-%m-%Y" selected>DD-MM-YYYY</option>
+              <option value="%Y-%m-%d">YYYY-MM-DD</option>
+              <option value="%d/%m/%Y">DD/MM/YYYY</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="doStandardizeDates()" style="height:28px; padding:0 10px;">Standardize</button>
+        </div>
+        <div id="dateResult" style="margin-top:4px; font-size:11px;"></div>
+      </div>
+
+    </div>
+  </div>`;
+
+  html += `</div>`; // End Grid Container
+
+  document.getElementById('colStats').innerHTML = html;
+  
+  // Update cross-validation labels/dropdowns after injection
+  const crossLabel = document.getElementById('crossCol1Label');
+  if (crossLabel) crossLabel.textContent = colLabel(colName);
+  const crossCol2Dropdown = document.getElementById('crossCol2');
+  if (crossCol2Dropdown) {
+      crossCol2Dropdown.innerHTML = columns.map(c => `<option value="${c.name}" title="${c.name}">${colLabel(c.name)}</option>`).join('');
+  }
+
+  renderUVTable();
+  renderCatMapTable();
+}
+
+// ── Sortable Table Renderers ─────────────────────────────
+function sortIndicator(key) {
+  if (uvSortKey !== key) return '';
+  return uvSortAsc ? ' ▲' : ' ▼';
+}
+
+function sortUVTable(key) {
+  if (uvSortKey === key) {
+    uvSortAsc = !uvSortAsc; // toggle direction
+  } else {
+    uvSortKey = key;
+    uvSortAsc = (key === 'value'); // value defaults ascending, others descending
+  }
+  renderUVTable();
+  renderCatMapTable();
+}
+
+function renderUVTable() {
+  const wrap = document.getElementById('uvTableWrap');
+  if (!wrap) return;
+  const sorted = uvItems.slice().sort((a, b) => {
+    let va = a[uvSortKey], vb = b[uvSortKey];
+    if (uvSortKey === 'value') {
+      va = String(va).toLowerCase(); vb = String(vb).toLowerCase();
+      return uvSortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    }
+    return uvSortAsc ? va - vb : vb - va;
+  });
+  const maxCount = sorted.length > 0 ? Math.max(...sorted.map(i => i.count)) : 1;
+  let t = `<table class="uv-table">
+    <thead><tr>
+      <th style="cursor:pointer;" onclick="sortUVTable('value')">Value${sortIndicator('value')}</th>
+      <th style="cursor:pointer;" onclick="sortUVTable('count')">Count${sortIndicator('count')}</th>
+      <th style="cursor:pointer;" onclick="sortUVTable('pct')">%${sortIndicator('pct')}</th>
+      <th class="bar-cell">Distribution</th>
+    </tr></thead><tbody>`;
+  sorted.forEach(item => {
+    const isMissing = item.value === '(missing)';
+    const displayVal = item.value === '(missing)' ? '(missing)' : item.value;
+    t += `<tr>
+      <td class="${isMissing ? 'missing-val' : ''}">${item.value}</td>
+      <td>${item.count}</td>
+      <td>${item.pct}%</td>
+      <td class="bar-cell"><div class="uv-bar" style="width:${(item.count / maxCount * 100)}%; ${isMissing ? 'background:var(--red);' : ''}"></div></td>
+      <td style="text-align:right;">
+        <button class="btn btn-sm btn-secondary" style="padding:2px 8px; font-size:10px;" onclick="filterByValue('${displayVal}')">Filter</button>
+      </td>
+    </tr>`;
+  });
+  t += '</tbody></table>';
+  wrap.innerHTML = t;
+}
+
+function renderCatMapTable() {
+  const wrap = document.getElementById('catMapTableWrap');
+  if (!wrap) return;
+  const sorted = uvItems.slice().sort((a, b) => {
+    let va = a[uvSortKey], vb = b[uvSortKey];
+    if (uvSortKey === 'value') {
+      va = String(va).toLowerCase(); vb = String(vb).toLowerCase();
+      return uvSortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    }
+    return uvSortAsc ? va - vb : vb - va;
+  });
+  let t = `<table class="uv-table">
+    <thead><tr>
+      <th style="cursor:pointer;" onclick="sortUVTable('value')">Current Value${sortIndicator('value')}</th>
+      <th style="cursor:pointer;" onclick="sortUVTable('count')">Count${sortIndicator('count')}</th>
+      <th>Target Value (leave blank to keep)</th>
+    </tr></thead><tbody>`;
+  sorted.forEach(item => {
+    const isMissing = item.value === '(missing)';
+    t += `<tr>
+      <td class="${isMissing ? 'missing-val' : ''}">${item.value}</td>
+      <td>${item.count}</td>
+      <td><input type="text" class="catmap-input" data-old="${item.value}"
+           placeholder="New value…" style="width:100%;padding:4px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;"></td>
+    </tr>`;
+  });
+  t += '</tbody></table>';
+  wrap.innerHTML = t;
+}
+
+// ── Replace ──────────────────────────────────────────────
+async function doReplace() {
+  if (!activeCol) return;
+  const find = document.getElementById('findVal').value;
+  const replace = document.getElementById('replaceVal').value;
+  const regex = document.getElementById('useRegex').checked;
+  if (!find && find !== '') { toast('Enter a value to find', 'error'); return; }
+  const data = await apiPost('replace', { column: activeCol, find, replace, regex });
+  if (data) {
+    toast(`Replaced ${data.replaced} occurrences`);
+    await loadInfo();
+    selectColumn(activeCol);
+  }
+}
+
+// ── Proportional Fill ────────────────────────────────────
+async function doFillProportional() {
+  if (!activeCol) return;
+  const data = await apiPost('fill_proportional', { column: activeCol });
+  if (data) {
+    toast(`Filled ${data.filled} missing values proportionally`);
+    await loadInfo();
+    selectColumn(activeCol);
+  }
+}
+
+async function doFillNA() {
+  if (!activeCol) return;
+  const data = await apiPost('fill_na', { column: activeCol });
+  if (data) {
+    toast(`Filled ${data.filled} cells with 'NA'`);
+    document.getElementById('quickCleanResult').innerHTML = `<p style="color:var(--green); font-size:12px;">✓ ${data.filled} cells filled with NA</p>`;
+    await loadInfo();
+    selectColumn(activeCol);
+  }
+}
+
+async function doRemoveSpaces() {
+  if (!activeCol) return;
+  const data = await apiPost('remove_spaces', { column: activeCol });
+  if (data) {
+    toast(`Modified ${data.modified} cells`);
+    document.getElementById('quickCleanResult').innerHTML = `<p style="color:var(--green); font-size:12px;">✓ Removed spaces in ${data.modified} cells</p>`;
+    await loadInfo();
+    selectColumn(activeCol);
+  }
+}
+
+async function doTextCase(caseType) {
+  if (!activeCol) return;
+  let caseName = caseType.charAt(0).toUpperCase() + caseType.slice(1);
+  const data = await apiPost('text_case', { column: activeCol, case_type: caseType });
+  if (data) {
+    toast(`Converted ${data.modified} cells to ${caseName} case`);
+    document.getElementById('quickCleanResult').innerHTML = `<p style="color:var(--green); font-size:12px;">✓ Converted ${data.modified} cells to ${caseName} case</p>`;
+    await loadInfo();
+    selectColumn(activeCol);
+  }
+}
+
+// ── Categorical Mapping ──────────────────────────────────
+async function applyCategoryMap() {
+  if (!activeCol) return;
+  const inputs = document.querySelectorAll('.catmap-input');
+  const mappings = {};
+  inputs.forEach(inp => {
+    if (inp.value.trim() !== '') {
+      mappings[inp.dataset.old] = inp.value.trim();
+    }
+  });
+  if (Object.keys(mappings).length === 0) { toast('Fill in at least one target value', 'error'); return; }
+  const data = await apiPost('categorical_map', { column: activeCol, mappings });
+  if (data) {
+    toast(`Mapped ${data.replaced} values`);
+    await loadInfo();
+    selectColumn(activeCol);
+  }
+}
+
+// ── Date Standardizer ────────────────────────────────────
+async function doStandardizeDates() {
+  if (!activeCol) return;
+  const fmt = document.getElementById('dateFormat').value;
+  const dayfirst = document.getElementById('dayFirst').checked;
+  const data = await apiPost('standardize_dates', { column: activeCol, format: fmt, dayfirst });
+  if (data) {
+    let msg = `Converted ${data.converted} of ${data.total} dates`;
+    if (data.failed > 0) msg += ` (${data.failed} failed to parse)`;
+    toast(msg);
+    let html = `<p style="font-size:12px;color:var(--green);">✓ ${data.converted} converted</p>`;
+    if (data.failed > 0) html += `<p style="font-size:12px;color:var(--yellow);">⚠ ${data.failed} could not be parsed</p>`;
+    document.getElementById('dateResult').innerHTML = html;
+    await loadInfo();
+    selectColumn(activeCol);
+  }
+}
+
+// ── Data Validation ──────────────────────────────────────
+function showValTab(tab) {
+  document.getElementById('valOutlierPanel').style.display = tab === 'outlier' ? 'block' : 'none';
+  document.getElementById('valFormatPanel').style.display = tab === 'format' ? 'block' : 'none';
+  document.getElementById('valCrossPanel').style.display = tab === 'cross' ? 'block' : 'none';
+  
+  document.getElementById('valTabOutlier').classList.toggle('btn-primary', tab === 'outlier');
+  document.getElementById('valTabOutlier').classList.toggle('btn-secondary', tab !== 'outlier');
+  document.getElementById('valTabFormat').classList.toggle('btn-primary', tab === 'format');
+  document.getElementById('valTabFormat').classList.toggle('btn-secondary', tab !== 'format');
+  document.getElementById('valTabCross').classList.toggle('btn-primary', tab === 'cross');
+  document.getElementById('valTabCross').classList.toggle('btn-secondary', tab !== 'cross');
+  
+  document.getElementById('validationResult').innerHTML = '';
+}
+
+async function doOutlierCheck() {
+  if (!activeCol) return;
+  const threshold = parseFloat(document.getElementById('zThreshold').value) || 3;
+  const data = await apiPost('detect_outliers', { column: activeCol, threshold });
+  if (data) {
+    let html = `<p style="font-size:12px;color:var(--text2);margin-bottom:8px;">Checked ${data.total_checked} values — Mean: ${data.mean}, Std: ${data.std}</p>`;
+    if (data.outliers.length === 0) {
+      html += '<p style="font-size:13px;color:var(--green);">✓ No outliers found</p>';
+    } else {
+      html += `<p style="font-size:13px;color:var(--yellow);margin-bottom:6px;">⚠ ${data.outliers.length} outliers found (|z| > ${data.threshold})</p>`;
+      html += '<div style="max-height:200px;overflow-y:auto;"><table class="uv-table"><thead><tr><th>Row</th><th>Value</th><th>Z-Score</th></tr></thead><tbody>';
+      data.outliers.forEach(o => {
+        html += `<tr><td>${o.row}</td><td>${o.value}</td><td style="color:var(--red);">${o.z_score}</td></tr>`;
+      });
+      html += '</tbody></table></div>';
+    }
+    document.getElementById('validationResult').innerHTML = html;
+  }
+}
+
+async function doFormatCheck() {
+  if (!activeCol) return;
+  const pattern = document.getElementById('fmtPattern').value;
+  if (!pattern) { toast('Enter a regex pattern', 'error'); return; }
+  const data = await apiPost('validate_format', { column: activeCol, pattern });
+  if (data) {
+    let html = `<p style="font-size:12px;color:var(--text2);margin-bottom:8px;">Checked ${data.total_checked} values against /${data.pattern}/</p>`;
+    if (data.total_mismatched === 0) {
+      html += '<p style="font-size:13px;color:var(--green);">✓ All values match the pattern</p>';
+    } else {
+      html += `<p style="font-size:13px;color:var(--yellow);margin-bottom:6px;">⚠ ${data.total_mismatched} values don't match</p>`;
+      html += '<div style="max-height:200px;overflow-y:auto;"><table class="uv-table"><thead><tr><th>Value</th><th>Count</th><th>Sample Rows</th></tr></thead><tbody>';
+      data.mismatches.forEach(m => {
+        html += `<tr><td>${m.value}</td><td>${m.count}</td><td style="color:var(--text3);">${m.sample_rows.join(', ')}</td></tr>`;
+      });
+      html += '</tbody></table></div>';
+    }
+    document.getElementById('validationResult').innerHTML = html;
+  }
+
+}
+
+function applyFindPreset(val) {
+  if (!val) return;
+  document.getElementById('findVal').value = val;
+  document.getElementById('useRegex').checked = true;
+}
+
+function applyFormatPreset(val) {
+  if (!val) return;
+  document.getElementById('fmtPattern').value = val;
+}
+
+async function generateRegexAI(targetId, descId, checkId) {
+  const desc = document.getElementById(descId).value;
+  if (!desc) { toast('Describe the pattern first', 'error'); return; }
+  
+  const btn = event.target;
+  const originalText = btn.textContent;
+  btn.textContent = '...';
+  btn.disabled = true;
+
+  const data = await apiPost('generate_regex', { description: desc });
+  btn.textContent = originalText;
+  btn.disabled = false;
+
+  if (data && data.regex) {
+    document.getElementById(targetId).value = data.regex;
+    if (checkId) document.getElementById(checkId).checked = true;
+    toast('Pattern generated!');
+  }
+}
+
+// ── Trim ─────────────────────────────────────────────────
+async function trimAll() {
+  const data = await apiPost('trim_whitespace', { columns: [] });
+  if (data) {
+    toast(`Trimmed whitespace — ${data.trimmed} cells modified`);
+    await loadInfo();
+    if (activeCol) selectColumn(activeCol);
+  }
+}
+
+// ── Undo ─────────────────────────────────────────────────
+async function doUndo() {
+  const data = await apiPost('undo', {});
+  if (data) {
+    toast(`Undone: ${data.undone}`);
+    await loadInfo();
+    if (activeCol) selectColumn(activeCol);
+  }
+}
+
+async function doRedo() {
+  const data = await apiPost('redo', {});
+  if (data) {
+    toast(`Redone`);
+    await loadInfo();
+    if (activeCol) selectColumn(activeCol);
+  }
+}
+
+// ── Save to Account ──────────────────────────────────────
+let _toolProjectId = null;
+let _toolProjectName = null;
+let _dirty = false;
+
+async function doSaveToAccount() {
+  if (!_fgUrl || !_fgToken) { toast('Not connected to FieldGovern', true); return; }
+  const defaultName = _toolProjectName || (DATA_FILENAME || 'cleaned_data').replace(/\.[^.]+$/, '') + '_cleaned';
+  const name = window.prompt('Save as:', defaultName);
+  if (!name) return;
+  const btn = document.getElementById('saveToAccountBtn');
+  btn.disabled = true; btn.textContent = '💾 Saving…';
+  try {
+    const res = await _postSaveToAccount(name, false);
+    const json = await res.json();
+    if (!res.ok) {
+      const msg = res.status === 401
+        ? 'Your session expired and could not be renewed — please log in again.'
+        : (json.error || 'Save failed');
+      throw new Error(msg);
+    }
+    _toolProjectId = json.id || _toolProjectId;
+    _toolProjectName = name;
+    _dirty = false;
+    _startCheckpointCountdown();
+    toast('Saved to your account ✓');
+  } catch (e) {
+    setAutosaveStatus('Not saved — check your connection or log in again', true);
+    toast(e.message || 'Save failed', true);
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Save to Account';
+  }
+}
+
+// ── Autosave ───────────────────────────────────────────────
+// Ticks every 60s; only writes when something actually changed since the
+// last save (see the `_dirty` flag set by apiPost), and only once the user
+// is connected to a FieldGovern account (the only place saves persist to).
+function setAutosaveStatus(text, isWarning) {
+  const el = document.getElementById('autosaveStatus');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = isWarning ? '#f87171' : 'var(--text3)';
+  el.style.display = (_fgUrl && _fgToken) ? 'block' : 'none';
+}
+
+// Backend only turns a save into a permanent checkpoint once 120s have passed
+// since the last one (see MIN_SECONDS_BETWEEN_VERSIONS in user_tool_projects.py)
+// — anything saved inside that window can be silently overwritten with no
+// history entry. This counts down visibly so it's obvious when it's safe to
+// re-upload, restore, or otherwise risk clobbering the just-saved version.
+let _checkpointTimer = null;
+function _renderCheckpointCountdown(remaining) {
+  const el = document.getElementById('autosaveStatus');
+  if (!el) return;
+  el.style.display = 'block';
+  if (remaining > 0) {
+    const m = Math.floor(remaining / 60), s = String(remaining % 60).padStart(2, '0');
+    el.innerHTML = `<span class="checkpoint-dot"></span>Checkpoint saved — wait ${m}:${s} before uploading or restoring`;
+  } else {
+    el.innerHTML = `<span style="color:#4ade80;">✓</span> Safe to upload or restore now`;
+  }
+}
+function _startCheckpointCountdown() {
+  if (_checkpointTimer) clearInterval(_checkpointTimer);
+  let remaining = 120;
+  _renderCheckpointCountdown(remaining);
+  _checkpointTimer = setInterval(() => {
+    remaining--;
+    _renderCheckpointCountdown(remaining);
+    if (remaining <= 0) clearInterval(_checkpointTimer);
+  }, 1000);
+}
+
+async function _postSaveToAccount(name, autosave) {
+  const body = { fg_base_url: _fgUrl, token: _fgToken, name, program_id: _fgProgramId || null, autosave };
+  let res = await fetch(BASE_URL + '/api/save-to-account', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (res.status === 401 && await _refreshFgToken()) {
+    res = await fetch(BASE_URL + '/api/save-to-account', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...body, token: _fgToken }),
+    });
+  }
+  return res;
+}
+
+async function _autosaveTick() {
+  if (!_fgUrl || !_fgToken || !_dirty || !_df_loaded()) return;
+  const name = _toolProjectName || (DATA_FILENAME || 'cleaned_data').replace(/\.[^.]+$/, '') + '_cleaned';
+  try {
+    const res = await _postSaveToAccount(name, true);
+    const json = await res.json();
+    if (!res.ok) {
+      setAutosaveStatus('Not saved — check your connection or log in again', true);
+      return;
+    }
+    _toolProjectId = json.id || _toolProjectId;
+    _toolProjectName = name;
+    _dirty = false;
+    _startCheckpointCountdown();
+  } catch (e) {
+    setAutosaveStatus('Not saved — check your connection or log in again', true);
+  }
+}
+function _df_loaded() { return !!DATA_FILENAME; }
+setInterval(_autosaveTick, 60000);
+
+// ── History (past saved/autosaved versions, restorable) ──────
+function openHistory() {
+  if (!_toolProjectId) { toast('Save to your account at least once before viewing history', true); return; }
+  document.getElementById('historyModal').classList.add('open');
+  loadHistoryList();
+}
+function closeHistory() {
+  document.getElementById('historyModal').classList.remove('open');
+}
+async function loadHistoryList() {
+  const list = document.getElementById('historyList');
+  list.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:12px;text-align:center;">Loading…</div>';
+  try {
+    const res = await fetch(BASE_URL + '/api/account-history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken, project_id: _toolProjectId }),
+    });
+    const versions = await res.json();
+    if (!res.ok) throw new Error((versions && versions.error) || 'Could not load history');
+    if (!versions.length) {
+      list.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:12px;text-align:center;">No previous versions yet — checkpoints appear here as you save.</div>';
+      return;
+    }
+    list.innerHTML = versions.map(v => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-size:13px; color:var(--text);">${new Date(v.saved_at).toLocaleString()}</div>
+          <div style="font-size:11px; color:var(--text3);">${v.autosave ? 'Autosaved' : 'Manual save'} · ${v.row_count ?? '?'} rows · ${v.col_count ?? '?'} cols</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="restoreHistoryVersion(${v.index})">Restore</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    list.innerHTML = `<div style="padding:20px;color:var(--red);font-size:12px;text-align:center;">${e.message}</div>`;
+  }
+}
+async function restoreHistoryVersion(index) {
+  if (!window.confirm('Restore this version into the working file? Your current state will be saved as a checkpoint first.')) return;
+  if (_dirty) await _autosaveTick(); // flush unsaved live edits so they aren't lost
+  showLoading('Restoring version…');
+  try {
+    const res = await fetch(BASE_URL + '/api/account-history/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken, project_id: _toolProjectId, index }),
+    });
+    const json = await res.json();
+    hideLoading();
+    if (!res.ok) throw new Error(json.error || 'Restore failed');
+    toast(`Restored version — ${json.rows} rows, ${json.cols} columns`);
+    closeHistory();
+    await loadInfo();
+    if (columns.length > 0) selectColumn(columns[0].name);
+  } catch (e) {
+    hideLoading();
+    toast(e.message || 'Restore failed', true);
+  }
+}
+
+// ── Load from Account (files saved in a past session) ────────
+function openLoadProjects() {
+  if (!_fgUrl || !_fgToken) { toast('Not connected to FieldGovern', true); return; }
+  document.getElementById('loadProjectsModal').classList.add('open');
+  loadProjectsList();
+}
+function closeLoadProjects() {
+  document.getElementById('loadProjectsModal').classList.remove('open');
+}
+let _accountProjects = [];
+async function loadProjectsList() {
+  const list = document.getElementById('loadProjectsList');
+  list.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:12px;text-align:center;">Loading…</div>';
+  try {
+    const res = await fetch(BASE_URL + '/api/account-projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken }),
+    });
+    const projects = await res.json();
+    if (!res.ok) throw new Error((projects && projects.error) || 'Could not load saved files');
+    _accountProjects = Array.isArray(projects) ? projects : [];
+    if (!_accountProjects.length) {
+      list.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:12px;text-align:center;">No files saved to your account yet.</div>';
+      return;
+    }
+    list.innerHTML = _accountProjects.map((p, i) => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-size:13px; color:var(--text);">${p.name}</div>
+          <div style="font-size:11px; color:var(--text3);">${new Date(p.updated_at).toLocaleString()} · ${p.data?.row_count ?? '?'} rows · ${p.data?.col_count ?? '?'} cols</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="doLoadProject(${i})">Load</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    list.innerHTML = `<div style="padding:20px;color:var(--red);font-size:12px;text-align:center;">${e.message}</div>`;
+  }
+}
+async function doLoadProject(i) {
+  const p = _accountProjects[i];
+  if (!p) return;
+  if (!window.confirm(`Load "${p.name}"? Your current working file will be replaced.`)) return;
+  closeLoadProjects();
+  showLoading('Loading saved file…');
+  try {
+    const res = await fetch(BASE_URL + '/api/account-projects/load', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: p.data }),
+    });
+    const json = await res.json();
+    hideLoading();
+    if (!res.ok) throw new Error(json.error || 'Load failed');
+    _toolProjectId = p.id;
+    _toolProjectName = p.name;
+    _dirty = false;
+    DATA_FILENAME = json.filename || p.name;
+    toast(`Loaded "${p.name}" — ${json.rows} rows, ${json.cols} columns`);
+    const wc = document.getElementById('welcomeCard');
+    if (wc) wc.style.display = 'none';
+    await loadInfo();
+    if (columns.length > 0) selectColumn(columns[0].name);
+  } catch (e) {
+    hideLoading();
+    toast(e.message || 'Load failed', true);
+  }
+}
+
+// ── Preview ──────────────────────────────────────────────
+async function loadPreview(page = 1) {
+  const data = await api(`preview?page=${page}&per_page=50`);
+  if (!data) return;
+  let html = '<div class="preview-table-wrap"><table class="preview-table"><thead><tr>';
+  data.columns.forEach(c => { html += `<th title="${c}">${colLabel(c)}</th>`; });
+  html += '</tr></thead><tbody>';
+  data.rows.forEach(row => {
+    html += '<tr>';
+    const rowIdx = row.__row_idx;
+    data.columns.forEach(c => {
+      const v = row[c];
+      const displayVal = v === null || v === undefined ? 'null' : String(v);
+      const isNull = v === null || v === undefined;
+      html += `<td class="${isNull?'null-cell':''}" 
+                   ondblclick="beginEditCell(this, ${rowIdx}, '${c.replace(/'/g, "\\'")}')"
+                   title="Double-click to edit">${displayVal}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  // Pagination
+  html += '<div class="pagination">';
+  if (data.page > 1) html += `<button class="btn btn-sm btn-secondary" onclick="loadPreview(${data.page - 1})">← Prev</button>`;
+  html += `<span style="font-size:13px;color:var(--text2);">Page ${data.page} of ${data.total_pages} (${data.total} rows)</span>`;
+  if (data.page < data.total_pages) html += `<button class="btn btn-sm btn-secondary" onclick="loadPreview(${data.page + 1})">Next →</button>`;
+  html += '</div>';
+
+  document.getElementById('previewContent').innerHTML = html;
+}
+ 
+function beginEditCell(td, rowIdx, colName) {
+  if (td.getAttribute('contenteditable')) return;
+  const originalVal = td.textContent;
+  td.contentEditable = true;
+  td.classList.add('editing');
+  td.focus();
+ 
+  // Select all text
+  const range = document.createRange();
+  range.selectNodeContents(td);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+ 
+  const finishEdit = async (save) => {
+    td.contentEditable = false;
+    td.classList.remove('editing');
+    if (save) {
+      const newVal = td.textContent;
+      if (newVal !== originalVal) {
+        const data = await apiPost('manual_edit', { row_idx: rowIdx, column: colName, value: newVal });
+        if (data) toast('Cell updated');
+        else td.textContent = originalVal;
+      }
+    } else {
+      td.textContent = originalVal;
+    }
+  };
+ 
+  td.onkeydown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finishEdit(true); }
+    if (e.key === 'Escape') { e.preventDefault(); finishEdit(false); }
+  };
+  td.onblur = () => finishEdit(true);
+}
+async function runAiCorrection() {
+  if (!activeCol) { toast('Select a column first', 'error'); return; }
+  document.getElementById('aiSpinner').style.display = 'inline-flex';
+  const prompt = document.getElementById('aiPrompt').value;
+  const data = await apiPost('ai_correct', { 
+    columns: [activeCol], 
+    context: Array.from(aiContextCols),
+    prompt 
+  });
+  document.getElementById('aiSpinner').style.display = 'none';
+  if (!data || !data.result) return;
+
+  const r = data.result;
+  let html = '';
+
+  if (r.suggestions && r.suggestions.length > 0) {
+    html += `<div style="margin-bottom:8px;font-size:13px;color:var(--text2);">${r.suggestions.length} suggestions found — check the ones you want to apply:</div>`;
+    r.suggestions.forEach((s, i) => {
+      html += `<div class="ai-suggestion-item">
+        <input type="checkbox" id="aiSug${i}" data-idx="${i}" checked>
+        <strong>${s.column}</strong>
+        <span>"${s.find}"</span>
+        <span class="arrow">→</span>
+        <span>"${s.replace}"</span>
+        <span class="reason">${s.reason || ''}</span>
+      </div>`;
+    });
+    html += `<div style="margin-top:12px;display:flex;gap:8px;">
+      <button class="btn btn-success" onclick="applyAiSuggestions()">✓ Apply Selected</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('aiSuggestions').innerHTML=''">✕ Dismiss</button>
+    </div>`;
+    // store suggestions globally
+    window._aiSuggestions = r.suggestions;
+  } else {
+    html += '<div style="font-size:13px;color:var(--green);margin-top:8px;">✓ AI found no issues — data looks clean!</div>';
+  }
+
+  if (r.notes) {
+    html += `<div class="ai-notes"><strong>AI Notes:</strong> ${r.notes}</div>`;
+  }
+
+  document.getElementById('aiSuggestions').innerHTML = html;
+}
+
+async function applyAiSuggestions() {
+  if (!window._aiSuggestions) return;
+  const selected = [];
+  window._aiSuggestions.forEach((s, i) => {
+    const cb = document.getElementById(`aiSug${i}`);
+    if (cb && cb.checked) selected.push(s);
+  });
+  if (selected.length === 0) { toast('No suggestions selected', 'error'); return; }
+  const data = await apiPost('apply_ai_suggestions', { suggestions: selected });
+  if (data) {
+    toast(`Applied ${data.applied} corrections`);
+    document.getElementById('aiSuggestions').innerHTML = '';
+    await loadInfo();
+    if (activeCol) selectColumn(activeCol);
+  }
+}
+
+// ── Tab Switching ────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+  const map = { explore: 'tabExplore', preview: 'tabPreview', ai: 'tabAi' };
+  const target = document.getElementById(map[name]);
+  if (target) target.style.display = 'block';
+  if (name === 'preview') loadPreview();
+}
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => switchTab(t.dataset.tab));
+});
+
+// ── Drag & Drop ──────────────────────────────────────────
+const zone = document.getElementById('uploadZone');
+['dragenter','dragover'].forEach(e => zone.addEventListener(e, ev => { ev.preventDefault(); zone.classList.add('dragover'); }));
+['dragleave','drop'].forEach(e => zone.addEventListener(e, ev => { ev.preventDefault(); zone.classList.remove('dragover'); }));
+zone.addEventListener('drop', ev => { if (ev.dataTransfer.files.length) uploadFile(ev.dataTransfer.files[0]); });
+
+async function clearAllFilters() {
+  const data = await apiPost('clear_filter', {});
+  if (data) {
+    toast('All filters cleared');
+    if (activeCol) selectColumn(activeCol);
+  }
+}
+
+async function clearFilter() {
+  if (!activeCol) return;
+  const data = await apiPost('clear_filter', { column: activeCol });
+  if (data) {
+    toast('Filter cleared');
+    selectColumn(activeCol);
+  }
+}
+ 
+async function applyMissingFilter() {
+  const threshold = document.getElementById('missThreshold').value;
+  const data = await apiPost('set_filter', {
+    column: '__missing_count',
+    type: 'range',
+    min: threshold || null,
+    max: null
+  });
+  if (data) {
+    toast('Completeness filter applied: >=' + threshold);
+    if (activeCol) selectColumn(activeCol); else await loadInfo();
+  }
+}
+
+async function setFilter() {
+  if (!activeCol) return;
+  const fType = document.getElementById('filterType').value;
+  if (!fType) {
+    clearFilter();
+    return;
+  }
+  
+  const f = { type: fType };
+  if (fType === 'range') {
+    f.min = document.getElementById('fMin').value;
+    f.max = document.getElementById('fMax').value;
+  } else if (fType === 'contain') {
+    f.value = document.getElementById('fText').value;
+  } else if (fType === 'missing') {
+    // Missing filter doesn't need extra values
+  }
+  
+  const data = await apiPost('set_filter', { column: activeCol, filter: f });
+  if (data) {
+    toast('Filter applied');
+    selectColumn(activeCol);
+  }
+}
+
+function toggleFilterInputs(val) {
+  const rPanel = document.getElementById('filterRangeInputs');
+  const tPanel = document.getElementById('filterTextInputs');
+  if (rPanel) rPanel.style.display = (val === 'range') ? 'flex' : 'none';
+  if (tPanel) tPanel.style.display = (val === 'contain') ? 'block' : 'none';
+}
+
+async function setColumnType(type) {
+  if (!activeCol) return;
+  const data = await apiPost('set_column_type', { column: activeCol, type });
+  if (data) toast('Type updated to ' + type);
+}
+
+// ── Advanced Features ──────────────────────────────────
+async function doGlobalSearch() {
+  const q = document.getElementById('globalSearch').value.trim();
+  if (q === '') {
+    await apiPost('clear_filter', { column: '__global_search' });
+  } else {
+    await apiPost('set_filter', { column: '__global_search', filter: { type: 'text', value: q } });
+  }
+  toast(`Searching for "${q}" across all columns...`);
+  if (activeCol) selectColumn(activeCol);
+  else await loadInfo();
+  switchTab('preview');
+}
+
+async function doRoundValues() {
+  if (!activeCol) return;
+  const dec = document.getElementById('roundDecimals').value || 0;
+  const data = await apiPost('round_values', { column: activeCol, decimals: dec });
+  if (data) {
+    toast(`Rounded ${data.modified} values in ${activeCol}`);
+    await loadInfo();
+    selectColumn(activeCol);
+  }
+}
+
+async function doCrossValidate() {
+  if (!activeCol) return;
+  const op = document.getElementById('crossOp').value;
+  const col2 = document.getElementById('crossCol2').value;
+  
+  const data = await apiPost('cross_validate', { col1: activeCol, operator: op, col2: col2 });
+  if (data) {
+    let html = `<p style="font-size:12px;color:var(--text2);margin-bottom:8px;">Checked Rule: <strong>${activeCol} ${op} ${col2}</strong> across ${data.total_checked} rows.</p>`;
+    if (data.total_violations === 0) {
+      html += '<p style="font-size:13px;color:var(--green);">✓ No violations found. Rule holds for all rows.</p>';
+    } else {
+      html += `<p style="font-size:13px;color:var(--red);margin-bottom:6px;">⚠ ${data.total_violations} violations found!</p>`;
+      html += '<div style="max-height:250px;overflow-y:auto;"><table class="uv-table"><thead><tr><th>Row</th><th>' + activeCol + '</th><th>' + col2 + '</th></tr></thead><tbody>';
+      data.violations.forEach(v => {
+        html += `<tr><td>${v.row}</td><td>${v.v1}</td><td>${v.v2}</td></tr>`;
+      });
+      html += '</tbody></table></div>';
+    }
+    document.getElementById('validationResult').innerHTML = html;
+  }
+}
+
+
+// ── New Features: Search & Navigation ───────────────────
+function filterColumns() {
+  const q = document.getElementById('colSearch').value.toLowerCase().trim();
+  const items = document.querySelectorAll('.col-item');
+  items.forEach(el => {
+    const name = el.getAttribute('data-col').toLowerCase();
+    const idx = el.getAttribute('data-idx');
+    const show = name.includes(q) || (q !== '' && idx === q);
+    el.style.display = show ? 'flex' : 'none';
+  });
+}
+
+// ── Export (fetch+blob — never navigates the SPA away, so a
+// failed/error response can't replace the app and wipe state) ──
+async function _downloadExport(fmt, extraParams = '') {
+  try {
+    const res = await fetch(`${BASE_URL}/api/export?format=${fmt}${extraParams}`);
+    if (!res.ok) {
+      let msg = 'Export failed';
+      try { msg = (await res.json()).error || msg; } catch (e) {}
+      toast(msg, true);
+      return;
+    }
+    const blob = await res.blob();
+    const cd = res.headers.get('Content-Disposition') || '';
+    const match = cd.match(/filename="?([^";]+)"?/);
+    const filename = match ? match[1] : `export.${fmt === 'excel' ? 'xlsx' : 'csv'}`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast('Exported ✓');
+  } catch (e) {
+    toast(e.message || 'Export failed', true);
+  }
+}
+
+function doExport(fmt) {
+  if (fmt === 'excel') {
+    document.getElementById('exportModal').classList.add('open');
+  } else {
+    _downloadExport(fmt);
+  }
+}
+
+function closeExportModal() {
+  document.getElementById('exportModal').classList.remove('open');
+}
+
+function confirmExport() {
+  const includeComments = document.getElementById('exportComments').checked;
+  closeExportModal();
+  _downloadExport('excel', `&comments=${includeComments}`);
+}
+
+
+async function filterByValue(val) {
+  if (!activeCol) return;
+  let f;
+  if (val === '(missing)') {
+    f = { type: 'missing' };
+  } else {
+    f = { type: 'contain', value: val };
+  }
+  
+  const data = await apiPost('set_filter', { column: activeCol, filter: f });
+  if (data) {
+    toast('Rows filtered to: ' + val);
+    selectColumn(activeCol);
+  }
+}
+
+async function scanErrors() {
+  if (!activeCol) return;
+  const type = document.getElementById('colDeclaredType').value;
+  const res = document.getElementById('errorResult');
+  res.innerHTML = '<div class="loader-small" style="margin:10px auto;"></div>';
+
+  const data = await apiPost('scan_errors', { column: activeCol, type });
+  if (data) {
+    if (data.total_errors === 0) {
+      res.innerHTML = '<p style="color:var(--green); font-size:13px; margin-top:10px;">✓ All clear! Values match ' + type + '.</p>';
+    } else {
+      let tbl = `<p style="color:var(--red); font-size:13px; margin:10px 0 8px;">⚠️ Found ${data.total_errors} problematic values:</p>
+        <div style="max-height:150px; overflow-y:auto; border:1px solid var(--border); border-radius:6px;">
+          <table class="uv-table" style="font-size:11px;">
+            <thead><tr><th>Invalid Value</th><th>Count</th></tr></thead><tbody>`;
+      data.errors.forEach(e => {
+        tbl += `<tr><td>${e.value}</td><td>${e.count}</td></tr>`;
+      });
+      tbl += '</tbody></table></div>';
+      res.innerHTML = tbl;
+    }
+  }
+}
+// ── Misc UI Helpers ─────────────────────────────────────
+function toggleSection(sectionId, headerEl) {
+  const target = document.getElementById(sectionId);
+  const header = headerEl || target.previousElementSibling;
+  const isHidden = target.style.display === 'none';
+  target.style.display = isHidden ? 'block' : 'none';
+  header.classList.toggle('collapsed', !isHidden);
+}
+</script>
+
+<script>
+// ── TableForge integration ───────────────────────────────────────────────────
+const _tfParams    = new URLSearchParams(window.location.search);
+const _tfUrl       = _tfParams.get('tf_url');
+const _tfHandoffId = _tfParams.get('handoff_id');
+const _tfFocusCol  = _tfParams.get('focus_col');
+
+async function tfLoadData() {
+  if (!_tfUrl || !_tfHandoffId) return;
+  showLoading('Loading data from TableForge…');
+  try {
+    const res = await fetch(BASE_URL + '/api/load-from-tableforge', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tf_base_url: _tfUrl, handoff_id: _tfHandoffId }),
+    });
+    const data = await res.json();
+    hideLoading();
+    if (data.error) { toast(data.error, 'error'); return; }
+    DATA_FILENAME = data.filename || '';
+    toast(`Loaded from TableForge — ${data.rows} rows, ${data.cols} columns`);
+    const wc = document.getElementById('welcomeCard');
+    if (wc) wc.style.display = 'none';
+    const uploadZone = document.getElementById('uploadZone');
+    if (uploadZone) uploadZone.style.display = 'none';
+    const divider = document.getElementById('uploadDivider');
+    if (divider) divider.style.display = 'none';
+    const saveBtn = document.getElementById('saveToTableforgeBtn');
+    if (saveBtn) saveBtn.style.display = '';
+    await loadInfo();
+    switchTab('explore');
+    const focus = data.focus_col || _tfFocusCol;
+    if (focus && columns.some(c => c.name === focus)) {
+      selectColumn(focus);
+    } else if (columns.length > 0) {
+      selectColumn(columns[0].name);
+    }
+  } catch (e) {
+    hideLoading();
+    toast('Failed to load TableForge data: ' + e, 'error');
+  }
+}
+
+async function doSaveToTableforge() {
+  if (!_tfUrl || !_tfHandoffId) { toast('Not connected to TableForge', 'error'); return; }
+  const btn = document.getElementById('saveToTableforgeBtn');
+  btn.disabled = true; btn.textContent = '💾 Saving…';
+  try {
+    const res = await fetch(BASE_URL + '/api/save-to-tableforge', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tf_base_url: _tfUrl, handoff_id: _tfHandoffId }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Save failed');
+    toast('Saved to TableForge ✓ — returning…');
+    try { window.opener && window.opener.postMessage({ type: 'tf-cleaner-saved', handoff_id: _tfHandoffId, rows: json.rows, cols: json.cols }, '*'); } catch {}
+    setTimeout(() => { try { window.close(); } catch {} }, 700);
+  } catch (e) {
+    toast(e.message || 'Save failed', 'error');
+    btn.disabled = false; btn.textContent = '🧹 Save & Return to TableForge';
+  }
+}
+
+// Auto-load if TF params present (runs before FG-init below; both are independent)
+if (_tfUrl && _tfHandoffId) {
+  window.addEventListener('DOMContentLoaded', () => { tfLoadData(); });
+}
+
+// ── FieldGovern integration ───────────────────────────────────────────────────
+const _fgParams    = new URLSearchParams(window.location.search);
+let   _fgUrl       = _fgParams.get('fg_url');
+let   _fgToken     = _fgParams.get('token');
+const _fgProgId    = _fgParams.get('program_id');
+let   _fgProgramId = _fgProgId;   // updated when user selects a program
+
+// Same-origin bootstrap: with no launch handoff, adopt the main FieldGovern
+// app's existing login (fp_token in localStorage) so opening /cleaner/ directly
+// authenticates instead of dead-ending at the upload-only screen.
+if (!_fgToken) {
+  try {
+    const _lt = localStorage.getItem('fp_token');
+    if (_lt) { _fgToken = _lt; if (!_fgUrl) _fgUrl = window.location.origin; }
+  } catch (e) {}
+}
+
+// The token handed off at launch expires after 2h (JWT_EXPIRE_MINUTES) with no
+// way for this page to renew it on its own. But Cleaner is served same-origin
+// with the main FieldGovern app, so the main app's refresh token (localStorage,
+// 30-day validity) is directly readable here. Without this, autosave silently
+// stops working for the rest of a multi-hour or multi-day session.
+let _fgRefreshing = null;  // in-flight refresh promise, shared across callers
+async function _refreshFgToken() {
+  if (_fgRefreshing) return _fgRefreshing;
+  _fgRefreshing = (async () => {
+    try {
+      const storedRefresh = localStorage.getItem('fp_refresh_token');
+      if (!storedRefresh) return false;
+      const res = await fetch(`${_fgUrl}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: storedRefresh }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (!data.access_token) return false;
+      _fgToken = data.access_token;
+      localStorage.setItem('fp_token', data.access_token);
+      if (data.refresh_token) localStorage.setItem('fp_refresh_token', data.refresh_token);
+      try {
+        const rawUser = localStorage.getItem('fp_user');
+        if (rawUser) {
+          const user = JSON.parse(rawUser);
+          localStorage.setItem('fp_user', JSON.stringify({ ...user, access_token: data.access_token }));
+        }
+      } catch { /* non-fatal */ }
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  try { return await _fgRefreshing; } finally { _fgRefreshing = null; }
+}
+
+// Strip query params (incl. the JWT) from the URL bar once captured — keeps the
+// token out of browser history and shows a clean short URL on startup.
+if (_fgToken || _tfHandoffId) {
+  window.history.replaceState(null, '', window.location.pathname);
+}
+
+// Wire logo link to FG dashboard
+if (_fgUrl) {
+  const _homeLink = document.getElementById('fgHomeLink');
+  if (_homeLink) _homeLink.href = _fgUrl;
+}
+let   DATA_FILENAME = '';          // updated after load
+
+async function fgLoadData(opts) {
+  const { programId, questionnaireId, formId } = opts || {};
+  if (!_fgUrl || !_fgToken || (!programId && !formId)) return;
+  showLoading('Loading data from FieldGovern…');
+  try {
+    const body = { fg_base_url: _fgUrl, token: _fgToken };
+    if (formId) body.form_id = formId;
+    if (programId) body.program_id = programId;
+    if (questionnaireId) body.questionnaire_id = questionnaireId;
+    const res = await fetch(BASE_URL + '/api/load-from-fg', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    hideLoading();
+    if (data.error) { toast(data.error, 'error'); return; }
+    DATA_FILENAME = data.filename || '';
+    toast(`Loaded ${data.filename} — ${data.rows} rows, ${data.cols} columns`);
+    const wc = document.getElementById('welcomeCard');
+    if (wc) wc.style.display = 'none';
+    await loadInfo();
+    switchTab('explore');
+    if (columns.length > 0) selectColumn(columns[0].name);
+  } catch (e) {
+    hideLoading();
+    toast('Failed to load FieldGovern data: ' + e, 'error');
+  }
+}
+
+// Build program / questionnaire selector if FG context present
+(async function () {
+  if (!_fgUrl || !_fgToken) return;
+
+  // Show Save to Account / History buttons (only when connected to FG)
+  const saveBtn = document.getElementById('saveToAccountBtn');
+  if (saveBtn) saveBtn.style.display = '';
+  const historyBtn = document.getElementById('historyBtn');
+  if (historyBtn) historyBtn.style.display = '';
+  const loadFromAccountBtn = document.getElementById('loadFromAccountBtn');
+  if (loadFromAccountBtn) loadFromAccountBtn.style.display = '';
+  setAutosaveStatus('Autosave on — every 60s once you save once');
+
+  // Hide the file upload zone — FG context is the primary data source
+  const uploadZone = document.getElementById('uploadZone');
+  if (uploadZone) uploadZone.style.display = 'none';
+  const divider = document.getElementById('uploadDivider');
+  if (divider) divider.style.display = 'none';
+
+  // Fetch programs
+  let programs = [];
+  let progError = '';
+  try {
+    const r = await fetch(BASE_URL + '/api/fg/programs', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken }),
+    });
+    const payload = await r.json();
+    if (Array.isArray(payload)) {
+      programs = payload;
+    } else {
+      // Proxy/API returned an error object instead of a list — surface it.
+      progError = (payload && (payload.error || payload.detail)) || `Request failed (HTTP ${r.status})`;
+    }
+  } catch (e) { progError = 'Could not reach FieldGovern: ' + e; }
+
+  // Fetch all forms (form-first: no program membership required)
+  let forms = [];
+  try {
+    const rf = await fetch(BASE_URL + '/api/fg/forms', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken }),
+    });
+    const fp = await rf.json();
+    if (Array.isArray(fp)) forms = fp;
+  } catch {}
+
+  const box = document.getElementById('fgSelector');
+  if (!box) return;
+
+  // No programs → tell the user why, but don't dead-end them: Save to Account,
+  // History, and AI Correction all work from an uploaded file with no Program
+  // needed, so give that path back instead of leaving them stuck.
+  if (!programs.length && !forms.length) {
+    const note = document.createElement('div');
+    note.className = 'fg-field';
+    note.style.cssText = 'font-size:13px;color:#b45309;line-height:1.5';
+    note.innerHTML = progError
+      ? `⚠️ Couldn't load your forms: ${progError}. You can still upload a file below and use "Save to Account".`
+      : '⚠️ No forms or Programs found for this account. You can still upload a file below and use "Save to Account".';
+    box.appendChild(note);
+    if (progError) toast(progError, 'error');
+    if (uploadZone) uploadZone.style.display = '';
+    if (divider) divider.style.display = '';
+    return;
+  }
+
+  // Form field — pick any of your forms and load its responses directly.
+  let selFormId = '';
+  const formField = document.createElement('div');
+  formField.className = 'fg-field';
+  formField.style.display = forms.length ? 'block' : 'none';
+  formField.innerHTML = '<label>Form</label>';
+  const formSel = document.createElement('select');
+  formSel.className = 'fg-select';
+  formSel.innerHTML = '<option value="">Select a form…</option>' +
+    forms.map(f => `<option value="${f.id}">${f.title}${f.status ? ' — ' + f.status : ''}${f.version ? ' (v' + f.version + ')' : ''}</option>`).join('');
+  formField.appendChild(formSel);
+  box.appendChild(formField);
+
+  // Program field
+  const progField = document.createElement('div');
+  progField.className = 'fg-field';
+  progField.style.display = programs.length ? 'block' : 'none';
+  progField.innerHTML = forms.length
+    ? '<label>Program <span style="text-transform:none;font-weight:400;opacity:.7">(optional)</span></label>'
+    : '<label>Program</label>';
+  const progSel = document.createElement('select');
+  progSel.className = 'fg-select';
+  progSel.innerHTML = '<option value="">Select a program…</option>' +
+    programs.map(p => `<option value="${p.id}">${p.name}${p.scheme_name ? ' — ' + p.scheme_name : ''}</option>`).join('');
+  progField.appendChild(progSel);
+  box.appendChild(progField);
+
+  // Questionnaire field (hidden until program selected)
+  const qField = document.createElement('div');
+  qField.className = 'fg-field';
+  qField.style.display = 'none';
+  qField.innerHTML = '<label>Questionnaire / Form <span style="text-transform:none;font-weight:400;opacity:.7">(optional)</span></label>';
+  const qSel = document.createElement('select');
+  qSel.className = 'fg-select';
+  qSel.innerHTML = '<option value="">All questionnaires</option>';
+  qField.appendChild(qSel);
+  box.appendChild(qField);
+
+  // Load button
+  const btn = document.createElement('button');
+  btn.className = 'btn-load';
+  btn.textContent = 'Load Data →';
+  btn.disabled = true;
+  box.appendChild(btn);
+
+  // Error area
+  const errDiv = document.createElement('div');
+  errDiv.style.cssText = 'color:#f87171;font-size:12px;margin-top:8px;display:none;padding:8px 10px;background:rgba(248,113,113,.08);border-radius:6px;';
+  box.appendChild(errDiv);
+
+  formSel.addEventListener('change', function () {
+    selFormId = this.value || '';
+    if (selFormId) {
+      // Form and program are mutually exclusive — clear program selection.
+      progSel.value = '';
+      _fgProgramId = null;
+      qSel.innerHTML = '<option value="">All questionnaires</option>';
+      qField.style.display = 'none';
+      const name = forms.find(f => f.id === selFormId)?.title || '';
+      btn.disabled = false;
+      btn.textContent = `Load "${name}" →`;
+    } else if (!progSel.value) {
+      btn.disabled = true;
+      btn.textContent = 'Load Data →';
+    }
+  });
+
+  progSel.addEventListener('change', async function () {
+    _fgProgramId = this.value || null;
+    if (this.value) { selFormId = ''; formSel.value = ''; }
+    qSel.innerHTML = '<option value="">All questionnaires</option>';
+    qField.style.display = 'none';
+    btn.disabled = !this.value && !selFormId;
+    if (!this.value) { btn.textContent = selFormId ? btn.textContent : 'Load Data →'; return; }
+    const name = programs.find(p => p.id === this.value)?.name || '';
+    btn.textContent = `Load "${name}" →`;
+    try {
+      const r = await fetch(BASE_URL + '/api/fg/questionnaires', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fg_base_url: _fgUrl, token: _fgToken, program_id: this.value }),
+      });
+      const qs = await r.json();
+      if (Array.isArray(qs) && qs.length) {
+        qs.forEach(q => {
+          const opt = document.createElement('option');
+          opt.value = q.questionnaire_id;
+          opt.textContent = q.name + (q.form_title ? ` (${q.form_title})` : '');
+          qSel.appendChild(opt);
+        });
+        qField.style.display = 'block';
+      }
+    } catch {}
+  });
+
+  btn.addEventListener('click', async () => {
+    errDiv.style.display = 'none';
+    btn.disabled = true; btn.textContent = 'Loading…';
+    try {
+      if (selFormId) await fgLoadData({ formId: selFormId });
+      else await fgLoadData({ programId: progSel.value, questionnaireId: qSel.value || null });
+    } catch (e) {
+      errDiv.textContent = e.message || 'Load failed';
+      errDiv.style.display = 'block';
+      btn.disabled = false;
+      const name = selFormId
+        ? (forms.find(f => f.id === selFormId)?.title || '')
+        : (programs.find(p => p.id === progSel.value)?.name || '');
+      btn.textContent = `Load "${name}" →`;
+    }
+  });
+
+  // Pre-select the program if it was in the URL, but DO NOT auto-load —
+  // the user must click "Load Data →" to fetch submissions.
+  if (_fgProgId) {
+    progSel.value = _fgProgId;
+    progSel.dispatchEvent(new Event('change'));
+  }
+})();
+</script>
+
+</body>
+</html>

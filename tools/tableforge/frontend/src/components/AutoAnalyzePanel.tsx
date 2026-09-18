@@ -1,0 +1,574 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { ColumnInfo, ColumnRole, TableResult } from '../types';
+import { runAutoBattery, planBattery, aiSuggestPlan, BatteryProgress, SkippedColumn, AISuggestedGroup } from '../api';
+import { ColPicker } from './ColPicker';
+import { ProjectFilterBanner } from './ProjectFilterBanner';
+import { STAT_TITLES } from './StatisticalTables';
+import { adaptMatrixToHeatmap } from './Chart';
+import { combineResults, buildBatteryRecipe, BatteryConfig } from '../lib/combineResults';
+
+type StatChart = { kind: 'heatmap'; data: any; title?: string; height?: number };
+
+// Only chi2 result tables are a clean row×column matrix a heatmap can render;
+// other kinds (t-test, ANOVA, regression coefficient tables, ...) have no
+// canonical chart form here, so chart insertion stays table-only for them.
+function buildChartForResult(r: any): StatChart | null {
+  if (r?.kind !== 'chi2' || !r.table?.headers?.length) return null;
+  const data = adaptMatrixToHeatmap(r.table.headers, r.table.rows, 'sequential');
+  return data
+    ? { kind: 'heatmap', data, title: 'Cross-tab heatmap (counts)', height: Math.max(240, data.yLabels.length * 32 + 60) }
+    : null;
+}
+
+// A handful of battery `kind` values don't have a STAT_TITLES entry (that map
+// is keyed by the Statistics-tab stat type, not every battery executor).
+function humanKindLabel(kind: string): string {
+  return STAT_TITLES[kind] || kind.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+}
+
+// The backend now bakes the full test statistic/df/p/CI/effect-size/N
+// directly into table.rows as a footer block (see _stat_footer_rows in
+// auto_analyze.py) — the same way the manual Statistics-tab dialogs do it —
+// so table.headers/table.rows are already complete; nothing to add here.
+
+interface Props {
+  datasetId: string;
+  columns: ColumnInfo[];
+  columnRoles?: Record<string, ColumnRole>;
+  projectFilters?: Record<string, string[]>;
+  onClose: () => void;
+  onPromote?: (label: string, headers: string[], rows: any[][], interpretation: string, recipe?: Omit<BatteryConfig, 'datasetId' | 'computedAt'>, chart?: StatChart, chartOnly?: boolean) => void;
+  onPackReady?: (pack: any[]) => void;
+}
+
+type Correction = 'fdr_bh' | 'bonferroni' | 'holm' | 'none';
+
+export function AutoAnalyzePanel({ datasetId, columns, columnRoles = {}, projectFilters, onClose, onPromote, onPackReady }: Props) {
+  const [outcomes, setOutcomes] = useState<string[]>([]);
+  const [predictors, setPredictors] = useState<string[]>([]);
+  const [correction, setCorrection] = useState<Correction>('fdr_bh');
+  const [useDesign, setUseDesign] = useState(true);
+
+  const [planLoading, setPlanLoading] = useState(false);
+  const [plan, setPlan] = useState<any[] | null>(null);
+  const [skippedColumns, setSkippedColumns] = useState<SkippedColumn[]>([]);
+  const [showSkipped, setShowSkipped] = useState(false);
+
+  const [running, setRunning] = useState(false);
+  const [runningSections, setRunningSections] = useState(false);
+  const [progress, setProgress] = useState<{ idx: number; total: number; label: string }>({ idx: 0, total: 0, label: '' });
+  const [results, setResults] = useState<any[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiGroups, setAiGroups] = useState<AISuggestedGroup[] | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const allCols = useMemo(() => columns.map(c => c.name), [columns]);
+  const columnLabelMap = useMemo(() => Object.fromEntries(columns.map(c => [c.name, c.label || c.name])), [columns]);
+
+  // Auto-pick outcomes / predictors from column_roles
+  const detectedOutcomes = useMemo(
+    () => Object.entries(columnRoles).filter(([, r]) => r?.role === 'outcome').map(([c]) => c),
+    [columnRoles],
+  );
+  const detectedPredictors = useMemo(() => {
+    const treatments = Object.entries(columnRoles).filter(([, r]) => r?.role === 'treatment').map(([c]) => c);
+    const demos = Object.entries(columnRoles).filter(([, r]) => r?.role === 'demographic').map(([c]) => c);
+    return Array.from(new Set([...treatments, ...demos]));
+  }, [columnRoles]);
+
+  useEffect(() => {
+    if (outcomes.length === 0 && detectedOutcomes.length > 0) setOutcomes(detectedOutcomes);
+    if (predictors.length === 0 && detectedPredictors.length > 0) setPredictors(detectedPredictors);
+  }, [detectedOutcomes, detectedPredictors]);
+
+  const toggle = (setter: React.Dispatch<React.SetStateAction<string[]>>, val: string) => {
+    setter(p => (p.includes(val) ? p.filter(x => x !== val) : [...p, val]));
+    setPlan(null);
+    setResults(null);
+    setSkippedColumns([]);
+  };
+
+  const doPlan = async () => {
+    setPlanLoading(true);
+    setError(null);
+    try {
+      const r = await planBattery({
+        dataset_id: datasetId, outcome_cols: outcomes, predictor_cols: predictors,
+        correction, use_design: useDesign, filters: projectFilters || {}, column_labels: columnLabelMap,
+      }) as any;
+      setPlan(r.plan);
+      setSkippedColumns(r.skipped || []);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setPlanLoading(false);
+    }
+  };
+
+  const doRun = async () => {
+    if (outcomes.length === 0) { setError('Pick at least one outcome'); return; }
+    setRunning(true);
+    setError(null);
+    setResults(null);
+    setProgress({ idx: 0, total: 0, label: 'Preparing…' });
+    try {
+      await runAutoBattery(
+        { dataset_id: datasetId, outcome_cols: outcomes, predictor_cols: predictors, correction, use_design: useDesign, filters: projectFilters || {}, column_labels: columnLabelMap },
+        (e: BatteryProgress) => {
+          if (e.step === 'start') {
+            setProgress({ idx: 0, total: e.total || 0, label: 'Starting…' });
+            setSkippedColumns(e.skipped_columns || []);
+          } else if (e.step === 'progress') {
+            setProgress({ idx: e.idx || 0, total: e.total || 0, label: e.label || '' });
+          } else if (e.step === 'done') {
+            const pack = e.results || [];
+            setResults(pack);
+            if (onPackReady) onPackReady(pack);
+          }
+        },
+      );
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const doAISuggest = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const r = await aiSuggestPlan(datasetId, columnLabelMap);
+      setAiGroups(r.groups || []);
+    } catch (e: any) {
+      setAiError(e.message);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // Prefill the existing manual pickers — reuses the normal single-run flow
+  // unchanged, the user can still edit before clicking Run Full Analysis.
+  const useGroup = (g: AISuggestedGroup) => {
+    setOutcomes(g.outcome_cols);
+    setPredictors(g.predictor_cols);
+    setPlan(null);
+    setResults(null);
+    setSkippedColumns([]);
+  };
+
+  // Runs each AI-suggested section as its own independent battery (own
+  // multi-testing correction family — different logical questions needn't
+  // share one), tagging every result with its section for grouped display.
+  const runAllSections = async (groups: AISuggestedGroup[]) => {
+    setRunningSections(true);
+    setError(null);
+    setResults(null);
+    const combined: any[] = [];
+    try {
+      for (const g of groups) {
+        setProgress({ idx: 0, total: 0, label: `${g.label}: preparing…` });
+        await runAutoBattery(
+          { dataset_id: datasetId, outcome_cols: g.outcome_cols, predictor_cols: g.predictor_cols, correction, use_design: useDesign, filters: projectFilters || {}, column_labels: columnLabelMap },
+          (e: BatteryProgress) => {
+            if (e.step === 'progress') {
+              setProgress({ idx: e.idx || 0, total: e.total || 0, label: `${g.label}: ${e.label || ''}` });
+            } else if (e.step === 'done') {
+              for (const r of (e.results || [])) combined.push({ ...r, _section: g.label });
+            }
+          },
+        );
+      }
+      setResults(combined);
+      if (onPackReady) onPackReady(combined);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setRunningSections(false);
+    }
+  };
+
+  const grouped = useMemo(() => {
+    if (!results) return null;
+    const out: Record<string, any[]> = {};
+    for (const r of results) {
+      const key = r.outcome || '(no outcome)';
+      (out[key] = out[key] || []).push(r);
+    }
+    return out;
+  }, [results]);
+
+  // Every result's `kind` maps 1:1 to a single backend executor (see
+  // EXECUTORS in auto_analyze.py), so same-kind results are guaranteed to
+  // share the same table.headers shape — safe to union their rows. Skip
+  // results with an empty table (executor error/skip) rather than silently
+  // corrupting the combined table with a blank row.
+  const groupedByKind = useMemo(() => {
+    if (!results) return null;
+    const out: Record<string, any[]> = {};
+    for (const r of results) {
+      if (!r.table?.headers?.length) continue;
+      (out[r.kind] = out[r.kind] || []).push(r);
+    }
+    return out;
+  }, [results]);
+
+  // Only set when results came from "Run all sections" — nests by section
+  // then outcome. The single-run flow (plain doRun) never tags _section, so
+  // it keeps using the flat `grouped`-by-outcome view below unchanged.
+  const groupedBySection = useMemo(() => {
+    if (!results || !results.some(r => r._section)) return null;
+    const out: Record<string, Record<string, any[]>> = {};
+    for (const r of results) {
+      const sec = r._section || '(no section)';
+      const byOutcome = out[sec] = out[sec] || {};
+      const key = r.outcome || '(no outcome)';
+      (byOutcome[key] = byOutcome[key] || []).push(r);
+    }
+    return out;
+  }, [results]);
+
+  const promote = (r: any, mode: 'table' | 'chart' | 'both' = 'table') => {
+    if (!onPromote || !r?.table) return;
+    const recipe = buildBatteryRecipe(r.kind, correction, [r]);
+    const chart = mode === 'table' ? undefined : buildChartForResult(r) || undefined;
+    onPromote(r.label, r.table.headers || [], r.table.rows || [], r.interpretation || '', recipe, chart, mode === 'chart');
+  };
+
+  // One-click bulk insert: every result with a real table goes in, plus its
+  // chart when the result shape supports one (chi2 crosstabs today) — same
+  // rule as the per-row "Insert both" button, just applied to the whole pack.
+  const eligibleResults = useMemo(() => (results || []).filter(r => r?.table?.headers?.length > 0), [results]);
+
+  const promoteAll = () => {
+    if (!onPromote || !eligibleResults.length) return;
+    for (const r of eligibleResults) {
+      const recipe = buildBatteryRecipe(r.kind, correction, [r]);
+      const chart = buildChartForResult(r) || undefined;
+      onPromote(r.label, r.table.headers || [], r.table.rows || [], r.interpretation || '', recipe, chart, false);
+    }
+  };
+
+  const combineGroup = (kind: string) => {
+    const group = groupedByKind?.[kind];
+    if (!onPromote || !group?.length) return;
+    const { headers, rows, interpretation } = combineResults(group);
+    const recipe = buildBatteryRecipe(kind, correction, group);
+    const label = `${humanKindLabel(kind)} — Combined (${group.length} variables)`;
+    onPromote(label, headers, rows, interpretation, recipe);
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpanded(p => {
+      const n = new Set(p);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const renderResultCard = (r: any) => {
+    const open = expanded.has(r.id);
+    const pAdj = r.test?.p_adj;
+    const pRaw = r.test?.p_raw;
+    const sig = r.test?.sig || '';
+    const sigColour = sig === '***' ? '#ef4444' : sig === '**' ? '#f59e0b' : sig === '*' ? '#22c55e' : 'var(--text-dim)';
+    return (
+      <div key={r.id} style={{
+        border: '1px solid var(--border, #334155)', borderRadius: 6, marginBottom: 8,
+        background: 'var(--bg, #0f172a)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer' }}
+          onClick={() => toggleExpand(r.id)}>
+          <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 40, fontFamily: 'monospace' }}>{r.id}</span>
+          <span style={{ fontSize: 11, padding: '2px 6px', background: 'var(--bg-alt, #1e293b)', borderRadius: 3 }}>{r.kind}</span>
+          <span style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{r.label}</span>
+          {pAdj !== undefined && (
+            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+              p<sub>raw</sub>={pRaw ?? 'NA'} · p<sub>adj</sub>={pAdj} <strong style={{ color: sigColour }}>{sig}</strong>
+            </span>
+          )}
+          <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>{open ? '▾' : '▸'}</span>
+        </div>
+        {open && (
+          <div style={{ padding: '0 12px 12px 12px' }}>
+            {r.warnings?.length > 0 && (
+              <div style={{ fontSize: 11, color: '#f59e0b', marginBottom: 6 }}>
+                ⚠ {r.warnings.join(' · ')}
+              </div>
+            )}
+            {r.table?.headers?.length > 0 && (
+              <div style={{ overflow: 'auto', marginBottom: 6 }}>
+                <table className="result-table" style={{ fontSize: 11 }}>
+                  <thead>
+                    <tr>{r.table.headers.map((h: string, i: number) => (
+                      <th key={i} style={{ padding: '4px 8px', fontSize: 10 }}>{h}</th>
+                    ))}</tr>
+                  </thead>
+                  <tbody>
+                    {r.table.rows.map((row: any[], ri: number) => (
+                      <tr key={ri}>{row.map((cell, ci) => (
+                        <td key={ci} style={{ padding: '3px 8px', fontSize: 11 }}>{cell != null ? String(cell) : ''}</td>
+                      ))}</tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 6 }}>
+              {r.interpretation}
+            </div>
+            {onPromote && r.table?.headers?.length > 0 && (() => {
+              const chart = buildChartForResult(r);
+              return (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button className="btn-small" style={{ fontSize: 10 }}
+                    onClick={(e) => { e.stopPropagation(); promote(r, 'table'); }}>
+                    📋 Insert table
+                  </button>
+                  <button className="btn-small" style={{ fontSize: 10, opacity: chart ? 1 : 0.5 }}
+                    disabled={!chart} onClick={(e) => { e.stopPropagation(); promote(r, 'chart'); }}
+                    title={chart ? 'Insert as a chart-only card' : 'No chart available for this test'}>
+                    📊 Insert chart
+                  </button>
+                  <button className="btn-small" style={{ fontSize: 10, opacity: chart ? 1 : 0.5 }}
+                    disabled={!chart} onClick={(e) => { e.stopPropagation(); promote(r, 'both'); }}
+                    title={chart ? 'Insert one card showing both table and chart' : 'No chart available for this test'}>
+                    📋📊 Insert both
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: 1000, maxHeight: '90vh' }}>
+        <div className="modal-header">
+          <h2>⚡ Run Full Analysis</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body" style={{ maxHeight: 'calc(90vh - 80px)', overflow: 'auto' }}>
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
+            Pick outcomes (what you care about) + predictors (what might explain them). The system picks the right test for
+            each pairing, applies multi-test correction, and returns the full pack. Tag column roles in the
+            <strong> Variables </strong> panel for smarter test selection.
+          </p>
+
+          <ProjectFilterBanner filters={projectFilters} context="battery" />
+
+          <div style={{ marginBottom: 12 }}>
+            <button className="btn-small" onClick={doAISuggest} disabled={aiLoading}>
+              {aiLoading ? '✨ Thinking…' : '✨ AI Suggest Plan'}
+            </button>
+            <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-dim)' }}>
+              New to this? Let AI read the questions and propose what to compare — review before running.
+            </span>
+            {aiError && <div style={{ marginTop: 4, fontSize: 11, color: '#ef4444' }}>{aiError}</div>}
+          </div>
+
+          {aiGroups && aiGroups.length === 0 && (
+            <div style={{ marginBottom: 12, fontSize: 11, color: 'var(--text-dim)' }}>
+              AI couldn't propose a plan for this dataset — pick outcomes/predictors manually below.
+            </div>
+          )}
+
+          {aiGroups && aiGroups.length > 0 && (
+            <div style={{ marginBottom: 16, padding: 10, background: 'var(--bg-alt, #1e293b)', borderRadius: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>
+                  AI-suggested sections — review before running, edit anytime:
+                </div>
+                <button className="btn-small" onClick={() => runAllSections(aiGroups)} disabled={running || runningSections}>
+                  {runningSections ? `Running ${progress.idx}/${progress.total}…` : `Run all ${aiGroups.length} sections`}
+                </button>
+              </div>
+              {aiGroups.map((g, i) => (
+                <div key={i} style={{ padding: 8, marginBottom: 6, background: 'var(--bg, #0f172a)', borderRadius: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700 }}>{g.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{g.rationale}</div>
+                      <div style={{ fontSize: 10 }}>
+                        <strong>Outcomes:</strong> {g.outcome_cols.map(c => columnLabelMap[c] || c).join(', ')}
+                        &nbsp;·&nbsp;
+                        <strong>Predictors:</strong> {g.predictor_cols.length ? g.predictor_cols.map(c => columnLabelMap[c] || c).join(', ') : '(none)'}
+                      </div>
+                    </div>
+                    <button className="btn-small" onClick={() => useGroup(g)}>Use this →</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <ColPicker
+              allColumns={columns}
+              available={columns}
+              selected={outcomes}
+              label={`Outcomes (${outcomes.length} selected${detectedOutcomes.length > 0 ? `, ${detectedOutcomes.length} auto-detected` : ''})`}
+              height={180}
+              onToggle={c => toggle(setOutcomes, c)}
+            />
+            <ColPicker
+              allColumns={columns}
+              available={columns}
+              selected={predictors}
+              label={`Predictors (${predictors.length} selected${detectedPredictors.length > 0 ? `, ${detectedPredictors.length} auto-detected` : ''})`}
+              height={180}
+              onToggle={c => toggle(setPredictors, c)}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <label>Multi-test correction:&nbsp;
+              <select value={correction} onChange={e => setCorrection(e.target.value as Correction)}>
+                <option value="fdr_bh">Benjamini-Hochberg FDR</option>
+                <option value="bonferroni">Bonferroni</option>
+                <option value="holm">Holm</option>
+                <option value="none">None</option>
+              </select>
+            </label>
+            <label>
+              <input type="checkbox" checked={useDesign} onChange={e => setUseDesign(e.target.checked)} />
+              &nbsp;Use saved Study Design (pre/post pairs, treatment col, weights)
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <button className="btn-small" onClick={doPlan}
+              disabled={planLoading || running || runningSections || outcomes.length === 0}>
+              {planLoading ? 'Planning…' : 'Preview plan'}
+            </button>
+            <button className="btn-primary" onClick={doRun}
+              disabled={running || runningSections || outcomes.length === 0}>
+              {running ? `Running ${progress.idx}/${progress.total}…` : '⚡ Run Full Analysis'}
+            </button>
+          </div>
+
+          {error && <div className="error-msg" style={{ marginBottom: 10 }}>{error}</div>}
+
+          {plan && !results && (
+            <div style={{ marginBottom: 12, padding: 10, background: 'var(--bg-alt, #1e293b)', borderRadius: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Planned battery ({plan.length} tests):</div>
+              <div style={{ maxHeight: 200, overflow: 'auto' }}>
+                {plan.map((p: any) => (
+                  <div key={p.id} style={{ fontSize: 11, padding: '2px 4px', display: 'flex', gap: 8 }}>
+                    <span style={{ color: 'var(--text-dim)', fontFamily: 'monospace', minWidth: 36 }}>{p.id}</span>
+                    <span style={{ minWidth: 100, color: 'var(--accent, #3b82f6)' }}>{p.kind}</span>
+                    <span>{p.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {skippedColumns.length > 0 && !results && (
+            <div style={{ marginBottom: 12, padding: 10, background: 'var(--bg-alt, #1e293b)', borderRadius: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                onClick={() => setShowSkipped(s => !s)}>
+                <span style={{ fontSize: 10 }}>{showSkipped ? '▾' : '▸'}</span>
+                {skippedColumns.length} column pair{skippedColumns.length === 1 ? '' : 's'} won't be tested — why
+              </div>
+              {showSkipped && (
+                <div style={{ maxHeight: 200, overflow: 'auto', marginTop: 6 }}>
+                  {skippedColumns.map((s, i) => (
+                    <div key={i} style={{ fontSize: 11, padding: '3px 4px', color: 'var(--text-dim)' }}>
+                      <strong>{s.outcome}{s.predictor ? ` × ${s.predictor}` : ''}</strong>: {s.reason}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {(running || runningSections) && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, marginBottom: 4 }}>
+                {progress.idx}/{progress.total} · <span style={{ color: 'var(--text-dim)' }}>{progress.label}</span>
+              </div>
+              <div style={{ height: 6, background: 'var(--bg-alt, #1e293b)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{
+                  width: progress.total ? `${(progress.idx / progress.total) * 100}%` : '0%',
+                  height: '100%', background: 'var(--accent, #3b82f6)', transition: 'width 0.2s',
+                }} />
+              </div>
+            </div>
+          )}
+
+          {groupedBySection ? (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  Pack — {results?.length} tests across {Object.keys(groupedBySection).length} sections · correction = {correction}
+                </div>
+                {onPromote && eligibleResults.length > 0 && (
+                  <button className="btn-primary" style={{ fontSize: 12 }} onClick={promoteAll}>
+                    ⬇ Insert All {eligibleResults.length} to Project
+                  </button>
+                )}
+              </div>
+              {Object.entries(groupedBySection).map(([section, byOutcome]) => (
+                <div key={section} style={{ marginBottom: 20, padding: 10, border: '1px solid var(--border, #334155)', borderRadius: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📂 {section}</div>
+                  {Object.entries(byOutcome).map(([outcome, items]) => (
+                    <div key={outcome} style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent, #3b82f6)', marginBottom: 6 }}>
+                        Outcome: {columnLabelMap[outcome] || outcome} <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>({items.length} tests)</span>
+                      </div>
+                      {items.map(renderResultCard)}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : grouped && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  Pack — {results?.length} tests · correction = {correction}
+                </div>
+                {onPromote && eligibleResults.length > 0 && (
+                  <button className="btn-primary" style={{ fontSize: 12 }} onClick={promoteAll}>
+                    ⬇ Insert All {eligibleResults.length} to Project
+                  </button>
+                )}
+              </div>
+
+              {groupedByKind && Object.values(groupedByKind).some(g => g.length > 1) && (
+                <div style={{ marginBottom: 16, padding: 10, background: 'var(--bg-alt, #1e293b)', borderRadius: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
+                    Same test across multiple variables — combine into one table:
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {Object.entries(groupedByKind).filter(([, g]) => g.length > 1).map(([kind, g]) => (
+                      <button key={kind} className="btn-small" onClick={() => combineGroup(kind)}>
+                        Combine {g.length} {humanKindLabel(kind)} results →
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {Object.entries(grouped).map(([outcome, items]) => (
+                <div key={outcome} style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent, #3b82f6)', marginBottom: 6 }}>
+                    Outcome: {columnLabelMap[outcome] || outcome} <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>({items.length} tests)</span>
+                  </div>
+                  {items.map(renderResultCard)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

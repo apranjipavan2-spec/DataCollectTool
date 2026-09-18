@@ -1,0 +1,1598 @@
+from datetime import datetime, timezone
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
+from typing import Any, Literal, Optional
+from sqlalchemy.orm import Session
+from app.core.database import get_db
+from app.core.deps import get_current_user, require_enumerator, require_supervisor, require_org_admin
+from app.core.rate_limit import limiter
+from app.core.soft_delete import soft_delete
+from app.models.submission import Submission
+from app.models.submission_draft import SubmissionDraft
+from app.models.submission_history import SubmissionHistory
+from app.models.form import Form
+from app.models.user import User
+from app.models.tenant import Tenant
+from app.services.email import send_flagged_submission_email
+from app.services.webhook import fire_webhooks
+from app.services.whatsapp import notify as wa_notify
+from app.services.telegram import notify as tg_notify
+import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+
+def _fire_webhook_bg(tenant_id: str, event: str, payload: dict, submission_id: str):
+    """Fire a single webhook in a background task (new DB session)."""
+    from app.core.database import SessionLocal
+    db = SessionLocal()
+    try:
+        fire_webhooks(db, tenant_id, event, payload)
+    except Exception:
+        logger.warning("Background webhook fire failed for submission %s", submission_id)
+    finally:
+        db.close()
+
+
+class SubmissionCreate(BaseModel):
+    form_id: str
+    form_version: int
+    data_json: dict[str, Any]
+    gps_open: Optional[dict] = None
+    gps_submit: Optional[dict] = None
+    local_created_at: Optional[str] = None
+
+
+VALID_STATUSES = {"synced", "flagged", "approved", "rejected"}
+
+
+class SubmissionUpdate(BaseModel):
+    status: Optional[Literal["synced", "flagged", "approved", "rejected"]] = None
+    flag_note: Optional[str] = None
+    reviewer_name: Optional[str] = None
+
+
+class BulkUpdateBody(BaseModel):
+    ids: list[str]
+    status: str
+    flag_note: Optional[str] = None
+
+
+class SubmissionDataEdit(BaseModel):
+    data_json: dict[str, Any]
+
+
+class SerialNoUpdate(BaseModel):
+    serial_no: int
+
+
+# ── List all submissions ──────────────────────────────────────────────────────
+
+@router.get("/")
+def list_submissions(
+    form_id: Optional[str] = None,
+    enumerator_id: Optional[str] = None,
+    status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    q: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+    backcheck_required: Optional[bool] = None,
+    has_violations: Optional[bool] = None,
+    duplicate_only: bool = False,
+    ids: Optional[str] = None,
+    slim: bool = False,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    role = user.get("role", "")
+    if role not in ("org_admin", "supervisor", "enumerator", "master_admin"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    try:
+        page_size = min(page_size, 5000)
+        query = db.query(Submission, User.name).outerjoin(
+            User, Submission.enumerator_id == User.id
+        ).filter(Submission.tenant_id == user["tenant_id"])
+        if ids:
+            # Targeted fetch by id (e.g. duplicate-group compare view) — return
+            # exactly what's asked, not silently filtered by duplicate status.
+            import uuid as _uuid
+            try:
+                id_list = [_uuid.UUID(i.strip()) for i in ids.split(",") if i.strip()]
+            except ValueError:
+                raise HTTPException(400, "Invalid id in ids list")
+            query = query.filter(Submission.id.in_(id_list))
+        else:
+            # Confirmed duplicates are hidden from the default view — the "Marked
+            # Duplicate" filter (duplicate_only=true) is the only way to see them.
+            query = query.filter(Submission.is_duplicate == (True if duplicate_only else False))
+        if role == "enumerator":
+            query = query.filter(Submission.enumerator_id == user["sub"])
+        if form_id:
+            query = query.filter(Submission.form_id == form_id)
+        if enumerator_id and role != "enumerator":
+            query = query.filter(Submission.enumerator_id == enumerator_id)
+        if status:
+            query = query.filter(Submission.status == status)
+        if backcheck_required is not None:
+            query = query.filter(Submission.backcheck_required == backcheck_required)
+        if has_violations is not None:
+            query = query.filter(Submission.has_violations == has_violations)
+        if date_from:
+            query = query.filter(Submission.server_received_at >= datetime.fromisoformat(date_from))
+        if date_to:
+            end = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
+            query = query.filter(Submission.server_received_at <= end)
+        if q:
+            from sqlalchemy import or_, func, Text
+            term = f"%{q}%"
+            query = query.filter(
+                or_(
+                    User.name.ilike(term),
+                    User.phone.ilike(term),
+                    func.cast(Submission.data_json, Text).ilike(term),
+                )
+            )
+        total = query.count()
+        rows = query.order_by(Submission.server_received_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+
+        # Build form title lookup for this page's form_ids
+        from app.models.form import Form as FormModel
+        fids = list({s.form_id for s, _ in rows})
+        form_title_map = {}
+        if fids:
+            for f in db.query(FormModel.id, FormModel.title).filter(FormModel.id.in_(fids)).all():
+                form_title_map[f.id] = f.title
+
+        return {
+            "items": [
+                {
+                    "id": str(s.id),
+                    "form_id": str(s.form_id),
+                    "form_title": form_title_map.get(s.form_id, ""),
+                    "form_version": s.form_version,
+                    "enumerator_id": str(s.enumerator_id) if s.enumerator_id else None,
+                    "enumerator_name": name or "Unknown",
+                    "status": s.status,
+                    "serial_no": s.serial_no,
+                    "duplicate_suspect": bool((s.data_json or {}).get("_duplicate_suspect") == "true" or (s.data_json or {}).get("_duplicate_suspect") is True),
+                    "is_duplicate": bool(s.is_duplicate),
+                    "duplicate_of": str(s.duplicate_of) if s.duplicate_of else None,
+                    **({"data_json": s.data_json} if not slim else {}),
+                    "has_violations": bool(s.has_violations),
+                    "backcheck_required": bool(s.backcheck_required),
+                    "consent_given": s.consent_given,
+                    "local_created_at": s.local_created_at.isoformat() if s.local_created_at else None,
+                    "server_received_at": s.server_received_at.isoformat() if s.server_received_at else None,
+                }
+                for s, name in rows
+            ],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error listing submissions")
+        raise HTTPException(status_code=500, detail=f"Failed to list submissions: {type(e).__name__}: {str(e)}")
+
+
+# ── Submissions summary — accurate stats, no row fetching ────────────────────
+
+@router.get("/summary")
+def get_submissions_summary(
+    form_id: Optional[str] = None,
+    program_id: Optional[str] = None,
+    status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    from sqlalchemy import func, case, cast, Boolean
+    from sqlalchemy.dialects.postgresql import JSONB
+
+    base = db.query(Submission).filter(
+        Submission.tenant_id == user["tenant_id"],
+        Submission.is_duplicate == False,  # noqa: E712 — confirmed duplicates never count toward stats
+    )
+    if form_id:
+        base = base.filter(Submission.form_id == form_id)
+    if program_id:
+        import uuid as _uuid
+        base = base.filter(Submission.program_id == _uuid.UUID(program_id))
+    if status:
+        base = base.filter(Submission.status == status)
+    if date_from:
+        base = base.filter(Submission.server_received_at >= datetime.fromisoformat(date_from))
+    if date_to:
+        end = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
+        base = base.filter(Submission.server_received_at <= end)
+
+    # Single aggregation query — no rows fetched
+    agg = base.with_entities(
+        func.count().label("total"),
+        func.sum(case((Submission.status == "approved",  1), else_=0)).label("approved"),
+        func.sum(case((Submission.status == "flagged",   1), else_=0)).label("flagged"),
+        func.sum(case((Submission.status == "synced",    1), else_=0)).label("synced"),
+        func.sum(case((Submission.has_violations == True, 1), else_=0)).label("violations"),
+        func.sum(case((Submission.backcheck_required == True, 1), else_=0)).label("backcheck_required"),
+    ).one()
+
+    # Duplicate suspects — count via JSONB operator (uses index if present)
+    dup_count = base.filter(
+        Submission.data_json["_duplicate_suspect"].astext == "true"
+    ).count()
+
+    # By-status breakdown
+    status_rows = base.with_entities(
+        Submission.status, func.count().label("cnt")
+    ).group_by(Submission.status).all()
+    by_status = {r.status: r.cnt for r in status_rows}
+
+    # By-form breakdown (join for title)
+    form_rows = base.with_entities(
+        Submission.form_id, Form.title, func.count().label("cnt")
+    ).outerjoin(Form, Submission.form_id == Form.id).group_by(
+        Submission.form_id, Form.title
+    ).all()
+    by_form = [{"form_id": str(r.form_id), "form_title": r.title or "", "count": r.cnt}
+               for r in form_rows]
+
+    # By-enumerator breakdown
+    enum_rows = base.with_entities(
+        Submission.enumerator_id, User.name, func.count().label("cnt")
+    ).outerjoin(User, Submission.enumerator_id == User.id).group_by(
+        Submission.enumerator_id, User.name
+    ).order_by(func.count().desc()).all()
+    by_enumerator = [{"enumerator_id": str(r.enumerator_id) if r.enumerator_id else None,
+                      "name": r.name or "Unknown", "count": r.cnt}
+                     for r in enum_rows]
+
+    # By-date (daily counts, last 60 days)
+    date_rows = base.with_entities(
+        func.date_trunc("day", Submission.server_received_at).label("day"),
+        func.count().label("cnt")
+    ).group_by("day").order_by("day").all()
+    by_date = [{"date": r.day.strftime("%Y-%m-%d"), "count": r.cnt}
+               for r in date_rows if r.day]
+
+    return {
+        "total": agg.total or 0,
+        "approved": agg.approved or 0,
+        "flagged": agg.flagged or 0,
+        "synced": agg.synced or 0,
+        "violations": agg.violations or 0,
+        "backcheck_required": agg.backcheck_required or 0,
+        "duplicate_suspects": dup_count,
+        "by_status": by_status,
+        "by_form": by_form,
+        "by_enumerator": by_enumerator,
+        "by_date": by_date,
+    }
+
+
+# ── Map points — GPS locations of all submissions ────────────────────────────
+
+@router.get("/map-points")
+def get_map_points(
+    form_id: Optional[str] = None,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return GPS coordinates of all submissions for map visualisation (supervisor+)."""
+    role = user.get("role", "")
+    if role not in ("org_admin", "supervisor", "master_admin"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    try:
+        q = (
+            db.query(Submission, User.name, Form.title)
+            .outerjoin(User, Submission.enumerator_id == User.id)
+            .outerjoin(Form, Submission.form_id == Form.id)
+            .filter(
+                Submission.tenant_id == user["tenant_id"],
+                Submission.gps_submit.isnot(None),
+            )
+        )
+        if form_id:
+            q = q.filter(Submission.form_id == form_id)
+        rows = q.order_by(Submission.server_received_at.desc()).limit(3000).all()
+        points = []
+        for s, ename, ftitle in rows:
+            gps = s.gps_submit or {}
+            lat, lng = gps.get("lat"), gps.get("lng")
+            if lat is None or lng is None:
+                continue
+            points.append({
+                "id": str(s.id),
+                "lat": lat,
+                "lng": lng,
+                "status": s.status,
+                "enumerator_name": ename or "Unknown",
+                "form_title": ftitle or "Unknown",
+                "collected_at": s.local_created_at.isoformat() if s.local_created_at else None,
+            })
+        return points
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error fetching map points")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Map summary — GPS stats without fetching rows ────────────────────────────
+
+@router.get("/map-summary")
+def get_map_summary(
+    form_id: Optional[str] = None,
+    program_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    from sqlalchemy import func, case
+    try:
+        base = db.query(Submission).filter(Submission.tenant_id == user["tenant_id"])
+        if form_id:
+            base = base.filter(Submission.form_id == form_id)
+        if program_id:
+            import uuid as _uuid2
+            base = base.filter(Submission.program_id == _uuid2.UUID(program_id))
+        if date_from:
+            base = base.filter(Submission.server_received_at >= datetime.fromisoformat(date_from))
+        if date_to:
+            end = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
+            base = base.filter(Submission.server_received_at <= end)
+
+        total = base.count()
+        total_with_gps = base.filter(Submission.gps_submit.isnot(None)).count()
+
+        # GPS bounds — aggregate from filtered base (no row fetch)
+        from sqlalchemy import text as _text
+        bounds_agg = (
+            base.filter(Submission.gps_submit.isnot(None))
+            .with_entities(
+                func.min(Submission.server_received_at).label("first_date"),
+                func.max(Submission.server_received_at).label("last_date"),
+            )
+            .one()
+        )
+        # lat/lng bounds via raw cast (SQLAlchemy JSONB cast to float in aggregate)
+        bounds_row = db.execute(
+            _text("""
+                SELECT
+                  MIN((gps_submit->>'lat')::float) AS lat_min,
+                  MAX((gps_submit->>'lat')::float) AS lat_max,
+                  MIN((gps_submit->>'lng')::float) AS lng_min,
+                  MAX((gps_submit->>'lng')::float) AS lng_max
+                FROM submissions
+                WHERE tenant_id = :tid AND gps_submit IS NOT NULL
+            """), {"tid": str(user["tenant_id"])}
+        ).fetchone()
+
+        # By-form breakdown (GPS only)
+        form_rows = (
+            base.filter(Submission.gps_submit.isnot(None))
+            .with_entities(Submission.form_id, Form.title, func.count().label("cnt"))
+            .outerjoin(Form, Submission.form_id == Form.id)
+            .group_by(Submission.form_id, Form.title)
+            .all()
+        )
+        forms = [{"form_id": str(r.form_id), "title": r.title or "", "gps_count": r.cnt}
+                 for r in form_rows]
+
+        # By-enumerator breakdown (GPS only)
+        enum_rows = (
+            base.filter(Submission.gps_submit.isnot(None))
+            .with_entities(User.name, func.count().label("cnt"))
+            .outerjoin(User, Submission.enumerator_id == User.id)
+            .group_by(User.name)
+            .order_by(func.count().desc())
+            .all()
+        )
+        enumerators = [{"name": r.name or "Unknown", "gps_count": r.cnt} for r in enum_rows]
+
+        bounds = None
+        if bounds_row and bounds_row.lat_min is not None:
+            bounds = {
+                "lat_min": bounds_row.lat_min,
+                "lat_max": bounds_row.lat_max,
+                "lng_min": bounds_row.lng_min,
+                "lng_max": bounds_row.lng_max,
+            }
+
+        return {
+            "total_submissions": total,
+            "total_with_gps": total_with_gps,
+            "forms": forms,
+            "enumerators": enumerators,
+            "date_range": {
+                "first": bounds_agg.first_date.strftime("%Y-%m-%d") if bounds_agg.first_date else None,
+                "last": bounds_agg.last_date.strftime("%Y-%m-%d") if bounds_agg.last_date else None,
+            },
+            "bounds": bounds,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error fetching map summary")
+        raise HTTPException(status_code=500, detail=f"Map summary failed: {str(e)}")
+
+
+# ── Enumerator performance stats ─────────────────────────────────────────────
+
+@router.get("/enumerator-stats")
+def get_enumerator_stats(
+    form_id: Optional[str] = None,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Per-enumerator submission counts broken down by status."""
+    from sqlalchemy import func
+    try:
+        q = (
+            db.query(
+                Submission.enumerator_id,
+                User.name,
+                User.phone,
+                Submission.status,
+                func.count(Submission.id).label("cnt"),
+                func.max(Submission.server_received_at).label("last_at"),
+            )
+            .outerjoin(User, Submission.enumerator_id == User.id)
+            .filter(Submission.tenant_id == user["tenant_id"])
+        )
+        if form_id:
+            q = q.filter(Submission.form_id == form_id)
+        q = q.group_by(Submission.enumerator_id, User.name, User.phone, Submission.status)
+        rows = q.all()
+
+        stats: dict = {}
+        for row in rows:
+            eid = str(row.enumerator_id) if row.enumerator_id else "unknown"
+            if eid not in stats:
+                stats[eid] = {
+                    "enumerator_id": eid,
+                    "name": row.name or row.phone or "Unknown",
+                    "total": 0,
+                    "synced": 0, "approved": 0, "flagged": 0, "rejected": 0,
+                    "last_submission": None,
+                }
+            stats[eid]["total"] += row.cnt
+            stats[eid][row.status] = stats[eid].get(row.status, 0) + row.cnt
+            last = row.last_at.isoformat() if row.last_at else None
+            if last and (stats[eid]["last_submission"] is None or last > stats[eid]["last_submission"]):
+                stats[eid]["last_submission"] = last
+
+        return sorted(stats.values(), key=lambda x: -x["total"])
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error fetching enumerator stats")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/enumerator-scorecard")
+def get_enumerator_scorecard(
+    form_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Per-enumerator performance scorecard: submissions/day, accuracy rate, backcheck pass rate."""
+    from sqlalchemy import func, case
+    try:
+        q = (
+            db.query(
+                Submission.enumerator_id,
+                User.name,
+                User.phone,
+                func.count(Submission.id).label("total"),
+                func.sum(case((Submission.status == "approved", 1), else_=0)).label("approved"),
+                func.sum(case((Submission.status == "flagged", 1), else_=0)).label("flagged"),
+                func.sum(case((Submission.status == "rejected", 1), else_=0)).label("rejected"),
+                func.sum(case((Submission.has_violations == True, 1), else_=0)).label("violations"),
+                func.sum(case((Submission.backcheck_required == True, 1), else_=0)).label("bc_required"),
+                func.sum(case((Submission.backcheck_completed == True, 1), else_=0)).label("bc_completed"),
+                func.min(Submission.server_received_at).label("first_at"),
+                func.max(Submission.server_received_at).label("last_at"),
+            )
+            .outerjoin(User, Submission.enumerator_id == User.id)
+            .filter(Submission.tenant_id == user["tenant_id"])
+        )
+        if form_id:
+            q = q.filter(Submission.form_id == form_id)
+        if date_from:
+            q = q.filter(Submission.server_received_at >= date_from)
+        if date_to:
+            q = q.filter(Submission.server_received_at <= date_to)
+        q = q.group_by(Submission.enumerator_id, User.name, User.phone)
+        rows = q.all()
+
+        result = []
+        for r in rows:
+            total = r.total or 0
+            approved = int(r.approved or 0)
+            flagged = int(r.flagged or 0)
+            rejected = int(r.rejected or 0)
+            reviewed = approved + flagged + rejected
+            accuracy_rate = round(approved / reviewed * 100, 1) if reviewed > 0 else None
+
+            bc_required = int(r.bc_required or 0)
+            bc_completed = int(r.bc_completed or 0)
+            backcheck_pass_rate = round(bc_completed / bc_required * 100, 1) if bc_required > 0 else None
+
+            if r.first_at and r.last_at:
+                days = max(1, (r.last_at - r.first_at).days + 1)
+            else:
+                days = 1
+            submissions_per_day = round(total / days, 1)
+
+            result.append({
+                "enumerator_id": str(r.enumerator_id) if r.enumerator_id else "unknown",
+                "name": r.name or r.phone or "Unknown",
+                "total": total,
+                "approved": approved,
+                "flagged": flagged,
+                "rejected": rejected,
+                "violations": int(r.violations or 0),
+                "backcheck_required": bc_required,
+                "backcheck_completed": bc_completed,
+                "accuracy_rate": accuracy_rate,
+                "backcheck_pass_rate": backcheck_pass_rate,
+                "submissions_per_day": submissions_per_day,
+                "first_submission": r.first_at.isoformat() if r.first_at else None,
+                "last_submission": r.last_at.isoformat() if r.last_at else None,
+            })
+
+        return sorted(result, key=lambda x: -x["total"])
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error fetching enumerator scorecard")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Potential duplicates ──────────────────────────────────────────────────────
+
+def _canonical_value(v):
+    """Recursively normalize a JSON value into something hashable/comparable.
+    dict-valued answers (e.g. a `gps`-type question storing {lat,lng,accuracy})
+    and list-valued answers (multi-select) aren't hashable as-is."""
+    if isinstance(v, dict):
+        return tuple(sorted((str(k), _canonical_value(vv)) for k, vv in v.items()))
+    if isinstance(v, list):
+        return tuple(sorted(str(_canonical_value(x)) for x in v))
+    return v
+
+
+def _content_fingerprint(data_json: dict) -> tuple:
+    """Canonical, order-independent key for 'are these answers identical'.
+
+    Drops internal `_`-prefixed bookkeeping keys (_duplicate_suspect, _gps_*,
+    _duration_sec, etc.) so only actual question answers are compared.
+    """
+    d = data_json or {}
+    items = [(k, _canonical_value(v)) for k, v in d.items() if not k.startswith("_")]
+    return tuple(sorted(items, key=lambda kv: kv[0]))
+
+
+def _completeness(data_json: dict) -> int:
+    """Count of answered (non-null, non-empty) question fields."""
+    d = data_json or {}
+    return sum(
+        1 for k, v in d.items()
+        if not k.startswith("_") and v is not None and v != "" and v != []
+    )
+
+
+def _recommend_keep(subs: list[Submission]) -> str:
+    """Deterministic 'which one is probably correct' heuristic: a submission
+    with QC violations or that hasn't passed a backcheck loses to a clean/
+    backchecked one regardless of completeness; ties broken by most answered
+    fields, then longer interview duration, then submitted first. No AI call
+    — instant and explainable."""
+    def sort_key(s: Submission):
+        violated = 1 if s.has_violations else 0
+        not_backchecked = 0 if s.backcheck_completed else 1
+        completeness = _completeness(s.data_json)
+        duration = (s.data_json or {}).get("_duration_sec") or 0
+        try:
+            duration = float(duration)
+        except (TypeError, ValueError):
+            duration = 0.0
+        received = s.server_received_at or datetime.min.replace(tzinfo=timezone.utc)
+        return (violated, not_backchecked, -completeness, -duration, received)
+    return str(sorted(subs, key=sort_key)[0].id)
+
+
+def _identifier_fields(form_schema: dict) -> list[str]:
+    """Field names marked is_identifier=True in the form schema (Form Builder)
+    — together they form a composite 'respondent identifier' key."""
+    from app.api.routes.export import _field_key
+    names = []
+    for section in (form_schema or {}).get("sections", []):
+        for f in section.get("fields", []):
+            if f.get("is_identifier"):
+                name = _field_key(f)
+                if name:
+                    names.append(name)
+    return names
+
+
+def _identifier_fingerprint(data_json: dict, identifier_fields: list[str]):
+    """Composite key from the identifier fields' answers, exact-match only
+    (case/whitespace-normalized). None if any identifier field is unanswered
+    — nothing to match on."""
+    d = data_json or {}
+    values = []
+    for name in identifier_fields:
+        v = d.get(name)
+        if v is None or v == "":
+            return None
+        values.append(str(v).strip().lower())
+    return tuple(values)
+
+
+def _pool_enumerator_day(members: list[Submission], user_map: dict) -> tuple[str, str, Optional[str]]:
+    """Describe a group's enumerator/day for display. Exact-content and
+    identifier-match groups can legitimately span multiple enumerators/days
+    (that's the point — they're not scoped to a single day/enumerator pool),
+    so fall back to a count when the group isn't uniform."""
+    enum_ids = {s.enumerator_id for s in members}
+    single_enum_id = next(iter(enum_ids)) if len(enum_ids) == 1 else None
+    enum_name = user_map.get(str(single_enum_id), "Unknown") if len(enum_ids) == 1 else f"{len(enum_ids)} enumerators"
+    days = {s.local_created_at.date().isoformat() if s.local_created_at else "unknown" for s in members}
+    day_desc = next(iter(days)) if len(days) == 1 else f"{len(days)} days"
+    return enum_name, day_desc, (str(single_enum_id) if single_enum_id else None)
+
+
+def _sub_summary(s: Submission) -> dict:
+    return {
+        "id": str(s.id),
+        "serial_no": s.serial_no,
+        "status": s.status,
+        "completeness": _completeness(s.data_json),
+        "duration_sec": (s.data_json or {}).get("_duration_sec"),
+        "server_received_at": s.server_received_at.isoformat() if s.server_received_at else None,
+        "has_violations": bool(s.has_violations),
+        "backcheck_completed": bool(s.backcheck_completed),
+    }
+
+
+@router.get("/potential-duplicates")
+def list_potential_duplicates(
+    form_id: Optional[str] = None,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Return groups of submissions that appear to be duplicates, split into:
+
+    - tier="exact": every question answer is byte-for-byte identical, checked
+      across the WHOLE form (not just a same-day/same-enumerator pool) — near-
+      zero false positive rate, safe to auto-resolve with one click.
+    - tier="identifier_match": the form has one or more questions marked as a
+      duplicate identifier in Form Builder; this submission's identifier
+      field(s) exactly match another's even though other answers differ —
+      almost always the same respondent surveyed twice, possibly on a
+      different day or by a different enumerator.
+    - tier="possible": same enumerator, same form, same day, but neither of
+      the above — needs a supervisor to compare side by side.
+
+    Already-resolved (is_duplicate=True) and dismissed
+    (duplicate_dismissed_at set) submissions are excluded, so a group
+    shrinks/disappears as it gets cleaned up.
+    """
+    from sqlalchemy import func
+
+    tenant_id = user["tenant_id"]
+    live_filter = (
+        Submission.tenant_id == tenant_id,
+        Submission.is_duplicate == False,  # noqa: E712
+        Submission.duplicate_dismissed_at.is_(None),
+    )
+
+    if form_id:
+        form_ids = [form_id]
+    else:
+        rows = (
+            db.query(Submission.form_id)
+            .filter(*live_filter)
+            .group_by(Submission.form_id)
+            .having(func.count(Submission.id) > 1)
+            .all()
+        )
+        form_ids = [str(r.form_id) for r in rows]
+
+    user_map = {
+        str(u.id): u.name or u.phone
+        for u in db.query(User).filter(User.tenant_id == tenant_id).all()
+    }
+    forms_by_id = {
+        str(f.id): f for f in db.query(Form).filter(Form.tenant_id == tenant_id, Form.id.in_(form_ids)).all()
+    } if form_ids else {}
+
+    groups = []
+    for fid in form_ids:
+        form = forms_by_id.get(fid)
+        subs = db.query(Submission).filter(Submission.form_id == fid, *live_filter).all()
+        if len(subs) < 2:
+            continue
+
+        identifier_fields = _identifier_fields(form.json_schema if form else {})
+        base_fields = {"form_id": fid, "form_title": form.title if form else "Unknown"}
+        used_ids: set = set()
+
+        # Tier 1: exact content match, anywhere in the form.
+        by_fingerprint: dict = {}
+        for s in subs:
+            by_fingerprint.setdefault(_content_fingerprint(s.data_json), []).append(s)
+        for members in by_fingerprint.values():
+            if len(members) < 2:
+                continue
+            used_ids.update(s.id for s in members)
+            enum_name, day_desc, enum_id = _pool_enumerator_day(members, user_map)
+            groups.append({
+                **base_fields, "tier": "exact",
+                "enumerator_id": enum_id, "enumerator_name": enum_name, "day": day_desc,
+                "count": len(members),
+                "submission_ids": [str(s.id) for s in members],
+                "recommended_keep_id": _recommend_keep(members),
+                "submissions": [_sub_summary(s) for s in members],
+            })
+
+        # Tier 2: identifier-field composite match (only if configured).
+        remaining = [s for s in subs if s.id not in used_ids]
+        if identifier_fields:
+            by_identifier: dict = {}
+            for s in remaining:
+                key = _identifier_fingerprint(s.data_json, identifier_fields)
+                if key is not None:
+                    by_identifier.setdefault(key, []).append(s)
+            for members in by_identifier.values():
+                if len(members) < 2:
+                    continue
+                used_ids.update(s.id for s in members)
+                enum_name, day_desc, enum_id = _pool_enumerator_day(members, user_map)
+                groups.append({
+                    **base_fields, "tier": "identifier_match",
+                    "enumerator_id": enum_id, "enumerator_name": enum_name, "day": day_desc,
+                    "count": len(members),
+                    "submission_ids": [str(s.id) for s in members],
+                    "recommended_keep_id": _recommend_keep(members),
+                    "submissions": [_sub_summary(s) for s in members],
+                    "matched_fields": identifier_fields,
+                })
+
+        # Tier 3: same enumerator + same day fallback.
+        remaining = [s for s in subs if s.id not in used_ids]
+        by_day: dict = {}
+        for s in remaining:
+            day = s.local_created_at.date().isoformat() if s.local_created_at else "unknown"
+            by_day.setdefault((s.enumerator_id, day), []).append(s)
+        for (enum_id, day), members in by_day.items():
+            if len(members) < 2:
+                continue
+            groups.append({
+                **base_fields, "tier": "possible",
+                "enumerator_id": str(enum_id) if enum_id else None,
+                "enumerator_name": user_map.get(str(enum_id), "Unknown"), "day": day,
+                "count": len(members),
+                "submission_ids": [str(s.id) for s in members],
+                "recommended_keep_id": _recommend_keep(members),
+                "submissions": [_sub_summary(s) for s in members],
+            })
+
+    # Newest duplicates first (by the group's most-recent submission), then by
+    # size. A fresh 2-item group must surface ahead of an old 4-item one — the
+    # opposite of size-first, which buried brand-new duplicates below the cap.
+    def _group_recency(g: dict) -> str:
+        times = [s["server_received_at"] for s in g["submissions"] if s.get("server_received_at")]
+        return max(times) if times else ""  # ISO strings sort chronologically
+    groups.sort(key=lambda g: (_group_recency(g), g["count"]), reverse=True)
+    # ponytail: flat cap, not real pagination — 1000 covers current scale (a few
+    # hundred groups at 1.3k submissions); switch to cursor paging past ~10k subs.
+    return groups[:1000]
+
+
+class DuplicateResolveIn(BaseModel):
+    keep_id: str
+    duplicate_ids: list[str]
+
+
+@router.post("/duplicates/resolve")
+def resolve_duplicates(
+    body: DuplicateResolveIn,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Confirm which submission is canonical; mark the rest as duplicate."""
+    import uuid as _uuid
+    try:
+        keep_uuid = _uuid.UUID(body.keep_id)
+        dup_uuids = [_uuid.UUID(i) for i in body.duplicate_ids]
+    except ValueError:
+        raise HTTPException(400, "Invalid submission id format")
+
+    keep = db.query(Submission).filter(
+        Submission.id == keep_uuid, Submission.tenant_id == user["tenant_id"]
+    ).first()
+    if not keep:
+        raise HTTPException(404, "Kept submission not found")
+
+    dups = db.query(Submission).filter(
+        Submission.id.in_(dup_uuids), Submission.tenant_id == user["tenant_id"]
+    ).all()
+    if len(dups) != len(dup_uuids):
+        raise HTTPException(404, "One or more duplicate submissions not found")
+
+    keep.is_duplicate = False
+    keep.duplicate_of = None
+    for d in dups:
+        d.is_duplicate = True
+        d.duplicate_of = keep.id
+    db.commit()
+    return {"kept": str(keep.id), "marked_duplicate": [str(d.id) for d in dups]}
+
+
+class DuplicateUnmarkIn(BaseModel):
+    submission_ids: list[str]
+
+
+@router.post("/duplicates/unmark")
+def unmark_duplicates(
+    body: DuplicateUnmarkIn,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Restore confirmed-duplicate submission(s) back to normal — undoes /resolve."""
+    import uuid as _uuid
+    try:
+        ids = [_uuid.UUID(i) for i in body.submission_ids]
+    except ValueError:
+        raise HTTPException(400, "Invalid submission id format")
+
+    subs = db.query(Submission).filter(
+        Submission.id.in_(ids), Submission.tenant_id == user["tenant_id"]
+    ).all()
+    for s in subs:
+        s.is_duplicate = False
+        s.duplicate_of = None
+    db.commit()
+    return {"restored": [str(s.id) for s in subs]}
+
+
+class DuplicateDismissIn(BaseModel):
+    submission_ids: list[str]
+
+
+@router.post("/duplicates/dismiss")
+def dismiss_duplicates(
+    body: DuplicateDismissIn,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Mark a reviewed group as NOT actually duplicates (false positive —
+    e.g. different respondents coincidentally surveyed by the same enumerator
+    on the same day). Permanently excludes these submissions from future
+    duplicate grouping so the same coincidence doesn't keep resurfacing."""
+    import uuid as _uuid
+    try:
+        ids = [_uuid.UUID(i) for i in body.submission_ids]
+    except ValueError:
+        raise HTTPException(400, "Invalid submission id format")
+
+    subs = db.query(Submission).filter(
+        Submission.id.in_(ids), Submission.tenant_id == user["tenant_id"]
+    ).all()
+    for s in subs:
+        s.duplicate_dismissed_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"dismissed": [str(s.id) for s in subs]}
+
+
+# ── Create submission ─────────────────────────────────────────────────────────
+
+@router.post("/", status_code=201)
+@limiter.limit("60/minute")
+def create_submission(request: Request, body: SubmissionCreate, background_tasks: BackgroundTasks, user=Depends(require_enumerator), db: Session = Depends(get_db)):
+    if user.get("role") != "master_admin":
+        from app.services.plan_enforcement import check_submission_limit
+        from app.models.tenant import Tenant
+        _tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+        if _tenant:
+            _sub_result = check_submission_limit(db, str(user["tenant_id"]), _tenant.plan_tier)
+            if not _sub_result["allowed"]:
+                raise HTTPException(status_code=402, detail=_sub_result["reason"])
+
+    form = db.query(Form).filter(
+        Form.id == body.form_id, Form.tenant_id == user["tenant_id"]
+    ).first()
+    if not form or form.status != "active":
+        raise HTTPException(status_code=409, detail="This form is no longer accepting submissions")
+
+    try:
+        # A form's program link isn't in the request body — derive it server-side so
+        # program-filtered queries (export, analyzer, dashboards) see this submission.
+        from app.models.program import ProgramQuestionnaire
+        pq = db.query(ProgramQuestionnaire).filter(
+            ProgramQuestionnaire.form_id == body.form_id,
+            ProgramQuestionnaire.tenant_id == user["tenant_id"],
+        ).first()
+
+        sub = Submission(
+            tenant_id=user["tenant_id"],
+            form_id=body.form_id,
+            form_version=body.form_version,
+            enumerator_id=user.get("sub"),
+            data_json=body.data_json,
+            gps_open=body.gps_open,
+            gps_submit=body.gps_submit,
+            local_created_at=datetime.fromisoformat(body.local_created_at) if body.local_created_at else None,
+            program_id=pq.program_id if pq else None,
+            questionnaire_id=pq.id if pq else None,
+            participant_type_id=pq.participant_type_id if pq else None,
+        )
+        db.add(sub)
+        db.commit()
+        db.refresh(sub)
+        webhook_payload = {
+            "submission_id": str(sub.id),
+            "form_id": str(sub.form_id),
+            "enumerator_id": str(sub.enumerator_id),
+            "data_json": sub.data_json,
+            "status": sub.status,
+        }
+        background_tasks.add_task(_fire_webhook_bg, str(user["tenant_id"]), "submission.created", webhook_payload, str(sub.id))
+        return {"id": str(sub.id), "status": sub.status}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception("Error creating submission")
+        raise HTTPException(status_code=500, detail=f"Failed to create submission: {type(e).__name__}: {str(e)}")
+
+
+# ── Bulk status update ────────────────────────────────────────────────────────
+
+@router.post("/bulk")
+def bulk_update_submissions(
+    body: BulkUpdateBody,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Bulk approve / reject / flag a set of submissions by ID."""
+    if body.status not in VALID_STATUSES:
+        raise HTTPException(status_code=422, detail=f"Invalid status. Must be one of: {', '.join(sorted(VALID_STATUSES))}")
+    if not body.ids:
+        raise HTTPException(status_code=422, detail="ids list must not be empty")
+    if len(body.ids) > 200:
+        raise HTTPException(status_code=422, detail="Maximum 200 IDs per bulk operation")
+
+    subs = db.query(Submission).filter(
+        Submission.id.in_(body.ids),
+        Submission.tenant_id == user["tenant_id"],
+    ).all()
+
+    reviewer = user.get("name") or user.get("sub", "reviewer")
+    updated = 0
+    history_entries = []
+
+    for sub in subs:
+        old_status = sub.status
+        if old_status == body.status:
+            continue
+        sub.status = body.status
+        if body.status == "approved":
+            sub.flag_note = f"Approved by {reviewer}"
+        elif body.status == "rejected":
+            reason = body.flag_note or "No reason provided"
+            sub.flag_note = f"Rejected by {reviewer}: {reason}"
+        elif body.flag_note is not None:
+            sub.flag_note = body.flag_note
+
+        history_entries.append(SubmissionHistory(
+            submission_id=sub.id,
+            changed_by=user.get("sub"),
+            action=body.status,
+            old_data={"status": old_status},
+            new_data={"status": sub.status, "flag_note": sub.flag_note},
+            note=f"Bulk action by {reviewer}",
+        ))
+        updated += 1
+
+    db.add_all(history_entries)
+    db.commit()
+
+    skipped = len(body.ids) - len(subs)
+    logger.info("Bulk %s: updated=%d skipped=%d by %s", body.status, updated, skipped, reviewer)
+    return {"updated": updated, "skipped": skipped}
+
+
+# ── Named sub-routes — must be before /{submission_id} to avoid being captured ─
+
+class DraftUpsert(BaseModel):
+    local_id: str                       # client draft UUID (upsert key)
+    form_id: str
+    form_version: Optional[int] = None
+    data_json: dict
+    gps_open: Optional[Any] = None
+    gps_submit: Optional[Any] = None
+    local_created_at: Optional[str] = None
+
+
+@router.put("/draft")
+def upsert_draft(body: DraftUpsert, user=Depends(require_enumerator), db: Session = Depends(get_db)):
+    """Best-effort server backup of a half-filled form (Save & Exit). Upsert by
+    (enumerator, local_id). Never counts toward quota/dashboards — lives in its
+    own table. Returns quietly so the client can fire-and-forget."""
+    lca = None
+    if body.local_created_at:
+        try:
+            lca = datetime.fromisoformat(body.local_created_at)
+        except ValueError:
+            pass
+    # include_deleted so a re-saved draft reuses (and un-bins) any soft-deleted
+    # row for the same (enumerator, local_id) instead of colliding on the unique key.
+    draft = db.query(SubmissionDraft).execution_options(include_deleted=True).filter(
+        SubmissionDraft.enumerator_id == user["sub"],
+        SubmissionDraft.local_id == body.local_id,
+    ).first()
+    if draft:
+        draft.data_json = body.data_json
+        draft.form_version = body.form_version
+        draft.gps_open = body.gps_open
+        draft.gps_submit = body.gps_submit
+        draft.deleted_at = None
+    else:
+        draft = SubmissionDraft(
+            tenant_id=user["tenant_id"],
+            enumerator_id=user["sub"],
+            form_id=body.form_id,
+            form_version=body.form_version,
+            local_id=body.local_id,
+            data_json=body.data_json,
+            gps_open=body.gps_open,
+            gps_submit=body.gps_submit,
+            local_created_at=lca,
+        )
+        db.add(draft)
+    db.commit()
+    return {"id": str(draft.id), "local_id": draft.local_id}
+
+
+@router.get("/drafts")
+def list_my_drafts(user=Depends(require_enumerator), db: Session = Depends(get_db)):
+    """The caller's own server-backed drafts (for cross-device recovery)."""
+    rows = db.query(SubmissionDraft).filter(
+        SubmissionDraft.enumerator_id == user["sub"],
+    ).order_by(SubmissionDraft.updated_at.desc()).limit(200).all()
+    return [{
+        "local_id": d.local_id,
+        "form_id": str(d.form_id),
+        "form_version": d.form_version,
+        "data_json": d.data_json,
+        "gps_open": d.gps_open,
+        "gps_submit": d.gps_submit,
+        "local_created_at": d.local_created_at.isoformat() if d.local_created_at else None,
+        "updated_at": d.updated_at.isoformat() if d.updated_at else None,
+    } for d in rows]
+
+
+@router.delete("/draft/{local_id}", status_code=204)
+def delete_draft(local_id: str, user=Depends(require_enumerator), db: Session = Depends(get_db)):
+    """Soft-delete a server draft (deleted locally, or superseded)."""
+    draft = db.query(SubmissionDraft).filter(
+        SubmissionDraft.enumerator_id == user["sub"],
+        SubmissionDraft.local_id == local_id,
+    ).first()
+    if draft:
+        soft_delete(draft)
+        db.commit()
+
+
+@router.get("/my-backchecks")
+def get_my_backchecks(user=Depends(require_enumerator), db: Session = Depends(get_db)):
+    """Enumerator: list submissions assigned to me that need back-checking."""
+    rows = db.query(Submission).filter(
+        Submission.tenant_id == user["tenant_id"],
+        Submission.enumerator_id == user["sub"],
+        Submission.backcheck_required == True,
+        Submission.backcheck_form_id != None,
+        Submission.backcheck_completed != True,
+    ).order_by(Submission.server_received_at.desc()).limit(50).all()
+
+    result = []
+    for s in rows:
+        from app.models.form import Form as FormModel
+        bc_form = db.query(FormModel).filter(FormModel.id == s.backcheck_form_id).first()
+        result.append({
+            "original_submission_id": str(s.id),
+            "form_title": s.form_title if hasattr(s, "form_title") else None,
+            "submitted_at": s.server_received_at.isoformat() if s.server_received_at else None,
+            "backcheck_form_id": str(s.backcheck_form_id),
+            "backcheck_form_title": bc_form.title if bc_form else "Back-check Form",
+            "data_json": s.data_json,
+        })
+    return result
+
+
+@router.get("/map-data")
+def get_map_data(
+    form_id: Optional[str] = Query(None),
+    enumerator_id: Optional[str] = Query(None),
+    days: int = Query(30, ge=0, le=3650),
+    user: dict = Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """GPS pins for the live field map. Returns last N days of submissions with GPS. days=0 means all time."""
+    from datetime import datetime, timezone, timedelta
+    from app.models.form import Form
+    from app.models.user import User as UserModel
+    from app.models.roster import RespondentRoster
+
+    q = db.query(Submission, RespondentRoster.name.label("roster_name")).outerjoin(
+        RespondentRoster, Submission.roster_id == RespondentRoster.id
+    ).filter(
+        Submission.tenant_id == user["tenant_id"],
+        Submission.gps_submit.isnot(None),
+    )
+    if days > 0:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        q = q.filter(Submission.server_received_at >= cutoff)
+    if form_id:
+        q = q.filter(Submission.form_id == form_id)
+    if enumerator_id:
+        q = q.filter(Submission.enumerator_id == enumerator_id)
+
+    rows = q.order_by(Submission.server_received_at.desc()).limit(2000).all()
+
+    enum_map = {str(u.id): u.name for u in db.query(UserModel).filter(UserModel.tenant_id == user["tenant_id"]).all()}
+    form_map = {str(f.id): f.title for f in db.query(Form).filter(Form.tenant_id == user["tenant_id"]).all()}
+
+    _BENEFICIARY_KEYS = ("beneficiary_name", "name", "respondent_name", "farmer_name",
+                         "household_head", "participant_name", "applicant_name")
+
+    def _beneficiary_name(s: Submission, roster_name: Optional[str]) -> Optional[str]:
+        if roster_name:
+            return roster_name
+        dj = s.data_json or {}
+        for k in _BENEFICIARY_KEYS:
+            v = dj.get(k)
+            if v and isinstance(v, str):
+                return v
+        return None
+
+    return [{
+        "id": str(s.id),
+        "lat": (s.gps_submit or {}).get("lat"),
+        "lng": (s.gps_submit or {}).get("lng"),
+        "accuracy": (s.gps_submit or {}).get("accuracy"),
+        "status": s.status,
+        "enumerator": enum_map.get(str(s.enumerator_id), "Unknown"),
+        "form": form_map.get(str(s.form_id), "Unknown"),
+        "form_id": str(s.form_id),
+        "received": s.server_received_at.isoformat() if s.server_received_at else None,
+        "beneficiary_name": _beneficiary_name(s, roster_name),
+    } for s, roster_name in rows if (s.gps_submit or {}).get("lat")]
+
+
+# ── Get single submission ─────────────────────────────────────────────────────
+
+@router.get("/{submission_id}")
+def get_submission(submission_id: str, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    role = user.get("role", "")
+    if role not in ("org_admin", "supervisor", "enumerator", "master_admin"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    try:
+        row = db.query(Submission, User.name).outerjoin(
+            User, Submission.enumerator_id == User.id
+        ).filter(
+            Submission.id == submission_id, Submission.tenant_id == user["tenant_id"]
+        ).first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Submission not found")
+        sub, enumerator_name = row
+        if role == "enumerator" and str(sub.enumerator_id) != str(user["sub"]):
+            raise HTTPException(status_code=403, detail="You can only view your own submissions")
+        # Attach uploaded media (photos, audio, audio audits) with servable URLs
+        from app.models.media_file import MediaFile
+        media = [
+            {
+                "id": str(m.id),
+                "field_name": m.field_name,
+                "file_type": m.file_type,
+                "mime_type": m.mime_type,
+                "url": m.cloud_url,
+                "size_bytes": m.file_size_bytes,
+            }
+            for m in db.query(MediaFile).filter(MediaFile.submission_id == sub.id).all()
+        ]
+        return {
+            "id": str(sub.id),
+            "form_id": str(sub.form_id),
+            "enumerator_id": str(sub.enumerator_id) if sub.enumerator_id else None,
+            "enumerator_name": enumerator_name or "Unknown",
+            "form_version": sub.form_version,
+            "serial_no": sub.serial_no,
+            "data_json": sub.data_json,
+            "gps_open": sub.gps_open,
+            "gps_submit": sub.gps_submit,
+            "status": sub.status,
+            "flag_note": sub.flag_note,
+            "backcheck_required": bool(sub.backcheck_required),
+            "backcheck_form_id": str(sub.backcheck_form_id) if sub.backcheck_form_id else None,
+            "local_created_at": sub.local_created_at.isoformat() if sub.local_created_at else None,
+            "server_received_at": sub.server_received_at.isoformat() if sub.server_received_at else None,
+            "media": media,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error fetching submission %s", submission_id)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch submission: {type(e).__name__}: {str(e)}")
+
+
+# ── Flag / approve / reject ───────────────────────────────────────────────────
+
+@router.patch("/{submission_id}")
+def update_submission(submission_id: str, body: SubmissionUpdate, user=Depends(require_supervisor), db: Session = Depends(get_db)):
+    try:
+        sub = db.query(Submission).filter(
+            Submission.id == submission_id, Submission.tenant_id == user["tenant_id"]
+        ).first()
+        if not sub:
+            raise HTTPException(status_code=404, detail="Submission not found")
+
+        old_status = sub.status
+        old_flag_note = sub.flag_note
+
+        if body.status is not None:
+            sub.status = body.status
+
+        reviewer = body.reviewer_name or user.get("name") or user.get("sub", "reviewer")
+        if body.status == "approved":
+            sub.flag_note = f"Approved by {reviewer}"
+        elif body.status == "rejected":
+            reason = body.flag_note or "No reason provided"
+            sub.flag_note = f"Rejected by {reviewer}: {reason}"
+        elif body.flag_note is not None:
+            sub.flag_note = body.flag_note
+
+        if body.status and body.status != old_status:
+            action_map = {"flagged": "flagged", "approved": "approved", "rejected": "rejected"}
+            action = action_map.get(body.status, "updated")
+            history_entry = SubmissionHistory(
+                submission_id=sub.id,
+                changed_by=user.get("sub"),
+                action=action,
+                old_data={"status": old_status, "flag_note": old_flag_note},
+                new_data={"status": sub.status, "flag_note": sub.flag_note},
+                note=sub.flag_note,
+            )
+            db.add(history_entry)
+
+            if body.status == "flagged":
+                try:
+                    form = db.query(Form).filter(Form.id == sub.form_id).first()
+                    form_title = form.title if form else "Unknown Form"
+                    enumerator = db.query(User).filter(User.id == sub.enumerator_id).first()
+                    enumerator_name = enumerator.name if enumerator else "Unknown"
+                    supervisor_name = user.get("name") or user.get("sub", "Supervisor")
+                    supervisors = db.query(User).filter(
+                        User.tenant_id == user["tenant_id"],
+                        User.role.in_(["org_admin", "supervisor"]),
+                        User.is_active == True,
+                    ).all()
+                    for sup in supervisors:
+                        sup_email = getattr(sup, "email", None)
+                        if sup_email:
+                            send_flagged_submission_email(
+                                to=sup_email,
+                                supervisor_name=supervisor_name,
+                                form_title=form_title,
+                                enumerator_name=enumerator_name,
+                                flag_note=sub.flag_note,
+                                submission_id=str(sub.id),
+                            )
+                except Exception as email_err:
+                    logger.warning("Failed to send flagged-submission emails: %s", email_err)
+
+        db.commit()
+
+        if body.status in ("approved", "rejected") and body.status != old_status and sub.enumerator_id:
+            try:
+                from app.api.routes.notifications import send_push
+                action_label = "approved" if body.status == "approved" else "rejected"
+                note_text = (sub.flag_note or "").strip()
+                send_push(
+                    db, str(sub.enumerator_id),
+                    f"Submission {action_label.capitalize()}",
+                    f"Your submission was {action_label}.{' ' + note_text if note_text else ''}",
+                    url="/collect",
+                )
+            except Exception:
+                logger.warning("Push to enumerator failed for submission %s", sub.id)
+
+        if body.status and body.status != old_status:
+            try:
+                fire_webhooks(db, user["tenant_id"], f"submission.{sub.status}", {
+                    "submission_id": str(sub.id),
+                    "form_id": str(sub.form_id),
+                    "status": sub.status,
+                    "flag_note": sub.flag_note,
+                })
+            except Exception:
+                logger.warning("Webhook fire failed for submission %s status change", sub.id)
+            # WhatsApp + Telegram notification on status change
+            try:
+                tenant = db.query(Tenant).filter(Tenant.id == sub.tenant_id).first()
+                form_obj = db.query(Form).filter(Form.id == sub.form_id).first()
+                if tenant:
+                    notify_params = {
+                        "serial_no": sub.serial_no or str(sub.id)[:8],
+                        "form_title": form_obj.title if form_obj else str(sub.form_id),
+                        "note": sub.flag_note or "",
+                    }
+                    wa_notify(tenant, f"submission.{sub.status}", notify_params)
+                    asyncio.ensure_future(tg_notify(tenant, f"submission.{sub.status}", notify_params))
+            except Exception:
+                logger.warning("WhatsApp/Telegram notify failed for submission %s", sub.id)
+
+        return {"id": str(sub.id), "status": sub.status, "flag_note": sub.flag_note}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception("Error updating submission %s", submission_id)
+        raise HTTPException(status_code=500, detail=f"Failed to update submission: {type(e).__name__}: {str(e)}")
+
+
+# ── Edit submission data ──────────────────────────────────────────────────────
+
+@router.patch("/{submission_id}/data")
+def edit_submission_data(
+    submission_id: str,
+    body: SubmissionDataEdit,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    role = user.get("role", "")
+    sub = db.query(Submission).filter(
+        Submission.id == submission_id,
+        Submission.tenant_id == user["tenant_id"],
+    ).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    if role == "enumerator":
+        if str(sub.enumerator_id) != str(user["sub"]):
+            raise HTTPException(status_code=403, detail="You can only edit your own submissions")
+        # Check override hierarchy: form-level → org-level
+        form_override = None
+        if sub.form_id:
+            form = db.query(Form).filter(Form.id == sub.form_id).first()
+            form_override = form.allow_enumerator_edit if form else None
+        if form_override is not None:
+            if not form_override:
+                raise HTTPException(status_code=403, detail="Editing is disabled for this form.")
+        else:
+            from app.models.tenant import Tenant
+            tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+            if tenant and not getattr(tenant, "allow_enumerator_edit", True):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Your administrator has disabled enumerator editing. Contact your supervisor."
+                )
+    elif role not in ("org_admin", "supervisor", "master_admin"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    sub.data_json = body.data_json
+    db.commit()
+    return {"id": str(sub.id), "status": "updated", "serial_no": sub.serial_no}
+
+
+# ── Serial number — master_admin only ────────────────────────────────────────
+
+@router.patch("/{submission_id}/serial-no")
+def update_serial_no(
+    submission_id: str,
+    body: SerialNoUpdate,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if user.get("role") != "master_admin":
+        raise HTTPException(status_code=403, detail="Only master_admin can change serial numbers")
+
+    sub = db.query(Submission).filter(Submission.id == submission_id).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    sub.serial_no = body.serial_no
+    db.commit()
+    return {"id": str(sub.id), "serial_no": sub.serial_no}
+
+
+# ── Anonymize (DPDP) — master_admin only ─────────────────────────────────────
+
+@router.post("/{submission_id}/anonymize")
+def anonymize_submission(
+    submission_id: str,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if user.get("role") != "master_admin":
+        raise HTTPException(status_code=403, detail="Only master_admin can anonymize submissions")
+    sub = db.query(Submission).filter(
+        Submission.id == submission_id, Submission.tenant_id == user["tenant_id"]
+    ).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    sub.data_json = {"anonymized": True, "anonymized_at": datetime.now(timezone.utc).isoformat()}
+    db.commit()
+    return {"id": str(sub.id), "status": "anonymized"}
+
+
+# ── Soft-delete to Recycle Bin — org_admin only ──────────────────────────────
+
+@router.delete("/{submission_id}", status_code=204)
+def delete_submission(
+    submission_id: str,
+    user=Depends(require_org_admin),
+    db: Session = Depends(get_db),
+):
+    """Send a submission to the 360-day Recycle Bin. Restorable from /bin; never
+    hard-deleted. The soft-delete listener then hides it from every list/export."""
+    sub = db.query(Submission).filter(
+        Submission.id == submission_id, Submission.tenant_id == user["tenant_id"]
+    ).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    soft_delete(sub)
+    db.commit()
+
+
+# ── Flag back-check — supervisor+ ────────────────────────────────────────────
+
+@router.post("/{submission_id}/flag-backcheck")
+def flag_backcheck(
+    submission_id: str,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    sub = db.query(Submission).filter(
+        Submission.id == submission_id, Submission.tenant_id == user["tenant_id"]
+    ).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    sub.backcheck_required = True
+    db.commit()
+    return {"id": str(sub.id), "backcheck_required": True}
+
+
+@router.post("/{submission_id}/complete-backcheck")
+def complete_backcheck(
+    submission_id: str,
+    user=Depends(require_enumerator),
+    db: Session = Depends(get_db),
+):
+    """Mark the original submission as back-check completed after enumerator submits."""
+    sub = db.query(Submission).filter(
+        Submission.id == submission_id,
+        Submission.tenant_id == user["tenant_id"],
+        Submission.enumerator_id == user["sub"],
+    ).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    sub.backcheck_completed = True
+    db.commit()
+    return {"id": str(sub.id), "backcheck_completed": True}
+
+
+@router.patch("/{submission_id}/backcheck-form")
+def assign_backcheck_form(
+    submission_id: str,
+    body: dict,
+    user=Depends(require_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Assign a specific form to use for back-checking this submission."""
+    sub = db.query(Submission).filter(
+        Submission.id == submission_id, Submission.tenant_id == user["tenant_id"]
+    ).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    form_id = body.get("form_id")
+    if form_id:
+        form = db.query(Form).filter(
+            Form.id == form_id, Form.tenant_id == user["tenant_id"]
+        ).first()
+        if not form:
+            raise HTTPException(status_code=404, detail="Form not found")
+    sub.backcheck_form_id = form_id
+    sub.backcheck_required = True
+    db.commit()
+    return {
+        "id": str(sub.id),
+        "backcheck_required": True,
+        "backcheck_form_id": str(sub.backcheck_form_id) if sub.backcheck_form_id else None,
+    }
+
+
+@router.post("/recover")
+def recover_submissions(body: dict, user=Depends(require_enumerator), db: Session = Depends(get_db)):
+    """Recover encrypted offline-backup capsules (.fgresp) for authenticated
+    submissions. Decrypts each with the server private key, validates the form is
+    in the caller's org, dedups by (form_id, local_id) so a response already synced
+    normally is not duplicated, and stores the rest attributed to the uploader.
+
+    Media rides inline in data_json (as captured on-device) — this is a last-resort
+    recovery path, so preserving the data outranks the normal media pipeline."""
+    from app.core.survey_crypto import decrypt_capsule, get_or_create_keypair, CapsuleError
+    from sqlalchemy import func as _func
+
+    _, private_pem = get_or_create_keypair(db)
+    if not private_pem:
+        raise HTTPException(status_code=503, detail="Offline recovery is not available on this server")
+    capsules = body.get("capsules")
+    if not isinstance(capsules, list) or not capsules:
+        raise HTTPException(status_code=400, detail="No capsules provided")
+    if len(capsules) > 500:
+        raise HTTPException(status_code=413, detail="Too many capsules in one request (max 500)")
+
+    tenant_id = user["tenant_id"]
+    uploader = user["sub"]
+    results = []
+    for i, env in enumerate(capsules):
+        try:
+            payload = decrypt_capsule(env, private_pem)
+        except CapsuleError as e:
+            results.append({"index": i, "status": "error", "detail": str(e)})
+            continue
+
+        payload = payload if isinstance(payload, dict) else {"data_json": payload}
+        data_json = payload.get("data_json", {})
+        form_id = (env or {}).get("form_id")
+        local_id = (env or {}).get("id")
+
+        form = db.query(Form).filter(Form.id == form_id, Form.tenant_id == tenant_id).first() if form_id else None
+        if not form:
+            results.append({"index": i, "status": "error", "detail": "form not found in your organization"})
+            continue
+
+        if local_id:
+            existing = db.query(Submission).filter(
+                Submission.form_id == form.id, Submission.local_id == str(local_id),
+            ).first()
+            if existing:
+                results.append({"index": i, "status": "duplicate", "id": str(existing.id)})
+                continue
+
+        max_serial = db.query(_func.coalesce(_func.max(Submission.serial_no), 0)).filter(
+            Submission.form_id == form.id
+        ).scalar() or 0
+        sub = Submission(
+            form_id=form.id,
+            tenant_id=tenant_id,
+            enumerator_id=uploader,
+            data_json={**data_json, "_recovered": True},
+            gps_open=payload.get("gps_open"),
+            gps_submit=payload.get("gps_submit"),
+            status="submitted",
+            form_version=int(payload.get("form_version") or form.version or 1),
+            serial_no=max_serial + 1,
+            local_id=str(local_id) if local_id else None,
+        )
+        db.add(sub)
+        db.commit()
+        db.refresh(sub)
+        results.append({"index": i, "status": "saved", "id": str(sub.id), "serial_no": sub.serial_no})
+
+    saved = sum(1 for r in results if r["status"] == "saved")
+    return {"saved": saved, "total": len(results), "results": results}

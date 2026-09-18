@@ -1,0 +1,38 @@
+{
+  "output": ".github/copilot-instructions.md",
+  "outputs": ["claude", "copilot", "codex"],
+
+  "srcDirs": ["backend/app", "frontend/src", "website"],
+
+  "exclude": [
+    "node_modules", ".git", "dist", "build", "out",
+    "__pycache__", ".next", "coverage", "target", "vendor",
+    ".context", "venv", ".venv", "*.egg-info",
+    "alembic/versions", "frontend/node_modules",
+    "caveman-main", "claude-mem-main", "hermes-agent-main", "graphify-4",
+    "graphify-out", "*.zip"
+  ],
+
+  "maxDepth": 6,
+  "maxSigsPerFile": 30,
+  "autoMaxTokens": true,
+  "coverageTarget": 0.85,
+  "modelContextLimit": 200000,
+  "maxTokensHeadroom": 0.15,
+
+  "secretScan": true,
+  "monorepo": false,
+  "diffPriority": true,
+
+  "mcp": { "autoRegister": true },
+
+  "strategy": "hot-cold",
+  "hotCommits": 10,
+
+  "depMap": true,
+  "todos": true,
+  "changes": true,
+  "changesCommits": 10,
+  "testCoverage": false,
+  "impactRadius": false
+}

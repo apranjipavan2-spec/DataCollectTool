@@ -1,0 +1,113 @@
+name: Set up offsite backups (Google Drive)
+
+# One-shot setup + immediate run. Safe during live submissions:
+# only READS the DB (pg_dump) and volume files, then copies them offsite.
+# No app restart, no migration, no writes to app data.
+#
+# Installs rclone on the VPS, wires it to Google Drive via the GDRIVE_TOKEN
+# secret, creates /opt/fieldgovern/backup-all.sh (DB + photos + tool projects),
+# points the 2-hourly cron at it, and runs it once now.
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    name: Install rclone + backup-all + run once
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure + run via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          GDRIVE_TOKEN: ${{ secrets.GDRIVETOKEN }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 55m
+          envs: GDRIVE_TOKEN
+          script: |
+            set -e
+            cd /opt/fieldgovern
+
+            echo "=== 1. Ensure rclone is installed ==="
+            if ! command -v rclone >/dev/null 2>&1; then
+              apt-get update -qq && apt-get install -y rclone
+            fi
+            rclone version | head -1
+
+            echo "=== 2. Write rclone config for Google Drive (mode 600) ==="
+            mkdir -p /root/.config/rclone
+            umask 077
+            printf '[gdrive]\ntype = drive\nscope = drive\ntoken = %s\n' "$GDRIVE_TOKEN" \
+              > /root/.config/rclone/rclone.conf
+            echo "  wrote /root/.config/rclone/rclone.conf"
+            # Prove the token works before we rely on it
+            rclone mkdir gdrive:FieldGovern-Backups
+            echo "  Drive OK — FieldGovern-Backups folder ready"
+
+            echo "=== 3. Write /opt/fieldgovern/backup-all.sh ==="
+            cat > /opt/fieldgovern/backup-all.sh <<'SCRIPT'
+            #!/bin/bash
+            # Full offsite backup: DB + photos + analyzer/cleaner projects.
+            # copy (not sync) everywhere => Drive NEVER auto-deletes: permanent
+            # unless removed by hand. Only new/changed files upload each run.
+            set -uo pipefail
+            REMOTE="gdrive:FieldGovern-Backups"
+            # Modest concurrency for steady-state runs (the big first push is
+            # done). --bwlimit caps upload bandwidth so it never saturates the link.
+            RCOPY="rclone copy --transfers=4 --checkers=4 --drive-chunk-size=16M --fast-list --bwlimit 8M"
+            LOG(){ echo "[$(date '+%F %T')] $*"; }
+
+            # host path of a container's mount point
+            src_of(){ docker inspect "$1" -f "{{range .Mounts}}{{if eq .Destination \"$2\"}}{{.Source}}{{end}}{{end}}" 2>/dev/null; }
+
+            # 1. DB dump (local, timestamped) + push every dump to Drive
+            /opt/fieldgovern/backup-db.sh || LOG "WARN: backup-db.sh failed"
+            $RCOPY /opt/fieldgovern/backups "$REMOTE/db" --include "*.sql.gz" \
+              && LOG "DB dumps synced to Drive" || LOG "WARN: DB offsite copy failed"
+
+            # 2. Photos (app /app/uploads volume). The app runs under docker
+            # compose, so its container isn't literally named "app" — resolve
+            # the real container id via compose, then read its mount.
+            APP_CID=$(docker compose -f /opt/fieldgovern/docker-compose.yml ps -q app 2>/dev/null | head -1)
+            MEDIA=$(docker inspect "$APP_CID" -f '{{range .Mounts}}{{if eq .Destination "/app/uploads"}}{{.Source}}{{end}}{{end}}' 2>/dev/null)
+            if [ -n "$MEDIA" ] && [ -d "$MEDIA" ]; then
+              $RCOPY "$MEDIA" "$REMOTE/media" && LOG "photos synced ($MEDIA)" \
+                || LOG "WARN: photo copy failed"
+            else
+              LOG "WARN: could not resolve app /app/uploads volume"
+            fi
+
+            # 3. Analyzer + Cleaner saved projects
+            TF=$(src_of analyzer /app/projects)
+            CL=$(src_of cleaner /app/working_copies)
+            [ -n "$TF" ] && [ -d "$TF" ] && { $RCOPY "$TF" "$REMOTE/tableforge_projects" && LOG "analyzer projects synced"; } || LOG "WARN: analyzer projects not resolved"
+            [ -n "$CL" ] && [ -d "$CL" ] && { $RCOPY "$CL" "$REMOTE/cleaner_projects" && LOG "cleaner projects synced"; } || LOG "WARN: cleaner projects not resolved"
+
+            LOG "offsite backup complete"
+            SCRIPT
+            chmod +x /opt/fieldgovern/backup-all.sh
+            echo "  wrote backup-all.sh"
+
+            echo "=== 4. Point the 2-hourly cron at backup-all.sh (dedupe old lines) ==="
+            # nice/ionice => backup only uses spare CPU + disk IO; the app
+            # always wins under load, so live submissions are never starved.
+            LINE='0 */2 * * * nice -n 19 ionice -c 3 /opt/fieldgovern/backup-all.sh >> /var/log/fieldgovern-backup.log 2>&1'
+            # Strip EVERY existing backup line (incl. any corrupted dupes from a
+            # prior sed bug), then add exactly one clean line. grep, not sed, so
+            # the & in 2>&1 is never reinterpreted.
+            crontab -l 2>/dev/null | grep -v 'backup-\(db\|all\)\.sh' > /tmp/ct || true
+            echo "$LINE" >> /tmp/ct
+            crontab /tmp/ct; rm -f /tmp/ct
+            echo "Backup cron now:"; crontab -l | grep backup-all
+
+            echo "=== 5. Run a full offsite backup NOW ==="
+            /opt/fieldgovern/backup-all.sh
+
+            echo "=== 6. Verify what landed on Drive ==="
+            echo "-- folders --"; rclone lsd gdrive:FieldGovern-Backups
+            echo "-- file counts + sizes --"
+            for d in db media tableforge_projects cleaner_projects; do
+              echo -n "  $d: "; rclone size "gdrive:FieldGovern-Backups/$d" 2>/dev/null | tr '\n' ' '; echo
+            done

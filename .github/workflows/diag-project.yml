@@ -1,0 +1,94 @@
+name: Diagnose Project Version History
+
+# Read-only diagnostic — no writes to any project file. Inspects the
+# tableforge_data volume and runs recover_stat_configs.py to figure out which
+# stat tables (correlation, crosstab, t-test, etc.) still have their columns
+# recorded somewhere (current file, saved _statConfig, or an older snapshot),
+# and which are genuinely unrecoverable. Only prints table titles and column
+# NAMES (survey question labels) — never row-level survey data.
+on:
+  workflow_dispatch:
+    inputs:
+      user_dir:
+        description: "User folder under /app/projects to inspect, or the literal word ROOT for root-level projects"
+        required: true
+        default: "6781e087-d12b-43cb-9207-ec2a3f6093f2"
+      project_name:
+        description: "Current/active project filename stem (without .tableforge)"
+        required: true
+        default: "GK-INTERIM"
+      other_files:
+        description: "Comma-separated extra .tableforge paths (relative to /app/projects) to search as fallback sources"
+        required: false
+        default: "6781e087-d12b-43cb-9207-ec2a3f6093f2/__autosave__.tableforge,GK-INTERIM.tableforge"
+      source_xlsx:
+        description: "Path (relative to /app/projects) of the cached source data file, to read its full header row"
+        required: false
+        default: "GK-INTERIM_data.xlsx"
+      grep_terms:
+        description: "Comma-separated single-word substrings (no spaces) — if set, just lists every column containing any of them instead of running the full recovery scan"
+        required: false
+        default: ""
+
+jobs:
+  diagnose:
+    name: Inspect project + recover stat table columns
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout (for the recovery script)
+        uses: actions/checkout@v4
+
+      - name: Copy recovery script to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "tools/tableforge/backend/scripts/recover_stat_configs.py"
+          target: "/tmp/diag-recover/"
+
+      - name: Inspect via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            set -e
+            USER_DIR="${{ inputs.user_dir }}"
+            PROJECT_NAME="${{ inputs.project_name }}"
+            OTHER_FILES="${{ inputs.other_files }}"
+            SOURCE_XLSX="${{ inputs.source_xlsx }}"
+            GREP_TERMS="${{ inputs.grep_terms }}"
+
+            DATA_ROOT=$(docker inspect analyzer --format '{{range .Mounts}}{{if eq .Destination "/app/projects"}}{{.Source}}{{end}}{{end}}' 2>/dev/null)
+            echo "DATA_ROOT: $DATA_ROOT"
+            SCRIPT_PATH="/tmp/diag-recover/tools/tableforge/backend/scripts/recover_stat_configs.py"
+
+            if [ "$USER_DIR" = "ROOT" ]; then
+              CURRENT="/data/${PROJECT_NAME}.tableforge"
+            else
+              CURRENT="/data/$USER_DIR/${PROJECT_NAME}.tableforge"
+            fi
+            OTHER_ARGS=""
+            IFS=',' read -ra PARTS <<< "$OTHER_FILES"
+            for p in "${PARTS[@]}"; do
+              [ -n "$p" ] && OTHER_ARGS="$OTHER_ARGS /data/$p"
+            done
+            SOURCE_ARGS=""
+            if [ -n "$SOURCE_XLSX" ]; then
+              SOURCE_ARGS="--source-xlsx /data/$SOURCE_XLSX"
+            fi
+            GREP_ARGS=""
+            if [ -n "$GREP_TERMS" ]; then
+              GREP_ARGS="--grep $GREP_TERMS"
+            fi
+            echo "Current: $CURRENT"
+            echo "Fallback sources: $OTHER_ARGS"
+            echo "Source headers: $SOURCE_ARGS"
+            echo "Grep: $GREP_ARGS"
+            echo ""
+            docker run --rm -v "$DATA_ROOT":/data:ro -v "$SCRIPT_PATH":/script.py:ro \
+              python:3.11-slim sh -c "pip install --quiet openpyxl && python3 /script.py '$CURRENT' $OTHER_ARGS $SOURCE_ARGS $GREP_ARGS"

@@ -1,0 +1,390 @@
+# DPDP Compliance & Development Master Plan — Tracked Backlog
+
+Source: `FieldGovern_Compliance_and_Development_Plan.docx` (external audit, 18 Sep 2026).
+Full doc scope: India-platform market comparison, DPDP Act 2023 / Rules 2025 gap analysis,
+FieldGovern-specific findings, and a phased roadmap to 13 May 2027 (when core DPDP
+obligations fully apply).
+
+**Status legend:** `todo` · `in-progress` · `done` · `verified`
+Work top-down: P0 → P1 → P1/P2 → P2. Each session resumes at the first non-`verified` item.
+When an item lands: tick status here, note what was verified, and add a line to
+`tasks/lessons.md` if a bug/lesson emerged (per `CLAUDE.md` workflow rule).
+
+---
+
+## P0 — fix within 30 days (active risk or misstatement)
+
+### 1. AI cross-border data flow — `in-progress`
+- [x] **PII stripping before model calls — done + verified 2026-09-18.** New shared
+      redaction module at every layer that talks to a third-party LLM:
+      `backend/app/services/pii_redact.py` (main app — schema-driven via
+      `Form.json_schema`'s `is_identifier` flag + regex heuristic for
+      email/phone/Aadhaar-shaped/GPS-pair values in untagged fields),
+      `tools/tableforge/backend/pii_redact.py` and `tools/datacleaner/pii_redact.py`
+      (heuristic + column-name-hint only, since sidecar tools operate on arbitrary
+      uploaded datasets with no form schema). Wired into every raw-data-to-prompt
+      call site found in the codebase audit (2 in the main app, 8 in TableForge, 1 in
+      DataCleaner). Self-check tests in all three locations
+      (`backend/tests/test_pii_redact.py` + two `test_pii_redact.py` alongside the
+      tool modules) — caught and fixed two real regex bugs (word-boundary miss on
+      snake_case column names, camelCase split-after-lowercase ordering bug) before
+      shipping. Full backend test suite re-run clean (9 passed, 0 failed).
+- [x] **Go further than redaction for features that don't need real data at all —
+      done + verified 2026-09-18.** User asked whether report-writing and
+      table-design suggestion could send only column metadata + dummy values
+      instead of real (even redacted) content. Answer was yes for those two;
+      no for data-cleaning suggestions (their whole job is seeing real values).
+      Shipped:
+      - New `ai_sanitize.py` in all 3 services (main app, TableForge, DataCleaner
+        n/a — no tabulation feature there): type-matched dummy values + a
+        population-level aggregate summarizer (`summarize_fields`: value counts /
+        numeric min-max-mean / answered-counts only, never a raw row).
+      - `generate_report` now sends **zero raw submissions** — only the aggregate
+        summary. `suggest_tabulation`/`smart_build_tabulation`/auto-generate flows
+        (main app + TableForge, 8 more call sites) now send **zero real
+        respondent/dataset values** — fully synthetic rows built from declared
+        field type + schema options. `smart_build_tabulation` also dropped a
+        500-row DB query entirely (wasn't needed once nothing real is sent).
+      - Partial exception for TableForge (uploaded spreadsheets have no separate
+        form-schema layer): a non-PII-named, low-cardinality column with repeated
+        values (a genuine taxonomy, e.g. "North"/"South") may still send its real
+        category labels — never a PII-named column, never free text/numeric.
+      - `ai_correct` (DataCleaner) and `create-column` (TableForge) — per explicit
+        decision, kept on real values (the feature needs them) but changed from
+        silent `[REDACTED]` substitution to a hard 400 refusal naming the PII
+        column when one is selected, instead of silently returning a useless
+        response.
+      - Self-checks in all new modules caught 3 more real bugs before shipping:
+        a cardinality-only categorical heuristic that broke on small samples (no
+        "repeats required" check), a `dummy_row` calling `dummy_value` with the
+        wrong vocabulary (normalized type label vs raw pandas dtype string), and
+        a relative-import test-invocation issue. Full backend suite re-run clean
+        (17 passed, 0 failed) after every change.
+- [x] **AI opt-in per organisation — done + verified 2026-09-18.** Repurposed the
+      already-existing-but-unused `Tenant.ai_config` JSONB column (no migration
+      needed). Default **on** for every org (existing and new) — a genuine business
+      decision, made explicitly with the user: default-off would have silently
+      broken AI features for every current paying customer with zero warning.
+      Enforced inside `check_feature()` (the single existing choke point all 10
+      AI-route call sites already funnel through) so every `ai_*` feature respects
+      it regardless of plan tier. `GET/PATCH /tenants/ai-config` (org_admin only,
+      same pattern as the existing `/tenants/security` toggle) + a UI card in
+      `OrgAdminPanel.modern.tsx`. Standalone-verified (4 scenarios: no config set
+      → allowed, explicit true → allowed, explicit false → blocked 403, non-`ai_`
+      feature ignores the toggle) since no test DB was available here to run the
+      full `backend/tests/test_ai_opt_out.py` suite.
+- [x] **Sub-processor list — done + verified 2026-09-18.** Didn't hardcode a
+      provider — the admin can configure any of 4 (OpenAI/Anthropic/Gemini/
+      DeepSeek) at runtime and this session had no visibility into prod's actual
+      DB state. New public no-auth `GET /ai/sub-processor` reads the live
+      `system_settings.ai_config` (same resolution logic `GET /ai/config` already
+      uses) and returns only `{configured, provider, country}` — never key
+      material. Wired into a new "Sub-processors" section on
+      `website/dpdp-compliance.html` via a small live-fetch script (same pattern
+      as `pricing-sync.js`) — updates automatically if the admin changes provider,
+      never needs a manual content edit.
+- [x] **Corrected the exact overclaim the audit named — done 2026-09-18.**
+      `website/index.html:1143` said "Personal data does not leave the deployment
+      region unless an organisation explicitly opts in" — false, since no per-org
+      opt-in toggle exists yet (see sub-item above). Reworded to state what's
+      actually true now (direct identifiers stripped before any AI call) and
+      flagged the opt-in as roadmap, not shipped. Checked `dpdp-compliance.html`
+      (the dedicated DPDP page) for the same pattern — clean, no AI-specific claims
+      there to fix.
+
+### 2. Tenant isolation — `done` (code) / owner action pending
+Native PostgreSQL RLS already built and merged (PR #13, migration 0048): restricted
+`fieldgovern_app` DB role (NOSUPERUSER/NOBYPASSRLS), policies verified against Postgres
+16 (`backend/tests/rls_policy_check.sql`, 7 assertions). **Not yet active in prod** —
+deferred by owner because the platform has live users (enabling it needs an app
+restart). This is tracked in full detail, with exact steps, in
+**`tasks/pending_owner_action.md` §1** — do not duplicate that checklist here, just
+confirm it's been actioned before marking this `verified`.
+
+### 3. Public repository hygiene — `in-progress`
+- [x] **Found + rotated a live exposed credential — done 2026-09-18.** Investigating
+      this item surfaced `backend/scripts/seed_dev.py:270-271,521` — a hardcoded
+      `master_admin` (highest-privilege role) password (`superadmin@4991`) for
+      phone `+918317390926`, checked into the public repo. Script runs on every
+      deploy per its own docstring and force-resets the password on every actual
+      run (not just first-seed). **Confirmed live on production — owner rotated
+      the password via Profile → Security → Change Password.** No git-history
+      scrub or code fix yet — the exposed value is still in every past commit
+      and `seed_dev.py`/`create_superuser.py`/`reset_passwords.py` still contain
+      hardcoded credential patterns.
+- [x] **Fixed the `users.py:129` weak shared default — done 2026-09-18.** A
+      full repo-wide sweep for other hardcoded credentials (API keys, DB
+      URLs, connection strings, .env files) found only this one real issue:
+      `POST /users/bulk-import` gave every CSV row without an explicit
+      password the same hardcoded, publicly-documented value
+      (`"fieldgovern123"`) — one leaked/known password compromised every
+      such user across every tenant. Fixed: each row without a CSV password
+      now gets its own random 12-char password (`secrets.choice`, not
+      hardcoded); the admin sees the generated phone/name/password list
+      once in the import-result UI (`Dashboard.modern.tsx`) with a
+      copy-all button, since it can't be shown again after hashing. New
+      `backend/tests/test_bulk_import.py` (3 cases) — collects/skips
+      cleanly (no test DB here) but the core new logic (password generator
+      itself) was verified standalone: 1000 generated passwords, zero
+      collisions, old default absent. Full backend suite re-run clean
+      (17 passed). Everything else in the sweep (API keys, JWT secrets, DB
+      connection strings, Docker Compose files, `.env.example` templates,
+      Alembic migrations, TableForge/DataCleaner) checked clean — either
+      properly templated/env-driven or the known intentional demo accounts.
+- [x] **Removed the real account from both scripts — done 2026-09-18.**
+      `seed_dev.py` and `reset_passwords.py` both had `+918317390926` /
+      `superadmin@4991` hardcoded as a seed target. Root fix: a demo-seed
+      script should never own or reset a real person's credential at all —
+      removed the account from both scripts entirely (not just changed the
+      password, which would've just created a new exposed value). That
+      account's password now lives only in the database. `seed_dev.py` had a
+      `Demo Org`-exists fast-path gate that made this low-risk to deploy as
+      one-off; `reset_passwords.py` had **no gate at all** — it's a manual
+      "run this if login breaks" ops script, more dangerous of the two.
+      Verified: `grep -r superadmin@4991` across the repo now only matches
+      this tracking note, not code. Both scripts still syntax-check clean.
+- [ ] Scrub the old hardcoded values from git history (destructive — rewrites
+      history, needs a force-push; requires explicit go-ahead before doing this).
+- [ ] Remove/rotate any other seed scripts, dev env templates from the public
+      branch; decide public vs private + add explicit licence/SECURITY.md
+      (business decision, not mine to make).
+- [x] **App refuses to start on default JWT secret or open/unset CORS in what
+      looks like production — done + verified 2026-09-18.** No existing
+      `ENVIRONMENT` variable to key off, and adding one that prod's real `.env`
+      doesn't set would make the guard silently never fire — instead used a
+      signal that must already be correct in prod: `APP_URL` (required, used in
+      email links) is only ever `http://localhost:...` by default; any other
+      value is treated as "this is a real deployment." Guard lives in
+      `main.py`, before `app = FastAPI(...)` is even constructed. Verified all 4
+      cases directly (local-dev-nothing-set → passes; prod-looking + placeholder
+      JWT_SECRET → blocks; prod-looking + wildcard CORS → blocks; prod-looking +
+      real config → passes) via subprocess-isolated env vars, not mocks — see
+      `backend/tests/test_prod_config_guard.py`. **Flagged to the user:** if
+      prod's real `JWT_SECRET` somehow still is the placeholder (no way to check
+      from here), this guard will correctly block the *next* deploy until fixed
+      — very unlikely given the live app clearly works today, but worth knowing
+      before the next push.
+
+### 4. Marketing accuracy — `in-progress`
+- [x] Single canonical price list (₹0 / ₹7,999 / ₹12,999 / ₹24,999) — live-synced across
+      the marketing site this session (see `tasks/todo.md` pricing-sync entry).
+- [x] Fixed the exact ₹18,000/₹6,999 relics the audit named: `README.md`,
+      `SETUP_STATUS.txt`, `FIELDPULSE_GUIDE.html`, `fieldgovern-on-dataworx.html`.
+- [x] **Removed the self-scored 9.6/10 ranking — done 2026-09-18.**
+      `website/compare.html`'s "Overall ranking" table gave FieldGovern and 8
+      competitors fake-precision numeric scores (9.6, 9.0, 8.3...) with no stated
+      methodology — exactly what the audit named. Removed all 9 numeric scores,
+      kept the ordered ranking + qualitative "best for" reasoning (legitimate
+      editorial content), and replaced the closing note with an explicit
+      disclosure that this is FieldGovern's own comparison, not a third-party or
+      audited score.
+- [x] **Swept the clearest "DPDP-compliant" overclaims — done 2026-09-18, partial
+      by design.** Fixed ~15 instances across `index.html`, `pricing.html`,
+      `security.html`, `features.html` (a hard "DPDP 2023 Compliant" badge),
+      `commcare-alternative.html`, `kobotoolbox-alternative.html`,
+      `surveycto-alternative.html`, `odk-alternative.html`,
+      `survey-tool-for-ngos-india.html` — meta/og/twitter/schema descriptions,
+      one UI badge, and every FAQ answer that said an unqualified "Yes" to "is
+      FieldGovern DPDP compliant" (now: DPDP-aligned by design, compliance
+      depends on customer configuration, legal team should confirm). Two of
+      those FAQ fixes also quietly dropped **"tenant isolation" and "encryption
+      at rest"** as flat claims — neither is true yet (RLS built but not active
+      in prod per item 2; no disk/media encryption per item 10) — so those two
+      answers were doubly wrong, not just overclaiming the compliance label.
+      **Deliberately NOT touched, ~25 more instances found:** (a) blog posts
+      (`dpdp-act-2023-field-research.html`, `dpdp-consent-retention-checklist.html`,
+      `panel-study-india-guide.html`) use "DPDP-compliant consent screen/form" as
+      *educational guidance to the reader about their own forms* — not a
+      self-claim about FieldGovern; (b) the page `dpdp-compliant-survey-software.html`
+      and every link/nav-text pointing to it — its URL, `<title>`, and `<h1>` use
+      the phrase as a keyword-targeted category name; renaming that URL is an SEO
+      decision, not a wording fix, and out of scope here; (c)
+      `survey-tool-for-ngos-india.html:298` and `use-cases.html`'s two instances —
+      describe what donors/use-cases require as a category, not a FieldGovern
+      self-claim. Full list is reproducible: `grep -in "DPDP.compliant" website/**/*.html`.
+- [x] **Fixed tenant-isolation wording where found this pass** — see the two FAQ
+      answers above; the big compliance-mapping table on `dpdp-compliance.html`
+      still says "Implemented" for tenant isolation AND children's-data guardian
+      consent, neither of which is actually true yet (items 2 and 13).
+      **Explicit owner decision, 2026-09-18: do NOT touch this further.** Softening
+      more marketing copy right now would hurt positioning/ranking for gaps we're
+      actively closing anyway — the fix is to build items 2 and 13 for real (so
+      the claim becomes true), not to keep walking the copy back. Revisit this
+      specific table once those two items ship.
+
+---
+
+## P1 — before 13 May 2027 (DPDP core obligations)
+
+### 5. Notice builder — `todo`
+Itemised, versioned, all 22 scheduled languages, audio read-out option, shown before the
+first question. Must state: org name, data items, purpose, retention, sharing, how to
+withdraw, how to complain (grievance contact + Data Protection Board).
+
+### 6. Per-purpose consent — `todo`
+Separate consent items: survey answers / audio / photo / GPS / follow-up contact. Block
+the matching question types if refused. Store notice-version ID, language, consent items,
+timestamp, enumerator ID, device ID with each submission. Support oral consent +
+enumerator attestation (optional audio proof).
+
+### 7. Consent withdrawal — `todo`
+Respondent reference code (printed slip or SMS). Withdrawal as easy as giving consent —
+an admin action via the customer's grievance channel that stops processing and triggers
+erasure/anonymisation.
+
+### 8. Data-principal rights workflow — `todo`
+Log → verify identity → search respondent across all forms/waves → act (export/correct/
+erase) → close with audit record. SLA tracking (aim 30 days, outer limit 90 days per
+Rules) with overdue alerts. Machine-readable export. Nomination support (nominee acts if
+respondent dies/incapacitated).
+
+### 9. Erasure completeness — `todo`
+Current state: anonymisation of submissions exists. Gap: must also cover photos, audio,
+GPS, exports, Google Sheets copies, cached AI outputs, and backups (needs a backup-expiry
+policy so erased data eventually leaves backups too).
+
+### 10. Encryption at rest — `todo`
+Currently TLS + bcrypt only (no data-at-rest encryption described). Add: disk + object
+storage (photos/audio) + backup encryption via a managed key service in an Indian region;
+field-level (envelope) encryption for direct identifiers (name, phone, Aadhaar-like IDs,
+exact GPS) — never store full Aadhaar numbers. TLS 1.2+, HSTS, secure cookies, scheduled
+key/secret rotation + rotation on staff exit.
+
+### 11. Logs — `todo`
+Audit trail exists (append-only) but retention period + tamper-evidence not stated.
+Need: ≥1 year retention, hash-chained or write-once, stored in India; separate 180-day
+ICT log retention in India per CERT-In; NIC/NPL NTP clock sync; alerting on anomalies
+(mass export, off-hours access, repeated failed logins).
+
+### 12. Breach response — `todo`
+Written incident-response plan: roles, severity levels, contact lists. Timelines: CERT-In
+report ≤6h, customer notice ≤24h (so they can meet their own obligations), Board detailed
+report ≤72h. Pre-drafted notification templates, forensic log preservation, tabletop
+exercise twice a year.
+
+### 13. Children & vulnerable groups — `todo`
+Age-screening question at form start; guardian identity + consent required under 18.
+Flag and extra-protect child records: restrict access, disable AI processing by default,
+no photos without specific guardian consent. Guardian-consent option for persons with
+disability.
+
+### 14. Processor contract — `todo`
+Publish a DPA template, sub-processor list, and a deletion-certificate process for when a
+customer's contract ends.
+
+### 15. Device / offline security (PWA) — `todo`
+`navigator.storage.persist()` + quota check on start, warn on low/denied storage. Encrypt
+on-device submissions via Web Crypto keyed from an enumerator PIN; clear local copies
+after confirmed sync. Auto-lock after inactivity; server-side device de-registration so a
+lost phone can't sync/decrypt further. Visible "unsynced items" counter that blocks
+logout/cache-clear while unsynced. iOS Safari can evict storage — require Add-to-
+Home-Screen for iOS or recommend Android. Test matrix: low-end Android, multi-day
+offline, low storage, app kill, browser update, clock changes, interrupted sync, duplicate
+resubmission (note: duplicate-resubmission UX already has a guard — see `tasks/todo.md`
+"Resubmit cooldown" entry — reuse/extend rather than rebuild).
+
+### 16. Auth / access — `in-progress`
+- [x] **2FA (TOTP) — real UI shipped, done 2026-09-18.** Backend TOTP already
+      existed (`backend/app/api/routes/two_factor.py`: setup/verify/disable/
+      confirm, QR + secret, wired into `/auth/login` — none of this was new)
+      but had **zero frontend enrollment UI anywhere**, and the login page's
+      OTP step was wired for the wrong flow entirely (`LoginPage.tsx` always
+      called `/auth/verify-otp` — the separate tenant email-OTP endpoint —
+      never `/auth/2fa/confirm`, so a TOTP-enabled account could not actually
+      complete login through the UI). Fixed: `LoginPage.tsx` now branches on
+      `method: "totp"` vs the email-OTP shape and calls the right endpoint;
+      added a full 2FA section (QR enrollment, verify, disable) to
+      `UserProfile.tsx`'s existing Security card — role-agnostic, so it's
+      available to every role including `master_admin` (reachable via avatar
+      menu → My Profile, same path as the already-working Change Password).
+      Added `totp_enabled` to `GET /users/me` so the UI knows current state.
+      New `backend/tests/test_two_factor.py` (5 cases: setup→verify, login
+      challenge shape, confirm success/failure, disable) — collects and skips
+      cleanly (no test DB in this dev environment, matches existing test
+      convention) but **could not be run end-to-end here** (Docker Desktop not
+      running) — run `pytest tests/test_two_factor.py -v` with a test DB up
+      before trusting this fully, and do one manual browser QA pass (enable
+      2FA on a test account → log out → log back in with a real authenticator
+      code) before calling this `verified`. Still not *mandatory* — a user can
+      choose not to enable it; making it required for admins/supervisors is
+      the remaining sub-item below.
+- [ ] Make MFA mandatory for admins/supervisors (currently opt-in per user).
+- [ ] SSO (SAML/OIDC) for enterprise/government customers.
+- [ ] Short-lived access tokens + refresh-token rotation + server-side revocation;
+      session timeouts; login rate limiting + lockout.
+- [ ] Least-privilege roles including an analysis-only role without identifier
+      access. FieldGovern staff access to customer data only with customer
+      approval, time-limited, and logged.
+
+---
+
+## P1 / P2 — assurance
+
+### 17. Independent assurance — `todo`
+Annual penetration test by a CERT-In empanelled auditor (publish a summary letter).
+ISO/IEC 27001 (+27701 for privacy) within 12–18 months. SOC 2 Type II if selling to
+international funders.
+
+---
+
+## P2 — competitiveness / government readiness
+
+### 18. Government hosting readiness — `todo`
+Confirm current Mumbai hosting or move to a MeitY-empanelled cloud provider; be ready for
+STQC/tender-specific audits and GIGW/WCAG 2.1 AA accessibility.
+
+### 19. Secure development — `todo`
+Dependency/container/secret scanning + SAST in CI. Code review on every change. Separate
+dev/staging/prod with no real personal data outside prod. Publish `security.txt`
+vulnerability-disclosure policy.
+
+### 20. Legal & governance — `todo`
+Engage an Indian data-protection lawyer (role classification, DPA, privacy policy, terms,
+research-exemption position — do not market Section 17(2)(b) research exemption as a
+blanket cover). Publish a named Grievance Officer with contact + response timelines.
+Maintain a Record of Processing Activities. Run a DPIA on AI features + audio recording.
+Write internal policies (access control, incident response, retention, acceptable use,
+vendor management, secure development) and train staff.
+
+### 21. AI feature controls — `todo`
+Send only aggregated/pseudonymised data to models. Per-org opt-in with provider +
+processing-country disclosure; an "India-only" mode that disables foreign model calls.
+DPAs with model providers (no training on customer data, retention period confirmed,
+zero-data-retention where available). Label every AI output "AI-generated draft — verify
+before use," show the underlying table alongside it, never use AI output to decide about
+an individual respondent. Guard against prompt injection from respondent free-text. Log
+every model call (tenant, purpose, data categories, provider) without logging personal
+content.
+
+### 22. Sub-processors & integrations — `todo`
+Publish a full sub-processor list (hosting, AI providers, Google Sheets/Drive,
+WhatsApp/Meta, email, SMS, payment gateway, error tracking, analytics) with purpose +
+country. Notify customers before adding a new one, with a right to object. Treat Google
+Sheets sync as an export that leaves FieldGovern's control: warn admins, allow disabling
+per tenant, exclude identifier fields by default.
+
+### 23. Retention & deletion — `todo`
+Per-form retention setting with automatic deletion/anonymisation at expiry + a reminder
+before it happens. On contract end: data export, deletion within an agreed period, and a
+deletion certificate. Delete enumerator location traces once no longer needed for QC.
+
+### 24. Trust Centre page — `todo`
+Public page: security overview, sub-processor list, DPA, DPDP feature mapping, uptime
+status.
+
+### 25. Product roadmap (competitive gaps vs. the 17 other India-built platforms) — `todo`
+Longitudinal case management (Avni/SocialCops gap), XLSForm import/export (ODK-ecosystem
+migration), GIS layers/maps (TechCSR gap), indicator framework/logframe (Dhwani RIS/
+TolaData gap), CSR reporting templates (CSR-2/BRSR/SDG — iAmpact/Goodera gap),
+Dalgo/data-warehouse connector, native Android app, SSO/SCIM/on-premise option, full UI
+localisation (Hindi/Kannada/Telugu first), WCAG 2.1 AA / GIGW accessibility.
+
+---
+
+## Not tracked here (informational only, no action needed)
+- §3 Market landscape (18-platform comparison table) and §4.4 (FieldGovern vs. each
+  competitor) — reference material, re-derive from the source doc if needed for future
+  marketing copy, not an engineering task.
+- §9 Pre-launch DPDP readiness checklist and §10 "Questions buyers will ask" — these are
+  restatements of items 1–24 above in checklist/FAQ form; use them as the acceptance
+  criteria when closing out each numbered item, not as separate work.

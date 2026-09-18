@@ -1,0 +1,118 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+.env
+
+# Node
+node_modules/
+dist/
+.DS_Store
+*.local
+
+# Editor
+.vscode/
+.idea/
+
+# Env files (keep examples)
+.env
+.env.local
+!.env.example
+
+# Misc
+*.log
+.pytest_cache/
+
+# Sensitive — never commit real credentials
+credentials.csv
+export_credentials.py
+create_forms.py
+e2e_test.py
+TEST_CREDENTIALS.csv
+
+# Google OAuth credentials
+backend/credentials/
+credentials/
+
+# Claude Code local settings
+.claude/settings.local.json
+.claude/worktrees/
+
+# External tool sources (not part of FieldPulse)
+caveman-main/
+caveman-main.zip
+claude-mem-main/
+claude-mem-main.zip
+hermes-agent-main/
+hermes-agent-main.zip
+graphify-4/
+graphify-4.zip
+graphify-out/
+
+# SigMap — cold context (large, auto-generated; regenerate with: npx sigmap)
+.github/context-cold.md
+
+# Railway data backups
+backend/backups/
+
+# Graphify artifacts
+.graphify_ast.json
+.graphify_detect.json
+.graphify_python
+.graphify_uncached.txt
+.graphifyignore
+
+# Local logo source files (copied to website/assets/)
+1.png
+2.png
+
+# Separate sub-projects
+MiroFish/
+
+# Tools — runtime dirs (never commit)
+tools/tableforge/static/
+tools/tableforge/cache/
+tools/tableforge/exports/
+tools/tableforge/logs/
+tools/tableforge/parquet_cache/
+tools/tableforge/projects/
+tools/tableforge/__pycache__/
+tools/tableforge/backend/*.backup
+tools/tableforge/*.db
+tools/datacleaner/working_copies/
+tools/datacleaner/__pycache__/
+tools/datacleaner/*.pkl
+tools/datacleaner/*.db
+
+# Data analysis files
+*.xlsx
+# but the blank XLSForm starter template must ship with the app (download button)
+!frontend/public/FieldGovern_Form_Template.xlsx
+website/status.html
+
+# Customer deliverables / working drafts (not repo source)
+content-drafts/
+
+# Local archive (Railway configs + old tools, zipped for reference)
+_archive/
+_archive.zip
+deploy/monitor-config.json
+process_deployment.md
+.gstack/
+
+# Personal data — never commit (lead-gen / outreach / prospect intel)
+tools/INDEX.md
+tools/SNAPSHOT.md
+tools/data_store/
+tools/ngo_intel/
+tools/outreach/
+tools/prospect_intel/
+.claude/scheduled_tasks.lock
+
+# sigmap tool cache
+.context/
+
+# agent scratch notes
+MUNDER_DIFFLIN_AGENT_NOTES.md

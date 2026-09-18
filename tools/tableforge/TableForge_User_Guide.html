@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TableForge – Complete User Guide</title>
+  <style>
+    :root {
+      --gold: #f0c040;
+      --gold-light: #fde68a;
+      --dark: #0f1117;
+      --card: #1a1f2e;
+      --card2: #1e2535;
+      --border: #2a3047;
+      --text: #e2e8f0;
+      --text-dim: #94a3b8;
+      --primary: #3b82f6;
+      --primary-light: #60a5fa;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --purple: #a855f7;
+      --teal: #14b8a6;
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--dark);
+      color: var(--text);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    /* ── TOP NAV ── */
+    .topnav {
+      position: sticky; top: 0; z-index: 100;
+      background: linear-gradient(135deg, #0f1117 60%, #1a1f2e);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      display: flex; align-items: center; gap: 24px;
+      height: 56px; box-shadow: 0 2px 16px rgba(0,0,0,0.4);
+    }
+    .topnav .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .topnav .brand-icon {
+      width: 36px; height: 36px; background: var(--gold);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 900; color: #000;
+    }
+    .topnav .brand-name { font-size: 18px; font-weight: 700; color: var(--gold); }
+    .topnav nav { display: flex; gap: 4px; margin-left: auto; }
+    .topnav nav a {
+      color: var(--text-dim); text-decoration: none; font-size: 13px;
+      padding: 6px 12px; border-radius: 6px; transition: all 0.2s;
+    }
+    .topnav nav a:hover { background: var(--card2); color: var(--text); }
+
+    /* ── HERO ── */
+    .hero {
+      background: linear-gradient(135deg, #0f1117 0%, #1a1f2e 50%, #0f1117 100%);
+      padding: 72px 32px 56px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 60% at 50% 0%, rgba(240,192,64,0.08), transparent);
+      pointer-events: none;
+    }
+    .hero-icon {
+      width: 80px; height: 80px; background: linear-gradient(135deg, var(--gold), #e0a020);
+      border-radius: 20px; margin: 0 auto 24px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 44px; box-shadow: 0 8px 32px rgba(240,192,64,0.3);
+    }
+    .hero h1 { font-size: 42px; font-weight: 800; color: var(--gold); margin-bottom: 12px; }
+    .hero .tagline { font-size: 18px; color: var(--text-dim); max-width: 600px; margin: 0 auto 16px; }
+    .hero .author { font-size: 14px; color: var(--text-dim); }
+    .hero .author strong { color: var(--gold-light); }
+    .hero .version-badge {
+      display: inline-block; margin-top: 20px;
+      background: rgba(59,130,246,0.15); border: 1px solid var(--primary);
+      color: var(--primary-light); font-size: 12px; padding: 4px 14px;
+      border-radius: 20px; font-weight: 600;
+    }
+
+    /* ── LAYOUT ── */
+    .page { display: flex; max-width: 1280px; margin: 0 auto; }
+    .sidebar {
+      width: 260px; flex-shrink: 0;
+      position: sticky; top: 56px; height: calc(100vh - 56px);
+      overflow-y: auto; padding: 24px 16px;
+      border-right: 1px solid var(--border);
+    }
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    .sidebar h3 {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1.5px; color: var(--text-dim); margin: 20px 0 8px 8px;
+    }
+    .sidebar h3:first-child { margin-top: 0; }
+    .sidebar a {
+      display: flex; align-items: center; gap: 8px;
+      color: var(--text-dim); text-decoration: none;
+      font-size: 13px; padding: 7px 10px; border-radius: 7px;
+      transition: all 0.15s; margin-bottom: 1px;
+    }
+    .sidebar a:hover { background: var(--card2); color: var(--text); }
+    .sidebar a .icon { font-size: 14px; width: 18px; text-align: center; }
+    .content { flex: 1; padding: 40px 48px; min-width: 0; }
+
+    /* ── SECTIONS ── */
+    .section { margin-bottom: 56px; scroll-margin-top: 80px; }
+    .section-header {
+      display: flex; align-items: center; gap: 14px;
+      margin-bottom: 24px; padding-bottom: 16px;
+      border-bottom: 2px solid var(--border);
+    }
+    .section-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+    .icon-gold { background: rgba(240,192,64,0.15); }
+    .icon-blue { background: rgba(59,130,246,0.15); }
+    .icon-green { background: rgba(34,197,94,0.15); }
+    .icon-purple { background: rgba(168,85,247,0.15); }
+    .icon-amber { background: rgba(245,158,11,0.15); }
+    .icon-red { background: rgba(239,68,68,0.15); }
+    .icon-teal { background: rgba(20,184,166,0.15); }
+    .section-title { font-size: 26px; font-weight: 700; }
+
+    /* ── CARDS ── */
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .card:hover { border-color: var(--primary); box-shadow: 0 4px 20px rgba(59,130,246,0.1); }
+    .card-icon { font-size: 28px; margin-bottom: 10px; }
+    .card h4 { font-size: 15px; font-weight: 700; margin-bottom: 6px; color: var(--text); }
+    .card p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+
+    /* ── STEPS ── */
+    .steps { counter-reset: step; list-style: none; display: flex; flex-direction: column; gap: 14px; }
+    .steps li {
+      counter-increment: step;
+      display: flex; gap: 14px; align-items: flex-start;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 18px;
+    }
+    .steps li::before {
+      content: counter(step);
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--primary); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+    }
+    .steps li .step-content { flex: 1; }
+    .steps li .step-title { font-weight: 600; margin-bottom: 4px; }
+    .steps li .step-desc { font-size: 13px; color: var(--text-dim); }
+
+    /* ── TABLE ── */
+    .guide-table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 13px; }
+    .guide-table th {
+      background: var(--card2); padding: 10px 14px; text-align: left;
+      font-weight: 600; border-bottom: 2px solid var(--border);
+      color: var(--gold-light);
+    }
+    .guide-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); }
+    .guide-table tr:hover td { background: var(--card2); }
+
+    /* ── BADGES ── */
+    .badge {
+      display: inline-block; padding: 2px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .badge-blue { background: rgba(59,130,246,0.2); color: var(--primary-light); border: 1px solid rgba(59,130,246,0.3); }
+    .badge-green { background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+    .badge-amber { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
+    .badge-red { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+    .badge-purple { background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); }
+    .badge-teal { background: rgba(20,184,166,0.15); color: #2dd4bf; border: 1px solid rgba(20,184,166,0.3); }
+
+    /* ── KEYBOARD SHORTCUTS ── */
+    kbd {
+      display: inline-block; background: var(--card2); border: 1px solid var(--border);
+      border-radius: 5px; padding: 2px 8px; font-size: 12px; font-family: monospace;
+      color: var(--gold-light); box-shadow: 0 2px 0 var(--border);
+    }
+
+    /* ── TIPS ── */
+    .tip {
+      display: flex; gap: 12px; align-items: flex-start;
+      background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.25);
+      border-radius: var(--radius); padding: 14px 16px; margin: 16px 0;
+    }
+    .tip.warn { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.3); }
+    .tip.success { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.3); }
+    .tip .tip-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    .tip .tip-text { font-size: 13px; color: var(--text-dim); }
+    .tip .tip-text strong { color: var(--text); }
+
+    /* ── CODE ── */
+    code {
+      background: var(--card2); padding: 2px 7px; border-radius: 4px;
+      font-size: 12px; font-family: 'Consolas', monospace; color: var(--gold-light);
+    }
+
+    /* ── FEATURE LIST ── */
+    .feature-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .feature-list li {
+      display: flex; gap: 10px; align-items: flex-start;
+      font-size: 14px; color: var(--text-dim);
+    }
+    .feature-list li::before { content: '✓'; color: var(--green); font-weight: 700; flex-shrink: 0; }
+    .feature-list li strong { color: var(--text); }
+
+    /* ── ZONE BADGES ── */
+    .zone { display: inline-flex; align-items: center; gap: 4px; }
+    .zone-r { color: #60a5fa; font-weight: 700; }
+    .zone-c { color: #fbbf24; font-weight: 700; }
+    .zone-v { color: #f87171; font-weight: 700; }
+
+    /* ── DIVIDER ── */
+    hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center; padding: 40px 32px;
+      border-top: 1px solid var(--border);
+      color: var(--text-dim); font-size: 13px;
+    }
+    footer strong { color: var(--gold); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .content { padding: 24px 20px; }
+      .hero h1 { font-size: 28px; }
+      .card-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<div class="topnav">
+  <a class="brand" href="#">
+    <div class="brand-icon">🦁</div>
+    <span class="brand-name">TableForge</span>
+  </a>
+  <nav>
+    <a href="#getting-started">Get Started</a>
+    <a href="#ribbon">Ribbon</a>
+    <a href="#tables">Tables</a>
+    <a href="#format">Format</a>
+    <a href="#charts">Charts</a>
+    <a href="#stats">Statistics</a>
+    <a href="#export">Export</a>
+    <a href="#shortcuts">Shortcuts</a>
+  </nav>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-icon">🦁</div>
+  <h1>TableForge</h1>
+  <p class="tagline">Desktop Tabulation & Analytics Workbench — Complete User Guide</p>
+  <p class="author">Developed by <strong>Pavankumar Deshetty</strong> · +91 83173 90926</p>
+  <span class="version-badge">Version 2.0 · Complete Feature Reference</span>
+</div>
+
+<div class="page">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <h3>Getting Started</h3>
+  <a href="#getting-started"><span class="icon">🚀</span> Quick Start</a>
+  <a href="#interface"><span class="icon">🖥️</span> Interface Overview</a>
+  <a href="#import"><span class="icon">📂</span> Importing Data</a>
+
+  <h3>Core Features</h3>
+  <a href="#tables"><span class="icon">📊</span> Building Tables</a>
+  <a href="#drop-zones"><span class="icon">🎯</span> Drop Zones</a>
+  <a href="#aggregation"><span class="icon">∑</span> Aggregation</a>
+  <a href="#show-as"><span class="icon">%</span> Show Values As</a>
+
+  <h3>Ribbon Tabs</h3>
+  <a href="#ribbon-home"><span class="icon">🏠</span> Home</a>
+  <a href="#ribbon-insert"><span class="icon">➕</span> Insert</a>
+  <a href="#ribbon-data"><span class="icon">🗄️</span> Data</a>
+  <a href="#ribbon-statistics"><span class="icon">📈</span> Statistics</a>
+  <a href="#ribbon-format"><span class="icon">🎨</span> Format</a>
+  <a href="#ribbon-view"><span class="icon">👁️</span> View</a>
+
+  <h3>Panels & Tools</h3>
+  <a href="#source-panel"><span class="icon">📋</span> Source Panel</a>
+  <a href="#format"><span class="icon">🎨</span> Format Panel</a>
+  <a href="#filter"><span class="icon">🔍</span> Filters</a>
+  <a href="#charts"><span class="icon">📉</span> Chart Builder</a>
+  <a href="#stats"><span class="icon">🧮</span> Statistical Tests</a>
+
+  <h3>Advanced</h3>
+  <a href="#metrics"><span class="icon">⚡</span> Custom Metrics</a>
+  <a href="#bins"><span class="icon">📦</span> Bin Creator</a>
+  <a href="#annotations"><span class="icon">📝</span> Annotations</a>
+  <a href="#export"><span class="icon">💾</span> Export</a>
+  <a href="#projects"><span class="icon">🗂️</span> Projects</a>
+  <a href="#shortcuts"><span class="icon">⌨️</span> Shortcuts</a>
+</aside>
+
+<!-- MAIN CONTENT -->
+<main class="content">
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: GETTING STARTED -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="getting-started">
+    <div class="section-header">
+      <div class="section-icon icon-gold">🚀</div>
+      <h2 class="section-title">Getting Started</h2>
+    </div>
+
+    <p style="color:var(--text-dim); margin-bottom:24px;">TableForge is a desktop analytics workbench that turns raw Excel or CSV data into publication-ready pivot tables, statistical reports, and charts — all without writing any code.</p>
+
+    <ol class="steps">
+      <li>
+        <div class="step-content">
+          <div class="step-title">Launch the Application</div>
+          <div class="step-desc">Run <code>python launcher.py</code> from the <code>C:\DCT\tableforge\</code> folder. This starts both the backend (port 8000) and frontend (port 5173) servers automatically. Your browser opens TableForge.</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-content">
+          <div class="step-title">Import Your Data File</div>
+          <div class="step-desc">Click <strong>Import Excel or CSV File</strong> on the welcome screen, or drag-and-drop your file. Supported formats: <code>.xlsx</code> <code>.xls</code> <code>.csv</code> <code>.tsv</code></div>
+        </div>
+      </li>
+      <li>
+        <div class="step-content">
+          <div class="step-title">Drag Columns into Zones</div>
+          <div class="step-desc">From the <strong>Source Panel</strong> on the left, drag column names into the <span class="zone-r">Rows</span>, <span class="zone-c">Columns</span>, or <span class="zone-v">Values</span> drop zones.</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-content">
+          <div class="step-title">Your Table Appears Instantly</div>
+          <div class="step-desc">The pivot table is automatically generated and appears in the <strong>Live Preview</strong> panel. Any change you make is reflected immediately.</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-content">
+          <div class="step-title">Format, Analyze & Export</div>
+          <div class="step-desc">Use the ribbon tabs to apply themes, run statistical tests, build charts, and export to Excel, CSV, or PDF.</div>
+        </div>
+      </li>
+    </ol>
+
+    <div class="tip success">
+      <div class="tip-icon">💡</div>
+      <div class="tip-text"><strong>Tip:</strong> You can import multiple sheets from an Excel file. TableForge will ask which sheet to use and shows a data preview before building any table.</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: INTERFACE OVERVIEW -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="interface">
+    <div class="section-header">
+      <div class="section-icon icon-blue">🖥️</div>
+      <h2 class="section-title">Interface Overview</h2>
+    </div>
+
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-icon">📌</div>
+        <h4>Top Bar</h4>
+        <p>Brand logo, file import button, and ribbon tab navigation (Home, Insert, Data, Statistics, Format, View). Also has light/dark table theme toggle.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🎛️</div>
+        <h4>Ribbon Bar</h4>
+        <p>Context-sensitive toolbar that changes based on the active ribbon tab. Contains buttons for all major actions like Totals, Filters, Sort, Export, etc.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📋</div>
+        <h4>Source Panel (Left)</h4>
+        <p>Lists all columns in your dataset. Search columns, view which are "IN TABLE" with zone badges (R/C/V), and drag columns into zones.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🎯</div>
+        <h4>Drop Zones (Center-Left)</h4>
+        <p>Three zones: Rows, Columns, Values. Drag columns here to build your pivot table. Reorder by dragging within a zone.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📊</div>
+        <h4>Live Preview (Center-Right)</h4>
+        <p>Real-time pivot table view. Supports sorting, filtering, zooming, annotations, keyboard navigation, and drill-down.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🎨</div>
+        <h4>Format Panel (Right)</h4>
+        <p>Slide-out panel for themes, fonts, borders, colors, and all visual formatting. Open via Format tab or the ribbon Format button.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🗂️</div>
+        <h4>Table Tabs (Bottom)</h4>
+        <p>Each table is a tab at the bottom. Create multiple tables from the same dataset. Right-click a tab to duplicate or delete.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📟</div>
+        <h4>Status Bar</h4>
+        <p>Shows dataset name, row count, active table result count, and keyboard shortcut hints. Located at the very bottom.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: IMPORTING DATA -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="import">
+    <div class="section-header">
+      <div class="section-icon icon-green">📂</div>
+      <h2 class="section-title">Importing Data</h2>
+    </div>
+
+    <table class="guide-table">
+      <thead><tr><th>Format</th><th>Extension</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Excel Workbook</td><td><code>.xlsx</code> <code>.xls</code></td><td>Multi-sheet support — select sheet on import</td></tr>
+        <tr><td>Comma Separated</td><td><code>.csv</code></td><td>Auto-detects delimiter and encoding</td></tr>
+        <tr><td>Tab Separated</td><td><code>.tsv</code></td><td>Treated same as CSV</td></tr>
+      </tbody>
+    </table>
+
+    <div class="tip">
+      <div class="tip-icon">📌</div>
+      <div class="tip-text"><strong>Data Preview:</strong> After importing, click <strong>Data → Data Preview</strong> in the ribbon to browse the raw data, check data types, and verify column names before building tables.</div>
+    </div>
+
+    <div class="tip warn">
+      <div class="tip-icon">⚠️</div>
+      <div class="tip-text"><strong>Refresh Dataset:</strong> If you update your source file, use <strong>Data → Refresh Dataset</strong> to reload the latest data without losing your table configurations.</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: BUILDING TABLES -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="tables">
+    <div class="section-header">
+      <div class="section-icon icon-blue">📊</div>
+      <h2 class="section-title">Building Tables</h2>
+    </div>
+
+    <section id="drop-zones" style="margin-bottom:32px;">
+      <h3 style="font-size:19px; margin-bottom:16px; color:var(--gold-light);">Drop Zones</h3>
+      <p style="color:var(--text-dim); margin-bottom:16px;">The three drop zones are the heart of TableForge. Think of them like an Excel PivotTable field list.</p>
+
+      <table class="guide-table">
+        <thead><tr><th>Zone</th><th>Badge</th><th>Purpose</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Rows</strong></td>
+            <td><span class="badge badge-blue">R</span></td>
+            <td>Categorical groups down the left side</td>
+            <td>State, Gender, Department</td>
+          </tr>
+          <tr>
+            <td><strong>Columns</strong></td>
+            <td><span class="badge badge-amber">C</span></td>
+            <td>Categorical groups across the top</td>
+            <td>Year, Quarter, Category</td>
+          </tr>
+          <tr>
+            <td><strong>Values</strong></td>
+            <td><span class="badge badge-red">V</span></td>
+            <td>Numeric measures to summarize</td>
+            <td>Sales, Count, Revenue</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="tip">
+        <div class="tip-icon">🔄</div>
+        <div class="tip-text"><strong>Reorder:</strong> Drag items within a zone to reorder them. Drag them out to remove. Multiple fields in Rows creates hierarchical sub-groups.</div>
+      </div>
+    </section>
+
+    <section id="aggregation" style="margin-bottom:32px;">
+      <h3 style="font-size:19px; margin-bottom:16px; color:var(--gold-light);">Aggregation (Summarize By)</h3>
+      <p style="color:var(--text-dim); margin-bottom:16px;">Click on any field in the Values zone to choose how it is summarized:</p>
+
+      <table class="guide-table">
+        <thead><tr><th>Function</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>Count</code></td><td>Number of non-null values</td></tr>
+          <tr><td><code>Sum</code></td><td>Total of all values</td></tr>
+          <tr><td><code>Mean</code></td><td>Average (arithmetic mean)</td></tr>
+          <tr><td><code>Median</code></td><td>Middle value</td></tr>
+          <tr><td><code>Min</code></td><td>Smallest value</td></tr>
+          <tr><td><code>Max</code></td><td>Largest value</td></tr>
+          <tr><td><code>Std</code></td><td>Standard deviation</td></tr>
+          <tr><td><code>Var</code></td><td>Variance</td></tr>
+          <tr><td><code>% of Total</code></td><td>Each cell as % of grand total</td></tr>
+          <tr><td><code>% of Row</code></td><td>Each cell as % of its row total</td></tr>
+          <tr><td><code>% of Column</code></td><td>Each cell as % of its column total</td></tr>
+          <tr><td><code>Combo (Count + %)</code></td><td>Shows count on line 1, percentage on line 2 in parentheses</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="show-as">
+      <h3 style="font-size:19px; margin-bottom:16px; color:var(--gold-light);">Show Values As (Running Calculations)</h3>
+      <p style="color:var(--text-dim); margin-bottom:16px;">Additional display transformations applied after aggregation:</p>
+      <ul class="feature-list">
+        <li><strong>None</strong> — raw aggregated value</li>
+        <li><strong>% of Grand Total</strong> — cell ÷ overall total</li>
+        <li><strong>% of Row Total</strong> — cell ÷ row total</li>
+        <li><strong>% of Column Total</strong> — cell ÷ column total</li>
+        <li><strong>Running Total</strong> — cumulative sum across rows</li>
+        <li><strong>Rank</strong> — rank of each value (1 = highest)</li>
+      </ul>
+    </section>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: RIBBON — HOME -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="ribbon-home">
+    <div class="section-header">
+      <div class="section-icon icon-gold">🏠</div>
+      <h2 class="section-title">Ribbon — Home Tab</h2>
+    </div>
+
+    <table class="guide-table">
+      <thead><tr><th>Button</th><th>Group</th><th>What It Does</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Import</strong></td><td>File</td><td>Open a new Excel or CSV file</td></tr>
+        <tr><td><strong>Save</strong></td><td>File</td><td>Save the current project state (<kbd>Ctrl+S</kbd>)</td></tr>
+        <tr><td><strong>Export</strong></td><td>File</td><td>Export current table to Excel/CSV/PDF (<kbd>Ctrl+E</kbd>)</td></tr>
+        <tr><td><strong>Undo</strong></td><td>Edit</td><td>Undo last table change (<kbd>Ctrl+Z</kbd>)</td></tr>
+        <tr><td><strong>Redo</strong></td><td>Edit</td><td>Redo undone change (<kbd>Ctrl+Y</kbd>)</td></tr>
+        <tr><td><strong>Duplicate</strong></td><td>Edit</td><td>Create a copy of the current table with all formatting preserved</td></tr>
+        <tr><td><strong>Totals</strong></td><td>Table</td><td>Toggle grand total row on/off</td></tr>
+        <tr><td><strong>Subtotals</strong></td><td>Table</td><td>Toggle subtotal rows for each group</td></tr>
+        <tr><td><strong>Transpose</strong></td><td>Table</td><td>Swap rows and columns</td></tr>
+        <tr><td><strong>Sort A–Z / Z–A</strong></td><td>Sort & Filter</td><td>Sort rows alphabetically or by value</td></tr>
+        <tr><td><strong>Filters</strong></td><td>Sort & Filter</td><td>Open the filter panel to restrict data</td></tr>
+        <tr><td><strong>2 Dec</strong></td><td>Number</td><td>Set decimal places for value cells (0–6)</td></tr>
+        <tr><td><strong>Empty Cells</strong></td><td>Number</td><td>What to show for missing data: Blank, 0, N/A, –</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: RIBBON — INSERT -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="ribbon-insert">
+    <div class="section-header">
+      <div class="section-icon icon-green">➕</div>
+      <h2 class="section-title">Ribbon — Insert Tab</h2>
+    </div>
+
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-icon">📊</div>
+        <h4>New Table</h4>
+        <p>Add a blank table tab. Each table is independent — different rows, columns, values, and formatting.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📉</div>
+        <h4>Chart Builder</h4>
+        <p>Open the chart builder to visualize the current table as Bar, Line, Pie, Stacked, Grouped, Waterfall, or Combo chart.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <h4>Custom Metric</h4>
+        <p>Create a calculated column using a formula — e.g., <code>Revenue / Count</code>. Saved as a virtual column in the source panel.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📦</div>
+        <h4>Bin / Group</h4>
+        <p>Group a numeric column into ranges — e.g., Age: 0–18, 19–35, 36–60, 60+. Appears as a new grouping column.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📝</div>
+        <h4>Annotations</h4>
+        <p>Right-click any table cell to add a sticky note annotation visible in the table and in exports.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🏷️</div>
+        <h4>Table Title</h4>
+        <p>Set a custom title and subtitle for the current table. Auto-generated from row/column/value config or manually overridden.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: RIBBON — DATA -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="ribbon-data">
+    <div class="section-header">
+      <div class="section-icon icon-teal">🗄️</div>
+      <h2 class="section-title">Ribbon — Data Tab</h2>
+    </div>
+
+    <table class="guide-table">
+      <thead><tr><th>Button</th><th>What It Does</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Data Preview</strong></td><td>Browse raw imported data — check values, data types, row count</td></tr>
+        <tr><td><strong>Refresh Dataset</strong></td><td>Reload the source file — picks up changes you made to the Excel file</td></tr>
+        <tr><td><strong>Data Quality</strong></td><td>Scan for missing values, outliers, duplicates, and data type mismatches</td></tr>
+        <tr><td><strong>Filter Panel</strong></td><td>Filter which rows are included in tabulation — supports text, numeric range, date range filters</td></tr>
+        <tr><td><strong>Date Grouping</strong></td><td>Group date columns by Year, Quarter, Month, Week, Day automatically</td></tr>
+        <tr><td><strong>Metric Library</strong></td><td>Browse and reuse saved custom metrics across tables</td></tr>
+      </tbody>
+    </table>
+
+    <section id="filter" style="margin-top:24px;">
+      <h3 style="font-size:17px; margin-bottom:12px; color:var(--gold-light);">Filter Panel</h3>
+      <p style="color:var(--text-dim); margin-bottom:12px;">Filters restrict which source rows are used in tabulation. They do not modify your original data.</p>
+      <ul class="feature-list">
+        <li><strong>Text filter</strong> — include/exclude specific category values</li>
+        <li><strong>Numeric range</strong> — e.g., only rows where Age &gt; 18</li>
+        <li><strong>Date range</strong> — filter by start and end date</li>
+        <li>Multiple filters stack (AND logic)</li>
+        <li>Filters are saved per-table — different tables can have different filters</li>
+      </ul>
+    </section>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: RIBBON — STATISTICS -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="ribbon-statistics">
+    <div class="section-header">
+      <div class="section-icon icon-purple">📈</div>
+      <h2 class="section-title">Ribbon — Statistics Tab</h2>
+    </div>
+
+    <p style="color:var(--text-dim); margin-bottom:20px;">Run advanced statistical analyses on your dataset directly from TableForge — no SPSS or R required.</p>
+
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-icon">📊</div>
+        <h4>Descriptive Statistics</h4>
+        <p>Mean, median, mode, std dev, variance, skewness, kurtosis, quartiles for all numeric columns.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔗</div>
+        <h4>Correlation Matrix</h4>
+        <p>Pearson/Spearman correlation coefficients between numeric variables. Color-coded heatmap display.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔀</div>
+        <h4>Cross-tabulation</h4>
+        <p>Chi-square test of independence between two categorical variables with expected frequencies.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">⚖️</div>
+        <h4>T-Test</h4>
+        <p>Independent samples and paired t-test. Select group variable and value variable. Shows p-value and significance.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🧪</div>
+        <h4>ANOVA</h4>
+        <p>One-way analysis of variance across multiple groups. F-statistic, p-value, and post-hoc comparisons.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📉</div>
+        <h4>Regression</h4>
+        <p>Simple and multiple linear regression. R², coefficients, p-values, and residual analysis.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📐</div>
+        <h4>Normality Tests</h4>
+        <p>Shapiro-Wilk and Kolmogorov-Smirnov tests. Helps decide which statistical tests are appropriate.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔎</div>
+        <h4>Outlier Detection</h4>
+        <p>IQR method and Z-score method to identify outlier rows in numeric columns.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📋</div>
+        <h4>Frequency Table</h4>
+        <p>Value counts, cumulative frequency, and percentage distribution for categorical columns.</p>
+      </div>
+    </div>
+
+    <div class="tip">
+      <div class="tip-icon">📌</div>
+      <div class="tip-text"><strong>Export Stats:</strong> Statistical test results can be copied or exported along with your main tables for inclusion in reports.</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: RIBBON — FORMAT -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="ribbon-format">
+    <div class="section-header">
+      <div class="section-icon icon-amber">🎨</div>
+      <h2 class="section-title">Ribbon — Format Tab</h2>
+    </div>
+    <p style="color:var(--text-dim); margin-bottom:16px;">Opens the <strong>Format Panel</strong> on the right side. Contains 3 tabs: <strong>Appearance</strong>, <strong>Content</strong>, <strong>Advanced</strong>.</p>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: RIBBON — VIEW -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="ribbon-view">
+    <div class="section-header">
+      <div class="section-icon icon-teal">👁️</div>
+      <h2 class="section-title">Ribbon — View Tab</h2>
+    </div>
+
+    <table class="guide-table">
+      <thead><tr><th>Button</th><th>What It Does</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Zoom In / Zoom Out</strong></td><td>Scale the table view larger or smaller without changing actual font size</td></tr>
+        <tr><td><strong>Freeze Columns</strong></td><td>Freeze the first N row-label columns so they stay visible while scrolling right</td></tr>
+        <tr><td><strong>Wrap Headers</strong></td><td>Allow long column headers to wrap to multiple lines instead of truncating</td></tr>
+        <tr><td><strong>Summary Dashboard</strong></td><td>Shows an overview of all tables in the project side by side</td></tr>
+        <tr><td><strong>Table Comparison</strong></td><td>Compare two different tables from the project side by side</td></tr>
+        <tr><td><strong>Light/Dark Table</strong></td><td>Toggle the table area between light and dark mode — does not affect the rest of the UI</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: SOURCE PANEL -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="source-panel">
+    <div class="section-header">
+      <div class="section-icon icon-blue">📋</div>
+      <h2 class="section-title">Source Panel</h2>
+    </div>
+
+    <p style="color:var(--text-dim); margin-bottom:16px;">The Source Panel on the left side lists all columns from your dataset.</p>
+
+    <ul class="feature-list">
+      <li><strong>Search box</strong> — type to filter columns by name. Matching text is highlighted in yellow.</li>
+      <li><strong>IN TABLE section</strong> — shows only columns currently used in the active table, with zone badges <span class="badge badge-blue">R</span> <span class="badge badge-amber">C</span> <span class="badge badge-red">V</span></li>
+      <li><strong>Drag to drop zones</strong> — drag any column to the Rows, Columns, or Values zone</li>
+      <li><strong>Multi-select</strong> — hold Shift or Ctrl to select multiple columns and drop them all at once</li>
+      <li><strong>Column type icons</strong> — <code>123</code> for numeric, <code>Abc</code> for text, <code>📅</code> for date columns</li>
+      <li><strong>Custom columns</strong> — metrics and bins you create also appear here</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: FORMAT PANEL -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="format">
+    <div class="section-header">
+      <div class="section-icon icon-amber">🎨</div>
+      <h2 class="section-title">Format Panel</h2>
+    </div>
+
+    <p style="color:var(--text-dim); margin-bottom:20px;">Open via <strong>Format tab → Open Format Panel</strong>. Three tabs give you full control over table appearance.</p>
+
+    <h3 style="font-size:17px; margin-bottom:12px; color:var(--gold-light);">Tab 1 — Appearance</h3>
+    <ul class="feature-list" style="margin-bottom:24px;">
+      <li><strong>Theme Presets</strong> — choose from Default (dark), Corporate Blue, Minimal B&W, Financial, Government, Teal. Selecting a preset resets all custom colors.</li>
+      <li><strong>Font Family</strong> — choose from Times New Roman (default), Arial, Calibri, Georgia, and more</li>
+      <li><strong>Font Size</strong> — default is 12pt for table content</li>
+      <li><strong>Bold / Italic</strong> — toggle for title text</li>
+      <li><strong>Border Style</strong> — None, Thin, Medium, Thick, Booktabs</li>
+      <li><strong>Zebra Stripes</strong> — alternating row background colors for readability</li>
+    </ul>
+
+    <h3 style="font-size:17px; margin-bottom:12px; color:var(--gold-light);">Tab 2 — Content</h3>
+    <ul class="feature-list" style="margin-bottom:24px;">
+      <li><strong>Background Colors</strong> — set separate colors for: Header Row, Row Labels, Values Area, Grand Total Row, Header Text</li>
+      <li><strong>Conditional Formatting</strong> — color cells based on value thresholds (e.g., values &gt; 1000 show in green)</li>
+      <li><strong>Heatmap</strong> — gradient color scale across all value cells (lowest=blue, highest=red)</li>
+      <li><strong>Header Renames</strong> — rename any column header without changing source data</li>
+      <li><strong>Table Number</strong> — auto-number tables (Table 1, Table 2 …) with custom prefix</li>
+      <li><strong>Footnote</strong> — add a footnote text below the table</li>
+    </ul>
+
+    <h3 style="font-size:17px; margin-bottom:12px; color:var(--gold-light);">Tab 3 — Advanced</h3>
+    <ul class="feature-list">
+      <li><strong>Serial Numbers</strong> — add row numbers (continuous or per-group)</li>
+      <li><strong>Freeze Columns</strong> — keep row label columns sticky when scrolling</li>
+      <li><strong>Wrap Headers</strong> — allow long headers to wrap to 2 lines</li>
+      <li><strong>Custom Column Groups</strong> — group multiple columns under a single spanning header</li>
+      <li><strong>Title Bold / Italic</strong> — style the table title text</li>
+    </ul>
+
+    <div class="tip warn">
+      <div class="tip-icon">⚠️</div>
+      <div class="tip-text"><strong>Resetting Colors:</strong> Selecting a new theme preset automatically clears all manually set colors. The theme's default colors take over. To keep custom colors, do not click a theme preset.</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: CHART BUILDER -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="charts">
+    <div class="section-header">
+      <div class="section-icon icon-purple">📉</div>
+      <h2 class="section-title">Chart Builder</h2>
+    </div>
+
+    <p style="color:var(--text-dim); margin-bottom:20px;">Open via <strong>Insert → Chart Builder</strong>. Visualize your current table data as various chart types.</p>
+
+    <h3 style="font-size:17px; margin-bottom:12px; color:var(--gold-light);">Chart Types</h3>
+    <table class="guide-table" style="margin-bottom:24px;">
+      <thead><tr><th>Type</th><th>Best For</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Bar</strong></td><td>Comparing values across categories</td></tr>
+        <tr><td><strong>Grouped Bar</strong></td><td>Multiple series side by side</td></tr>
+        <tr><td><strong>Stacked Bar</strong></td><td>Part-to-whole composition</td></tr>
+        <tr><td><strong>Line</strong></td><td>Trends over time or ordered categories</td></tr>
+        <tr><td><strong>Pie</strong></td><td>Proportional share of a whole (best with &lt;6 slices)</td></tr>
+        <tr><td><strong>Waterfall</strong></td><td>Cumulative change — additions and subtractions</td></tr>
+        <tr><td><strong>Combo</strong></td><td>Bar + Line on the same chart (dual purpose)</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="font-size:17px; margin-bottom:12px; color:var(--gold-light);">Customization Options</h3>
+    <ul class="feature-list" style="margin-bottom:24px;">
+      <li><strong>X-axis field</strong> — choose which column becomes the horizontal axis</li>
+      <li><strong>Multiple Y-axis fields</strong> — select multiple value columns as separate series</li>
+      <li><strong>Color Palette</strong> — 6 palettes: Default, Warm, Cool, Pastel, High Contrast, Corporate</li>
+      <li><strong>Legend position</strong> — Right, Bottom, Top, or Hidden</li>
+      <li><strong>Custom axis labels</strong> — override X and Y axis titles</li>
+      <li><strong>Font size controls</strong> — label size and chart title size</li>
+      <li><strong>Bar opacity</strong> — 10%–100% transparency slider</li>
+      <li><strong>Bar entry animation</strong> — animated bars when chart loads</li>
+      <li><strong>PNG Export</strong> — download the chart as a high-quality PNG image</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: STATISTICAL TESTS -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="stats">
+    <div class="section-header">
+      <div class="section-icon icon-purple">🧮</div>
+      <h2 class="section-title">Statistical Tests — Detailed Guide</h2>
+    </div>
+
+    <table class="guide-table">
+      <thead><tr><th>Test</th><th>When to Use</th><th>Output</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Descriptive Stats</strong></td>
+          <td>Always — first step to understand your data</td>
+          <td>Mean, Median, SD, Min, Max, Quartiles, Skewness</td>
+        </tr>
+        <tr>
+          <td><strong>Normality Test</strong></td>
+          <td>Before running t-tests or ANOVA — checks if data is normally distributed</td>
+          <td>Shapiro-Wilk W, p-value, pass/fail interpretation</td>
+        </tr>
+        <tr>
+          <td><strong>T-Test</strong></td>
+          <td>Compare means of two groups (e.g., Male vs Female income)</td>
+          <td>t-statistic, p-value, significance stars (*, **, ***)</td>
+        </tr>
+        <tr>
+          <td><strong>ANOVA</strong></td>
+          <td>Compare means across 3+ groups (e.g., regional sales)</td>
+          <td>F-statistic, p-value, between/within group variance</td>
+        </tr>
+        <tr>
+          <td><strong>Correlation</strong></td>
+          <td>Measure linear relationship between two numeric variables</td>
+          <td>Correlation matrix, coefficient values (–1 to +1)</td>
+        </tr>
+        <tr>
+          <td><strong>Regression</strong></td>
+          <td>Predict one variable from others</td>
+          <td>R², coefficients, standard errors, p-values</td>
+        </tr>
+        <tr>
+          <td><strong>Cross-tab / Chi-Square</strong></td>
+          <td>Test independence between two categorical variables</td>
+          <td>Chi-square statistic, p-value, expected frequencies</td>
+        </tr>
+        <tr>
+          <td><strong>Outlier Detection</strong></td>
+          <td>Find extreme values that may skew analysis</td>
+          <td>List of outlier rows with Z-scores or IQR distance</td>
+        </tr>
+        <tr>
+          <td><strong>Frequency Table</strong></td>
+          <td>Summarize a categorical variable's distribution</td>
+          <td>Count, cumulative count, %, cumulative %</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: CUSTOM METRICS -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="metrics">
+    <div class="section-header">
+      <div class="section-icon icon-green">⚡</div>
+      <h2 class="section-title">Custom Metrics</h2>
+    </div>
+
+    <p style="color:var(--text-dim); margin-bottom:16px;">Create calculated columns from formulas. Access via <strong>Insert → Custom Metric</strong>.</p>
+
+    <ol class="steps">
+      <li>
+        <div class="step-content">
+          <div class="step-title">Click "Insert → Custom Metric"</div>
+          <div class="step-desc">Opens the Metric Builder dialog.</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-content">
+          <div class="step-title">Name your metric</div>
+          <div class="step-desc">Give it a meaningful name like "Revenue Per Person" or "Conversion Rate".</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-content">
+          <div class="step-title">Write the formula</div>
+          <div class="step-desc">Use column names in the formula: e.g., <code>Revenue / Headcount</code> or <code>(Sales - Cost) / Sales * 100</code>. Supports +, –, *, /, parentheses, and basic math functions.</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-content">
+          <div class="step-title">Save and use</div>
+          <div class="step-desc">The new metric appears in the Source Panel. Drag it to Values like any other column.</div>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: BIN CREATOR -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="bins">
+    <div class="section-header">
+      <div class="section-icon icon-amber">📦</div>
+      <h2 class="section-title">Bin Creator (Group Ranges)</h2>
+    </div>
+
+    <p style="color:var(--text-dim); margin-bottom:16px;">Group a continuous numeric column into ranges. Access via <strong>Insert → Bin / Group</strong>.</p>
+
+    <table class="guide-table">
+      <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Column</strong></td><td>The numeric column to group (e.g., Age, Income)</td></tr>
+        <tr><td><strong>Bin Width</strong></td><td>Fixed interval — e.g., 10 creates bins 0–9, 10–19, 20–29…</td></tr>
+        <tr><td><strong>Custom Breaks</strong></td><td>Define your own boundaries — e.g., 0, 18, 35, 60, 100</td></tr>
+        <tr><td><strong>Label Style</strong></td><td>How labels appear — e.g., "18–34" or "18 to 34" or "18–34 years"</td></tr>
+      </tbody>
+    </table>
+
+    <div class="tip">
+      <div class="tip-icon">💡</div>
+      <div class="tip-text">Binned columns appear in the Source Panel with a <code>📦</code> icon. Drag them into Rows or Columns just like any other column.</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: ANNOTATIONS -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="annotations">
+    <div class="section-header">
+      <div class="section-icon icon-amber">📝</div>
+      <h2 class="section-title">Cell Annotations</h2>
+    </div>
+
+    <p style="color:var(--text-dim); margin-bottom:16px;">Add sticky-note style comments to any table cell.</p>
+
+    <ol class="steps">
+      <li>
+        <div class="step-content">
+          <div class="step-title">Right-click any cell in the Live Preview table</div>
+          <div class="step-desc">A context menu appears with "Add Annotation" option.</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-content">
+          <div class="step-title">Type your note</div>
+          <div class="step-desc">Enter text and choose a highlight color (yellow, red, green, blue).</div>
+        </div>
+      </li>
+      <li>
+        <div class="step-content">
+          <div class="step-title">Annotation appears on the cell</div>
+          <div class="step-desc">A colored dot indicator appears. Hover to see the full text.</div>
+        </div>
+      </li>
+    </ol>
+
+    <div class="tip warn">
+      <div class="tip-icon">⚠️</div>
+      <div class="tip-text"><strong>After data changes:</strong> If you change the table structure (add/remove rows or columns), the system will check for orphaned annotations and ask you to reconcile or dismiss them.</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: EXPORT -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="export">
+    <div class="section-header">
+      <div class="section-icon icon-green">💾</div>
+      <h2 class="section-title">Export</h2>
+    </div>
+
+    <p style="color:var(--text-dim); margin-bottom:16px;">Access via <strong>Home → Export</strong> or <kbd>Ctrl+E</kbd>.</p>
+
+    <table class="guide-table">
+      <thead><tr><th>Format</th><th>What's Included</th><th>Best For</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="badge badge-green">Excel .xlsx</span></td>
+          <td>Table data, formatting, cell colors, column widths</td>
+          <td>Further analysis in Excel</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-blue">CSV</span></td>
+          <td>Raw table values only (no formatting)</td>
+          <td>Importing into other tools</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-red">PDF</span></td>
+          <td>Print-ready layout with title, table, footnote</td>
+          <td>Reports, presentations</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-amber">HTML</span></td>
+          <td>Interactive sortable/filterable table</td>
+          <td>Embedding in web pages</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-purple">PNG (Chart)</span></td>
+          <td>Current chart as a high-resolution image</td>
+          <td>Inserting chart into Word/Slides</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="tip success">
+      <div class="tip-icon">📦</div>
+      <div class="tip-text"><strong>Report Builder:</strong> Use <strong>Insert → Report Builder</strong> to combine multiple tables, charts, and statistical outputs into a single branded PDF report.</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: PROJECTS -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="projects">
+    <div class="section-header">
+      <div class="section-icon icon-teal">🗂️</div>
+      <h2 class="section-title">Projects & Saving</h2>
+    </div>
+
+    <ul class="feature-list">
+      <li><strong>Save Project</strong> (<kbd>Ctrl+S</kbd>) — saves all tables, configurations, filters, annotations, and metrics to a <code>.tforge</code> project file</li>
+      <li><strong>Open Project</strong> — reload a previously saved project</li>
+      <li><strong>Auto-save</strong> — project is auto-saved every 2 minutes in the background</li>
+      <li><strong>Project Manager</strong> — browse recent projects from the welcome screen</li>
+      <li><strong>Audit Trail</strong> — view a full history of changes made in the current session</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: MULTIPLE TABLES -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="multiple-tables">
+    <div class="section-header">
+      <div class="section-icon icon-blue">🗂️</div>
+      <h2 class="section-title">Working with Multiple Tables</h2>
+    </div>
+
+    <ul class="feature-list">
+      <li><strong>Add Table</strong> — click <code>+</code> next to the table tabs at the bottom, or use Insert → New Table</li>
+      <li><strong>Duplicate Table</strong> — right-click a tab or use Home → Duplicate to copy a table with all its formatting, filters, and metrics preserved</li>
+      <li><strong>Rename Table</strong> — double-click a tab to rename it; or it auto-names from your row/column/value config</li>
+      <li><strong>Delete Table</strong> — right-click a tab → Delete</li>
+      <li><strong>Summary Dashboard</strong> — View → Summary Dashboard shows all tables at once in a grid overview</li>
+      <li><strong>Table Comparison</strong> — View → Table Comparison puts two tables side by side for difference analysis</li>
+    </ul>
+
+    <div class="tip">
+      <div class="tip-icon">💡</div>
+      <div class="tip-text"><strong>Auto Title:</strong> When you add fields to Rows, Columns, or Values, the table automatically gets a descriptive title and subtitle. You can click on the title area to override it manually.</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: KEYBOARD SHORTCUTS -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="shortcuts">
+    <div class="section-header">
+      <div class="section-icon icon-blue">⌨️</div>
+      <h2 class="section-title">Keyboard Shortcuts</h2>
+    </div>
+
+    <table class="guide-table">
+      <thead><tr><th>Shortcut</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>Ctrl</kbd> + <kbd>S</kbd></td><td>Save project</td></tr>
+        <tr><td><kbd>Ctrl</kbd> + <kbd>E</kbd></td><td>Open Export dialog</td></tr>
+        <tr><td><kbd>Ctrl</kbd> + <kbd>Z</kbd></td><td>Undo last table change</td></tr>
+        <tr><td><kbd>Ctrl</kbd> + <kbd>Y</kbd></td><td>Redo</td></tr>
+        <tr><td><kbd>Ctrl</kbd> + <kbd>D</kbd></td><td>Duplicate current table</td></tr>
+        <tr><td><kbd>Ctrl</kbd> + <kbd>F</kbd></td><td>Focus source panel search</td></tr>
+        <tr><td><kbd>Arrow Keys</kbd></td><td>Navigate cells in the live preview table</td></tr>
+        <tr><td><kbd>Click column header</kbd></td><td>Sort table by that column</td></tr>
+        <tr><td><kbd>Right-click cell</kbd></td><td>Add/edit annotation on that cell</td></tr>
+        <tr><td><kbd>Scroll</kbd></td><td>Pan through large tables</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: TIPS & BEST PRACTICES -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="tips">
+    <div class="section-header">
+      <div class="section-icon icon-green">💡</div>
+      <h2 class="section-title">Tips & Best Practices</h2>
+    </div>
+
+    <div class="tip success">
+      <div class="tip-icon">✅</div>
+      <div class="tip-text"><strong>Start simple:</strong> Add one field to Rows and one to Values first. Then add more complexity — Columns, filters, second value field — gradually.</div>
+    </div>
+    <div class="tip success">
+      <div class="tip-icon">✅</div>
+      <div class="tip-text"><strong>Use Combo for survey data:</strong> The Combo aggregation (Count + %) is ideal for categorical survey questions — shows raw count and the percentage in one cell on two lines.</div>
+    </div>
+    <div class="tip success">
+      <div class="tip-icon">✅</div>
+      <div class="tip-text"><strong>Use Bins for age/income:</strong> Always bin continuous variables like Age or Income before adding them to Rows — raw continuous values create one row per unique number.</div>
+    </div>
+    <div class="tip success">
+      <div class="tip-icon">✅</div>
+      <div class="tip-text"><strong>Duplicate before experimenting:</strong> Duplicate a well-formatted table before trying a different structure — preserves your work while you experiment.</div>
+    </div>
+    <div class="tip warn">
+      <div class="tip-icon">⚠️</div>
+      <div class="tip-text"><strong>Large files:</strong> For files with 100,000+ rows, tabulation may take 2–5 seconds. Use filters to narrow the dataset for faster results.</div>
+    </div>
+    <div class="tip warn">
+      <div class="tip-icon">⚠️</div>
+      <div class="tip-text"><strong>Theme vs. Custom Colors:</strong> Selecting a theme preset resets all manual color customizations. Set your theme first, then apply custom colors.</div>
+    </div>
+  </section>
+
+  <hr />
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- SECTION: SYSTEM REQUIREMENTS -->
+  <!-- ═══════════════════════════════════════════ -->
+  <section class="section" id="requirements">
+    <div class="section-header">
+      <div class="section-icon icon-teal">🖥️</div>
+      <h2 class="section-title">System Requirements</h2>
+    </div>
+
+    <table class="guide-table">
+      <thead><tr><th>Component</th><th>Requirement</th></tr></thead>
+      <tbody>
+        <tr><td><strong>OS</strong></td><td>Windows 10/11, macOS 12+, Ubuntu 20.04+</td></tr>
+        <tr><td><strong>Python</strong></td><td>3.9 or higher</td></tr>
+        <tr><td><strong>Node.js</strong></td><td>18.0 or higher (for running the frontend)</td></tr>
+        <tr><td><strong>RAM</strong></td><td>4 GB minimum, 8 GB recommended for large datasets</td></tr>
+        <tr><td><strong>Browser</strong></td><td>Chrome, Edge, Firefox (latest version)</td></tr>
+        <tr><td><strong>Backend Port</strong></td><td>8000 (FastAPI server)</td></tr>
+        <tr><td><strong>Frontend Port</strong></td><td>5173 (Vite dev server)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+</main>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <p><strong>TableForge v2.0</strong> — Desktop Tabulation & Analytics Workbench</p>
+  <p style="margin-top:8px;">Developed by <strong>Pavankumar Deshetty</strong> · +91 83173 90926</p>
+  <p style="margin-top:8px; font-size:12px; color:#4b5563;">© 2025 Pavankumar Deshetty. All rights reserved.</p>
+</footer>
+
+</body>
+</html>
