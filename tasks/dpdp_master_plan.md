@@ -118,14 +118,21 @@ When an item lands: tick status here, note what was verified, and add a line to
       (the dedicated DPDP page) for the same pattern — clean, no AI-specific claims
       there to fix.
 
-### 2. Tenant isolation — `done` (code) / owner action pending
-Native PostgreSQL RLS already built and merged (PR #13, migration 0048): restricted
-`fieldgovern_app` DB role (NOSUPERUSER/NOBYPASSRLS), policies verified against Postgres
-16 (`backend/tests/rls_policy_check.sql`, 7 assertions). **Not yet active in prod** —
-deferred by owner because the platform has live users (enabling it needs an app
-restart). This is tracked in full detail, with exact steps, in
-**`tasks/pending_owner_action.md` §1** — do not duplicate that checklist here, just
-confirm it's been actioned before marking this `verified`.
+### 2. Tenant isolation — `verified` ✅ 2026-09-18
+Native PostgreSQL RLS (PR #13, migration 0048) is now **live in production**.
+Completed together, live, over SSH: generated a fresh password, set it directly on
+the `fieldgovern_app` Postgres role (`ALTER ROLE ... PASSWORD ...` — the step the
+original runbook undersold; migration 0048 only sets this password if
+`APP_DB_PASSWORD` was present in the environment at the moment it ran, which it
+wasn't), added `APP_DB_PASSWORD` to `.env`, restarted the app container. Stayed up
+clean, no crash-loop. Smoke-tested: normal user sees only their own org's data ✅,
+master_admin still lists every tenant ✅ (public-survey-submission check was
+skipped by choice). Full detail in `tasks/pending_owner_action.md` §1.
+
+**Found in the same session, not yet resolved:** the server's region is confirmed
+**EU**, not India — contradicts DPDP data-localisation expectations and existing
+"India-hosted" marketing claims. Tracked as its own item in
+`tasks/pending_owner_action.md` §3.
 
 ### 3. Public repository hygiene — `in-progress`
 - [x] **Found + rotated a live exposed credential — done 2026-09-18.** Investigating

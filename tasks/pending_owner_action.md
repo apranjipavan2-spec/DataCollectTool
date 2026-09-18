@@ -8,25 +8,38 @@ Status: created 2026-09-05 · code MERGED to main via PR #13 (2026-09-05).
 The items below are the ONLY remaining steps, and none can be done from a dev
 machine — they need the prod server / hosting console + a maintenance window.
 
-> **DEFERRED (owner decision 2026-09-05):** platform has active live users, so
-> these changes are held until a low-traffic window / planned maintenance.
-> NOT urgent-unsafe: tenant isolation already works via app-code filters today;
-> the items below are defense-in-depth + compliance, not an open hole.
-> Sequence when resuming: (a) seconds of downtime — encrypted backups, then
-> DB isolation (#1), then sslmode=require; (b) real downtime, announce first —
-> volume encryption (#2 first row) only.
+> **Update 2026-09-18:** item 1 (DB-layer tenant isolation) is done — completed
+> live via SSH, ~3s of app-container restart, no issues. The original deferral
+> below was written when this still looked like it needed a bigger maintenance
+> window; in practice it didn't. Items 2 and 3 (disk encryption, data-residency
+> region) still need real planning — see their sections below, now updated with
+> what was actually found on the server (region is EU, not India).
 
 ---
 
-## 1. Turn ON database-level tenant isolation  ⚠️ highest value
-- [ ] Set a strong `APP_DB_PASSWORD` in prod `.env`.
-- [ ] Set `APP_DATABASE_URL=postgresql://fieldgovern_app:<APP_DB_PASSWORD>@postgres:5432/fieldgovern`
-      (already wired in `deploy/docker-compose.prod.yml`).
-- [ ] Redeploy.
-- [ ] Smoke-test: (a) normal user logs in, (b) sees ONLY their tenant's data,
-      (c) public survey link submits, (d) master_admin dashboard lists all tenants.
-Why: until this is set, the app runs as the DB superuser and row-level security
-is bypassed — isolation relies on app-code filters alone.
+## 1. Turn ON database-level tenant isolation — ✅ DONE 2026-09-18
+Completed live, via Contabo's SSH access (VNC console turned out not to be needed —
+OpenSSH client is built into Windows and the VPS accepts root password auth directly).
+
+What was actually done, since the original steps below undersold one part:
+- Generated a strong password on the server itself (`openssl rand -base64 32`).
+- **Set that password directly on the `fieldgovern_app` Postgres role** via
+  `docker compose exec postgres psql -U fieldgovern -d fieldgovern` →
+  `ALTER ROLE fieldgovern_app PASSWORD '...';` — this step was missing from the
+  original checklist below. Migration 0048 only sets the role's password if
+  `APP_DB_PASSWORD` was present in the environment at the moment it ran; it wasn't,
+  so the role had no password until this manual step. Setting `APP_DB_PASSWORD` in
+  `.env` alone (next step) would not have activated anything without this.
+- Added `APP_DB_PASSWORD=...` to `.env` (`docker-compose.prod.yml` already derives
+  the full `APP_DATABASE_URL` from this one variable — nothing else to add there).
+- `docker compose up -d --no-deps --force-recreate app` — restarted clean, stayed
+  up (no crash-loop).
+- Smoke-tested: (a) normal user login ✅ sees only own org's data, (b) public
+  survey submission — skipped by choice, not attempted, (c) master_admin login ✅
+  still lists every tenant.
+
+Net effect: PostgreSQL row-level security is now actually enforced at the database
+layer, not just relied on via app-code `.filter(tenant_id==...)` calls.
 
 ## 2. Encryption + transport (server/hosting settings)
 - [ ] Encrypt the Postgres data volume (managed DB = checkbox; self-host = encrypted disk).
@@ -35,9 +48,14 @@ is bypassed — isolation relies on app-code filters alone.
 - [ ] Confirm the public site is HTTPS-only (nginx + certbot already in the stack).
 - [ ] Automated, encrypted, in-region backups — and do one restore test.
 
-## 3. Data residency (India)
-- [ ] Confirm app, DB, media, and backups all live in one India region (e.g. AWS
-      Mumbai `ap-south-1`). Do not scatter across providers.
+## 3. Data residency (India) — ⚠️ CONFIRMED NOT India, 2026-09-18
+Checked the Contabo control panel directly while doing item 1: the VPS's region
+shows **EU**, not India (IP `178.238.227.32`). This contradicts DPDP data-
+localisation expectations and several existing marketing claims ("India-hosted
+by default", Mumbai servers). This is now a confirmed fact needing a decision —
+migrate to an India region, or correct the public claims — not an open question
+to go check. Worth folding into the same conversation as item 2 (disk encryption)
+below, since a region move means provisioning a new server anyway.
 
 ## 4. DPDP paperwork (you own these)
 - [ ] Consent capture text for beneficiary personal data (purpose-limited, withdrawable).
