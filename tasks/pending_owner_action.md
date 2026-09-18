@@ -42,13 +42,21 @@ Net effect: PostgreSQL row-level security is now actually enforced at the databa
 layer, not just relied on via app-code `.filter(tenant_id==...)` calls.
 
 ## 2. Encryption + transport (server/hosting settings)
-- [ ] Encrypt the Postgres data volume (managed DB = checkbox; self-host = encrypted disk).
-- [ ] Encrypt the media/uploads volume.
+- [ ] **Disk encryption — CONFIRMED real gap, 2026-09-18.** `lsblk` on the live
+      server shows plain partitions only, no `crypt` layer anywhere. Since the
+      Docker uploads volume lives on this same disk, this single finding covers
+      both the Postgres data volume and the media/uploads volume — neither is
+      encrypted. Not fixable in place; needs a fresh encrypted volume/server and
+      a migration. See item 2 in the artifact-style plan discussed this session.
 - [ ] Force TLS: add `?sslmode=require` to `DATABASE_URL` and `APP_DATABASE_URL`.
       **Not a quick .env edit** — the Postgres container has no TLS certificate
       configured yet; forcing this on without one first just refuses every
       connection. Needs cert generation + a compose-file change + redeploy.
-- [ ] Confirm the public site is HTTPS-only (nginx + certbot already in the stack).
+- [x] **HTTPS-only — CONFIRMED 2026-09-18.** Visiting `http://app.fieldgovern.com`
+      auto-redirects to `https://`. Also confirmed the Let's Encrypt cert itself
+      is valid (31 days left) and genuinely auto-renews — via a `certbot.timer`
+      systemd timer (not the cron job the old docs described; mechanism differs
+      but it's real and running, last check ~4h before this was verified).
 - [x] **Backup restore test — DONE 2026-09-18.** Confirmed live: the daily backup
       job is genuinely running (69 dated `.sql.gz` files in
       `/opt/fieldgovern/backups/`, most recent within the hour). Restored the
