@@ -991,12 +991,49 @@ deletion certificate. Delete enumerator location traces once no longer needed fo
 Public page: security overview, sub-processor list, DPA, DPDP feature mapping, uptime
 status.
 
-### 25. Product roadmap (competitive gaps vs. the 17 other India-built platforms) — `todo`
-Longitudinal case management (Avni/SocialCops gap), XLSForm import/export (ODK-ecosystem
-migration), GIS layers/maps (TechCSR gap), indicator framework/logframe (Dhwani RIS/
-TolaData gap), CSR reporting templates (CSR-2/BRSR/SDG — iAmpact/Goodera gap),
-Dalgo/data-warehouse connector, native Android app, SSO/SCIM/on-premise option, full UI
-localisation (Hindi/Kannada/Telugu first), WCAG 2.1 AA / GIGW accessibility.
+### 25. Product roadmap (competitive gaps vs. the 17 other India-built platforms) — `in-progress` (triaged — most items already exist)
+- [x] **Triage done 2026-09-18 — checked the actual codebase against every
+      named gap before assuming any needed building.** Result: 4 of the
+      "gaps" this list named **already exist and are marketing/documentation
+      gaps, not product gaps**:
+  - **XLSForm import/export** — fully built.
+    `backend/app/api/routes/migration/xlsform_parser.py` +
+    `xlsform_serializer.py`, wired to `/xlsform/parse`, `/xlsform/save`,
+    `/xlsform/serialize`, `/xlsform/export/{form_id}`. Kobo, SurveyCTO, and
+    ODK Central platform-import clients exist too
+    (`migration/platform_clients.py`).
+  - **Indicator framework / logframe** — fully built.
+    `backend/app/models/results_framework.py` (`LogframeLevel`,
+    `Indicator`, `IndicatorValue`) + full CRUD, auto-compute, and an
+    Indicator Tracking Table export (`GET /programs/{id}/itt/xlsx`) in
+    `backend/app/api/routes/results.py`.
+  - **GIS / maps** — built. `frontend/src/map/FieldMapPage.tsx`, Leaflet +
+    react-leaflet, live at `/map` in the nav.
+  - **Longitudinal case management (panel studies)** — built. Wave
+    tracking, panel-study toggle, and an attrition report
+    (`GET /programs/{id}/attrition`) already exist in `field_govern.py`.
+      **None of this was known/flagged before this triage** — worth telling
+      whoever owns product marketing, since these are real differentiators
+      already shipped, not roadmap items.
+- [ ] **Real gap: full UI localisation.** Partial, not full — respondent-
+      facing form-taking (`FormRenderer`, the consent notice) IS localized
+      (`en`/`hi`/`kn`/`te`) via `LanguageContext`/`getLocalizedLabel`. The
+      staff-facing admin UI chrome is not: `Sidebar.tsx` has 2 references to
+      the language system, `TopNav.tsx` has zero. `react-i18next` is a
+      listed dependency but not wired up for the admin/staff surface.
+- [ ] **Real gap: CSR reporting templates** (CSR-2/BRSR/SDG format
+      exports) — zero matches anywhere in the codebase, genuinely not built.
+- [ ] **Real gap: Dalgo / data-warehouse connector** — not built.
+- [ ] **Real gap: native Android app** — this is a PWA; no native app shell
+      exists.
+- [ ] **Real gap: SSO/SCIM/on-premise option** — SSO is also named under
+      item 16; on-premise deployability was not specifically checked this
+      pass, flagged for follow-up rather than assumed either way.
+- [ ] **Real gap: WCAG 2.1 AA / GIGW accessibility** — no accessibility
+      audit has been run against either the respondent-facing collection
+      flow or the admin UI; not something to claim compliant without
+      actually testing it (screen reader pass, keyboard-only navigation,
+      contrast ratios).
 
 ---
 
