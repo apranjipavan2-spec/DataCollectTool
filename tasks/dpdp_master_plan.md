@@ -283,6 +283,14 @@ field-level (envelope) encryption for direct identifiers (name, phone, Aadhaar-l
 exact GPS) — never store full Aadhaar numbers. TLS 1.2+, HSTS, secure cookies, scheduled
 key/secret rotation + rotation on staff exit.
 
+**Verified live 2026-09-18 (still open, confirmed real):** disk is not encrypted
+(unmanaged Contabo VPS — needs provisioning a fresh encrypted volume, not a
+retrofit). Backup job itself confirmed genuinely working (69 backups, one full
+restore test passed — 4 tenants recovered correctly into a throwaway DB) but
+**no offsite copy exists** — `R2_BUCKET` was never configured, so all 69 backups
+live only on the same server as the data they protect. Full detail in
+`tasks/pending_owner_action.md` §2.
+
 ### 11. Logs — `todo`
 Audit trail exists (append-only) but retention period + tamper-evidence not stated.
 Need: ≥1 year retention, hash-chained or write-once, stored in India; separate 180-day

@@ -45,8 +45,22 @@ layer, not just relied on via app-code `.filter(tenant_id==...)` calls.
 - [ ] Encrypt the Postgres data volume (managed DB = checkbox; self-host = encrypted disk).
 - [ ] Encrypt the media/uploads volume.
 - [ ] Force TLS: add `?sslmode=require` to `DATABASE_URL` and `APP_DATABASE_URL`.
+      **Not a quick .env edit** — the Postgres container has no TLS certificate
+      configured yet; forcing this on without one first just refuses every
+      connection. Needs cert generation + a compose-file change + redeploy.
 - [ ] Confirm the public site is HTTPS-only (nginx + certbot already in the stack).
-- [ ] Automated, encrypted, in-region backups — and do one restore test.
+- [x] **Backup restore test — DONE 2026-09-18.** Confirmed live: the daily backup
+      job is genuinely running (69 dated `.sql.gz` files in
+      `/opt/fieldgovern/backups/`, most recent within the hour). Restored the
+      latest one into a throwaway `fieldgovern_restore_test` database, verified
+      real data landed (`SELECT count(*) FROM tenants` → 4, matching production),
+      then dropped the test database. The backup mechanism itself works.
+- [ ] **Gap found, not yet fixed: no offsite backup.** `grep R2_BUCKET .env`
+      returned nothing — Cloudflare R2 offsite sync was never configured. All 69
+      backups exist ONLY on this same server. If this VPS is ever lost, every
+      backup is lost with it. Fixing this needs a Cloudflare account + R2 bucket
+      + API credentials — a short setup, but needs your Cloudflare login, not
+      something doable from a terminal alone.
 
 ## 3. Data residency (India) — ⚠️ CONFIRMED NOT India, 2026-09-18
 Checked the Contabo control panel directly while doing item 1: the VPS's region
