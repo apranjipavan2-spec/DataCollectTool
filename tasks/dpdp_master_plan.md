@@ -14,7 +14,7 @@ When an item lands: tick status here, note what was verified, and add a line to
 
 ## P0 — fix within 30 days (active risk or misstatement)
 
-### 1. AI cross-border data flow — `in-progress`
+### 1. AI cross-border data flow — `verified` ✅ 2026-09-18
 - [x] **PII stripping before model calls — done + verified 2026-09-18.** New shared
       redaction module at every layer that talks to a third-party LLM:
       `backend/app/services/pii_redact.py` (main app — schema-driven via
@@ -176,8 +176,14 @@ skipped by choice). Full detail in `tasks/pending_owner_action.md` §1.
       "run this if login breaks" ops script, more dangerous of the two.
       Verified: `grep -r superadmin@4991` across the repo now only matches
       this tracking note, not code. Both scripts still syntax-check clean.
-- [ ] Scrub the old hardcoded values from git history (destructive — rewrites
-      history, needs a force-push; requires explicit go-ahead before doing this).
+- [x] **Git history scrubbed — done 2026-09-18.** User chose the more drastic
+      of two offered options (squash all history into one commit, over a
+      surgical per-commit secret removal). Verified: `git log --oneline` is
+      now 10 commits total, rooted at `db031b8` ("Squash history — remove
+      exposed credential from all past commits"). A local-only safety-net
+      branch (`pre-squash-backup-2026-09-18`) was kept, never pushed — worth
+      deciding whether to delete it now that the squash has been live and
+      stable for a while.
 - [ ] Remove/rotate any other seed scripts, dev env templates from the public
       branch; decide public vs private + add explicit licence/SECURITY.md
       (business decision, not mine to make).
