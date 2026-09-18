@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -1451,27 +1452,16 @@ def _media_storage_key(m) -> str:
     return f"{m.tenant_id}/{m.submission_id}/{m.field_name}{ext}"
 
 
-@router.post("/{submission_id}/anonymize")
-def anonymize_submission(
-    submission_id: str,
-    request: Request,
-    user=Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """DPDP erasure. Covers every place this submission's personal data lives:
-    answers (data_json), GPS coordinates, and uploaded photo/audio files —
-    both the storage object and its DB record. Best-effort on file deletion:
-    a storage failure never blocks the data_json/GPS wipe, since that's the
-    part that matters most and must always complete. Logged to the audit
-    trail (erasure is itself an action DPDP expects to be traceable)."""
-    if user.get("role") != "master_admin":
-        raise HTTPException(status_code=403, detail="Only master_admin can anonymize submissions")
-    sub = db.query(Submission).filter(
-        Submission.id == submission_id, Submission.tenant_id == user["tenant_id"]
-    ).first()
-    if not sub:
-        raise HTTPException(status_code=404, detail="Submission not found")
-
+def _erase_submission_row(db: Session, sub: "Submission", *, action: str, tenant_id, user_id, ip_address: Optional[str], extra_detail: Optional[dict] = None) -> dict:
+    """Shared DPDP-erasure core: wipes answers/GPS/media for one submission row
+    and writes an audit entry. Covers every place personal data lives — answers
+    (data_json), GPS coordinates, and uploaded photo/audio files, both the
+    storage object and its DB record. Best-effort on file deletion: a storage
+    failure never blocks the data_json/GPS wipe, since that's the part that
+    matters most and must always complete. Caller commits.
+    Used by both master_admin's direct anonymize action and org_admin's
+    consent-withdrawal-by-reference-code flow — same erasure, different
+    audit `action` label so the two stay distinguishable in the log."""
     from app.models.media_file import MediaFile
     media_rows = db.query(MediaFile).filter(MediaFile.submission_id == sub.id).all()
     deleted_count, delete_errors = 0, 0
@@ -1491,17 +1481,117 @@ def anonymize_submission(
     sub.gps_submit = None
 
     from app.services.audit import write_audit
+    detail = {"media_files_deleted": deleted_count, "media_delete_errors": delete_errors}
+    if extra_detail:
+        detail.update(extra_detail)
     write_audit(
-        db, tenant_id=user["tenant_id"], user_id=user.get("sub"),
-        action="submission_anonymized", resource="submission", resource_id=str(sub.id),
-        detail={"media_files_deleted": deleted_count, "media_delete_errors": delete_errors},
+        db, tenant_id=tenant_id, user_id=user_id,
+        action=action, resource="submission", resource_id=str(sub.id),
+        detail=detail, ip_address=ip_address,
+    )
+    return {"id": str(sub.id), "media_files_deleted": deleted_count, "media_delete_errors": delete_errors}
+
+
+@router.post("/{submission_id}/anonymize")
+def anonymize_submission(
+    submission_id: str,
+    request: Request,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """DPDP erasure of a single submission, by ID — master_admin only."""
+    if user.get("role") != "master_admin":
+        raise HTTPException(status_code=403, detail="Only master_admin can anonymize submissions")
+    sub = db.query(Submission).filter(
+        Submission.id == submission_id, Submission.tenant_id == user["tenant_id"]
+    ).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    result = _erase_submission_row(
+        db, sub, action="submission_anonymized",
+        tenant_id=user["tenant_id"], user_id=user.get("sub"),
         ip_address=request.client.host if request.client else None,
     )
     db.commit()
+    return {**result, "status": "anonymized"}
+
+
+# ── Consent withdrawal by reference code — org_admin+ ────────────────────────
+#
+# A respondent is given a short reference code at submission time (derived
+# client-side from the submission's own local_id — see refCodeFromId() in the
+# frontend — no server round-trip needed, works offline, requires no new
+# storage). To withdraw consent later, they quote that code through the
+# org's grievance channel (phone/email/in-person); staff look it up here and
+# withdrawal triggers the exact same erasure as an anonymize action, so the
+# obligation ("withdrawal must be as easy as giving consent") is met on the
+# staff side without needing the respondent to have any account.
+
+
+class ConsentWithdrawLookupIn(BaseModel):
+    ref_code: str
+
+
+def _normalize_ref_code(ref_code: str) -> str:
+    """Strip everything but hex digits and lowercase — matches the frontend's
+    refCodeFromId() formatting (XXXX-XXXX, uppercase) regardless of how the
+    admin actually typed it in (with/without the dash, upper/lower case)."""
+    return re.sub(r"[^0-9A-Fa-f]", "", ref_code).lower()
+
+
+def _find_submission_by_ref_code(db: Session, tenant_id, ref_code: str) -> Submission:
+    tail = _normalize_ref_code(ref_code)
+    if len(tail) < 6:
+        raise HTTPException(400, "Reference code too short — check it and try again")
+    matches = db.query(Submission).filter(
+        Submission.tenant_id == tenant_id,
+        Submission.local_id.ilike(f"%{tail}"),
+    ).all()
+    if not matches:
+        raise HTTPException(404, "No submission found for that reference code")
+    if len(matches) > 1:
+        raise HTTPException(409, "That code matches more than one submission — ask for the full code")
+    return matches[0]
+
+
+@router.get("/consent-withdrawal/lookup")
+def lookup_consent_withdrawal(
+    ref_code: str,
+    user=Depends(require_org_admin),
+    db: Session = Depends(get_db),
+):
+    """Preview what a reference code resolves to, before erasing anything."""
+    sub = _find_submission_by_ref_code(db, user["tenant_id"], ref_code)
     return {
-        "id": str(sub.id), "status": "anonymized",
-        "media_files_deleted": deleted_count, "media_delete_errors": delete_errors,
+        "id": str(sub.id),
+        "form_id": str(sub.form_id),
+        "status": sub.status,
+        "already_withdrawn": bool((sub.data_json or {}).get("_consent_withdrawn_at")) or (sub.data_json or {}).get("anonymized") is True,
+        "server_received_at": sub.server_received_at.isoformat() if sub.server_received_at else None,
     }
+
+
+@router.post("/consent-withdrawal/withdraw")
+def withdraw_consent(
+    body: ConsentWithdrawLookupIn,
+    request: Request,
+    user=Depends(require_org_admin),
+    db: Session = Depends(get_db),
+):
+    """Withdraw consent for the submission a reference code resolves to —
+    same erasure as anonymize_submission, distinct audit action label."""
+    sub = _find_submission_by_ref_code(db, user["tenant_id"], body.ref_code)
+    withdrawn_at = datetime.now(timezone.utc).isoformat()
+    result = _erase_submission_row(
+        db, sub, action="consent_withdrawn",
+        tenant_id=user["tenant_id"], user_id=user.get("sub"),
+        ip_address=request.client.host if request.client else None,
+        extra_detail={"ref_code_tail": _normalize_ref_code(body.ref_code)[-8:]},
+    )
+    sub.data_json = {**sub.data_json, "_consent_withdrawn_at": withdrawn_at}
+    db.commit()
+    return {**result, "status": "consent_withdrawn", "withdrawn_at": withdrawn_at}
 
 
 # ── Soft-delete to Recycle Bin — org_admin only ──────────────────────────────

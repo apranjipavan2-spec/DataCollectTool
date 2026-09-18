@@ -10,6 +10,7 @@ import {
 } from './surveyStore'
 import { encryptCapsule, downloadBlob } from './surveyCrypto'
 import { buildQA } from './responseRecord'
+import { refCodeFromId } from '@/lib/consentRefCode'
 
 export default function PublicSurveyPage() {
   const { token } = useParams<{ token: string }>()
@@ -207,6 +208,14 @@ export default function PublicSurveyPage() {
               Your response is <span className="font-semibold text-catalan-text">saved on this device</span> and
               will upload automatically once you have a connection. You can safely leave this page open.
             </p>
+          )}
+
+          {backup.current && (
+            <div className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2.5 mt-4 inline-block">
+              <div className="text-[10px] text-catalan-textMuted uppercase tracking-wider mb-0.5">Your reference code</div>
+              <div className="text-lg font-mono font-bold text-catalan-text tracking-wider">{refCodeFromId(backup.current.id)}</div>
+              <div className="text-[11px] text-catalan-textMuted mt-0.5 max-w-[220px]">Keep this — quote it if you ever want your response withdrawn</div>
+            </div>
           )}
 
           {/* Encrypted device backup — the strong safety net when the network is

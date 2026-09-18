@@ -387,10 +387,67 @@ skipped by choice). Full detail in `tasks/pending_owner_action.md` §1.
       if this logic grows more branches; not done this pass since it's
       still simple enough to verify by direct code trace (documented above).
 
-### 7. Consent withdrawal — `todo`
-Respondent reference code (printed slip or SMS). Withdrawal as easy as giving consent —
-an admin action via the customer's grievance channel that stops processing and triggers
-erasure/anonymisation.
+### 7. Consent withdrawal — `in-progress` (core built + verified)
+- [x] **Reference code, derived not stored — done 2026-09-18.** Rather than
+      generate and persist a new random code (new column, new write path,
+      new place to leak), the code is a formatted view of the submission's
+      own `local_id` — already an indexed column, already populated by
+      **both** real respondent-facing write paths (`sync.py push` for the
+      offline-first enumerator PWA, `public_survey.py _persist_submission`
+      for self-serve public surveys). `refCodeFromId()`
+      (`frontend/src/lib/consentRefCode.ts`) formats the last 8 hex chars as
+      `XXXX-XXXX` — computable instantly, client-side, fully offline, no
+      server round-trip. Shown on both real confirmation screens:
+      `FieldApp.modern.tsx`'s "Saved!" screen and `PublicSurveyPage.tsx`'s
+      "Thank you!" screen — the actual respondent-facing UI. (The direct
+      `POST /submissions/` API-ingestion path, used only by external
+      API-key integrations/bulk import, doesn't set `local_id` — no live
+      respondent to hand a slip to on that path, so no ref code there;
+      documented as an intentional scope boundary, not an oversight.)
+- [x] **Admin lookup + withdrawal, reusing item 9's erasure — done
+      2026-09-18.** Extracted the wipe-answers/GPS/media + audit-log core of
+      `anonymize_submission` (item 9) into a shared `_erase_submission_row()`
+      helper, so withdrawal triggers the *exact same* erasure — not a
+      parallel reimplementation — with a distinct audit action label
+      (`consent_withdrawn` vs `submission_anonymized`) so the two stay
+      distinguishable in the log. New `GET /submissions/consent-withdrawal/
+      lookup` (preview only, no side effects — lets staff confirm they've
+      found the right response before erasing) and
+      `POST /submissions/consent-withdrawal/withdraw`, both `org_admin`+
+      (routine/frequent action, unlike `anonymize`'s `master_admin`-only
+      gate). Tenant-scoped suffix match on `local_id` (≥6 hex chars
+      required; 0 matches → 404, >1 → 409 asking for the fuller code —
+      astronomically unlikely collision space at 8 hex chars, but handled
+      honestly rather than assumed away). A `_consent_withdrawn_at`
+      timestamp is written back after the wipe (erasure clears `data_json`
+      to `{"anonymized": True, ...}`, then this key is added back) so
+      "was this respondent's withdrawal honoured" stays provable even after
+      their data is gone.
+- [x] **Admin UI — done 2026-09-18.** New "Consent Withdrawal" card in
+      `OrgAdminPanel.modern.tsx`'s Security tab (the tenant's existing home
+      for compliance/access tooling — 2FA, QR login, AI config already live
+      there): paste the code → look up → confirm → withdraw, with an
+      already-withdrawn state so staff don't double-erase.
+- [x] **Caught and fixed a real bug before shipping — `re` module was never
+      imported in `submissions.py`.** `py_compile` doesn't catch this (not a
+      syntax error, only fails at the exact moment the new endpoint runs) —
+      caught by actually running the new pytest file, then confirmed fixed
+      by both re-running the tests and a genuine `import app.api.routes.
+      submissions` (not just compiling it) before shipping.
+- [x] **Verified:** new `backend/tests/test_consent_withdrawal.py` (5 pure
+      cases — dashed/undashed/whitespace/non-hex-char normalization, plus a
+      case pinning the exact JS↔Python round-trip assumption that a UUID's
+      last 8 characters are always dash-free) — all pass. Full backend
+      suite: 44 passed / 76 skipped / 0 failed (up from 39). `py_compile`
+      clean; module actually imports clean. `npx tsc --noEmit` clean;
+      `npm run build` (incl. service worker) succeeds.
+- [ ] **Not done: SMS delivery of the code.** The requirement's "printed
+      slip **or SMS**" — only the on-screen/printable display is built.
+      Texting it would reuse the existing MSG91/WhatsApp notification
+      services already in the codebase (`services/whatsapp.py`,
+      `notification_config`), but needs a phone-number capture point in the
+      respondent flow that doesn't exist today — real follow-up work, not
+      attempted this pass.
 
 ### 8. Data-principal rights workflow — `todo`
 Log → verify identity → search respondent across all forms/waves → act (export/correct/

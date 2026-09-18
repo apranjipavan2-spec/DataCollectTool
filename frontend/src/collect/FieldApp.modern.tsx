@@ -15,6 +15,7 @@ import BeneficiaryListScreen, { type RosterEntry } from './BeneficiaryListScreen
 import EmojiIcon from '@/components/EmojiIcon'
 import { makeCapsule, capsuleFileBlob, downloadBlob, parseCapsuleFile, type Capsule } from './surveyCrypto'
 import { buildQA } from './responseRecord'
+import { refCodeFromId } from '@/lib/consentRefCode'
 
 function _haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000
@@ -116,6 +117,7 @@ export default function FieldApp() {
   const [searchParams] = useSearchParams()
   const initialScreen = searchParams.get('screen') === 'history' ? 'history' : 'list'
   const [screen, setScreen] = useState<Screen>(initialScreen)
+  const [lastRefCode, setLastRefCode] = useState('')
   const [forms, setForms] = useState<FormMeta[]>([])
   const [activeForm, setActiveForm] = useState<{ meta: FormMeta; schema: FormSchema } | null>(null)
   const [formsError, setFormsError] = useState('')
@@ -847,6 +849,7 @@ export default function FieldApp() {
     // Save text data to outbox immediately (fast — IndexedDB)
     await handleSave(draft)
     setOutboxCount(c => c + 1)
+    setLastRefCode(refCodeFromId(draft.id))
 
     // Reflect the upload phase on the confirmation screen. Online → show the
     // uploading animation (syncToServer flips it to 'uploaded' / 'offline' below);
@@ -1113,6 +1116,14 @@ export default function FieldApp() {
             <div className="text-6xl mb-6"><EmojiIcon e={uploadState === 'offline' ? '📥' : '✅'} /></div>
             <h2 className="text-2xl font-bold text-catalan-success mb-2">Saved!</h2>
             <p className="text-sm text-catalan-textMuted mb-3">Your response has been recorded.</p>
+
+            {lastRefCode && (
+              <div className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2.5 mb-3 inline-block">
+                <div className="text-[10px] text-catalan-textMuted uppercase tracking-wider mb-0.5">Reference code (keep this)</div>
+                <div className="text-lg font-mono font-bold text-catalan-text tracking-wider">{lastRefCode}</div>
+                <div className="text-[11px] text-catalan-textMuted mt-0.5">Give this to the respondent — needed to withdraw consent later</div>
+              </div>
+            )}
 
             {/* Server-upload status */}
             {uploadState === 'uploading' && (

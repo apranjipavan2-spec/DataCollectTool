@@ -93,6 +93,11 @@ function SecurityTab() {
   const [pwError, setPwError] = useState('')
   const [pwSaving, setPwSaving] = useState(false)
   const [pwSaved, setPwSaved] = useState(false)
+  const [withdrawCode, setWithdrawCode] = useState('')
+  const [withdrawLookup, setWithdrawLookup] = useState<{ id: string; form_id: string; already_withdrawn: boolean; server_received_at: string | null } | null>(null)
+  const [withdrawError, setWithdrawError] = useState('')
+  const [withdrawBusy, setWithdrawBusy] = useState(false)
+  const [withdrawDone, setWithdrawDone] = useState(false)
 
   useEffect(() => {
     api.get('/tenants/security')
@@ -183,6 +188,30 @@ function SecurityTab() {
     } catch (e: any) {
       setPwError(e?.response?.data?.detail ?? 'Failed to change password')
     } finally { setPwSaving(false) }
+  }
+
+  async function lookupWithdrawCode() {
+    setWithdrawError(''); setWithdrawLookup(null); setWithdrawDone(false)
+    if (!withdrawCode.trim()) return
+    try {
+      const { data } = await api.get('/submissions/consent-withdrawal/lookup', { params: { ref_code: withdrawCode.trim() } })
+      setWithdrawLookup(data)
+    } catch (e: any) {
+      setWithdrawError(e?.response?.data?.detail ?? 'Lookup failed')
+    }
+  }
+
+  async function confirmWithdraw() {
+    if (!withdrawLookup) return
+    setWithdrawBusy(true); setWithdrawError('')
+    try {
+      await api.post('/submissions/consent-withdrawal/withdraw', { ref_code: withdrawCode.trim() })
+      setWithdrawDone(true)
+      setWithdrawLookup(null)
+      setWithdrawCode('')
+    } catch (e: any) {
+      setWithdrawError(e?.response?.data?.detail ?? 'Withdrawal failed')
+    } finally { setWithdrawBusy(false) }
   }
 
   if (loading) return <div className="p-6 text-catalan-textMuted text-sm">Loading…</div>
@@ -385,6 +414,55 @@ function SecurityTab() {
               {pwSaving ? 'Saving…' : pwSaved ? '✓ Password changed' : 'Update Password'}
             </button>
           </div>
+        </div>
+      </Card>
+
+      {/* Consent withdrawal — DPDP */}
+      <Card>
+        <div className="p-6">
+          <h3 className="text-base font-semibold text-catalan-text mb-1">Consent Withdrawal</h3>
+          <p className="text-sm text-catalan-textMuted mb-5">
+            A respondent quotes their reference code (shown to them after submitting) through your grievance
+            channel. Look it up here to confirm the right response, then withdraw — this erases their
+            answers, GPS, and any photos/audio, the same as a full erasure request.
+          </p>
+          <div className="flex gap-2 mb-3">
+            <input
+              value={withdrawCode}
+              onChange={e => { setWithdrawCode(e.target.value); setWithdrawLookup(null); setWithdrawDone(false) }}
+              onKeyDown={e => e.key === 'Enter' && lookupWithdrawCode()}
+              placeholder="e.g. A1B2-C3D4"
+              className="flex-1 bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text font-mono uppercase tracking-wider focus:outline-none focus:border-catalan-primary transition-colors"
+            />
+            <button
+              onClick={lookupWithdrawCode}
+              disabled={!withdrawCode.trim()}
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-catalan-hover border border-catalan-border text-catalan-text hover:bg-catalan-border transition-colors disabled:opacity-50"
+            >
+              Look up
+            </button>
+          </div>
+          {withdrawError && <p className="text-xs text-catalan-error flex items-center gap-1 mb-2"><span><EmojiIcon e="⚠" /></span>{withdrawError}</p>}
+          {withdrawLookup && (
+            <div className="p-4 bg-catalan-bg border border-catalan-border rounded-xl mb-2">
+              <p className="text-sm text-catalan-text mb-1">
+                Submission <span className="font-mono text-xs">{withdrawLookup.id.slice(0, 8)}…</span>
+                {withdrawLookup.server_received_at && <> — received {new Date(withdrawLookup.server_received_at).toLocaleString()}</>}
+              </p>
+              {withdrawLookup.already_withdrawn ? (
+                <p className="text-xs text-catalan-textMuted">Already withdrawn/erased — nothing left to do.</p>
+              ) : (
+                <button
+                  onClick={confirmWithdraw}
+                  disabled={withdrawBusy}
+                  className="mt-2 w-full py-2 rounded-lg text-sm font-semibold bg-catalan-error text-white hover:brightness-110 transition-all disabled:opacity-50"
+                >
+                  {withdrawBusy ? 'Withdrawing…' : 'Confirm withdrawal — erase this response'}
+                </button>
+              )}
+            </div>
+          )}
+          {withdrawDone && <p className="text-xs text-catalan-success">✓ Consent withdrawn — response erased</p>}
         </div>
       </Card>
     </div>
