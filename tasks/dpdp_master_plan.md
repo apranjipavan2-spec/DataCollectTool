@@ -249,10 +249,69 @@ skipped by choice). Full detail in `tasks/pending_owner_action.md` §1.
 
 ## P1 — before 13 May 2027 (DPDP core obligations)
 
-### 5. Notice builder — `todo`
-Itemised, versioned, all 22 scheduled languages, audio read-out option, shown before the
-first question. Must state: org name, data items, purpose, retention, sharing, how to
-withdraw, how to complain (grievance contact + Data Protection Board).
+### 5. Notice builder — `in-progress` (core built + verified)
+- [x] **Itemised, versioned notice shown before the first question — done
+      2026-09-18.** Found a real, already-existing (but cosmetic-only)
+      mechanism to build on: `schema.settings.purpose` + `FormRenderer`'s
+      consent gate already blocked the first question behind an "I Agree"
+      screen — but it only carried one free-text string, was never versioned,
+      and **the fact that consent was given was never sent to or stored by
+      the backend at all** (`consentTimestamp` lived only in the browser's
+      in-memory draft). Extended it rather than rebuilding: `schema.settings`
+      gets a new `consent_notice` object (org name, itemised data-collection
+      list, purpose, retention, sharing, withdrawal instructions, grievance
+      contact, Data Protection Board contact, optional audio-URL) — reuses
+      the existing `json_schema` JSONB column, so **no new Form-table
+      migration was needed**. Version numbers are **server-assigned**, in
+      `forms.py`'s new `_reconcile_consent_notice_version()`: bumps only
+      when the notice's own content changes (not on every unrelated
+      question edit), and a client-supplied version number is always
+      ignored/overwritten — can't be forged. 6 pure-logic pytest cases in
+      `backend/tests/test_consent_notice.py` cover first-save, unrelated-edit
+      no-bump, content-change bump, and forged-version rejection — all pass.
+- [x] **Consent proof now actually reaches the backend — done 2026-09-18.**
+      `FormRenderer.tsx`'s `buildFinalDraft()` now stamps
+      `_consent_notice_version` / `_consent_language` / `_consent_given_at`
+      into `data_json`, riding the exact same established convention as
+      `_started_at`/`_duration_sec`/`_audio_audit` (submission-level
+      metadata inside `data_json`, already excluded from AI-facing field
+      summaries via `field_govern.py`'s `_internal` set, which was extended
+      to cover the 3 new keys too). Surfaced in `_sub_summary()`
+      (`submissions.py`, the single shared helper every submission-list
+      response uses) and added to the existing-but-previously-unused
+      `GET /forms/{id}/consent-log` endpoint.
+- [x] **Language support: reused, not invented.** The app supports 4
+      languages today (`en`/`hi`/`kn`/`te` — `LANGUAGE_OPTIONS`). The notice
+      editor (new "Full DPDP Notice" panel in `FormBuilder.modern.tsx`,
+      collapsible, next to the existing purpose textarea) and the respondent-
+      facing notice screen both reuse the **exact same** nested
+      `languages: {code: {...}}` map + `getLocalizedLabel()` fallback
+      pattern already used for per-field label/hint translations — zero new
+      localization code, a language switcher inside the consent screen
+      itself (needed since the main header's language toggle isn't shown
+      until after the gate).
+- [x] **Verified:** `npx tsc --noEmit --skipLibCheck` clean; `npm run build`
+      (production Vite build, including the service worker) succeeds clean.
+      Backend: `py_compile` clean on all touched files; full pytest suite
+      39 passed / 76 skipped / 0 failed (up from 33 passed before this item).
+      **Not done: a live browser walkthrough** — no local backend/DB running
+      in this environment (consistent with every other DB-dependent check
+      this session), so the builder panel and consent screen were verified
+      by type-checking + production build only, not by clicking through them
+      in Chrome. Flagged rather than silently skipped.
+- [ ] **Real gap, not fixed: 22 scheduled languages.** The app has
+      infrastructure for 4 (`en`/`hi`/`kn`/`te`). Getting to all 22
+      8th-Schedule languages needs either a much larger translation-content
+      pipeline or reusing the existing `POST /ai/translate` endpoint to
+      machine-translate notice text on demand — neither built this pass;
+      the notice mechanism itself is designed so adding more language codes
+      later is additive (new entries in `LANGUAGE_OPTIONS`), not a rebuild.
+- [ ] **Real gap, not fixed: true audio read-out (TTS).** No text-to-speech
+      integration exists in the stack. Shipped the achievable piece instead —
+      an admin can paste a link to a **pre-recorded** audio file per
+      language (uploaded via the existing Shared Files feature) and it plays
+      in the consent screen. Automatic TTS generation is separate, sizeable
+      follow-up work, not attempted against non-existent infrastructure.
 
 ### 6. Per-purpose consent — `todo`
 Separate consent items: survey answers / audio / photo / GPS / follow-up contact. Block

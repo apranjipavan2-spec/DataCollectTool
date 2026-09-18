@@ -165,6 +165,25 @@ def _validate_schema_formulas(schema: dict[str, Any]) -> None:
                 raise ValueError(f"Field '{key}': unknown function '{fn}()' in formula")
 
 
+def _reconcile_consent_notice_version(old_schema: Optional[dict], new_schema: dict) -> None:
+    """Mutates new_schema in place: server-assigns settings.consent_notice's
+    version number. Increments only when the notice's own content actually
+    changed (not on every question/schema edit, which would make the version
+    meaningless for "which notice text did this respondent see"), and a
+    client can never forge a version bump by sending one directly."""
+    new_settings = new_schema.setdefault("settings", {}) if isinstance(new_schema, dict) else {}
+    new_notice = new_settings.get("consent_notice") if isinstance(new_settings, dict) else None
+    if not isinstance(new_notice, dict):
+        return
+    old_notice = ((old_schema or {}).get("settings") or {}).get("consent_notice") or {}
+    old_content = {k: v for k, v in old_notice.items() if k != "version"}
+    new_content = {k: v for k, v in new_notice.items() if k != "version"}
+    if old_notice and old_content == new_content:
+        new_notice["version"] = old_notice.get("version") or 1
+    else:
+        new_notice["version"] = (old_notice.get("version") or 0) + 1
+
+
 def _get_form_for_tenant(db: Session, form_id: str, tenant_id: str) -> Form:
     form = db.query(Form).filter(
         Form.id == form_id, Form.tenant_id == tenant_id
@@ -214,6 +233,7 @@ def create_form(request: Request, body: FormCreate, user=Depends(require_org_adm
         _validate_schema_formulas(body.json_schema)
     except ValueError as e:
         raise HTTPException(422, str(e))
+    _reconcile_consent_notice_version(None, body.json_schema)
     # Forms are created as drafts — the active-forms limit is checked at activation time.
     form = Form(
         tenant_id=user["tenant_id"],
@@ -267,6 +287,7 @@ def update_form(form_id: str, body: FormUpdate, user=Depends(require_org_admin),
             _validate_schema_formulas(body.json_schema)
         except ValueError as e:
             raise HTTPException(422, str(e))
+        _reconcile_consent_notice_version(form.json_schema, body.json_schema)
         # Increment version and snapshot the new schema
         form.version += 1
         form.json_schema = body.json_schema
@@ -673,6 +694,9 @@ def consent_log(
                 "submission_id": str(sub.id),
                 "enumerator_id": str(sub.enumerator_id),
                 "signed_at": sub.server_received_at.isoformat() if sub.server_received_at else None,
+                "consent_notice_version": data.get("_consent_notice_version"),
+                "consent_language": data.get("_consent_language"),
+                "consent_given_at": data.get("_consent_given_at"),
             })
 
     return results

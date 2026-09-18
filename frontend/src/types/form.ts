@@ -80,11 +80,33 @@ export interface FormSection {
   skipLogic?: SkipLogic   // if set, entire section is shown/skipped based on this condition
 }
 
+// DPDP consent notice, shown before the first question. `version` is
+// server-assigned (see forms.py _reconcile_consent_notice_version) — never
+// set it from the client. Per-language overrides live in `languages` using
+// the same nested-map convention as field label/hint translations
+// (see i18n/LanguageContext.getLocalizedLabel); English fields are the
+// fallback when a language has no override.
+export interface ConsentNotice {
+  version?: number
+  org_name?: string
+  items_text?: string        // newline-separated list of data items collected
+  purpose?: string
+  retention?: string
+  sharing?: string
+  withdrawal?: string
+  grievance_contact?: string
+  board_contact?: string
+  audio_url?: string
+  languages?: Record<string, Partial<Omit<ConsentNotice, 'version' | 'languages'>>>
+}
+
 export interface FormSchema {
   title: string
   sections: FormSection[]
   version: number
   settings?: {
+    purpose?: string   // legacy simple consent banner text — still supported as a fallback
+    consent_notice?: ConsentNotice
     randomization?: {
       enabled?: boolean
       arms?: string[]

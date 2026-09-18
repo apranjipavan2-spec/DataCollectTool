@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import type { FormSchema, FormField, FormSection } from '@/types/form'
+import type { FormSchema, FormField, FormSection, ConsentNotice } from '@/types/form'
 import { shouldShow, shouldShowSection, evalFormula, getAllFieldsInOrder, filterOptions } from '@/lib/formUtils'
 import { v4 as uuidv4 } from 'uuid'
 import { useLanguage, getLocalizedLabel, LANGUAGE_OPTIONS } from '@/i18n/LanguageContext'
@@ -52,6 +52,8 @@ export interface SubmissionDraft {
   status: 'draft' | 'outbox'
   startedAt: string
   consentTimestamp?: string
+  consentNoticeVersion?: number
+  consentLanguage?: string
 }
 
 interface GpsCoord { lat: number; lng: number; accuracy: number }
@@ -100,7 +102,9 @@ function seedAutoNow(schema: FormSchema): Record<string, unknown> {
 
 export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDownload, onSaveExit, onCancel, initialDraft, getLastSubmission }: Props) {
   const purpose = schema.settings?.purpose as string | undefined
-  const [consentGiven, setConsentGiven] = useState(!purpose || !!initialDraft?.consentTimestamp)
+  const noticeCfg = schema.settings?.consent_notice
+  const hasNotice = !!(noticeCfg?.org_name || noticeCfg?.purpose || purpose)
+  const [consentGiven, setConsentGiven] = useState(!hasNotice || !!initialDraft?.consentTimestamp)
 
   const [draft, setDraft] = useState<SubmissionDraft>(() => initialDraft ?? {
     id: uuidv4(), formVersion: schema.version,
@@ -313,6 +317,9 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
       _started_at: draft.startedAt ?? new Date().toISOString(),
       _duration_sec,
       ...(auditUri && auditUri.startsWith('data:audio/') ? { _audio_audit: auditUri } : {}),
+      ...(draft.consentNoticeVersion != null ? { _consent_notice_version: draft.consentNoticeVersion } : {}),
+      ...(draft.consentLanguage ? { _consent_language: draft.consentLanguage } : {}),
+      ...(draft.consentTimestamp ? { _consent_given_at: draft.consentTimestamp } : {}),
     }
     const final: SubmissionDraft = { ...draft, values: valuesWithMeta, gpsSubmit, status: 'outbox' }
     setDraft(final)
@@ -360,27 +367,90 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
   const currentHasValue = draft.values[currentField.name] !== '' && draft.values[currentField.name] != null
   const progress = allFields.length > 0 ? ((page + 1) / allFields.length) * 100 : 0
 
-  if (purpose && !consentGiven) {
+  if (hasNotice && !consentGiven) {
+    const asRec = (noticeCfg ?? {}) as unknown as Record<string, unknown>
+    const loc = (key: keyof ConsentNotice) => getLocalizedLabel(asRec, key, language)
+    const orgName = loc('org_name')
+    const itemsText = loc('items_text')
+    const items = itemsText ? itemsText.split('\n').map(s => s.trim()).filter(Boolean) : []
+    const noticePurpose = loc('purpose') || purpose || ''
+    const retention = loc('retention')
+    const sharing = loc('sharing')
+    const withdrawal = loc('withdrawal')
+    const grievance = loc('grievance_contact')
+    const board = loc('board_contact')
+    const audioUrl = loc('audio_url')
+    const isFullNotice = !!noticeCfg?.org_name
+
+    const agree = () => {
+      const ts = new Date().toISOString()
+      setConsentGiven(true)
+      setDraft(d => ({
+        ...d, consentTimestamp: ts,
+        consentNoticeVersion: noticeCfg?.version,
+        consentLanguage: language,
+      }))
+    }
+
     return (
-      <div className="h-full bg-catalan-bg flex flex-col items-center justify-center px-5 font-sans">
-        <div className="w-full max-w-lg bg-catalan-surface border border-catalan-border rounded-2xl p-8 text-center">
-          <div className="text-4xl mb-4"><EmojiIcon e="📋" /></div>
-          <h2 className="text-lg font-semibold text-catalan-text mb-2">Data Collection Purpose</h2>
-          <p className="text-sm text-catalan-textMuted mb-6 leading-relaxed">{purpose}</p>
+      <div className="h-full bg-catalan-bg flex flex-col items-center justify-center px-5 font-sans overflow-y-auto py-8">
+        <div className="w-full max-w-lg bg-catalan-surface border border-catalan-border rounded-2xl p-8">
+          {isFullNotice && (
+            <div className="flex justify-center gap-0.5 border border-catalan-border rounded-lg overflow-hidden mb-5 w-fit mx-auto">
+              {LANGUAGE_OPTIONS.map(opt => (
+                <button
+                  key={opt.code}
+                  type="button"
+                  onClick={() => setLanguage(opt.code)}
+                  className={`px-2.5 py-1 text-[11px] font-semibold transition-colors ${language === opt.code ? 'bg-catalan-primary text-catalan-bg' : 'text-catalan-textMuted hover:bg-catalan-hover'}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="text-center">
+            <div className="text-4xl mb-4"><EmojiIcon e="📋" /></div>
+            <h2 className="text-lg font-semibold text-catalan-text mb-1">{orgName || 'Data Collection Purpose'}</h2>
+            {noticeCfg?.version != null && (
+              <p className="text-[11px] text-catalan-textMuted mb-3">Notice v{noticeCfg.version}</p>
+            )}
+          </div>
+
+          <div className="text-sm text-catalan-textMuted leading-relaxed space-y-3 text-left mb-6">
+            {noticePurpose && <p>{noticePurpose}</p>}
+            {items.length > 0 && (
+              <div>
+                <p className="font-medium text-catalan-text mb-1">We will collect:</p>
+                <ul className="list-disc pl-5 space-y-0.5">
+                  {items.map((it, i) => <li key={i}>{it}</li>)}
+                </ul>
+              </div>
+            )}
+            {retention && <p><span className="font-medium text-catalan-text">Retention: </span>{retention}</p>}
+            {sharing && <p><span className="font-medium text-catalan-text">Sharing: </span>{sharing}</p>}
+            {withdrawal && <p><span className="font-medium text-catalan-text">Withdrawing consent: </span>{withdrawal}</p>}
+            {(grievance || board) && (
+              <p>
+                {grievance && <><span className="font-medium text-catalan-text">Grievance contact: </span>{grievance}<br /></>}
+                {board && <><span className="font-medium text-catalan-text">Data Protection Board: </span>{board}</>}
+              </p>
+            )}
+            {audioUrl && (
+              <audio controls src={audioUrl} className="w-full mt-2" />
+            )}
+          </div>
+
           <button
             type="button"
-            onClick={() => {
-              const ts = new Date().toISOString()
-              setConsentGiven(true)
-              setDraft(d => ({ ...d, consentTimestamp: ts }))
-            }}
+            onClick={agree}
             className="w-full bg-catalan-primary text-white rounded-xl py-4 text-base font-semibold cursor-pointer hover:brightness-110 active:scale-[0.98] transition-all"
           >
             I Agree &amp; Continue
           </button>
           {onCancel && (
-            <button type="button" onClick={onCancel} className="mt-3 text-sm text-catalan-textMuted hover:text-catalan-text">
-              Cancel
+            <button type="button" onClick={onCancel} className="mt-3 w-full text-sm text-catalan-textMuted hover:text-catalan-text">
+              I Don't Agree
             </button>
           )}
         </div>

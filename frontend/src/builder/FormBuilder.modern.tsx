@@ -5,7 +5,8 @@ interface RawImportSection { title?: string; fields?: RawImportField[] }
 import InfoButton from '@/help/InfoButton'
 import { useSearchParams } from 'react-router-dom'
 import { v4 as uuidv4 } from 'uuid'
-import type { FormSchema, FormSection, FormField, FieldType, FieldOption } from '@/types/form'
+import type { FormSchema, FormSection, FormField, FieldType, FieldOption, ConsentNotice } from '@/types/form'
+import { LANGUAGE_OPTIONS, type AppLanguage } from '@/i18n/LanguageContext'
 import { newField, newSection, newSchema, updateFieldInSchema, mapSectionById, getAllFieldsInOrder } from '@/lib/formUtils'
 import type { SkipLogic } from '@/types/form'
 import { saveFormDraft, loadFormDraft, clearFormDraft, draftAgeLabel, type FormDraft } from '@/lib/formDraft'
@@ -1187,6 +1188,8 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
   const [auditOpen, setAuditOpen] = React.useState(false)
   const [validationOpen, setValidationOpen] = React.useState(false)
   const [locating, setLocating] = React.useState(false)
+  const [noticeOpen, setNoticeOpen] = React.useState(false)
+  const [noticeLang, setNoticeLang] = React.useState<AppLanguage>('en')
 
   const rand = schema.settings?.randomization ?? {}
   const geo = schema.settings?.geofence ?? {}
@@ -1216,6 +1219,21 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
   const updateAudit = (patch: Record<string, unknown>) =>
     onChange({ ...schema, settings: { ...schema.settings, audio_audit: { ...aud, ...patch } } })
 
+  const notice = schema.settings?.consent_notice ?? {}
+  // English fields live at the top level of consent_notice; other languages
+  // live under consent_notice.languages[code] — same nested-map convention
+  // used for per-field label/hint translations (see getLocalizedLabel).
+  type NoticeContentKey = Exclude<keyof ConsentNotice, 'version' | 'languages'>
+  const noticeFieldValue = (key: NoticeContentKey): string =>
+    (noticeLang === 'en' ? notice[key] : notice.languages?.[noticeLang]?.[key]) as string ?? ''
+  const updateNoticeField = (key: NoticeContentKey, value: string) => {
+    const nextNotice: ConsentNotice = noticeLang === 'en'
+      ? { ...notice, [key]: value || undefined }
+      : { ...notice, languages: { ...notice.languages, [noticeLang]: { ...notice.languages?.[noticeLang], [key]: value || undefined } } }
+    onChange({ ...schema, settings: { ...schema.settings, consent_notice: nextNotice } })
+  }
+  const hasFullNotice = !!notice.org_name
+
   const useMyLocation = () => {
     setLocating(true)
     navigator.geolocation.getCurrentPosition(
@@ -1241,7 +1259,7 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
 
         {/* Data Purpose (DPDP) */}
         <div className="mb-4">
-          <label className={labelCls}>Data Purpose (DPDP Compliance)</label>
+          <label className={labelCls}>Data Purpose (simple consent banner)</label>
           <textarea
             className={inputCls + ' resize-none'}
             rows={3}
@@ -1249,7 +1267,84 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
             onChange={e => onChange({ ...schema, settings: { ...schema.settings, purpose: e.target.value || undefined } })}
             placeholder="Describe why this data is being collected. If set, respondents will see a consent banner before starting."
           />
-          <p className="text-xs text-catalan-textMuted mt-1">Leave blank to skip the consent banner.</p>
+          <p className="text-xs text-catalan-textMuted mt-1">
+            Used as a fallback when no full notice below is configured. Leave blank to skip the consent banner entirely.
+          </p>
+        </div>
+
+        {/* Full DPDP Notice */}
+        <div className="mb-4 border border-catalan-border rounded-xl overflow-hidden">
+          <button
+            onClick={() => setNoticeOpen(o => !o)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-catalan-surface hover:bg-catalan-hover transition-colors text-left"
+          >
+            <span className="font-medium text-catalan-text text-sm">
+              <EmojiIcon e="📜" /> Full DPDP Notice (recommended) {hasFullNotice && <span className="ml-1 text-xs bg-catalan-primary/20 text-catalan-primary px-1.5 py-0.5 rounded-full">v{notice.version ?? 'draft'}</span>}
+            </span>
+            <span className="text-catalan-textMuted text-xs">{noticeOpen ? '▲' : '▼'}</span>
+          </button>
+          {noticeOpen && (
+            <div className="p-4 border-t border-catalan-border bg-catalan-hover/30 space-y-3">
+              <p className="text-xs text-catalan-textMuted">
+                Itemised, versioned notice shown before the first question. The version number is assigned
+                automatically and only changes when this notice's own content changes.
+              </p>
+
+              <div className="flex gap-0.5 border border-catalan-border rounded-lg overflow-hidden w-fit">
+                {LANGUAGE_OPTIONS.map(opt => (
+                  <button
+                    key={opt.code}
+                    type="button"
+                    onClick={() => setNoticeLang(opt.code)}
+                    className={`px-2.5 py-1 text-[11px] font-semibold transition-colors ${noticeLang === opt.code ? 'bg-catalan-primary text-catalan-bg' : 'text-catalan-textMuted hover:bg-catalan-hover'}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {noticeLang !== 'en' && (
+                <p className="text-xs text-catalan-textMuted">Blank fields fall back to the English text below.</p>
+              )}
+
+              <div>
+                <label className={labelCls}>Organisation name{noticeLang !== 'en' ? '' : ' *'}</label>
+                <input className={inputCls} value={noticeFieldValue('org_name')} onChange={e => updateNoticeField('org_name', e.target.value)} placeholder="e.g. Acme Research Foundation" />
+              </div>
+              <div>
+                <label className={labelCls}>Data items collected (one per line)</label>
+                <textarea className={inputCls + ' resize-none'} rows={3} value={noticeFieldValue('items_text')} onChange={e => updateNoticeField('items_text', e.target.value)} placeholder={'Name and contact details\nSurvey answers\nPhoto of the dwelling\nGPS location'} />
+              </div>
+              <div>
+                <label className={labelCls}>Purpose</label>
+                <textarea className={inputCls + ' resize-none'} rows={2} value={noticeFieldValue('purpose')} onChange={e => updateNoticeField('purpose', e.target.value)} placeholder="Why this data is being collected" />
+              </div>
+              <div>
+                <label className={labelCls}>Retention</label>
+                <input className={inputCls} value={noticeFieldValue('retention')} onChange={e => updateNoticeField('retention', e.target.value)} placeholder="e.g. Retained for 3 years, then anonymised" />
+              </div>
+              <div>
+                <label className={labelCls}>Sharing</label>
+                <input className={inputCls} value={noticeFieldValue('sharing')} onChange={e => updateNoticeField('sharing', e.target.value)} placeholder="e.g. Shared only with the funding donor in aggregate form" />
+              </div>
+              <div>
+                <label className={labelCls}>How to withdraw consent</label>
+                <input className={inputCls} value={noticeFieldValue('withdrawal')} onChange={e => updateNoticeField('withdrawal', e.target.value)} placeholder="e.g. Call 1800-XXX-XXXX with your reference code" />
+              </div>
+              <div>
+                <label className={labelCls}>Grievance contact</label>
+                <input className={inputCls} value={noticeFieldValue('grievance_contact')} onChange={e => updateNoticeField('grievance_contact', e.target.value)} placeholder="Name, email or phone of the Grievance Officer" />
+              </div>
+              <div>
+                <label className={labelCls}>Data Protection Board contact</label>
+                <input className={inputCls} value={noticeFieldValue('board_contact')} onChange={e => updateNoticeField('board_contact', e.target.value)} placeholder="e.g. https://dataprotection.gov.in" />
+              </div>
+              <div>
+                <label className={labelCls}>Audio read-out URL (optional)</label>
+                <input className={inputCls} value={noticeFieldValue('audio_url')} onChange={e => updateNoticeField('audio_url', e.target.value)} placeholder="Link to a pre-recorded audio file for this language" />
+                <p className="text-xs text-catalan-textMuted mt-1">Upload the audio file via Shared Files, then paste its link here.</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Validation Rules */}
