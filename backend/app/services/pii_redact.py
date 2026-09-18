@@ -64,6 +64,35 @@ def redact_value(value, is_identifier_field: bool = False):
     return REDACTED if _looks_like_pii(value) else value
 
 
+def _mask_aadhaar_match(m: "re.Match") -> str:
+    digits = re.sub(r"\s", "", m.group(0))
+    return f"XXXX-XXXX-{digits[-4:]}"
+
+
+def mask_aadhaar(value):
+    """Replace any Aadhaar-shaped digit sequence in `value` with a masked
+    last-4-only form (e.g. "1234 5678 9012" -> "XXXX-XXXX-9012"). This is
+    minimisation, not encryption — DPDP's "never store full Aadhaar" is best
+    satisfied by not holding a reversible full copy at all, so there's
+    nothing to decrypt or leak later, and no read-path changes are needed
+    anywhere the value is later displayed or exported."""
+    if isinstance(value, str):
+        return _AADHAAR_RE.sub(_mask_aadhaar_match, value)
+    if isinstance(value, list):
+        return [mask_aadhaar(v) for v in value]
+    return value
+
+
+def mask_aadhaar_in_data(data: dict) -> dict:
+    """Apply mask_aadhaar() to every value in a submission's data_json, at
+    write time, before it's ever persisted. Call this at every point a
+    submission's answers are stored or replaced — see submissions.py,
+    sync.py, public_survey.py."""
+    if not isinstance(data, dict):
+        return data
+    return {k: mask_aadhaar(v) for k, v in data.items()}
+
+
 def identifier_field_ids(form_schema: dict) -> set:
     """Field ids marked is_identifier=True in a Form.json_schema. Mirrors
     submissions.py:_identifier_fields but returns a set for O(1) lookups."""

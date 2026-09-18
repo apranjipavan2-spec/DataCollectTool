@@ -17,6 +17,7 @@ from app.models.form import Form
 from app.models.sync_log import SyncLog
 from app.models.tenant import Tenant
 from app.services.webhook import fire_webhooks
+from app.services.pii_redact import mask_aadhaar_in_data
 from app.services.whatsapp import notify as wa_notify
 from app.services.telegram import notify as tg_notify
 from app.services.sheets_sync import sync_submission
@@ -272,7 +273,7 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
                     reference_dt = getattr(existing, "updated_at", None) or existing.local_created_at
                     existing_dt = reference_dt.replace(tzinfo=None) if reference_dt else None
                     if existing_dt is None or incoming_dt > existing_dt:
-                        new_data = dict(item.data_json)
+                        new_data = mask_aadhaar_in_data(dict(item.data_json))
                         new_data["_conflict_resolved"] = True
                         existing.data_json = new_data
                         existing.form_version = item.form_version
@@ -301,7 +302,7 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
             except ValueError:
                 pass
 
-        data_for_storage = dict(item.data_json)
+        data_for_storage = mask_aadhaar_in_data(dict(item.data_json))
         roster_id = data_for_storage.pop("_roster_id", None)
 
         # Auto-inject location hierarchy from the linked ProgramLocation (zero burden on enumerator)

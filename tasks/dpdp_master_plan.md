@@ -573,12 +573,103 @@ skipped by choice). Full detail in `tasks/pending_owner_action.md` §1.
       place, or tracking provenance per generated report — non-trivial,
       flagged as follow-up rather than half-built.
 
-### 10. Encryption at rest — `todo`
-Currently TLS + bcrypt only (no data-at-rest encryption described). Add: disk + object
-storage (photos/audio) + backup encryption via a managed key service in an Indian region;
-field-level (envelope) encryption for direct identifiers (name, phone, Aadhaar-like IDs,
-exact GPS) — never store full Aadhaar numbers. TLS 1.2+, HSTS, secure cookies, scheduled
-key/secret rotation + rotation on staff exit.
+### 10. Encryption at rest — `in-progress` (code-buildable pieces built + verified)
+- [x] **TLS 1.2+, HSTS — already satisfied, verified not rebuilt.** Checked
+      rather than assumed: `deploy/nginx.conf:24` already pins
+      `ssl_protocols TLSv1.2 TLSv1.3` (no legacy versions); `main.py`'s
+      `SecurityHeadersMiddleware` already sets
+      `Strict-Transport-Security: max-age=31536000; includeSubDomains`.
+      Both pre-existing, nothing to build.
+- [x] **"Secure cookies" — not applicable, confirmed not just skipped.**
+      Grepped every route for `set_cookie` — zero results. Auth is pure JWT
+      bearer-token (Authorization header, tokens held client-side), no
+      cookie-based session state exists anywhere in the app, so there is
+      nothing to mark Secure/HttpOnly/SameSite. Documented so this doesn't
+      get re-investigated as if it might be a real gap.
+- [x] **Aadhaar minimisation — done 2026-09-18, and arguably the stronger
+      fix than encryption for this specific requirement.** The audit's
+      "never store full Aadhaar numbers" is best satisfied by never holding
+      a reversible full copy at all — nothing to decrypt is nothing to leak.
+      New `pii_redact.mask_aadhaar()` (reuses the module's own existing
+      `_AADHAAR_RE`) replaces any 12-digit Aadhaar-shaped sequence with
+      `XXXX-XXXX-<last 4>`, irreversibly, at write time — before the value
+      is ever persisted, so **every existing read path (exports, analyzer,
+      dashboards, AI redaction, duplicate detection) needed zero changes**,
+      since a masked string displays exactly like any other short string.
+      Wired into **every** place a submission's `data_json` is written or
+      replaced, found by grepping for `Submission(`/`.data_json =` across
+      the whole backend rather than assuming the obvious 1-2 spots:
+      `submissions.py` (create, draft upsert, direct data edit),
+      `sync.py` (offline push — both the main-path and conflict-resolution
+      branches), `public_survey.py` (public self-serve submit),
+      `bulk_upload.py` (Excel bulk import), `migration/router.py`
+      (Kobo/SurveyCTO/ODK import — also flows into the returned
+      `data_rows` used for downstream Sheets sync, so that gets the masked
+      version too, not the raw one). 8 pytest cases
+      (`backend/tests/test_pii_redact.py`) cover: spaced/unspaced Aadhaar,
+      masking mid-sentence, non-Aadhaar strings passing through untouched,
+      list values, non-string passthrough, and that the original dict
+      passed in is never mutated in place.
+- [x] **Envelope-encryption primitive built — done 2026-09-18, not yet
+      wired to identifier fields (see gap below).** New
+      `backend/app/core/field_crypto.py` — same proven shape as the
+      existing `tenant_ai_crypto.py` (Fernet keyed via HKDF from
+      `JWT_SECRET`, independent derived key via a distinct HKDF info
+      string, no new required env var, no new managed-KMS dependency for
+      this code-buildable piece). 4 pytest cases
+      (`backend/tests/test_field_crypto.py`): round-trip, empty-string
+      safety, tamper/corruption correctly raises rather than silently
+      passing, and same-plaintext encrypts to different ciphertext each
+      time (Fernet's IV — otherwise identical values would be
+      correlatable at rest without ever being decrypted).
+- [x] **Verified:** `py_compile` clean on all 8 touched/new files; the full
+      `app.api.router` actually **imported** (302 routes registered,
+      confirming no runtime-only import errors across every touched
+      module). Full pytest suite: 60 passed / 76 skipped / 0 failed (up
+      from 48). No frontend changes this item.
+- [ ] **Real gap, not fixed: field-level encryption not wired to
+      `is_identifier` fields yet.** The primitive (`field_crypto.py`) is
+      built and tested, but actually encrypting name/phone/other
+      `is_identifier=True` field values inside `data_json` — as opposed to
+      Aadhaar, which is minimised rather than encrypted — needs a genuinely
+      staged rollout that a single pass shouldn't attempt against live
+      production data: every read path that touches `data_json` (exports,
+      analyzer, cleaner, dashboards, duplicate detection, AI redaction,
+      consent-log, the new data-rights search) would need decrypt-aware
+      reads shipped *before* any write starts encrypting, plus a backfill
+      script for every existing unencrypted row. Flagged as real follow-up
+      work, not attempted as a single risky pass.
+- [ ] **Real gap, not fixed: exact GPS.** Same reasoning as identifier
+      fields — `gps_open`/`gps_submit` are read directly by the submissions
+      map, exports, and geofence checks; encrypting them needs the same
+      staged read-path retrofit. Unlike Aadhaar, GPS precision can't be
+      safely minimised without changing what the org actually asked for
+      (map accuracy), so masking isn't a substitute fix here the way it was
+      for Aadhaar — this one genuinely needs the full encryption retrofit.
+- [ ] **Not fixed (ops, tracked separately): disk + object-storage +
+      backup encryption via a managed KMS in an Indian region.** Owner's
+      server-rebuild plan already covers this — see the existing note
+      below and `tasks/pending_owner_action.md` §2-3; not a code change.
+- [ ] **Not fixed: scheduled key/secret rotation + rotation on staff
+      exit.** No rotation schedule or staff-exit-triggered rotation
+      process exists for `JWT_SECRET` or the Fernet-derived keys above —
+      an ops/process gap, not something this pass built tooling for.
+
+**Verified live 2026-09-18 — disk encryption still open, owner has committed a
+timeline.** Disk is not encrypted (unmanaged Contabo VPS, confirmed via `lsblk`
+— no `crypt` layer). Owner's plan: back up, then rebuild the server on a fresh
+encrypted volume, bundled with the region move (item 3's finding below) rather
+than two separate migrations — timeline "a couple of days" as of 2026-09-18.
+
+Backup job itself confirmed genuinely working (69 backups, one full restore
+test passed — 4 tenants recovered correctly into a throwaway DB). Automated
+R2 offsite sync was never configured, but owner has a separate manual process
+(copies to Drive, downloaded periodically) — parked intentionally, not being
+automated. Full detail in `tasks/pending_owner_action.md` §2.
+
+**Region confirmed EU, not India** (§3 of the same file) — owner committed to
+moving to an India region within days, same server rebuild as the disk-
+encryption fix above.
 
 **Verified live 2026-09-18 — disk encryption still open, owner has committed a
 timeline.** Disk is not encrypted (unmanaged Contabo VPS, confirmed via `lsblk`

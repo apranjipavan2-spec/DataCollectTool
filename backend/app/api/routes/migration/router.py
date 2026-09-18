@@ -24,6 +24,7 @@ from app.models.tenant import Tenant
 from app.services.whatsapp import notify as wa_notify
 from app.services.telegram import notify as tg_notify
 from app.services.sheets_sync import bulk_sync_submissions
+from app.services.pii_redact import mask_aadhaar_in_data
 
 from .xlsform_parser import parse_xlsform
 from .xlsform_serializer import serialize_xlsform
@@ -104,7 +105,7 @@ def _save_submissions(
     saved = 0
     data_rows: list[dict] = []
     for raw in raw_submissions:
-        data = map_submission_data(raw, field_names)
+        data = mask_aadhaar_in_data(map_submission_data(raw, field_names))
         sub = Submission(
             id=uuid.uuid4(),
             tenant_id=form.tenant_id,

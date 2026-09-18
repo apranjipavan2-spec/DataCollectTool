@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.core.deps import get_current_user, require_enumerator, require_supervisor, require_org_admin
 from app.core.rate_limit import limiter
 from app.core.soft_delete import soft_delete
+from app.services.pii_redact import mask_aadhaar_in_data
 from app.models.submission import Submission
 from app.models.submission_draft import SubmissionDraft
 from app.models.submission_history import SubmissionHistory
@@ -946,13 +947,14 @@ def create_submission(request: Request, body: SubmissionCreate, background_tasks
 
         from app.services.child_protection import compute_child_protection_status
         child_status = compute_child_protection_status(form.json_schema, body.data_json)
+        stored_data = mask_aadhaar_in_data(body.data_json)
 
         sub = Submission(
             tenant_id=user["tenant_id"],
             form_id=body.form_id,
             form_version=body.form_version,
             enumerator_id=user.get("sub"),
-            data_json=body.data_json,
+            data_json=stored_data,
             gps_open=body.gps_open,
             gps_submit=body.gps_submit,
             local_created_at=datetime.fromisoformat(body.local_created_at) if body.local_created_at else None,
@@ -1063,12 +1065,13 @@ def upsert_draft(body: DraftUpsert, user=Depends(require_enumerator), db: Sessio
             pass
     # include_deleted so a re-saved draft reuses (and un-bins) any soft-deleted
     # row for the same (enumerator, local_id) instead of colliding on the unique key.
+    stored_data = mask_aadhaar_in_data(body.data_json)
     draft = db.query(SubmissionDraft).execution_options(include_deleted=True).filter(
         SubmissionDraft.enumerator_id == user["sub"],
         SubmissionDraft.local_id == body.local_id,
     ).first()
     if draft:
-        draft.data_json = body.data_json
+        draft.data_json = stored_data
         draft.form_version = body.form_version
         draft.gps_open = body.gps_open
         draft.gps_submit = body.gps_submit
@@ -1080,7 +1083,7 @@ def upsert_draft(body: DraftUpsert, user=Depends(require_enumerator), db: Sessio
             form_id=body.form_id,
             form_version=body.form_version,
             local_id=body.local_id,
-            data_json=body.data_json,
+            data_json=stored_data,
             gps_open=body.gps_open,
             gps_submit=body.gps_submit,
             local_created_at=lca,
@@ -1416,7 +1419,7 @@ def edit_submission_data(
     elif role not in ("org_admin", "supervisor", "master_admin"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
-    sub.data_json = body.data_json
+    sub.data_json = mask_aadhaar_in_data(body.data_json)
     db.commit()
     return {"id": str(sub.id), "status": "updated", "serial_no": sub.serial_no}
 

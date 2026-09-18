@@ -2,7 +2,7 @@
 stripped regardless of content, and identifier-shaped values (email/phone/Aadhaar/
 GPS pair) in untagged fields must be caught by the heuristic layer. If this breaks,
 raw respondent data can reach a third-party LLM provider."""
-from app.services.pii_redact import redact_row, redact_rows, redact_value, REDACTED
+from app.services.pii_redact import redact_row, redact_rows, redact_value, REDACTED, mask_aadhaar, mask_aadhaar_in_data
 
 
 def test_identifier_field_always_redacted():
@@ -43,3 +43,43 @@ def test_redact_value_scalar():
     assert redact_value("9876543210") == REDACTED
     assert redact_value("Rampur") == "Rampur"
     assert redact_value("Rampur", is_identifier_field=True) == REDACTED
+
+
+# ── Aadhaar minimisation at write time (encryption-at-rest item) ────────────
+
+def test_mask_aadhaar_keeps_last_4_digits_only():
+    assert mask_aadhaar("1234 5678 9012") == "XXXX-XXXX-9012"
+
+
+def test_mask_aadhaar_handles_no_spaces():
+    assert mask_aadhaar("123456789012") == "XXXX-XXXX-9012"
+
+
+def test_mask_aadhaar_masks_within_a_longer_string():
+    out = mask_aadhaar("My Aadhaar is 1234 5678 9012, call me")
+    assert "1234" not in out and "5678" not in out
+    assert out.endswith("9012, call me") or "XXXX-XXXX-9012" in out
+
+
+def test_mask_aadhaar_non_aadhaar_string_untouched():
+    assert mask_aadhaar("Rampur village") == "Rampur village"
+
+
+def test_mask_aadhaar_handles_lists():
+    assert mask_aadhaar(["1234 5678 9012", "no id here"]) == ["XXXX-XXXX-9012", "no id here"]
+
+
+def test_mask_aadhaar_non_string_passthrough():
+    assert mask_aadhaar(42) == 42
+    assert mask_aadhaar(None) is None
+
+
+def test_mask_aadhaar_in_data_full_submission():
+    data = {"name": "Priya", "aadhaar": "1234 5678 9012", "age": 34}
+    out = mask_aadhaar_in_data(data)
+    assert out == {"name": "Priya", "aadhaar": "XXXX-XXXX-9012", "age": 34}
+    assert data["aadhaar"] == "1234 5678 9012"  # original dict untouched
+
+
+def test_mask_aadhaar_in_data_non_dict_passthrough():
+    assert mask_aadhaar_in_data(None) is None
