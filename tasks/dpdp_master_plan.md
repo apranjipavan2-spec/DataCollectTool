@@ -1104,6 +1104,34 @@ STQC/tender-specific audits and GIGW/WCAG 2.1 AA accessibility.
       dependencies but not vulnerabilities baked into base images; a
       reasonable small follow-up (a CI step scanning the image before
       push) but not built this pass.
+- [x] **Enabling scanning immediately surfaced a real finding — fixed, not
+      just logged.** GitHub's vulnerability alerts (a side effect of
+      enabling `dependabot_security_updates` above) reported 140 existing
+      alerts (2 critical, 69 high, 57 medium, 12 low) the moment scanning
+      turned on. Pulled the 2 critical ones specifically rather than just
+      noting the count: **`python-jose` — algorithm confusion with OpenSSH
+      ECDSA keys (< 3.4.0), patched in 3.4.0.** This library signs/verifies
+      *every* login token in the app (`app/core/security.py`), so this
+      wasn't a theoretical risk to leave for later — checked
+      `JWT_ALGORITHM` is hardcoded to `HS256` only (no multi-algorithm
+      acceptance, so the specific ECDSA-confusion vector doesn't directly
+      apply to this app's usage), then bumped to `3.4.0` anyway since it's
+      a safe, patch-level fix. Verified before shipping: encode/decode
+      round-trip works with the new version, full backend suite still 60
+      passed / 0 failed, and the full `app.api.router` still imports clean
+      (302 routes) despite a pip dependency-resolver warning about a
+      transitive `pyasn1` version conflict (checked — non-fatal, nothing
+      actually broke). The other critical (**`vitest`**, arbitrary file
+      read when its UI server is network-exposed on Windows) is a
+      dev-only test-tool dependency, low practical risk here, and its fix
+      is a major version bump (1.x → 3.x) that could break the test setup —
+      deliberately **not** bumped blindly; flagged for a dedicated pass
+      with time to verify the test suite still runs after upgrading,
+      rather than risking it inside this item.
+      **137 more alerts remain untriaged** (69 high / 57 medium / 12 low) —
+      opening `dependabot_security_updates` will start proposing PRs for
+      these automatically going forward; reviewing the existing backlog is
+      real follow-up work, not something to rubber-stamp in bulk.
 
 ### 20. Legal & governance — `todo`
 Engage an Indian data-protection lawyer (role classification, DPA, privacy policy, terms,
