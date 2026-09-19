@@ -229,6 +229,8 @@ _PATCHES = [
     # 0060 — login lockout (failed_login_count / locked_until on users)
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_count INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ",
+    # 0061 — per-form retention policy
+    "ALTER TABLE forms ADD COLUMN IF NOT EXISTS retention_days INTEGER",
 ]
 
 # 0048 — restricted runtime role + empty-context-bypass RLS policies. Mirrors the

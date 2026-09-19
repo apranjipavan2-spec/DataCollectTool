@@ -30,6 +30,7 @@ class FormUpdate(BaseModel):
     json_schema: Optional[dict[str, Any]] = None
     status: Optional[str] = None
     allow_enumerator_edit: Optional[bool] = None  # None = clear override (use org default)
+    retention_days: Optional[int] = None  # None = no automatic retention policy
 
 
 class BulkEditSettingRequest(BaseModel):
@@ -260,7 +261,7 @@ def get_form(form_id: str, user=Depends(require_enumerator), db: Session = Depen
     if user.get("role") == "enumerator" and form.status != "active":
         raise HTTPException(status_code=404, detail="Form not found")
     return {"id": str(form.id), "title": form.title, "json_schema": form.json_schema,
-            "version": form.version, "status": form.status}
+            "version": form.version, "status": form.status, "retention_days": form.retention_days}
 
 
 @router.get("/{form_id}/generation-status")
@@ -307,9 +308,14 @@ def update_form(form_id: str, body: FormUpdate, user=Depends(require_org_admin),
     if "allow_enumerator_edit" in body.model_fields_set:
         form.allow_enumerator_edit = body.allow_enumerator_edit
 
+    if "retention_days" in body.model_fields_set:
+        if body.retention_days is not None and body.retention_days < 1:
+            raise HTTPException(422, "retention_days must be a positive number of days, or null to disable")
+        form.retention_days = body.retention_days
+
     db.commit()
     db.refresh(form)
-    return {"id": str(form.id), "version": form.version, "status": form.status}
+    return {"id": str(form.id), "version": form.version, "status": form.status, "retention_days": form.retention_days}
 
 
 @router.patch("/bulk-edit-setting")

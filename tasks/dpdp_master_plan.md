@@ -1158,10 +1158,48 @@ country. Notify customers before adding a new one, with a right to object. Treat
 Sheets sync as an export that leaves FieldGovern's control: warn admins, allow disabling
 per tenant, exclude identifier fields by default.
 
-### 23. Retention & deletion — `todo`
-Per-form retention setting with automatic deletion/anonymisation at expiry + a reminder
-before it happens. On contract end: data export, deletion within an agreed period, and a
-deletion certificate. Delete enumerator location traces once no longer needed for QC.
+### 23. Retention & deletion — `in-progress` (per-form policy + auto-expiry built)
+- [x] **Per-form retention setting — done 2026-09-19.** New
+      `forms.retention_days` column (migration `0061`, nullable — `NULL`
+      means no policy, preserving current behavior for every existing
+      form). Editable in the Form Builder's settings panel, alongside the
+      other DPDP settings added in item 5 — separate save action from the
+      schema save, since it's a real `Form` column, not part of
+      `json_schema`.
+- [x] **Automatic anonymisation at expiry — done, reuses the same erasure
+      core again.** New `backend/app/services/retention.py` +
+      a daily scheduler job (04:15 UTC, matching the existing APScheduler
+      convention in `core/scheduler.py`). `action=erase` here calls the
+      **same** `_erase_submission_row()` helper as anonymize (master_admin),
+      consent withdrawal (org_admin), and data-rights erasure — the 4th
+      call site now sharing one implementation, with its own audit action
+      label (`retention_expiry_anonymized`) so it stays distinguishable
+      from the other three in the log.
+- [x] **Reminder before expiry — done.** In-app notification (reusing the
+      existing `create_notification()` inbox helper, not a new
+      notification path) to every `org_admin` in the tenant, fired once —
+      exactly 7 days before a submission's retention date, computed by
+      whole-day comparison so a job running a few minutes late doesn't
+      miss the window.
+- [x] **Verified:** the two pure date-math functions
+      (`is_past_retention`, `is_reminder_due`) are unit-testable without a
+      DB — 9 pytest cases (`backend/tests/test_retention.py`) cover the
+      exact boundary day (not yet past at exactly N days old), the
+      reminder firing exactly once at the threshold and not before/after,
+      an already-anonymized submission never re-triggering a reminder, and
+      missing-timestamp safety. All 9 pass. Full backend suite: 69 passed
+      (up from 60) / 79 skipped / 0 failed — `py_compile` clean;
+      `app.api.router` + `core.scheduler` both actually imported, no
+      runtime errors. `npx tsc --noEmit` clean; `npm run build` succeeds
+      (65 precached entries).
+- [ ] **Not done: contract-end deletion certificate.** Tracked together
+      with item 14's DPA/deletion-certificate work — see that item.
+- [ ] **Not done: deleting enumerator location traces once no longer
+      needed for QC.** No specific "GPS trace expiry, independent of the
+      submission's own retention policy" mechanism exists — exact GPS
+      currently lives as long as its parent submission does. A real,
+      separate follow-up if location data needs a shorter/different
+      retention window than the rest of the response.
 
 ### 24. Trust Centre page — `todo`
 Public page: security overview, sub-processor list, DPA, DPDP feature mapping, uptime

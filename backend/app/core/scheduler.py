@@ -126,6 +126,24 @@ def _run_bin_purge():
         logger.exception("[Scheduler] Recycle-bin purge failed")
 
 
+def _run_retention_expiry():
+    """Anonymize submissions past their form's configured retention window,
+    and send reminders for submissions approaching it."""
+    from app.core.database import SessionLocal
+    from app.services.retention import run_retention_expiry
+
+    logger.info("[Scheduler] Retention expiry check starting")
+    db = SessionLocal()
+    try:
+        result = run_retention_expiry(db)
+        logger.info("[Scheduler] Retention expiry done — anonymized=%d reminders_sent=%d",
+                    result["anonymized"], result["reminders_sent"])
+    except Exception:
+        logger.exception("[Scheduler] Retention expiry job failed")
+    finally:
+        db.close()
+
+
 def _run_form_version_purge():
     """Purge form-version history older than 6 months (keeps each form's most
     recent 20 versions, and therefore its latest version, regardless of age)."""
@@ -206,8 +224,18 @@ def start_scheduler():
         misfire_grace_time=3600,
     )
 
+    # Retention-policy expiry — daily at 04:15 UTC
+    _scheduler.add_job(
+        _run_retention_expiry,
+        CronTrigger(hour=4, minute=15),
+        id="retention_expiry",
+        name="Per-form Retention Policy Expiry",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
     _scheduler.start()
-    logger.info("[Scheduler] Started — daily digest @ 07:00 UTC, monthly usage reset @ 1st 00:30 UTC, scheduled reports @ :00 each hour, bin purge @ 03:15 UTC, trial expiry @ 02:00 UTC, form version purge @ 03:45 UTC")
+    logger.info("[Scheduler] Started — daily digest @ 07:00 UTC, monthly usage reset @ 1st 00:30 UTC, scheduled reports @ :00 each hour, bin purge @ 03:15 UTC, trial expiry @ 02:00 UTC, form version purge @ 03:45 UTC, retention expiry @ 04:15 UTC")
 
 
 def stop_scheduler():

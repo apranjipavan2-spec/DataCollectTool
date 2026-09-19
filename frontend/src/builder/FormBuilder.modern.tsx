@@ -48,6 +48,7 @@ export default function FormBuilder() {
   const [selectedField, setSelectedField]     = useState<{ sectionId: string; fieldId: string } | null>(null)
   const [showTypeMenu, setShowTypeMenu]       = useState(false)
   const [formId, setFormId]         = useState<string | null>(null)
+  const [retentionDays, setRetentionDays] = useState<number | null>(null)
   const [saving, setSaving]         = useState(false)
   const [saved, setSaved]           = useState(false)
   const [saveError, setSaveError]   = useState('')
@@ -201,6 +202,7 @@ export default function FormBuilder() {
           const loaded: FormSchema = data.json_schema ?? data
           setSchema(loaded)
           setFormId(formIdFromUrl)
+          setRetentionDays(data.retention_days ?? null)
           setSelectedSection(loaded.sections[0]?.id ?? '')
           setSelectedField(null)
           // Unsaved local edits from a prior session (crash, stale-chunk reload,
@@ -995,7 +997,7 @@ export default function FormBuilder() {
                   onAddField={() => setShowTypeMenu(true)}
                 />
               ) : (
-                <FormSettingsPanel schema={schema} onChange={setSchema} />
+                <FormSettingsPanel schema={schema} onChange={setSchema} formId={formId} retentionDays={retentionDays} onRetentionSaved={setRetentionDays} />
               )}
             </div>
           </div>
@@ -1182,7 +1184,10 @@ function SectionEditor({ section, schema, onTitleChange, onSkipLogicChange, onAd
 }
 
 // ── Form-level Settings Panel ────────────────────────────────────────────────
-function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange: (s: FormSchema) => void }) {
+function FormSettingsPanel({ schema, onChange, formId, retentionDays, onRetentionSaved }: {
+  schema: FormSchema; onChange: (s: FormSchema) => void
+  formId: string | null; retentionDays: number | null; onRetentionSaved: (days: number | null) => void
+}) {
   const [randOpen, setRandOpen] = React.useState(false)
   const [geoOpen, setGeoOpen] = React.useState(false)
   const [auditOpen, setAuditOpen] = React.useState(false)
@@ -1190,6 +1195,30 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
   const [locating, setLocating] = React.useState(false)
   const [noticeOpen, setNoticeOpen] = React.useState(false)
   const [noticeLang, setNoticeLang] = React.useState<AppLanguage>('en')
+  const [retentionInput, setRetentionInput] = React.useState<string>(retentionDays != null ? String(retentionDays) : '')
+  const [retentionSaving, setRetentionSaving] = React.useState(false)
+  const [retentionSaved, setRetentionSaved] = React.useState(false)
+  const [retentionError, setRetentionError] = React.useState('')
+  React.useEffect(() => { setRetentionInput(retentionDays != null ? String(retentionDays) : '') }, [retentionDays])
+
+  const saveRetention = async () => {
+    if (!formId) return
+    const trimmed = retentionInput.trim()
+    const value = trimmed === '' ? null : Number(trimmed)
+    if (value !== null && (!Number.isInteger(value) || value < 1)) {
+      setRetentionError('Enter a whole number of days, or leave blank to disable')
+      return
+    }
+    setRetentionError('')
+    setRetentionSaving(true)
+    try {
+      await api.put(`/forms/${formId}`, { retention_days: value })
+      onRetentionSaved(value)
+      setRetentionSaved(true); setTimeout(() => setRetentionSaved(false), 2000)
+    } catch (e: any) {
+      setRetentionError(e?.response?.data?.detail ?? 'Failed to save')
+    } finally { setRetentionSaving(false) }
+  }
 
   const rand = schema.settings?.randomization ?? {}
   const geo = schema.settings?.geofence ?? {}
@@ -1356,6 +1385,38 @@ function FormSettingsPanel({ schema, onChange }: { schema: FormSchema; onChange:
                 Photo/audio/GPS purposes are asked automatically whenever this form has a matching question type — no extra setup needed for those.
               </p>
             </div>
+          )}
+        </div>
+
+        {/* Retention policy (DPDP) */}
+        <div className="mb-4">
+          <label className={labelCls}>Retention Policy (days)</label>
+          {!formId ? (
+            <p className="text-xs text-catalan-textMuted">Save this form first to set a retention policy.</p>
+          ) : (
+            <>
+              <div className="flex gap-2 items-start">
+                <input
+                  type="number"
+                  min={1}
+                  className={inputCls + ' max-w-[140px]'}
+                  value={retentionInput}
+                  onChange={e => setRetentionInput(e.target.value)}
+                  placeholder="No limit"
+                />
+                <button
+                  onClick={saveRetention}
+                  disabled={retentionSaving}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 ${retentionSaved ? 'bg-catalan-success text-catalan-bg' : 'bg-catalan-primary text-catalan-bg hover:bg-catalan-primaryDark'}`}
+                >
+                  {retentionSaving ? 'Saving…' : retentionSaved ? '✓ Saved' : 'Save'}
+                </button>
+              </div>
+              {retentionError && <p className="text-xs text-catalan-error mt-1">{retentionError}</p>}
+              <p className="text-xs text-catalan-textMuted mt-1">
+                Responses older than this are automatically anonymized. Org admins get an in-app reminder 7 days before it happens. Leave blank to keep responses indefinitely.
+              </p>
+            </>
           )}
         </div>
 
