@@ -1086,18 +1086,42 @@ encryption fix above.
 
 ## P1 / P2 — assurance
 
-### 17. Independent assurance — `todo`
+### 17. Independent assurance — `todo` (genuinely ops/business, not code — documented honestly)
 Annual penetration test by a CERT-In empanelled auditor (publish a summary letter).
 ISO/IEC 27001 (+27701 for privacy) within 12–18 months. SOC 2 Type II if selling to
 international funders.
+
+**Not code-buildable — every sub-item here requires engaging an external,
+accredited third party** (a CERT-In empanelled pentest firm; an ISO
+certification body; a SOC 2 auditor). Nothing in this repo can substitute
+for an independent auditor's sign-off, and fabricating progress here would
+be actively misleading. What this session *did* build that a future
+pentest/audit would actually rely on as evidence: the tamper-evident audit
+chain (item 11), RLS tenant isolation (item 2), the breach-response plan
+(item 12), and the CI security-scanning setup (item 19) — real artifacts an
+auditor could point to, not a substitute for the audit itself.
 
 ---
 
 ## P2 — competitiveness / government readiness
 
-### 18. Government hosting readiness — `todo`
+### 18. Government hosting readiness — `todo` (genuinely ops/business, not code — corrected a stale assumption)
 Confirm current Mumbai hosting or move to a MeitY-empanelled cloud provider; be ready for
 STQC/tender-specific audits and GIGW/WCAG 2.1 AA accessibility.
+
+**Correcting this item's own premise, found while documenting it**: it
+assumes "current Mumbai hosting" needs confirming — but this session (and
+the one before it) already verified directly against the live server that
+hosting is actually in an **EU region, not Mumbai/India** (see
+`tasks/pending_owner_action.md` §3), with an owner-committed move to India
+"in a couple of days" as of 2026-09-18, bundled with the disk-encryption
+server rebuild (item 10). This is genuinely not code-buildable —
+confirming/choosing a MeitY-empanelled provider and passing STQC/tender
+audits are ops and business decisions. GIGW/WCAG 2.1 AA accessibility is
+partially code-adjacent but substantial enough that it's tracked as its
+own real gap under item 25 (product roadmap) rather than duplicated here —
+no accessibility audit has been run against either the collection flow or
+the admin UI.
 
 ### 19. Secure development — `in-progress` (CI scanning + disclosure policy done)
 - [x] **Dependency scanning — done 2026-09-18.** New `.github/dependabot.yml`
@@ -1172,13 +1196,40 @@ STQC/tender-specific audits and GIGW/WCAG 2.1 AA accessibility.
       these automatically going forward; reviewing the existing backlog is
       real follow-up work, not something to rubber-stamp in bulk.
 
-### 20. Legal & governance — `todo`
+### 20. Legal & governance — `todo` (genuinely legal/business, not code — one real gap confirmed)
 Engage an Indian data-protection lawyer (role classification, DPA, privacy policy, terms,
 research-exemption position — do not market Section 17(2)(b) research exemption as a
 blanket cover). Publish a named Grievance Officer with contact + response timelines.
 Maintain a Record of Processing Activities. Run a DPIA on AI features + audio recording.
 Write internal policies (access control, incident response, retention, acceptable use,
 vendor management, secure development) and train staff.
+
+**Not code-buildable — needs an actual lawyer's judgment**, not a document
+I write: role classification (fiduciary vs. processor) has real legal
+consequences, and the explicit warning against overselling the Section
+17(2)(b) research exemption is exactly the kind of call a non-lawyer
+generating text shouldn't make.
+
+**Confirmed one real, specific gap while checking this** rather than
+assuming: grepped the whole marketing site for "Grievance Officer" —
+FieldGovern (the company) has **no named Grievance Officer published
+anywhere for itself**. What exists (`dpdp-compliance.html`) is a
+*per-tenant configurable* grievance email that FieldGovern's *customers*
+use with *their own* respondents — a different thing entirely from
+FieldGovern's own obligation as a company. This is the one sub-item here
+that's a straightforward publish-a-page fix once the org names a real
+person — genuinely blocked on that name/contact existing, not on more
+code or docs.
+
+RoPA, DPIA, and the internal policy set (access control, incident
+response, retention, acceptable use, vendor management, secure
+development) are all real, substantial documents this session didn't
+attempt to fabricate — several of the underlying *mechanisms* they'd
+document now exist (retention: item 23, incident response: item 12,
+access control: item 16, vendor management: item 14's sub-processor
+list/DPA), which should make writing the actual policy documents faster
+once a lawyer engages, but the policy documents themselves are still a
+real, separate deliverable.
 
 ### 21. AI feature controls — `in-progress` (most already covered by item 1, 2 new labels added)
 - [x] **Most of this item's requirements were already satisfied by item 1's
