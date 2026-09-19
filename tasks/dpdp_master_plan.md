@@ -1060,10 +1060,50 @@ international funders.
 Confirm current Mumbai hosting or move to a MeitY-empanelled cloud provider; be ready for
 STQC/tender-specific audits and GIGW/WCAG 2.1 AA accessibility.
 
-### 19. Secure development — `todo`
-Dependency/container/secret scanning + SAST in CI. Code review on every change. Separate
-dev/staging/prod with no real personal data outside prod. Publish `security.txt`
-vulnerability-disclosure policy.
+### 19. Secure development — `in-progress` (CI scanning + disclosure policy done)
+- [x] **Dependency scanning — done 2026-09-18.** New `.github/dependabot.yml`
+      covers every real package manifest in the monorepo, checked by
+      grepping for all of them rather than assuming just frontend/backend:
+      frontend (npm), backend (pip), and the two deployed sub-apps
+      `tools/tableforge` (npm+pip) and `tools/datacleaner` (pip) — these are
+      genuinely deployed parts of the product per the deploy pipeline's own
+      "sync tool sources" step. Excluded `claude-mem-main/` and
+      `hermes-agent-main/` after confirming they're `.gitignore`d local
+      tooling clones, not part of the shipped product. Weekly checks,
+      minor/patch grouped to reduce PR noise.
+- [x] **Secret scanning — already enabled, verified not assumed.** Checked
+      via the repo API rather than assuming: `secret_scanning` and
+      `secret_scanning_push_protection` were already `enabled` (GitHub
+      turns this on by default for public repos now). Enabled the one
+      setting that was off: `dependabot_security_updates`.
+- [x] **SAST — done 2026-09-18.** New `.github/workflows/codeql.yml` — CodeQL
+      across both real languages in the repo (JavaScript/TypeScript,
+      Python), on every push/PR to `main` plus a weekly scheduled scan.
+- [x] **`security.txt` — done 2026-09-18.** RFC 9116 format at
+      `frontend/public/.well-known/security.txt` — confirmed it actually
+      gets served correctly rather than assumed: traced `main.py`'s SPA
+      catch-all route, which checks `file_path.is_file()` before falling
+      back to `index.html`, so a real static file at that path is served
+      as-is. Verified in the production build output
+      (`dist/.well-known/security.txt` exists with the right content).
+      Contact uses the one real, working address found on the marketing
+      site (`hello@fieldgovern.com`) rather than inventing an unmonitored
+      `security@` alias.
+- [ ] **Not done: code review on every change.** This repo's whole working
+      pattern this session (and presumably in general) is direct pushes to
+      `main` with CI auto-deploy — enabling mandatory PR review would
+      break that established workflow contract. A process/policy decision
+      for the owner, not something to silently switch on.
+- [ ] **Not done: separate dev/staging/prod.** Confirmed single-environment
+      setup (one Docker Compose prod stack, no staging tier observed this
+      session). Setting up a real staging environment with synthetic (not
+      real personal) data is genuine infrastructure work, not a config
+      flip — flagged, not attempted.
+- [ ] **Not done: container scanning specifically** (e.g. Trivy/Grype
+      against the built Docker images) — Dependabot covers source
+      dependencies but not vulnerabilities baked into base images; a
+      reasonable small follow-up (a CI step scanning the image before
+      push) but not built this pass.
 
 ### 20. Legal & governance — `todo`
 Engage an Indian data-protection lawyer (role classification, DPA, privacy policy, terms,

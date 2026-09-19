@@ -1,0 +1,5 @@
+Contact: mailto:hello@fieldgovern.com
+Expires: 2027-09-19T00:00:00.000Z
+Preferred-Languages: en, hi
+Canonical: https://app.fieldgovern.com/.well-known/security.txt
+Policy: https://www.fieldgovern.com/security.html
