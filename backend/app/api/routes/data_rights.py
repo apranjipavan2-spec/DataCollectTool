@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -284,6 +285,76 @@ def close_request(
     db.commit()
     db.refresh(r)
     return _serialize(r)
+
+
+@router.get("/{request_id}/certificate")
+def deletion_certificate(request_id: str, user=Depends(require_org_admin), db: Session = Depends(get_db)):
+    """Deletion certificate for a closed erasure request — documentary proof
+    for the requester or a downstream auditor. Only issued for requests
+    that are actually closed, so this never certifies something that
+    hasn't happened yet."""
+    r = _get(db, user["tenant_id"], request_id)
+    if r.status != "closed":
+        raise HTTPException(400, "Certificate can only be issued for a closed request")
+
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        raise HTTPException(501, "fpdf2 not installed — run: pip install fpdf2")
+
+    from app.models.tenant import Tenant
+    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+    org_name = tenant.name if tenant else "FieldGovern customer"
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_text_color(14, 165, 233)
+    pdf.cell(0, 12, "Certificate of Data Deletion", ln=True)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(100, 100, 120)
+    pdf.cell(0, 6, f"Issued: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}", ln=True)
+    pdf.ln(3)
+    pdf.set_draw_color(14, 165, 233)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(6)
+
+    def row(label: str, value: str):
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(30, 30, 46)
+        pdf.cell(50, 7, label)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(60, 60, 80)
+        pdf.multi_cell(0, 7, value or "-")
+
+    row("Organisation:", org_name)
+    row("Request ID:", str(r.id))
+    row("Request type:", r.request_type)
+    row("Requester:", r.requester_name)
+    row("Logged:", r.created_at.strftime('%Y-%m-%d') if r.created_at else "-")
+    row("Closed:", r.closed_at.strftime('%Y-%m-%d %H:%M UTC') if r.closed_at else "-")
+    row("Records covered:", str(len(r.linked_submission_ids or [])))
+    row("Resolution note:", r.resolution_note or "-")
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_text_color(120, 120, 140)
+    pdf.multi_cell(0, 5,
+        "This certifies that FieldGovern processed the above data-principal rights request "
+        "and, where the request type was erasure, anonymized the personal data in the "
+        "records linked to this request as of the closed date above. \"Records covered\" "
+        "reflects submissions linked to this request at the time it was closed via search "
+        "and/or manual review.")
+
+    import io
+    buf = io.BytesIO()
+    pdf.output(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="deletion_certificate_{str(r.id)[:8]}.pdf"'},
+    )
 
 
 @router.delete("/{request_id}", status_code=204)

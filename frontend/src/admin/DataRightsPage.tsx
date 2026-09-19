@@ -151,6 +151,20 @@ export default function DataRightsPage() {
     } finally { setBusy(false) }
   }
 
+  const downloadCertificate = async () => {
+    if (!detail) return
+    setBusy(true)
+    try {
+      const res = await api.get(`/data-rights/${detail.id}/certificate`, { responseType: 'blob' })
+      const url = URL.createObjectURL(res.data)
+      const a = document.createElement('a'); a.href = url
+      a.download = `deletion_certificate_${detail.id.slice(0, 8)}.pdf`
+      a.click(); URL.revokeObjectURL(url)
+    } catch (err: any) {
+      toast.error(apiErrorMessage(err, 'Certificate download failed'))
+    } finally { setBusy(false) }
+  }
+
   const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleDateString() : '—'
 
   return (
@@ -288,6 +302,12 @@ export default function DataRightsPage() {
                 <div className="text-xs text-catalan-textMuted uppercase tracking-wider mb-1">Resolution note</div>
                 <p className="text-sm text-catalan-text">{detail.resolution_note}</p>
               </div>
+            )}
+
+            {detail.status === 'closed' && (
+              <Button size="sm" variant="secondary" onClick={downloadCertificate} disabled={busy}>
+                <EmojiIcon e="📄" /> Download Deletion Certificate
+              </Button>
             )}
           </div>
         )}

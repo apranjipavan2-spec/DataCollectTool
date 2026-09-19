@@ -887,9 +887,48 @@ encryption fix above.
       invariant — an admin has to configure it correctly, nothing stops a
       misconfigured form from allowing a photo without consent.
 
-### 14. Processor contract — `todo`
-Publish a DPA template, sub-processor list, and a deletion-certificate process for when a
-customer's contract ends.
+### 14. Processor contract — `in-progress` (DPA template + sub-processor list + per-request certificate done)
+- [x] **Sub-processor list — done 2026-09-19.** New `deploy/SUB_PROCESSORS.md`
+      — built from actually checking every real integration in the
+      codebase (`grep`-verified every service in `backend/app/services/`,
+      `storage.py`, and the frontend's analytics setup) rather than
+      guessing: hosting, AI providers, Google Sheets/Drive/OAuth, SMTP,
+      MSG91, WhatsApp, Telegram, Razorpay, Sentry, and **PostHog** — found
+      via this check, not previously documented anywhere as a
+      sub-processor (US-hosted usage analytics, `main.tsx`). Explicitly
+      notes what's placeholder (hosting region, SMTP provider — both
+      operator-configured at runtime, not hardcoded, so can't be verified
+      from code) versus real. Explicitly excludes Redis/self-hosted
+      storage as not being third-party sub-processors in the DPDP sense.
+- [x] **DPA template — done 2026-09-19.** New `deploy/DPA_TEMPLATE.md` —
+      a real, structured starting point (scope, obligations, sub-processor
+      notification, breach timelines, residency, audit rights, term) that
+      cross-references the actual built mechanisms (`/data-rights`,
+      `verify-chain`, the breach plan) rather than generic boilerplate —
+      explicitly flagged as needing lawyer review before use (item 20),
+      with every business-specific blank left as a placeholder rather than
+      invented.
+- [x] **Deletion certificate — done 2026-09-19, scoped to per-request
+      erasure (not full contract-end).** New
+      `GET /data-rights/{id}/certificate` — only issuable for a **closed**
+      request, so it never certifies something that hasn't actually
+      happened. Generates a real PDF (reuses the exact `fpdf2` pattern
+      already used by `export.py`'s PDF report) with org name, request
+      details, records covered, and an honest scope note (what "records
+      covered" actually means — submissions linked to the request at
+      closing time). New "Download Deletion Certificate" button in
+      `DataRightsPage.tsx`'s detail view, shown once a request is closed.
+      Verified: `py_compile` clean; `app.api.router` actually imported
+      (303 routes, up from 302); full backend suite 72 passed / 79
+      skipped / 0 failed; `npx tsc --noEmit` clean; `npm run build`
+      succeeds.
+- [ ] **Not done: full contract-end deletion process.** The certificate
+      above covers individual data-rights erasure requests during an
+      active contract — a genuinely different, larger feature ("delete
+      everything for this entire tenant when their contract ends") has no
+      equivalent workflow yet. Tracked as a real gap, consistent with the
+      note already in the DPA template itself rather than silently
+      assumed to be covered.
 
 ### 15. Device / offline security (PWA) — `in-progress` (3 real gaps found + fixed, 2 large ones deferred)
 - [x] **`navigator.storage.persist()` + quota check — already fully built,
