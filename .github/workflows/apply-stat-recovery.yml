@@ -21,7 +21,7 @@ jobs:
     environment: production
     steps:
       - name: Checkout (for the scripts)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Copy scripts to VPS
         uses: appleboy/scp-action@v0.1.7
