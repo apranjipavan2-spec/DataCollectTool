@@ -565,6 +565,7 @@ class FormSheetsSyncUpdate(BaseModel):
     enabled: bool = False
     apps_script_url: str = ""
     include_metadata: bool = True
+    exclude_identifiers: bool = True   # opt-out, not opt-in — matches sheets_sync.py's default
 
 
 @router.patch("/integrations/sheets")
@@ -586,6 +587,7 @@ def update_form_sheets_sync(
         "enabled": body.enabled,
         "apps_script_url": body.apps_script_url,
         "include_metadata": body.include_metadata,
+        "exclude_identifiers": body.exclude_identifiers,
     }
     db.commit()
     return {"ok": True}

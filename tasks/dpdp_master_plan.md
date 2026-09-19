@@ -1151,12 +1151,28 @@ an individual respondent. Guard against prompt injection from respondent free-te
 every model call (tenant, purpose, data categories, provider) without logging personal
 content.
 
-### 22. Sub-processors & integrations — `todo`
-Publish a full sub-processor list (hosting, AI providers, Google Sheets/Drive,
-WhatsApp/Meta, email, SMS, payment gateway, error tracking, analytics) with purpose +
-country. Notify customers before adding a new one, with a right to object. Treat Google
-Sheets sync as an export that leaves FieldGovern's control: warn admins, allow disabling
-per tenant, exclude identifier fields by default.
+### 22. Sub-processors & integrations — `in-progress` (Sheets-sync safeguards done)
+- [x] **Google Sheets treated as an export — done 2026-09-19.** `exclude_identifiers`
+      added to `forms.sheets_sync_config` (default `True` — opt-out, not
+      opt-in), reusing the same `is_identifier` flag + `pii_redact.redact_row()`
+      already used for AI-call protection, so identifier fields (name,
+      phone, etc.) never leave via Sheets sync unless an admin explicitly
+      turns the exclusion off. Redaction happens inside `sync_submission()`
+      itself, so `bulk_sync_submissions()` (used by platform migration
+      imports) inherits it automatically rather than needing a second copy.
+      New red warning banner in `IntegrationsPanel.tsx`'s Sheets section:
+      "This is a data export" — explicit that FieldGovern's erasure/
+      retention/audit tools don't reach a synced row once it's in the
+      Sheet. Per-tenant disable already existed (the existing enabled
+      toggle) — nothing new needed there.
+      3 pytest cases (`backend/tests/test_sheets_sync_redaction.py`):
+      excluded by default, explicitly disabled, explicit true matches
+      default. Full backend suite: 72 passed / 79 skipped / 0 failed.
+- [ ] **Not done: full sub-processor list with purpose + country.** Tracked
+      together with item 14's DPA/sub-processor work — see that item.
+- [ ] **Not done: notify customers before adding a new sub-processor, with
+      a right to object.** This is a process commitment (a standing policy
+      about *future* changes), not something expressible in code today.
 
 ### 23. Retention & deletion — `in-progress` (per-form policy + auto-expiry built)
 - [x] **Per-form retention setting — done 2026-09-19.** New

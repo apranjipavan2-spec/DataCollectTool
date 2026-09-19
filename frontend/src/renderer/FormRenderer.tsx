@@ -133,7 +133,15 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
   // Gate-local state — only used while the consent screen is showing; the
   // respondent's choices are committed into `draft` on Agree (below), which
   // is what the rest of the session (blocking, auto-save, resume) reads from.
-  const [gatePurposes, setGatePurposes] = useState<Record<string, boolean>>(initialDraft?.consentPurposes ?? {})
+  // Purposes default to CHECKED (consented) rather than unchecked: these
+  // question types are usually core to the survey the enumerator was sent
+  // out to run, not an optional bonus, so defaulting to "declined until an
+  // enumerator notices and checks a box" silently dropped required
+  // questions from real forms. Declining is still one tap away — this only
+  // changes the default, not the ability to decline.
+  const [gatePurposes, setGatePurposes] = useState<Record<string, boolean>>(
+    initialDraft?.consentPurposes ?? Object.fromEntries(relevantPurposes.map(p => [p, true])),
+  )
   const [gateOral, setGateOral] = useState(initialDraft?.consentOral ?? false)
   const [gateOralAudio, setGateOralAudio] = useState<string>(initialDraft?.consentOralAudio ?? '')
 
@@ -498,7 +506,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
 
           {relevantPurposes.length > 0 && (
             <div className="mb-6 space-y-2 text-left">
-              <p className="text-xs font-medium text-catalan-text uppercase tracking-wider">You may separately agree to:</p>
+              <p className="text-xs font-medium text-catalan-text uppercase tracking-wider">This survey also includes:</p>
               {relevantPurposes.map(p => (
                 <label key={p} className="flex items-center gap-2.5 text-sm text-catalan-text cursor-pointer">
                   <input
@@ -510,7 +518,7 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
                   {PURPOSE_LABELS[p] ?? p}
                 </label>
               ))}
-              <p className="text-xs text-catalan-textMuted">Unchecked items are simply skipped during the survey — the rest still proceeds.</p>
+              <p className="text-xs text-catalan-textMuted">Uncheck anything the respondent doesn't agree to — that question will be skipped, the rest still proceeds.</p>
             </div>
           )}
 

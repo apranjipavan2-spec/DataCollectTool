@@ -20,7 +20,7 @@ const WEBHOOK_EVENTS = [
   'submission.approved', 'submission.rejected',
 ]
 
-interface Form { id: string; title: string; sheets_sync_config?: { enabled?: boolean; apps_script_url?: string; include_metadata?: boolean } }
+interface Form { id: string; title: string; sheets_sync_config?: { enabled?: boolean; apps_script_url?: string; include_metadata?: boolean; exclude_identifiers?: boolean } }
 
 function Input({ label, value, onChange, placeholder, type = 'text', hint }: {
   label: string; value: string; onChange: (v: string) => void
@@ -379,7 +379,7 @@ function SheetsSection() {
   const [forms, setForms] = useState<Form[]>([])
   const [saving, setSaving] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
-  const [configs, setConfigs] = useState<Record<string, { enabled: boolean; url: string; meta: boolean }>>({})
+  const [configs, setConfigs] = useState<Record<string, { enabled: boolean; url: string; meta: boolean; excludeIds: boolean }>>({})
 
   useEffect(() => {
     api.get('/forms/').then(r => {
@@ -388,25 +388,26 @@ function SheetsSection() {
       const init: typeof configs = {}
       fs.forEach(f => {
         const cfg = f.sheets_sync_config || {}
-        init[f.id] = { enabled: cfg.enabled ?? false, url: cfg.apps_script_url ?? '', meta: cfg.include_metadata ?? true }
+        init[f.id] = { enabled: cfg.enabled ?? false, url: cfg.apps_script_url ?? '', meta: cfg.include_metadata ?? true, excludeIds: cfg.exclude_identifiers ?? true }
       })
       setConfigs(init)
     }).catch(() => {})
   }, [])
 
-  function update(id: string, patch: Partial<{ enabled: boolean; url: string; meta: boolean }>) {
+  function update(id: string, patch: Partial<{ enabled: boolean; url: string; meta: boolean; excludeIds: boolean }>) {
     setConfigs(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }))
   }
 
   async function save(formId: string) {
     setSaving(formId)
-    const cfg = configs[formId] || { enabled: false, url: '', meta: true }
+    const cfg = configs[formId] || { enabled: false, url: '', meta: true, excludeIds: true }
     try {
       await api.patch('/tenants/integrations/sheets', {
         form_id: formId,
         enabled: cfg.enabled,
         apps_script_url: cfg.url,
         include_metadata: cfg.meta,
+        exclude_identifiers: cfg.excludeIds,
       })
       setSaved(formId)
       setTimeout(() => setSaved(null), 2500)
@@ -421,7 +422,11 @@ function SheetsSection() {
         <p className="text-xs text-catalan-textMuted mt-0.5">
           Every new submission is appended as a row to your Google Sheet automatically.
         </p>
-        <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 space-y-1">
+        <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800">
+          <p className="font-semibold"><EmojiIcon e="⚠" /> This is a data export.</p>
+          <p className="mt-1">Once a row is written to your Sheet, it's outside FieldGovern's access control, audit log, and erasure/retention tools — deleting or anonymizing a submission in FieldGovern does NOT remove it from the Sheet. Manage access to the Sheet itself accordingly.</p>
+        </div>
+        <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 space-y-1">
           <p className="font-semibold">Setup (one-time per sheet):</p>
           <ol className="list-decimal list-inside space-y-0.5">
             <li>Open your Google Sheet → Extensions → Apps Script</li>
@@ -451,6 +456,10 @@ function SheetsSection() {
                   <label className="flex items-center gap-2 text-xs text-catalan-textMuted cursor-pointer">
                     <input type="checkbox" checked={cfg.meta} onChange={e => update(form.id, { meta: e.target.checked })} className="rounded" />
                     Include metadata columns (submission ID, serial no, sync time)
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-catalan-textMuted cursor-pointer">
+                    <input type="checkbox" checked={cfg.excludeIds} onChange={e => update(form.id, { excludeIds: e.target.checked })} className="rounded" />
+                    Exclude identifier fields (name, phone, etc. marked as identifiers in the form) — recommended
                   </label>
                 </div>
               )}

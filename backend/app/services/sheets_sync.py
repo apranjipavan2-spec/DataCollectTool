@@ -11,12 +11,20 @@ Per-form config stored in forms.sheets_sync_config:
 {
   "enabled": true,
   "apps_script_url": "https://script.google.com/macros/s/.../exec",
-  "include_metadata": true
+  "include_metadata": true,
+  "exclude_identifiers": true   # default — see below
 }
 
 We POST JSON to the Apps Script URL on every new submission.
 The Apps Script handles appending the row — no OAuth on our side.
 Never raises — Sheets failures must never block API responses.
+
+DPDP note: once data leaves via this sync, it's in a spreadsheet outside
+FieldGovern's access control, audit log, and erasure/retention machinery —
+it's an export, not a mirror. `exclude_identifiers` defaults to True (opt-out,
+not opt-in) so fields the form marked `is_identifier=True` (name, phone, etc.)
+are redacted before the row ever leaves, reusing the same flag and redaction
+helper (`pii_redact.py`) already used to protect AI calls.
 """
 from __future__ import annotations
 
@@ -84,6 +92,13 @@ async def _post_to_script(url: str, payload: dict) -> None:
         r.raise_for_status()
 
 
+def _redact_identifiers_if_configured(form, cfg: dict, data_json: dict) -> dict:
+    if not cfg.get("exclude_identifiers", True):
+        return data_json
+    from app.services.pii_redact import redact_row, identifier_field_ids
+    return redact_row(data_json, identifier_field_ids(form.json_schema))
+
+
 def sync_submission(form, submission_data: dict, metadata: dict | None = None) -> None:
     """
     Post a single submission row to the form's configured Apps Script URL.
@@ -97,6 +112,7 @@ def sync_submission(form, submission_data: dict, metadata: dict | None = None) -
     url = cfg["apps_script_url"]
     include_meta = cfg.get("include_metadata", True)
 
+    submission_data = _redact_identifiers_if_configured(form, cfg, submission_data)
     meta = metadata or {}
     row = _flatten_submission(submission_data, meta if include_meta else {})
 
