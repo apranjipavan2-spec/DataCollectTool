@@ -891,16 +891,65 @@ encryption fix above.
 Publish a DPA template, sub-processor list, and a deletion-certificate process for when a
 customer's contract ends.
 
-### 15. Device / offline security (PWA) — `todo`
-`navigator.storage.persist()` + quota check on start, warn on low/denied storage. Encrypt
-on-device submissions via Web Crypto keyed from an enumerator PIN; clear local copies
-after confirmed sync. Auto-lock after inactivity; server-side device de-registration so a
-lost phone can't sync/decrypt further. Visible "unsynced items" counter that blocks
-logout/cache-clear while unsynced. iOS Safari can evict storage — require Add-to-
-Home-Screen for iOS or recommend Android. Test matrix: low-end Android, multi-day
-offline, low storage, app kill, browser update, clock changes, interrupted sync, duplicate
-resubmission (note: duplicate-resubmission UX already has a guard — see `tasks/todo.md`
-"Resubmit cooldown" entry — reuse/extend rather than rebuild).
+### 15. Device / offline security (PWA) — `in-progress` (3 real gaps found + fixed, 2 large ones deferred)
+- [x] **`navigator.storage.persist()` + quota check — already fully built,
+      verified rather than assumed.** Checked before building anything:
+      `storage/index.ts`'s `getStorage()` (the single entry point every
+      page uses) already calls `adapter.requestPersistence()` on every
+      init and warns on <200MB free. `FieldApp.modern.tsx` also has its own
+      UI banner for the low-storage case. Nothing to build here — this
+      bullet was already satisfied.
+- [x] **Auto-lock after inactivity — built but never wired, found + fixed
+      2026-09-18.** Same pattern as item 16's 2FA-UI gap: a complete,
+      working `useSessionTimeout` hook (28min warn / 30min expire,
+      activity-event-based reset) and a polished `SessionTimeoutModal`
+      component both already existed in the codebase — fully built,
+      **zero imports anywhere**, dead code. Wired both into
+      `RequireAuth.tsx`, the single choke point every authenticated route
+      already passes through, so every staff-facing page gets this for
+      free without touching individual pages. `onExpire` calls the same
+      `logout()` every other logout path uses.
+- [x] **Visible unsynced-items warning on logout — done 2026-09-18.**
+      Found `FieldApp.modern.tsx` doesn't even use the shared `TopNav`
+      component (no logout button there at all) — the offline outbox is
+      device-scoped storage, not tied to any one page, so the fix had to
+      live in `TopNav.tsx`'s existing logout-confirm flow, checking
+      `getStorage()` directly rather than relying on a specific page's
+      React state. Doesn't hard-block logout (a hard block could deadlock
+      a shared/kiosk device with no connectivity at that exact moment) —
+      shows the exact unsynced count inside the existing confirm dialog so
+      it's impossible to miss.
+- [x] **iOS Add-to-Home-Screen warning — done 2026-09-18.** Genuinely
+      didn't exist (checked — zero UA-detection code anywhere). Added a
+      dismissible banner on `FieldApp.modern.tsx` (the collection screen,
+      where storage-eviction risk actually matters) — detects iOS Safari
+      not running in standalone/installed mode, explains the real risk
+      (Safari can evict IndexedDB under storage pressure), dismissal
+      remembered per-device via `localStorage` so it doesn't nag.
+- [x] **Verified:** `npx tsc --noEmit` clean; `npm run build` succeeds
+      (65 precached entries, up from 64). No backend changes this item —
+      full backend suite re-run as a sanity check anyway: 60 passed / 79
+      skipped / 0 failed, unchanged.
+- [ ] **Real gap, not fixed: on-device encryption keyed from an enumerator
+      PIN.** No Web Crypto encryption of the local outbox exists — data
+      sits in IndexedDB/OPFS in plain form until synced. A genuinely
+      separate, sizeable feature (PIN enrollment UX, key derivation,
+      encrypt-before-write and decrypt-before-read on every storage
+      adapter call) — not attempted this pass rather than half-built.
+- [ ] **Real gap, not fixed: server-side device de-registration.** No
+      concept of a "device" exists server-side to revoke — this needs the
+      same server-side token-revocation store flagged as missing in item
+      16, plus a device-identity concept that doesn't exist yet either.
+- [ ] **Minor, not fixed: "warn on denied storage" specifically.**
+      `requestPersistence()`'s boolean return is currently fire-and-forget
+      — low-quota is warned on, but an explicit persistence *denial* (as
+      opposed to low space) isn't separately surfaced. Low value to chase
+      further given low-storage already covers the practically important
+      case.
+- [ ] **Not done: the full offline test matrix** (low-end Android,
+      multi-day offline, app kill, browser update, clock changes,
+      interrupted sync) — this is a manual/device-lab QA exercise, not a
+      code change; genuinely can't be executed from this environment.
 
 ### 16. Auth / access — `in-progress`
 - [x] **2FA (TOTP) — real UI shipped, done 2026-09-18.** Backend TOTP already

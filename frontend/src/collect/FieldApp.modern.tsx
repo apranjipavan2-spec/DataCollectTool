@@ -142,6 +142,20 @@ export default function FieldApp() {
   const [myHistory, setMyHistory] = useState<HistorySubmission[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [lowStorage, setLowStorage] = useState(false)
+  // iOS Safari (not installed to home screen) can evict IndexedDB/OPFS under
+  // storage pressure — a real risk to unsynced offline submissions. Detect
+  // once on mount; dismissible, remembered per-device so it doesn't nag.
+  const [showIosWarning, setShowIosWarning] = useState(() => {
+    if (typeof navigator === 'undefined') return false
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
+    const isStandalone = window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone === true
+    const dismissed = localStorage.getItem('fg_ios_a2hs_dismissed') === 'true'
+    return isIos && !isStandalone && !dismissed
+  })
+  const dismissIosWarning = () => {
+    localStorage.setItem('fg_ios_a2hs_dismissed', 'true')
+    setShowIosWarning(false)
+  }
   const [resumingDraft, setResumingDraft] = useState<SubmissionDraft | null>(null)
   const [editingSubmission, setEditingSubmission] = useState<{ id: string; formId: string; dataJson: Record<string, unknown>; formTitle: string } | null>(null)
   const [editMsg, setEditMsg] = useState('')
@@ -1470,6 +1484,15 @@ export default function FieldApp() {
             <span><EmojiIcon e="⚠" /></span>
             <span><strong>Low storage.</strong> Sync now and free space on your device.</span>
           </div>
+        </div>
+      )}
+
+      {/* iOS Safari storage-eviction warning */}
+      {showIosWarning && (
+        <div className="bg-catalan-warning/10 border-b border-catalan-warning/30 text-catalan-warning text-xs px-4 py-2.5 flex items-center gap-2">
+          <span><EmojiIcon e="⚠" /></span>
+          <span className="flex-1"><strong>Add this app to your Home Screen</strong> — Safari can otherwise delete unsynced offline responses under storage pressure. Tap Share → Add to Home Screen, then open it from there.</span>
+          <button onClick={dismissIosWarning} className="text-catalan-warning hover:opacity-70 flex-shrink-0 px-1">✕</button>
         </div>
       )}
 

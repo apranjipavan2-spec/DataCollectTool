@@ -310,6 +310,7 @@ const TopNav: React.FC<TopNavProps> = ({ title, titleNode, breadcrumbs, rightCon
   const navigate = useNavigate()
   const [showUserMenu, setShowUserMenu]           = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [unsyncedCount, setUnsyncedCount] = useState(0)
   const menuRef = useRef<HTMLDivElement>(null)
   const user = getStoredUser() || { name: '', role: '' }
   const { resolvedTheme } = useTheme()
@@ -417,12 +418,31 @@ const TopNav: React.FC<TopNavProps> = ({ title, titleNode, breadcrumbs, rightCon
 
                 <div style={{ borderTop: `1px solid ${ts.sep}` }}>
                   {!showLogoutConfirm ? (
-                    <button onClick={() => setShowLogoutConfirm(true)}
+                    <button onClick={async () => {
+                      // Device-scoped offline outbox — not tied to this page or React
+                      // state, so check storage directly regardless of which page the
+                      // user is on when they log out (FieldApp's collect screen doesn't
+                      // even render this nav). Never blocks logout outright — a hard
+                      // block could deadlock a shared/kiosk device with no connectivity
+                      // right now — but makes unsynced work impossible to miss.
+                      try {
+                        const { getStorage } = await import('@/storage')
+                        const store = await getStorage()
+                        const [outbox, mediaCount] = await Promise.all([store.getOutbox(), store.getMediaQueueCount()])
+                        setUnsyncedCount(outbox.length + mediaCount)
+                      } catch { setUnsyncedCount(0) }
+                      setShowLogoutConfirm(true)
+                    }}
                       className="w-full text-left px-4 py-2.5 hover:bg-catalan-error/10 text-sm text-catalan-error transition-colors flex items-center gap-2.5 group">
                       <span className="text-base group-hover:scale-110 inline-block transition-transform"><EmojiIcon e="🚪" /></span> Log Out
                     </button>
                   ) : (
                     <div className="px-4 py-3" style={{ background: 'rgba(239,68,68,0.06)' }}>
+                      {unsyncedCount > 0 && (
+                        <p className="text-xs text-catalan-error mb-2 font-medium">
+                          <EmojiIcon e="⚠" /> {unsyncedCount} item{unsyncedCount === 1 ? '' : 's'} not yet synced to the server on this device — they're safe locally, but won't upload until you (or someone else) log back in here with a connection.
+                        </p>
+                      )}
                       <p className="text-xs text-catalan-text mb-2 font-medium">Are you sure?</p>
                       <div className="flex gap-2">
                         <button onClick={() => { setShowUserMenu(false); setShowLogoutConfirm(false); logout() }}
