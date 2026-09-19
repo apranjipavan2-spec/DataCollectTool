@@ -27,7 +27,7 @@
     "react-leaflet": "^4.2.1",
     "react-qr-code": "^2.0.21",
     "react-router-dom": "^6.23.1",
-    "recharts": "^2.12.0",
+    "recharts": "^3.10.1",
     "uuid": "^13.0.0",
     "wa-sqlite": "^1.0.0",
     "workbox-window": "^7.1.0",
