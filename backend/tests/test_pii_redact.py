@@ -83,3 +83,46 @@ def test_mask_aadhaar_in_data_full_submission():
 
 def test_mask_aadhaar_in_data_non_dict_passthrough():
     assert mask_aadhaar_in_data(None) is None
+
+
+# ── Regression: Aadhaar masking must never touch media data (found in
+# production 2026-09-19 — a guardian-consent audio recording was corrupted
+# because its base64 content happened to contain a 12-digit run) ──────────
+
+def test_mask_aadhaar_never_touches_data_uri_even_with_embedded_digit_run():
+    # A realistic base64 audio payload that happens to contain 12 consecutive
+    # digits — exactly the accidental-collision scenario that broke a real
+    # recording. Must pass through completely unchanged.
+    audio_value = "data:audio/webm;base64,GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQI" \
+                  "123456789012xyzABCdefGHIjklMNOpqrSTUvwxYZ0987654321=="
+    assert mask_aadhaar(audio_value) == audio_value
+
+
+def test_mask_aadhaar_never_touches_photo_data_uri():
+    photo_value = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/111122223333/2Q=="
+    assert mask_aadhaar(photo_value) == photo_value
+
+
+def test_mask_aadhaar_never_touches_media_reference():
+    # media:// references are also excluded, even though a 12-hex-digit UUID
+    # segment made entirely of 0-9 (no a-f) is a rarer but real possibility.
+    ref = "media://123456789012"
+    assert mask_aadhaar(ref) == ref
+
+
+def test_mask_aadhaar_still_masks_a_real_aadhaar_typed_as_text():
+    # The actual feature must still work for genuine free-text answers —
+    # only data: and media:// values are exempted.
+    assert mask_aadhaar("My Aadhaar is 1234 5678 9012") != "My Aadhaar is 1234 5678 9012"
+    assert "1234" not in mask_aadhaar("1234 5678 9012")
+
+
+def test_mask_aadhaar_in_data_full_submission_with_audio_field():
+    data = {
+        "name": "Priya",
+        "aadhaar": "1234 5678 9012",
+        "consent_audio": "data:audio/webm;base64,AAAA123456789012BBBB",
+    }
+    out = mask_aadhaar_in_data(data)
+    assert out["aadhaar"] == "XXXX-XXXX-9012"
+    assert out["consent_audio"] == data["consent_audio"]  # untouched

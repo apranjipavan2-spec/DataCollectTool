@@ -75,8 +75,18 @@ def mask_aadhaar(value):
     minimisation, not encryption — DPDP's "never store full Aadhaar" is best
     satisfied by not holding a reversible full copy at all, so there's
     nothing to decrypt or leak later, and no read-path changes are needed
-    anywhere the value is later displayed or exported."""
+    anywhere the value is later displayed or exported.
+
+    Never applied to binary-encoded values (data: URIs — photo/audio
+    captures; media:// storage references) — those are long base64/hex
+    blobs, not free text, and are near-certain to contain an accidental
+    12-digit run somewhere in their length purely by chance. Masking one
+    would corrupt the encoding at that byte offset and silently break the
+    recording/photo. Found + fixed 2026-09-19 after a guardian-consent
+    audio recording was reported broken."""
     if isinstance(value, str):
+        if value.startswith("data:") or value.startswith("media://"):
+            return value
         return _AADHAAR_RE.sub(_mask_aadhaar_match, value)
     if isinstance(value, list):
         return [mask_aadhaar(v) for v in value]

@@ -176,7 +176,14 @@ export default function FormRenderer({ schema, onSave, onSubmit, onSubmitAndDown
         if (!shouldShowSection(sec, draft.values)) continue
         for (const f of sec.fields) {
           if (!shouldShow(f, draft.values)) continue
-          if (declinedPurposes.has(purposeOfFieldType(f.type))) continue  // per-purpose consent refused — skip this question type
+          // Guardian-consent capture fields (e.g. an audio recording of verbal
+          // consent) are NEVER subject to per-purpose filtering, even though
+          // their field type (audio/photo) would otherwise match a declinable
+          // purpose — declining "audio recording" as a general content
+          // purpose must not also delete the mechanism that proves consent
+          // was given. Visibility for these is controlled by their own skip
+          // logic (e.g. only show when age < 18), not the purpose gate.
+          if (!f.is_guardian_consent && declinedPurposes.has(purposeOfFieldType(f.type))) continue  // per-purpose consent refused — skip this question type
           result.push(f)
         }
         if (sec.subsections?.length) traverse(sec.subsections)
