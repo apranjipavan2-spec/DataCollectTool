@@ -409,6 +409,20 @@ skipped by choice). Full detail in `tasks/pending_owner_action.md` §1.
       (incl. service worker) succeeds. Backend: `py_compile` clean; full
       pytest suite 39 passed / 76 skipped / 0 failed (unchanged from item 5
       — no DB-dependent test added for this item, flagged below).
+- [x] **Real production bug found + fixed — 2026-09-19.** A live tenant
+      reported a guardian-consent audio recording question completely
+      disappearing from a form (Sangwari Endline Survey). Root cause:
+      `purposeOfFieldType()` treats every `audio`-type field as a
+      declinable "purpose," with no exception for a field marked
+      `is_guardian_consent` — declining the general "record audio" purpose
+      silently removed the very field meant to *capture* consent for a
+      minor respondent, which is both logically backwards and a
+      compliance risk (the whole reason item 13 exists). Fixed: fields
+      with `is_guardian_consent === true` are now unconditionally exempt
+      from purpose-based filtering — visible whenever their own skip logic
+      says so (e.g. age < 18), never hidden by the general audio toggle.
+      Required-field enforcement is untouched (still blocks submission
+      until answered, once visible).
 - [ ] **Real gap, not fixed: device ID.** No device-identifier capture
       exists anywhere in the codebase today (checked `Submission` model and
       both submission-write paths) — storing one is separate, sizeable
@@ -645,6 +659,24 @@ skipped by choice). Full detail in `tasks/pending_owner_action.md` §1.
       masking mid-sentence, non-Aadhaar strings passing through untouched,
       list values, non-string passthrough, and that the original dict
       passed in is never mutated in place.
+- [x] **Real production bug found + fixed — 2026-09-19: Aadhaar masking was
+      corrupting media recordings.** Surfaced by the same live-tenant
+      report as item 6's guardian-consent bug above — investigating "any
+      issues with media upload" led here. `mask_aadhaar()` scanned *every*
+      string value in a submission, including base64-encoded photo/audio
+      data URIs. A long recording has a real, non-negligible chance of
+      containing an accidental 12-digit run somewhere in its base64
+      content; the masker would silently replace it with
+      `XXXX-XXXX-####`, corrupting the encoding at that byte offset and
+      breaking the file. Fixed: `data:` URIs and `media://` references are
+      now excluded entirely — they're binary encodings, never a place a
+      genuine typed Aadhaar number could appear. 5 new regression tests
+      (`backend/tests/test_pii_redact.py`) specifically construct base64
+      payloads with an embedded 12-digit run and assert they pass through
+      byte-for-byte unchanged, plus confirm real Aadhaar-shaped *text*
+      values still get masked correctly (the exemption is narrowly scoped
+      to binary-looking prefixes, not a blanket bypass). Full backend
+      suite: 77 passed / 0 failed.
 - [x] **Envelope-encryption primitive built — done 2026-09-18, not yet
       wired to identifier fields (see gap below).** New
       `backend/app/core/field_crypto.py` — same proven shape as the
