@@ -168,7 +168,7 @@ jobs:
       # ── Sync + rebuild the tools ONLY when tools/ changed ───────────────────
       - name: Sync tool sources to VPS
         if: steps.tools.outputs.changed == 'true'
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
