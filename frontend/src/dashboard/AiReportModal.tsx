@@ -48,9 +48,14 @@ export default function AiReportModal({ formId, formTitle, onClose }: Props) {
         <div className="flex-1 overflow-auto px-6 py-4 space-y-4">
           <AiProgressBar job={aiJob.job} label="Report" onReset={aiJob.reset} />
           {report && (
-            <pre className="font-mono text-sm text-catalan-text whitespace-pre-wrap overflow-auto max-h-96 leading-relaxed">
-              {report}
-            </pre>
+            <>
+              <div className="text-xs font-medium text-catalan-warning bg-catalan-warning/10 border border-catalan-warning/30 rounded-lg px-3 py-2">
+                ⚠ AI-generated draft — verify against the underlying data before use.
+              </div>
+              <pre className="font-mono text-sm text-catalan-text whitespace-pre-wrap overflow-auto max-h-96 leading-relaxed">
+                {report}
+              </pre>
+            </>
           )}
         </div>
 

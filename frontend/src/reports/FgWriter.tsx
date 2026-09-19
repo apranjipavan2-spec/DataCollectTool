@@ -609,6 +609,9 @@ export default function FgWriter() {
                 {/* Report output */}
                 {reportMd && (
                   <div className={card}>
+                    <div className="text-xs font-medium text-catalan-warning bg-catalan-warning/10 border border-catalan-warning/30 rounded-lg px-3 py-2 mb-3">
+                      ⚠ AI-generated draft — verify against the source tables before sending. Edit freely below.
+                    </div>
                     <div className="flex items-center justify-between mb-3">
                       <div className={sh + ' mb-0'}>Generated Report</div>
                       <div className="flex gap-2">

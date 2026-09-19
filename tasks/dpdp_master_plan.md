@@ -1141,15 +1141,62 @@ Maintain a Record of Processing Activities. Run a DPIA on AI features + audio re
 Write internal policies (access control, incident response, retention, acceptable use,
 vendor management, secure development) and train staff.
 
-### 21. AI feature controls — `todo`
-Send only aggregated/pseudonymised data to models. Per-org opt-in with provider +
-processing-country disclosure; an "India-only" mode that disables foreign model calls.
-DPAs with model providers (no training on customer data, retention period confirmed,
-zero-data-retention where available). Label every AI output "AI-generated draft — verify
-before use," show the underlying table alongside it, never use AI output to decide about
-an individual respondent. Guard against prompt injection from respondent free-text. Log
-every model call (tenant, purpose, data categories, provider) without logging personal
-content.
+### 21. AI feature controls — `in-progress` (most already covered by item 1, 2 new labels added)
+- [x] **Most of this item's requirements were already satisfied by item 1's
+      work earlier this session** — checked before assuming anything was
+      missing: send-only-aggregated/pseudonymised data (item 1's PII
+      stripping + `ai_sanitize.py` dummy-data work), per-org opt-in
+      (`Tenant.ai_config`), provider disclosure (`GET /ai/sub-processor`),
+      BYO key. Not duplicating that write-up here — see item 1.
+- [x] **Model-call logging (tenant, purpose, provider — no personal
+      content) — already fully built, verified not assumed.** Checked
+      `AiUsageLog` (`backend/app/models/ai_usage_log.py`): `tenant_id`,
+      `user_id`, `feature`, `provider`, `model`, token counts,
+      success/error — **structurally cannot log personal content**, since
+      there's no free-text/content column to put it in. Confirmed it's
+      actually written (not dead code, unlike two other things found
+      earlier this session) — used in `ai_service.py`.
+- [x] **"AI-generated draft — verify before use" labeling — done
+      2026-09-19.** Genuinely didn't exist anywhere in the UI (only a
+      marketing-copy mention, not a real label next to real AI output).
+      Added a visible warning banner directly above the rendered AI output
+      in both places a full AI report is shown: `AiReportModal.tsx` (the
+      dashboard's quick single-form report) and `FgWriter.tsx` (the main
+      report-writing tool, above the editable draft).
+- [x] **"Never use AI output to decide about an individual respondent" —
+      checked, not violated.** Traced every AI-suggestion endpoint
+      (`suggest_skip_logic`, DataCleaner's `ai_correct`): all return
+      `{suggestions: [...]}` for a human to review and explicitly accept —
+      nothing auto-applies an AI decision to a specific respondent's data
+      or status. `ai_correct` additionally has a hard 400 refusal (from
+      item 1) if a PII-shaped column is selected at all.
+- [ ] **Real gap, not fixed: "show the underlying table alongside" AI
+      output.** Partially true by architecture (FgWriter's Narrate flow
+      requires selecting existing tabulation tables first, which the user
+      has already seen in the Tabulator tab) but the source table isn't
+      shown *alongside* the generated narrative in the same view — a real,
+      if minor, UX gap, not built this pass.
+- [ ] **Real gap, not fixed: proactive prompt-injection defense.**
+      `DataCleaner`'s `ai_correct` interpolates real (non-PII-column) row
+      values — which can include respondent free-text — directly into an
+      f-string prompt with no escaping or sandboxing. The blast radius is
+      already bounded by architecture (every AI suggestion requires human
+      review before anything is applied — see above), so a successful
+      injection can't directly mutate data or trigger an action, but
+      there's no input-side defense (detecting/neutralizing injection
+      attempts before they reach the model). Flagged honestly rather than
+      claimed as "guarded."
+- [ ] **Real gap, not fixed: "India-only mode."** BYO lets an org pick
+      among OpenAI/Anthropic/Gemini/DeepSeek — all foreign providers. A
+      real "India-only" toggle would currently mean "disable AI
+      entirely," since no India-hosted model is integrated — this needs an
+      actual product/vendor decision (integrating a domestic model
+      provider) before the toggle would mean anything, not just a
+      config flag.
+- [ ] **Not done: DPAs with model providers.** Legal/contractual work, not
+      code — tracked alongside item 14's other contract work.
+- [ ] **Verified:** `npx tsc --noEmit` clean; `npm run build` succeeds. No
+      backend changes this item.
 
 ### 22. Sub-processors & integrations — `in-progress` (Sheets-sync safeguards done)
 - [x] **Google Sheets treated as an export — done 2026-09-19.** `exclude_identifiers`
