@@ -91,6 +91,7 @@
     <div class="nav-links">
       <a href="/features.html">Features</a>
       <a href="/pricing.html">Pricing</a>
+      <a href="/trust.html">Trust Centre</a>
       <a href="/security.html">Security</a>
       <a href="/dpa-template.html">DPA Template</a>
       <a href="https://app.fieldgovern.com" style="color:var(--brand);font-weight:600">Get Started</a>
@@ -233,7 +234,7 @@
 
 <hr class="divider"/>
 
-<section>
+<section id="subprocessors">
   <h2>Sub-processors</h2>
   <p>Third parties FieldGovern may share data with while providing the service, and where each one processes it.</p>
   <div class="table-wrap">
@@ -245,7 +246,7 @@
         <tr>
           <td>Hosting</td>
           <td>Application, database and media storage</td>
-          <td>India (Mumbai)</td>
+          <td>See our <a href="/trust.html">Trust Centre</a> for the current region</td>
         </tr>
         <tr id="ai-subprocessor-row" style="display:none">
           <td>AI processing (<span id="ai-provider-name">—</span>)</td>
@@ -255,6 +256,31 @@
         <tr id="ai-subprocessor-none" style="display:none">
           <td>AI processing</td>
           <td colspan="2">Not currently configured on this deployment</td>
+        </tr>
+        <tr>
+          <td>Google (Sheets, Drive, OAuth)</td>
+          <td>Optional live Sheets sync (opt-in per form, identifier fields excluded by default), optional Drive-backed media storage, "Sign in with Google"</td>
+          <td>US / global</td>
+        </tr>
+        <tr>
+          <td>SMS / WhatsApp / Telegram</td>
+          <td>Optional notifications — opt-in per organisation</td>
+          <td>India (MSG91) / US (Meta)</td>
+        </tr>
+        <tr>
+          <td>Razorpay</td>
+          <td>Subscription payment processing</td>
+          <td>India</td>
+        </tr>
+        <tr>
+          <td>Sentry</td>
+          <td>Application error monitoring</td>
+          <td>Configurable</td>
+        </tr>
+        <tr>
+          <td>PostHog</td>
+          <td>Product usage analytics — not submission/respondent data</td>
+          <td>US</td>
         </tr>
       </tbody>
     </table>

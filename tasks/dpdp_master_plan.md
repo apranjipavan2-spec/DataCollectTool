@@ -1303,9 +1303,32 @@ vendor management, secure development) and train staff.
       separate follow-up if location data needs a shorter/different
       retention window than the rest of the response.
 
-### 24. Trust Centre page — `todo`
-Public page: security overview, sub-processor list, DPA, DPDP feature mapping, uptime
-status.
+### 24. Trust Centre page — `done` (mostly already existed under other pages, indexed rather than duplicated)
+- [x] **Checked before building — most of this already existed, just wasn't
+      tied together.** `security.html` (security overview),
+      `dpdp-compliance.html` (DPDP feature mapping), and `dpa-template.html`
+      (a full, already-public 11-section DPA) were all live already.
+      `website/status.html` exists but is an internal deploy/CI dashboard
+      (`noindex,nofollow`, shows GitHub Actions runs and commits) — not
+      appropriate to link publicly as a customer-facing uptime page.
+- [x] **New `website/trust.html` — done 2026-09-19.** A real index/hub page
+      (not a duplicate) at `/trust.html`: a live public health check
+      (fetches `/health` directly, shows Operational/Down — not the
+      internal CI dashboard), cards linking to the 4 real pages above, and
+      an "at a glance" summary table describing actual built mechanisms
+      (tenant isolation, audit chain, consent, data-rights workflow,
+      breach plan) rather than generic claims.
+- [x] **Fixed a real incompleteness while in the area:**
+      `dpdp-compliance.html`'s sub-processor table only listed Hosting +
+      AI — extended it to match the comprehensive list built for item 14
+      (`deploy/SUB_PROCESSORS.md`): Google Sheets/Drive/OAuth, SMS/WhatsApp/
+      Telegram, Razorpay, Sentry, and PostHog. Added a `#subprocessors`
+      anchor + cross-links between `dpdp-compliance.html` and the new
+      `trust.html` in both directions.
+- [x] **Verified:** basic tag-balance check (div/section/nav/footer/
+      table/tr/script open-vs-close counts) on both the new page and the
+      edited existing one — all matched. Could not visually render-test
+      (no browser available this session) — flagged rather than claimed.
 
 ### 25. Product roadmap (competitive gaps vs. the 17 other India-built platforms) — `in-progress` (triaged — most items already exist)
 - [x] **Triage done 2026-09-18 — checked the actual codebase against every
