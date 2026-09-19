@@ -23,7 +23,7 @@ router = APIRouter()
 OTP_EXPIRE_MINUTES = 10
 RESET_TOKEN_EXPIRE_MINUTES = 60
 LOCKOUT_THRESHOLD = 5   # matches audit.py's FAILED_LOGIN_THRESHOLD — same signal, two consumers
-LOCKOUT_MINUTES = 15
+LOCKOUT_MINUTES = 1   # kept short deliberately — field enumerators can't wait long; the correct password bypasses the lock immediately anyway (see login())
 
 
 def _mask_email(email: str) -> str:
@@ -173,19 +173,22 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     # login deterministically resolves to that org — a user active in one org can
     # never log into another. Deactivation is what frees the phone for another org.
     user = db.query(User).filter(match, User.is_active == True).first()
+    password_ok = bool(user and user.password_hash and verify_password(body.password, user.password_hash))
 
-    # Account lockout: check BEFORE attempting password verification — skips
-    # the bcrypt compute (cheap defense against a locked account being used
-    # as a hash-timing oracle) and gives a clear, distinct error rather than
-    # a generic "invalid credentials" that would mask the real cause.
-    if user and user.locked_until and user.locked_until > datetime.now(timezone.utc):
-        remaining_min = max(1, int((user.locked_until - datetime.now(timezone.utc)).total_seconds() // 60) + 1)
+    # Account lockout only blocks WRONG passwords. The right password always
+    # gets in immediately and clears the lock — lockout exists to slow down
+    # guessing a password you don't know, not to punish someone who already
+    # proved they know it. (A prior version rejected every attempt outright
+    # while locked, including the correct password — fixed 2026-09-19.)
+    if not password_ok and user and user.locked_until and user.locked_until > datetime.now(timezone.utc):
+        remaining_sec = max(1, int((user.locked_until - datetime.now(timezone.utc)).total_seconds()))
+        wait_msg = f"{remaining_sec} second(s)" if remaining_sec < 60 else f"{-(-remaining_sec // 60)} minute(s)"
         raise HTTPException(
             status_code=423,
-            detail=f"Too many failed login attempts. Try again in {remaining_min} minute(s).",
+            detail=f"Too many failed login attempts. Try again in {wait_msg}, or re-enter your correct password.",
         )
 
-    if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
+    if not password_ok:
         # A real active account exists for this identifier but the password was
         # wrong — log it (scoped to that account's tenant) so repeated attempts
         # against a specific account are detectable. An identifier matching no

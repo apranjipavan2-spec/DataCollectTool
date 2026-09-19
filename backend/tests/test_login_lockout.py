@@ -1,13 +1,20 @@
 """Login lockout after repeated failed attempts (item 16). If the threshold
 check or the lock-check ordering drifts, either a brute-force attacker gets
 unlimited attempts (lockout never triggers) or a legitimate user gets
-permanently locked out (counter never resets on success)."""
+permanently locked out (counter never resets on success).
+
+CRITICAL regression covered here (found in production 2026-09-19): an
+earlier version rejected EVERY login attempt while locked, including the
+correct password — a real enumerator with the right password was locked
+out and couldn't get in until the timer expired. Fixed: only WRONG
+passwords are blocked by the lock; the correct password always succeeds
+immediately and clears it."""
 from .conftest import skip_no_db, make_tenant, make_user
 
 
 @skip_no_db
 class TestLoginLockout:
-    def test_locks_after_threshold_failed_attempts(self, client, db_session):
+    def test_wrong_password_still_rejected_while_locked(self, client, db_session):
         tenant = make_tenant(db_session)
         make_user(db_session, tenant.id, role="org_admin", phone="+919222000001", password="Correct@123")
 
@@ -15,10 +22,28 @@ class TestLoginLockout:
             r = client.post("/api/v1/auth/login", json={"phone": "+919222000001", "password": "wrong"})
             assert r.status_code == 401
 
-        # 6th attempt, even with the CORRECT password, must be rejected — locked.
-        r = client.post("/api/v1/auth/login", json={"phone": "+919222000001", "password": "Correct@123"})
+        # 6th attempt, still wrong — locked, must stay rejected.
+        r = client.post("/api/v1/auth/login", json={"phone": "+919222000001", "password": "still-wrong"})
         assert r.status_code == 423
-        assert "minute" in r.json()["detail"].lower()
+        assert "second" in r.json()["detail"].lower() or "minute" in r.json()["detail"].lower()
+
+    def test_correct_password_bypasses_lock_immediately(self, client, db_session):
+        tenant = make_tenant(db_session)
+        make_user(db_session, tenant.id, role="org_admin", phone="+919222000004", password="Correct@123")
+
+        for _ in range(5):
+            client.post("/api/v1/auth/login", json={"phone": "+919222000004", "password": "wrong"})
+
+        # Now locked — but the CORRECT password must succeed immediately, not
+        # wait out the timer. This is the exact bug found in production.
+        r = client.post("/api/v1/auth/login", json={"phone": "+919222000004", "password": "Correct@123"})
+        assert r.status_code == 200, r.text
+        assert "access_token" in r.json()
+
+        from app.models.user import User
+        user = db_session.query(User).filter(User.phone == "+919222000004").first()
+        assert user.locked_until is None
+        assert user.failed_login_count == 0
 
     def test_successful_login_resets_the_counter(self, client, db_session):
         tenant = make_tenant(db_session)
