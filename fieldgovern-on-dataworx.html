@@ -468,7 +468,7 @@
   </div>
 </div>
 <script>
-  // Auto-opens 30s after every fresh load of this page (refresh resets the
+  // Auto-opens 15s after every fresh load of this page (refresh resets the
   // timer). Only suppressed for the rest of THIS page view once closed.
   (function(){
     setTimeout(function(){
@@ -479,7 +479,7 @@
       function dismiss(){ overlay.classList.remove('open'); }
       document.getElementById('trialPopupClose').addEventListener('click', dismiss);
       overlay.addEventListener('click', function(e){ if (e.target === overlay) dismiss(); });
-    }, 30000);
+    }, 15000);
   })();
 </script>
 
