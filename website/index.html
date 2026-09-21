@@ -585,19 +585,44 @@
     .calc-note{margin-top:14px;text-align:center;font-size:0.74rem;color:var(--text3);line-height:1.5}
     @media(max-width:640px){.calc-sliders{grid-template-columns:1fr;gap:16px}}
 
-    /* ── Timed trial/demo popup (home page only, once per visitor) ── */
-    #trialPopupOverlay{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(3px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+    /* ── Timed trial/demo popup (home page only, once per page load) ── */
+    #trialPopupOverlay{position:fixed;inset:0;background:rgba(15,23,42,.6);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
     #trialPopupOverlay.open{display:flex}
-    @keyframes trialPopIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
-    .trial-popup{position:relative;background:#fff;border-radius:20px;max-width:440px;width:100%;padding:36px 32px 32px;box-shadow:0 24px 64px rgba(0,0,0,.28);animation:trialPopIn .35s cubic-bezier(.16,1,.3,1)}
-    .trial-popup-close{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:none;background:var(--bg2,#f8fafc);color:var(--text3,#64748b);cursor:pointer;font-size:1.1rem;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .2s,color .2s}
-    .trial-popup-close:hover{background:var(--bg3,#f1f5f9);color:var(--text,#0f172a)}
-    .trial-popup .section-tag{margin-bottom:14px}
-    .trial-popup h3{font-size:1.4rem;font-weight:900;color:var(--text);line-height:1.25;margin-bottom:10px}
-    .trial-popup p{font-size:.92rem;color:var(--text2);line-height:1.6;margin-bottom:22px}
+    @keyframes tpPopIn{0%{opacity:0;transform:translateY(24px) scale(.94)}60%{transform:translateY(-4px) scale(1.015)}100%{opacity:1;transform:translateY(0) scale(1)}}
+    @keyframes tpIconPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+    @keyframes tpShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+    @keyframes tpGlow{0%,100%{box-shadow:0 4px 20px rgba(14,165,233,.35)}50%{box-shadow:0 4px 32px rgba(124,58,237,.55)}}
+    @keyframes tpFreeGlow{0%,100%{text-shadow:0 0 0 rgba(255,255,255,0)}50%{text-shadow:0 0 18px rgba(255,255,255,.85)}}
+    @keyframes tpFeatIn{to{opacity:1}}
+
+    .trial-popup{position:relative;background:#fff;border-radius:24px;max-width:460px;width:100%;box-shadow:0 32px 80px rgba(0,0,0,.4);animation:tpPopIn .5s cubic-bezier(.16,1,.3,1);overflow:hidden}
+    .tp-top{background:linear-gradient(135deg,var(--brand),var(--accent));padding:28px 32px 56px;position:relative;overflow:hidden}
+    .tp-top::after{content:'';position:absolute;top:-40%;right:-20%;width:200px;height:200px;background:rgba(255,255,255,.12);border-radius:50%}
+    .trial-popup-close{position:absolute;top:16px;right:16px;width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.2);color:#fff;cursor:pointer;font-size:1rem;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .2s;z-index:2}
+    .trial-popup-close:hover{background:rgba(255,255,255,.35)}
+    .tp-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:5px 13px;font-size:.72rem;font-weight:800;color:#fff;letter-spacing:.04em;text-transform:uppercase;position:relative;z-index:1}
+    .tp-icon{width:52px;height:52px;border-radius:15px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;margin-top:16px;animation:tpIconPulse 2.4s ease-in-out infinite;position:relative;z-index:1}
+    .tp-icon svg{width:26px;height:26px;stroke:#fff;stroke-width:2;fill:none}
+    .trial-popup h3{color:#fff;font-size:1.42rem;font-weight:900;line-height:1.28;margin-top:14px;max-width:330px;position:relative;z-index:1}
+    .tp-free{font-style:normal;background:linear-gradient(135deg,#fff,#fef08a);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:tpFreeGlow 1.8s ease-in-out infinite}
+
+    .trial-popup-body{padding:22px 32px 30px;margin-top:-32px;position:relative;z-index:2}
+    .tp-feat-card{background:#fff;border:1px solid var(--border,#e2e8f0);border-radius:16px;padding:16px 18px;box-shadow:0 8px 24px rgba(0,0,0,.06);margin-bottom:18px}
+    .tp-feat-card ul{list-style:none;display:flex;flex-direction:column;gap:9px}
+    .tp-feat-card li{display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--text2);font-weight:500;opacity:0;animation:tpFeatIn .4s ease forwards}
+    .tp-feat-card li:nth-child(1){animation-delay:.1s}
+    .tp-feat-card li:nth-child(2){animation-delay:.2s}
+    .tp-feat-card li:nth-child(3){animation-delay:.3s}
+    .tp-feat-card .tp-chk{width:19px;height:19px;border-radius:50%;background:rgba(16,185,129,.12);color:var(--green,#10b981);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .tp-feat-card .tp-chk svg{width:11px;height:11px;stroke:currentColor;stroke-width:3;fill:none}
+
     .trial-popup-actions{display:flex;flex-direction:column;gap:10px}
-    .trial-popup-actions a{width:100%;justify-content:center}
-    .trial-popup-note{margin-top:16px;text-align:center;font-size:.76rem;color:var(--text3)}
+    .tp-btn-trial{position:relative;width:100%;text-align:center;padding:15px;border-radius:12px;font-weight:800;font-size:.96rem;color:#fff;text-decoration:none;background:linear-gradient(135deg,var(--brand),var(--accent));background-size:200% 100%;animation:tpGlow 2.2s ease-in-out infinite;display:flex;align-items:center;justify-content:center;gap:8px;overflow:hidden}
+    .tp-btn-trial::before{content:'';position:absolute;inset:0;background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);background-size:200% 100%;animation:tpShimmer 2.5s linear infinite}
+    .tp-btn-demo{width:100%;text-align:center;padding:14px;border-radius:12px;font-weight:700;font-size:.9rem;color:var(--text2);text-decoration:none;background:var(--bg2,#f8fafc);border:1.5px solid var(--border,#e2e8f0);transition:all .2s}
+    .tp-btn-demo:hover{border-color:var(--brand);color:var(--brand)}
+    .trial-popup-note{margin-top:14px;text-align:center;font-size:.78rem;color:var(--text3);display:flex;align-items:center;justify-content:center;gap:6px}
+    .trial-popup-note svg{width:14px;height:14px;stroke:var(--green,#10b981);stroke-width:2.5;fill:none}
 
     /* ── FAQ show-more (all Q&A stays in the DOM for SEO; hidden ones just collapsed) ── */
     .faq-list .faq-extra{display:none}
@@ -1593,7 +1618,7 @@
     btn.textContent = expanded ? 'Show fewer posts ▴' : 'Show more posts ▾';
   }
 
-  // Timed trial/demo popup — 20s after every fresh load of the home page
+  // Timed trial/demo popup — 30s after every fresh load of the home page
   // (a refresh, or navigating away and back, resets the timer). Only
   // suppressed for the rest of THIS page view once closed — not persisted
   // across visits.
@@ -1608,7 +1633,7 @@
       }
       document.getElementById('trialPopupClose').addEventListener('click', dismiss);
       overlay.addEventListener('click', function(e){ if (e.target === overlay) dismiss(); });
-    }, 20000);
+    }, 30000);
   })();
 </script>
 <script defer src="/assets/pricing-sync.js"></script>
@@ -1616,15 +1641,26 @@
 
 <div id="trialPopupOverlay" role="dialog" aria-modal="true" aria-labelledby="trialPopupTitle">
   <div class="trial-popup">
-    <button class="trial-popup-close" id="trialPopupClose" type="button" aria-label="Close">✕</button>
-    <div class="section-tag"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Get Started</div>
-    <h3 id="trialPopupTitle">Still exploring? Start free — no card needed.</h3>
-    <p>Full platform access for 15 days, or skip straight to a pre-loaded demo account with real forms, GPS submissions, and all 3 user roles already set up.</p>
-    <div class="trial-popup-actions">
-      <a href="https://app.fieldgovern.com" class="btn-primary" style="font-size:.95rem;padding:13px 24px">Start 15-Day Free Trial →</a>
-      <a href="demo.html" class="btn-outline" style="font-size:.95rem;padding:13px 24px">Access Demo Account</a>
+    <div class="tp-top">
+      <button class="trial-popup-close" id="trialPopupClose" type="button" aria-label="Close">✕</button>
+      <span class="tp-badge">⚡ Get Started</span>
+      <div class="tp-icon"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+      <h3 id="trialPopupTitle">Still exploring? Start <em class="tp-free">free</em> — takes about 30 seconds.</h3>
     </div>
-    <p class="trial-popup-note">No credit card required</p>
+    <div class="trial-popup-body">
+      <div class="tp-feat-card">
+        <ul>
+          <li><span class="tp-chk"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Full platform — every feature, 15 days, no card</li>
+          <li><span class="tp-chk"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>All 3 roles ready — Admin, Supervisor, Enumerator</li>
+          <li><span class="tp-chk"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>GPS, offline sync, AI reports — all unlocked</li>
+        </ul>
+      </div>
+      <div class="trial-popup-actions">
+        <a href="https://app.fieldgovern.com" class="tp-btn-trial">Start 15-Day Free Trial <span>→</span></a>
+        <a href="demo.html" class="tp-btn-demo">Access Demo Account</a>
+      </div>
+      <p class="trial-popup-note"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>No credit card required</p>
+    </div>
   </div>
 </div>
 </body>
