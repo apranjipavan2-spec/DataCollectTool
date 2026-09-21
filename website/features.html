@@ -61,7 +61,7 @@
     #mobileMenu a:hover{background:var(--bg2);color:var(--brand)}
 
     /* ── HERO ─────────────────────────────── */
-    .page-hero{padding:48px 24px 56px;background:linear-gradient(160deg,#f0f9ff 0%,#fff 55%,#faf5ff 100%);text-align:center;margin-left:280px}
+    .page-hero{padding:48px 24px 56px;background:linear-gradient(160deg,#f0f9ff 0%,#fff 55%,#faf5ff 100%);text-align:center}
     @keyframes fadeUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
     .afu{animation:fadeUp .7s ease forwards;opacity:0}
     .d1{animation-delay:.12s}.d2{animation-delay:.26s}.d3{animation-delay:.4s}
@@ -445,17 +445,12 @@
       .side-group-label{display:none}
       .fnav-highlight{display:none}
       .feat-main{padding:0 4px;margin-left:0}
-      .page-hero{margin-left:0}
-      .cta-section{margin-left:0}
+      .feat-compare-cta{margin-left:0}
       footer{margin-left:0}
     }
 
-    /* ── CTA ──────────────────────────────── */
-    .cta-section{background:linear-gradient(135deg,#f0f9ff,#faf5ff);text-align:center;padding:80px 24px;border-top:1px solid var(--border);margin-left:280px}
-    .cta-section h2{font-size:2.2rem;font-weight:900;color:var(--text);margin-bottom:12px}
-    .cta-section p{color:var(--text2);margin-bottom:32px;font-size:1rem}
-
     /* ── FOOTER ───────────────────────────── */
+    .feat-compare-cta{margin-left:280px}
     footer{background:var(--dark);color:rgba(255,255,255,.7);padding:60px 24px 32px;margin-left:280px}
     .footer-inner{max-width:1200px;margin:0 auto}
     .footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;margin-bottom:48px}
@@ -529,14 +524,6 @@
   <a href="pricing.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Pricing</a>
   <a href="about.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg> About Us</a>
   <a href="demo.html" style="color:var(--brand);font-weight:700"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Try Free Demo</a>
-</div>
-
-<!-- HERO -->
-<div class="page-hero">
-  <div class="section-tag afu"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg> Platform Features</div>
-  <h1 class="afu d1">Every tool your field team needs<br/><span class="grad-text">— in one platform</span></h1>
-  <p class="afu d2">From offline-first data collection to AI-generated reports — purpose-built for India's connectivity realities and compliance requirements.</p>
-  <a href="https://app.fieldgovern.com" class="btn-primary pulse-btn afu d3" style="font-size:1rem;padding:14px 28px">Start Free Trial →</a>
 </div>
 
 <!-- FEATURE LAYOUT: left card-nav + right content -->
@@ -1532,20 +1519,7 @@
 </div><!-- /feat-main -->
 </div><!-- /feat-layout -->
 
-<!-- CTA -->
-<div class="cta-section">
-  <div style="max-width:600px;margin:0 auto">
-    <div class="section-tag" style="margin-bottom:16px"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Ready to start?</div>
-    <h2>Replace SurveyCTO in one sprint.</h2>
-    <p>Full platform access, free for 15 days. No credit card required. Import your existing forms in minutes.</p>
-    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-      <a href="https://app.fieldgovern.com" class="btn-primary pulse-btn" style="font-size:1.05rem;padding:16px 36px">Start Free Trial →</a>
-      <a href="demo.html" class="btn-outline" style="font-size:1.05rem;padding:16px 36px">Try Live Demo</a>
-    </div>
-  </div>
-</div>
-
-<section style="padding:56px 24px;background:linear-gradient(135deg,#f8fafc,#f1f5f9)">
+<section class="feat-compare-cta" style="padding:56px 24px;background:linear-gradient(135deg,#f8fafc,#f1f5f9)">
   <div style="max-width:1200px;margin:0 auto">
     <div style="text-align:center;margin-bottom:28px">
       <h2 style="font-size:1.7rem;font-weight:800;letter-spacing:-0.01em;margin-bottom:8px">How FieldGovern compares</h2>
