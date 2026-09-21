@@ -37,7 +37,7 @@ jobs:
     environment: production
     steps:
       - name: Checkout (for the recovery script)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Copy recovery script to VPS
         uses: appleboy/scp-action@v0.1.7
