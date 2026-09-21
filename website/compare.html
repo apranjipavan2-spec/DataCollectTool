@@ -536,7 +536,7 @@
         <tr><td>Free</td><td class="col-fg"><div class="fg-plan">₹0 · Free forever</div><div class="fg-meta">300 subs/mo</div></td><td><span class="tag-ok">Community · 200/mo</span></td><td><span class="tag-better">Community · 5,000/mo</span></td><td><span class="tag-ok">Free (self-host)</span></td></tr>
         <tr><td>Entry</td><td class="col-fg"><div class="fg-plan">Starter · <span data-fg-price="starter.monthly">₹7,999</span></div><div class="fg-meta">2,000 subs · <span data-fg-price="starter.annual">₹6,999</span>/mo annual</div></td><td><span class="tag-worse">~$198 (₹16,500+)</span></td><td><span class="tag-ok">Professional · 25,000</span></td><td><span class="tag-ok">ODK Cloud / hosting</span></td></tr>
         <tr><td>Mid</td><td class="col-fg"><div class="fg-plan">Growth · <span data-fg-price="growth.monthly">₹12,999</span></div><div class="fg-meta">5,000 subs · <del>₹14,999</del></div></td><td><span class="tag-worse">~$300 (₹25,000+)</span></td><td><span class="tag-ok">Teams · 50,000</span></td><td><span class="tag-ok">Server + DevOps</span></td></tr>
-        <tr><td>Top managed</td><td class="col-fg"><div class="fg-plan">Pro · <span data-fg-price="pro.monthly">₹24,999</span></div><div class="fg-meta">25,000 subs · <del>₹28,999</del></div></td><td><span class="tag-worse">up to ~$700 (₹58,000+)</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Your servers + DevOps</span></td></tr>
+        <tr><td>Top managed</td><td class="col-fg"><div class="fg-plan">Pro · <span data-fg-price="pro.monthly">₹21,999</span></div><div class="fg-meta">20,000 subs · <del>₹28,999</del></div></td><td><span class="tag-worse">up to ~$700 (₹58,000+)</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Your servers + DevOps</span></td></tr>
         <tr><td>Beyond / custom</td><td class="col-fg"><div class="fg-plan">Custom</div><div class="fg-meta">by subs / schedules / project</div></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Enterprise (quote)</span></td><td><span class="tag-ok">Self-managed</span></td></tr>
         <tr><td>Built-in cleaning + analysis + AI reports</td><td class="col-fg"><span class="tag-better">✓ Included in price</span></td><td><span class="tag-worse">✕ Buy Stata + analyst</span></td><td><span class="tag-worse">✕ Buy tools + analyst</span></td><td><span class="tag-worse">✕ Buy tools + analyst</span></td></tr>
         <tr><td>Payment</td><td class="col-fg"><span class="tag-better">UPI / NEFT (INR)</span></td><td><span class="tag-worse">USD card</span></td><td><span class="tag-worse">USD card</span></td><td><span class="tag-ok">n/a</span></td></tr>
@@ -742,7 +742,7 @@
     var fallback = [
       {name:'Starter', price:7999,  subs:2000,  forms:8},
       {name:'Growth',  price:12999, subs:5000,  forms:20},
-      {name:'Pro',     price:24999, subs:25000, forms:100}
+      {name:'Pro',     price:21999, subs:20000, forms:100}
     ];
     if (!window.FG_PRICING || !window.FG_PRICING.length) return fallback;
     var byTier = {}; window.FG_PRICING.forEach(function(p){ byTier[p.tier] = p; });

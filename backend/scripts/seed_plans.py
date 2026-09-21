@@ -291,8 +291,8 @@ UNIFIED_PLANS = [
     dict(
         id="fg_pro", segment="unified", tier="pro", name="Pro", sort_order=4,
         description="For large organisations with high volume data collection.",
-        price_inr=24999, price_usd_cents=30000,
-        submissions_limit=25000, storage_limit_mb=10240,  # 10 GB
+        price_inr=21999, price_usd_cents=26400,
+        submissions_limit=20000, storage_limit_mb=10240,  # 10 GB
         active_forms_limit=100,  ai_reports_per_month=100, api_calls_per_month=25000,
         max_org_admins=20,       max_supervisors=None,    max_enumerators=None,
         asr_minutes_limit=None,  translation_chars=None,
