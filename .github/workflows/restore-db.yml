@@ -1,0 +1,156 @@
+name: Restore DB from backup
+
+# Manual, deliberate use only. Two-step safety so this can NEVER delete data:
+#   1. Default (confirm != "yes-restore") = DRY RUN. Restores the chosen dump
+#      into a throwaway scratch database and prints row-count comparisons
+#      against the live DB. The live DB is never touched.
+#   2. confirm == "yes-restore" = APPLY. Takes one more safety dump of the
+#      current live DB first, then swaps the restored DB in. The old live DB
+#      is RENAMED (fieldgovern_prev_<timestamp>), never dropped, so nothing
+#      is ever deleted — you can always swap back by hand if the restore was
+#      the wrong call.
+on:
+  workflow_dispatch:
+    inputs:
+      dump_file:
+        description: 'Dump filename from Drive db/ folder (e.g. fieldgovern_2026-09-20_10-00-01.sql.gz), or "latest"'
+        required: true
+        default: "latest"
+      confirm:
+        description: "Type yes-restore to actually swap it in. Anything else = dry-run/verify only."
+        required: true
+        default: "dry-run"
+
+jobs:
+  restore:
+    name: Restore
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Write + run restore-db.sh via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          GDRIVE_TOKEN: ${{ secrets.GDRIVETOKEN }}
+          DUMP_FILE_INPUT: ${{ github.event.inputs.dump_file }}
+          CONFIRM_INPUT: ${{ github.event.inputs.confirm }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 20m
+          envs: GDRIVE_TOKEN,DUMP_FILE_INPUT,CONFIRM_INPUT
+          script: |
+            set -e
+            cd /opt/fieldgovern
+
+            echo "=== Write /opt/fieldgovern/restore-db.sh ==="
+            cat > /opt/fieldgovern/restore-db.sh <<'SCRIPT'
+            #!/bin/bash
+            # Restore a DB backup. Safe by construction:
+            #  - dry-run (default) restores into a scratch DB, compares row
+            #    counts against live, then drops the scratch DB. Live untouched.
+            #  - apply takes a fresh safety dump of live first, then renames
+            #    (never drops) the old live DB before cutting the restored one in.
+            set -uo pipefail
+            APP_DIR="/opt/fieldgovern"
+            BACKUP_DIR="$APP_DIR/backups"
+            REMOTE="gdrive:FieldGovern-Backups"
+            COMPOSE="docker compose -f $APP_DIR/docker-compose.yml"
+            DUMP_ARG="${1:-latest}"
+            APPLY="${2:-0}"
+            TS=$(date +"%Y-%m-%d_%H-%M-%S")
+            CHECK_TABLES="submissions media_files users forms form_versions"
+            LOG(){ echo "[$(date '+%F %T')] $*"; }
+
+            mkdir -p "$BACKUP_DIR"
+
+            # 1. Resolve which dump to use
+            if [ "$DUMP_ARG" = "latest" ]; then
+              DUMP_FILE=$(rclone lsf "$REMOTE/db" --include "*.sql.gz" | sort | tail -1)
+            else
+              DUMP_FILE="$DUMP_ARG"
+            fi
+            if [ -z "$DUMP_FILE" ]; then
+              LOG "ERROR: no dump found (arg was '$DUMP_ARG')"
+              exit 1
+            fi
+            LOG "Using dump: $DUMP_FILE"
+
+            # 2. Fetch it locally if not already present
+            LOCAL_PATH="$BACKUP_DIR/$DUMP_FILE"
+            if [ ! -f "$LOCAL_PATH" ]; then
+              LOG "Not on disk locally, pulling from Drive..."
+              rclone copy "$REMOTE/db/$DUMP_FILE" "$BACKUP_DIR" \
+                || { LOG "ERROR: could not fetch $DUMP_FILE from Drive"; exit 1; }
+            fi
+            if [ ! -f "$LOCAL_PATH" ]; then
+              LOG "ERROR: $LOCAL_PATH still missing after fetch"
+              exit 1
+            fi
+
+            # 3. Restore into a SCRATCH database. The live 'fieldgovern' DB is
+            # never touched by this step, no matter what.
+            SCRATCH_DB="restore_check_${TS}"
+            $COMPOSE exec -T postgres psql -U fieldgovern -d postgres \
+              -c "CREATE DATABASE ${SCRATCH_DB};"
+            gunzip -c "$LOCAL_PATH" | $COMPOSE exec -T postgres \
+              psql -U fieldgovern -d "$SCRATCH_DB" -q
+            LOG "Restored '$DUMP_FILE' into scratch DB '$SCRATCH_DB'"
+
+            # 4. Compare row counts: backup vs live, always shown
+            LOG "=== Row count comparison (backup vs live) ==="
+            for TBL in $CHECK_TABLES; do
+              B=$($COMPOSE exec -T postgres psql -U fieldgovern -d "$SCRATCH_DB" -t -A \
+                -c "SELECT COUNT(*) FROM $TBL;" 2>/dev/null || echo "?")
+              L=$($COMPOSE exec -T postgres psql -U fieldgovern -d fieldgovern -t -A \
+                -c "SELECT COUNT(*) FROM $TBL;" 2>/dev/null || echo "?")
+              LOG "  $TBL: backup=$B  live=$L"
+            done
+
+            if [ "$APPLY" != "1" ]; then
+              LOG "Dry-run only (no apply). Dropping scratch DB, live data untouched."
+              $COMPOSE exec -T postgres psql -U fieldgovern -d postgres \
+                -c "DROP DATABASE ${SCRATCH_DB};"
+              exit 0
+            fi
+
+            # 5. APPLY: safety-dump the current live DB, then swap the
+            # restored DB in. The old live DB is RENAMED, never dropped.
+            LOG "APPLY requested - taking a safety dump of current live DB first..."
+            SAFETY_FILE="fieldgovern_prerestore_${TS}.sql.gz"
+            $COMPOSE exec -T postgres pg_dump -U fieldgovern fieldgovern \
+              | gzip > "$BACKUP_DIR/$SAFETY_FILE"
+            rclone copy "$BACKUP_DIR/$SAFETY_FILE" "$REMOTE/db" \
+              && LOG "Safety dump pushed to Drive: $SAFETY_FILE"
+
+            LOG "Terminating connections to 'fieldgovern' and swapping databases..."
+            $COMPOSE exec -T postgres psql -U fieldgovern -d postgres -c \
+              "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='fieldgovern' AND pid <> pg_backend_pid();"
+            $COMPOSE exec -T postgres psql -U fieldgovern -d postgres -c \
+              "ALTER DATABASE fieldgovern RENAME TO fieldgovern_prev_${TS};"
+            $COMPOSE exec -T postgres psql -U fieldgovern -d postgres -c \
+              "ALTER DATABASE ${SCRATCH_DB} RENAME TO fieldgovern;"
+
+            LOG "Restarting app so it reconnects to the restored DB..."
+            $COMPOSE restart app
+
+            LOG "DONE. Live DB is now the restored backup ($DUMP_FILE)."
+            LOG "Previous live DB kept as 'fieldgovern_prev_${TS}' - drop it by hand once verified, e.g.:"
+            LOG "  docker compose exec postgres psql -U fieldgovern -d postgres -c \"DROP DATABASE fieldgovern_prev_${TS};\""
+            SCRIPT
+            chmod +x /opt/fieldgovern/restore-db.sh
+            echo "  wrote restore-db.sh"
+
+            echo "=== Ensure rclone config exists (for pulling dumps from Drive) ==="
+            if [ ! -f /root/.config/rclone/rclone.conf ]; then
+              mkdir -p /root/.config/rclone
+              umask 077
+              printf '[gdrive]\ntype = drive\nscope = drive\ntoken = %s\n' "$GDRIVE_TOKEN" \
+                > /root/.config/rclone/rclone.conf
+            fi
+
+            echo "=== Run restore-db.sh ==="
+            APPLY=0
+            if [ "$CONFIRM_INPUT" = "yes-restore" ]; then APPLY=1; fi
+            echo "dump_file=$DUMP_FILE_INPUT  apply=$APPLY"
+            /opt/fieldgovern/restore-db.sh "$DUMP_FILE_INPUT" "$APPLY"

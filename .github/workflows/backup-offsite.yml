@@ -67,6 +67,34 @@ jobs:
             $RCOPY /opt/fieldgovern/backups "$REMOTE/db" --include "*.sql.gz" \
               && LOG "DB dumps synced to Drive" || LOG "WARN: DB offsite copy failed"
 
+            # 1b. Row-count shrink check: alert if a core table has FEWER rows
+            # than at the last backup run. Never deletes/restores anything by
+            # itself — just makes data loss visible immediately instead of
+            # silently, since a real drop is either a bug or an incident.
+            COUNTS_FILE="/opt/fieldgovern/.last_row_counts"
+            ALERT_LOG="/opt/fieldgovern/backup-alerts.log"
+            NEW_COUNTS=$(docker compose -f /opt/fieldgovern/docker-compose.yml exec -T postgres \
+              psql -U fieldgovern -d fieldgovern -t -A -c \
+              "SELECT relname||':'||n_live_tup FROM pg_stat_user_tables WHERE relname IN ('submissions','media_files','users','forms','form_versions');" 2>/dev/null)
+            if [ -z "$NEW_COUNTS" ]; then
+              LOG "WARN: could not read row counts (DB unreachable?) - skipping shrink check"
+            else
+              if [ -f "$COUNTS_FILE" ]; then
+                while IFS=: read -r TBL CNT; do
+                  [ -z "$TBL" ] && continue
+                  PREV=$(grep "^${TBL}:" "$COUNTS_FILE" | cut -d: -f2)
+                  if [ -n "$PREV" ] && [ "$CNT" -lt "$PREV" ]; then
+                    MSG="[$(date '+%F %T')] ALERT: '$TBL' shrank from $PREV to $CNT rows ($((PREV-CNT)) fewer than last backup)"
+                    LOG "$MSG"
+                    echo "$MSG" >> "$ALERT_LOG"
+                    $RCOPY "$ALERT_LOG" "$REMOTE/alerts" || LOG "WARN: could not push alert log to Drive"
+                  fi
+                done <<< "$NEW_COUNTS"
+              fi
+              echo "$NEW_COUNTS" > "$COUNTS_FILE"
+              LOG "row counts: $(echo "$NEW_COUNTS" | tr '\n' ' ')"
+            fi
+
             # 2. Photos (app /app/uploads volume). The app runs under docker
             # compose, so its container isn't literally named "app" — resolve
             # the real container id via compose, then read its mount.
