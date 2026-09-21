@@ -61,7 +61,7 @@
     #mobileMenu a:hover{background:var(--bg2);color:var(--brand)}
 
     /* ── HERO ─────────────────────────────── */
-    .page-hero{padding:48px 24px 56px;background:linear-gradient(160deg,#f0f9ff 0%,#fff 55%,#faf5ff 100%);text-align:center}
+    .page-hero{padding:48px 24px 56px;background:linear-gradient(160deg,#f0f9ff 0%,#fff 55%,#faf5ff 100%);text-align:center;margin-left:280px}
     @keyframes fadeUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
     .afu{animation:fadeUp .7s ease forwards;opacity:0}
     .d1{animation-delay:.12s}.d2{animation-delay:.26s}.d3{animation-delay:.4s}
@@ -393,8 +393,9 @@
     .ai-compare-lbl.new{color:#34d399}
 
     /* ── FEATURE LAYOUT: left card-nav + right content ── */
-    .feat-layout{max-width:1200px;margin:0 auto;display:flex;align-items:flex-start;padding-top:68px}
-    .feat-sidenav{position:relative;width:280px;flex-shrink:0;position:sticky;top:88px;padding:24px 16px;margin-top:20px}
+    .feat-layout{width:100%;display:flex;align-items:flex-start;padding-top:68px}
+    /* Fixed (not sticky) — pinned to the viewport for the whole page, never scrolls with content */
+    .feat-sidenav{position:fixed;top:68px;left:0;width:280px;height:calc(100vh - 68px);overflow-y:auto;padding:24px 16px;background:var(--bg2);border-right:1px solid var(--border);z-index:40}
     .fnav-highlight{position:absolute;left:16px;right:16px;top:0;height:0;background:white;border:1.5px solid var(--accent-color,var(--brand));border-radius:14px;box-shadow:0 6px 18px -4px var(--accent-shadow,rgba(14,165,233,.28));transition:transform .38s cubic-bezier(.16,1,.3,1),height .38s cubic-bezier(.16,1,.3,1),border-color .3s,box-shadow .3s;pointer-events:none;z-index:0}
     .fnav-highlight::before{content:'';position:absolute;left:-1.5px;top:14px;bottom:14px;width:3px;border-radius:3px;background:var(--accent-color,var(--brand))}
     .fcard-list{position:relative;z-index:1;display:flex;flex-direction:column;gap:8px}
@@ -416,7 +417,7 @@
     .side-group-label{font-size:.66rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;padding:14px 14px 4px}
     .side-group-label:first-child{padding-top:2px}
 
-    .feat-main{flex:1;min-width:0}
+    .feat-main{flex:1;min-width:0;margin-left:280px}
     @keyframes contentIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
     .tab-panel.animate{animation:contentIn .42s cubic-bezier(.16,1,.3,1)}
 
@@ -433,26 +434,29 @@
     .tab-panel{display:none}
     .tab-panel.active{display:block}
 
-    /* ── MOBILE FALLBACK (horizontal cards, no sticky sidebar) ── */
+    /* ── MOBILE FALLBACK (horizontal cards, no fixed sidebar) ── */
     @media(max-width:900px){
       .feat-layout{flex-direction:column;padding:0}
-      .feat-sidenav{position:static;width:100%;top:auto;margin-top:0;padding:16px}
+      .feat-sidenav{position:static;width:100%;height:auto;top:auto;left:auto;overflow-y:visible;padding:16px}
       .fcard-list{flex-direction:row;overflow-x:auto;scrollbar-width:none}
       .fcard-list::-webkit-scrollbar{display:none}
       .fcard{flex-direction:column;text-align:center;min-width:126px}
       .fcard-text{text-align:center}
       .side-group-label{display:none}
       .fnav-highlight{display:none}
-      .feat-main{padding:0 4px}
+      .feat-main{padding:0 4px;margin-left:0}
+      .page-hero{margin-left:0}
+      .cta-section{margin-left:0}
+      footer{margin-left:0}
     }
 
     /* ── CTA ──────────────────────────────── */
-    .cta-section{background:linear-gradient(135deg,#f0f9ff,#faf5ff);text-align:center;padding:80px 24px;border-top:1px solid var(--border)}
+    .cta-section{background:linear-gradient(135deg,#f0f9ff,#faf5ff);text-align:center;padding:80px 24px;border-top:1px solid var(--border);margin-left:280px}
     .cta-section h2{font-size:2.2rem;font-weight:900;color:var(--text);margin-bottom:12px}
     .cta-section p{color:var(--text2);margin-bottom:32px;font-size:1rem}
 
     /* ── FOOTER ───────────────────────────── */
-    footer{background:var(--dark);color:rgba(255,255,255,.7);padding:60px 24px 32px}
+    footer{background:var(--dark);color:rgba(255,255,255,.7);padding:60px 24px 32px;margin-left:280px}
     .footer-inner{max-width:1200px;margin:0 auto}
     .footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;margin-bottom:48px}
     .footer-logo-box{display:inline-flex;margin-bottom:14px}
@@ -1705,7 +1709,9 @@
   function moveFnavHighlight(card) {
     var hl = document.getElementById('fnavHighlight');
     var nav = document.querySelector('.feat-sidenav');
-    if (!hl || !nav || !card || nav.offsetParent === null) return; // hidden on mobile
+    // .feat-sidenav is position:fixed on desktop, so offsetParent is always null there —
+    // check the highlight's own computed display (set to none in the mobile media query) instead.
+    if (!hl || !nav || !card || getComputedStyle(hl).display === 'none') return; // hidden on mobile
     var navRect = nav.getBoundingClientRect();
     var cardRect = card.getBoundingClientRect();
     hl.style.transform = 'translateY(' + (cardRect.top - navRect.top) + 'px)';
