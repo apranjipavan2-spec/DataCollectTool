@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>FieldGovern — Offline-First Field Data Collection & AI Analysis | Dataworx Partner Solution</title>
+<link rel="icon" type="image/png" href="https://www.fieldgovern.com/assets/logo-icon.png"/>
 <meta name="description" content="FieldGovern is Dataworx's strategic technology partner for field data collection — offline-first survey software with AI analysis, built for Indian NGOs, researchers, and government M&E teams."/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
@@ -30,8 +31,8 @@
   /* sticky mini nav */
   nav.page-nav{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
   .page-nav .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
-  .page-nav .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:1.02rem;color:var(--dark)}
-  .page-nav .brand .mark{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;color:#fff;font-size:.8rem;font-weight:900}
+  .page-nav .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:1.02rem;color:var(--dark);text-decoration:none}
+  .page-nav .brand img{height:30px;width:auto;display:block}
   .page-nav .links{display:flex;gap:26px}
   .page-nav .links a{font-size:.86rem;font-weight:600;color:var(--ink-muted);text-decoration:none}
   .page-nav .links a:hover{color:var(--primary-dark)}
@@ -158,6 +159,43 @@
     .partner-box{flex-direction:column;text-align:center;padding:32px}
     .stat-row{gap:28px}
   }
+
+  /* ── Timed trial popup (auto-opens, redirects to app.fieldgovern.com) ── */
+  #trialPopupOverlay{position:fixed;inset:0;background:rgba(15,23,42,.6);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+  #trialPopupOverlay.open{display:flex}
+  @keyframes tpPopIn{0%{opacity:0;transform:translateY(24px) scale(.94)}60%{transform:translateY(-4px) scale(1.015)}100%{opacity:1;transform:translateY(0) scale(1)}}
+  @keyframes tpIconPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+  @keyframes tpShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+  @keyframes tpGlow{0%,100%{box-shadow:0 4px 20px rgba(14,165,233,.35)}50%{box-shadow:0 4px 32px rgba(124,58,237,.55)}}
+  @keyframes tpFreeGlow{0%,100%{text-shadow:0 0 0 rgba(255,255,255,0)}50%{text-shadow:0 0 18px rgba(255,255,255,.85)}}
+  @keyframes tpFeatIn{to{opacity:1}}
+  .trial-popup{position:relative;background:#fff;border-radius:24px;max-width:460px;width:100%;box-shadow:0 32px 80px rgba(0,0,0,.4);animation:tpPopIn .5s cubic-bezier(.16,1,.3,1);overflow:hidden}
+  .tp-top{background:linear-gradient(135deg,var(--primary),var(--accent));padding:28px 32px 56px;position:relative;overflow:hidden}
+  .tp-top::after{content:'';position:absolute;top:-40%;right:-20%;width:200px;height:200px;background:rgba(255,255,255,.12);border-radius:50%}
+  .trial-popup-close{position:absolute;top:16px;right:16px;width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.2);color:#fff;cursor:pointer;font-size:1rem;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .2s;z-index:2}
+  .trial-popup-close:hover{background:rgba(255,255,255,.35)}
+  .tp-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:5px 13px;font-size:.72rem;font-weight:800;color:#fff;letter-spacing:.04em;text-transform:uppercase;position:relative;z-index:1}
+  .tp-icon{width:52px;height:52px;border-radius:15px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;margin-top:16px;animation:tpIconPulse 2.4s ease-in-out infinite;position:relative;z-index:1}
+  .tp-icon svg{width:26px;height:26px;stroke:#fff;stroke-width:2;fill:none}
+  .trial-popup h3{color:#fff;font-size:1.42rem;font-weight:900;line-height:1.28;margin-top:14px;max-width:330px;position:relative;z-index:1}
+  .tp-free{font-style:normal;background:linear-gradient(135deg,#fff,#fef08a);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:tpFreeGlow 1.8s ease-in-out infinite}
+  .trial-popup-body{padding:22px 32px 30px;margin-top:-32px;position:relative;z-index:2}
+  .tp-feat-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:16px 18px;box-shadow:0 8px 24px rgba(0,0,0,.06);margin-bottom:18px}
+  .tp-feat-card ul{list-style:none;display:flex;flex-direction:column;gap:9px}
+  .tp-feat-card li{display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--ink-muted);font-weight:500;opacity:0;animation:tpFeatIn .4s ease forwards}
+  .tp-feat-card li:nth-child(1){animation-delay:.1s}
+  .tp-feat-card li:nth-child(2){animation-delay:.2s}
+  .tp-feat-card li:nth-child(3){animation-delay:.3s}
+  .tp-feat-card .tp-chk{width:19px;height:19px;border-radius:50%;background:var(--good-bg);color:var(--good);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .tp-feat-card .tp-chk svg{width:11px;height:11px;stroke:currentColor;stroke-width:3;fill:none}
+  .trial-popup-actions{display:flex;flex-direction:column;gap:10px}
+  .tp-btn-trial{position:relative;width:100%;text-align:center;padding:15px;border-radius:12px;font-weight:800;font-size:.96rem;color:#fff;text-decoration:none;background:linear-gradient(135deg,var(--primary),var(--accent));background-size:200% 100%;animation:tpGlow 2.2s ease-in-out infinite;display:flex;align-items:center;justify-content:center;gap:8px;overflow:hidden}
+  .tp-btn-trial::before{content:'';position:absolute;inset:0;background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);background-size:200% 100%;animation:tpShimmer 2.5s linear infinite}
+  .tp-btn-demo{width:100%;text-align:center;padding:14px;border-radius:12px;font-weight:700;font-size:.9rem;color:var(--ink-muted);text-decoration:none;background:var(--surface-2);border:1.5px solid var(--border);transition:all .2s}
+  .tp-btn-demo:hover{border-color:var(--primary);color:var(--primary-dark)}
+  .trial-popup-note{margin-top:14px;text-align:center;font-size:.78rem;color:var(--ink-faint);display:flex;align-items:center;justify-content:center;gap:6px}
+  .trial-popup-note svg{width:14px;height:14px;stroke:var(--good);stroke-width:2.5;fill:none}
+  @media(max-width:480px){.tp-top{padding:24px 24px 52px}.trial-popup-body{padding:20px 24px 26px}}
 </style>
 </head>
 <body>
@@ -195,7 +233,7 @@
 
 <nav class="page-nav">
   <div class="wrap">
-    <div class="brand"><span class="mark">FG</span> FieldGovern</div>
+    <a class="brand" href="https://www.fieldgovern.com" target="_blank" rel="noopener"><img src="https://www.fieldgovern.com/assets/logo-wide.png" alt="FieldGovern"/></a>
     <div class="links">
       <a href="#problem">Problem</a>
       <a href="#platform">Platform</a>
@@ -404,6 +442,46 @@
 <footer>
   <p>FieldGovern is a strategic technology partner of Dataworx. Questions? <a href="mailto:pallavi@dataworx.co.in">pallavi@dataworx.co.in</a></p>
 </footer>
+
+<div id="trialPopupOverlay" role="dialog" aria-modal="true" aria-labelledby="trialPopupTitle">
+  <div class="trial-popup">
+    <div class="tp-top">
+      <button class="trial-popup-close" id="trialPopupClose" type="button" aria-label="Close">✕</button>
+      <span class="tp-badge">⚡ Get Started</span>
+      <div class="tp-icon"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+      <h3 id="trialPopupTitle">Still exploring? Start <em class="tp-free">free</em> — takes about 30 seconds.</h3>
+    </div>
+    <div class="trial-popup-body">
+      <div class="tp-feat-card">
+        <ul>
+          <li><span class="tp-chk"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Full platform — every feature, 15 days, no card</li>
+          <li><span class="tp-chk"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>All 3 roles ready — Admin, Supervisor, Enumerator</li>
+          <li><span class="tp-chk"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>GPS, offline sync, AI reports — all unlocked</li>
+        </ul>
+      </div>
+      <div class="trial-popup-actions">
+        <a href="https://app.fieldgovern.com" target="_blank" rel="noopener" class="tp-btn-trial">Start 15-Day Free Trial <span>→</span></a>
+        <a href="https://www.fieldgovern.com/demo.html" target="_blank" rel="noopener" class="tp-btn-demo">Access Demo Account</a>
+      </div>
+      <p class="trial-popup-note"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>No credit card required</p>
+    </div>
+  </div>
+</div>
+<script>
+  // Auto-opens 30s after every fresh load of this page (refresh resets the
+  // timer). Only suppressed for the rest of THIS page view once closed.
+  (function(){
+    setTimeout(function(){
+      var overlay = document.getElementById('trialPopupOverlay');
+      if (!overlay) return;
+      overlay.classList.add('open');
+
+      function dismiss(){ overlay.classList.remove('open'); }
+      document.getElementById('trialPopupClose').addEventListener('click', dismiss);
+      overlay.addEventListener('click', function(e){ if (e.target === overlay) dismiss(); });
+    }, 30000);
+  })();
+</script>
 
 </body>
 </html>
