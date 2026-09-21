@@ -787,7 +787,7 @@ def public_pricing(db: Session = Depends(get_db)):
             {
                 "tier": tier,
                 "limits": PLAN_LIMITS.get(tier, {}),
-                "price_inr": {"free": 0, "starter": 7999, "growth": 12999, "pro": 24999, "custom": 0}.get(tier, 0),
+                "price_inr": {"free": 0, "starter": 8399, "growth": 12999, "pro": 19999, "custom": 0}.get(tier, 0),
             }
             for tier in ["free", "starter", "growth", "pro", "custom"]
         ]
