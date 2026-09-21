@@ -6,6 +6,7 @@ from sqlalchemy.sql import func
 from pydantic import BaseModel
 from typing import Optional, List
 from app.core.deps import require_supervisor, get_current_user, get_db
+from app.core.soft_delete import soft_delete
 from app.models.user_tool_project import UserToolProject
 
 router = APIRouter()
@@ -82,8 +83,9 @@ def list_projects(tool: str = "", archived: bool = False,
     if tool:
         q = q.filter(UserToolProject.tool == tool)
     # Active list hides archived projects; pass ?archived=true for the Archive folder.
+    # The global soft-delete filter would otherwise hide archived rows outright.
     if archived:
-        q = q.filter(UserToolProject.archived_at.isnot(None))
+        q = q.execution_options(include_deleted=True).filter(UserToolProject.archived_at.isnot(None))
     else:
         q = q.filter(UserToolProject.archived_at.is_(None))
     rows = q.order_by(UserToolProject.updated_at.desc()).all()
@@ -151,7 +153,9 @@ def share_project(project_id: str, body: ShareProjectRequest, user=Depends(get_c
 
 
 def _owned_project(project_id: str, user, db: Session) -> UserToolProject:
-    proj = db.query(UserToolProject).filter(
+    # include_deleted: restore_project must be able to find an archived/binned
+    # row, which the global soft-delete filter would otherwise hide.
+    proj = db.query(UserToolProject).execution_options(include_deleted=True).filter(
         UserToolProject.id == project_id,
         UserToolProject.user_id == user["sub"],
         UserToolProject.tenant_id == user["tenant_id"],
@@ -163,11 +167,12 @@ def _owned_project(project_id: str, user, db: Session) -> UserToolProject:
 
 @router.delete("/tool-projects/{project_id}")
 def delete_project(project_id: str, user=Depends(require_supervisor), db: Session = Depends(get_db)):
-    """Soft-delete: archive the project instead of removing it. Stays restorable."""
+    """Soft-delete: archive the project and send it to the 360-day Recycle Bin."""
     proj = _owned_project(project_id, user, db)
     if proj.archived_at is None:
         proj.archived_at = func.now()
-        db.commit()
+    soft_delete(proj)
+    db.commit()
     return {"archived": True}
 
 
@@ -176,6 +181,7 @@ def restore_project(project_id: str, user=Depends(require_supervisor), db: Sessi
     """Move an archived project back into the active list."""
     proj = _owned_project(project_id, user, db)
     proj.archived_at = None
+    proj.deleted_at = None
     db.commit()
     return {"restored": True}
 

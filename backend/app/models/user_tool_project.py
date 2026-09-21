@@ -3,9 +3,10 @@ from sqlalchemy import Column, String, DateTime, ForeignKey, text
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from sqlalchemy.sql import func
 from app.core.database import Base
+from app.core.soft_delete import SoftDeleteMixin
 
 
-class UserToolProject(Base):
+class UserToolProject(Base, SoftDeleteMixin):
     __tablename__ = "user_tool_projects"
 
     id         = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

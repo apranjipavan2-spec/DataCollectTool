@@ -8,6 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, load_only
 from app.core.database import get_db
 from app.core.deps import require_org_admin, require_enumerator
+from app.core.soft_delete import soft_delete
 from app.models.form import Form
 from app.models.form_assignment import FormAssignment
 from app.models.form_version import FormVersion
@@ -205,6 +206,10 @@ def list_forms(
 ):
     q = db.query(Form).filter(Form.tenant_id == user["tenant_id"])
     if status:
+        # The global soft-delete filter would otherwise hide archived forms
+        # outright, breaking the explicit ?status=archived lookup.
+        if status == "archived":
+            q = q.execution_options(include_deleted=True)
         q = q.filter(Form.status == status)
     else:
         # Hide archived (soft-deleted) forms from the default list; they remain
@@ -329,8 +334,10 @@ def bulk_update_edit_setting(body: BulkEditSettingRequest, user=Depends(require_
 
 @router.delete("/{form_id}", status_code=status.HTTP_204_NO_CONTENT)
 def archive_form(form_id: str, user=Depends(require_org_admin), db: Session = Depends(get_db)):
+    """Archive + soft-delete: sends the form to the 360-day Recycle Bin, restorable from /bin."""
     form = _get_form_for_tenant(db, form_id, user["tenant_id"])
     form.status = "archived"
+    soft_delete(form)
     db.commit()
 
 

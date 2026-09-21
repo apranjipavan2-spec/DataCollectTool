@@ -80,6 +80,13 @@ def restore_item(entity_type: str, item_id: str,
     """Bring an item back out of the bin."""
     _, row = _get_row(db, entity_type, item_id, user["tenant_id"])
     row.deleted_at = None
+    # Forms/projects also carry their own status/archived flag alongside the
+    # shared deleted_at — clear it too, or the item stays hidden from its own
+    # list even after leaving the bin.
+    if entity_type == "form":
+        row.status = "draft"
+    elif entity_type == "project":
+        row.archived_at = None
     db.commit()
     return {"restored": True, "entity_type": entity_type, "id": item_id}
 

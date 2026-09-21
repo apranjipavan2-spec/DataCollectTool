@@ -231,6 +231,15 @@ _PATCHES = [
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ",
     # 0061 — per-form retention policy
     "ALTER TABLE forms ADD COLUMN IF NOT EXISTS retention_days INTEGER",
+    # 0062 — soft-delete now also covers forms and analyzer/cleaner projects
+    "ALTER TABLE forms ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ",
+    "CREATE INDEX IF NOT EXISTS ix_forms_deleted_at ON forms (deleted_at)",
+    "ALTER TABLE user_tool_projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ",
+    "CREATE INDEX IF NOT EXISTS ix_user_tool_projects_deleted_at ON user_tool_projects (deleted_at)",
+    "UPDATE forms SET deleted_at = COALESCE(updated_at, created_at, now()) "
+    "WHERE status = 'archived' AND deleted_at IS NULL",
+    "UPDATE user_tool_projects SET deleted_at = archived_at "
+    "WHERE archived_at IS NOT NULL AND deleted_at IS NULL",
 ]
 
 # 0048 — restricted runtime role + empty-context-bypass RLS policies. Mirrors the

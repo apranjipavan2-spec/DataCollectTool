@@ -81,9 +81,13 @@ def _build_registry() -> dict:
     from app.models.webhook import Webhook
     from app.models.submission import Submission
     from app.models.data_rights_request import DataRightsRequest
+    from app.models.form import Form
+    from app.models.user_tool_project import UserToolProject
 
     return {
         "submission":       (Submission,                  "Submission"),
+        "form":             (Form,                         "Form"),
+        "project":          (UserToolProject,              "Analyzer/Cleaner project"),
         "respondent":       (RespondentRoster,            "Respondent"),
         "shared_file":      (SharedFile,                  "Shared file"),
         "assignment":       (FormAssignment,              "Form assignment"),
