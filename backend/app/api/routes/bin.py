@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db, SessionLocal
 from app.core.deps import require_role
-from app.core.soft_delete import registry, label_for, RETENTION_DAYS
+from app.core.soft_delete import registry, label_for, created_at_for, RETENTION_DAYS
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -33,29 +33,73 @@ def _all_deleted(db: Session, model, tenant_id):
     )
 
 
+# ── File-manager-style grouping ──────────────────────────────────────────────
+# entity_type -> (folder name, icon). "project" is a shared table for four
+# different tools (UserToolProject.tool), so it's split out below instead.
+_GROUPS = {
+    "submission":          ("Data Collected",       "📥"),
+    "respondent":          ("Records",              "🗂️"),
+    "form":                ("Forms",                "📋"),
+    "assignment":          ("Form Assignments",     "🔗"),
+    "shared_file":         ("Shared Files",          "📁"),
+    "program":             ("Programs & Setup",      "🏷️"),
+    "program_location":    ("Programs & Setup",      "🏷️"),
+    "participant_type":    ("Programs & Setup",      "🏷️"),
+    "questionnaire":       ("Programs & Setup",      "🏷️"),
+    "location_target":     ("Programs & Setup",      "🏷️"),
+    "location":            ("Programs & Setup",      "🏷️"),
+    "scheduled_report":    ("Scheduled Reports",     "⏰"),
+    "webhook":             ("Webhooks",               "🔌"),
+    "data_rights_request": ("Data Rights Requests",  "⚖️"),
+}
+_PROJECT_GROUPS = {
+    "analyzer": ("Analyzer Projects", "📊"),
+    "cleaner":  ("Cleaner Projects",  "🧹"),
+    "writer":   ("Writer Files",      "✍️"),
+    "ai_job":   ("AI Reports",        "🤖"),
+}
+
+
+def _group_for(entity_type: str, row) -> tuple[str, str]:
+    if entity_type == "project":
+        return _PROJECT_GROUPS.get(getattr(row, "tool", None), ("Other Projects", "🗄️"))
+    return _GROUPS.get(entity_type, ("Other", "🗄️"))
+
+
 @router.get("/bin")
 def list_bin(user: dict = Depends(require_org_admin), db: Session = Depends(get_db)):
     """Everything currently in the 360-day bin for this org, newest first."""
+    from app.core.config import settings
     tenant_id = user["tenant_id"]
     items = []
     for entity_type, (model, human) in registry().items():
         for row in _all_deleted(db, model, tenant_id):
             deleted_at = row.deleted_at
+            created_at = created_at_for(row)
             purge_at = (deleted_at + timedelta(days=RETENTION_DAYS)) if deleted_at else None
             days_left = None
             if purge_at:
                 days_left = max(0, (purge_at - datetime.now(timezone.utc)).days)
+            group, icon = _group_for(entity_type, row)
             items.append({
                 "entity_type": entity_type,
                 "entity_label": human,
+                "group": group,
+                "icon": icon,
                 "id": str(row.id),
                 "label": label_for(row),
+                "created_at": created_at.isoformat() if created_at else None,
                 "deleted_at": deleted_at.isoformat() if deleted_at else None,
                 "purge_at": purge_at.isoformat() if purge_at else None,
                 "days_left": days_left,
             })
     items.sort(key=lambda x: x["deleted_at"] or "", reverse=True)
-    return {"items": items, "count": len(items), "retention_days": RETENTION_DAYS}
+    return {
+        "items": items,
+        "count": len(items),
+        "retention_days": RETENTION_DAYS,
+        "allow_hard_delete": settings.ALLOW_HARD_DELETE,
+    }
 
 
 def _get_row(db: Session, entity_type: str, item_id: str, tenant_id):

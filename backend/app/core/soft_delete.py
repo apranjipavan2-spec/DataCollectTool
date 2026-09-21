@@ -67,6 +67,18 @@ def label_for(obj) -> str:
     return str(getattr(obj, "id", ""))
 
 
+# Most models have `created_at`; FormAssignment only has `assigned_at`.
+_CREATED_AT_ATTRS = ("created_at", "assigned_at")
+
+
+def created_at_for(obj):
+    for attr in _CREATED_AT_ATTRS:
+        val = getattr(obj, attr, None)
+        if val:
+            return val
+    return None
+
+
 def _build_registry() -> dict:
     # Imported here to avoid a circular import at module load.
     from app.models.roster import RespondentRoster
