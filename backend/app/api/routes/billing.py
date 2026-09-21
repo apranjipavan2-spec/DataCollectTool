@@ -30,9 +30,16 @@ CYCLE_DISCOUNT     = {"monthly": 0, "3month": 0, "6month": 0, "annual": 0, "3yea
 CYCLE_MONTHS       = {"monthly": 1, "3month": 3, "6month": 6, "annual": 12, "3year": 36}
 CYCLE_BONUS_MONTHS = {"monthly": 0, "3month": 0, "6month": 0, "annual": 2,  "3year": 6}
 
-# Starter-tier plans price each cycle as a flat monthly rate (steeper discount for
-# longer commitments) instead of the bonus-months model used by Growth/Pro/Enterprise.
-STARTER_CYCLE_RATE = {"monthly": 7999, "3month": 7999, "6month": 7499, "annual": 6999, "3year": 6999}
+# Every paid tier prices each cycle as an explicit flat monthly rate (steeper
+# discount for longer commitments), not the generic bonus-months formula —
+# each tier's per-cycle discount % differs, which a single shared formula
+# can't represent. 3month mirrors monthly and 3year mirrors annual (no UI
+# button offers those two cycles anymore; kept as a sane API-level fallback).
+TIER_CYCLE_RATE = {
+    "starter": {"monthly": 8399, "3month": 8399, "6month": 7499, "annual": 6499, "3year": 6499},
+    "growth":  {"monthly": 12999, "3month": 12999, "6month": 11999, "annual": 9999, "3year": 9999},
+    "pro":     {"monthly": 19999, "3month": 19999, "6month": 16499, "annual": 15999, "3year": 15999},
+}
 
 _PAYMENT_DEFAULTS = {
     "upi_id":         "fieldgovernindia@upi",
@@ -91,13 +98,18 @@ def _order_ref() -> str:
 def _calc_amount(plan: Plan, billing_cycle: str) -> int:
     """Return total amount in INR for the chosen billing cycle.
 
-    Starter-tier plans: flat per-cycle monthly rate x months (STARTER_CYCLE_RATE) —
-    a genuinely lower rate for longer commitments, not a "pay X get Y free" framing.
-    All other tiers: paid_months = total_months - bonus_months (e.g. annual: pay 10, get 12).
+    Tiers with an explicit entry in TIER_CYCLE_RATE (starter/growth/pro): flat
+    per-cycle monthly rate x months — a genuinely lower rate for longer
+    commitments, not a "pay X get Y free" framing.
+    Any other tier (free/trial/custom — all price_inr=0): paid_months =
+    total_months - bonus_months (e.g. annual: pay 10, get 12). Kept as a
+    fallback for tiers with no explicit rate table, not currently reachable
+    for a real paid amount.
     """
     months = CYCLE_MONTHS.get(billing_cycle, 1)
-    if plan.tier == "starter":
-        rate = STARTER_CYCLE_RATE.get(billing_cycle, plan.price_inr)
+    tier_rates = TIER_CYCLE_RATE.get(plan.tier)
+    if tier_rates:
+        rate = tier_rates.get(billing_cycle, plan.price_inr)
         return int(rate * months)
     bonus       = CYCLE_BONUS_MONTHS.get(billing_cycle, 0)
     discount    = CYCLE_DISCOUNT.get(billing_cycle, 0)
@@ -182,9 +194,9 @@ def list_plans(db: Session = Depends(get_db)):
             "billing": {
                 cycle: {
                     "months": CYCLE_MONTHS[cycle],
-                    "bonus_months": 0 if p.tier == "starter" else CYCLE_BONUS_MONTHS[cycle],
+                    "bonus_months": 0 if p.tier in TIER_CYCLE_RATE else CYCLE_BONUS_MONTHS[cycle],
                     "paid_months": (
-                        CYCLE_MONTHS[cycle] if p.tier == "starter"
+                        CYCLE_MONTHS[cycle] if p.tier in TIER_CYCLE_RATE
                         else CYCLE_MONTHS[cycle] - CYCLE_BONUS_MONTHS[cycle]
                     ),
                     "price_discount_pct": disc,

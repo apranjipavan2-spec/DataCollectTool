@@ -263,7 +263,7 @@ UNIFIED_PLANS = [
     dict(
         id="fg_starter", segment="unified", tier="starter", name="Starter", sort_order=2,
         description="For small teams running active surveys.",
-        price_inr=7999, price_usd_cents=8400,
+        price_inr=8399, price_usd_cents=8800,
         submissions_limit=2000,  storage_limit_mb=500,
         active_forms_limit=8,    ai_reports_per_month=8,  api_calls_per_month=3000,
         max_org_admins=2,        max_supervisors=None,    max_enumerators=None,
@@ -291,7 +291,7 @@ UNIFIED_PLANS = [
     dict(
         id="fg_pro", segment="unified", tier="pro", name="Pro", sort_order=4,
         description="For large organisations with high volume data collection.",
-        price_inr=21999, price_usd_cents=26400,
+        price_inr=19999, price_usd_cents=24000,
         submissions_limit=20000, storage_limit_mb=10240,  # 10 GB
         active_forms_limit=100,  ai_reports_per_month=100, api_calls_per_month=25000,
         max_org_admins=20,       max_supervisors=None,    max_enumerators=None,

@@ -16,10 +16,19 @@ from openpyxl.utils import get_column_letter
 
 from scripts.seed_plans import UNIFIED_PLANS
 
-CYCLE_MONTHS       = {"monthly": 1, "3month": 3, "6month": 6, "annual": 12, "3year": 36}
-CYCLE_BONUS_MONTHS = {"monthly": 0, "3month": 0, "6month": 0, "annual": 2,  "3year": 6}
-STARTER_CYCLE_RATE = {"monthly": 7999, "3month": 7999, "6month": 7499, "annual": 6999, "3year": 6999}
-CYCLE_LABELS       = {"monthly": "Monthly", "3month": "3-Month", "6month": "6-Month", "annual": "Annual", "3year": "3-Year"}
+CYCLE_MONTHS       = {"monthly": 1, "6month": 6, "annual": 12}
+CYCLE_BONUS_MONTHS = {"monthly": 0, "6month": 0, "annual": 2}
+CYCLE_LABELS       = {"monthly": "Monthly", "6month": "6-Month", "annual": "Annual"}
+
+# Mirrors backend/app/api/routes/billing.py:TIER_CYCLE_RATE — every paid tier
+# has an explicit flat monthly rate per cycle now (each tier's discount % is
+# independent, not derivable from a shared formula). Keep this in sync by hand
+# whenever billing.py's TIER_CYCLE_RATE changes.
+TIER_CYCLE_RATE = {
+    "starter": {"monthly": 8399, "6month": 7499, "annual": 6499},
+    "growth":  {"monthly": 12999, "6month": 11999, "annual": 9999},
+    "pro":     {"monthly": 19999, "6month": 16499, "annual": 15999},
+}
 
 
 def calc_effective_monthly(price_inr: int, tier: str, cycle: str) -> int:
@@ -28,8 +37,9 @@ def calc_effective_monthly(price_inr: int, tier: str, cycle: str) -> int:
     if price_inr <= 0:
         return 0
     months = CYCLE_MONTHS[cycle]
-    if tier == "starter":
-        rate = STARTER_CYCLE_RATE.get(cycle, price_inr)
+    tier_rates = TIER_CYCLE_RATE.get(tier)
+    if tier_rates:
+        rate = tier_rates.get(cycle, price_inr)
         total = rate * months
     else:
         bonus = CYCLE_BONUS_MONTHS.get(cycle, 0)
