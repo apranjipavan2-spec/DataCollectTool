@@ -33,37 +33,58 @@ def _all_deleted(db: Session, model, tenant_id):
     )
 
 
-# ── File-manager-style grouping ──────────────────────────────────────────────
-# entity_type -> (folder name, icon). "project" is a shared table for four
-# different tools (UserToolProject.tool), so it's split out below instead.
-_GROUPS = {
-    "submission":          ("Data Collected",       "📥"),
-    "respondent":          ("Records",              "🗂️"),
-    "form":                ("Forms",                "📋"),
-    "assignment":          ("Form Assignments",     "🔗"),
-    "shared_file":         ("Shared Files",          "📁"),
-    "program":             ("Programs & Setup",      "🏷️"),
-    "program_location":    ("Programs & Setup",      "🏷️"),
-    "participant_type":    ("Programs & Setup",      "🏷️"),
-    "questionnaire":       ("Programs & Setup",      "🏷️"),
-    "location_target":     ("Programs & Setup",      "🏷️"),
-    "location":            ("Programs & Setup",      "🏷️"),
-    "scheduled_report":    ("Scheduled Reports",     "⏰"),
-    "webhook":             ("Webhooks",               "🔌"),
-    "data_rights_request": ("Data Rights Requests",  "⚖️"),
+# ── File-explorer-style grouping ─────────────────────────────────────────────
+# Fixed sidebar order + icon for every known folder, shown even at zero count
+# so the taxonomy never "disappears" just because nothing's binned there yet.
+GROUP_DEFS = [
+    ("Forms",                "📋"),
+    ("Form Assignments",     "🔗"),
+    ("Analyzer Projects",    "📊"),
+    ("Cleaner Projects",     "🧹"),
+    ("Writer Files",         "✍️"),
+    ("AI Reports",           "🤖"),
+    ("Records",              "🗂️"),
+    ("Data Collected",       "📥"),
+    ("Shared Files",         "📁"),
+    ("Programs & Setup",     "🏷️"),
+    ("Scheduled Reports",    "⏰"),
+    ("Webhooks",             "🔌"),
+    ("Data Rights Requests", "⚖️"),
+]
+_GROUP_ICON = dict(GROUP_DEFS)
+
+# entity_type -> folder name. "project" is a shared table for four different
+# tools (UserToolProject.tool), so it's split out below instead.
+_ENTITY_GROUP = {
+    "submission":          "Data Collected",
+    "respondent":          "Records",
+    "form":                "Forms",
+    "assignment":          "Form Assignments",
+    "shared_file":         "Shared Files",
+    "program":             "Programs & Setup",
+    "program_location":    "Programs & Setup",
+    "participant_type":    "Programs & Setup",
+    "questionnaire":       "Programs & Setup",
+    "location_target":     "Programs & Setup",
+    "location":            "Programs & Setup",
+    "scheduled_report":    "Scheduled Reports",
+    "webhook":             "Webhooks",
+    "data_rights_request": "Data Rights Requests",
 }
-_PROJECT_GROUPS = {
-    "analyzer": ("Analyzer Projects", "📊"),
-    "cleaner":  ("Cleaner Projects",  "🧹"),
-    "writer":   ("Writer Files",      "✍️"),
-    "ai_job":   ("AI Reports",        "🤖"),
+_PROJECT_TOOL_GROUP = {
+    "analyzer": "Analyzer Projects",
+    "cleaner":  "Cleaner Projects",
+    "writer":   "Writer Files",
+    "ai_job":   "AI Reports",
 }
 
 
 def _group_for(entity_type: str, row) -> tuple[str, str]:
     if entity_type == "project":
-        return _PROJECT_GROUPS.get(getattr(row, "tool", None), ("Other Projects", "🗄️"))
-    return _GROUPS.get(entity_type, ("Other", "🗄️"))
+        name = _PROJECT_TOOL_GROUP.get(getattr(row, "tool", None), "Other Projects")
+    else:
+        name = _ENTITY_GROUP.get(entity_type, "Other")
+    return name, _GROUP_ICON.get(name, "🗄️")
 
 
 @router.get("/bin")
@@ -72,6 +93,7 @@ def list_bin(user: dict = Depends(require_org_admin), db: Session = Depends(get_
     from app.core.config import settings
     tenant_id = user["tenant_id"]
     items = []
+    group_counts: dict[str, int] = {}
     for entity_type, (model, human) in registry().items():
         for row in _all_deleted(db, model, tenant_id):
             deleted_at = row.deleted_at
@@ -81,6 +103,7 @@ def list_bin(user: dict = Depends(require_org_admin), db: Session = Depends(get_
             if purge_at:
                 days_left = max(0, (purge_at - datetime.now(timezone.utc)).days)
             group, icon = _group_for(entity_type, row)
+            group_counts[group] = group_counts.get(group, 0) + 1
             items.append({
                 "entity_type": entity_type,
                 "entity_label": human,
@@ -94,9 +117,19 @@ def list_bin(user: dict = Depends(require_org_admin), db: Session = Depends(get_
                 "days_left": days_left,
             })
     items.sort(key=lambda x: x["deleted_at"] or "", reverse=True)
+
+    # Every known folder, in fixed order, always present — even at 0 — plus
+    # any unmapped fallback folder ("Other"/"Other Projects") that actually has items.
+    groups = [{"name": n, "icon": i, "count": group_counts.get(n, 0)} for n, i in GROUP_DEFS]
+    known = {n for n, _ in GROUP_DEFS}
+    for name, count in group_counts.items():
+        if name not in known:
+            groups.append({"name": name, "icon": _GROUP_ICON.get(name, "🗄️"), "count": count})
+
     return {
         "items": items,
         "count": len(items),
+        "groups": groups,
         "retention_days": RETENTION_DAYS,
         "allow_hard_delete": settings.ALLOW_HARD_DELETE,
     }

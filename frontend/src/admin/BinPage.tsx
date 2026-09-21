@@ -19,12 +19,11 @@ interface BinItem {
   days_left: number | null
 }
 
-// Fixed display order for the folders that matter most; anything else falls
-// back to alphabetical after these.
-const GROUP_ORDER = [
-  'Forms', 'Form Assignments', 'Analyzer Projects', 'Cleaner Projects',
-  'Writer Files', 'Records', 'Data Collected', 'Shared Files',
-]
+interface BinGroup {
+  name: string
+  icon: string
+  count: number
+}
 
 type SortField = 'deleted_at' | 'created_at'
 
@@ -32,6 +31,7 @@ export default function BinPage() {
   const user = getStoredUser()
   const toast = useToast()
   const [items, setItems] = useState<BinItem[]>([])
+  const [groups, setGroups] = useState<BinGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [retentionDays, setRetentionDays] = useState(360)
   const [allowHardDelete, setAllowHardDelete] = useState(false)
@@ -45,6 +45,7 @@ export default function BinPage() {
     try {
       const { data } = await api.get('/bin')
       setItems(data.items)
+      setGroups(data.groups ?? [])
       setRetentionDays(data.retention_days ?? 360)
       setAllowHardDelete(!!data.allow_hard_delete)
     } catch (err: any) {
@@ -61,6 +62,7 @@ export default function BinPage() {
     try {
       await api.post(`/bin/${it.entity_type}/${it.id}/restore`)
       setItems(prev => prev.filter(x => x.id !== it.id))
+      setGroups(prev => prev.map(g => g.name === it.group ? { ...g, count: Math.max(0, g.count - 1) } : g))
       toast.success(`Restored ${it.entity_label.toLowerCase()} "${it.label}"`)
     } catch (err: any) {
       toast.error(apiErrorMessage(err, 'Restore failed'))
@@ -75,6 +77,7 @@ export default function BinPage() {
     try {
       await api.delete(`/bin/${it.entity_type}/${it.id}`)
       setItems(prev => prev.filter(x => x.id !== it.id))
+      setGroups(prev => prev.map(g => g.name === it.group ? { ...g, count: Math.max(0, g.count - 1) } : g))
       toast.success(`Permanently deleted "${it.label}"`)
     } catch (err: any) {
       toast.error(apiErrorMessage(err, 'Delete failed'))
@@ -85,23 +88,7 @@ export default function BinPage() {
 
   const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleDateString() : '—'
 
-  // ── Folders (file-manager style) ────────────────────────────────────────────
-  const folders = useMemo(() => {
-    const counts = new Map<string, { icon: string; count: number }>()
-    for (const it of items) {
-      const cur = counts.get(it.group)
-      if (cur) cur.count++
-      else counts.set(it.group, { icon: it.icon, count: 1 })
-    }
-    const names = Array.from(counts.keys()).sort((a, b) => {
-      const ia = GROUP_ORDER.indexOf(a), ib = GROUP_ORDER.indexOf(b)
-      if (ia !== -1 && ib !== -1) return ia - ib
-      if (ia !== -1) return -1
-      if (ib !== -1) return 1
-      return a.localeCompare(b)
-    })
-    return names.map(name => ({ name, icon: counts.get(name)!.icon, count: counts.get(name)!.count }))
-  }, [items])
+  const totalCount = items.length
 
   const visibleItems = useMemo(() => {
     const filtered = folder === 'all' ? items : items.filter(it => it.group === folder)
@@ -130,55 +117,58 @@ export default function BinPage() {
       <Sidebar items={getNavItems(user?.role ?? '')} role={user?.role} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopNav titleNode={<span className="text-catalan-text font-semibold text-base">Recycle Bin</span>} />
-        <main className="flex-1 overflow-auto p-6 space-y-4">
-          <p className="text-sm text-catalan-textMuted">
-            Deleted items are kept here for <span className="font-semibold text-catalan-text">{retentionDays} days</span>,
-            then permanently removed. Restore anything before then.
-          </p>
 
-          {loading ? (
-            <div className="text-sm text-catalan-textMuted animate-pulse">Loading…</div>
-          ) : items.length === 0 ? (
-            <div className="text-center py-16 text-catalan-textMuted">
-              <div className="text-4xl mb-3"><EmojiIcon e="🗑️" /></div>
-              <div className="text-sm">The bin is empty — nothing has been deleted.</div>
-            </div>
-          ) : (
-            <>
-              {/* Folder tiles — file-manager style */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                <button
-                  onClick={() => setFolder('all')}
-                  className={`flex flex-col items-center gap-1 rounded-xl border px-3 py-3 text-center transition-colors ${
-                    folder === 'all'
-                      ? 'border-catalan-primary bg-catalan-primary/5'
-                      : 'border-catalan-border hover:border-catalan-primary hover:bg-catalan-primary/5'
-                  }`}
-                >
-                  <span className="text-2xl"><EmojiIcon e="🗑️" /></span>
-                  <span className="text-xs font-medium text-catalan-text">All items</span>
-                  <span className="text-[11px] text-catalan-textMuted">{items.length}</span>
-                </button>
-                {folders.map(f => (
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center text-sm text-catalan-textMuted animate-pulse">Loading…</div>
+        ) : (
+          <div className="flex-1 flex overflow-hidden">
+            {/* ── Folder tree (Explorer-style left pane) ─────────────────────── */}
+            <aside className="w-64 flex-shrink-0 border-r border-catalan-border overflow-y-auto p-3 space-y-0.5">
+              <p className="px-2 pb-2 text-xs text-catalan-textMuted">
+                Kept <span className="font-semibold text-catalan-text">{retentionDays} days</span> before permanent removal.
+              </p>
+              <button
+                onClick={() => setFolder('all')}
+                className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm transition-colors ${
+                  folder === 'all' ? 'bg-catalan-primary/10 text-catalan-primary font-medium' : 'text-catalan-text hover:bg-catalan-hover'
+                }`}
+              >
+                <span className="text-base"><EmojiIcon e="🗑️" /></span>
+                <span className="flex-1 text-left">All items</span>
+                <span className={`text-xs rounded-full px-2 py-0.5 ${folder === 'all' ? 'bg-catalan-primary/15' : 'bg-catalan-hover text-catalan-textMuted'}`}>
+                  {totalCount}
+                </span>
+              </button>
+
+              <div className="pt-2 mt-2 border-t border-catalan-border space-y-0.5">
+                {groups.map(g => (
                   <button
-                    key={f.name}
-                    onClick={() => setFolder(f.name)}
-                    className={`flex flex-col items-center gap-1 rounded-xl border px-3 py-3 text-center transition-colors ${
-                      folder === f.name
-                        ? 'border-catalan-primary bg-catalan-primary/5'
-                        : 'border-catalan-border hover:border-catalan-primary hover:bg-catalan-primary/5'
+                    key={g.name}
+                    onClick={() => setFolder(g.name)}
+                    className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm transition-colors ${
+                      folder === g.name ? 'bg-catalan-primary/10 text-catalan-primary font-medium' : 'text-catalan-text hover:bg-catalan-hover'
                     }`}
                   >
-                    <span className="text-2xl"><EmojiIcon e={f.icon} /></span>
-                    <span className="text-xs font-medium text-catalan-text">{f.name}</span>
-                    <span className="text-[11px] text-catalan-textMuted">{f.count}</span>
+                    <span className="text-base"><EmojiIcon e={g.icon} /></span>
+                    <span className="flex-1 text-left truncate">{g.name}</span>
+                    <span className={`text-xs rounded-full px-2 py-0.5 ${
+                      g.count > 0
+                        ? (folder === g.name ? 'bg-catalan-primary/15' : 'bg-catalan-hover text-catalan-textMuted')
+                        : 'text-catalan-textMuted/50'
+                    }`}>
+                      {g.count}
+                    </span>
                   </button>
                 ))}
               </div>
+            </aside>
 
-              {/* Sort controls */}
+            {/* ── File list (Explorer-style right pane) ──────────────────────── */}
+            <main className="flex-1 overflow-auto p-4 space-y-3">
               <div className="flex items-center gap-2 text-xs text-catalan-textMuted">
-                <span>Sort by:</span>
+                <span className="text-sm font-medium text-catalan-text">{folder === 'all' ? 'All items' : folder}</span>
+                <span>· {visibleItems.length} item{visibleItems.length === 1 ? '' : 's'}</span>
+                <span className="ml-auto">Sort by:</span>
                 <button
                   onClick={() => toggleSort('deleted_at')}
                   className={`px-2.5 py-1 rounded-full border ${
@@ -195,69 +185,77 @@ export default function BinPage() {
                 >
                   Created date{sortArrow('created_at')}
                 </button>
-                <span className="ml-auto">{visibleItems.length} item{visibleItems.length === 1 ? '' : 's'}{folder !== 'all' ? ` in ${folder}` : ''}</span>
               </div>
 
-              <div className="overflow-x-auto rounded-xl border border-catalan-border">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-catalan-border bg-catalan-surface text-catalan-textMuted text-xs uppercase tracking-wide">
-                      <th className="text-left px-3 py-2 font-medium">Item</th>
-                      <th className="text-left px-3 py-2 font-medium">Type</th>
-                      <th className="text-left px-3 py-2 font-medium cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
-                        Created{sortArrow('created_at')}
-                      </th>
-                      <th className="text-left px-3 py-2 font-medium cursor-pointer select-none" onClick={() => toggleSort('deleted_at')}>
-                        Deleted{sortArrow('deleted_at')}
-                      </th>
-                      <th className="text-left px-3 py-2 font-medium">Days left</th>
-                      <th className="text-right px-3 py-2 font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleItems.map(it => (
-                      <tr key={`${it.entity_type}:${it.id}`} className="border-b border-catalan-border hover:bg-catalan-hover">
-                        <td className="px-3 py-2 font-medium text-catalan-text">
-                          <span className="mr-1.5"><EmojiIcon e={it.icon} /></span>{it.label}
-                        </td>
-                        <td className="px-3 py-2 text-catalan-textMuted">{it.group}</td>
-                        <td className="px-3 py-2 text-catalan-textMuted">{fmt(it.created_at)}</td>
-                        <td className="px-3 py-2 text-catalan-textMuted">{fmt(it.deleted_at)}</td>
-                        <td className="px-3 py-2">
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            (it.days_left ?? 0) <= 30 ? 'bg-amber-500/10 text-amber-500' : 'bg-catalan-hover text-catalan-textMuted'
-                          }`}>
-                            {it.days_left ?? '—'} days
-                          </span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex gap-3 justify-end">
-                            <button
-                              onClick={() => restore(it)}
-                              disabled={busy === it.id}
-                              className="inline-flex items-center gap-1 text-xs text-catalan-success hover:underline disabled:opacity-50"
-                              title="Restore this item"
-                            >
-                              <EmojiIcon e="↩️" /> Restore
-                            </button>
-                            <button
-                              onClick={() => purge(it)}
-                              disabled={busy === it.id || !allowHardDelete}
-                              className="inline-flex items-center gap-1 text-xs text-catalan-danger hover:underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
-                              title={allowHardDelete ? 'Delete permanently now' : 'Hard delete is disabled for this org — data is retained until the retention window ends'}
-                            >
-                              <EmojiIcon e="🗑️" /> Delete forever
-                            </button>
-                          </div>
-                        </td>
+              {visibleItems.length === 0 ? (
+                <div className="text-center py-16 text-catalan-textMuted">
+                  <div className="text-4xl mb-3"><EmojiIcon e="🗑️" /></div>
+                  <div className="text-sm">
+                    {totalCount === 0 ? 'The bin is empty — nothing has been deleted.' : `Nothing deleted in "${folder}" yet.`}
+                  </div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-catalan-border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-catalan-border bg-catalan-surface text-catalan-textMuted text-xs uppercase tracking-wide">
+                        <th className="text-left px-3 py-2 font-medium">Item</th>
+                        <th className="text-left px-3 py-2 font-medium">Type</th>
+                        <th className="text-left px-3 py-2 font-medium cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
+                          Created{sortArrow('created_at')}
+                        </th>
+                        <th className="text-left px-3 py-2 font-medium cursor-pointer select-none" onClick={() => toggleSort('deleted_at')}>
+                          Deleted{sortArrow('deleted_at')}
+                        </th>
+                        <th className="text-left px-3 py-2 font-medium">Days left</th>
+                        <th className="text-right px-3 py-2 font-medium">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </main>
+                    </thead>
+                    <tbody>
+                      {visibleItems.map(it => (
+                        <tr key={`${it.entity_type}:${it.id}`} className="border-b border-catalan-border hover:bg-catalan-hover">
+                          <td className="px-3 py-2 font-medium text-catalan-text">
+                            <span className="mr-1.5"><EmojiIcon e={it.icon} /></span>{it.label}
+                          </td>
+                          <td className="px-3 py-2 text-catalan-textMuted">{it.group}</td>
+                          <td className="px-3 py-2 text-catalan-textMuted">{fmt(it.created_at)}</td>
+                          <td className="px-3 py-2 text-catalan-textMuted">{fmt(it.deleted_at)}</td>
+                          <td className="px-3 py-2">
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              (it.days_left ?? 0) <= 30 ? 'bg-amber-500/10 text-amber-500' : 'bg-catalan-hover text-catalan-textMuted'
+                            }`}>
+                              {it.days_left ?? '—'} days
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex gap-3 justify-end">
+                              <button
+                                onClick={() => restore(it)}
+                                disabled={busy === it.id}
+                                className="inline-flex items-center gap-1 text-xs text-catalan-success hover:underline disabled:opacity-50"
+                                title="Restore this item"
+                              >
+                                <EmojiIcon e="↩️" /> Restore
+                              </button>
+                              <button
+                                onClick={() => purge(it)}
+                                disabled={busy === it.id || !allowHardDelete}
+                                className="inline-flex items-center gap-1 text-xs text-catalan-danger hover:underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
+                                title={allowHardDelete ? 'Delete permanently now' : 'Hard delete is disabled for this org — data is retained until the retention window ends'}
+                              >
+                                <EmojiIcon e="🗑️" /> Delete forever
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </main>
+          </div>
+        )}
       </div>
     </div>
   )
