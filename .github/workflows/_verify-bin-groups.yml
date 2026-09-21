@@ -1,0 +1,33 @@
+name: TEMP verify bin groups
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            cd /opt/fieldgovern
+            docker compose exec -T postgres psql -U fieldgovern -d fieldgovern -c \
+              "SELECT tool, count(*) FROM user_tool_projects WHERE deleted_at IS NOT NULL GROUP BY tool;"
+            docker compose exec -T postgres psql -U fieldgovern -d fieldgovern -c \
+              "SELECT count(*) AS binned_forms FROM forms WHERE deleted_at IS NOT NULL;"
+            docker compose exec -T app sh -c "python -c \"
+from app.core.database import SessionLocal
+from app.core.soft_delete import registry
+db = SessionLocal()
+for et, (model, human) in registry().items():
+    n = db.query(model).execution_options(include_deleted=True).filter(model.deleted_at.isnot(None)).count()
+    if n:
+        print(et, human, n)
+db.close()
+\""
