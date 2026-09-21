@@ -11,21 +11,21 @@
   </script>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Features — FieldGovern | Offline PWA, AI, Back-Check, DPDP</title>
+  <title>Features — FieldGovern | Collect, Analyze, Clean, Secure</title>
   <link rel="icon" href="assets/logo-icon.png" type="image/png"/>
   <link rel="manifest" href="/site.webmanifest"/>
-  <meta name="description" content="Everything your field team needs: offline-first PWA, AI form builder, back-check workflow, GPS verification, panel studies, AI cleaning, cross-tabs & report writing."/>
+  <meta name="description" content="Every tool your field team needs, by product: offline PWA collection, GPS map & M&E panel tracking, FG Analyzer (cross-tabs, regression, power analysis), FG Cleaner (deduplication, PII redaction), FG Writer (AI reports), and DPDP-grade field-level encryption."/>
   <link rel="canonical" href="https://www.fieldgovern.com/features.html"/>
   <meta name="robots" content="index,follow"/>
   <meta property="og:type" content="website"/>
   <meta property="og:url" content="https://www.fieldgovern.com/features.html"/>
   <meta property="og:title" content="Features — FieldGovern"/>
-  <meta property="og:description" content="Offline-first collection, AI form builder, supervisor dashboard, DPDP compliance — every tool your field team needs."/>
+  <meta property="og:description" content="Offline-first collection, FG Analyzer statistical tools, FG Cleaner deduplication & PII redaction, AI report writing, GPS mapping, and DPDP-grade encryption — every tool your field team needs."/>
   <meta property="og:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
   <meta property="og:site_name" content="FieldGovern"/>
   <meta name="twitter:card" content="summary_large_image"/>
   <meta name="twitter:title" content="Features — FieldGovern"/>
-  <meta name="twitter:description" content="Offline-first collection, AI form builder, supervisor dashboard, DPDP compliance."/>
+  <meta name="twitter:description" content="Offline-first collection, statistical analysis, data cleaning, AI reports, GPS mapping, and DPDP-grade encryption — organized by product."/>
   <meta name="twitter:image" content="https://www.fieldgovern.com/assets/logo-wide.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -401,24 +401,17 @@
     .fqn-item:hover,.fqn-item.active{background:var(--bg2);color:var(--brand);box-shadow:0 1px 3px rgba(0,0,0,.06);font-weight:600}
     .fqn-sep{width:1px;height:14px;background:var(--border);margin:0 8px;flex-shrink:0}
 
-    /* ── PAGE SIDEBAR (desktop only ≥1440px) ── */
-    .feat-page-nav{position:fixed;left:0;top:68px;bottom:0;width:172px;z-index:40;display:none;flex-direction:column;overflow:hidden;background:rgba(255,255,255,.97);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-right:1px solid var(--border)}
-    @media(min-width:1440px){.feat-page-nav{display:flex}}
-    .psn-hdr{padding:16px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
-    .psn-title{font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);display:block;margin-bottom:8px}
-    .psn-progress-wrap{height:2px;background:var(--bg3);border-radius:2px;overflow:hidden}
-    .psn-progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--brand),var(--accent));border-radius:2px;transition:width .12s}
-    .psn-body{flex:1;overflow-y:auto;padding:6px 0 24px;scrollbar-width:none}
-    .psn-body::-webkit-scrollbar{display:none}
-    .psn-group{margin-bottom:2px}
-    .psn-cat{display:flex;align-items:center;gap:5px;padding:10px 14px 4px;font-size:.6rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.09em}
-    .psn-cat svg{width:12px;height:12px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
-    .psn-link{display:flex;align-items:center;gap:7px;padding:5px 14px 5px 18px;font-size:.76rem;color:var(--text3);text-decoration:none;transition:all .16s;border-left:2px solid transparent}
-    .psn-dot{width:4px;height:4px;border-radius:50%;background:var(--border);flex-shrink:0;transition:all .16s}
-    .psn-link:hover{color:var(--brand);background:rgba(14,165,233,.04)}
-    .psn-link:hover .psn-dot{background:var(--brand)}
-    .psn-link.active{color:var(--brand);background:rgba(14,165,233,.06);border-left-color:var(--brand);font-weight:600}
-    .psn-link.active .psn-dot{background:var(--brand);box-shadow:0 0 0 2px rgba(14,165,233,.2)}
+    /* ── PRODUCT TAB BAR ─────────────────── */
+    .ftb-inner{max-width:1200px;margin:0 auto;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding:10px 0}
+    .ftb-inner::-webkit-scrollbar{display:none}
+    .ftb-tab{appearance:none;border:1px solid transparent;background:transparent;color:var(--text3);font-family:inherit;font-size:.82rem;font-weight:600;padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:all .18s;flex-shrink:0}
+    .ftb-tab svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+    .ftb-tab:hover{color:var(--text);background:var(--bg2)}
+    .ftb-tab.active{color:white;background:linear-gradient(135deg,var(--brand),var(--accent));box-shadow:0 4px 14px rgba(14,165,233,.28)}
+
+    /* ── TAB PANELS ───────────────────────── */
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
 
     /* ── CTA ──────────────────────────────── */
     .cta-section{background:linear-gradient(135deg,#f0f9ff,#faf5ff);text-align:center;padding:80px 24px;border-top:1px solid var(--border)}
@@ -478,7 +471,6 @@
   </a>
   <ul class="nav-links">
     <li><a href="features.html">Features</a></li>
-    <li><a href="integrations.html">Integrations</a></li>
     <li><a href="use-cases.html">Use Cases</a></li>
     <li><a href="compare.html">Compare</a></li>
     <li><a href="security.html">Security</a></li>
@@ -494,7 +486,6 @@
 
 <div id="mobileMenu" role="navigation">
   <a href="features.html">✦ Features</a>
-  <a href="integrations.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Integrations</a>
   <a href="use-cases.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Use Cases</a>
   <a href="compare.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Compare</a>
   <a href="security.html"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Security</a>
@@ -503,66 +494,15 @@
   <a href="demo.html" style="color:var(--brand);font-weight:700"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Try Free Demo</a>
 </div>
 
-<!-- PAGE SIDEBAR (shown at ≥1440px desktop) -->
-<nav class="feat-page-nav" aria-label="Page sections">
-  <div class="psn-hdr">
-    <span class="psn-title">On this page</span>
-    <div class="psn-progress-wrap"><div class="psn-progress-fill" id="pgProgress"></div></div>
-  </div>
-  <div class="psn-body">
-    <div class="psn-group">
-      <div class="psn-cat"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg> Data</div>
-      <a href="#f1-offline" class="psn-link" data-s="f1-offline"><span class="psn-dot"></span>Offline-First</a>
-      <a href="#f2-forms" class="psn-link" data-s="f2-forms"><span class="psn-dot"></span>Form Builder</a>
-      <a href="#f3-ai-form" class="psn-link" data-s="f3-ai-form"><span class="psn-dot"></span>AI Form Builder</a>
-      <a href="#f4-import" class="psn-link" data-s="f4-import"><span class="psn-dot"></span>Migrate &amp; Import</a>
-    </div>
-    <div class="psn-group">
-      <div class="psn-cat"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Operate</div>
-      <a href="#f5-sync" class="psn-link" data-s="f5-sync"><span class="psn-dot"></span>Sync &amp; Media</a>
-      <a href="#f6-supervisor" class="psn-link" data-s="f6-supervisor"><span class="psn-dot"></span>Supervisor</a>
-      <a href="#f7-whatsapp" class="psn-link" data-s="f7-whatsapp"><span class="psn-dot"></span>WhatsApp Alerts</a>
-      <a href="#f8-sheets" class="psn-link" data-s="f8-sheets"><span class="psn-dot"></span>Google Sheets</a>
-    </div>
-    <div class="psn-group">
-      <div class="psn-cat"><svg viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg> AI Tools</div>
-      <a href="#f9-writer" class="psn-link" data-s="f9-writer"><span class="psn-dot"></span>Report Writer</a>
-      <a href="#f9b-builder" class="psn-link" data-s="f9b-builder"><span class="psn-dot"></span>Smart Builder</a>
-      <a href="#f9c-interpret" class="psn-link" data-s="f9c-interpret"><span class="psn-dot"></span>Interpretation</a>
-    </div>
-    <div class="psn-group">
-      <div class="psn-cat"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Quality</div>
-      <a href="#f10-qc" class="psn-link" data-s="f10-qc"><span class="psn-dot"></span>QC Suite</a>
-      <a href="#f11-dpdp" class="psn-link" data-s="f11-dpdp"><span class="psn-dot"></span>DPDP 2023</a>
-      <a href="#f12-lang" class="psn-link" data-s="f12-lang"><span class="psn-dot"></span>Multilingual</a>
-    </div>
-  </div>
-</nav>
-
-<!-- QUICK NAV BAR (top, just below navbar) -->
+<!-- PRODUCT TAB BAR (top, just below navbar) -->
 <div class="feat-quicknav">
-  <div class="fqn-inner">
-    <span class="fqn-cat">Collect</span>
-    <a href="#f1-offline" class="fqn-item"><svg viewBox="0 0 24 24"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12" y2="20"/></svg>Offline</a>
-    <a href="#f2-forms" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Forms</a>
-    <a href="#f3-ai-form" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg>AI Builder</a>
-    <a href="#f4-import" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Import</a>
-    <div class="fqn-sep"></div>
-    <span class="fqn-cat">Operate</span>
-    <a href="#f5-sync" class="fqn-item"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Sync</a>
-    <a href="#f6-supervisor" class="fqn-item"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Supervisor</a>
-    <a href="#f7-whatsapp" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>WhatsApp</a>
-    <a href="#f8-sheets" class="fqn-item"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>Sheets</a>
-    <div class="fqn-sep"></div>
-    <span class="fqn-cat">AI</span>
-    <a href="#f9-writer" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Writer</a>
-    <a href="#f9b-builder" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>Builder</a>
-    <a href="#f9c-interpret" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Interpret</a>
-    <div class="fqn-sep"></div>
-    <span class="fqn-cat">Quality</span>
-    <a href="#f10-qc" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>QC</a>
-    <a href="#f11-dpdp" class="fqn-item"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>DPDP</a>
-    <a href="#f12-lang" class="fqn-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Languages</a>
+  <div class="ftb-inner" role="tablist" aria-label="Feature categories">
+    <button class="ftb-tab active" data-tab="collect" onclick="switchTab('collect')" role="tab" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>Field App</button>
+    <button class="ftb-tab" data-tab="supervise" onclick="switchTab('supervise')" role="tab" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Supervisor &amp; M&amp;E</button>
+    <button class="ftb-tab" data-tab="analyzer" onclick="switchTab('analyzer')" role="tab" aria-selected="false"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>FG Analyzer</button>
+    <button class="ftb-tab" data-tab="cleaner" onclick="switchTab('cleaner')" role="tab" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>FG Cleaner</button>
+    <button class="ftb-tab" data-tab="writer" onclick="switchTab('writer')" role="tab" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>FG Writer</button>
+    <button class="ftb-tab" data-tab="security" onclick="switchTab('security')" role="tab" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Quality &amp; Security</button>
   </div>
 </div>
 
@@ -575,8 +515,9 @@
 </div>
 
 <!-- ══════════════════════════════════════════════
-     CATEGORY 1: DATA COLLECTION
+     TAB: FIELD APP (COLLECT)
 ═══════════════════════════════════════════════ -->
+<div class="tab-panel active" data-tab="collect">
 <div class="cat-heading reveal">
   <div class="cat-tag"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg> Data Collection</div>
   <h2>Collect data anywhere, on any form</h2>
@@ -745,14 +686,16 @@
     </div>
   </div>
 </section>
+</div><!-- /tab-panel: collect -->
 
 <!-- ══════════════════════════════════════════════
-     CATEGORY 2: OPERATIONS & OVERSIGHT
+     TAB: SUPERVISOR & M&E
 ═══════════════════════════════════════════════ -->
+<div class="tab-panel" data-tab="supervise">
 <div class="cat-heading reveal" style="background:var(--bg2);padding-bottom:8px">
   <div class="cat-tag"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Operations & Oversight</div>
   <h2>Real-time visibility across your entire field team</h2>
-  <p>Supervisor dashboard, live sync, WhatsApp alerts, and Google Sheets integration — all connected.</p>
+  <p>Supervisor dashboard, GPS mapping, panel/M&E tracking, live sync, WhatsApp alerts, and Google Sheets — all connected.</p>
 </div>
 
 <!-- F5: SYNC & MEDIA -->
@@ -916,13 +859,67 @@
   </div>
 </section>
 
+<!-- F6b: GPS MAP VIEW -->
+<section id="f6b-map" class="feat-section alt">
+  <div class="feat-inner flip reveal">
+    <div class="feat-content">
+      <div class="feat-tag green"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> GPS Map &amp; Geofencing</div>
+      <h3>See every submission.<br/>On a live map.</h3>
+      <p>Every response carries GPS coordinates, plotted in real time on an interactive map inside the supervisor dashboard. Cluster markers by district, filter by enumerator or date, and draw geofence boundaries to catch submissions collected outside the assigned survey area.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Live map view of every submission's GPS pin</li>
+        <li><span class="bchk">✓</span>Cluster by district/block, filter by enumerator or date</li>
+        <li><span class="bchk">✓</span>Geofence checks — flag submissions outside the survey area</li>
+        <li><span class="bchk">✓</span>Cached OpenStreetMap tiles work for offline supervisor review</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Submission Map</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">847 submissions plotted on map</span><span class="f10-badge ok">Live</span></div>
+        <div class="f10-row"><div class="f10-icon warn"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></div><span class="f10-text">Outside geofence boundary</span><span class="f10-badge warn">3 records</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Enumerators tracked live</span><span class="f10-badge ok">12 active</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Map tiles cached for offline use</span><span class="f10-badge ok">Ready</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- F6c: PANEL STUDIES & M&E TRACKING -->
+<section id="f6c-panel" class="feat-section">
+  <div class="feat-inner reveal">
+    <div class="feat-content">
+      <div class="feat-tag green"><svg viewBox="0 0 24 24"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg> M&amp;E / Panel Studies</div>
+      <h3>Track the same respondent.<br/>Across every wave.</h3>
+      <p>Built for monitoring &amp; evaluation work — assign respondents to a panel, run the same questionnaire across baseline, midline, and endline waves, and roll indicators up into a program scorecard without losing the thread between rounds.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Panel/cohort tracking — same respondent, multiple waves</li>
+        <li><span class="bchk">✓</span>Program-level indicator scorecards, auto-updated</li>
+        <li><span class="bchk">✓</span>Assign forms to arms (treatment/control) for evaluation designs</li>
+        <li><span class="bchk">✓</span>Attrition &amp; re-contact tracking between waves</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Panel Study — MGNREGA Impact</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Baseline → Midline → Endline linked</span><span class="f10-badge ok">412 resp.</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Treatment 206 · Control 206</span><span class="f10-badge ok">Balanced</span></div>
+        <div class="f10-row"><div class="f10-icon warn"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg></div><span class="f10-text">Pending re-contact for Endline</span><span class="f10-badge warn">18 resp.</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Indicator scorecard</span><span class="f10-badge ok">Updated</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+</div><!-- /tab-panel: supervise -->
+
 <!-- ══════════════════════════════════════════════
-     CATEGORY 3: AI INTELLIGENCE
+     TAB: FG WRITER
 ═══════════════════════════════════════════════ -->
+<div class="tab-panel" data-tab="writer">
 <div class="cat-heading reveal" style="background:var(--dark);padding-bottom:8px">
-  <div class="cat-tag" style="background:rgba(124,58,237,.15);border-color:rgba(124,58,237,.3);color:#a78bfa"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg> AI Intelligence</div>
-  <h2 style="color:white">AI that understands field research</h2>
-  <p style="color:rgba(255,255,255,.5)">From generating forms to writing final reports — bring your own API key and let AI do the heavy lifting.</p>
+  <div class="cat-tag" style="background:rgba(124,58,237,.15);border-color:rgba(124,58,237,.3);color:#a78bfa"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/></svg> FG Writer</div>
+  <h2 style="color:white">AI report writing, connected to your analysis</h2>
+  <p style="color:rgba(255,255,255,.5)">Bring your own OpenAI, Claude, or Gemini API key — FG Writer turns Analyzer tables and interpretations into a finished, exportable report.</p>
 </div>
 
 <!-- F9: AI REPORT WRITER -->
@@ -957,6 +954,42 @@
     </div>
   </div>
 </section>
+
+<!-- F9d: SCHEDULED REPORTS -->
+<section id="f9d-schedule" class="feat-section dark-bg">
+  <div class="feat-inner flip reveal">
+    <div class="feat-content">
+      <div class="feat-tag white"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Scheduling &amp; Versions</div>
+      <h3>Set it once.<br/><span style="background:linear-gradient(135deg,#38bdf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Reports land in inboxes automatically.</span></h3>
+      <p>Schedule any report to regenerate and email itself weekly or monthly — supervisors and donors get a fresh narrative without anyone opening the tool. Every generated draft is versioned, so you can compare, restore, or roll back to an earlier write-up.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Weekly or monthly scheduled email delivery</li>
+        <li><span class="bchk">✓</span>Every draft versioned — compare and restore past reports</li>
+        <li><span class="bchk">✓</span>Same report definition reused as data refreshes</li>
+        <li><span class="bchk">✓</span>Export destinations: Word, Markdown, or scheduled email</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">FG Writer — Schedule</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Weekly digest — every Monday 9:00 AM</span><span class="f10-badge ok">Active</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Recipients: 3 supervisors, 1 donor</span><span class="f10-badge ok">Set</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Version 4 saved</span><span class="f10-badge ok">Restorable</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+</div><!-- /tab-panel: writer -->
+
+<!-- ══════════════════════════════════════════════
+     TAB: FG ANALYZER
+═══════════════════════════════════════════════ -->
+<div class="tab-panel" data-tab="analyzer">
+<div class="cat-heading reveal" style="background:var(--dark);padding-bottom:8px">
+  <div class="cat-tag" style="background:rgba(124,58,237,.15);border-color:rgba(124,58,237,.3);color:#a78bfa"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> FG Analyzer</div>
+  <h2 style="color:white">Cross-tabs, statistics, and AI — in one workspace</h2>
+  <p style="color:rgba(255,255,255,.5)">Build tables with AI, run the right statistical test automatically, and catch data quality issues before you present the results.</p>
+</div>
 
 <!-- F9b: SMART BUILDER -->
 <section id="f9b-builder" class="feat-section dark-bg">
@@ -1039,13 +1072,182 @@
   </div>
 </section>
 
+<!-- Fa: CROSS-TABS & STATISTICAL TESTS -->
+<section id="fa-stats" class="feat-section dark-bg">
+  <div class="feat-inner flip reveal">
+    <div class="feat-content">
+      <div class="feat-tag white"><svg viewBox="0 0 24 24"><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg> Statistical Analysis</div>
+      <h3>Cross-tabs and the right test.<br/><span style="background:linear-gradient(135deg,#38bdf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Chosen for you.</span></h3>
+      <p>Build cross-tabulations with a click, then let the built-in test chooser recommend the correct statistical test based on your variables' measurement scale — chi-square for categorical pairs, t-test or ANOVA for group comparisons, Pearson/Spearman correlation for continuous variables. Weighted statistics supported throughout.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Auto test-chooser: chi-square, t-test, ANOVA, or correlation</li>
+        <li><span class="bchk">✓</span>Weighted means, SDs, and effective sample size</li>
+        <li><span class="bchk">✓</span>P-values and effect sizes reported alongside every table</li>
+        <li><span class="bchk">✓</span>Likert scoring — mean, sum, or z-score, with reverse-coding</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">FG Analyzer — Test Chooser</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">district_name × gender</span><span class="f10-badge ok">Chi-square</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">income by treatment arm</span><span class="f10-badge ok">t-test</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">age vs satisfaction score</span><span class="f10-badge ok">Correlation</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">score across 4 districts</span><span class="f10-badge ok">ANOVA</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Fb: REGRESSION, DRIVER & CAUSAL ANALYSIS -->
+<section id="fa-regression" class="feat-section dark-bg">
+  <div class="feat-inner reveal">
+    <div class="feat-content">
+      <div class="feat-tag white"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.1-2.8-2.8L7 14"/></svg> Advanced Analysis</div>
+      <h3>From correlation<br/><span style="background:linear-gradient(135deg,#38bdf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">to what's actually driving it.</span></h3>
+      <p>Driver analysis one-hot encodes your categorical predictors and runs regression to show which factors move an outcome. For evaluation designs, difference-in-differences causal analysis compares treatment and control before/after an intervention. Power analysis and a guided study-design wizard help you size the sample before you're in the field.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Driver/regression analysis with automatic categorical encoding</li>
+        <li><span class="bchk">✓</span>Difference-in-differences causal analysis (pre/post, treatment/control)</li>
+        <li><span class="bchk">✓</span>Power analysis — Cohen's d, required sample size, MDE calculator</li>
+        <li><span class="bchk">✓</span>Balance tables — standardized mean difference across arms</li>
+        <li><span class="bchk">✓</span>Guided study design wizard for evaluation studies</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">FG Analyzer — Driver Analysis</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Top driver: landholding size</span><span class="f10-badge ok">β = 0.41</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">DiD estimate: treatment effect</span><span class="f10-badge ok">+12.4%</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Balance check (SMD)</span><span class="f10-badge ok">&lt; 0.1</span></div>
+        <div class="f10-row"><div class="f10-icon warn"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg></div><span class="f10-text">Recommended sample size</span><span class="f10-badge warn">n = 384</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Fc: GEO, DUPLICATES & SURVEY QUALITY -->
+<section id="fa-quality" class="feat-section dark-bg">
+  <div class="feat-inner flip reveal">
+    <div class="feat-content">
+      <div class="feat-tag white"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Data Quality &amp; Geo</div>
+      <h3>Duplicates, straight-lining, outliers.<br/><span style="background:linear-gradient(135deg,#38bdf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Caught before you analyze.</span></h3>
+      <p>Survey quality checks scan every response for full-row or partial duplicates and straight-lining (identical answers repeated down a grid), flagging suspect records before they skew your results. Geo aggregation summarizes responses by district or custom boundary, while verbatim coding and cluster analysis round out qualitative and segmentation work.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Full-row and partial (column-subset) duplicate detection</li>
+        <li><span class="bchk">✓</span>Straight-lining detection — flags suspiciously uniform grids</li>
+        <li><span class="bchk">✓</span>Geo aggregation — summarize and map by district/boundary</li>
+        <li><span class="bchk">✓</span>Verbatim coding palette for open-ended responses</li>
+        <li><span class="bchk">✓</span>Cluster analysis for respondent segmentation</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">FG Analyzer — Survey Quality</span></div>
+        <div class="f10-row"><div class="f10-icon warn"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></div><span class="f10-text">Duplicate rows found</span><span class="f10-badge warn">6 records</span></div>
+        <div class="f10-row"><div class="f10-icon warn"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg></div><span class="f10-text">Straight-lined responses</span><span class="f10-badge warn">9 records</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Districts aggregated on map</span><span class="f10-badge ok">12</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Verbatim codes applied</span><span class="f10-badge ok">184 responses</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+</div><!-- /tab-panel: analyzer -->
+
 <!-- ══════════════════════════════════════════════
-     CATEGORY 4: QUALITY & COMPLIANCE
+     TAB: FG CLEANER
 ═══════════════════════════════════════════════ -->
+<div class="tab-panel" data-tab="cleaner">
+<div class="cat-heading reveal">
+  <div class="cat-tag" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.25);color:var(--orange)"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> FG Cleaner</div>
+  <h2>Deduplicate. Redact. Never touch the original.</h2>
+  <p>A safe, separate cleaning workspace — dedup engine, PII redaction, and version-safe working copies.</p>
+</div>
+
+<!-- Fd: DEDUPLICATION ENGINE -->
+<section id="fc-dedup" class="feat-section">
+  <div class="feat-inner reveal">
+    <div class="feat-content">
+      <div class="feat-tag orange"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Deduplication</div>
+      <h3>Find the duplicate.<br/>Keep the original untouched.</h3>
+      <p>FG Cleaner scans your dataset for exact and partial duplicate rows — same respondent submitted twice, same phone number reused, same GPS point recorded minutes apart — and lets you review and merge or remove them without ever touching your raw export.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Exact and partial (column-subset) duplicate detection</li>
+        <li><span class="bchk">✓</span>Side-by-side review before merge or removal</li>
+        <li><span class="bchk">✓</span>Works on any uploaded file or FieldGovern-linked form</li>
+        <li><span class="bchk">✓</span>Runs as a separate step from the raw export — nothing overwritten</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">FG Cleaner — Duplicates</span></div>
+        <div class="f10-row"><div class="f10-icon warn"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></div><span class="f10-text">Exact duplicate rows</span><span class="f10-badge warn">4 pairs</span></div>
+        <div class="f10-row"><div class="f10-icon warn"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg></div><span class="f10-text">Partial matches (phone + name)</span><span class="f10-badge warn">7 pairs</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Source file unchanged</span><span class="f10-badge ok">Protected</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Fe: PII REDACTION -->
+<section id="fc-pii" class="feat-section alt">
+  <div class="feat-inner flip reveal">
+    <div class="feat-content">
+      <div class="feat-tag orange"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="3" y1="3" x2="21" y2="21"/></svg> Privacy</div>
+      <h3>Share the dataset.<br/>Not the identity.</h3>
+      <p>Every identifier field marked on a form — name, phone, Aadhaar — can be automatically redacted or masked before a dataset leaves your hands. Aadhaar numbers are masked to their last four digits; other identifiers are replaced outright, so external partners and donors only ever see de-identified data.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Field-level PII redaction driven by the form's identifier flags</li>
+        <li><span class="bchk">✓</span>Aadhaar masking (last 4 digits only) built in</li>
+        <li><span class="bchk">✓</span>Redact single values or entire columns/rows in bulk</li>
+        <li><span class="bchk">✓</span>Same redaction logic reused in Google Sheets sync exports</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">FG Cleaner — Redaction</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">aadhaar_number</span><span class="f10-badge ok">XXXX-XXXX-4821</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">phone_number</span><span class="f10-badge ok">REDACTED</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">respondent_name</span><span class="f10-badge ok">REDACTED</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Fields protected this export</span><span class="f10-badge ok">3</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Ff: VERSION-SAFE WORKING COPIES -->
+<section id="fc-versions" class="feat-section">
+  <div class="feat-inner reveal">
+    <div class="feat-content">
+      <div class="feat-tag orange"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Safety</div>
+      <h3>Every edit is a copy.<br/>The original never changes.</h3>
+      <p>Cleaning operations run against a working copy of your dataset, never the source file or the live submissions. Step back through your cleaning history, compare before/after, or start over from the untouched original at any point.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Working copies isolate cleaning edits from source data</li>
+        <li><span class="bchk">✓</span>Full history of cleaning operations, reversible at any step</li>
+        <li><span class="bchk">✓</span>Export the cleaned copy without ever touching the original</li>
+        <li><span class="bchk">✓</span>Safe to experiment — nothing is destructive</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">FG Cleaner — Working Copies</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">working_copy_v3.xlsx</span><span class="f10-badge ok">Current</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">original_export.xlsx</span><span class="f10-badge ok">Untouched</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">3 cleaning steps in history</span><span class="f10-badge ok">Reversible</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+</div><!-- /tab-panel: cleaner -->
+
+<!-- ══════════════════════════════════════════════
+     TAB: QUALITY & SECURITY
+═══════════════════════════════════════════════ -->
+<div class="tab-panel" data-tab="security">
 <div class="cat-heading reveal">
   <div class="cat-tag"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Quality & Compliance</div>
   <h2>Clean data. Full compliance. Always.</h2>
-  <p>Server-side QC, back-check audit workflow, DPDP consent tracking, and multilingual support — built in from day one.</p>
+  <p>Server-side QC, DPDP consent tracking, field-level encryption, tenant isolation, data rights, and multilingual support — built in from day one.</p>
 </div>
 
 <!-- F10: QC SUITE -->
@@ -1166,6 +1368,82 @@
     </div>
   </div>
 </section>
+
+<!-- Fg: FIELD-LEVEL ENCRYPTION -->
+<section id="fs-encrypt" class="feat-section alt">
+  <div class="feat-inner flip reveal">
+    <div class="feat-content">
+      <div class="feat-tag blue"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Encryption</div>
+      <h3>Sensitive fields.<br/>Encrypted at rest.</h3>
+      <p>Personally identifiable fields are encrypted at the database layer using field-level AES encryption — not just disk-level encryption. Public survey responses and per-tenant AI API keys are encrypted with their own dedicated keys, so a database compromise alone doesn't expose respondent identities or credentials.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Field-level AES encryption for identifier data, independent of disk encryption</li>
+        <li><span class="bchk">✓</span>Dedicated encryption for public (anonymous) survey submissions</li>
+        <li><span class="bchk">✓</span>Per-tenant AI API keys encrypted separately from respondent data</li>
+        <li><span class="bchk">✓</span>Encryption keys never stored alongside the data they protect</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Field Encryption</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">respondent_phone</span><span class="f10-badge ok">AES-encrypted</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">public_survey_response</span><span class="f10-badge ok">AES-encrypted</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">tenant_ai_api_key</span><span class="f10-badge ok">AES-encrypted</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Fh: TENANT ISOLATION (RLS) -->
+<section id="fs-rls" class="feat-section">
+  <div class="feat-inner reveal">
+    <div class="feat-content">
+      <div class="feat-tag blue"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg> Multi-Tenant Isolation</div>
+      <h3>Your data.<br/>Invisible to every other tenant.</h3>
+      <p>Database-level Row-Level Security enforces tenant isolation at the PostgreSQL layer itself — not just in application code. Even a bug in a query can't leak one organization's submissions into another's results, because the database refuses the row before it ever reaches the API.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>PostgreSQL Row-Level Security enforced per tenant, at the DB layer</li>
+        <li><span class="bchk">✓</span>Isolation holds even if application-layer filtering is missed</li>
+        <li><span class="bchk">✓</span>No shared tables without a tenant boundary</li>
+        <li><span class="bchk">✓</span>Hardened specifically for DPDP-grade data separation</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Tenant Isolation — RLS</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Tenant A query</span><span class="f10-badge ok">Tenant A rows only</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Tenant B query</span><span class="f10-badge ok">Tenant B rows only</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">RLS policies active</span><span class="f10-badge ok">All tables</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Fi: DATA RIGHTS & ERASURE -->
+<section id="fs-rights" class="feat-section alt">
+  <div class="feat-inner flip reveal">
+    <div class="feat-content">
+      <div class="feat-tag blue"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Data Rights</div>
+      <h3>Access, correction, erasure.<br/>On demand, with a certificate.</h3>
+      <p>Respondents' DPDP rights are handled as first-class workflow: search a request across every form and submission, act on it (redact, export, or delete), and close it out with a generated deletion certificate for your compliance records.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Search any request across all forms and historical submissions</li>
+        <li><span class="bchk">✓</span>Act: redact, export, or fully delete matched records</li>
+        <li><span class="bchk">✓</span>Deletion certificate generated automatically on closure</li>
+        <li><span class="bchk">✓</span>Overdue-request tracking keeps compliance SLAs visible</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Data Rights Requests</span></div>
+        <div class="f10-row"><div class="f10-icon warn"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg></div><span class="f10-text">Erasure request — Record #312</span><span class="f10-badge warn">In progress</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Deletion certificate issued</span><span class="f10-badge ok">Closed</span></div>
+        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Overdue requests</span><span class="f10-badge ok">0</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+</div><!-- /tab-panel: security -->
 
 <!-- CTA -->
 <div class="cta-section">
@@ -1331,26 +1609,27 @@
     document.getElementById('hamburgerBtn').classList.remove('open');
   }, { passive: true });
 
-  /* ── Sidebar + quicknav scrollspy ─── */
-  (function() {
-    var sIds = ['f1-offline','f2-forms','f3-ai-form','f4-import','f5-sync','f6-supervisor','f7-whatsapp','f8-sheets','f9-writer','f9b-builder','f9c-interpret','f10-qc','f11-dpdp','f12-lang'];
-    var psnLinks = document.querySelectorAll('.psn-link[data-s]');
-    var fqnLinks = document.querySelectorAll('.fqn-item[href^="#"]');
-    var progress = document.getElementById('pgProgress');
-    function spyUpdate() {
-      var scrollY = window.scrollY + 140;
-      var totalH = document.documentElement.scrollHeight - window.innerHeight;
-      if (progress) progress.style.width = Math.min(100, (window.scrollY / totalH) * 100) + '%';
-      var cur = sIds[0];
-      sIds.forEach(function(id) {
-        var el = document.getElementById(id);
-        if (el && el.getBoundingClientRect().top + window.scrollY <= scrollY) cur = id;
-      });
-      psnLinks.forEach(function(l) { l.classList.toggle('active', l.dataset.s === cur); });
-      fqnLinks.forEach(function(l) { l.classList.toggle('active', l.getAttribute('href') === '#' + cur); });
+  /* ── Product tab switcher ─── */
+  function switchTab(name) {
+    document.querySelectorAll('.tab-panel').forEach(function(p) {
+      p.classList.toggle('active', p.dataset.tab === name);
+    });
+    document.querySelectorAll('.ftb-tab').forEach(function(b) {
+      var isActive = b.dataset.tab === name;
+      b.classList.toggle('active', isActive);
+      b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    var panel = document.querySelector('.tab-panel[data-tab="' + name + '"]');
+    if (panel) {
+      panel.querySelectorAll('.reveal').forEach(function(el) { el.classList.add('visible'); });
+      panel.querySelectorAll('.feat-visual').forEach(function(el) { el.classList.add('playing'); });
     }
-    window.addEventListener('scroll', spyUpdate, { passive: true });
-    spyUpdate();
+    document.querySelector('.feat-quicknav').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    history.replaceState(null, '', '#tab-' + name);
+  }
+  (function() {
+    var hash = location.hash.replace('#tab-', '');
+    if (hash && document.querySelector('.tab-panel[data-tab="' + hash + '"]')) switchTab(hash);
   })();
 </script>
 <script defer src="/assets/trial-cta.js"></script>
