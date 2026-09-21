@@ -142,53 +142,6 @@
   .link-row a{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;padding:9px 18px;border-radius:10px;font-size:.85rem;font-weight:600;text-decoration:none}
   .link-row a:hover{background:rgba(255,255,255,.2)}
 
-  /* billing cycle toggle */
-  .cycle-row{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:680px;margin:0 auto 26px}
-  .cycle-btn{border:1.5px solid var(--border);background:var(--surface);border-radius:10px;padding:8px 16px;font-size:.82rem;font-weight:700;color:var(--ink-muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:inherit}
-  .cycle-btn.active{border-color:var(--primary);background:linear-gradient(135deg,rgba(14,165,233,.1),rgba(124,58,237,.1));color:var(--primary-dark)}
-  .cycle-btn .cy-save{font-size:.62rem;font-weight:600;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.03em}
-  .cycle-btn.active .cy-save{color:var(--primary-dark)}
-  .price-6month,.price-annual,.price-3year{display:none}
-
-  /* pricing cards */
-  .price-grid{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-  .price-card{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:24px 20px;position:relative}
-  .price-card.pop{border-color:var(--primary);box-shadow:0 10px 30px rgba(14,165,233,.14)}
-  .price-card .pop-badge{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;font-size:.68rem;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:4px 12px;border-radius:999px;white-space:nowrap}
-  .price-card .p-name{font-size:.82rem;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
-  .price-card .p-amount{font-family:'Plus Jakarta Sans',sans-serif;font-size:1.7rem;font-weight:800;color:var(--dark);font-variant-numeric:tabular-nums}
-  .price-card .p-amount small{font-size:.85rem;font-weight:600;color:var(--ink-faint)}
-  .price-card .p-tag{font-size:.82rem;color:var(--ink-muted);margin:8px 0 16px;min-height:2.6em}
-  .price-card ul{list-style:none;display:flex;flex-direction:column;gap:8px}
-  .price-card li{font-size:.82rem;color:var(--ink-muted);display:flex;gap:7px}
-  .price-card li b{color:var(--dark);font-weight:700}
-  .savings-strip{max-width:1080px;margin:28px auto 0;display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
-  .savings-card{background:var(--dark);border-radius:14px;padding:20px 24px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:16px}
-  .savings-card b{font-family:'Plus Jakarta Sans',sans-serif;font-size:1.7rem;font-weight:800;color:#7dd3fc;font-variant-numeric:tabular-nums}
-  .savings-card span{font-size:.85rem;color:rgba(255,255,255,.75)}
-  .price-note{text-align:center;font-size:.78rem;color:var(--ink-faint);max-width:640px;margin:18px auto 0}
-
-  /* calculator */
-  .calc-box{max-width:820px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:36px;display:grid;grid-template-columns:1fr 1fr;gap:36px}
-  .calc-controls label{display:flex;justify-content:space-between;font-size:.85rem;font-weight:600;color:var(--ink);margin-bottom:6px}
-  .calc-controls label b{color:var(--primary-dark);font-variant-numeric:tabular-nums}
-  .calc-controls input[type=range]{width:100%;margin-bottom:22px;accent-color:var(--primary)}
-  .calc-result .cr-head{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-faint);margin-bottom:10px}
-  .calc-line{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:.86rem;color:var(--ink-muted);font-variant-numeric:tabular-nums}
-  .calc-line.hi{color:var(--dark);font-weight:700}
-  .calc-line:last-child{border-bottom:none}
-  .calc-save{margin-top:16px;background:var(--good);border-radius:14px;padding:24px 20px;text-align:center;box-shadow:0 12px 32px rgba(5,150,105,0.28)}
-  .calc-save .cs-badge{display:inline-flex;align-items:center;gap:10px;font-family:'Plus Jakarta Sans',sans-serif;font-size:1.7rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#fde047;margin-bottom:2px;animation:savedPulse 1.8s ease-in-out infinite}
-  .calc-save .ping-dot{position:relative;width:11px;height:11px;border-radius:50%;background:#fde047;flex:none}
-  .calc-save .ping-dot::before{content:'';position:absolute;inset:0;border-radius:50%;background:#fde047;animation:pingRing 1.6s cubic-bezier(0,0,.2,1) infinite}
-  .calc-save .cs-val{font-family:'Plus Jakarta Sans',sans-serif;font-size:2.4rem;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;line-height:1.1}
-  .calc-save .cs-lbl{font-size:.82rem;color:rgba(255,255,255,.9);font-weight:600;margin-top:4px}
-  @keyframes savedPulse{0%,100%{transform:scale(1);text-shadow:0 0 0 rgba(253,224,71,0)}50%{transform:scale(1.07);text-shadow:0 0 16px rgba(253,224,71,.8)}}
-  @keyframes pingRing{0%{transform:scale(1);opacity:.7}75%,100%{transform:scale(2.8);opacity:0}}
-  @media(prefers-reduced-motion:reduce){.calc-save .cs-badge,.calc-save .ping-dot::before{animation:none}}
-  @media(max-width:640px){.calc-save .cs-val{font-size:1.9rem}.calc-save .cs-badge{font-size:1.3rem}}
-  @media(max-width:760px){.calc-box{grid-template-columns:1fr}}
-
   /* blog roundup */
   .blog-grid{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
   .blog-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;text-decoration:none;display:block;transition:box-shadow .25s,transform .25s}
@@ -248,7 +201,6 @@
       <a href="#platform">Platform</a>
       <a href="#action">In Action</a>
       <a href="#usecases">Use Cases</a>
-      <a href="#cost">Cost</a>
       <a href="#partnership">Partnership</a>
       <a href="#blog">Blog</a>
     </div>
@@ -274,10 +226,10 @@
   </div>
 
   <div class="stat-row wrap">
-    <div class="stat"><b>₹7,999</b><span>starting monthly price</span></div>
     <div class="stat"><b>Zero</b><span>internet required to collect data</span></div>
     <div class="stat"><b>DPDP</b><span>Act 2023 compliant by design</span></div>
     <div class="stat"><b>4</b><span>AI modules: build, clean, analyze, write</span></div>
+    <div class="stat"><b>22</b><span>Indian languages supported</span></div>
   </div>
 </header>
 
@@ -371,85 +323,12 @@
     <table class="compare">
       <tr><th>Capability</th><th class="hl">FieldGovern</th><th>Typical global SaaS tool</th></tr>
       <tr><td class="hl">Works with zero internet</td><td class="yes"><span class="cell-flex"><svg class="icon" style="width:.9em;height:.9em"><use href="#i-check"/></svg> Full offline PWA</span></td><td class="no"><span class="cell-flex"><svg class="icon" style="width:.9em;height:.9em"><use href="#i-minus"/></svg> Partial / add-on</span></td></tr>
-      <tr><td class="hl">Pricing</td><td class="yes">INR, from ₹7,999/mo</td><td class="no">USD-denominated</td></tr>
+      <tr><td class="hl">Pricing</td><td class="yes">INR, GST-invoiced, UPI billing</td><td class="no">USD-denominated</td></tr>
       <tr><td class="hl">DPDP Act 2023 tooling</td><td class="yes">Built in, with signed DPA</td><td class="no">Not designed for it</td></tr>
       <tr><td class="hl">Support hours</td><td class="yes">IST-native</td><td class="no">Often US/EU hours</td></tr>
       <tr><td class="hl">AI analysis & report writing</td><td class="yes">Included (Analyzer, Writer)</td><td class="no">Rare or third-party</td></tr>
       <tr><td class="hl">Indian-language forms</td><td class="yes">One-click translation</td><td class="no">Manual, limited</td></tr>
     </table>
-  </div>
-</section>
-
-<section id="cost" class="features-bg">
-  <div class="section-head">
-    <span class="kicker">Cost Comparison</span>
-    <h2>What FieldGovern actually costs</h2>
-    <p>Real published pricing, in INR, with GST — no "contact sales" for the numbers that matter.</p>
-  </div>
-  <div class="cycle-row">
-    <button class="cycle-btn active" data-cycle="monthly" onclick="setCycle('monthly')"><span>Monthly</span></button>
-    <button class="cycle-btn" data-cycle="6month" onclick="setCycle('6month')"><span>6 Months</span></button>
-    <button class="cycle-btn" data-cycle="annual" onclick="setCycle('annual')"><span>Annual</span><span class="cy-save">2 mo free</span></button>
-    <button class="cycle-btn" data-cycle="3year" onclick="setCycle('3year')"><span>3 Years</span><span class="cy-save">6 mo free</span></button>
-  </div>
-  <div class="price-grid">
-    <div class="price-card">
-      <div class="p-name">Free</div>
-      <div class="p-amount">₹0</div>
-      <p class="p-tag">Pilot before you scale</p>
-      <ul><li><b>300</b> submissions/mo</li><li><b>2</b> active forms</li><li><b>1</b> admin</li></ul>
-    </div>
-    <div class="price-card">
-      <div class="p-name">Starter</div>
-      <div class="p-amount"><span class="price-monthly">₹7,999</span><span class="price-6month">₹7,499</span><span class="price-annual">₹6,999</span><span class="price-3year">₹6,999</span><small>/mo</small></div>
-      <p class="p-tag">Small teams &amp; pilots</p>
-      <ul><li><b>2,000</b> submissions/mo</li><li><b>8</b> active forms</li><li>GPS + audio QC included</li></ul>
-    </div>
-    <div class="price-card pop">
-      <span class="pop-badge">Most Popular</span>
-      <div class="p-name">Growth</div>
-      <div class="p-amount"><span class="price-monthly">₹12,999</span><span class="price-6month">₹12,999</span><span class="price-annual">₹10,833</span><span class="price-3year">₹10,833</span><small>/mo</small></div>
-      <p class="p-tag">Growing research &amp; M&amp;E teams</p>
-      <ul><li><b>5,000</b> submissions/mo</li><li><b>20</b> active forms</li><li>Full AI Analyzer + Writer</li></ul>
-    </div>
-    <div class="price-card">
-      <div class="p-name">Pro</div>
-      <div class="p-amount"><span class="price-monthly">₹24,999</span><span class="price-6month">₹24,999</span><span class="price-annual">₹20,833</span><span class="price-3year">₹20,833</span><small>/mo</small></div>
-      <p class="p-tag">High-volume, multi-project teams</p>
-      <ul><li><b>25,000</b> submissions/mo</li><li><b>100</b> active forms</li><li>Priority support · 8h</li></ul>
-    </div>
-  </div>
-  <div class="savings-strip">
-    <div class="savings-card"><span>FieldGovern Pro vs. a comparable<br/>SurveyCTO tier</span><b>~52% less</b></div>
-    <div class="savings-card"><span>FieldGovern Pro vs. a comparable<br/>Qualtrics tier</span><b>~80% less</b></div>
-  </div>
-  <p class="price-note">All prices +18% GST. Every paid plan starts with a 15-day full-feature trial, no card required. Custom / pay-as-you-go pricing available for consortiums and government engagements — see <a href="https://www.fieldgovern.com/pricing.html" target="_blank" rel="noopener">fieldgovern.com/pricing.html</a> for full feature-by-feature limits.</p>
-</section>
-
-<section id="calculator">
-  <div class="section-head">
-    <span class="kicker">Estimate Your Savings</span>
-    <h2>Cost calculator</h2>
-    <p>Model a real project against FieldGovern, SurveyCTO, Qualtrics, and paper-based collection.</p>
-  </div>
-  <div class="calc-box">
-    <div class="calc-controls">
-      <label>Active forms <b id="calcFormsOut">20</b></label>
-      <input type="range" id="calcForms" min="1" max="100" value="20" oninput="fgCalc()"/>
-      <label>Submissions / month <b id="calcSubsOut">5,000</b></label>
-      <input type="range" id="calcSubs" min="500" max="25000" step="500" value="5000" oninput="fgCalc()"/>
-      <label>Project duration <b id="calcMonthsOut">6 months</b></label>
-      <input type="range" id="calcMonths" min="1" max="24" value="6" oninput="fgCalc()"/>
-    </div>
-    <div class="calc-result">
-      <div class="cr-head">Estimated total cost</div>
-      <div id="calcRows"></div>
-      <div class="calc-save">
-        <div class="cs-badge"><span class="ping-dot"></span>Saved</div>
-        <div class="cs-val" id="calcSaveVal">—</div>
-        <div class="cs-lbl">vs. SurveyCTO (<span id="calcSavePct">—</span>) over this project</div>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -526,54 +405,5 @@
   <p>FieldGovern is a strategic technology partner of Dataworx. Questions? <a href="mailto:pallavi@dataworx.co.in">pallavi@dataworx.co.in</a></p>
 </footer>
 
-<script>
-  // Billing cycle toggle for the pricing cards above.
-  function setCycle(cycle){
-    document.querySelectorAll('.cycle-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.cycle===cycle); });
-    document.querySelectorAll('.price-monthly,.price-6month,.price-annual,.price-3year').forEach(function(el){ el.style.display='none'; });
-    document.querySelectorAll('.price-'+cycle).forEach(function(el){ el.style.display='inline-block'; });
-  }
-  setCycle('monthly');
-
-  // Cost calculator — same model as fieldgovern.com/index.html, INR list prices.
-  function fgCalc(){
-    var fEl=document.getElementById('calcForms'); if(!fEl) return;
-    var forms=+fEl.value, subs=+document.getElementById('calcSubs').value, months=+document.getElementById('calcMonths').value;
-    document.getElementById('calcFormsOut').textContent=forms;
-    document.getElementById('calcSubsOut').textContent=subs.toLocaleString('en-IN');
-    document.getElementById('calcMonthsOut').textContent=months+(months===1?' month':' months');
-    // FieldGovern: pick the cheapest published tier that actually covers the
-    // selected forms + submissions, instead of always pricing at Pro.
-    var fgTiers=[
-      {name:'FieldGovern Free',price:0,subs:300,forms:2},
-      {name:'FieldGovern Starter',price:7999,subs:2000,forms:8},
-      {name:'FieldGovern Growth',price:12999,subs:5000,forms:20},
-      {name:'FieldGovern Pro',price:24999,subs:25000,forms:100}
-    ];
-    var fgTier=fgTiers[fgTiers.length-1];
-    for(var t=0;t<fgTiers.length;t++){
-      if(subs<=fgTiers[t].subs && forms<=fgTiers[t].forms){ fgTier=fgTiers[t]; break; }
-    }
-    var fg=fgTier.price*months;              // FieldGovern (tier matched to inputs)
-    var surveycto=52000*months;              // SurveyCTO Pro tier (~$625/mo)
-    var qualtrics=125000*months;             // Qualtrics (~$1,500/mo)
-    var paper=(subs*months*8)+(forms*3000);  // ₹8/response entry+logistics + ₹3k/form setup
-    var rows=[
-      {name:fgTier.name,cost:fg,hi:true},
-      {name:'SurveyCTO (Pro tier)',cost:surveycto},
-      {name:'Qualtrics',cost:qualtrics},
-      {name:'Paper + manual entry',cost:paper}
-    ];
-    var html='';
-    rows.forEach(function(r){
-      html+='<div class="calc-line'+(r.hi?' hi':'')+'"><span>'+r.name+'</span><span>₹'+r.cost.toLocaleString('en-IN')+'</span></div>';
-    });
-    document.getElementById('calcRows').innerHTML=html;
-    var save=Math.max(0,surveycto-fg), pct=surveycto>0?Math.round(save/surveycto*100):0;
-    document.getElementById('calcSaveVal').textContent='₹'+save.toLocaleString('en-IN');
-    document.getElementById('calcSavePct').textContent=pct+'%';
-  }
-  window.addEventListener('DOMContentLoaded', fgCalc);
-</script>
 </body>
 </html>
