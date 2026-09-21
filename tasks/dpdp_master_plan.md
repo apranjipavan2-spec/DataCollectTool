@@ -1253,6 +1253,16 @@ that's a straightforward publish-a-page fix once the org names a real
 person — genuinely blocked on that name/contact existing, not on more
 code or docs.
 
+- [x] **Grievance Officer named + published — done 2026-09-21.** Owner
+      provided the name/contact: **Manjunath YN, manjunath@dataworx.co.in**.
+      Published a new public "FieldGovern's Grievance Officer" section on
+      `website/dpdp-compliance.html` (distinct from the per-tenant customer-
+      facing grievance email already there), and filled in the placeholder
+      in `deploy/BREACH_RESPONSE_PLAN.md`'s role table. The other 4 roles
+      in that table (Incident Commander, Technical Lead, Communications,
+      Legal/DPO) remain placeholders — only the Grievance Officer name was
+      provided.
+
 RoPA, DPIA, and the internal policy set (access control, incident
 response, retention, acceptable use, vendor management, secure
 development) are all real, substantial documents this session didn't

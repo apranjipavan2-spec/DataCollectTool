@@ -27,7 +27,8 @@ Homepage: https://www.fieldgovern.com/
 - [Magpi alternative](https://www.fieldgovern.com/magpi-alternative.html)
 
 ## Compliance
-- [DPDP Act 2023 compliance](https://www.fieldgovern.com/dpdp-compliance.html)
+- [Trust Centre](https://www.fieldgovern.com/trust.html): Security, DPDP compliance, and data-processing docs in one place.
+- [DPDP Act 2023 compliance](https://www.fieldgovern.com/dpdp-compliance.html): Clause-by-clause mapping — consent, purpose/storage limitation, data principal rights, breach notification, data localisation.
 - [DPDP-compliant survey software in India](https://www.fieldgovern.com/dpdp-compliant-survey-software.html)
 - [Data Processing Agreement template](https://www.fieldgovern.com/dpa-template.html)
 

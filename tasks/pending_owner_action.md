@@ -42,15 +42,16 @@ Net effect: PostgreSQL row-level security is now actually enforced at the databa
 layer, not just relied on via app-code `.filter(tenant_id==...)` calls.
 
 ## 2. Encryption + transport (server/hosting settings)
-- [ ] **Disk encryption — CONFIRMED real gap, owner has a plan (2026-09-18).**
+- [ ] **Disk encryption — CONFIRMED real gap, owner has committed a date (updated 2026-09-21).**
       `lsblk` on the live server shows plain partitions only, no `crypt` layer
       anywhere. Since the Docker uploads volume lives on this same disk, this
       single finding covers both the Postgres data volume and the media/uploads
-      volume — neither is encrypted. **Owner's plan (stated 2026-09-18, timeline
-      "a couple of days"):** take a fresh backup, then rebuild the server from
-      scratch on an encrypted volume and reconfigure it — bundled with the
-      region move below rather than two separate migrations. Tracked as pending
-      with an owner-committed timeline, not an open unknown.
+      volume — neither is encrypted. **Owner's plan, date confirmed 2026-09-21:
+      rebuild scheduled for 2026-10-05** (the original "couple of days" estimate
+      from 2026-09-18 slipped — still same EU IP as of this update): take a
+      fresh backup, then rebuild the server from scratch on an encrypted
+      volume and reconfigure it — bundled with the region move below rather
+      than two separate migrations.
 - [ ] Force TLS: add `?sslmode=require` to `DATABASE_URL` and `APP_DATABASE_URL`.
       **Not a quick .env edit** — the Postgres container has no TLS certificate
       configured yet; forcing this on without one first just refuses every
@@ -77,14 +78,14 @@ layer, not just relied on via app-code `.filter(tenant_id==...)` calls.
       folder occasionally to confirm it's staying current, but not tracked here
       as an open gap needing engineering work.
 
-## 3. Data residency (India) — confirmed gap, owner has committed to fixing it (2026-09-18)
+## 3. Data residency (India) — confirmed gap, owner has committed a date (updated 2026-09-21)
 Checked the Contabo control panel directly while doing item 1: the VPS's region
-shows **EU**, not India (IP `178.238.227.32`). This contradicts DPDP data-
-localisation expectations and several existing marketing claims ("India-hosted
-by default", Mumbai servers). **Owner's plan, stated 2026-09-18: moving to an
-India region "in a couple of days"** — bundled with the disk-encryption rebuild
-above (item 2), one fresh server instead of two separate migrations. Tracked as
-pending with an owner-committed timeline, not an open decision to make.
+shows **EU**, not India (IP `178.238.227.32`) — re-confirmed via DNS on
+2026-09-21, still the same EU IP. This contradicts DPDP data-localisation
+expectations and several existing marketing claims ("India-hosted by default",
+Mumbai servers). **Owner's committed date: 2026-10-05** — bundled with the
+disk-encryption rebuild above (item 2), one fresh server instead of two
+separate migrations.
 
 ## 4. DPDP paperwork (you own these)
 - [ ] Consent capture text for beneficiary personal data (purpose-limited, withdrawable).
@@ -96,27 +97,11 @@ pending with an owner-committed timeline, not an open decision to make.
 - [ ] Confirm: stay on ONE server + multi-tenant DB (recommended). Per-client
       DB/VDS only for a future enterprise client who requires and pays for it.
 
-## 6. Short-lived access tokens — recommended, now safe (2026-09-18)
-`JWT_EXPIRE_MINUTES` defaults to `0` (access tokens never expire — the
-session only ends on explicit logout). This is a real gap against item 16 of
-`tasks/dpdp_master_plan.md` ("short-lived access tokens + refresh rotation").
-It was very likely set to 0 deliberately at some point to work around a real
-incident (the Analyzer/Cleaner tools losing autosaved work when a 2-hour
-token silently expired with no refresh) — but that failure mode is now fixed:
-`frontend/src/lib/api.ts` has a working silent-refresh interceptor (401 →
-exchange the stored refresh token → retry), and the refresh endpoint already
-rotates the refresh token on every use.
-
-**Recommendation:** set `JWT_EXPIRE_MINUTES=120` (2 hours) in the server's
-`.env` and redeploy. This is a config-only change (no code change needed —
-`security.py` already branches on this value). Not done automatically here
-because it changes behavior for every currently-active session on a live
-app with real field enumerators mid-collection — worth a deliberate choice
-and a quiet-hours deploy window, not a silent flip. After changing it, spot-
-check: log in fresh, wait past the expiry window, confirm the app keeps
-working without forcing a re-login (the interceptor should handle it
-invisibly) — and separately confirm TableForge/Cleaner tool sessions
-survive the same way, since they read the same `fp_refresh_token`.
+## 6. Short-lived access tokens — DECLINED, owner decision (2026-09-21)
+`JWT_EXPIRE_MINUTES` stays at `0` (access tokens never expire — session ends
+only on explicit logout). Owner reviewed the recommendation to set it to 120
+and does not want this change. Not tracked as an open gap going forward —
+this is a deliberate, informed decision, not an oversight.
 
 ---
 

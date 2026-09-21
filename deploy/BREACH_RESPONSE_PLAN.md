@@ -50,7 +50,7 @@ Fill in names/contacts. One person can hold multiple roles in a small team.
 |------|----------------|---------|
 | **Incident Commander** | Owns the response end-to-end, makes the call on severity and notification | `[name, phone, email]` |
 | **Technical Lead** | Contains the incident, preserves logs, root-causes it | `[name, phone, email]` |
-| **Grievance Officer** | Single point of contact for affected data principals — should already be published per DPDP Rules | `[name, phone, email]` |
+| **Grievance Officer** | Single point of contact for affected data principals — published per DPDP Rules | Manjunath YN, manjunath@dataworx.co.in |
 | **Communications** | Drafts and sends customer/Board notifications | `[name, phone, email]` |
 | **Legal / DPO** (if engaged) | Confirms notification obligations, reviews external communications | `[name/firm, phone, email]` |
 

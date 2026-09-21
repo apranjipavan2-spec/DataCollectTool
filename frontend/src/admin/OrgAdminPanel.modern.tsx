@@ -499,6 +499,35 @@ function SecurityTab() {
           {withdrawDone && <p className="text-xs text-catalan-success">✓ Consent withdrawn — response erased</p>}
         </div>
       </Card>
+
+      {/* Compliance & Trust Centre — pointers to the public pages, not new claims */}
+      <Card>
+        <div className="p-6">
+          <h3 className="text-base font-semibold text-catalan-text mb-1">Compliance &amp; Trust Centre</h3>
+          <p className="text-sm text-catalan-textMuted mb-4">
+            Security architecture, DPDP Act 2023 compliance mapping, and sub-processor list — useful for your own
+            donor or client due-diligence questions.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <a href="https://www.fieldgovern.com/trust.html" target="_blank" rel="noopener noreferrer"
+               className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-catalan-hover border border-catalan-border text-catalan-text hover:bg-catalan-border transition-colors">
+              Trust Centre ↗
+            </a>
+            <a href="https://www.fieldgovern.com/security.html" target="_blank" rel="noopener noreferrer"
+               className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-catalan-hover border border-catalan-border text-catalan-text hover:bg-catalan-border transition-colors">
+              Security ↗
+            </a>
+            <a href="https://www.fieldgovern.com/dpdp-compliance.html" target="_blank" rel="noopener noreferrer"
+               className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-catalan-hover border border-catalan-border text-catalan-text hover:bg-catalan-border transition-colors">
+              DPDP Compliance ↗
+            </a>
+            <a href="https://www.fieldgovern.com/dpa-template.html" target="_blank" rel="noopener noreferrer"
+               className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-catalan-hover border border-catalan-border text-catalan-text hover:bg-catalan-border transition-colors">
+              DPA Template ↗
+            </a>
+          </div>
+        </div>
+      </Card>
     </div>
   )
 }
