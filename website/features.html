@@ -392,26 +392,59 @@
     .ai-compare-lbl.old{color:rgba(239,68,68,.7)}
     .ai-compare-lbl.new{color:#34d399}
 
-    /* ── QUICK NAV BAR ─────────────────────── */
-    .feat-quicknav{background:white;border-bottom:1px solid var(--border);padding:0 24px;position:sticky;top:68px;margin-top:68px;z-index:30;box-shadow:0 1px 8px rgba(0,0,0,.04)}
-    .fqn-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:2px;overflow-x:auto;scrollbar-width:none;padding:8px 0}
-    .fqn-inner::-webkit-scrollbar{display:none}
-    .fqn-cat{font-size:.62rem;font-weight:800;color:var(--text3);padding:4px 8px;white-space:nowrap;text-transform:uppercase;letter-spacing:.07em;flex-shrink:0}
-    .fqn-item{text-decoration:none;font-size:.78rem;font-weight:500;color:var(--text2);padding:5px 8px;border-radius:6px;white-space:nowrap;transition:all .18s;display:inline-flex;align-items:center;gap:4px;flex-shrink:0}
-    .fqn-item:hover,.fqn-item.active{background:var(--bg2);color:var(--brand);box-shadow:0 1px 3px rgba(0,0,0,.06);font-weight:600}
-    .fqn-sep{width:1px;height:14px;background:var(--border);margin:0 8px;flex-shrink:0}
+    /* ── FEATURE LAYOUT: left card-nav + right content ── */
+    .feat-layout{max-width:1200px;margin:0 auto;display:flex;align-items:flex-start;padding-top:68px}
+    .feat-sidenav{position:relative;width:280px;flex-shrink:0;position:sticky;top:88px;padding:24px 16px;margin-top:20px}
+    .fnav-highlight{position:absolute;left:16px;right:16px;top:0;height:0;background:white;border:1.5px solid var(--accent-color,var(--brand));border-radius:14px;box-shadow:0 6px 18px -4px var(--accent-shadow,rgba(14,165,233,.28));transition:transform .38s cubic-bezier(.16,1,.3,1),height .38s cubic-bezier(.16,1,.3,1),border-color .3s,box-shadow .3s;pointer-events:none;z-index:0}
+    .fnav-highlight::before{content:'';position:absolute;left:-1.5px;top:14px;bottom:14px;width:3px;border-radius:3px;background:var(--accent-color,var(--brand))}
+    .fcard-list{position:relative;z-index:1;display:flex;flex-direction:column;gap:8px}
+    .fcard{appearance:none;position:relative;text-align:left;background:transparent;border:1.5px solid transparent;border-radius:14px;padding:14px 14px 14px 16px;cursor:pointer;transition:border-color .2s;display:flex;align-items:flex-start;gap:12px;width:100%;font-family:inherit}
+    .fcard:hover:not(.active){background:var(--bg2)}
+    .fcard-icon{width:38px;height:38px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:var(--accent-wash,rgba(14,165,233,.1));color:var(--accent-color,var(--brand));flex-shrink:0;transition:background .3s,color .3s,transform .3s cubic-bezier(.34,1.56,.64,1)}
+    .fcard-icon svg{width:19px;height:19px;stroke:currentColor;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .fcard.active .fcard-icon{background:var(--accent-color,var(--brand));color:white;transform:scale(1.08)}
+    .fcard-text{min-width:0}
+    .fcard h3{font-size:.9rem;font-weight:700;color:var(--text);margin-bottom:2px;line-height:1.3;transition:color .3s}
+    .fcard.active h3{color:var(--accent-color,var(--brand))}
+    .fcard p{font-size:.76rem;color:var(--text3);line-height:1.5}
+    .fcard[data-tab="collect"]{--accent-color:#0ea5e9;--accent-wash:rgba(14,165,233,.1);--accent-shadow:rgba(14,165,233,.28)}
+    .fcard[data-tab="supervise"]{--accent-color:#10b981;--accent-wash:rgba(16,185,129,.1);--accent-shadow:rgba(16,185,129,.28)}
+    .fcard[data-tab="analyzer"]{--accent-color:#7c3aed;--accent-wash:rgba(124,58,237,.1);--accent-shadow:rgba(124,58,237,.28)}
+    .fcard[data-tab="cleaner"]{--accent-color:#f59e0b;--accent-wash:rgba(245,158,11,.1);--accent-shadow:rgba(245,158,11,.28)}
+    .fcard[data-tab="writer"]{--accent-color:#6366f1;--accent-wash:rgba(99,102,241,.1);--accent-shadow:rgba(99,102,241,.28)}
+    .fcard[data-tab="security"]{--accent-color:#334155;--accent-wash:rgba(51,65,85,.1);--accent-shadow:rgba(51,65,85,.22)}
+    .side-group-label{font-size:.66rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;padding:14px 14px 4px}
+    .side-group-label:first-child{padding-top:2px}
 
-    /* ── PRODUCT TAB BAR ─────────────────── */
-    .ftb-inner{max-width:1200px;margin:0 auto;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding:10px 0}
-    .ftb-inner::-webkit-scrollbar{display:none}
-    .ftb-tab{appearance:none;border:1px solid transparent;background:transparent;color:var(--text3);font-family:inherit;font-size:.82rem;font-weight:600;padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:all .18s;flex-shrink:0}
-    .ftb-tab svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
-    .ftb-tab:hover{color:var(--text);background:var(--bg2)}
-    .ftb-tab.active{color:white;background:linear-gradient(135deg,var(--brand),var(--accent));box-shadow:0 4px 14px rgba(14,165,233,.28)}
+    .feat-main{flex:1;min-width:0}
+    @keyframes contentIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    .tab-panel.animate{animation:contentIn .42s cubic-bezier(.16,1,.3,1)}
+
+    /* ── NEXT-SECTION CTA ─────────────────── */
+    .feat-next{display:flex;align-items:center;justify-content:space-between;gap:16px;max-width:1200px;margin:8px auto 0;padding:20px 24px;border:1.5px solid var(--border);border-radius:16px;background:var(--bg2);cursor:pointer;transition:all .22s cubic-bezier(.16,1,.3,1)}
+    .feat-next:hover{border-color:var(--accent-color,var(--brand));background:white;box-shadow:0 8px 22px -6px var(--accent-shadow,rgba(14,165,233,.25));transform:translateY(-2px)}
+    .feat-next-label{font-size:.7rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px}
+    .feat-next-title{font-size:1.05rem;font-weight:800;color:var(--text)}
+    .feat-next-arrow{width:38px;height:38px;border-radius:50%;background:var(--accent-wash,rgba(14,165,233,.1));color:var(--accent-color,var(--brand));display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .22s}
+    .feat-next:hover .feat-next-arrow{transform:translateX(4px)}
+    .feat-next-arrow svg{width:18px;height:18px;stroke:currentColor;stroke-width:2.3;fill:none;stroke-linecap:round;stroke-linejoin:round}
 
     /* ── TAB PANELS ───────────────────────── */
     .tab-panel{display:none}
     .tab-panel.active{display:block}
+
+    /* ── MOBILE FALLBACK (horizontal cards, no sticky sidebar) ── */
+    @media(max-width:900px){
+      .feat-layout{flex-direction:column;padding:0}
+      .feat-sidenav{position:static;width:100%;top:auto;margin-top:0;padding:16px}
+      .fcard-list{flex-direction:row;overflow-x:auto;scrollbar-width:none}
+      .fcard-list::-webkit-scrollbar{display:none}
+      .fcard{flex-direction:column;text-align:center;min-width:126px}
+      .fcard-text{text-align:center}
+      .side-group-label{display:none}
+      .fnav-highlight{display:none}
+      .feat-main{padding:0 4px}
+    }
 
     /* ── CTA ──────────────────────────────── */
     .cta-section{background:linear-gradient(135deg,#f0f9ff,#faf5ff);text-align:center;padding:80px 24px;border-top:1px solid var(--border)}
@@ -494,18 +527,6 @@
   <a href="demo.html" style="color:var(--brand);font-weight:700"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Try Free Demo</a>
 </div>
 
-<!-- PRODUCT TAB BAR (top, just below navbar) -->
-<div class="feat-quicknav">
-  <div class="ftb-inner" role="tablist" aria-label="Feature categories">
-    <button class="ftb-tab active" data-tab="collect" onclick="switchTab('collect')" role="tab" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>Field App</button>
-    <button class="ftb-tab" data-tab="supervise" onclick="switchTab('supervise')" role="tab" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Supervisor &amp; M&amp;E</button>
-    <button class="ftb-tab" data-tab="analyzer" onclick="switchTab('analyzer')" role="tab" aria-selected="false"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>FG Analyzer</button>
-    <button class="ftb-tab" data-tab="cleaner" onclick="switchTab('cleaner')" role="tab" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>FG Cleaner</button>
-    <button class="ftb-tab" data-tab="writer" onclick="switchTab('writer')" role="tab" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>FG Writer</button>
-    <button class="ftb-tab" data-tab="security" onclick="switchTab('security')" role="tab" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Quality &amp; Security</button>
-  </div>
-</div>
-
 <!-- HERO -->
 <div class="page-hero">
   <div class="section-tag afu"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg> Platform Features</div>
@@ -513,6 +534,45 @@
   <p class="afu d2">From offline-first data collection to AI-generated reports — purpose-built for India's connectivity realities and compliance requirements.</p>
   <a href="https://app.fieldgovern.com" class="btn-primary pulse-btn afu d3" style="font-size:1rem;padding:14px 28px">Start Free Trial →</a>
 </div>
+
+<!-- FEATURE LAYOUT: left card-nav + right content -->
+<div class="feat-layout">
+<nav class="feat-sidenav" role="tablist" aria-label="Feature categories">
+  <div class="fnav-highlight" id="fnavHighlight"></div>
+  <div class="fcard-list">
+    <div class="side-group-label">Collect &amp; Supervise</div>
+    <button class="fcard active" data-tab="collect" onclick="switchTab('collect')" role="tab" aria-selected="true">
+      <div class="fcard-icon"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg></div>
+      <div class="fcard-text"><h3>Field App</h3><p>Offline-first collection, GPS &amp; media</p></div>
+    </button>
+    <button class="fcard" data-tab="supervise" onclick="switchTab('supervise')" role="tab" aria-selected="false">
+      <div class="fcard-icon"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
+      <div class="fcard-text"><h3>Supervisor &amp; M&amp;E</h3><p>Dashboard, mapping, panel tracking</p></div>
+    </button>
+
+    <div class="side-group-label">Analyze &amp; Report</div>
+    <button class="fcard" data-tab="analyzer" onclick="switchTab('analyzer')" role="tab" aria-selected="false">
+      <div class="fcard-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+      <div class="fcard-text"><h3>FG Analyzer</h3><p>Cross-tabs, regression, power analysis</p></div>
+    </button>
+    <button class="fcard" data-tab="cleaner" onclick="switchTab('cleaner')" role="tab" aria-selected="false">
+      <div class="fcard-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+      <div class="fcard-text"><h3>FG Cleaner</h3><p>Deduplication &amp; PII redaction</p></div>
+    </button>
+    <button class="fcard" data-tab="writer" onclick="switchTab('writer')" role="tab" aria-selected="false">
+      <div class="fcard-icon"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
+      <div class="fcard-text"><h3>FG Writer</h3><p>AI report writing, bring your own key</p></div>
+    </button>
+
+    <div class="side-group-label">Platform</div>
+    <button class="fcard" data-tab="security" onclick="switchTab('security')" role="tab" aria-selected="false">
+      <div class="fcard-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <div class="fcard-text"><h3>Quality &amp; Security</h3><p>Encryption, RLS, DPDP compliance</p></div>
+    </button>
+  </div>
+</nav>
+
+<div class="feat-main">
 
 <!-- ══════════════════════════════════════════════
      TAB: FIELD APP (COLLECT)
@@ -686,6 +746,10 @@
     </div>
   </div>
 </section>
+<div class="feat-next" data-tab="collect" onclick="switchTab('supervise')">
+  <div><div class="feat-next-label">Next</div><div class="feat-next-title">Supervisor &amp; M&amp;E</div></div>
+  <div class="feat-next-arrow"><svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+</div>
 </div><!-- /tab-panel: collect -->
 
 <!-- ══════════════════════════════════════════════
@@ -910,6 +974,10 @@
     </div>
   </div>
 </section>
+<div class="feat-next" data-tab="supervise" onclick="switchTab('analyzer')">
+  <div><div class="feat-next-label">Next</div><div class="feat-next-title">FG Analyzer</div></div>
+  <div class="feat-next-arrow"><svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+</div>
 </div><!-- /tab-panel: supervise -->
 
 <!-- ══════════════════════════════════════════════
@@ -979,6 +1047,10 @@
     </div>
   </div>
 </section>
+<div class="feat-next" data-tab="writer" onclick="switchTab('security')">
+  <div><div class="feat-next-label">Next</div><div class="feat-next-title">Quality &amp; Security</div></div>
+  <div class="feat-next-arrow"><svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+</div>
 </div><!-- /tab-panel: writer -->
 
 <!-- ══════════════════════════════════════════════
@@ -1151,6 +1223,10 @@
     </div>
   </div>
 </section>
+<div class="feat-next" data-tab="analyzer" onclick="switchTab('cleaner')">
+  <div><div class="feat-next-label">Next</div><div class="feat-next-title">FG Cleaner</div></div>
+  <div class="feat-next-arrow"><svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+</div>
 </div><!-- /tab-panel: analyzer -->
 
 <!-- ══════════════════════════════════════════════
@@ -1238,6 +1314,10 @@
     </div>
   </div>
 </section>
+<div class="feat-next" data-tab="cleaner" onclick="switchTab('writer')">
+  <div><div class="feat-next-label">Next</div><div class="feat-next-title">FG Writer</div></div>
+  <div class="feat-next-arrow"><svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+</div>
 </div><!-- /tab-panel: cleaner -->
 
 <!-- ══════════════════════════════════════════════
@@ -1445,6 +1525,9 @@
 </section>
 </div><!-- /tab-panel: security -->
 
+</div><!-- /feat-main -->
+</div><!-- /feat-layout -->
+
 <!-- CTA -->
 <div class="cta-section">
   <div style="max-width:600px;margin:0 auto">
@@ -1610,23 +1693,58 @@
   }, { passive: true });
 
   /* ── Product tab switcher ─── */
+  var FNAV_COLORS = {
+    collect:   '#0ea5e9',
+    supervise: '#10b981',
+    analyzer:  '#7c3aed',
+    cleaner:   '#f59e0b',
+    writer:    '#6366f1',
+    security:  '#334155'
+  };
+
+  function moveFnavHighlight(card) {
+    var hl = document.getElementById('fnavHighlight');
+    var nav = document.querySelector('.feat-sidenav');
+    if (!hl || !nav || !card || nav.offsetParent === null) return; // hidden on mobile
+    var navRect = nav.getBoundingClientRect();
+    var cardRect = card.getBoundingClientRect();
+    hl.style.transform = 'translateY(' + (cardRect.top - navRect.top) + 'px)';
+    hl.style.height = cardRect.height + 'px';
+    var color = FNAV_COLORS[card.dataset.tab] || '#0ea5e9';
+    hl.style.setProperty('--accent-color', color);
+    hl.style.setProperty('--accent-shadow', color + '48');
+  }
+
   function switchTab(name) {
     document.querySelectorAll('.tab-panel').forEach(function(p) {
-      p.classList.toggle('active', p.dataset.tab === name);
+      var isActive = p.dataset.tab === name;
+      p.classList.toggle('active', isActive);
+      if (isActive) {
+        p.classList.remove('animate');
+        void p.offsetWidth; // restart the fade/slide-in animation on every switch
+        p.classList.add('animate');
+      }
     });
-    document.querySelectorAll('.ftb-tab').forEach(function(b) {
+    document.querySelectorAll('.fcard').forEach(function(b) {
       var isActive = b.dataset.tab === name;
       b.classList.toggle('active', isActive);
       b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      if (isActive) moveFnavHighlight(b);
     });
     var panel = document.querySelector('.tab-panel[data-tab="' + name + '"]');
     if (panel) {
       panel.querySelectorAll('.reveal').forEach(function(el) { el.classList.add('visible'); });
       panel.querySelectorAll('.feat-visual').forEach(function(el) { el.classList.add('playing'); });
     }
-    document.querySelector('.feat-quicknav').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.querySelector('.feat-layout').scrollIntoView({ behavior: 'smooth', block: 'start' });
     history.replaceState(null, '', '#tab-' + name);
   }
+  window.addEventListener('load', function() {
+    moveFnavHighlight(document.querySelector('.fcard.active'));
+  });
+  window.addEventListener('resize', function() {
+    moveFnavHighlight(document.querySelector('.fcard.active'));
+  });
   (function() {
     var hash = location.hash.replace('#tab-', '');
     if (hash && document.querySelector('.tab-panel[data-tab="' + hash + '"]')) switchTab(hash);
