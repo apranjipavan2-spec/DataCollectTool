@@ -1593,11 +1593,11 @@
     btn.textContent = expanded ? 'Show fewer posts ▴' : 'Show more posts ▾';
   }
 
-  // Timed trial/demo popup — shows once ever, 20s after landing on the home page.
+  // Timed trial/demo popup — 20s after every fresh load of the home page
+  // (a refresh, or navigating away and back, resets the timer). Only
+  // suppressed for the rest of THIS page view once closed — not persisted
+  // across visits.
   (function(){
-    var KEY = 'fg_trial_popup_seen';
-    try { if (localStorage.getItem(KEY) === '1') return; } catch(e) {}
-
     setTimeout(function(){
       var overlay = document.getElementById('trialPopupOverlay');
       if (!overlay) return;
@@ -1605,7 +1605,6 @@
 
       function dismiss(){
         overlay.classList.remove('open');
-        try { localStorage.setItem(KEY, '1'); } catch(e) {}
       }
       document.getElementById('trialPopupClose').addEventListener('click', dismiss);
       overlay.addEventListener('click', function(e){ if (e.target === overlay) dismiss(); });
