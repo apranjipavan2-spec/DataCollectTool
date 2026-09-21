@@ -349,6 +349,9 @@ def my_subscription(user=Depends(get_current_user), db: Session = Depends(get_db
             "submissions_limit": plan.submissions_limit if plan else 2000,
             "storage_limit_mb":  plan.storage_limit_mb  if plan else 500,
         },
+        "features": {
+            "two_fa": bool(plan.two_fa) if plan else False,
+        },
         "usage": {
             "submissions_used": usage.submissions_used if usage else 0,
             "storage_used_mb":  usage.storage_used_mb  if usage else 0.0,

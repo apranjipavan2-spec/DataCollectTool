@@ -91,6 +91,13 @@ export default function RegisterPage() {
   const input: React.CSSProperties = {
     width: '100%', padding: '10px 14px', borderRadius: '12px',
     border: '1px solid #e2e8f0', fontSize: '14px', outline: 'none', background: '#fff',
+    color: '#1e293b',
+  }
+  const select: React.CSSProperties = {
+    ...input, appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer',
+    paddingRight: '38px',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236366f1' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center',
   }
   const labelCls = 'block text-xs font-semibold mb-1.5'
 
@@ -115,10 +122,26 @@ export default function RegisterPage() {
                 </svg>
               </div>
               <h1 className="text-2xl font-bold mb-2" style={{ color: '#1e293b' }}>Check your email</h1>
-              <p className="text-sm mb-6" style={{ color: '#64748b' }}>
+              <p className="text-sm mb-4" style={{ color: '#64748b' }}>
                 We've sent a verification link to <strong style={{ color: '#1e293b' }}>{form.email}</strong>.
                 Click it to activate your 15-day free trial.
               </p>
+              <div className="mb-6 px-4 py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+                   style={{
+                     background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)',
+                     color: '#b45309', animation: 'fg-pulse 1.8s ease-in-out infinite',
+                   }}>
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="#f59e0b" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+                Don't see it? Check your spam / junk folder
+              </div>
+              <style>{`
+                @keyframes fg-pulse {
+                  0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0.35); }
+                  50% { box-shadow: 0 0 0 6px rgba(245,158,11,0); }
+                }
+              `}</style>
               <button onClick={() => navigate('/login')}
                       className="w-full py-3 rounded-xl font-bold text-sm text-white"
                       style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
@@ -150,7 +173,7 @@ export default function RegisterPage() {
                 </div>
                 <div>
                   <label className={labelCls} style={{ color: '#475569' }}>Organization type</label>
-                  <select style={input} value={form.segment} onChange={set('segment')}>
+                  <select style={select} value={form.segment} onChange={set('segment')}>
                     {SEGMENTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>

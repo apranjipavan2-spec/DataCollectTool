@@ -73,6 +73,7 @@ function SecurityTab() {
   const [qrEnabled,    setQrEnabled]    = useState(false)
   const [twoFaEnabled, setTwoFaEnabled] = useState(false)
   const [twoFaRoles, setTwoFaRoles] = useState<string[]>([])
+  const [twoFaAllowed, setTwoFaAllowed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
@@ -109,6 +110,9 @@ function SecurityTab() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
+    api.get('/billing/my-subscription')
+      .then(({ data }) => setTwoFaAllowed(!!data?.features?.two_fa))
+      .catch(() => {})
     api.get('/tenants/ai-config')
       .then(({ data }) => {
         setAiEnabled(data.enabled ?? true)
@@ -266,6 +270,17 @@ function SecurityTab() {
           <p className="text-sm text-catalan-textMuted mb-5">
             When enabled, all users must enter a one-time code sent to their email after entering their password. Requires a plan that includes 2FA.
           </p>
+          {!twoFaAllowed ? (
+            <div className="flex items-center justify-between p-4 bg-catalan-bg border border-catalan-border rounded-xl opacity-70">
+              <div>
+                <p className="text-sm font-medium text-catalan-text flex items-center gap-1.5">
+                  <EmojiIcon e="🔒" /> Not available on your plan
+                </p>
+                <p className="text-xs text-catalan-textMuted mt-0.5">Upgrade to unlock 2FA for your organisation</p>
+              </div>
+              <a href="/subscription" className="text-xs font-semibold text-catalan-primary underline whitespace-nowrap">Upgrade →</a>
+            </div>
+          ) : (
           <div className="flex items-center justify-between p-4 bg-catalan-bg border border-catalan-border rounded-xl">
             <div>
               <p className="text-sm font-medium text-catalan-text">Require OTP on login</p>
@@ -281,7 +296,8 @@ function SecurityTab() {
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${twoFaEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
           </div>
-          {twoFaError && (
+          )}
+          {twoFaAllowed && twoFaError && (
             <p className="text-xs text-catalan-error mt-2 flex items-center gap-1">
               <span><EmojiIcon e="⚠" /></span>{twoFaError}
               {twoFaError.includes('plan') && (
@@ -289,7 +305,7 @@ function SecurityTab() {
               )}
             </p>
           )}
-          {twoFaEnabled && (
+          {twoFaAllowed && twoFaEnabled && (
             <div className="mt-3 p-3 bg-catalan-bg border border-catalan-border rounded-xl">
               <p className="text-xs font-medium text-catalan-text mb-2">Require for these roles only (leave all unchecked to require for everyone)</p>
               <div className="flex gap-4 flex-wrap">
