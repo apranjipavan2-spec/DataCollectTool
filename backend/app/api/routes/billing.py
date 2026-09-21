@@ -146,8 +146,21 @@ def _activate_subscription(db: Session, tenant_id, plan_id: str, billing_cycle: 
 
 @router.get("/plans")
 def list_plans(db: Session = Depends(get_db)):
-    """Return all active plans — used by pricing page."""
-    plans = db.query(Plan).filter(Plan.is_active == True).order_by(Plan.sort_order).all()
+    """Return active 'unified' plans — used by the pricing page and the
+    admin plan-assignment dropdown (AdminPayments.tsx).
+
+    Filtered to segment='unified' — the 16 legacy per-segment rows
+    (ngo/govt/research/corporate) are a superseded pricing model that
+    every real enforcement path already ignores; surfacing them here let
+    an admin assign a tenant to e.g. "ngo_free" instead of "fg_free",
+    which plan_limits.py's unified-only lookup would then silently not
+    resolve correctly."""
+    plans = (
+        db.query(Plan)
+        .filter(Plan.is_active == True, Plan.segment == "unified")
+        .order_by(Plan.sort_order)
+        .all()
+    )
     result = []
     for p in plans:
         result.append({
@@ -687,16 +700,28 @@ def _plan_to_admin_dict(p: Plan) -> dict:
 
 @router.get("/admin/plans")
 def admin_list_plans(
+    include_legacy: bool = False,
     user=Depends(require_role("master_admin")),
     db: Session = Depends(get_db),
 ):
-    """Return all plans grouped by segment — unified plans first.
+    """Return plans for the admin screen — 'unified' (the 6 tiers actually sold
+    today: trial/free/starter/growth/pro/custom) by default.
+
+    The other 16 rows (segment in ngo/govt/research/corporate) are a superseded
+    per-segment pricing model — every real enforcement path (plan_limits.py,
+    tenant creation, billing fallbacks) already filters to segment='unified'
+    only, so those rows are dead weight here, not a second live pricing tier.
+    Kept in the DB rather than deleted (no destructive migration needed to
+    declutter the screen); pass ?include_legacy=true to see them if ever needed.
 
     The super-admin sees every column so they can edit limits directly.
     Changes made via PATCH /billing/admin/plans/{plan_id} take effect immediately
     in enforcement without a code deploy.
     """
-    plans = db.query(Plan).order_by(Plan.segment, Plan.sort_order).all()
+    query = db.query(Plan)
+    if not include_legacy:
+        query = query.filter(Plan.segment == "unified")
+    plans = query.order_by(Plan.segment, Plan.sort_order).all()
     return [_plan_to_admin_dict(p) for p in plans]
 
 

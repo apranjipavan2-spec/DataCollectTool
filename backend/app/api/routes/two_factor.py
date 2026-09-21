@@ -57,9 +57,26 @@ class TempTokenIn(BaseModel):
     code: str
 
 
+def _require_2fa_plan(db: Session, tenant_id) -> None:
+    """Same plan.two_fa gate the tenant-wide toggle already enforces
+    (see PATCH /tenants/security) — personal TOTP must respect the same
+    plan restriction, not just the mandatory org-wide switch."""
+    from app.models.billing import Subscription, Plan as BillingPlan
+    sub = (
+        db.query(Subscription)
+        .filter(Subscription.tenant_id == tenant_id)
+        .order_by(Subscription.created_at.desc())
+        .first()
+    )
+    plan = db.query(BillingPlan).filter(BillingPlan.id == sub.plan_id).first() if sub else None
+    if not plan or not plan.two_fa:
+        raise HTTPException(403, "Two-factor authentication requires a plan that includes this feature. Upgrade your plan to unlock 2FA.")
+
+
 @router.post("/setup")
 def setup_2fa(user=Depends(get_current_user), db: Session = Depends(get_db)):
     """Generate a new TOTP secret for the user. Does NOT enable 2FA yet — call /2fa/verify first."""
+    _require_2fa_plan(db, user["tenant_id"])
     db_user = db.query(User).filter(User.id == user["id"]).first()
     if not db_user:
         raise HTTPException(404, "User not found")
