@@ -324,8 +324,9 @@ def submit_utr(body: SubmitUTRIn, user=Depends(get_current_user), db: Session = 
 @router.get("/my-subscription")
 def my_subscription(user=Depends(get_current_user), db: Session = Depends(get_db)):
     """Return current org's subscription + usage."""
-    from sqlalchemy import extract
+    from app.models.submission import Submission
     now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     sub  = db.query(Subscription).filter(Subscription.tenant_id == user["tenant_id"]).first()
     plan = db.query(Plan).filter(Plan.id == (sub.plan_id if sub else "ngo_free")).first()
@@ -335,6 +336,10 @@ def my_subscription(user=Depends(get_current_user), db: Session = Depends(get_db
         UsageRecord.period_year  == now.year,
         UsageRecord.period_month == now.month,
     ).first()
+    submissions_used = db.query(Submission).filter(
+        Submission.tenant_id == user["tenant_id"],
+        Submission.server_received_at >= month_start,
+    ).count()
 
     pending_req = db.query(PaymentRequest).filter(
         PaymentRequest.tenant_id == user["tenant_id"],
@@ -358,7 +363,7 @@ def my_subscription(user=Depends(get_current_user), db: Session = Depends(get_db
             "two_fa": bool(plan.two_fa) if plan else False,
         },
         "usage": {
-            "submissions_used": usage.submissions_used if usage else 0,
+            "submissions_used": submissions_used,
             "storage_used_mb":  usage.storage_used_mb  if usage else 0.0,
             "ai_reports_used":  usage.ai_reports_used  if usage else 0,
         },
@@ -540,18 +545,18 @@ def admin_list_subscriptions(
     db: Session = Depends(get_db),
 ):
     """All org subscriptions with plan, status, usage — for master_admin overview."""
-    from datetime import timezone as _tz
+    from app.models.submission import Submission
     now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     tenants = db.query(Tenant).all()
     result  = []
     for t in tenants:
         sub   = db.query(Subscription).filter(Subscription.tenant_id == t.id).first()
         plan  = db.query(Plan).filter(Plan.id == (sub.plan_id if sub else "ngo_free")).first()
-        usage = db.query(UsageRecord).filter(
-            UsageRecord.tenant_id    == t.id,
-            UsageRecord.period_year  == now.year,
-            UsageRecord.period_month == now.month,
-        ).first()
+        submissions_used = db.query(Submission).filter(
+            Submission.tenant_id == t.id,
+            Submission.server_received_at >= month_start,
+        ).count()
         result.append({
             "tenant_id":    str(t.id),
             "org_name":     t.name,
@@ -562,7 +567,7 @@ def admin_list_subscriptions(
             "period_end":   sub.current_period_end.isoformat() if sub and sub.current_period_end else None,
             "trial_end":    sub.trial_end.isoformat()          if sub and sub.trial_end          else None,
             "submissions_limit": plan.submissions_limit if plan else None,
-            "submissions_used":  usage.submissions_used if usage else 0,
+            "submissions_used":  submissions_used,
         })
     return result
 
