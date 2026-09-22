@@ -147,8 +147,11 @@ def update_my_tenant(
         raise HTTPException(status_code=404, detail="Tenant not found")
 
     for field, value in body.model_dump(exclude_unset=True).items():
-        if value is not None:
-            setattr(tenant, field, value)
+        # name may never be cleared to empty/null; the other branding fields
+        # (logo_url, primary_color, app_name) can be explicitly reset to None.
+        if field == "name" and not value:
+            continue
+        setattr(tenant, field, value)
 
     db.commit()
     return {"id": str(tenant.id), "name": tenant.name}

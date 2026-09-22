@@ -157,11 +157,15 @@ def _get_row(db: Session, entity_type: str, item_id: str, tenant_id):
 
 
 @router.post("/bin/{entity_type}/{item_id}/restore")
-def restore_item(entity_type: str, item_id: str, tenant_id: str | None = None,
+def restore_item(entity_type: str, item_id: str,
                  user: dict = Depends(require_org_admin), db: Session = Depends(get_db)):
-    """Bring an item back out of the bin."""
-    effective_tenant_id = tenant_id if (tenant_id and user.get("role") == "master_admin") else user["tenant_id"]
-    _, row = _get_row(db, entity_type, item_id, effective_tenant_id)
+    """Bring an item back out of the bin.
+
+    No tenant_id override here, unlike list_bin — this is a write, and the
+    same rule app/core/deps.py enforces for the X-Tenant-ID header applies:
+    master_admin's cross-tenant access is inspect-only, never write-on-behalf-of.
+    A master_admin viewing another org's bin can see it but not restore/purge it."""
+    _, row = _get_row(db, entity_type, item_id, user["tenant_id"])
     row.deleted_at = None
     # Forms/projects also carry their own status/archived flag alongside the
     # shared deleted_at — clear it too, or the item stays hidden from its own
@@ -175,17 +179,19 @@ def restore_item(entity_type: str, item_id: str, tenant_id: str | None = None,
 
 
 @router.delete("/bin/{entity_type}/{item_id}")
-def purge_item(entity_type: str, item_id: str, tenant_id: str | None = None,
+def purge_item(entity_type: str, item_id: str,
                user: dict = Depends(require_org_admin), db: Session = Depends(get_db)):
-    """Permanently delete one item from the bin (irreversible)."""
+    """Permanently delete one item from the bin (irreversible).
+
+    No tenant_id override — same inspect-only rule as restore_item above,
+    doubly important here since this is a destructive, unrecoverable write."""
     from app.core.config import settings
     if not settings.ALLOW_HARD_DELETE:
         raise HTTPException(
             status_code=403,
             detail="Hard delete is disabled. Client data is retained; use anonymize for erasure.",
         )
-    effective_tenant_id = tenant_id if (tenant_id and user.get("role") == "master_admin") else user["tenant_id"]
-    model, row = _get_row(db, entity_type, item_id, effective_tenant_id)
+    model, row = _get_row(db, entity_type, item_id, user["tenant_id"])
     if entity_type == "shared_file":
         _remove_disk_file(row)
     db.delete(row)

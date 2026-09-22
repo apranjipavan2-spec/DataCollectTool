@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import Select from '@/components/Select'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useHelp } from '@/help/HelpContext'
 import AppLogo from '@/components/AppLogo'
@@ -102,7 +101,10 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
 
         {/* Language */}
         <div className="px-2 py-2" style={{ borderTop: `1px solid ${glass.border}` }}>
-          <Select
+          {/* Raw select, not the shared Select: this picker is deliberately
+              arrow-less to blend into the glass sidebar chrome — Select always
+              renders its own chevron. */}
+          <select
             value={language}
             onChange={e => setLanguage(e.target.value as AppLanguage)}
             title="Language"
@@ -112,7 +114,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
             {LANGUAGE_OPTIONS.map(opt => (
               <option key={opt.code} value={opt.code} className="bg-white dark:bg-slate-900">{opt.label}</option>
             ))}
-          </Select>
+          </select>
         </div>
 
         {/* Help */}
@@ -198,7 +200,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
 
         {/* Bottom section - Mobile */}
         <div className="absolute bottom-4 left-3 right-3 space-y-2">
-          <Select
+          <select
             value={language}
             onChange={e => setLanguage(e.target.value as AppLanguage)}
             className="w-full rounded-md px-2 py-1.5 text-xs bg-transparent focus:outline-none cursor-pointer"
@@ -207,7 +209,7 @@ const Sidebar: React.FC<SidebarProps> = ({ items, role }) => {
             {LANGUAGE_OPTIONS.map(opt => (
               <option key={opt.code} value={opt.code} className="bg-white dark:bg-slate-900">{opt.label}</option>
             ))}
-          </Select>
+          </select>
 
           <button
             onClick={() => { setMobileOpen(false); togglePanel() }}

@@ -125,35 +125,29 @@ export default function BeneficiaryListScreen({ formTitle, formId, onSelect, onB
 
       {!loadingDistricts && hasLocationData && (
         <div className="px-4 sm:px-6 pt-4 pb-2 space-y-3">
-          <div className="relative">
-            <Select
-              value={selectedDistrict}
-              onChange={e => handleDistrictChange(e.target.value)}
-              className={selectClass}
-            >
-              <option value="">Select District</option>
-              {districts.map(d => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </Select>
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-catalan-textMuted text-xs">▼</span>
-          </div>
+          <Select
+            value={selectedDistrict}
+            onChange={e => handleDistrictChange(e.target.value)}
+            className={selectClass}
+          >
+            <option value="">Select District</option>
+            {districts.map(d => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </Select>
 
           {selectedDistrict && (
-            <div className="relative">
-              <Select
-                value={selectedTaluka}
-                onChange={e => handleTalukaChange(e.target.value)}
-                className={selectClass}
-                disabled={talukas.length === 0}
-              >
-                <option value="">Select Taluka</option>
-                {talukas.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </Select>
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-catalan-textMuted text-xs">▼</span>
-            </div>
+            <Select
+              value={selectedTaluka}
+              onChange={e => handleTalukaChange(e.target.value)}
+              className={selectClass}
+              disabled={talukas.length === 0}
+            >
+              <option value="">Select Taluka</option>
+              {talukas.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </Select>
           )}
         </div>
       )}

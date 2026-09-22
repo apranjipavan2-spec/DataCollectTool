@@ -209,7 +209,11 @@ function ExprInput({ label, value, prevFields, onChange }: {
           onChange={e => onChange(e.target.value)}
           placeholder='number, "text", or expression'
         />
-        <Select
+        {/* Raw select, not the shared Select: this control is itself absolutely
+            positioned inside .flex-1.relative — Select's own wrapper div would
+            become the positioned box instead, collapsing to zero height since
+            both its children are position:absolute. */}
+        <select
           value=""
           onChange={e => handleInsertField(e.target.value)}
           className="absolute right-1 top-1 bottom-1 text-xs bg-catalan-primary/10 border border-catalan-primary/20 text-catalan-primary rounded-md px-1 focus:outline-none cursor-pointer"
@@ -218,7 +222,7 @@ function ExprInput({ label, value, prevFields, onChange }: {
           {prevFields.map(f => (
             <option key={f.id} value={f.name}>{f.label || f.name}</option>
           ))}
-        </Select>
+        </select>
       </div>
     </div>
   )

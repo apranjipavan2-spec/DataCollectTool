@@ -238,7 +238,11 @@ function Field({ label, value, onChange, placeholder, type }: {
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className={type === 'color' ? `${inp} p-1 h-[34px]` : inp}
+        className={inp}
+        // Tailwind utility precedence isn't guaranteed by class-string order, so a
+        // trailing className override (`p-1 h-[34px]`) can't reliably beat `inp`'s
+        // own px-3/py-2 — use inline style, which always wins, same as pre-reskin.
+        style={type === 'color' ? { padding: 4, height: 34 } : undefined}
       />
     </div>
   )

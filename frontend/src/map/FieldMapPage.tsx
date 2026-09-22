@@ -181,22 +181,22 @@ export default function FieldMapPage() {
           rightContent={
             <div className="flex items-center gap-2 flex-nowrap overflow-x-auto">
               <Select value={filterForm} onChange={e => setFilterForm(e.target.value)}
-                className="text-xs py-1.5" wrapperClassName="w-[140px] shrink-0">
+                className="text-xs py-1.5" wrapperClassName="min-w-[140px] max-w-[140px] shrink-0">
                 <option value="">All forms</option>
                 {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
               </Select>
               <Select value={filterEnum} onChange={e => setFilterEnum(e.target.value)}
-                className="text-xs py-1.5" wrapperClassName="w-[130px] shrink-0">
+                className="text-xs py-1.5" wrapperClassName="min-w-[130px] max-w-[130px] shrink-0">
                 <option value="">All enumerators</option>
                 {enumerators.map(e => <option key={e} value={e}>{e}</option>)}
               </Select>
               <Select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                className="text-xs py-1.5" wrapperClassName="w-[120px] shrink-0">
+                className="text-xs py-1.5" wrapperClassName="min-w-[130px] shrink-0">
                 <option value="">All statuses</option>
                 {Object.keys(STATUS_COLOR).map(s => <option key={s} value={s}>{s}</option>)}
               </Select>
               <Select value={days} onChange={e => setDays(Number(e.target.value))}
-                className="text-xs py-1.5" wrapperClassName="w-[120px] shrink-0">
+                className="text-xs py-1.5" wrapperClassName="min-w-[150px] shrink-0">
                 <option value={0}>All time</option>
                 <option value={1}>Today</option>
                 <option value={7}>Last 7 days</option>

@@ -49,8 +49,12 @@ export default function BinPage() {
   const isMasterAdmin = user?.role === 'master_admin'
   const [orgs, setOrgs] = useState<OrgOption[]>([])
   const [selectedTenantId, setSelectedTenantId] = useState<string>('')
-  // Only master_admin can override tenant_id (backend ignores it for anyone else).
+  // Only master_admin can override tenant_id (backend ignores it for anyone else),
+  // and only for the read-only GET /bin — restore/purge are writes and the backend
+  // rejects a cross-tenant override on those, matching the read-only inspection
+  // rule app/core/deps.py already enforces for X-Tenant-ID elsewhere.
   const tenantParam = isMasterAdmin && selectedTenantId ? { tenant_id: selectedTenantId } : {}
+  const viewingOtherOrg = isMasterAdmin && !!selectedTenantId
 
   useEffect(() => {
     if (!isMasterAdmin) return
@@ -79,7 +83,7 @@ export default function BinPage() {
   const restore = async (it: BinItem) => {
     setBusy(it.id)
     try {
-      await api.post(`/bin/${it.entity_type}/${it.id}/restore`, null, { params: tenantParam })
+      await api.post(`/bin/${it.entity_type}/${it.id}/restore`)
       setItems(prev => prev.filter(x => x.id !== it.id))
       setGroups(prev => prev.map(g => g.name === it.group ? { ...g, count: Math.max(0, g.count - 1) } : g))
       toast.success(`Restored ${it.entity_label.toLowerCase()} "${it.label}"`)
@@ -94,7 +98,7 @@ export default function BinPage() {
     if (!window.confirm(`Permanently delete "${it.label}"? This cannot be undone.`)) return
     setBusy(it.id)
     try {
-      await api.delete(`/bin/${it.entity_type}/${it.id}`, { params: tenantParam })
+      await api.delete(`/bin/${it.entity_type}/${it.id}`)
       setItems(prev => prev.filter(x => x.id !== it.id))
       setGroups(prev => prev.map(g => g.name === it.group ? { ...g, count: Math.max(0, g.count - 1) } : g))
       toast.success(`Permanently deleted "${it.label}"`)
@@ -263,17 +267,17 @@ export default function BinPage() {
                             <div className="flex gap-3 justify-end">
                               <button
                                 onClick={() => restore(it)}
-                                disabled={busy === it.id}
-                                className="inline-flex items-center gap-1 text-xs text-catalan-success hover:underline disabled:opacity-50"
-                                title="Restore this item"
+                                disabled={busy === it.id || viewingOtherOrg}
+                                className="inline-flex items-center gap-1 text-xs text-catalan-success hover:underline disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed"
+                                title={viewingOtherOrg ? 'Viewing another organisation\'s bin is read-only — switch to "My account" to restore items' : 'Restore this item'}
                               >
                                 <EmojiIcon e="↩️" /> Restore
                               </button>
                               <button
                                 onClick={() => purge(it)}
-                                disabled={busy === it.id || !allowHardDelete}
+                                disabled={busy === it.id || !allowHardDelete || viewingOtherOrg}
                                 className="inline-flex items-center gap-1 text-xs text-catalan-danger hover:underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
-                                title={allowHardDelete ? 'Delete permanently now' : 'Hard delete is disabled for this org — data is retained until the retention window ends'}
+                                title={viewingOtherOrg ? 'Viewing another organisation\'s bin is read-only — switch to "My account" to delete items' : allowHardDelete ? 'Delete permanently now' : 'Hard delete is disabled for this org — data is retained until the retention window ends'}
                               >
                                 <EmojiIcon e="🗑️" /> Delete forever
                               </button>

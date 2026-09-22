@@ -56,6 +56,10 @@ const LIMIT_FIELDS: { key: keyof AdminPlan['limits']; apiField: string; label: s
   { key: 'ai_reports_per_month',  apiField: 'ai_reports_per_month',  label: 'AI reports / month' },
   { key: 'api_calls_per_month',   apiField: 'api_calls_per_month',   label: 'API calls / month' },
   { key: 'max_org_admins',        apiField: 'max_org_admins',        label: 'Org admins' },
+  { key: 'max_supervisors',       apiField: 'max_supervisors',       label: 'Supervisors' },
+  { key: 'max_enumerators',       apiField: 'max_enumerators',       label: 'Enumerators' },
+  { key: 'asr_minutes_limit',     apiField: 'asr_minutes_limit',     label: 'ASR minutes / month' },
+  { key: 'translation_chars',     apiField: 'translation_chars',     label: 'Translation chars / month' },
 ]
 
 const FEATURE_FIELDS: { key: string; label: string }[] = [
@@ -66,7 +70,8 @@ const FEATURE_FIELDS: { key: string; label: string }[] = [
   { key: 'api_write', label: 'API Write' }, { key: 'webhooks', label: 'Webhooks' },
   { key: 'two_fa', label: '2FA' }, { key: 'sso', label: 'SSO' },
   { key: 'audit_log', label: 'Audit Log' }, { key: 'advanced_rbac', label: 'Advanced RBAC' },
-  { key: 'white_label', label: 'White Label' }, { key: 'priority_support', label: 'Priority Support' },
+  { key: 'white_label', label: 'White Label' }, { key: 'on_premise', label: 'On-Premise' },
+  { key: 'priority_support', label: 'Priority Support' },
 ]
 
 const card  = 'bg-catalan-surface border border-catalan-border rounded-xl p-5'
