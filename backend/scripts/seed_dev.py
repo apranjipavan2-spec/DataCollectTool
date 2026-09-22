@@ -240,6 +240,8 @@ _PATCHES = [
     "WHERE status = 'archived' AND deleted_at IS NULL",
     "UPDATE user_tool_projects SET deleted_at = archived_at "
     "WHERE archived_at IS NOT NULL AND deleted_at IS NULL",
+    # 0063 — per-tier daily AI call cap
+    "ALTER TABLE plans ADD COLUMN IF NOT EXISTS ai_calls_per_day INTEGER",
 ]
 
 # 0048 — restricted runtime role + empty-context-bypass RLS policies. Mirrors the

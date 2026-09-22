@@ -28,6 +28,7 @@ class Plan(Base):
     active_forms_limit   = Column(Integer)   # null = unlimited
     ai_reports_per_month = Column(Integer)   # null = unlimited
     api_calls_per_month  = Column(Integer)   # null = unlimited
+    ai_calls_per_day      = Column(Integer)   # null = unlimited; daily throttle on top of the monthly cap
 
     # Feature flags
     ai_cleaning         = Column(Boolean, default=False)

@@ -229,3 +229,73 @@ def increment_api_calls(db: Session, tenant_id: str) -> None:
     rec = _get_or_create_usage_record(db, tenant_id)
     rec.api_calls_used = (rec.api_calls_used or 0) + 1
     db.commit()
+
+
+# ── AI calls per day ─────────────────────────────────────────────────────────
+
+def check_ai_daily_limit(db: Session, tenant_id: str, plan_tier: str) -> dict:
+    """Check today's AI call count (any feature, from AiUsageLog) against the plan's daily cap."""
+    from app.models.ai_usage_log import AiUsageLog
+
+    limits = _limits_for_db(plan_tier, db)
+    limit: int = limits.get("ai_calls_per_day", -1)
+
+    if limit < 0:
+        return {"allowed": True, "reason": "", "used": 0, "limit": -1}
+
+    day_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    used = (
+        db.query(func.count(AiUsageLog.id))
+        .filter(AiUsageLog.tenant_id == tenant_id, AiUsageLog.created_at >= day_start)
+        .scalar() or 0
+    )
+
+    if used >= limit:
+        return {
+            "allowed": False,
+            "reason": (
+                f"Daily AI call limit reached ({used}/{limit} on the {plan_tier} plan). "
+                f"Resets at midnight UTC, or upgrade your plan."
+            ),
+            "used": used,
+            "limit": limit,
+        }
+    return {"allowed": True, "reason": "", "used": used, "limit": limit}
+
+
+# ── Seats (supervisors / enumerators) ────────────────────────────────────────
+
+def _check_seat_limit(db: Session, tenant_id: str, plan_tier: str, role: str, limit_key: str) -> dict:
+    from app.models.user import User
+
+    limits = _limits_for_db(plan_tier, db)
+    limit: int = limits.get(limit_key, -1)
+
+    if limit < 0:
+        return {"allowed": True, "reason": "", "used": 0, "limit": -1}
+
+    used = (
+        db.query(func.count(User.id))
+        .filter(User.tenant_id == tenant_id, User.role == role, User.is_active == True)
+        .scalar() or 0
+    )
+
+    if used >= limit:
+        return {
+            "allowed": False,
+            "reason": (
+                f"{role.capitalize()} seat limit reached ({used}/{limit} on the {plan_tier} plan). "
+                f"Deactivate a user or upgrade your plan to add more."
+            ),
+            "used": used,
+            "limit": limit,
+        }
+    return {"allowed": True, "reason": "", "used": used, "limit": limit}
+
+
+def check_supervisor_limit(db: Session, tenant_id: str, plan_tier: str) -> dict:
+    return _check_seat_limit(db, tenant_id, plan_tier, "supervisor", "supervisors")
+
+
+def check_enumerator_limit(db: Session, tenant_id: str, plan_tier: str) -> dict:
+    return _check_seat_limit(db, tenant_id, plan_tier, "enumerator", "enumerators")

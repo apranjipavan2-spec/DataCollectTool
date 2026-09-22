@@ -72,7 +72,7 @@ def list_users(page: int = 1, page_size: int = 50, include_inactive: bool = True
 @router.post("/", status_code=status.HTTP_201_CREATED)
 @limiter.limit("30/minute")
 def create_user(request: Request, body: UserCreate, user=Depends(require_org_admin), db: Session = Depends(get_db)):
-    # Enforce admin limit when creating an org_admin (enumerators and supervisors are uncapped)
+    # Enforce seat limits per role
     if body.role == "org_admin":
         from app.core.plan_limits import _limits_for_db
         tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
@@ -90,6 +90,14 @@ def create_user(request: Request, body: UserCreate, user=Depends(require_org_adm
                         status_code=402,
                         detail=f"Admin limit reached ({current_count}/{admin_limit} on your plan). Upgrade to add more admins.",
                     )
+    elif body.role in ("supervisor", "enumerator"):
+        from app.services.plan_enforcement import check_supervisor_limit, check_enumerator_limit
+        tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+        if tenant:
+            check_fn = check_supervisor_limit if body.role == "supervisor" else check_enumerator_limit
+            result = check_fn(db, str(user["tenant_id"]), tenant.plan_tier)
+            if not result["allowed"]:
+                raise HTTPException(status_code=402, detail=result["reason"])
 
     phone = normalize_phone(body.phone)
     existing = db.query(User).filter(User.phone == phone).first()
@@ -173,13 +181,23 @@ def bulk_import_users(
     errors: list[str] = []
     generated_passwords: list[dict] = []  # rows that didn't specify one — only chance to show these
 
-    # Bulk import: track admin limit separately; enumerators/supervisors are uncapped
+    # Bulk import: track admin/supervisor/enumerator seat limits as we go
     from app.core.plan_limits import _limits_for_db
     tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
-    plan_admin_limit = -1
+    plan_admin_limit = plan_supervisor_limit = plan_enumerator_limit = -1
     if tenant:
         limits = _limits_for_db(tenant.plan_tier, db)
         plan_admin_limit = limits.get("admins", -1)
+        plan_supervisor_limit = limits.get("supervisors", -1)
+        plan_enumerator_limit = limits.get("enumerators", -1)
+
+    current_supervisor_count = db.query(func.count(User.id)).filter(
+        User.tenant_id == user["tenant_id"], User.is_active == True, User.role == "supervisor"
+    ).scalar() or 0
+    current_enumerator_count = db.query(func.count(User.id)).filter(
+        User.tenant_id == user["tenant_id"], User.is_active == True, User.role == "enumerator"
+    ).scalar() or 0
+    created_supervisors = created_enumerators = 0
 
     current_user_count = db.query(func.count(User.id)).filter(
         User.tenant_id == user["tenant_id"], User.is_active == True
@@ -222,6 +240,16 @@ def bulk_import_users(
                 errors.append(f"Row {idx}: admin limit ({plan_admin_limit}) reached — skipping remaining admins")
                 continue
 
+        if role == "supervisor" and plan_supervisor_limit >= 0:
+            if current_supervisor_count + created_supervisors >= plan_supervisor_limit:
+                errors.append(f"Row {idx}: supervisor limit ({plan_supervisor_limit}) reached — skipping remaining supervisors")
+                continue
+
+        if role == "enumerator" and plan_enumerator_limit >= 0:
+            if current_enumerator_count + created_enumerators >= plan_enumerator_limit:
+                errors.append(f"Row {idx}: enumerator limit ({plan_enumerator_limit}) reached — skipping remaining enumerators")
+                continue
+
         # ── Create user ──
         new_user = User(
             tenant_id=user["tenant_id"],
@@ -233,6 +261,10 @@ def bulk_import_users(
         db.add(new_user)
         existing_phones.add(phone)
         created += 1
+        if role == "supervisor":
+            created_supervisors += 1
+        elif role == "enumerator":
+            created_enumerators += 1
         if not csv_password:
             generated_passwords.append({"phone": phone, "name": new_user.name, "password": password})
 

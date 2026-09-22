@@ -186,6 +186,13 @@ def list_plans(db: Session = Depends(get_db)):
             "price_inr": p.price_inr, "price_usd_cents": p.price_usd_cents,
             "submissions_limit": p.submissions_limit, "storage_limit_mb": p.storage_limit_mb,
             "asr_minutes_limit": p.asr_minutes_limit,
+            "active_forms_limit": p.active_forms_limit,
+            "ai_reports_per_month": p.ai_reports_per_month,
+            "ai_calls_per_day": getattr(p, "ai_calls_per_day", None),
+            "api_calls_per_month": p.api_calls_per_month,
+            "max_org_admins": p.max_org_admins,
+            "max_supervisors": p.max_supervisors,
+            "max_enumerators": p.max_enumerators,
             "features": {
                 "ai_cleaning": p.ai_cleaning, "ai_writer": p.ai_writer,
                 "ai_smart_builder": p.ai_smart_builder, "ai_interpret": p.ai_interpret,
@@ -358,9 +365,32 @@ def my_subscription(user=Depends(get_current_user), db: Session = Depends(get_db
         "limits": {
             "submissions_limit": plan.submissions_limit if plan else 2000,
             "storage_limit_mb":  plan.storage_limit_mb  if plan else 500,
+            "active_forms_limit": plan.active_forms_limit if plan else None,
+            "ai_reports_per_month": plan.ai_reports_per_month if plan else 0,
+            "ai_calls_per_day":  getattr(plan, "ai_calls_per_day", None) if plan else 0,
+            "api_calls_per_month": plan.api_calls_per_month if plan else 0,
+            "max_org_admins":    plan.max_org_admins if plan else None,
+            "max_supervisors":   plan.max_supervisors if plan else None,
+            "max_enumerators":   plan.max_enumerators if plan else None,
         },
         "features": {
-            "two_fa": bool(plan.two_fa) if plan else False,
+            "tier": plan.tier if plan else "free",
+            "ai_cleaning":      bool(plan.ai_cleaning)      if plan else False,
+            "ai_writer":        bool(plan.ai_writer)        if plan else False,
+            "ai_smart_builder": bool(plan.ai_smart_builder) if plan else False,
+            "ai_interpret":     bool(plan.ai_interpret)     if plan else False,
+            "ai_analyzer":      bool(plan.ai_analyzer)      if plan else False,
+            "map_view":         bool(plan.map_view)         if plan else False,
+            "panel_study":      bool(plan.panel_study)      if plan else False,
+            "spss_export":      bool(plan.spss_export)      if plan else False,
+            "api_write":        bool(plan.api_write)        if plan else False,
+            "webhooks":         bool(plan.webhooks)         if plan else False,
+            "two_fa":           bool(plan.two_fa)           if plan else False,
+            "sso":              bool(plan.sso)              if plan else False,
+            "audit_log":        bool(plan.audit_log)        if plan else False,
+            "advanced_rbac":    bool(plan.advanced_rbac)    if plan else False,
+            "white_label":      bool(plan.white_label)      if plan else False,
+            "priority_support": bool(plan.priority_support) if plan else False,
         },
         "usage": {
             "submissions_used": submissions_used,
@@ -738,6 +768,10 @@ def check_feature(tenant_id, feature: str, db: Session):
                 "re-enable them in Settings — data sent to AI providers is redacted "
                 "of personal identifiers, but processing still leaves your servers.",
             )
+        from app.services.plan_enforcement import check_ai_daily_limit
+        daily = check_ai_daily_limit(db, str(tenant_id), tenant.plan_tier if tenant else plan.tier)
+        if not daily["allowed"]:
+            raise HTTPException(402, daily["reason"])
 
 
 # ── Admin: unified plan configuration (limits editable without a code deploy) ─
