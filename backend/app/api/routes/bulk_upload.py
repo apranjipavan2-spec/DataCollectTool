@@ -43,6 +43,7 @@ from app.models.form import Form as FormModel
 from app.models.submission import Submission
 from app.models.user import User
 from app.services.pii_redact import mask_aadhaar_in_data
+from app.services.field_encrypt import encrypt_identifiers
 
 router = APIRouter()
 
@@ -379,7 +380,7 @@ def bulk_upload_apply(
                 form_version=form.version,
                 enumerator_id=enum_id_str,
                 local_id=str(uuid.uuid4()),
-                data_json=mask_aadhaar_in_data(data_json),
+                data_json=encrypt_identifiers(mask_aadhaar_in_data(data_json), form.json_schema),
                 gps_open=gps,
                 gps_submit=gps,
                 status="synced",

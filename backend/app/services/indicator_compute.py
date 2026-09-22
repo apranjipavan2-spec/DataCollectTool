@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.models.results_framework import Indicator, IndicatorValue, LogframeLevel
+from app.services.field_encrypt import decrypt_identifiers
 
 
 def _matches(data: dict, filt: Optional[dict]) -> bool:
@@ -25,16 +26,29 @@ def _bucket_key(data: dict, disaggregate_by: list) -> tuple:
     return tuple(str(data.get(f, "__missing__")) for f in disaggregate_by)
 
 
-def compute_indicator_values(indicator: Indicator, subs: list) -> list[dict]:
+def compute_indicator_values(indicator: Indicator, subs: list, db=None) -> list[dict]:
     """Return a list of {disaggregation, actual_value, numerator, denominator} dicts,
-    one per disaggregation bucket found in `subs` (plus a total bucket when disaggregate_by is set)."""
+    one per disaggregation bucket found in `subs` (plus a total bucket when disaggregate_by is set).
+
+    `db` is optional only for callers/tests that pass already-decrypted `subs`;
+    real callers should pass it so is_identifier fields get decrypted before any
+    disaggregation bucketing (Fernet ciphertext is non-deterministic, so grouping
+    on an encrypted field would otherwise put every row in its own bucket)."""
     disaggregate_by = indicator.disaggregate_by or []
     agg = indicator.aggregation or "count"
     field = indicator.source_form_field
 
+    form_schema_map = {}
+    if db is not None and subs:
+        from app.models.form import Form
+        form_schema_map = {
+            f.id: f.json_schema for f in db.query(Form).filter(Form.id.in_({s.form_id for s in subs})).all()
+        }
+
     buckets: dict[tuple, list] = defaultdict(list)
     for s in subs:
-        data = s.data_json if isinstance(s.data_json, dict) else {}
+        raw = s.data_json if isinstance(s.data_json, dict) else {}
+        data = decrypt_identifiers(raw, form_schema_map.get(s.form_id)) if form_schema_map else raw
         buckets[()].append(data)  # total row always computed
         if disaggregate_by:
             buckets[_bucket_key(data, disaggregate_by)].append(data)
@@ -75,7 +89,7 @@ def compute_indicator(indicator: Indicator, questionnaire_id, subs: list, db) ->
     if indicator.value_source == "manual":
         return []
 
-    computed = compute_indicator_values(indicator, subs)
+    computed = compute_indicator_values(indicator, subs, db)
     now = datetime.now(timezone.utc)
     written = []
     for row in computed:

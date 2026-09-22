@@ -15,6 +15,7 @@ from app.core.survey_crypto import decrypt_capsule, get_or_create_keypair, Capsu
 from app.models.form import Form
 from app.models.submission import Submission
 from app.services.pii_redact import mask_aadhaar_in_data
+from app.services.field_encrypt import encrypt_identifiers
 
 router = APIRouter()
 
@@ -103,7 +104,7 @@ def _persist_submission(db: Session, form: Form, data_json: dict, local_id: str 
         form_id=form.id,
         tenant_id=form.tenant_id,
         enumerator_id=None,
-        data_json=mask_aadhaar_in_data(data_json),
+        data_json=encrypt_identifiers(mask_aadhaar_in_data(data_json), form.json_schema),
         status="submitted",
         form_version=str(form.version),
         serial_no=max_serial + 1,

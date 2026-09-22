@@ -20,6 +20,7 @@ from app.core.database import get_db
 from app.core.deps import require_role
 from app.api.routes.export import _flatten, _build_enumerator_map, _field_key, _build_label_maps, _decode_row_values
 from app.models.form import Form
+from app.services.field_encrypt import decrypt_identifiers
 from app.models.program import Program, ProgramQuestionnaire, ProgramAnalysis
 from app.models.submission import Submission
 from app.models.tenant import Tenant
@@ -776,6 +777,14 @@ def _execute_tabulation_inner(program_id, body, user, db):
 
     subs = query.all()
 
+    # Decrypt per-submission using each row's own form schema (subs can span
+    # multiple forms via body.form_ids) — grouping on ciphertext identifier
+    # values would bucket every row separately, since Fernet is non-deterministic.
+    _form_schemas = {
+        f.id: f.json_schema for f in db.query(Form).filter(Form.id.in_({s.form_id for s in subs})).all()
+    } if subs else {}
+    decrypted_data = {s.id: decrypt_identifiers(s.data_json, _form_schemas.get(s.form_id)) for s in subs}
+
     groupby_field = body.groupby_field
     value_field = body.value_field
     aggregation = body.aggregation
@@ -792,10 +801,11 @@ def _execute_tabulation_inner(program_id, body, user, db):
     if secondary_groupby:
         cross: dict = defaultdict(lambda: defaultdict(int))
         for s in subs:
-            if not s.data_json or not isinstance(s.data_json, dict):
+            dj = decrypted_data[s.id]
+            if not dj or not isinstance(dj, dict):
                 continue
-            g1 = _str_val(s.data_json.get(groupby_field, "__missing__"), groupby_field)
-            g2 = _str_val(s.data_json.get(secondary_groupby, "__missing__"), secondary_groupby)
+            g1 = _str_val(dj.get(groupby_field, "__missing__"), groupby_field)
+            g2 = _str_val(dj.get(secondary_groupby, "__missing__"), secondary_groupby)
             cross[g1][g2] += 1
         sub_keys = sorted({k for row in cross.values() for k in row})
         rows = []
@@ -826,13 +836,14 @@ def _execute_tabulation_inner(program_id, body, user, db):
     # Simple aggregation path
     groups: dict = defaultdict(list)
     for s in subs:
-        if not s.data_json or not isinstance(s.data_json, dict):
+        dj = decrypted_data[s.id]
+        if not dj or not isinstance(dj, dict):
             continue
-        group_val = _str_val(s.data_json.get(groupby_field, "__missing__"), groupby_field)
+        group_val = _str_val(dj.get(groupby_field, "__missing__"), groupby_field)
         if value_field == "*" or aggregation == "count":
             groups[group_val].append(1)
         else:
-            val = s.data_json.get(value_field)
+            val = dj.get(value_field)
             try:
                 groups[group_val].append(float(val))
             except (TypeError, ValueError):
@@ -1306,7 +1317,8 @@ def delete_tabulation(
 
 # ── AI Auto-Generate: background job ─────────────────────────────────────────
 
-def _execute_config_rows(config: dict, subs: list, options_map: dict | None = None) -> dict:
+def _execute_config_rows(config: dict, subs: list, options_map: dict | None = None,
+                          form_schema_map: dict | None = None) -> dict:
     """Execute one tabulation config against Submission objects, return rows."""
     groupby_field = config.get("groupby_field", "")
     value_field   = config.get("value_field", "*")
@@ -1314,6 +1326,11 @@ def _execute_config_rows(config: dict, subs: list, options_map: dict | None = No
     secondary     = config.get("secondary_groupby", "")
     show_pct      = config.get("show_percent", False)
     options_map   = options_map or {}
+    form_schema_map = form_schema_map or {}
+    # Decrypt per submission's own form schema — grouping on ciphertext
+    # identifier values would bucket every row separately (Fernet is
+    # non-deterministic), so this must happen before any groupby below.
+    decrypted = {s.id: decrypt_identifiers(s.data_json, form_schema_map.get(s.form_id)) for s in subs}
 
     def _sv(raw, field_name=""):
         opts = options_map.get(field_name, {})
@@ -1323,8 +1340,9 @@ def _execute_config_rows(config: dict, subs: list, options_map: dict | None = No
     if secondary:
         cross: dict = defaultdict(lambda: defaultdict(int))
         for s in subs:
-            if not s.data_json or not isinstance(s.data_json, dict): continue
-            cross[_sv(s.data_json.get(groupby_field, "__missing__"), groupby_field)][_sv(s.data_json.get(secondary, "__missing__"), secondary)] += 1
+            dj = decrypted[s.id]
+            if not dj or not isinstance(dj, dict): continue
+            cross[_sv(dj.get(groupby_field, "__missing__"), groupby_field)][_sv(dj.get(secondary, "__missing__"), secondary)] += 1
         sub_keys = sorted({k for row in cross.values() for k in row})
         rows = []
         for g1, d in sorted(cross.items()):
@@ -1339,12 +1357,13 @@ def _execute_config_rows(config: dict, subs: list, options_map: dict | None = No
 
     groups: dict = defaultdict(list)
     for s in subs:
-        if not s.data_json or not isinstance(s.data_json, dict): continue
-        gv = _sv(s.data_json.get(groupby_field, "__missing__"), groupby_field)
+        dj = decrypted[s.id]
+        if not dj or not isinstance(dj, dict): continue
+        gv = _sv(dj.get(groupby_field, "__missing__"), groupby_field)
         if value_field == "*" or aggregation == "count":
             groups[gv].append(1)
         else:
-            try: groups[gv].append(float(s.data_json.get(value_field)))
+            try: groups[gv].append(float(dj.get(value_field)))
             except (TypeError, ValueError): pass
     rows = []
     for group, vals in sorted(groups.items()):
@@ -1487,9 +1506,12 @@ async def _run_ai_generation(
 
         # Execute each config to get rows
         options_map = _merged_program_options(db, program_id, tenant_id)
+        form_schema_map = {
+            f.id: f.json_schema for f in db.query(Form).filter(Form.id.in_({s.form_id for s in subs})).all()
+        } if subs else {}
         table_configs = []
         for cfg in valid:
-            rd = _execute_config_rows(cfg, subs, options_map)
+            rd = _execute_config_rows(cfg, subs, options_map, form_schema_map)
             table_configs.append({
                 "id": str(_uuid.uuid4()),
                 "title": cfg.get("title", f"{cfg.get('groupby_field', '')} breakdown"),
@@ -1627,9 +1649,12 @@ def refresh_analysis(
     ).all()
 
     options_map = _merged_program_options(db, program_id, user["tenant_id"])
+    form_schema_map = {
+        f.id: f.json_schema for f in db.query(Form).filter(Form.id.in_({s.form_id for s in subs})).all()
+    } if subs else {}
     new_configs = []
     for cfg in rec.table_configs:
-        result = _execute_config_rows(cfg, subs, options_map)
+        result = _execute_config_rows(cfg, subs, options_map, form_schema_map)
         new_configs.append({**cfg, **result})
 
     rec.table_configs = new_configs
@@ -1989,11 +2014,14 @@ def export_program_xlsx(
 
     try:
         enum_map = _build_enumerator_map(db, user["tenant_id"])
+        form_schema_map = {
+            f.id: f.json_schema for f in db.query(Form).filter(Form.id.in_({s.form_id for s in subs})).all()
+        } if subs else {}
 
         rows = []
         for s in subs:
             try:
-                flat = _flatten(s.data_json or {})
+                flat = _flatten(decrypt_identifiers(s.data_json or {}, form_schema_map.get(s.form_id)))
             except Exception as e:
                 logger.warning("_flatten failed for submission %s: %s", s.id, e)
                 flat = {}

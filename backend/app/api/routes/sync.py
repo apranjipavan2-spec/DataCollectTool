@@ -18,6 +18,9 @@ from app.models.sync_log import SyncLog
 from app.models.tenant import Tenant
 from app.services.webhook import fire_webhooks
 from app.services.pii_redact import mask_aadhaar_in_data
+from app.services.field_encrypt import (
+    encrypt_identifiers, encrypt_identifiers_for_form_id, decrypt_identifiers,
+)
 from app.services.whatsapp import notify as wa_notify
 from app.services.telegram import notify as tg_notify
 from app.services.sheets_sync import sync_submission
@@ -131,7 +134,7 @@ def _check_duplicate(db: Session, sub: Submission, data_json: dict, enumerator_i
     return same_enum
 
 
-def _find_exact_duplicate(db: Session, sub: Submission, data_json: dict, enumerator_id: str):
+def _find_exact_duplicate(db: Session, sub: Submission, data_json: dict, enumerator_id: str, form_schema: Optional[dict]):
     """Return the id of an existing LIVE submission with byte-for-byte identical
     answers by the same enumerator today, else None.
 
@@ -139,6 +142,12 @@ def _find_exact_duplicate(db: Session, sub: Submission, data_json: dict, enumera
     synced — the client-side resubmit latch can't catch it, so we catch it here.
     Identical content across all question fields (ignoring _-prefixed bookkeeping)
     is conclusive, so it's safe to auto-mark rather than only flag as suspect.
+
+    `data_json` is the incoming payload (still plaintext at this point in the
+    push flow — encryption is applied after dedup, not before). Stored rows
+    being compared against are already-encrypted, so their identifier fields
+    must be decrypted before fingerprinting, or Fernet's non-determinism makes
+    every row look unique.
     """
     from app.api.routes.submissions import _content_fingerprint
     from sqlalchemy import func, cast, Date
@@ -156,7 +165,7 @@ def _find_exact_duplicate(db: Session, sub: Submission, data_json: dict, enumera
         .all()
     )
     for other in same:
-        if _content_fingerprint(other.data_json) == fp:
+        if _content_fingerprint(decrypt_identifiers(other.data_json, form_schema)) == fp:
             return other.id
     return None
 
@@ -275,7 +284,9 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
                     if existing_dt is None or incoming_dt > existing_dt:
                         new_data = mask_aadhaar_in_data(dict(item.data_json))
                         new_data["_conflict_resolved"] = True
-                        existing.data_json = new_data
+                        existing.data_json = encrypt_identifiers_for_form_id(
+                            db, user["tenant_id"], item.form_id, new_data
+                        )
                         existing.form_version = item.form_version
                         db.flush()
                         results.append({"local_id": item.local_id, "server_id": str(existing.id), "status": "conflict_resolved"})
@@ -374,7 +385,10 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
         # by the same enumerator today → auto-mark as duplicate (kept out of
         # stats and the review queue; recoverable via Restore). Otherwise fall
         # back to the softer same-enumerator/GPS-proximity suspect flag.
-        exact_dup_of = _find_exact_duplicate(db, sub, data_for_storage, str(user["sub"]))
+        exact_dup_of = _find_exact_duplicate(
+            db, sub, data_for_storage, str(user["sub"]),
+            form_obj_for_val.json_schema if form_obj_for_val else None,
+        )
         if exact_dup_of is not None:
             sub.is_duplicate = True
             sub.duplicate_of = exact_dup_of
@@ -401,6 +415,12 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
                             sub.data_json = d
                     except ValueError:
                         pass
+
+        # Encrypt identifier fields last — after dedup/validation/geofence have
+        # all read and annotated the plaintext data_json.
+        sub.data_json = encrypt_identifiers(
+            sub.data_json, form_obj_for_val.json_schema if form_obj_for_val else None
+        )
 
         results.append({"local_id": item.local_id, "server_id": str(sub.id), "status": "synced", "serial_no": next_serial})
 

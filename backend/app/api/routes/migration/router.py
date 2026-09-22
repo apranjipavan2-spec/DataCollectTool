@@ -25,6 +25,7 @@ from app.services.whatsapp import notify as wa_notify
 from app.services.telegram import notify as tg_notify
 from app.services.sheets_sync import bulk_sync_submissions
 from app.services.pii_redact import mask_aadhaar_in_data
+from app.services.field_encrypt import encrypt_identifiers
 
 from .xlsform_parser import parse_xlsform
 from .xlsform_serializer import serialize_xlsform
@@ -105,13 +106,15 @@ def _save_submissions(
     saved = 0
     data_rows: list[dict] = []
     for raw in raw_submissions:
+        # data stays plaintext for the returned data_rows (downstream Sheets sync
+        # does its own identifier redaction); only the stored row is encrypted.
         data = mask_aadhaar_in_data(map_submission_data(raw, field_names))
         sub = Submission(
             id=uuid.uuid4(),
             tenant_id=form.tenant_id,
             form_id=form.id,
             form_version=form.version,
-            data_json=data,
+            data_json=encrypt_identifiers(data, form.json_schema),
             status="synced",
             enumerator_id=user["sub"],
             local_id=str(uuid.uuid4()),

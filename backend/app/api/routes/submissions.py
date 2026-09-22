@@ -9,6 +9,9 @@ from app.core.deps import get_current_user, require_enumerator, require_supervis
 from app.core.rate_limit import limiter
 from app.core.soft_delete import soft_delete
 from app.services.pii_redact import mask_aadhaar_in_data
+from app.services.field_encrypt import (
+    encrypt_identifiers, decrypt_identifiers, encrypt_identifiers_for_form_id,
+)
 from app.models.submission import Submission
 from app.models.submission_draft import SubmissionDraft
 from app.models.submission_history import SubmissionHistory
@@ -139,6 +142,14 @@ def list_submissions(
             end = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
             query = query.filter(Submission.server_received_at <= end)
         if q:
+            # NOTE: this cast-to-text search still matches User.name/phone and any
+            # still-plaintext (non-identifier) answer content. It will NOT match a
+            # query term that only appears inside an is_identifier-flagged field's
+            # value, since that field is now encrypted — decrypting every row of a
+            # large, frequently-hit paginated list endpoint just to support that
+            # search case isn't worth the cost. The dedicated "find this respondent
+            # across all forms" tool (data_rights.py's search_across_forms) is the
+            # purpose-built venue for identifier-value search and decrypts properly.
             from sqlalchemy import or_, func, Text
             term = f"%{q}%"
             query = query.filter(
@@ -151,13 +162,16 @@ def list_submissions(
         total = query.count()
         rows = query.order_by(Submission.server_received_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
 
-        # Build form title lookup for this page's form_ids
+        # Build form title + schema lookup for this page's form_ids (schema needed
+        # to decrypt is_identifier fields before returning data_json).
         from app.models.form import Form as FormModel
         fids = list({s.form_id for s, _ in rows})
         form_title_map = {}
+        form_schema_map = {}
         if fids:
-            for f in db.query(FormModel.id, FormModel.title).filter(FormModel.id.in_(fids)).all():
+            for f in db.query(FormModel.id, FormModel.title, FormModel.json_schema).filter(FormModel.id.in_(fids)).all():
                 form_title_map[f.id] = f.title
+                form_schema_map[f.id] = f.json_schema
 
         return {
             "items": [
@@ -173,7 +187,7 @@ def list_submissions(
                     "duplicate_suspect": bool((s.data_json or {}).get("_duplicate_suspect") == "true" or (s.data_json or {}).get("_duplicate_suspect") is True),
                     "is_duplicate": bool(s.is_duplicate),
                     "duplicate_of": str(s.duplicate_of) if s.duplicate_of else None,
-                    **({"data_json": s.data_json} if not slim else {}),
+                    **({"data_json": decrypt_identifiers(s.data_json, form_schema_map.get(s.form_id))} if not slim else {}),
                     "has_violations": bool(s.has_violations),
                     "backcheck_required": bool(s.backcheck_required),
                     "consent_given": s.consent_given,
@@ -748,10 +762,20 @@ def list_potential_duplicates(
         base_fields = {"form_id": fid, "form_title": form.title if form else "Unknown"}
         used_ids: set = set()
 
+        # Fingerprinting must compare plaintext — Fernet encryption is
+        # non-deterministic, so two encrypted-but-identical identifier values
+        # would never match as ciphertext. Decrypt into a local dict per
+        # submission (never write back to s.data_json — that's the ORM-tracked
+        # attribute and would risk persisting plaintext on the next flush).
+        decrypted_by_id = {
+            s.id: decrypt_identifiers(s.data_json, form.json_schema if form else None)
+            for s in subs
+        }
+
         # Tier 1: exact content match, anywhere in the form.
         by_fingerprint: dict = {}
         for s in subs:
-            by_fingerprint.setdefault(_content_fingerprint(s.data_json), []).append(s)
+            by_fingerprint.setdefault(_content_fingerprint(decrypted_by_id[s.id]), []).append(s)
         for members in by_fingerprint.values():
             if len(members) < 2:
                 continue
@@ -771,7 +795,7 @@ def list_potential_duplicates(
         if identifier_fields:
             by_identifier: dict = {}
             for s in remaining:
-                key = _identifier_fingerprint(s.data_json, identifier_fields)
+                key = _identifier_fingerprint(decrypted_by_id[s.id], identifier_fields)
                 if key is not None:
                     by_identifier.setdefault(key, []).append(s)
             for members in by_identifier.values():
@@ -947,7 +971,7 @@ def create_submission(request: Request, body: SubmissionCreate, background_tasks
 
         from app.services.child_protection import compute_child_protection_status
         child_status = compute_child_protection_status(form.json_schema, body.data_json)
-        stored_data = mask_aadhaar_in_data(body.data_json)
+        stored_data = encrypt_identifiers(mask_aadhaar_in_data(body.data_json), form.json_schema)
 
         sub = Submission(
             tenant_id=user["tenant_id"],
@@ -971,7 +995,7 @@ def create_submission(request: Request, body: SubmissionCreate, background_tasks
             "submission_id": str(sub.id),
             "form_id": str(sub.form_id),
             "enumerator_id": str(sub.enumerator_id),
-            "data_json": sub.data_json,
+            "data_json": decrypt_identifiers(sub.data_json, form.json_schema),
             "status": sub.status,
         }
         background_tasks.add_task(_fire_webhook_bg, str(user["tenant_id"]), "submission.created", webhook_payload, str(sub.id))
@@ -1065,7 +1089,9 @@ def upsert_draft(body: DraftUpsert, user=Depends(require_enumerator), db: Sessio
             pass
     # include_deleted so a re-saved draft reuses (and un-bins) any soft-deleted
     # row for the same (enumerator, local_id) instead of colliding on the unique key.
-    stored_data = mask_aadhaar_in_data(body.data_json)
+    stored_data = encrypt_identifiers_for_form_id(
+        db, user["tenant_id"], body.form_id, mask_aadhaar_in_data(body.data_json)
+    )
     draft = db.query(SubmissionDraft).execution_options(include_deleted=True).filter(
         SubmissionDraft.enumerator_id == user["sub"],
         SubmissionDraft.local_id == body.local_id,
@@ -1138,13 +1164,16 @@ def get_my_backchecks(user=Depends(require_enumerator), db: Session = Depends(ge
     for s in rows:
         from app.models.form import Form as FormModel
         bc_form = db.query(FormModel).filter(FormModel.id == s.backcheck_form_id).first()
+        # data_json belongs to the original submission's form (s.form_id), not the
+        # backcheck form — that's the schema whose is_identifier flags apply here.
+        orig_form = db.query(FormModel).filter(FormModel.id == s.form_id).first()
         result.append({
             "original_submission_id": str(s.id),
             "form_title": s.form_title if hasattr(s, "form_title") else None,
             "submitted_at": s.server_received_at.isoformat() if s.server_received_at else None,
             "backcheck_form_id": str(s.backcheck_form_id),
             "backcheck_form_title": bc_form.title if bc_form else "Back-check Form",
-            "data_json": s.data_json,
+            "data_json": decrypt_identifiers(s.data_json, orig_form.json_schema if orig_form else None),
         })
     return result
 
@@ -1180,7 +1209,9 @@ def get_map_data(
     rows = q.order_by(Submission.server_received_at.desc()).limit(2000).all()
 
     enum_map = {str(u.id): u.name for u in db.query(UserModel).filter(UserModel.tenant_id == user["tenant_id"]).all()}
-    form_map = {str(f.id): f.title for f in db.query(Form).filter(Form.tenant_id == user["tenant_id"]).all()}
+    all_forms = db.query(Form).filter(Form.tenant_id == user["tenant_id"]).all()
+    form_map = {str(f.id): f.title for f in all_forms}
+    form_schema_map = {str(f.id): f.json_schema for f in all_forms}
 
     _BENEFICIARY_KEYS = ("beneficiary_name", "name", "respondent_name", "farmer_name",
                          "household_head", "participant_name", "applicant_name")
@@ -1188,7 +1219,7 @@ def get_map_data(
     def _beneficiary_name(s: Submission, roster_name: Optional[str]) -> Optional[str]:
         if roster_name:
             return roster_name
-        dj = s.data_json or {}
+        dj = decrypt_identifiers(s.data_json or {}, form_schema_map.get(str(s.form_id)))
         for k in _BENEFICIARY_KEYS:
             v = dj.get(k)
             if v and isinstance(v, str):
@@ -1240,6 +1271,7 @@ def get_submission(submission_id: str, user=Depends(get_current_user), db: Sessi
             }
             for m in db.query(MediaFile).filter(MediaFile.submission_id == sub.id).all()
         ]
+        form = db.query(Form).filter(Form.id == sub.form_id).first()
         return {
             "id": str(sub.id),
             "form_id": str(sub.form_id),
@@ -1247,7 +1279,7 @@ def get_submission(submission_id: str, user=Depends(get_current_user), db: Sessi
             "enumerator_name": enumerator_name or "Unknown",
             "form_version": sub.form_version,
             "serial_no": sub.serial_no,
-            "data_json": sub.data_json,
+            "data_json": decrypt_identifiers(sub.data_json, form.json_schema if form else None),
             "gps_open": sub.gps_open,
             "gps_submit": sub.gps_submit,
             "status": sub.status,
@@ -1419,7 +1451,9 @@ def edit_submission_data(
     elif role not in ("org_admin", "supervisor", "master_admin"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
-    sub.data_json = mask_aadhaar_in_data(body.data_json)
+    sub.data_json = encrypt_identifiers_for_form_id(
+        db, user["tenant_id"], sub.form_id, mask_aadhaar_in_data(body.data_json)
+    )
     db.commit()
     return {"id": str(sub.id), "status": "updated", "serial_no": sub.serial_no}
 

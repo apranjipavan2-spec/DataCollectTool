@@ -25,6 +25,7 @@ from app.models.api_key import ApiKey
 from app.models.form import Form
 from app.models.submission import Submission
 from app.models.user import User
+from app.services.field_encrypt import decrypt_identifiers
 from fastapi import Query as _Query
 
 router = APIRouter()
@@ -87,11 +88,11 @@ def _build_enumerator_map(db: Session, tenant_id: str) -> dict:
     return {u.id: u.name or u.phone for u in users}
 
 
-def _build_rows(subs: list, enumerator_map: dict) -> list[dict]:
+def _build_rows(subs: list, enumerator_map: dict, form_schema: dict | None = None) -> list[dict]:
     """Convert submission ORM objects into flat dicts for export."""
     rows = []
     for s in subs:
-        flat = _flatten(s.data_json or {})
+        flat = _flatten(decrypt_identifiers(s.data_json or {}, form_schema))
         row = {
             "submission_id": str(s.id),
             "enumerator_id": str(s.enumerator_id) if s.enumerator_id else "",
@@ -194,7 +195,7 @@ def export_csv(
 
     subs = _query_submissions(db, form_id, user["tenant_id"], date_from, date_to, status)
     enum_map = _build_enumerator_map(db, user["tenant_id"])
-    rows = _build_rows(subs, enum_map)
+    rows = _build_rows(subs, enum_map, form.json_schema)
 
     if not rows:
         return StreamingResponse(
@@ -327,7 +328,7 @@ def export_json(
     result.append(meta)
 
     for s in subs:
-        flat = _flatten(s.data_json or {})
+        flat = _flatten(decrypt_identifiers(s.data_json or {}, form.json_schema))
         row = {
             "submission_id": str(s.id),
             "serial_no": s.serial_no,
@@ -487,7 +488,7 @@ def export_dta(
 
     subs = _query_submissions(db, form_id, user["tenant_id"], date_from, date_to, status)
     enum_map = _build_enumerator_map(db, user["tenant_id"])
-    rows = _build_rows(subs, enum_map)
+    rows = _build_rows(subs, enum_map, form.json_schema)
 
     if not rows:
         # Return an empty .dta with no observations
@@ -593,7 +594,7 @@ def export_spss(
 
     subs = _query_submissions(db, form_id, user["tenant_id"], date_from, date_to, status)
     enum_map = _build_enumerator_map(db, user["tenant_id"])
-    rows = _build_rows(subs, enum_map)
+    rows = _build_rows(subs, enum_map, form.json_schema)
 
     df = pd.DataFrame(rows) if rows else pd.DataFrame()
 
@@ -694,7 +695,7 @@ def export_sheets(
 
     subs = _query_submissions(db, form_id, user["tenant_id"], date_from, date_to, status)
     enum_map = _build_enumerator_map(db, user["tenant_id"])
-    rows_dicts = _build_rows(subs, enum_map)
+    rows_dicts = _build_rows(subs, enum_map, form.json_schema)
 
     if not rows_dicts:
         raise HTTPException(status_code=422, detail="No submissions match the selected filters")
@@ -763,7 +764,7 @@ def export_xlsx(
 
     subs = _query_submissions(db, form_id, user["tenant_id"], date_from, date_to, status)
     enum_map = _build_enumerator_map(db, user["tenant_id"])
-    rows_dicts = _build_rows(subs, enum_map)
+    rows_dicts = _build_rows(subs, enum_map, form.json_schema)
 
     if decode_values:
         _, id_to_options = _build_label_maps(form.json_schema or {})

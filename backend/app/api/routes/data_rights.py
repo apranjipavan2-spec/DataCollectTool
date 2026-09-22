@@ -8,7 +8,6 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -19,6 +18,7 @@ from app.models.form import Form
 from app.models.submission import Submission
 from app.services.audit import write_audit
 from app.services.pii_redact import identifier_field_ids
+from app.services.field_encrypt import decrypt_identifiers
 
 router = APIRouter(prefix="/data-rights", tags=["data-rights"])
 
@@ -194,16 +194,25 @@ def search_across_forms(
 
     forms = db.query(Form).filter(Form.tenant_id == user["tenant_id"]).all()
     matches: list[dict[str, Any]] = []
+    query_lower = query.lower()
     for form in forms:
         field_ids = identifier_field_ids(form.json_schema)
         if not field_ids:
             continue
-        conditions = [Submission.data_json[fid].astext.ilike(f"%{query}%") for fid in field_ids]
-        subs = db.query(Submission).filter(
+        # Identifier fields are encrypted at rest — Fernet ciphertext can't be
+        # filtered at the SQL level (astext.ilike would never match), so fetch
+        # this form's candidate rows (already tenant+form scoped, bounded) and
+        # filter in Python after decrypting. Low-frequency admin tool, not a
+        # hot path, so the extra decrypt cost per row is a non-issue.
+        candidates = db.query(Submission).filter(
             Submission.tenant_id == user["tenant_id"],
             Submission.form_id == form.id,
-            or_(*conditions),
         ).all()
+        subs = []
+        for s in candidates:
+            decrypted = decrypt_identifiers(s.data_json or {}, form.json_schema)
+            if any(query_lower in str(decrypted.get(fid, "")).lower() for fid in field_ids):
+                subs.append(s)
         for s in subs:
             matches.append({
                 "id": str(s.id), "form_id": str(form.id), "form_title": form.title,
@@ -254,7 +263,14 @@ def act_on_request(
         return {"action": "erase", "erased": results, "not_found": sorted(missing)}
 
     if body.action == "export":
-        bundle = [{"submission_id": str(s.id), "form_id": str(s.form_id), "data": s.data_json} for s in subs]
+        _form_schemas = {
+            f.id: f.json_schema for f in db.query(Form).filter(Form.id.in_({s.form_id for s in subs})).all()
+        } if subs else {}
+        bundle = [
+            {"submission_id": str(s.id), "form_id": str(s.form_id),
+             "data": decrypt_identifiers(s.data_json, _form_schemas.get(s.form_id))}
+            for s in subs
+        ]
         write_audit(
             db, tenant_id=user["tenant_id"], user_id=user.get("sub"),
             action="data_rights_export", resource="data_rights_request", resource_id=str(r.id),
