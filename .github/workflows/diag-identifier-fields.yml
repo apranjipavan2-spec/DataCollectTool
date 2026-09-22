@@ -6,7 +6,7 @@ name: Diagnose is_identifier Fields on Live Forms
 # rest going forward). Only prints form id/title/tenant and the flagged
 # field ids — never row-level respondent/submission data.
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
 
 jobs:
   diagnose:
@@ -24,19 +24,4 @@ jobs:
           script: |
             set -e
             cd /opt/fieldgovern
-            docker compose exec -T app python3 -c "
-from app.core.database import SessionLocal
-from app.models.form import Form
-from app.services.pii_redact import identifier_field_ids
-db = SessionLocal()
-forms = db.query(Form).all()
-flagged = []
-for f in forms:
-    ids = identifier_field_ids(f.json_schema)
-    if ids:
-        flagged.append((f.id, f.title, f.tenant_id, sorted(ids)))
-print(f'{len(forms)} forms total, {len(flagged)} with is_identifier fields set')
-for fid, title, tid, ids in flagged:
-    print(f'  form={fid} title={title!r} tenant={tid} identifier_fields={ids}')
-db.close()
-"
+            docker compose exec -T app python3 -c "from app.core.database import SessionLocal; from app.models.form import Form; from app.services.pii_redact import identifier_field_ids; db=SessionLocal(); forms=db.query(Form).all(); flagged=[(f.id,f.title,f.tenant_id,sorted(identifier_field_ids(f.json_schema))) for f in forms if identifier_field_ids(f.json_schema)]; print(f'{len(forms)} forms total, {len(flagged)} with is_identifier fields set'); [print(f'  form={fid} title={title!r} tenant={tid} identifier_fields={ids}') for fid,title,tid,ids in flagged]; db.close()"
