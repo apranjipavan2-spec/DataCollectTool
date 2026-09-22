@@ -110,6 +110,13 @@
     .scr-dot.r{background:#ef4444}.scr-dot.y{background:#f59e0b}.scr-dot.g{background:#10b981}
     .scr-lbl{font-size:.68rem;font-weight:600;color:rgba(255,255,255,.3);margin-left:8px;font-family:'JetBrains Mono',monospace;letter-spacing:.03em}
 
+    /* ── REAL SCREENSHOT VARIANT ───────────── */
+    .feat-screen.shot{padding:0;min-height:0}
+    .feat-screen.shot .scr-bar{margin:0;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
+    .feat-screen.shot img{width:100%;display:block}
+    .shot-caption{margin-top:10px;font-size:.72rem;color:var(--text3);text-align:center}
+    .dark-bg .shot-caption{color:rgba(255,255,255,.4)}
+
     /* scroll reveal */
     .reveal{opacity:0;transform:translateY(32px);transition:all .8s cubic-bezier(.16,1,.3,1)}
     .reveal.visible{opacity:1;transform:translateY(0)}
@@ -931,13 +938,11 @@
       </ul>
     </div>
     <div class="feat-visual">
-      <div class="feat-screen">
-        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Submission Map</span></div>
-        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">847 submissions plotted on map</span><span class="f10-badge ok">Live</span></div>
-        <div class="f10-row"><div class="f10-icon warn"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></div><span class="f10-text">Outside geofence boundary</span><span class="f10-badge warn">3 records</span></div>
-        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Enumerators tracked live</span><span class="f10-badge ok">12 active</span></div>
-        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Map tiles cached for offline use</span><span class="f10-badge ok">Ready</span></div>
+      <div class="feat-screen shot">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Live Field Map — app.fieldgovern.com</span></div>
+        <img src="assets/screenshots/fg-gps-map.jpg" alt="FieldGovern live GPS map showing 545 real submission pins clustered across Karnataka and Andhra Pradesh, color-coded by review status" loading="lazy" width="975" height="545"/>
       </div>
+      <div class="shot-caption">Actual product screenshot — 545 GPS-tagged submissions, live</div>
     </div>
   </div>
 </section>
@@ -957,13 +962,35 @@
       </ul>
     </div>
     <div class="feat-visual">
-      <div class="feat-screen">
-        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Panel Study — MGNREGA Impact</span></div>
-        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Baseline → Midline → Endline linked</span><span class="f10-badge ok">412 resp.</span></div>
-        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Treatment 206 · Control 206</span><span class="f10-badge ok">Balanced</span></div>
-        <div class="f10-row"><div class="f10-icon warn"><svg class="ei" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg></div><span class="f10-text">Pending re-contact for Endline</span><span class="f10-badge warn">18 resp.</span></div>
-        <div class="f10-row"><div class="f10-icon ok">✓</div><span class="f10-text">Indicator scorecard</span><span class="f10-badge ok">Updated</span></div>
+      <div class="feat-screen shot">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Programs — app.fieldgovern.com</span></div>
+        <img src="assets/screenshots/fg-programs-me.jpg" alt="FieldGovern Programs dashboard listing real M&E programs including PM-KISAN, MGNREGA Work Monitoring, Jal Jeevan Mission, and an RCT baseline, each with collection progress bars" loading="lazy" width="975" height="545"/>
       </div>
+      <div class="shot-caption">Actual product screenshot — 14 live M&amp;E programs, real collection progress</div>
+    </div>
+  </div>
+</section>
+
+<!-- F6d: CROSS-PLATFORM, SELF-HOSTED, DATA-SOVEREIGN -->
+<section id="f6d-sovereignty" class="feat-section alt">
+  <div class="feat-inner flip reveal">
+    <div class="feat-content">
+      <div class="feat-tag blue"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> Deployment &amp; Data Sovereignty</div>
+      <h3>Runs on any device.<br/>Lives on infrastructure you control.</h3>
+      <p>FieldGovern's PWA runs the same form, offline, on Android, iPhone, and Windows tablets — no app-store install, one codebase. On the backend, run our India-hosted SaaS (Mumbai servers, DPDP-aligned) or self-host the entire stack via Docker Compose on your own Linux server, so your data never leaves infrastructure your organisation controls.</p>
+      <ul class="feat-bullets">
+        <li><span class="bchk">✓</span>Cross-platform PWA — Android, iPhone, Windows, no app store</li>
+        <li><span class="bchk">✓</span>Self-hostable via Docker Compose — full source, your servers</li>
+        <li><span class="bchk">✓</span>India-hosted SaaS option — Mumbai/Hyderabad data centres</li>
+        <li><span class="bchk">✓</span>Data sovereignty — encryption at rest/in transit, row-level tenant isolation</li>
+      </ul>
+    </div>
+    <div class="feat-visual">
+      <div class="feat-screen shot">
+        <div class="scr-bar"><span class="scr-dot r"></span><span class="scr-dot y"></span><span class="scr-dot g"></span><span class="scr-lbl">Dashboard — app.fieldgovern.com</span></div>
+        <img src="assets/screenshots/fg-dashboard.jpg" alt="FieldGovern supervisor dashboard with 545 total submissions, 16 active forms, 103 flagged records, submissions-over-time chart and top enumerators — the same dashboard runs identically whether hosted by FieldGovern or self-hosted on your own servers" loading="lazy" width="975" height="545"/>
+      </div>
+      <div class="shot-caption">Actual product screenshot — same dashboard, hosted or self-hosted</div>
     </div>
   </div>
 </section>
