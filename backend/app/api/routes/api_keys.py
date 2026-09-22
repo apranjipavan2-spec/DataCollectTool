@@ -53,6 +53,9 @@ def create_api_key(
     if user["role"] not in ("master_admin", "org_admin"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only org admins can create API keys")
 
+    from app.api.routes.billing import check_feature
+    check_feature(user["tenant_id"], "api_write", db)
+
     # Generate plaintext key
     plaintext_key = uuid.uuid4().hex
 

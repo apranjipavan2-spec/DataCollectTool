@@ -76,6 +76,9 @@ def list_webhooks(user=Depends(require_org_admin), db: Session = Depends(get_db)
 @router.post("/", status_code=201)
 def create_webhook(body: WebhookCreate, user=Depends(require_org_admin), db: Session = Depends(get_db)):
     """Create a new webhook."""
+    from app.api.routes.billing import check_feature
+    check_feature(user["tenant_id"], "webhooks", db)
+
     # Validate events
     invalid = set(body.events) - VALID_EVENTS
     if invalid:
@@ -152,6 +155,9 @@ def delete_webhook(webhook_id: str, user=Depends(require_org_admin), db: Session
 @router.post("/{webhook_id}/test")
 def test_webhook(webhook_id: str, user=Depends(require_org_admin), db: Session = Depends(get_db)):
     """Send a test payload to the webhook."""
+    from app.api.routes.billing import check_feature
+    check_feature(user["tenant_id"], "webhooks", db)
+
     hook = db.query(Webhook).filter(
         Webhook.id == webhook_id, Webhook.tenant_id == user["tenant_id"]
     ).first()

@@ -316,6 +316,8 @@ def get_map_points(
     role = user.get("role", "")
     if role not in ("org_admin", "supervisor", "master_admin"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
+    from app.api.routes.billing import check_feature
+    check_feature(user["tenant_id"], "map_view", db)
     try:
         q = (
             db.query(Submission, User.name, Form.title)
@@ -363,6 +365,8 @@ def get_map_summary(
     user=Depends(require_supervisor),
     db: Session = Depends(get_db),
 ):
+    from app.api.routes.billing import check_feature
+    check_feature(user["tenant_id"], "map_view", db)
     from sqlalchemy import func, case
     try:
         base = db.query(Submission).filter(Submission.tenant_id == user["tenant_id"])
@@ -1192,6 +1196,8 @@ def get_map_data(
     db: Session = Depends(get_db),
 ):
     """GPS pins for the live field map. Returns last N days of submissions with GPS. days=0 means all time."""
+    from app.api.routes.billing import check_feature
+    check_feature(user["tenant_id"], "map_view", db)
     from datetime import datetime, timezone, timedelta
     from app.models.form import Form
     from app.models.user import User as UserModel

@@ -258,6 +258,18 @@ def _resolve_user_from_request(request: Request, db: Session) -> dict:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
         from app.core.database import set_tenant_context
         set_tenant_context(db, str(matching.tenant_id))
+
+        from app.api.routes.billing import check_feature
+        from app.models.tenant import Tenant
+        from app.services.plan_enforcement import check_api_calls_limit, increment_api_calls
+        check_feature(str(matching.tenant_id), "api_write", db)
+        tenant = db.query(Tenant).filter(Tenant.id == matching.tenant_id).first()
+        if tenant:
+            rate = check_api_calls_limit(db, str(matching.tenant_id), tenant.plan_tier)
+            if not rate["allowed"]:
+                raise HTTPException(status_code=402, detail=rate["reason"])
+            increment_api_calls(db, str(matching.tenant_id))
+
         return {
             "sub": str(creator.id),
             "tenant_id": str(matching.tenant_id),
@@ -477,6 +489,9 @@ def export_dta(
     db: Session = Depends(get_db),
 ):
     """Export submissions for a form as Stata .dta file."""
+    from app.api.routes.billing import check_feature
+    check_feature(user["tenant_id"], "spss_export", db)
+
     if not HAS_PANDAS:
         raise HTTPException(status_code=501, detail="Stata export requires pandas. Install pandas to enable this feature.")
 
@@ -578,6 +593,9 @@ def export_spss(
     db: Session = Depends(get_db),
 ):
     """Export submissions as SPSS .sav file using pyreadstat."""
+    from app.api.routes.billing import check_feature
+    check_feature(user["tenant_id"], "spss_export", db)
+
     try:
         import pyreadstat
     except ImportError:

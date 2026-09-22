@@ -178,6 +178,9 @@ def get_waves(program_id: str, user: dict = Depends(require_supervisor), db: Ses
 
 @router.patch("/programs/{program_id}/panel-study")
 def toggle_panel_study(program_id: str, body: dict, user: dict = Depends(require_org_admin), db: Session = Depends(get_db)):
+    if body.get("is_panel_study", False) and user.get("role") != "master_admin":
+        from app.api.routes.billing import check_feature
+        check_feature(user["tenant_id"], "panel_study", db)
     prog = db.query(Program).filter(
         Program.id == program_id, Program.tenant_id == user["tenant_id"]
     ).first()
