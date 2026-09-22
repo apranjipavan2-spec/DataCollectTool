@@ -13,6 +13,7 @@ import LineChart from '@/components/charts/LineChart'
 import AuditLog from '@/components/AuditLog'
 import AiReportModal from '@/dashboard/AiReportModal'
 import EmojiIcon from '@/components/EmojiIcon'
+import { useFeatureLocked, UpgradeBadge } from '@/components/PlanLock'
 import Select from '@/components/Select'
 import { resolveAnswer } from '@/collect/responseRecord'
 import { useFormFieldMap } from '@/lib/useFormFieldMap'
@@ -663,6 +664,7 @@ const TEAM_PAGE_SIZE = 20
 
 export default function Dashboard() {
   const toast = useToast()
+  const spssLocked = useFeatureLocked('spss_export')
   const [tab, setTab] = useState<'overview' | 'submissions' | 'analytics' | 'scorecard' | 'forms' | 'team' | 'roster'>('overview')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -2288,11 +2290,13 @@ export default function Dashboard() {
                     <Button variant="secondary" size="sm" onClick={handleExportPdf} disabled={exportingPdf} title="Download PDF summary report">
                       {exportingPdf ? 'Building…' : '↓ PDF'}
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={handleExportStata} disabled={exportingStata} title="Download Stata .dta file">
-                      {exportingStata ? 'Building…' : '↓ Stata'}
+                    <Button variant="secondary" size="sm" onClick={handleExportStata} disabled={exportingStata || spssLocked}
+                      title={spssLocked ? 'Upgrade your plan to unlock Stata/SPSS export' : 'Download Stata .dta file'}>
+                      {exportingStata ? 'Building…' : '↓ Stata'} {spssLocked && <UpgradeBadge />}
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={handleExportSpss} disabled={exportingSpss} title="Download SPSS .sav file">
-                      {exportingSpss ? 'Building…' : '↓ SPSS'}
+                    <Button variant="secondary" size="sm" onClick={handleExportSpss} disabled={exportingSpss || spssLocked}
+                      title={spssLocked ? 'Upgrade your plan to unlock Stata/SPSS export' : 'Download SPSS .sav file'}>
+                      {exportingSpss ? 'Building…' : '↓ SPSS'} {spssLocked && <UpgradeBadge />}
                     </Button>
                     {isSupervisorPlus && filterForm && (
                       <Button

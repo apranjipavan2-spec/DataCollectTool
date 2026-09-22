@@ -17,20 +17,13 @@ interface Plan {
   price_inr: number; price_usd_cents: number
   submissions_limit: number | null; storage_limit_mb: number | null
   asr_minutes_limit: number | null; features: PlanFeatures
+  active_forms_limit: number | null
+  ai_reports_per_month: number | null; ai_calls_per_day: number | null
+  api_calls_per_month: number | null
+  max_org_admins: number | null; max_supervisors: number | null; max_enumerators: number | null
   billing: Record<string, BillingOption>
 }
 interface PaymentCfg { admin_whatsapp?: string; support_email?: string }
-
-const SEGMENTS = [
-  { key: 'ngo',       label: 'NGO / Social Impact', icon: '🌱',
-    active: 'border-emerald-400 bg-emerald-50 shadow-emerald-100', text: 'text-emerald-700' },
-  { key: 'govt',      label: 'Government',           icon: '🏛️',
-    active: 'border-blue-400 bg-blue-50 shadow-blue-100',           text: 'text-blue-700'    },
-  { key: 'research',  label: 'Research',             icon: '🔬',
-    active: 'border-violet-400 bg-violet-50 shadow-violet-100',     text: 'text-violet-700'  },
-  { key: 'corporate', label: 'Corporate',            icon: '🏢',
-    active: 'border-amber-400 bg-amber-50 shadow-amber-100',        text: 'text-amber-700'   },
-]
 
 const CYCLES = [
   { key: 'monthly', label: 'Monthly',  months: 1,  save: '' },
@@ -61,7 +54,7 @@ const FAQS = [
   { q: 'How do I pay?', a: 'We accept UPI (Google Pay, PhonePe, Paytm) and direct bank transfer (NEFT/RTGS). Our admin confirms payment and activates your plan within 2–4 business hours.' },
   { q: 'Can I switch plans mid-cycle?', a: 'Yes. Contact us and we will upgrade or downgrade your plan. Upgrades are prorated; downgrades take effect at the next billing cycle.' },
   { q: 'What happens when I hit the submission limit?', a: 'New submissions are blocked and you receive an in-app notification. All existing data remains safe. Upgrade anytime to continue collecting.' },
-  { q: 'Is there a discount for NGOs?', a: 'The NGO segment already carries our lowest pricing — up to 20% below comparable KoboToolbox plans. Additional goodwill discounts for very small NGOs can be arranged — contact us on WhatsApp.' },
+  { q: 'Is there a discount for NGOs?', a: 'Our standard pricing already runs up to 20% below comparable KoboToolbox plans. Additional goodwill discounts for very small NGOs can be arranged — contact us on WhatsApp.' },
   { q: 'Can I get a demo?', a: 'Yes — message us on WhatsApp and we will schedule a live walkthrough for your team, including a sample data cleaning and AI report demonstration.' },
 ]
 
@@ -74,7 +67,6 @@ export default function PricingPage() {
 
   const [plans,      setPlans]      = useState<Plan[]>([])
   const [loading,    setLoading]    = useState(true)
-  const [segment,    setSegment]    = useState('ngo')
   const [cycle,      setCycle]      = useState('annual')
   const [openFaq,    setOpenFaq]    = useState<number | null>(null)
   const [paymentCfg, setPaymentCfg] = useState<PaymentCfg>({})
@@ -89,7 +81,7 @@ export default function PricingPage() {
   const waEntLink = `https://wa.me/${waNumber}?text=Hi%2C%20I%27m%20interested%20in%20FieldGovern%20Enterprise.`
   const supportEmail = paymentCfg.support_email || 'support@fieldgovern.in'
 
-  const segmentPlans = plans.filter(p => p.segment === segment && p.tier !== 'enterprise')
+  const segmentPlans = plans.filter(p => p.tier !== 'custom' && p.tier !== 'enterprise')
 
   const handleCTA = (plan: Plan) => {
     if (plan.tier === 'enterprise') { window.open(waEntLink, '_blank'); return }
@@ -165,26 +157,6 @@ export default function PricingPage() {
                 ) : (
                   <span className="text-[11px] text-slate-400 mt-1">standard</span>
                 )}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Segment tabs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl mx-auto mb-12">
-          {SEGMENTS.map(s => {
-            const isActive = segment === s.key
-            return (
-              <button key={s.key} onClick={() => setSegment(s.key)}
-                className={`flex flex-col items-center gap-2 px-4 py-5 rounded-2xl border-2 transition-all duration-150 ${
-                  isActive
-                    ? `${s.active} shadow-md`
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                }`}>
-                <span className="text-3xl leading-none"><EmojiIcon e={s.icon} /></span>
-                <span className={`text-xs font-semibold text-center leading-snug ${isActive ? s.text : 'text-slate-500'}`}>
-                  {s.label}
-                </span>
               </button>
             )
           })}
@@ -284,6 +256,30 @@ export default function PricingPage() {
                         <span><b>{plan.asr_minutes_limit} min</b> voice transcription / month</span>
                       </div>
                     ) : null}
+                    <div className="flex items-center gap-2.5 text-slate-700">
+                      <span className="text-base"><EmojiIcon e="📋" /></span>
+                      <span><b>{plan.active_forms_limit?.toLocaleString() ?? 'Unlimited'}</b> active forms</span>
+                    </div>
+                    {(plan.ai_reports_per_month ?? 0) > 0 || plan.ai_reports_per_month === null ? (
+                      <div className="flex items-center gap-2.5 text-slate-700">
+                        <span className="text-base"><EmojiIcon e="🤖" /></span>
+                        <span><b>{plan.ai_reports_per_month?.toLocaleString() ?? 'Unlimited'}</b> AI reports / month{plan.ai_calls_per_day ? ` (${plan.ai_calls_per_day}/day cap)` : ''}</span>
+                      </div>
+                    ) : null}
+                    {(plan.api_calls_per_month ?? 0) > 0 || plan.api_calls_per_month === null ? (
+                      <div className="flex items-center gap-2.5 text-slate-700">
+                        <span className="text-base"><EmojiIcon e="🔌" /></span>
+                        <span><b>{plan.api_calls_per_month?.toLocaleString() ?? 'Unlimited'}</b> API calls / month</span>
+                      </div>
+                    ) : null}
+                    <div className="flex items-center gap-2.5 text-slate-700">
+                      <span className="text-base"><EmojiIcon e="👥" /></span>
+                      <span>
+                        <b>{plan.max_org_admins ?? '∞'}</b> admin{plan.max_org_admins !== 1 ? 's' : ''} ·{' '}
+                        <b>{plan.max_supervisors?.toLocaleString() ?? '∞'}</b> supervisors ·{' '}
+                        <b>{plan.max_enumerators?.toLocaleString() ?? '∞'}</b> enumerators
+                      </span>
+                    </div>
                   </div>
 
                   {/* Features */}

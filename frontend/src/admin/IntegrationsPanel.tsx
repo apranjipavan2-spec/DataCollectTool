@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import api from '@/lib/api'
 import type { FormListItem, ProgramListItem } from '@/types/api'
 import EmojiIcon from '@/components/EmojiIcon'
+import { useFeatureLocked, UpgradeBadge } from '@/components/PlanLock'
 
 const ALL_EVENTS = [
   { id: 'submission.created',  label: 'New submission synced' },
@@ -227,6 +228,7 @@ interface WebhookItem {
 }
 
 function WebhooksSection() {
+  const webhooksLocked = useFeatureLocked('webhooks')
   const [webhooks, setWebhooks] = useState<WebhookItem[]>([])
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
@@ -292,10 +294,14 @@ function WebhooksSection() {
 
       <div className="flex justify-between items-center">
         <span className="text-sm text-catalan-textMuted">{webhooks.length} webhook{webhooks.length !== 1 ? 's' : ''}</span>
-        <button onClick={() => setShowForm(v => !v)}
-          className="px-3 py-1.5 text-xs rounded-lg bg-catalan-primary text-white font-semibold hover:opacity-90">
-          {showForm ? 'Cancel' : '+ New Webhook'}
-        </button>
+        {webhooksLocked ? (
+          <UpgradeBadge />
+        ) : (
+          <button onClick={() => setShowForm(v => !v)}
+            className="px-3 py-1.5 text-xs rounded-lg bg-catalan-primary text-white font-semibold hover:opacity-90">
+            {showForm ? 'Cancel' : '+ New Webhook'}
+          </button>
+        )}
       </div>
 
       {showForm && (

@@ -7,6 +7,7 @@ import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
 import EmojiIcon from '@/components/EmojiIcon'
 import Select from '@/components/Select'
+import { useFeatureLocked, UpgradeBadge } from '@/components/PlanLock'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -581,6 +582,7 @@ function SetupPanel({ prog, locations, forms, onRefresh }: {
   prog: ProgramDetail; locations: Location[]; forms: Form[]; onRefresh: () => void
 }) {
   const toast = useToast()
+  const panelStudyLocked = useFeatureLocked('panel_study')
   const [addingType, setAddingType] = useState(false)
   const [newTypeName, setNewTypeName] = useState('')
   const [addingQ, setAddingQ] = useState(false)
@@ -624,6 +626,7 @@ function SetupPanel({ prog, locations, forms, onRefresh }: {
   }
 
   const togglePanelStudy = async (val: boolean) => {
+    if (val && panelStudyLocked) { toast.error('Panel study is not available on your plan — upgrade to unlock it.'); return }
     await api.patch(`/fg/programs/${prog.id}/panel-study`, { is_panel_study: val })
     toast.success(val ? 'Panel study enabled' : 'Panel study disabled')
     onRefresh()
@@ -779,7 +782,7 @@ function SetupPanel({ prog, locations, forms, onRefresh }: {
       <div>
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="font-semibold text-xs text-catalan-textMuted uppercase tracking-wide">Panel Study</h3>
+            <h3 className="font-semibold text-xs text-catalan-textMuted uppercase tracking-wide">Panel Study {panelStudyLocked && !prog.is_panel_study && <UpgradeBadge className="ml-1" />}</h3>
             <p className="text-xs text-catalan-textMuted mt-0.5">Track the same respondents across waves (baseline → midline → endline)</p>
           </div>
           <button onClick={() => togglePanelStudy(!prog.is_panel_study)}

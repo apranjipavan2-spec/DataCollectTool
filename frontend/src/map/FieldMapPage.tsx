@@ -7,6 +7,8 @@ import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import EmojiIcon from '@/components/EmojiIcon'
 import Select from '@/components/Select'
+import { useFeatureLocked } from '@/components/PlanLock'
+import { useNavigate } from 'react-router-dom'
 
 interface Pin {
   id: string; lat: number; lng: number; accuracy: number
@@ -58,6 +60,8 @@ const SKIP_KEYS = new Set(['_roster_id', '_program_id', '_questionnaire_id', '_l
 
 export default function FieldMapPage() {
   const user = getStoredUser()
+  const navigate = useNavigate()
+  const mapLocked = useFeatureLocked('map_view')
   const [pins, setPins] = useState<Pin[]>([])
   const [pinsLoaded, setPinsLoaded] = useState(false)
   const [pinsLoading, setPinsLoading] = useState(false)
@@ -172,6 +176,23 @@ export default function FieldMapPage() {
         .filter(([k]) => !SKIP_KEYS.has(k) && !k.startsWith('_'))
         .map(([k, v]) => ({ key: k, label: fmtKey(k), value: fmtVal(v) }))
     : []
+
+  if (mapLocked) {
+    return (
+      <div className="flex h-screen bg-catalan-bg">
+        <Sidebar items={getNavItems(user?.role ?? '')} role={user?.role} />
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6">
+          <div className="text-5xl">🔒</div>
+          <h2 className="text-xl font-bold text-catalan-text">Map View isn't on your plan</h2>
+          <p className="text-sm text-catalan-textMuted max-w-sm">Visualise GPS submissions and flag spoofing attempts — upgrade your plan to unlock the live field map.</p>
+          <button onClick={() => navigate('/subscription')}
+            className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-catalan-primary hover:opacity-90">
+            Upgrade Plan
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen bg-catalan-bg">

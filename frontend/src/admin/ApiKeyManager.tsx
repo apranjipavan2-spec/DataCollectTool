@@ -9,6 +9,7 @@
  */
 import { useState, useEffect } from 'react'
 import api from '@/lib/api'
+import { useFeatureLocked, UpgradeBadge } from '@/components/PlanLock'
 
 interface ApiKey {
   id: string
@@ -23,6 +24,7 @@ interface NewKeyResponse extends ApiKey {
 }
 
 export default function ApiKeyManager() {
+  const apiWriteLocked = useFeatureLocked('api_write')
   const [keys, setKeys] = useState<ApiKey[]>([])
   const [loading, setLoading] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
@@ -91,18 +93,19 @@ export default function ApiKeyManager() {
 
   return (
     <div style={container}>
-      <h3 style={heading}>Generate API Key</h3>
+      <h3 style={heading}>Generate API Key {apiWriteLocked && <UpgradeBadge />}</h3>
       <div style={formRow}>
         <input
           type="text"
           placeholder="e.g., Mobile App, Data Export Tool"
           value={newKeyName}
           onChange={(e) => setNewKeyName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && generateKey()}
+          onKeyDown={(e) => e.key === 'Enter' && !apiWriteLocked && generateKey()}
           style={input}
-          disabled={loading}
+          disabled={loading || apiWriteLocked}
         />
-        <button onClick={generateKey} style={button} disabled={loading}>
+        <button onClick={generateKey} style={button} disabled={loading || apiWriteLocked}
+          title={apiWriteLocked ? 'Upgrade your plan to unlock API access' : undefined}>
           {loading ? 'Generating...' : 'Generate Key'}
         </button>
       </div>

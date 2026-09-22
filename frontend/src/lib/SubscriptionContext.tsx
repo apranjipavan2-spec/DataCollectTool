@@ -1,6 +1,15 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import api, { getStoredUser } from '@/lib/api'
 
+export interface PlanFeatures {
+  tier: string
+  ai_cleaning: boolean; ai_writer: boolean; ai_smart_builder: boolean
+  ai_interpret: boolean; ai_analyzer: boolean; map_view: boolean
+  panel_study: boolean; spss_export: boolean; api_write: boolean
+  webhooks: boolean; two_fa: boolean; sso: boolean; audit_log: boolean
+  advanced_rbac: boolean; white_label: boolean; priority_support: boolean
+}
+
 export interface SubData {
   subscription: {
     plan_id: string
@@ -10,7 +19,13 @@ export interface SubData {
     period_end: string | null
     trial_end: string | null
   }
-  limits: { submissions_limit: number | null; storage_limit_mb: number | null }
+  limits: {
+    submissions_limit: number | null; storage_limit_mb: number | null
+    active_forms_limit: number | null; ai_reports_per_month: number | null
+    ai_calls_per_day: number | null; api_calls_per_month: number | null
+    max_org_admins: number | null; max_supervisors: number | null; max_enumerators: number | null
+  }
+  features: PlanFeatures
   usage: { submissions_used: number; storage_used_mb: number; ai_reports_used: number }
   pending_payment: { order_ref: string; amount_inr: number; plan_id: string } | null
 }
