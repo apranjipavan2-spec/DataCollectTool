@@ -415,10 +415,15 @@ def get_map_summary(
                  for r in form_rows]
 
         # By-enumerator breakdown (GPS only)
+        # Join before with_entities: with_entities(User.name, ...) alone drops all
+        # reference to Submission from the query, so a later .outerjoin(User, ...)
+        # has no recognized entity to join from ("Don't know how to join to User").
+        # The sibling form_rows query above avoids this by keeping Submission.form_id
+        # in its with_entities; here we just join first instead.
         enum_rows = (
             base.filter(Submission.gps_submit.isnot(None))
-            .with_entities(User.name, func.count().label("cnt"))
             .outerjoin(User, Submission.enumerator_id == User.id)
+            .with_entities(User.name, func.count().label("cnt"))
             .group_by(User.name)
             .order_by(func.count().desc())
             .all()
