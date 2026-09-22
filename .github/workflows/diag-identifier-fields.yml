@@ -1,0 +1,42 @@
+name: Diagnose is_identifier Fields on Live Forms
+
+# Read-only diagnostic. Checks every Form's json_schema for fields flagged
+# is_identifier=True (the Form Builder's "Use as Duplicate Identifier"
+# toggle, which a recent change also makes those fields get encrypted at
+# rest going forward). Only prints form id/title/tenant and the flagged
+# field ids — never row-level respondent/submission data.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    name: Query forms for is_identifier fields
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Query via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 2m
+          script: |
+            set -e
+            cd /opt/fieldgovern
+            docker compose exec -T app python3 -c "
+from app.core.database import SessionLocal
+from app.models.form import Form
+from app.services.pii_redact import identifier_field_ids
+db = SessionLocal()
+forms = db.query(Form).all()
+flagged = []
+for f in forms:
+    ids = identifier_field_ids(f.json_schema)
+    if ids:
+        flagged.append((f.id, f.title, f.tenant_id, sorted(ids)))
+print(f'{len(forms)} forms total, {len(flagged)} with is_identifier fields set')
+for fid, title, tid, ids in flagged:
+    print(f'  form={fid} title={title!r} tenant={tid} identifier_fields={ids}')
+db.close()
+"
