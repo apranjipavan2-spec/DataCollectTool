@@ -22,6 +22,7 @@ import { getNavItems } from '@/lib/navigation'
 import api, { getStoredUser } from '@/lib/api'
 import { useToast } from '@/lib/ToastContext'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 const FIELD_TYPE_ICONS: Record<string, string> = {
   text: '𝐓', number: '#', decimal: '.1', single_choice: '◉', multiple_choice: '☑',
@@ -1437,18 +1438,18 @@ function FormSettingsPanel({ schema, onChange, formId, retentionDays, onRetentio
                   <div className="flex gap-2">
                     <div className="flex-1">
                       <label className={labelCls}>Field</label>
-                      <select
+                      <Select
                         className={inputCls}
                         value={rule.field_id}
                         onChange={e => updateValidationRule(i, { field_id: e.target.value })}
                       >
                         <option value="">Select field…</option>
                         {allFields.map(f => <option key={f.id} value={f.id}>{f.label || f.name}</option>)}
-                      </select>
+                      </Select>
                     </div>
                     <div className="w-36">
                       <label className={labelCls}>Operator</label>
-                      <select
+                      <Select
                         className={inputCls}
                         value={rule.operator}
                         onChange={e => updateValidationRule(i, { operator: e.target.value })}
@@ -1457,7 +1458,7 @@ function FormSettingsPanel({ schema, onChange, formId, retentionDays, onRetentio
                         <option value="max">max</option>
                         <option value="regex">regex</option>
                         <option value="required_if_field">required_if_field</option>
-                      </select>
+                      </Select>
                     </div>
                   </div>
                   <div>
@@ -1465,14 +1466,14 @@ function FormSettingsPanel({ schema, onChange, formId, retentionDays, onRetentio
                       {rule.operator === 'required_if_field' ? 'Required when this field ID is non-empty' : 'Value'}
                     </label>
                     {rule.operator === 'required_if_field' ? (
-                      <select
+                      <Select
                         className={inputCls}
                         value={rule.value}
                         onChange={e => updateValidationRule(i, { value: e.target.value })}
                       >
                         <option value="">Select triggering field…</option>
                         {allFields.filter(f => f.id !== rule.field_id).map(f => <option key={f.id} value={f.id}>{f.label || f.name}</option>)}
-                      </select>
+                      </Select>
                     ) : (
                       <input
                         className={inputCls}
@@ -1673,14 +1674,14 @@ function TranslateModal({ onTranslate, onClose, translating }: {
         <p className="text-xs text-catalan-textMuted">
           Replaces all field labels, section titles, and option labels with AI-translated text. This is a one-time operation — save the form after translating.
         </p>
-        <select
+        <Select
           className="w-full border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text focus:ring-2 focus:ring-catalan-primary outline-none"
           value={selected}
           onChange={e => setSelected(e.target.value)}
         >
           <option value="">— Select language —</option>
           {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
-        </select>
+        </Select>
         <div className="flex gap-2 justify-end">
           <Button variant="secondary" size="sm" onClick={onClose} disabled={translating}>Cancel</Button>
           <Button size="sm" onClick={() => selected && onTranslate(selected)} disabled={!selected || translating}>

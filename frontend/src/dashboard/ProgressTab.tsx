@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '@/lib/api'
 import { Card } from '@/components/ui'
+import Select from '@/components/Select'
 import { useToast } from '@/lib/ToastContext'
 
 interface Form { id: string; title: string }
@@ -86,14 +87,14 @@ export default function ProgressTab({ forms }: { forms: Form[] }) {
         <div className="flex flex-wrap gap-3 items-end mb-4">
           <div>
             <label className="text-xs text-catalan-textMuted block mb-1">Form</label>
-            <select
+            <Select
               value={selectedForm}
               onChange={e => setSelectedForm(e.target.value)}
               className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
             >
               <option value="">Select form…</option>
               {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-            </select>
+            </Select>
           </div>
           <div>
             <label className="text-xs text-catalan-textMuted block mb-1">Date</label>

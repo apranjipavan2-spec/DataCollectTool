@@ -5,6 +5,7 @@ import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 import Modal from '@/components/ui/Modal'
 import { Button } from '@/components/ui'
 
@@ -234,10 +235,10 @@ export default function DataRightsPage() {
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-medium text-catalan-textMuted uppercase tracking-wider mb-1.5">Request Type</label>
-            <select value={newType} onChange={e => setNewType(e.target.value)}
-              className="w-full bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text">
+            <Select value={newType} onChange={e => setNewType(e.target.value)}
+              className="w-full bg-catalan-hover">
               {REQUEST_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
+            </Select>
           </div>
           <div>
             <label className="block text-xs font-medium text-catalan-textMuted uppercase tracking-wider mb-1.5">Requester Name</label>

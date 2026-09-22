@@ -6,6 +6,7 @@ import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 interface ToolProject {
   id: string; tool: string; name: string; program_id: string | null
@@ -411,18 +412,18 @@ export default function FileManagerPage() {
               <>
                 {/* Filters + bulk toolbar */}
                 <div className="flex flex-wrap gap-3 mb-4 items-center">
-                  <select value={subFormFilter} onChange={e => { setSubFormFilter(e.target.value); setSubPage(1) }}
+                  <Select value={subFormFilter} onChange={e => { setSubFormFilter(e.target.value); setSubPage(1) }}
                     className="border border-catalan-border rounded-lg px-3 py-1.5 text-sm bg-catalan-bg text-catalan-text focus:outline-none max-w-[200px]">
                     <option value="">All forms</option>
                     {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-                  </select>
-                  <select value={subStatusFilter} onChange={e => { setSubStatusFilter(e.target.value); setSubPage(1) }}
+                  </Select>
+                  <Select value={subStatusFilter} onChange={e => { setSubStatusFilter(e.target.value); setSubPage(1) }}
                     className="border border-catalan-border rounded-lg px-3 py-1.5 text-sm bg-catalan-bg text-catalan-text focus:outline-none">
                     <option value="">All statuses</option>
                     {['synced', 'approved', 'flagged', 'rejected', 'pending'].map(s => (
                       <option key={s} value={s}>{s}</option>
                     ))}
-                  </select>
+                  </Select>
 
                   {selectedSubs.size > 0 && (
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-catalan-primary/10 border border-catalan-primary/20 rounded-lg">

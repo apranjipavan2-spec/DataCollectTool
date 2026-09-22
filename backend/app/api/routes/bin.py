@@ -88,10 +88,15 @@ def _group_for(entity_type: str, row) -> tuple[str, str]:
 
 
 @router.get("/bin")
-def list_bin(user: dict = Depends(require_org_admin), db: Session = Depends(get_db)):
-    """Everything currently in the 360-day bin for this org, newest first."""
+def list_bin(tenant_id: str | None = None,
+             user: dict = Depends(require_org_admin), db: Session = Depends(get_db)):
+    """Everything currently in the 360-day bin for this org, newest first.
+
+    master_admin may pass ?tenant_id=<id> to view another org's bin; the param
+    is ignored for everyone else, who always see only their own tenant_id.
+    """
     from app.core.config import settings
-    tenant_id = user["tenant_id"]
+    tenant_id = tenant_id if (tenant_id and user.get("role") == "master_admin") else user["tenant_id"]
     items = []
     group_counts: dict[str, int] = {}
     for entity_type, (model, human) in registry().items():
@@ -152,10 +157,11 @@ def _get_row(db: Session, entity_type: str, item_id: str, tenant_id):
 
 
 @router.post("/bin/{entity_type}/{item_id}/restore")
-def restore_item(entity_type: str, item_id: str,
+def restore_item(entity_type: str, item_id: str, tenant_id: str | None = None,
                  user: dict = Depends(require_org_admin), db: Session = Depends(get_db)):
     """Bring an item back out of the bin."""
-    _, row = _get_row(db, entity_type, item_id, user["tenant_id"])
+    effective_tenant_id = tenant_id if (tenant_id and user.get("role") == "master_admin") else user["tenant_id"]
+    _, row = _get_row(db, entity_type, item_id, effective_tenant_id)
     row.deleted_at = None
     # Forms/projects also carry their own status/archived flag alongside the
     # shared deleted_at — clear it too, or the item stays hidden from its own
@@ -169,7 +175,7 @@ def restore_item(entity_type: str, item_id: str,
 
 
 @router.delete("/bin/{entity_type}/{item_id}")
-def purge_item(entity_type: str, item_id: str,
+def purge_item(entity_type: str, item_id: str, tenant_id: str | None = None,
                user: dict = Depends(require_org_admin), db: Session = Depends(get_db)):
     """Permanently delete one item from the bin (irreversible)."""
     from app.core.config import settings
@@ -178,7 +184,8 @@ def purge_item(entity_type: str, item_id: str,
             status_code=403,
             detail="Hard delete is disabled. Client data is retained; use anonymize for erasure.",
         )
-    model, row = _get_row(db, entity_type, item_id, user["tenant_id"])
+    effective_tenant_id = tenant_id if (tenant_id and user.get("role") == "master_admin") else user["tenant_id"]
+    model, row = _get_row(db, entity_type, item_id, effective_tenant_id)
     if entity_type == "shared_file":
         _remove_disk_file(row)
     db.delete(row)

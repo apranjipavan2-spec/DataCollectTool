@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '@/lib/api'
 import { Button } from '@/components/ui'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -338,7 +339,7 @@ export default function VersionHistoryPanel({ formId, currentVersion, onClose, o
                 <div className="flex gap-3 items-end flex-wrap">
                   <div className="flex-1 min-w-[100px]">
                     <label className="block text-xs text-catalan-textMuted mb-1">From</label>
-                    <select
+                    <Select
                       value={compareFrom ?? ''}
                       onChange={e => { setCompareFrom(Number(e.target.value)); setDiffResult(null) }}
                       className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-1.5 text-sm text-catalan-text outline-none focus:border-catalan-primary"
@@ -347,12 +348,12 @@ export default function VersionHistoryPanel({ formId, currentVersion, onClose, o
                       {versions.map(v => (
                         <option key={v.id} value={v.version}>v{v.version}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                   <span className="text-catalan-textMuted text-sm pb-1.5"><EmojiIcon e="→" /></span>
                   <div className="flex-1 min-w-[100px]">
                     <label className="block text-xs text-catalan-textMuted mb-1">To</label>
-                    <select
+                    <Select
                       value={compareTo ?? ''}
                       onChange={e => { setCompareTo(Number(e.target.value)); setDiffResult(null) }}
                       className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-1.5 text-sm text-catalan-text outline-none focus:border-catalan-primary"
@@ -361,7 +362,7 @@ export default function VersionHistoryPanel({ formId, currentVersion, onClose, o
                       {versions.map(v => (
                         <option key={v.id} value={v.version}>v{v.version}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                   <Button
                     size="sm"

@@ -9,6 +9,7 @@ import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { Button, Input, Modal, Alert } from '@/components/ui'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -902,9 +903,9 @@ export default function AdminPanel() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-catalan-text mb-2">Plan Tier</label>
-                <select value={formData.plan_tier} onChange={e => setFormData({...formData, plan_tier: e.target.value})} className="w-full bg-catalan-hover border border-catalan-border text-catalan-text rounded px-3 py-2 text-sm">
-                  <option value="starter">Starter</option><option value="professional">Professional</option><option value="enterprise">Enterprise</option>
-                </select>
+                <Select value={formData.plan_tier} onChange={e => setFormData({...formData, plan_tier: e.target.value})} className="w-full bg-catalan-hover">
+                  <option value="free">Free</option><option value="starter">Starter</option><option value="growth">Growth</option><option value="pro">Pro</option><option value="custom">Custom</option>
+                </Select>
               </div>
               <Input label="Primary Color" type="color" value={formData.primary_color} onChange={e => setFormData({...formData, primary_color: e.target.value})} />
             </div>
@@ -925,9 +926,9 @@ export default function AdminPanel() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-catalan-text mb-2">Plan Tier</label>
-                <select value={formData.plan_tier} onChange={e => setFormData({...formData, plan_tier: e.target.value})} className="w-full bg-catalan-hover border border-catalan-border text-catalan-text rounded px-3 py-2 text-sm">
-                  <option value="starter">Starter</option><option value="professional">Professional</option><option value="enterprise">Enterprise</option>
-                </select>
+                <Select value={formData.plan_tier} onChange={e => setFormData({...formData, plan_tier: e.target.value})} className="w-full bg-catalan-hover">
+                  <option value="free">Free</option><option value="starter">Starter</option><option value="growth">Growth</option><option value="pro">Pro</option><option value="custom">Custom</option>
+                </Select>
               </div>
               <Input label="Primary Color" type="color" value={formData.primary_color} onChange={e => setFormData({...formData, primary_color: e.target.value})} />
             </div>
@@ -947,15 +948,15 @@ export default function AdminPanel() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-catalan-text mb-2">Role</label>
-                <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value})} className="w-full bg-catalan-hover border border-catalan-border text-catalan-text rounded px-3 py-2 text-sm">
+                <Select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value})} className="w-full bg-catalan-hover">
                   <option value="enumerator">Enumerator</option><option value="supervisor">Supervisor</option><option value="org_admin">Org Admin</option>
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-catalan-text mb-2">Status</label>
-                <select value={userForm.is_active ? 'active' : 'inactive'} onChange={e => setUserForm({...userForm, is_active: e.target.value === 'active'})} className="w-full bg-catalan-hover border border-catalan-border text-catalan-text rounded px-3 py-2 text-sm">
+                <Select value={userForm.is_active ? 'active' : 'inactive'} onChange={e => setUserForm({...userForm, is_active: e.target.value === 'active'})} className="w-full bg-catalan-hover">
                   <option value="active">Active</option><option value="inactive">Deactivated</option>
-                </select>
+                </Select>
               </div>
             </div>
             <div className="pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>

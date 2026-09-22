@@ -8,6 +8,7 @@ import ApiKeyManager from './ApiKeyManager'
 import IntegrationsPanel from './IntegrationsPanel'
 import AiConfigPanel from './AiConfigPanel'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 export default function OrgAdminPanel() {
   const [activeTab, setActiveTab] = useState('api-keys')
@@ -374,16 +375,16 @@ function SecurityTab() {
                 <div className="space-y-3 bg-catalan-bg border border-catalan-border rounded-xl p-4">
                   <div>
                     <label className="block text-xs font-medium text-catalan-textMuted uppercase tracking-wider mb-1.5">Provider</label>
-                    <select
+                    <Select
                       value={byoProvider}
                       onChange={e => setByoProvider(e.target.value)}
-                      className="w-full bg-catalan-surface border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text outline-none focus:border-catalan-primary"
+                      className="w-full bg-catalan-surface"
                     >
                       <option value="openai">OpenAI</option>
                       <option value="anthropic">Anthropic (Claude)</option>
                       <option value="gemini">Google Gemini</option>
                       <option value="deepseek">DeepSeek</option>
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-catalan-textMuted uppercase tracking-wider mb-1.5">Model (optional)</label>

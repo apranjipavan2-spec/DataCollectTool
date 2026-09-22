@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import Select from '@/components/Select'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import api from '@/lib/api'
@@ -246,15 +247,15 @@ export default function SuperAdminMonitor() {
             <div className="space-y-4">
               {/* Filters */}
               <div className="flex flex-wrap gap-3">
-                <select
+                <Select
                   value={filterTenant}
                   onChange={e => setFilterTenant(e.target.value)}
-                  className="border border-catalan-border rounded-lg px-3 py-1.5 text-sm bg-catalan-bg text-catalan-text focus:ring-2 focus:ring-catalan-primary outline-none"
+                  className="border border-catalan-border rounded-lg px-3 py-1.5 text-sm bg-catalan-bg text-catalan-text focus:ring-2 focus:ring-catalan-primary outline-none max-w-[220px] truncate"
                 >
                   <option value="">All Organisations</option>
                   {tenantOptions.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-                <select
+                </Select>
+                <Select
                   value={filterStatus}
                   onChange={e => setFilterStatus(e.target.value)}
                   className="border border-catalan-border rounded-lg px-3 py-1.5 text-sm bg-catalan-bg text-catalan-text focus:ring-2 focus:ring-catalan-primary outline-none"
@@ -263,7 +264,7 @@ export default function SuperAdminMonitor() {
                   {['active', 'planning', 'completed', 'archived'].map(s => (
                     <option key={s} value={s} className="capitalize">{s.charAt(0).toUpperCase() + s.slice(1)}</option>
                   ))}
-                </select>
+                </Select>
                 <span className="text-xs text-catalan-textMuted self-center">
                   {filteredPrograms.length} program{filteredPrograms.length !== 1 ? 's' : ''}
                 </span>

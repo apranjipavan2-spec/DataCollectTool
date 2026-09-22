@@ -6,6 +6,7 @@ import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -141,9 +142,9 @@ function ProgramModal({ initial, onSave, onClose }: {
               <input type="date" className={`${inputCls} mt-1`} value={d.end_date || ''} onChange={e => set('end_date', e.target.value)} /></div>
           </div>
           <div><label className="text-sm font-medium text-catalan-text">Status</label>
-            <select className={`${inputCls} mt-1`} value={d.status} onChange={e => set('status', e.target.value)}>
+            <Select className={`${inputCls} mt-1`} value={d.status} onChange={e => set('status', e.target.value)}>
               {['planning', 'active', 'completed', 'archived'].map(s => <option key={s} value={s}>{s}</option>)}
-            </select></div>
+            </Select></div>
         </div>
         <div className="flex justify-end gap-2 mt-5">
           <button onClick={onClose} className={btnSecondary}>Cancel</button>
@@ -305,16 +306,16 @@ function ResultsPanel({ prog }: { prog: ProgramDetail }) {
           <div className="border border-catalan-border rounded-xl p-4 mb-3 bg-catalan-primary/5 space-y-3">
             <div className="grid grid-cols-3 gap-3">
               <div><label className="text-xs font-medium text-catalan-textMuted">Type</label>
-                <select className={`${inputSmCls} mt-0.5`} value={newLevel.level_type}
+                <Select className={`${inputSmCls} mt-0.5`} value={newLevel.level_type}
                   onChange={e => setNewLevel(p => ({ ...p, level_type: e.target.value as LogframeLevel['level_type'] }))}>
                   {LEVEL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select></div>
+                </Select></div>
               <div><label className="text-xs font-medium text-catalan-textMuted">Parent (cascade)</label>
-                <select className={`${inputSmCls} mt-0.5`} value={newLevel.parent_id}
+                <Select className={`${inputSmCls} mt-0.5`} value={newLevel.parent_id}
                   onChange={e => setNewLevel(p => ({ ...p, parent_id: e.target.value }))}>
                   <option value="">— None (top level) —</option>
                   {levels.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-                </select></div>
+                </Select></div>
               <div><label className="text-xs font-medium text-catalan-textMuted">Title *</label>
                 <input className={`${inputSmCls} mt-0.5`} value={newLevel.title}
                   onChange={e => setNewLevel(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Reduced child malnutrition" /></div>
@@ -350,31 +351,31 @@ function ResultsPanel({ prog }: { prog: ProgramDetail }) {
           <div className="border border-catalan-border rounded-xl p-4 mb-3 bg-catalan-primary/5 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div><label className="text-xs font-medium text-catalan-textMuted">Logframe Level *</label>
-                <select className={`${inputSmCls} mt-0.5`} value={newInd.logframe_level_id}
+                <Select className={`${inputSmCls} mt-0.5`} value={newInd.logframe_level_id}
                   onChange={e => setNewInd(p => ({ ...p, logframe_level_id: e.target.value }))}>
                   <option value="">— Select —</option>
                   {levels.map(l => <option key={l.id} value={l.id}>{l.level_type}: {l.title}</option>)}
-                </select></div>
+                </Select></div>
               <div><label className="text-xs font-medium text-catalan-textMuted">Name *</label>
                 <input className={`${inputSmCls} mt-0.5`} value={newInd.name}
                   onChange={e => setNewInd(p => ({ ...p, name: e.target.value }))} placeholder="% households with improved nutrition" /></div>
               <div><label className="text-xs font-medium text-catalan-textMuted">Aggregation</label>
-                <select className={`${inputSmCls} mt-0.5`} value={newInd.aggregation}
+                <Select className={`${inputSmCls} mt-0.5`} value={newInd.aggregation}
                   onChange={e => setNewInd(p => ({ ...p, aggregation: e.target.value, unit: e.target.value === 'percent' ? 'percent' : 'count' }))}>
                   {['percent', 'count', 'sum', 'mean'].map(a => <option key={a} value={a}>{a}</option>)}
-                </select></div>
+                </Select></div>
               <div><label className="text-xs font-medium text-catalan-textMuted">Direction</label>
-                <select className={`${inputSmCls} mt-0.5`} value={newInd.direction}
+                <Select className={`${inputSmCls} mt-0.5`} value={newInd.direction}
                   onChange={e => setNewInd(p => ({ ...p, direction: e.target.value as 'increase' | 'decrease' }))}>
                   <option value="increase">Higher is better</option>
                   <option value="decrease">Lower is better</option>
-                </select></div>
+                </Select></div>
               <div><label className="text-xs font-medium text-catalan-textMuted">Value source</label>
-                <select className={`${inputSmCls} mt-0.5`} value={newInd.value_source}
+                <Select className={`${inputSmCls} mt-0.5`} value={newInd.value_source}
                   onChange={e => setNewInd(p => ({ ...p, value_source: e.target.value as 'auto' | 'manual' }))}>
                   <option value="auto">Auto-compute from form field</option>
                   <option value="manual">Manual entry</option>
-                </select></div>
+                </Select></div>
               {newInd.value_source === 'auto' && newInd.aggregation !== 'percent' && (
                 <div><label className="text-xs font-medium text-catalan-textMuted">Form field</label>
                   <input list="ind-field-opts" className={`${inputSmCls} mt-0.5`} value={newInd.source_form_field}
@@ -525,10 +526,10 @@ function FeedbackPanel({ prog }: { prog: ProgramDetail }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <select className={`${inputSmCls} max-w-[200px]`} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+        <Select className={`${inputSmCls} max-w-[200px]`} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="">— All statuses —</option>
           {['open', 'in_progress', 'resolved', 'escalated'].map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-        </select>
+        </Select>
         <span className="text-xs text-catalan-textMuted">{rows.length} item(s)</span>
       </div>
       {rows.length === 0 ? (
@@ -552,13 +553,13 @@ function FeedbackPanel({ prog }: { prog: ProgramDetail }) {
                 </div>
                 {e ? (
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <select className={inputSmCls} value={e.status} onChange={ev => setEditing(p => ({ ...p, [row.submission_id]: { ...e, status: ev.target.value } }))}>
+                    <Select className={inputSmCls} value={e.status} onChange={ev => setEditing(p => ({ ...p, [row.submission_id]: { ...e, status: ev.target.value } }))}>
                       {['open', 'in_progress', 'resolved', 'escalated'].map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-                    </select>
-                    <select className={inputSmCls} value={e.assigned_to} onChange={ev => setEditing(p => ({ ...p, [row.submission_id]: { ...e, assigned_to: ev.target.value } }))}>
+                    </Select>
+                    <Select className={inputSmCls} value={e.assigned_to} onChange={ev => setEditing(p => ({ ...p, [row.submission_id]: { ...e, assigned_to: ev.target.value } }))}>
                       <option value="">— Unassigned —</option>
                       {staff.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                    </select>
+                    </Select>
                     <input className={`${inputSmCls} flex-1 min-w-[160px]`} placeholder="Resolution note"
                       value={e.resolution_note} onChange={ev => setEditing(p => ({ ...p, [row.submission_id]: { ...e, resolution_note: ev.target.value } }))} />
                     <button onClick={() => save(row.submission_id)} className={btnPrimary}>Save</button>
@@ -683,15 +684,15 @@ function SetupPanel({ prog, locations, forms, onRefresh }: {
               <div><label className="text-xs font-medium text-catalan-textMuted">Name *</label>
                 <input className={`${inputSmCls} mt-0.5`} value={newQ.name} onChange={e => setNewQ(p => ({ ...p, name: e.target.value }))} placeholder="Household Survey" /></div>
               <div><label className="text-xs font-medium text-catalan-textMuted">Participant Type</label>
-                <select className={`${inputSmCls} mt-0.5`} value={newQ.participant_type_id} onChange={e => setNewQ(p => ({ ...p, participant_type_id: e.target.value }))}>
+                <Select className={`${inputSmCls} mt-0.5`} value={newQ.participant_type_id} onChange={e => setNewQ(p => ({ ...p, participant_type_id: e.target.value }))}>
                   <option value="">— Any —</option>
                   {prog.participant_types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select></div>
+                </Select></div>
               <div><label className="text-xs font-medium text-catalan-textMuted">Form / Questionnaire</label>
-                <select className={`${inputSmCls} mt-0.5`} value={newQ.form_id} onChange={e => setNewQ(p => ({ ...p, form_id: e.target.value }))}>
+                <Select className={`${inputSmCls} mt-0.5`} value={newQ.form_id} onChange={e => setNewQ(p => ({ ...p, form_id: e.target.value }))}>
                   <option value="">— None —</option>
                   {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-                </select></div>
+                </Select></div>
               <div><label className="text-xs font-medium text-catalan-textMuted">Total Sample Target</label>
                 <input type="number" min={0} className={`${inputSmCls} mt-0.5`} value={newQ.total_target}
                   onChange={e => setNewQ(p => ({ ...p, total_target: +e.target.value }))} /></div>
@@ -737,11 +738,11 @@ function SetupPanel({ prog, locations, forms, onRefresh }: {
                   </div>
                   {addingTarget === q.id && (
                     <div className="flex gap-2 mb-2 flex-wrap">
-                      <select className={`${inputSmCls} flex-1 min-w-48`} value={newTarget.location_id}
+                      <Select className={`${inputSmCls} flex-1 min-w-48`} value={newTarget.location_id}
                         onChange={e => setNewTarget(p => ({ ...p, location_id: e.target.value }))}>
                         <option value="">— Select Location —</option>
                         {locations.map(l => <option key={l.id} value={l.id}>{[l.district, l.block, l.village].filter(Boolean).join(' › ')}</option>)}
-                      </select>
+                      </Select>
                       <input type="number" min={0} className="border border-catalan-border rounded-lg px-2 py-1.5 text-sm bg-catalan-bg text-catalan-text w-24 outline-none focus:ring-2 focus:ring-catalan-primary"
                         placeholder="Target" value={newTarget.target_count} onChange={e => setNewTarget(p => ({ ...p, target_count: +e.target.value }))} />
                       <input type="date" className="border border-catalan-border rounded-lg px-2 py-1.5 text-sm bg-catalan-bg text-catalan-text outline-none focus:ring-2 focus:ring-catalan-primary"
@@ -842,14 +843,14 @@ function SetupPanel({ prog, locations, forms, onRefresh }: {
           Pick a form to use as the beneficiary feedback intake — staff can log complaints via <strong>Collect Data</strong>,
           or make it public (Form Builder → Share) for a public link. Submissions to this form show up in the Feedback tab.
         </p>
-        <select className={`${inputSmCls} max-w-sm`} value={prog.feedback_form_id || ''}
+        <Select className={`${inputSmCls} max-w-sm`} value={prog.feedback_form_id || ''}
           onChange={async e => {
             await api.put(`/programs/${prog.id}/feedback-form`, { form_id: e.target.value || null })
             onRefresh()
           }}>
           <option value="">— None —</option>
           {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-        </select>
+        </Select>
       </div>
     </div>
   )
@@ -1200,17 +1201,17 @@ export default function ProgramsPage() {
                     <div className="bg-catalan-surface border border-catalan-border rounded-xl p-4 mb-4">
                       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                         <div><label className="text-xs text-catalan-textMuted font-medium">Participant Type</label>
-                          <select className={`${inputCls} mt-0.5`} value={progressFilters.participant_type_id}
+                          <Select className={`${inputCls} mt-0.5`} value={progressFilters.participant_type_id}
                             onChange={e => setProgressFilters(p => ({ ...p, participant_type_id: e.target.value }))}>
                             <option value="">— All —</option>
                             {ptypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                          </select></div>
+                          </Select></div>
                         <div><label className="text-xs text-catalan-textMuted font-medium">Questionnaire</label>
-                          <select className={`${inputCls} mt-0.5`} value={progressFilters.questionnaire_id}
+                          <Select className={`${inputCls} mt-0.5`} value={progressFilters.questionnaire_id}
                             onChange={e => setProgressFilters(p => ({ ...p, questionnaire_id: e.target.value }))}>
                             <option value="">— All —</option>
                             {questionnaires.map(q => <option key={q.id} value={q.id}>{q.name}</option>)}
-                          </select></div>
+                          </Select></div>
                         <div><label className="text-xs text-catalan-textMuted font-medium">District</label>
                           <input list="district-opts" className={`${inputCls} mt-0.5`} placeholder="Search…" value={progressFilters.district}
                             onChange={e => setProgressFilters(p => ({ ...p, district: e.target.value }))} />
@@ -1224,13 +1225,13 @@ export default function ProgramsPage() {
                             {[...new Set((progress?.rows ?? []).map(r => r.block).filter(Boolean))].sort().map(b => <option key={b} value={b} />)}
                           </datalist></div>
                         <div><label className="text-xs text-catalan-textMuted font-medium">Status</label>
-                          <select className={`${inputCls} mt-0.5`} value={progressFilters.status}
+                          <Select className={`${inputCls} mt-0.5`} value={progressFilters.status}
                             onChange={e => setProgressFilters(p => ({ ...p, status: e.target.value }))}>
                             <option value="">— All —</option>
                             {['not_started', 'in_progress', 'at_risk', 'completed', 'overdue'].map(s => (
                               <option key={s} value={s}>{s.replace('_', ' ')}</option>
                             ))}
-                          </select></div>
+                          </Select></div>
                       </div>
                     </div>
 

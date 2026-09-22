@@ -13,6 +13,7 @@ import LineChart from '@/components/charts/LineChart'
 import AuditLog from '@/components/AuditLog'
 import AiReportModal from '@/dashboard/AiReportModal'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 import { resolveAnswer } from '@/collect/responseRecord'
 import { useFormFieldMap } from '@/lib/useFormFieldMap'
 import { DuplicateCompareModal } from '@/dashboard/DuplicateCompareModal'
@@ -431,14 +432,14 @@ function SubmissionDetailModal({
             <div className="text-xs font-medium text-catalan-textMuted uppercase tracking-wider mb-2">Back-Check Assignment</div>
             <p className="text-xs text-catalan-textMuted mb-3">Assign the form to use for back-checking this submission.</p>
             <div className="flex gap-2">
-              <select
+              <Select
                 value={bcFormId}
                 onChange={e => setBcFormId(e.target.value)}
                 className="flex-1 border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text focus:outline-none focus:border-catalan-primary"
               >
                 <option value="">— Select back-check form —</option>
                 {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-              </select>
+              </Select>
               <button
                 disabled={savingBcForm || !bcFormId}
                 onClick={async () => {
@@ -1375,7 +1376,7 @@ export default function Dashboard() {
           <p className="text-xs text-catalan-textMuted">{active.label} — {active.hint}</p>
           <div className="flex items-center gap-2">
             <label className="text-xs text-catalan-textMuted">Sort</label>
-            <select
+            <Select
               value={dupSort}
               onChange={e => { setDupSort(e.target.value as typeof dupSort); setDupTierPage(1) }}
               className="text-xs bg-catalan-hover border border-catalan-border rounded px-2 py-1 text-catalan-text"
@@ -1384,7 +1385,7 @@ export default function Dashboard() {
               <option value="oldest">Oldest first</option>
               <option value="name">Enumerator (A→Z)</option>
               <option value="count">Most copies</option>
-            </select>
+            </Select>
             {active.key === 'exact' && activeGroups.length > 1 && (
               <Button variant="secondary" size="sm" disabled={bulkResolvingExact} onClick={() => handleResolveAllExact(activeGroups)}>
                 {bulkResolvingExact ? 'Resolving…' : `Resolve all ${activeGroups.length} exact`}
@@ -1997,21 +1998,21 @@ export default function Dashboard() {
               },
             ].map(card => (
               <div key={card.label}
-                className="rounded-xl p-5 transition-all duration-200 hover:scale-[1.02] cursor-default"
+                className="rounded-xl p-3.5 transition-all duration-200 hover:scale-[1.02] cursor-default"
                 style={{ background: card.gradient, border: `1px solid ${card.border}` }}>
-                <div className="flex items-start justify-between mb-3">
+                <div className="flex items-start justify-between mb-2">
                   <div>
-                    <div className="text-sm font-medium text-catalan-textMuted">{card.label}</div>
-                    <div className="text-xs text-catalan-textMuted/70 mt-0.5">{card.sub}</div>
+                    <div className="text-xs font-medium text-catalan-textMuted">{card.label}</div>
+                    <div className="text-[11px] text-catalan-textMuted/70 mt-0.5">{card.sub}</div>
                   </div>
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                        style={{ background: `${card.color}18` }}>
-                    <svg className="w-5 h-5" style={{ color: card.color }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="w-4 h-4" style={{ color: card.color }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       {card.icon}
                     </svg>
                   </div>
                 </div>
-                <div className="text-3xl font-bold" style={{ color: card.color }}>{typeof card.value === 'number' ? card.value.toLocaleString() : card.value}</div>
+                <div className="text-2xl font-bold" style={{ color: card.color }}>{typeof card.value === 'number' ? card.value.toLocaleString() : card.value}</div>
               </div>
             ))}
           </div>}
@@ -2220,14 +2221,14 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <label className="text-xs text-catalan-textMuted block mb-1">Form</label>
-                    <select
+                    <Select
                       value={filterForm}
                       onChange={e => setFilterForm(e.target.value)}
                       className="w-full bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
                     >
                       <option value="">All forms</option>
                       {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-                    </select>
+                    </Select>
                   </div>
                 </div>
                 {/* Row 2: Dates + actions — wrap naturally */}
@@ -2701,14 +2702,14 @@ export default function Dashboard() {
                   Submissions where the same enumerator submitted the same form more than once on the same day.
                 </p>
                 <div className="flex gap-3 items-center mb-4 flex-wrap">
-                  <select
+                  <Select
                     value={filterForm}
                     onChange={e => setFilterForm(e.target.value)}
                     className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
                   >
                     <option value="">All forms</option>
                     {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-                  </select>
+                  </Select>
                   <Button variant="secondary" size="sm" onClick={() => { setShowDuplicates(true); handleLoadDuplicates() }} disabled={loadingDuplicates}>
                     {loadingDuplicates ? 'Scanning…' : 'Scan for Duplicates'}
                   </Button>
@@ -2728,14 +2729,14 @@ export default function Dashboard() {
                 <div className="flex gap-3 items-end flex-wrap">
                   <div>
                     <label className="text-xs text-catalan-textMuted block mb-1">Form</label>
-                    <select
+                    <Select
                       value={filterForm}
                       onChange={e => setFilterForm(e.target.value)}
                       className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
                     >
                       <option value="">Select form…</option>
                       {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-xs text-catalan-textMuted block mb-1">From</label>
@@ -3461,7 +3462,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <label className="text-xs text-catalan-textMuted block mb-1">Role</label>
-                      <select
+                      <Select
                         value={newUser.role}
                         onChange={e => setNewUser(u => ({ ...u, role: e.target.value }))}
                         className="w-full bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
@@ -3469,7 +3470,7 @@ export default function Dashboard() {
                         <option value="enumerator">Enumerator</option>
                         <option value="supervisor">Supervisor</option>
                         <option value="org_admin">Org Admin</option>
-                      </select>
+                      </Select>
                     </div>
                     <div>
                       <label className="text-xs text-catalan-textMuted block mb-1">Password</label>
@@ -3644,7 +3645,7 @@ export default function Dashboard() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-catalan-textMuted block mb-1">Form *</label>
-                        <select
+                        <Select
                           value={newSchedule.form_id}
                           onChange={e => setNewSchedule(s => ({ ...s, form_id: e.target.value }))}
                           className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
@@ -3653,11 +3654,11 @@ export default function Dashboard() {
                           {forms.filter(f => f.status !== 'archived').map(f => (
                             <option key={f.id} value={f.id}>{f.title}</option>
                           ))}
-                        </select>
+                        </Select>
                       </div>
                       <div>
                         <label className="text-xs text-catalan-textMuted block mb-1">Enumerator *</label>
-                        <select
+                        <Select
                           value={newSchedule.enumerator_id}
                           onChange={e => setNewSchedule(s => ({ ...s, enumerator_id: e.target.value }))}
                           className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
@@ -3666,7 +3667,7 @@ export default function Dashboard() {
                           {team.filter(u => u.role === 'enumerator').map(u => (
                             <option key={u.id} value={u.id}>{u.name}</option>
                           ))}
-                        </select>
+                        </Select>
                       </div>
                       <div>
                         <label className="text-xs text-catalan-textMuted block mb-1">Start Date *</label>
@@ -3710,23 +3711,23 @@ export default function Dashboard() {
                       {scheduleQuestionnaires.length > 0 && (
                         <div>
                           <label className="text-xs text-catalan-textMuted block mb-1">Link to Program Questionnaire <span className="text-catalan-textMuted">(optional)</span></label>
-                          <select value={newSchedule.program_questionnaire_id}
+                          <Select value={newSchedule.program_questionnaire_id}
                             onChange={e => setNewSchedule(s => ({ ...s, program_questionnaire_id: e.target.value }))}
                             className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary">
                             <option value="">— None —</option>
                             {scheduleQuestionnaires.map(q => <option key={q.id} value={q.id}>{q.program_name} › {q.name}</option>)}
-                          </select>
+                          </Select>
                         </div>
                       )}
                       {scheduleLocations.length > 0 && (
                         <div>
                           <label className="text-xs text-catalan-textMuted block mb-1">Collection Location <span className="text-catalan-textMuted">(optional)</span></label>
-                          <select value={newSchedule.location_id}
+                          <Select value={newSchedule.location_id}
                             onChange={e => setNewSchedule(s => ({ ...s, location_id: e.target.value }))}
                             className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary">
                             <option value="">— None —</option>
                             {scheduleLocations.map(l => <option key={l.id} value={l.id}>{[l.district, l.block, l.village].filter(Boolean).join(' › ')}</option>)}
-                          </select>
+                          </Select>
                         </div>
                       )}
                     <div>

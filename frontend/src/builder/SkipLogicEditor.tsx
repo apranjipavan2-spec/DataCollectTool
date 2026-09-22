@@ -3,6 +3,7 @@ import api from '@/lib/api'
 import type { FormField, FormSection, SkipLogic, SkipCondition, ConditionGroup } from '@/types/form'
 import { isConditionGroup } from '@/types/form'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 interface AiSuggestion {
   logic: 'AND' | 'OR'; action: 'show' | 'skip'
@@ -97,14 +98,14 @@ function ConditionRow({ condition, allFields, onUpdate, onRemove }: {
     onUpdate({ value: ref ? `${y}|${m}|${d}|${ref}` : `${y}|${m}|${d}` })
   return (
     <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-      <select
+      <Select
         className={selCls}
         value={condition.field}
         onChange={e => onUpdate({ field: e.target.value })}
       >
         {allFields.map(f => <option key={f.id} value={f.name}>{f.label || f.name}</option>)}
-      </select>
-      <select
+      </Select>
+      <Select
         className={selCls}
         value={condition.operator}
         onChange={e => {
@@ -116,7 +117,7 @@ function ConditionRow({ condition, allFields, onUpdate, onRemove }: {
         }}
       >
         {operatorList.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
-      </select>
+      </Select>
       {isAgeOp ? (
         <span className="flex items-center gap-1 flex-wrap">
           <input type="number" min={0} className={`${inpCls} w-14`} value={ay} onChange={e => setAge(parseInt(e.target.value) || 0, am, ad)} title="years" />
@@ -172,14 +173,14 @@ function GroupEditor({ group, allFields, depth, onUpdate, onRemove }: {
     <div className={`border border-catalan-border/60 rounded-lg p-2.5 mb-2 bg-catalan-bg/40 ${depth > 0 ? 'ml-4' : ''}`}>
       <div className="flex items-center gap-2 mb-2 text-xs text-catalan-textMuted">
         <span>Group:</span>
-        <select
+        <Select
           className={selCls}
           value={group.logic}
           onChange={e => onUpdate({ ...group, logic: e.target.value as 'AND' | 'OR' })}
         >
           <option value="AND">ALL match (AND)</option>
           <option value="OR">ANY matches (OR)</option>
-        </select>
+        </Select>
         <div className="flex-1" />
         <button
           onClick={onRemove}
@@ -370,22 +371,22 @@ export default function SkipLogicEditor({ field, sections, onChange, prevFieldsO
       {/* Action + top-level logic selectors */}
       <div className="flex items-center gap-2 mb-3 flex-wrap text-xs text-catalan-textMuted">
         <span>Action:</span>
-        <select
+        <Select
           className={selCls}
           value={logic.action}
           onChange={e => updateLogic({ action: e.target.value as 'show' | 'skip' })}
         >
           <option value="show">Show this field if</option>
           <option value="skip">Skip this field if</option>
-        </select>
-        <select
+        </Select>
+        <Select
           className={selCls}
           value={logic.logic}
           onChange={e => updateLogic({ logic: e.target.value as 'AND' | 'OR' })}
         >
           <option value="AND">ALL conditions match</option>
           <option value="OR">ANY condition matches</option>
-        </select>
+        </Select>
       </div>
 
       {/* Conditions */}

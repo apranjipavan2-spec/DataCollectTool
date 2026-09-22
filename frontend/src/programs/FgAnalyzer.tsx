@@ -15,6 +15,7 @@ import {
   saveAnalyzerToolProject, getLastProgram, setLastProgram, type SavedTabulation,
 } from '@/lib/fgStorage'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -1054,31 +1055,31 @@ function TabulatorTab({ programId, programName, cols, sampleRows }: { programId:
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
           <div>
             <label className="text-xs text-catalan-textMuted block mb-1">Group by *</label>
-            <select className={`${sel} w-full`} value={groupby} onChange={e => setGroupby(e.target.value)}>
+            <Select className={`${sel} w-full`} value={groupby} onChange={e => setGroupby(e.target.value)}>
               {cols.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-            </select>
+            </Select>
           </div>
           <div>
             <label className="text-xs text-catalan-textMuted block mb-1">Value field</label>
-            <select className={`${sel} w-full`} value={valueField} onChange={e => setValueField(e.target.value)}>
+            <Select className={`${sel} w-full`} value={valueField} onChange={e => setValueField(e.target.value)}>
               <option value="*">Count of records (*)</option>
               {numericCols.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-            </select>
+            </Select>
           </div>
           <div>
             <label className="text-xs text-catalan-textMuted block mb-1">Aggregation</label>
-            <select className={`${sel} w-full`} value={aggregation} onChange={e => setAggregation(e.target.value)}>
+            <Select className={`${sel} w-full`} value={aggregation} onChange={e => setAggregation(e.target.value)}>
               <option value="count">Count</option>
               <option value="sum">Sum</option>
               <option value="mean">Mean (avg)</option>
-            </select>
+            </Select>
           </div>
           <div>
             <label className="text-xs text-catalan-textMuted block mb-1">Chart type</label>
-            <select className={`${sel} w-full`} value={chartType} onChange={e => setChartType(e.target.value)}>
+            <Select className={`${sel} w-full`} value={chartType} onChange={e => setChartType(e.target.value)}>
               <option value="bar">Bar</option>
               <option value="line">Line</option>
-            </select>
+            </Select>
           </div>
           <div className="sm:col-span-2">
             <label className="text-xs text-catalan-textMuted block mb-1">Table title (optional)</label>
@@ -1521,31 +1522,31 @@ function CsvTab() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
             <div>
               <label className="text-xs text-catalan-textMuted block mb-1">Group by *</label>
-              <select className={`${sel} w-full`} value={groupby} onChange={e => setGroupby(e.target.value)}>
+              <Select className={`${sel} w-full`} value={groupby} onChange={e => setGroupby(e.target.value)}>
                 {headers.map(h => <option key={h} value={h}>{h}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="text-xs text-catalan-textMuted block mb-1">Value field</label>
-              <select className={`${sel} w-full`} value={valueField} onChange={e => setValueField(e.target.value)}>
+              <Select className={`${sel} w-full`} value={valueField} onChange={e => setValueField(e.target.value)}>
                 <option value="*">Count of records (*)</option>
                 {headers.map(h => <option key={h} value={h}>{h}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="text-xs text-catalan-textMuted block mb-1">Aggregation</label>
-              <select className={`${sel} w-full`} value={aggregation} onChange={e => setAggregation(e.target.value)}>
+              <Select className={`${sel} w-full`} value={aggregation} onChange={e => setAggregation(e.target.value)}>
                 <option value="count">Count</option>
                 <option value="sum">Sum</option>
                 <option value="mean">Mean</option>
-              </select>
+              </Select>
             </div>
             <div>
               <label className="text-xs text-catalan-textMuted block mb-1">Chart type</label>
-              <select className={`${sel} w-full`} value={chartType} onChange={e => setChartType(e.target.value)}>
+              <Select className={`${sel} w-full`} value={chartType} onChange={e => setChartType(e.target.value)}>
                 <option value="bar">Bar</option>
                 <option value="line">Line</option>
-              </select>
+              </Select>
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs text-catalan-textMuted block mb-1">Title (optional)</label>
@@ -1597,7 +1598,7 @@ function ProgramPicker({ value, onChange }: { value: string; onChange: (id: stri
     api.get('/programs/').then(r => setPrograms(Array.isArray(r.data) ? r.data : [])).catch(() => {})
   }, [])
   return (
-    <select className={`${sel} min-w-[220px]`} value={value}
+    <Select className={`${sel} min-w-[220px]`} value={value}
       onChange={e => {
         const p = programs.find(p => p.id === e.target.value)
         onChange(e.target.value, p?.name ?? '')
@@ -1607,7 +1608,7 @@ function ProgramPicker({ value, onChange }: { value: string; onChange: (id: stri
       {programs.map(p => (
         <option key={p.id} value={p.id}>{p.name}{p.scheme_name ? ` · ${p.scheme_name}` : ''}</option>
       ))}
-    </select>
+    </Select>
   )
 }
 

@@ -5,6 +5,12 @@ import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
+
+interface OrgOption {
+  tenant_id: string
+  org_name: string
+}
 
 interface BinItem {
   entity_type: string
@@ -40,10 +46,23 @@ export default function BinPage() {
   const [sortField, setSortField] = useState<SortField>('deleted_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
+  const isMasterAdmin = user?.role === 'master_admin'
+  const [orgs, setOrgs] = useState<OrgOption[]>([])
+  const [selectedTenantId, setSelectedTenantId] = useState<string>('')
+  // Only master_admin can override tenant_id (backend ignores it for anyone else).
+  const tenantParam = isMasterAdmin && selectedTenantId ? { tenant_id: selectedTenantId } : {}
+
+  useEffect(() => {
+    if (!isMasterAdmin) return
+    api.get('/billing/admin/subscriptions')
+      .then(({ data }) => setOrgs(data.map((o: any) => ({ tenant_id: o.tenant_id, org_name: o.org_name }))))
+      .catch(() => {}) // non-fatal — picker just stays empty, own-tenant bin still works
+  }, [isMasterAdmin])
+
   const load = async () => {
     setLoading(true)
     try {
-      const { data } = await api.get('/bin')
+      const { data } = await api.get('/bin', { params: tenantParam })
       setItems(data.items)
       setGroups(data.groups ?? [])
       setRetentionDays(data.retention_days ?? 360)
@@ -55,12 +74,12 @@ export default function BinPage() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [selectedTenantId])
 
   const restore = async (it: BinItem) => {
     setBusy(it.id)
     try {
-      await api.post(`/bin/${it.entity_type}/${it.id}/restore`)
+      await api.post(`/bin/${it.entity_type}/${it.id}/restore`, null, { params: tenantParam })
       setItems(prev => prev.filter(x => x.id !== it.id))
       setGroups(prev => prev.map(g => g.name === it.group ? { ...g, count: Math.max(0, g.count - 1) } : g))
       toast.success(`Restored ${it.entity_label.toLowerCase()} "${it.label}"`)
@@ -75,7 +94,7 @@ export default function BinPage() {
     if (!window.confirm(`Permanently delete "${it.label}"? This cannot be undone.`)) return
     setBusy(it.id)
     try {
-      await api.delete(`/bin/${it.entity_type}/${it.id}`)
+      await api.delete(`/bin/${it.entity_type}/${it.id}`, { params: tenantParam })
       setItems(prev => prev.filter(x => x.id !== it.id))
       setGroups(prev => prev.map(g => g.name === it.group ? { ...g, count: Math.max(0, g.count - 1) } : g))
       toast.success(`Permanently deleted "${it.label}"`)
@@ -116,7 +135,20 @@ export default function BinPage() {
     <div className="flex h-screen bg-catalan-bg">
       <Sidebar items={getNavItems(user?.role ?? '')} role={user?.role} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNav titleNode={<span className="text-catalan-text font-semibold text-base">Recycle Bin</span>} />
+        <TopNav
+          titleNode={<span className="text-catalan-text font-semibold text-base">Recycle Bin</span>}
+          rightContent={isMasterAdmin ? (
+            <Select
+              value={selectedTenantId}
+              onChange={e => setSelectedTenantId(e.target.value)}
+              className="text-sm py-1.5"
+              wrapperClassName="w-56"
+            >
+              <option value="">My account</option>
+              {orgs.map(o => <option key={o.tenant_id} value={o.tenant_id}>{o.org_name}</option>)}
+            </Select>
+          ) : undefined}
+        />
 
         {loading ? (
           <div className="flex-1 flex items-center justify-center text-sm text-catalan-textMuted animate-pulse">Loading…</div>

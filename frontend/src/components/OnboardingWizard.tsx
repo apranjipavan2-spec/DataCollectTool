@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '@/lib/api'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 const STORAGE_KEY = 'fg_onboarding_done'
 
@@ -16,6 +17,11 @@ const STEPS: Step[] = [
   { id: 3, title: 'Invite your team', desc: "Add a supervisor or enumerator. They'll get a login link and can start collecting data immediately." },
   { id: 4, title: "You're ready to go", desc: "Head to the dashboard to deploy your form, monitor submissions, and run reports." },
 ]
+
+const inp = 'w-full border border-catalan-border rounded-lg px-3 py-2.5 text-sm bg-catalan-bg text-catalan-text focus:outline-none focus:ring-2 focus:ring-catalan-primary'
+const label = 'block text-sm font-medium text-catalan-textSecondary mb-1'
+const btnPrimary = 'bg-catalan-primary hover:opacity-90 text-catalan-bg font-semibold rounded-lg py-2.5 text-sm transition-opacity disabled:opacity-50'
+const btnSecondary = 'border border-catalan-border text-catalan-textSecondary font-medium rounded-lg py-2.5 text-sm hover:bg-catalan-hover transition-colors'
 
 export default function OnboardingWizard() {
   const [visible, setVisible] = useState(false)
@@ -81,29 +87,29 @@ export default function OnboardingWizard() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div className="bg-catalan-surface rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
         {/* Progress bar */}
-        <div className="h-1 bg-gray-100 dark:bg-gray-800">
+        <div className="h-1 bg-catalan-hover">
           <div
-            className="h-1 bg-blue-500 transition-all duration-500"
+            className="h-1 bg-catalan-primary transition-all duration-500"
             style={{ width: `${(step / STEPS.length) * 100}%` }}
           />
         </div>
 
         {/* Header */}
-        <div className="px-6 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+        <div className="px-6 pt-5 pb-4 border-b border-catalan-border flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-1">
+            <p className="text-xs font-semibold text-catalan-primary uppercase tracking-wider mb-1">
               Step {step} of {STEPS.length}
             </p>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+            <h2 className="text-lg font-bold text-catalan-text">
               {STEPS[step - 1].title}
             </h2>
-            <p className="text-sm text-gray-500 mt-0.5">{STEPS[step - 1].desc}</p>
+            <p className="text-sm text-catalan-textMuted mt-0.5">{STEPS[step - 1].desc}</p>
           </div>
           <button
             onClick={dismiss}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl font-light leading-none p-1"
+            className="text-catalan-textMuted hover:text-catalan-text text-xl font-light leading-none p-1"
             title="Skip setup"
           >
             ×
@@ -113,13 +119,13 @@ export default function OnboardingWizard() {
         {/* Step content */}
         <div className="px-6 py-5">
           {error && (
-            <p className="text-red-500 text-sm mb-3 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+            <p className="text-catalan-error text-sm mb-3 bg-catalan-error/10 rounded-lg px-3 py-2">{error}</p>
           )}
 
           {step === 1 && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className={label}>
                   Organisation name
                 </label>
                 <input
@@ -127,14 +133,14 @@ export default function OnboardingWizard() {
                   value={orgName}
                   onChange={e => setOrgName(e.target.value)}
                   placeholder="e.g. Pratham Education Foundation"
-                  className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                  className={inp}
                   autoFocus
                 />
               </div>
               <button
                 onClick={handleStep1}
                 disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-2.5 text-sm transition-colors disabled:opacity-50"
+                className={`w-full ${btnPrimary}`}
               >
                 {loading ? 'Saving…' : 'Continue →'}
               </button>
@@ -144,30 +150,30 @@ export default function OnboardingWizard() {
           {step === 2 && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Describe your survey <span className="text-gray-400 font-normal">(optional)</span>
+                <label className={label}>
+                  Describe your survey <span className="text-catalan-textMuted font-normal">(optional)</span>
                 </label>
                 <textarea
                   value={formDescription}
                   onChange={e => setFormDescription(e.target.value)}
                   placeholder="e.g. A household survey to track WASH outcomes in rural Maharashtra — cover water source, sanitation facilities, hygiene practices, and 5-year trend questions."
                   rows={4}
-                  className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white resize-none"
+                  className={`${inp} resize-none`}
                   autoFocus
                 />
-                <p className="text-xs text-gray-400 mt-1">AI will generate a draft form — you can edit all questions before publishing.</p>
+                <p className="text-xs text-catalan-textMuted mt-1">AI will generate a draft form — you can edit all questions before publishing.</p>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => setStep(3)}
-                  className="flex-1 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 font-medium rounded-lg py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  className={`flex-1 ${btnSecondary}`}
                 >
                   Skip for now
                 </button>
                 <button
                   onClick={handleStep2}
                   disabled={loading}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-2.5 text-sm transition-colors disabled:opacity-50"
+                  className={`flex-1 ${btnPrimary}`}
                 >
                   {loading ? 'Generating…' : 'Generate form →'}
                 </button>
@@ -179,19 +185,19 @@ export default function OnboardingWizard() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Email <span className="text-gray-400 font-normal">(optional)</span>
+                  <label className={label}>
+                    Email <span className="text-catalan-textMuted font-normal">(optional)</span>
                   </label>
                   <input
                     type="email"
                     value={inviteEmail}
                     onChange={e => setInviteEmail(e.target.value)}
                     placeholder="team@org.com"
-                    className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                    className={inp}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className={label}>
                     Phone
                   </label>
                   <input
@@ -199,33 +205,33 @@ export default function OnboardingWizard() {
                     value={invitePhone}
                     onChange={e => setInvitePhone(e.target.value)}
                     placeholder="+91 98765 43210"
-                    className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                    className={inp}
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
-                <select
+                <label className={label}>Role</label>
+                <Select
                   value={inviteRole}
                   onChange={e => setInviteRole(e.target.value)}
-                  className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                  className="w-full py-2.5"
                 >
                   <option value="enumerator">Enumerator (field data collector)</option>
                   <option value="supervisor">Supervisor (reviews submissions)</option>
                   <option value="org_admin">Org Admin (full access)</option>
-                </select>
+                </Select>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => setStep(4)}
-                  className="flex-1 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 font-medium rounded-lg py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  className={`flex-1 ${btnSecondary}`}
                 >
                   Skip for now
                 </button>
                 <button
                   onClick={handleStep3}
                   disabled={loading}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-2.5 text-sm transition-colors disabled:opacity-50"
+                  className={`flex-1 ${btnPrimary}`}
                 >
                   {loading ? 'Sending invite…' : 'Send invite →'}
                 </button>
@@ -236,15 +242,15 @@ export default function OnboardingWizard() {
           {step === 4 && (
             <div className="space-y-4 text-center py-2">
               <div className="text-5xl"><EmojiIcon e="🎉" /></div>
-              <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
+              <p className="text-catalan-textSecondary text-sm leading-relaxed">
                 Your workspace is set up. Head to the dashboard to publish your first form, assign it to enumerators, and watch submissions come in — even offline.
               </p>
-              <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg px-4 py-3 text-left text-sm text-blue-800 dark:text-blue-200">
+              <div className="bg-catalan-primary/10 rounded-lg px-4 py-3 text-left text-sm text-catalan-primaryLight">
                 <strong>Quick tip:</strong> Use the AI Report button in the dashboard Analytics tab to auto-generate a narrative summary of your data — ideal for donor reports and presentations.
               </div>
               <button
                 onClick={dismiss}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-2.5 text-sm transition-colors"
+                className={`w-full ${btnPrimary}`}
               >
                 Go to dashboard →
               </button>
@@ -258,7 +264,7 @@ export default function OnboardingWizard() {
             <div
               key={s.id}
               className={`w-2 h-2 rounded-full transition-colors ${
-                s.id === step ? 'bg-blue-500' : s.id < step ? 'bg-blue-200' : 'bg-gray-200 dark:bg-gray-700'
+                s.id === step ? 'bg-catalan-primary' : s.id < step ? 'bg-catalan-primary/40' : 'bg-catalan-hover'
               }`}
             />
           ))}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import Select from '@/components/Select'
 import api from '@/lib/api'
 import { Button, Card } from '@/components/ui'
 import { useToast } from '@/lib/ToastContext'
@@ -205,14 +206,14 @@ export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: F
           <div className="flex flex-wrap gap-3 items-end">
             <div>
               <label className="text-xs text-catalan-textMuted block mb-1">Form *</label>
-              <select
+              <Select
                 value={csvFormId}
                 onChange={e => setCsvFormId(e.target.value)}
                 className="bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
               >
                 <option value="">Select form…</option>
                 {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="text-xs text-catalan-textMuted block mb-1">File (.csv or .xlsx)</label>
@@ -245,25 +246,25 @@ export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: F
                 <EmojiIcon e="📍" /> Location
               </div>
               <div>
-                <select
+                <Select
                   value={filterDistrict}
                   onChange={e => handleDistrictFilter(e.target.value)}
                   className="bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
                 >
                   <option value="">All Districts</option>
                   {districts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
+                </Select>
               </div>
               {talukas.length > 0 && (
                 <div>
-                  <select
+                  <Select
                     value={filterTaluka}
                     onChange={e => setFilterTaluka(e.target.value)}
                     className="bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
                   >
                     <option value="">All Talukas</option>
                     {talukas.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
+                  </Select>
                 </div>
               )}
               <button
@@ -296,18 +297,18 @@ export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: F
         <div className="flex flex-wrap gap-3 items-end mb-4">
           <div>
             <label className="text-xs text-catalan-textMuted block mb-1">Form</label>
-            <select
+            <Select
               value={filterForm}
               onChange={e => setFilterForm(e.target.value)}
               className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
             >
               <option value="">All forms</option>
               {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-            </select>
+            </Select>
           </div>
           <div>
             <label className="text-xs text-catalan-textMuted block mb-1">Status</label>
-            <select
+            <Select
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value)}
               className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
@@ -316,7 +317,7 @@ export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: F
               {['pending', 'visited', 'completed', 'refused'].map(s => (
                 <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <Button variant="primary" size="sm" onClick={() => setShowAddForm(v => !v)} className="ml-auto">
             {showAddForm ? 'Cancel' : '+ Add Respondent'}
@@ -328,14 +329,14 @@ export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: F
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-catalan-textMuted block mb-1">Form *</label>
-                <select
+                <Select
                   value={newEntry.form_id}
                   onChange={e => setNewEntry(n => ({ ...n, form_id: e.target.value }))}
                   className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
                 >
                   <option value="">Select form…</option>
                   {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="text-xs text-catalan-textMuted block mb-1">Name *</label>
@@ -357,14 +358,14 @@ export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: F
               </div>
               <div>
                 <label className="text-xs text-catalan-textMuted block mb-1">Assign Enumerator</label>
-                <select
+                <Select
                   value={newEntry.target_enumerator_id}
                   onChange={e => setNewEntry(n => ({ ...n, target_enumerator_id: e.target.value }))}
                   className="w-full bg-catalan-bg border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
                 >
                   <option value="">— Unassigned —</option>
                   {enumerators.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="text-xs text-catalan-textMuted block mb-1">Scheduled Date</label>
@@ -417,7 +418,7 @@ export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: F
                     <td className="px-3 py-2 text-catalan-textMuted text-xs">{getEnumeratorName(r.target_enumerator_id)}</td>
                     <td className="px-3 py-2 text-catalan-textMuted text-xs">{r.scheduled_date ?? '—'}</td>
                     <td className="px-3 py-2">
-                      <select
+                      <Select
                         value={r.status}
                         onChange={e => handleStatusChange(r.id, e.target.value)}
                         className={`text-xs px-2 py-1 rounded font-medium border-0 focus:outline-none cursor-pointer ${STATUS_COLORS[r.status] ?? 'text-catalan-textMuted'}`}
@@ -425,7 +426,7 @@ export default function RosterTab({ forms: rawForms, team: rawTeam }: { forms: F
                         {['pending', 'visited', 'completed', 'refused'].map(s => (
                           <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
                         ))}
-                      </select>
+                      </Select>
                     </td>
                     <td className="px-3 py-2">
                       <button

@@ -8,6 +8,7 @@ import { useToast } from '@/lib/ToastContext'
 import LineChart from '@/components/charts/LineChart'
 import BarChart from '@/components/charts/BarChart'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -200,11 +201,11 @@ function CleanerTab({ programId }: { programId: string }) {
 
       {/* Toolbar */}
       <div className="flex items-center gap-3">
-        <select className={selectCls} value={issueType} onChange={e => { setIssueType(e.target.value); setPage(1) }}>
+        <Select className={selectCls} value={issueType} onChange={e => { setIssueType(e.target.value); setPage(1) }}>
           <option value="all">All submissions</option>
           <option value="issues_only">Issues only</option>
           {Object.keys(ISSUE_LABELS).map(k => <option key={k} value={k}>{ISSUE_LABELS[k]}</option>)}
-        </select>
+        </Select>
         <span className="text-sm text-catalan-textMuted">{data?.total ?? 0} records</span>
         <span className="text-sm text-catalan-textMuted">Quality: {data?.quality_score ?? 0}%</span>
       </div>
@@ -368,26 +369,26 @@ function TabulatorTab({ programId }: { programId: string }) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="text-xs text-catalan-textMuted block mb-1">Group by</label>
-            <select className={`${selectCls} w-full`} value={groupby} onChange={e => setGroupby(e.target.value)}>
+            <Select className={`${selectCls} w-full`} value={groupby} onChange={e => setGroupby(e.target.value)}>
               {cols.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-            </select>
+            </Select>
           </div>
           <div>
             <label className="text-xs text-catalan-textMuted block mb-1">Value field</label>
-            <select className={`${selectCls} w-full`} value={valueField} onChange={e => setValueField(e.target.value)}>
+            <Select className={`${selectCls} w-full`} value={valueField} onChange={e => setValueField(e.target.value)}>
               <option value="*">Count (*)</option>
               {cols.filter(c => ['number', 'integer'].includes(c.type)).map(c => (
                 <option key={c.id} value={c.id}>{c.label}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <label className="text-xs text-catalan-textMuted block mb-1">Aggregation</label>
-            <select className={`${selectCls} w-full`} value={aggregation} onChange={e => setAggregation(e.target.value)}>
+            <Select className={`${selectCls} w-full`} value={aggregation} onChange={e => setAggregation(e.target.value)}>
               <option value="count">Count</option>
               <option value="sum">Sum</option>
               <option value="mean">Mean</option>
-            </select>
+            </Select>
           </div>
         </div>
         <div className="mt-4">

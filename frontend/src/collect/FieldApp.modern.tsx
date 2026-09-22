@@ -1266,7 +1266,7 @@ export default function FieldApp() {
             {programContext.location_id ? (
               <span className="text-blue-200 truncate"><EmojiIcon e="📍" /> {[programContext.location_district, programContext.location_block, programContext.location_village].filter(Boolean).join(' › ')}</span>
             ) : (
-              <select className="ml-auto text-blue-900 bg-white text-xs rounded px-2 py-0.5 border-0"
+              <select className="ml-auto text-blue-900 bg-white text-xs rounded px-2 py-0.5 border-0 max-w-[50vw] truncate"
                 value={selectedLocationId}
                 onChange={e => {
                   const lid = e.target.value

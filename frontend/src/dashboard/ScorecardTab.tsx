@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import Select from '@/components/Select'
 import api from '@/lib/api'
 
 interface EnumScore {
@@ -84,10 +85,10 @@ export default function ScorecardTab({ forms }: { forms: Form[] }) {
       <div className={`${card} flex flex-wrap gap-3 items-end`}>
         <div>
           <div className="text-xs text-catalan-textMuted mb-1">Form</div>
-          <select value={formId} onChange={e => setFormId(e.target.value)} className={inp}>
+          <Select value={formId} onChange={e => setFormId(e.target.value)} className={inp}>
             <option value="">All forms</option>
             {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-          </select>
+          </Select>
         </div>
         <div>
           <div className="text-xs text-catalan-textMuted mb-1">From</div>

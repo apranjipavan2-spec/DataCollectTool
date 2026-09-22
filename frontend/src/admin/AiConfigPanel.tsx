@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api, { getStoredUser } from '@/lib/api'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 const PROVIDERS = [
   { id: 'openai',    label: 'OpenAI',    icon: '🟢', placeholder: 'sk-…',     defaultModel: 'gpt-4o',               models: ['gpt-4o','gpt-4o-mini','gpt-4-turbo','gpt-3.5-turbo'] },
@@ -15,7 +16,7 @@ interface KeysStatus { [p: string]: { configured: boolean; model: string } }
 interface ConfigData { active_provider: string; keys: KeysStatus; configured: boolean }
 
 const inp = 'w-full border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text focus:ring-2 focus:ring-catalan-primary outline-none'
-const sel = 'w-full border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text focus:ring-2 focus:ring-catalan-primary outline-none'
+const sel = 'w-full truncate border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text focus:ring-2 focus:ring-catalan-primary outline-none'
 
 export default function AiConfigPanel() {
   const user = getStoredUser()
@@ -108,13 +109,13 @@ function AiUsagePanel() {
             {data?.scope === 'global' ? 'All tenants' : 'Your organisation'} · last {days} days
           </div>
         </div>
-        <select className="border border-catalan-border rounded-lg px-3 py-1.5 text-sm bg-catalan-bg text-catalan-text"
+        <Select className="border border-catalan-border rounded-lg px-3 py-1.5 text-sm bg-catalan-bg text-catalan-text"
           value={days} onChange={e => setDays(Number(e.target.value))}>
           <option value={7}>Last 7 days</option>
           <option value={30}>Last 30 days</option>
           <option value={90}>Last 90 days</option>
           <option value={365}>Last 365 days</option>
-        </select>
+        </Select>
       </div>
 
       {loading ? (
@@ -317,9 +318,9 @@ function MasterAiConfig({ initial, onUpdated }: { initial: ConfigData | null; on
               </div>
               <div>
                 <label className="text-xs font-medium text-catalan-textMuted block mb-1">Model</label>
-                <select className={sel} value={keys[pid].model} onChange={e => setKey(pid, 'model', e.target.value)}>
+                <Select className={sel} value={keys[pid].model} onChange={e => setKey(pid, 'model', e.target.value)}>
                   {p.models.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
+                </Select>
               </div>
             </div>
 

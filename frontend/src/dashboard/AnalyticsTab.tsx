@@ -8,6 +8,7 @@ import {
 } from 'recharts'
 import api from '@/lib/api'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 const COLORS = {
   primary: '#0ea5e9',
@@ -126,14 +127,14 @@ export default function AnalyticsTab({ forms }: { forms: Form[] }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <select
+        <Select
           value={selectedForm}
           onChange={e => setSelectedForm(e.target.value)}
           className="bg-catalan-hover border border-catalan-border rounded-lg px-3 py-2 text-sm text-catalan-text focus:outline-none focus:border-catalan-primary"
         >
           <option value="">Select a form…</option>
           {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-        </select>
+        </Select>
         {loading && <span className="text-xs text-catalan-textMuted animate-pulse">Loading…</span>}
       </div>
 

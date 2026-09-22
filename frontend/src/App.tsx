@@ -41,6 +41,7 @@ const PublicSurveyPage   = lazy(() => import('@/collect/PublicSurveyPage'))
 const RecoverPage        = lazy(() => import('@/collect/RecoverPage'))
 const SubscriptionPage   = lazy(() => import('@/admin/SubscriptionPage'))
 const AdminPayments      = lazy(() => import('@/admin/AdminPayments'))
+const PlatformSettingsPage = lazy(() => import('@/admin/PlatformSettingsPage'))
 const PricingPage        = lazy(() => import('@/pages/PricingPage'))
 const BinPage            = lazy(() => import('@/admin/BinPage'))
 const DataRightsPage     = lazy(() => import('@/admin/DataRightsPage'))
@@ -237,6 +238,12 @@ export default function App() {
               <Route path="/admin/payments" element={
                 <RequireAuth roles={['master_admin']}>
                   <LazyRoute><AdminPayments /></LazyRoute>
+                </RequireAuth>
+              } />
+
+              <Route path="/admin/settings" element={
+                <RequireAuth roles={['master_admin']}>
+                  <LazyRoute><PlatformSettingsPage /></LazyRoute>
                 </RequireAuth>
               } />
 

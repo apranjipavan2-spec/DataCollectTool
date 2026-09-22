@@ -5,6 +5,7 @@ import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import { getLastProgram, setLastProgram } from '@/lib/fgStorage'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -48,13 +49,13 @@ function ProgramPicker({ value, onChange }: { value: string; onChange: (id: stri
   const [programs, setPrograms] = useState<Program[]>([])
   useEffect(() => { api.get('/programs/').then(r => setPrograms(r.data)).catch(() => {}) }, [])
   return (
-    <select className={`${sel} min-w-[220px]`} value={value}
+    <Select className={`${sel} min-w-[220px]`} value={value}
       onChange={e => { onChange(e.target.value); setLastProgram(e.target.value) }}>
       <option value="">— Select a program —</option>
       {programs.map(p => (
         <option key={p.id} value={p.id}>{p.name}{p.scheme_name ? ` · ${p.scheme_name}` : ''}</option>
       ))}
-    </select>
+    </Select>
   )
 }
 
@@ -168,11 +169,11 @@ export default function FgCleaner() {
 
                 {/* Filter row */}
                 <div className="flex items-center gap-3">
-                  <select className={sel} value={issueType} onChange={e => { setIssueType(e.target.value); setPage(1) }}>
+                  <Select className={sel} value={issueType} onChange={e => { setIssueType(e.target.value); setPage(1) }}>
                     <option value="all">All submissions</option>
                     <option value="issues_only">Issues only</option>
                     {Object.keys(ISSUE_LABELS).map(k => <option key={k} value={k}>{ISSUE_LABELS[k]}</option>)}
-                  </select>
+                  </Select>
                   <button onClick={load} className={btnSe}>Refresh</button>
                 </div>
 

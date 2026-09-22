@@ -4,6 +4,7 @@ import type { FormField, FormSection, FieldOption, FieldType } from '@/types/for
 import { evalFormula } from '@/lib/formUtils'
 import SkipLogicEditor from './SkipLogicEditor'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'text',            label: 'Text' },
@@ -154,10 +155,10 @@ function CompareValueInput({ condField, value, onChange }: {
   if (condField?.type === 'single_choice' || condField?.type === 'multiple_choice') {
     const opts = condField.options ?? []
     return (
-      <select value={value} onChange={e => onChange(e.target.value)} className={`${base} min-w-[120px]`}>
+      <Select value={value} onChange={e => onChange(e.target.value)} className={`${base} min-w-[120px]`}>
         <option value="">-- pick option --</option>
         {opts.map(o => <option key={o.value} value={o.value}>{o.label || o.value}</option>)}
-      </select>
+      </Select>
     )
   }
 
@@ -169,12 +170,12 @@ function CompareValueInput({ condField, value, onChange }: {
     const min = condField.min ?? 1
     const max = condField.max ?? 5
     return (
-      <select value={value} onChange={e => onChange(e.target.value)} className={`${base} w-24`}>
+      <Select value={value} onChange={e => onChange(e.target.value)} className={`${base} w-24`}>
         <option value="">--</option>
         {Array.from({ length: max - min + 1 }, (_, i) => i + min).map(n => (
           <option key={n} value={String(n)}>{n}</option>
         ))}
-      </select>
+      </Select>
     )
   }
 
@@ -208,7 +209,7 @@ function ExprInput({ label, value, prevFields, onChange }: {
           onChange={e => onChange(e.target.value)}
           placeholder='number, "text", or expression'
         />
-        <select
+        <Select
           value=""
           onChange={e => handleInsertField(e.target.value)}
           className="absolute right-1 top-1 bottom-1 text-xs bg-catalan-primary/10 border border-catalan-primary/20 text-catalan-primary rounded-md px-1 focus:outline-none cursor-pointer"
@@ -217,7 +218,7 @@ function ExprInput({ label, value, prevFields, onChange }: {
           {prevFields.map(f => (
             <option key={f.id} value={f.name}>{f.label || f.name}</option>
           ))}
-        </select>
+        </Select>
       </div>
     </div>
   )
@@ -317,18 +318,18 @@ function FormulaBuilder({ field, prevFields, onChange }: {
 
           {/* Insert helpers — wrap within the panel width */}
           <div className="flex flex-wrap items-center gap-1.5">
-            <select
+            <Select
               value=""
               onChange={e => { if (e.target.value) onChange((field.formula ?? '') + (field.formula ? ' ' : '') + e.target.value) }}
               className="max-w-full text-xs bg-catalan-primary/10 border border-catalan-primary/20 text-catalan-primary rounded-md px-2 py-1 focus:outline-none cursor-pointer"
             >
               <option value="">+ insert field</option>
               {prevFields.map(f => <option key={f.id} value={f.name}>{f.label || f.name}</option>)}
-            </select>
+            </Select>
 
             {/* Age from a date-of-birth field */}
             {prevFields.some(f => f.type === 'date') && (
-              <select
+              <Select
                 value=""
                 onChange={e => { if (e.target.value) onChange((field.formula ?? '') + (field.formula ? ' ' : '') + `age(${e.target.value})`) }}
                 className="max-w-full text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 rounded-md px-2 py-1 focus:outline-none cursor-pointer"
@@ -336,7 +337,7 @@ function FormulaBuilder({ field, prevFields, onChange }: {
               >
                 <option value="">+ age(date)</option>
                 {prevFields.filter(f => f.type === 'date').map(f => <option key={f.id} value={f.name}>{f.label || f.name}</option>)}
-              </select>
+              </Select>
             )}
 
             {['+', '−', '×', '÷', 'round(', 'sum('].map(op => (
@@ -368,7 +369,7 @@ function FormulaBuilder({ field, prevFields, onChange }: {
               {/* Field selector */}
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs text-catalan-textMuted">Field</span>
-                <select
+                <Select
                   className={selCls}
                   value={cond.field}
                   onChange={e => updateCond({ field: e.target.value })}
@@ -377,14 +378,14 @@ function FormulaBuilder({ field, prevFields, onChange }: {
                   {prevFields.map(f => (
                     <option key={f.id} value={f.name}>{f.label || f.name}</option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               {/* Operator selector — adapts to field type */}
               {cond.field && (
                 <div className="flex flex-col gap-0.5">
                   <span className="text-xs text-catalan-textMuted">Condition</span>
-                  <select
+                  <Select
                     className={selCls}
                     value={cond.op}
                     onChange={e => updateCond({ op: e.target.value })}
@@ -392,7 +393,7 @@ function FormulaBuilder({ field, prevFields, onChange }: {
                     {availableOps.map(op => (
                       <option key={op.value} value={op.value}>{op.label}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               )}
 
@@ -569,7 +570,7 @@ function RepeatGroupChildEditor({ fields, onChange }: {
               onClick={() => setExpandedId(isOpen ? null : cf.id)}
             >
               <span className="text-xs font-mono text-catalan-primary w-5 flex-shrink-0">{idx + 1}</span>
-              <select
+              <Select
                 value={cf.type}
                 onClick={e => e.stopPropagation()}
                 onChange={e => {
@@ -585,7 +586,7 @@ function RepeatGroupChildEditor({ fields, onChange }: {
                 className="text-xs border border-catalan-border rounded px-1.5 py-0.5 bg-catalan-surface text-catalan-text focus:outline-none focus:border-catalan-primary flex-shrink-0"
               >
                 {CHILD_FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
+              </Select>
               <input
                 value={cf.label}
                 onClick={e => e.stopPropagation()}
@@ -761,13 +762,13 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
     <div className="p-5 sm:p-6 max-w-2xl">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <select
+        <Select
           value={field.type}
           onChange={e => handleTypeChange(e.target.value as FieldType)}
           className="text-xs font-semibold text-catalan-primary bg-catalan-primary/10 border border-catalan-primary/20 px-2.5 py-1 rounded-md focus:outline-none focus:border-catalan-primary cursor-pointer hover:bg-catalan-primary/20 transition-colors"
         >
           {FIELD_TYPES.map(ft => <option key={ft.value} value={ft.value}>{ft.label}</option>)}
-        </select>
+        </Select>
         <button onClick={onDelete} className="text-xs px-3 py-1.5 rounded-lg border border-catalan-error/30 text-catalan-error hover:bg-catalan-error/10 transition-colors">
           Delete field
         </button>
@@ -987,12 +988,12 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
                   )
                 })}
                 {parentChoiceFields.some(p => !(field.choiceFilter ?? []).some(cf => cf.field === p.name)) && (
-                  <select value="" onChange={e => addCascadeParent(e.target.value)} className={`${inputCls} !w-auto text-xs`}>
+                  <Select value="" onChange={e => addCascadeParent(e.target.value)} className={`${inputCls} !w-auto text-xs`}>
                     <option value="">+ Add parent question…</option>
                     {parentChoiceFields.filter(p => !(field.choiceFilter ?? []).some(cf => cf.field === p.name)).map(p => (
                       <option key={p.id} value={p.name}>{p.label || p.name}</option>
                     ))}
-                  </select>
+                  </Select>
                 )}
               </div>
               {!!field.choiceFilter?.length && (field.options ?? []).length > 0 && (
@@ -1003,7 +1004,7 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
                       {field.choiceFilter!.map(cf => {
                         const parent = parentChoiceFields.find(p => p.name === cf.field)
                         return (
-                          <select
+                          <Select
                             key={cf.field}
                             value={(opt as Record<string, unknown>)[cf.attr] as string ?? ''}
                             onChange={e => updateOptionCascadeValue(i, cf.attr, e.target.value)}
@@ -1013,7 +1014,7 @@ export default function FieldEditor({ field, sections, onChange, onDelete }: Pro
                             {(parent?.options ?? []).map(po => (
                               <option key={po.value} value={po.value}>{po.label || po.value}</option>
                             ))}
-                          </select>
+                          </Select>
                         )
                       })}
                     </div>

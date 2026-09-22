@@ -12,6 +12,7 @@ import {
   type SavedTabulation, type SavedReport,
 } from '@/lib/fgStorage'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -24,7 +25,6 @@ const sh    = 'text-xs font-semibold text-catalan-textMuted uppercase tracking-w
 const btnPr = 'px-4 py-2 bg-catalan-primary text-catalan-bg rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40'
 const btnSe = 'px-3 py-1.5 text-sm border border-catalan-border rounded-lg text-catalan-text hover:bg-catalan-hover transition-colors disabled:opacity-40'
 const btnDa = 'px-3 py-1.5 text-sm border border-catalan-error/30 text-catalan-error rounded-lg hover:bg-catalan-error/10 transition-colors'
-const sel   = 'border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text focus:ring-2 focus:ring-catalan-primary outline-none'
 const inp   = 'border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text placeholder:text-catalan-textMuted focus:ring-2 focus:ring-catalan-primary outline-none'
 
 const STYLES = [
@@ -43,7 +43,7 @@ function ProgramPicker({ value, onChange, size = 'normal' }: { value: string; on
   const [programs, setPrograms] = useState<Program[]>([])
   useEffect(() => { api.get('/programs/').then(r => setPrograms(Array.isArray(r.data) ? r.data : [])).catch(() => {}) }, [])
   return (
-    <select className={size === 'large' ? `${sel} w-full py-3 text-base` : `${sel} min-w-[220px]`} value={value}
+    <Select className={size === 'large' ? 'w-full py-3 text-base' : 'min-w-[220px]'} value={value}
       onChange={e => {
         const p = programs.find(p => p.id === e.target.value) ?? null
         onChange(e.target.value, p)
@@ -51,7 +51,7 @@ function ProgramPicker({ value, onChange, size = 'normal' }: { value: string; on
       }}>
       <option value="">— Select a program —</option>
       {programs.map(p => <option key={p.id} value={p.id}>{p.name}{p.scheme_name ? ` · ${p.scheme_name}` : ''}</option>)}
-    </select>
+    </Select>
   )
 }
 
@@ -256,27 +256,27 @@ function ScheduleModal({ programId, programName, style, onClose }: {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <div className="text-xs text-catalan-textMuted mb-1">Frequency</div>
-                <select className={sel} value={form.frequency} onChange={e => f('frequency', e.target.value)}>
+                <Select value={form.frequency} onChange={e => f('frequency', e.target.value)}>
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
                   <option value="monthly">Monthly (1st)</option>
-                </select>
+                </Select>
               </div>
               <div>
                 <div className="text-xs text-catalan-textMuted mb-1">Send at (UTC hour)</div>
-                <select className={sel} value={form.send_hour} onChange={e => f('send_hour', e.target.value)}>
+                <Select value={form.send_hour} onChange={e => f('send_hour', e.target.value)}>
                   {[0,4,6,7,8,9,10,12,14,16,18,20].map(h => (
                     <option key={h} value={String(h)}>{String(h).padStart(2,'0')}:00 UTC</option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
             {form.frequency === 'weekly' && (
               <div>
                 <div className="text-xs text-catalan-textMuted mb-1">Day of week</div>
-                <select className={sel} value={form.send_dow} onChange={e => f('send_dow', e.target.value)}>
+                <Select value={form.send_dow} onChange={e => f('send_dow', e.target.value)}>
                   {DOW.map((d, i) => <option key={i} value={String(i)}>{d}</option>)}
-                </select>
+                </Select>
               </div>
             )}
             <div>

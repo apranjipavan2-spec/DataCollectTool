@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '@/lib/api'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 export interface RosterEntry {
   id: string
@@ -125,7 +126,7 @@ export default function BeneficiaryListScreen({ formTitle, formId, onSelect, onB
       {!loadingDistricts && hasLocationData && (
         <div className="px-4 sm:px-6 pt-4 pb-2 space-y-3">
           <div className="relative">
-            <select
+            <Select
               value={selectedDistrict}
               onChange={e => handleDistrictChange(e.target.value)}
               className={selectClass}
@@ -134,13 +135,13 @@ export default function BeneficiaryListScreen({ formTitle, formId, onSelect, onB
               {districts.map(d => (
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
-            </select>
+            </Select>
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-catalan-textMuted text-xs">▼</span>
           </div>
 
           {selectedDistrict && (
             <div className="relative">
-              <select
+              <Select
                 value={selectedTaluka}
                 onChange={e => handleTalukaChange(e.target.value)}
                 className={selectClass}
@@ -150,7 +151,7 @@ export default function BeneficiaryListScreen({ formTitle, formId, onSelect, onB
                 {talukas.map(t => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
-              </select>
+              </Select>
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-catalan-textMuted text-xs">▼</span>
             </div>
           )}

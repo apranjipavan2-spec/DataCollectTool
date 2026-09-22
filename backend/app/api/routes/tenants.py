@@ -125,6 +125,35 @@ def get_my_usage(user=Depends(get_current_user), db: Session = Depends(get_db)):
     }
 
 
+class MyTenantUpdate(BaseModel):
+    name: Optional[str] = None
+    logo_url: Optional[str] = None
+    primary_color: Optional[str] = None
+    app_name: Optional[str] = None
+
+
+@router.patch("/my")
+def update_my_tenant(
+    body: MyTenantUpdate,
+    user=Depends(require_role("org_admin")),
+    db: Session = Depends(get_db),
+):
+    """Self-service branding update for the caller's own tenant — org_admin only,
+    no tenant_id in the path (used by the onboarding wizard's org-setup step).
+    Deliberately excludes plan_tier/subscription_status: those stay master_admin-only
+    via PATCH /{tenant_id}."""
+    tenant = db.query(Tenant).filter(Tenant.id == user["tenant_id"]).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    for field, value in body.model_dump(exclude_unset=True).items():
+        if value is not None:
+            setattr(tenant, field, value)
+
+    db.commit()
+    return {"id": str(tenant.id), "name": tenant.name}
+
+
 # ── CRUD (master admin) ───────────────────────────────────────────────────
 
 class TenantCreate(BaseModel):

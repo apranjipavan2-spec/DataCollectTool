@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 interface Pin {
   id: string; lat: number; lng: number; accuracy: number
@@ -179,30 +180,30 @@ export default function FieldMapPage() {
         <TopNav title="Live Field Map"
           rightContent={
             <div className="flex items-center gap-2 flex-nowrap overflow-x-auto">
-              <select value={filterForm} onChange={e => setFilterForm(e.target.value)}
-                className="border border-catalan-border rounded-lg px-2 py-1.5 text-xs bg-catalan-bg text-catalan-text max-w-[140px]">
+              <Select value={filterForm} onChange={e => setFilterForm(e.target.value)}
+                className="text-xs py-1.5" wrapperClassName="w-[140px] shrink-0">
                 <option value="">All forms</option>
                 {forms.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-              </select>
-              <select value={filterEnum} onChange={e => setFilterEnum(e.target.value)}
-                className="border border-catalan-border rounded-lg px-2 py-1.5 text-xs bg-catalan-bg text-catalan-text max-w-[130px]">
+              </Select>
+              <Select value={filterEnum} onChange={e => setFilterEnum(e.target.value)}
+                className="text-xs py-1.5" wrapperClassName="w-[130px] shrink-0">
                 <option value="">All enumerators</option>
                 {enumerators.map(e => <option key={e} value={e}>{e}</option>)}
-              </select>
-              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                className="border border-catalan-border rounded-lg px-2 py-1.5 text-xs bg-catalan-bg text-catalan-text">
+              </Select>
+              <Select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+                className="text-xs py-1.5" wrapperClassName="w-[120px] shrink-0">
                 <option value="">All statuses</option>
                 {Object.keys(STATUS_COLOR).map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <select value={days} onChange={e => setDays(Number(e.target.value))}
-                className="border border-catalan-border rounded-lg px-2 py-1.5 text-xs bg-catalan-bg text-catalan-text">
+              </Select>
+              <Select value={days} onChange={e => setDays(Number(e.target.value))}
+                className="text-xs py-1.5" wrapperClassName="w-[120px] shrink-0">
                 <option value={0}>All time</option>
                 <option value={1}>Today</option>
                 <option value={7}>Last 7 days</option>
                 <option value={30}>Last 30 days</option>
                 <option value={90}>Last 90 days</option>
                 <option value={365}>Last year</option>
-              </select>
+              </Select>
               {pinsLoaded && (
                 <button onClick={refresh} disabled={loading}
                   className="px-3 py-1.5 text-xs border border-catalan-border rounded-lg text-catalan-text hover:bg-catalan-hover disabled:opacity-40">

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import Select from '@/components/Select'
 import { useNavigate } from 'react-router-dom'
 import { v4 as uuidv4 } from 'uuid'
 import api from '@/lib/api'
@@ -151,7 +152,7 @@ export default function NewFormWizard({ onClose }: Props) {
                 {loadingProgs ? (
                   <p className="text-xs text-catalan-textMuted mt-1.5 italic">Loading programs…</p>
                 ) : (
-                  <select
+                  <Select
                     value={selectedProgId}
                     onChange={e => setSelectedProgId(e.target.value)}
                     className="mt-1.5 w-full border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text focus:ring-2 focus:ring-catalan-primary outline-none"
@@ -163,7 +164,7 @@ export default function NewFormWizard({ onClose }: Props) {
                       </option>
                     ))}
                     <option value="__new__">+ Create new program</option>
-                  </select>
+                  </Select>
                 )}
                 {isNewProg && (
                   <input
@@ -181,7 +182,7 @@ export default function NewFormWizard({ onClose }: Props) {
                 <div>
                   <label className="text-xs font-semibold text-catalan-textMuted uppercase tracking-wide">Participant Type</label>
                   {!isNewProg && participantTypes.length > 0 ? (
-                    <select
+                    <Select
                       value={selectedTypeId}
                       onChange={e => setSelectedTypeId(e.target.value)}
                       className="mt-1.5 w-full border border-catalan-border rounded-lg px-3 py-2 text-sm bg-catalan-bg text-catalan-text focus:ring-2 focus:ring-catalan-primary outline-none"
@@ -191,7 +192,7 @@ export default function NewFormWizard({ onClose }: Props) {
                         <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
                       <option value="__new__">+ Add new type</option>
-                    </select>
+                    </Select>
                   ) : (
                     <input
                       type="text"

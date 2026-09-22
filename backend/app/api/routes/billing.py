@@ -166,10 +166,15 @@ def list_plans(db: Session = Depends(get_db)):
     every real enforcement path already ignores; surfacing them here let
     an admin assign a tenant to e.g. "ngo_free" instead of "fg_free",
     which plan_limits.py's unified-only lookup would then silently not
-    resolve correctly."""
+    resolve correctly.
+
+    Also excludes tier='trial' — the 15-day trial is auto-granted at
+    self-serve signup (auth.py) and auto-expired by the scheduler via
+    Subscription.trial_end. Manually assigning it here would bypass that
+    expiry and leave an org on full trial features forever for free."""
     plans = (
         db.query(Plan)
-        .filter(Plan.is_active == True, Plan.segment == "unified")
+        .filter(Plan.is_active == True, Plan.segment == "unified", Plan.tier != "trial")
         .order_by(Plan.sort_order)
         .all()
     )

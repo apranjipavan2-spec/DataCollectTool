@@ -6,6 +6,7 @@ import TopNav from '@/components/TopNav'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
 import EmojiIcon from '@/components/EmojiIcon'
+import Select from '@/components/Select'
 
 interface OrgSubscription {
   tenant_id: string
@@ -35,20 +36,38 @@ interface PaymentRequest {
   created_at: string
 }
 
-interface PaymentConfig {
-  upi_id: string
-  upi_name: string
-  bank_account: string
-  bank_ifsc: string
-  bank_name: string
-  admin_whatsapp: string
-  support_email: string
+interface AdminPlan {
+  id: string; tier: string; segment: string; name: string
+  description: string | null; is_active: boolean
+  price_inr: number; price_usd_cents: number
+  limits: {
+    submissions_per_month: number | null; storage_mb: number | null; active_forms: number | null
+    ai_reports_per_month: number | null; api_calls_per_month: number | null
+    max_org_admins: number | null; max_supervisors: number | null; max_enumerators: number | null
+    asr_minutes_limit: number | null; translation_chars: number | null
+  }
+  features: Record<string, boolean>
 }
 
-const EMPTY_CFG: PaymentConfig = {
-  upi_id: '', upi_name: '', bank_account: '',
-  bank_ifsc: '', bank_name: '', admin_whatsapp: '', support_email: '',
-}
+const LIMIT_FIELDS: { key: keyof AdminPlan['limits']; apiField: string; label: string }[] = [
+  { key: 'submissions_per_month', apiField: 'submissions_limit',     label: 'Submissions / month' },
+  { key: 'storage_mb',            apiField: 'storage_limit_mb',      label: 'Storage (MB)' },
+  { key: 'active_forms',          apiField: 'active_forms_limit',    label: 'Active forms' },
+  { key: 'ai_reports_per_month',  apiField: 'ai_reports_per_month',  label: 'AI reports / month' },
+  { key: 'api_calls_per_month',   apiField: 'api_calls_per_month',   label: 'API calls / month' },
+  { key: 'max_org_admins',        apiField: 'max_org_admins',        label: 'Org admins' },
+]
+
+const FEATURE_FIELDS: { key: string; label: string }[] = [
+  { key: 'ai_cleaning', label: 'AI Cleaning' }, { key: 'ai_writer', label: 'AI Writer' },
+  { key: 'ai_smart_builder', label: 'AI Smart Builder' }, { key: 'ai_interpret', label: 'AI Interpret' },
+  { key: 'ai_analyzer', label: 'AI Analyzer' }, { key: 'map_view', label: 'Map View' },
+  { key: 'panel_study', label: 'Panel Study' }, { key: 'spss_export', label: 'SPSS Export' },
+  { key: 'api_write', label: 'API Write' }, { key: 'webhooks', label: 'Webhooks' },
+  { key: 'two_fa', label: '2FA' }, { key: 'sso', label: 'SSO' },
+  { key: 'audit_log', label: 'Audit Log' }, { key: 'advanced_rbac', label: 'Advanced RBAC' },
+  { key: 'white_label', label: 'White Label' }, { key: 'priority_support', label: 'Priority Support' },
+]
 
 const card  = 'bg-catalan-surface border border-catalan-border rounded-xl p-5'
 const btnPr = 'px-4 py-2 bg-catalan-primary text-catalan-bg rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40'
@@ -60,21 +79,18 @@ const CYCLE_LABEL: Record<string, string> = {
   monthly: 'Monthly', '6month': '6-Month', annual: 'Annual', '3year': '3-Year'
 }
 
-const CFG_FIELDS: { key: keyof PaymentConfig; label: string; placeholder: string; hint?: string }[] = [
-  { key: 'upi_id',         label: 'UPI ID',           placeholder: 'yourname@upi',              hint: 'Shown on the QR code payment screen' },
-  { key: 'upi_name',       label: 'UPI Display Name',  placeholder: 'FieldGovern Technologies' },
-  { key: 'bank_account',   label: 'Bank Account No.',  placeholder: '00000012345678' },
-  { key: 'bank_ifsc',      label: 'IFSC Code',         placeholder: 'HDFC0001234' },
-  { key: 'bank_name',      label: 'Bank Name',         placeholder: 'HDFC Bank' },
-  { key: 'admin_whatsapp', label: 'WhatsApp Number',   placeholder: '919876543210',             hint: 'With country code, no + or spaces (e.g. 919876543210)' },
-  { key: 'support_email',  label: 'Support Email',     placeholder: 'support@fieldgovern.in' },
-]
-
 export default function AdminPayments() {
   const user  = getStoredUser()
   const toast = useToast()
 
-  const [tab,     setTab]     = useState<'requests' | 'orgs' | 'settings'>('requests')
+  const [tab,     setTab]     = useState<'requests' | 'orgs' | 'plans'>('requests')
+
+  // Plan pricing/limits editor
+  const [plans,        setPlans]        = useState<AdminPlan[]>([])
+  const [plansLoading,  setPlansLoading]  = useState(false)
+  const [editingPlan,  setEditingPlan]  = useState<AdminPlan | null>(null)
+  const [planDraft,    setPlanDraft]    = useState<Record<string, any>>({})
+  const [planSaving,   setPlanSaving]   = useState(false)
 
   // Org subscriptions overview
   const [orgs,       setOrgs]       = useState<OrgSubscription[]>([])
@@ -91,11 +107,6 @@ export default function AdminPayments() {
   const [acting,   setActing]   = useState<string | null>(null)
   const [rejectId, setRejectId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
-
-  // Settings state
-  const [cfg,        setCfg]        = useState<PaymentConfig>(EMPTY_CFG)
-  const [cfgLoading, setCfgLoading] = useState(false)
-  const [cfgSaving,  setCfgSaving]  = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -114,18 +125,6 @@ export default function AdminPayments() {
     }
   }, [filter, toast])
 
-  const loadCfg = useCallback(async () => {
-    setCfgLoading(true)
-    try {
-      const res = await api.get('/billing/admin/payment-config')
-      setCfg({ ...EMPTY_CFG, ...res.data })
-    } catch {
-      toast.error('Failed to load payment config')
-    } finally {
-      setCfgLoading(false)
-    }
-  }, [toast])
-
   const loadOrgs = useCallback(async () => {
     setOrgsLoading(true)
     try {
@@ -138,6 +137,36 @@ export default function AdminPayments() {
     } catch { toast.error('Failed to load subscriptions') }
     finally { setOrgsLoading(false) }
   }, [toast])
+
+  const loadPlans = useCallback(async () => {
+    setPlansLoading(true)
+    try {
+      const res = await api.get('/billing/admin/plans')
+      setPlans(res.data)
+    } catch { toast.error('Failed to load plans') }
+    finally { setPlansLoading(false) }
+  }, [toast])
+
+  const openPlanEditor = (p: AdminPlan) => {
+    setEditingPlan(p)
+    const draft: Record<string, any> = { name: p.name, price_inr: p.price_inr, is_active: p.is_active }
+    for (const f of LIMIT_FIELDS) draft[f.apiField] = p.limits[f.key]
+    for (const f of FEATURE_FIELDS) draft[f.key] = p.features[f.key]
+    setPlanDraft(draft)
+  }
+
+  const savePlan = async () => {
+    if (!editingPlan) return
+    setPlanSaving(true)
+    try {
+      await api.patch(`/billing/admin/plans/${editingPlan.id}`, planDraft)
+      toast.success(`${editingPlan.name} updated — live on the website now`)
+      setEditingPlan(null)
+      loadPlans()
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Failed to save plan')
+    } finally { setPlanSaving(false) }
+  }
 
   const assignPlanToOrg = async () => {
     if (!assignTenant || !assignPlan) return
@@ -155,20 +184,8 @@ export default function AdminPayments() {
   }
 
   useEffect(() => { load() }, [load])
-  useEffect(() => { if (tab === 'settings') loadCfg() }, [tab, loadCfg])
   useEffect(() => { if (tab === 'orgs') loadOrgs() }, [tab, loadOrgs])
-
-  const saveCfg = async () => {
-    setCfgSaving(true)
-    try {
-      await api.patch('/billing/admin/payment-config', cfg)
-      toast.success('Payment settings saved')
-    } catch (e: any) {
-      toast.error(e.response?.data?.detail || 'Failed to save')
-    } finally {
-      setCfgSaving(false)
-    }
-  }
+  useEffect(() => { if (tab === 'plans') loadPlans() }, [tab, loadPlans])
 
   const confirm = async (id: string) => {
     setActing(id)
@@ -226,7 +243,7 @@ export default function AdminPayments() {
             {([
               { key: 'requests', label: 'Payment Requests' },
               { key: 'orgs',     label: 'Organisations' },
-              { key: 'settings', label: '⚙ Payment Settings' },
+              { key: 'plans',    label: 'Plans & Pricing' },
             ] as const).map(t => (
               <button key={t.key} onClick={() => setTab(t.key)}
                 className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === t.key ? 'border-catalan-primary text-catalan-primary' : 'border-transparent text-catalan-textMuted hover:text-catalan-text'}`}>
@@ -388,78 +405,57 @@ export default function AdminPayments() {
             </>
           )}
 
-          {/* ── SETTINGS TAB ─────────────────────────────────────────── */}
-          {tab === 'settings' && (
-            <div className="max-w-xl space-y-6">
-              <div className={card}>
-                <h2 className="text-base font-bold text-catalan-text mb-1">Payment Configuration</h2>
-                <p className="text-xs text-catalan-textMuted mb-5">
-                  These details are shown to organisations on the subscription page when they make a payment.
-                  Changes take effect immediately — no redeploy needed.
+          {/* ── PLANS TAB ───────────────────────────────────────────── */}
+          {tab === 'plans' && (
+            <>
+              <div className="flex justify-between items-center mb-4">
+                <p className="text-xs text-catalan-textMuted max-w-lg">
+                  Edits go live on fieldgovern.com/pricing.html immediately — the site fetches pricing at page load, no redeploy needed.
                 </p>
-
-                {cfgLoading ? (
-                  <div className="text-catalan-textMuted text-sm text-center py-8">Loading…</div>
-                ) : (
-                  <div className="space-y-4">
-                    {CFG_FIELDS.map(f => (
-                      <div key={f.key}>
-                        <label className="block text-xs font-semibold text-catalan-text mb-1">{f.label}</label>
-                        <input
-                          className={inp}
-                          placeholder={f.placeholder}
-                          value={cfg[f.key]}
-                          onChange={e => setCfg(prev => ({ ...prev, [f.key]: e.target.value }))}
-                        />
-                        {f.hint && <p className="text-xs text-catalan-textMuted mt-1">{f.hint}</p>}
-                      </div>
-                    ))}
-
-                    <div className="pt-2 flex items-center gap-3">
-                      <button onClick={saveCfg} disabled={cfgSaving} className={btnPr}>
-                        {cfgSaving ? 'Saving…' : 'Save Payment Settings'}
-                      </button>
-                      <button onClick={loadCfg} className={btnSe}>Reset</button>
-                    </div>
-                  </div>
-                )}
+                <button onClick={loadPlans} className={btnSe}><EmojiIcon e="↻" /> Refresh</button>
               </div>
 
-              {/* Live preview */}
-              <div className={card}>
-                <h3 className="text-sm font-bold text-catalan-text mb-3">Preview — what organisations will see</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex gap-3">
-                    <span className="text-catalan-textMuted w-32 shrink-0">UPI ID</span>
-                    <span className="font-mono text-catalan-primary">{cfg.upi_id || <span className="text-catalan-textMuted italic">not set</span>}</span>
-                  </div>
-                  <div className="flex gap-3">
-                    <span className="text-catalan-textMuted w-32 shrink-0">Bank Account</span>
-                    <span className="font-mono text-catalan-text">{cfg.bank_account || <span className="text-catalan-textMuted italic">not set</span>}</span>
-                  </div>
-                  <div className="flex gap-3">
-                    <span className="text-catalan-textMuted w-32 shrink-0">IFSC</span>
-                    <span className="font-mono text-catalan-text">{cfg.bank_ifsc || <span className="text-catalan-textMuted italic">not set</span>}</span>
-                  </div>
-                  <div className="flex gap-3">
-                    <span className="text-catalan-textMuted w-32 shrink-0">Bank</span>
-                    <span className="text-catalan-text">{cfg.bank_name || <span className="text-catalan-textMuted italic">not set</span>}</span>
-                  </div>
-                  <div className="flex gap-3">
-                    <span className="text-catalan-textMuted w-32 shrink-0">WhatsApp</span>
-                    {cfg.admin_whatsapp ? (
-                      <a href={`https://wa.me/${cfg.admin_whatsapp}`} target="_blank" rel="noopener noreferrer"
-                        className="text-green-500 hover:underline">+{cfg.admin_whatsapp}</a>
-                    ) : <span className="text-catalan-textMuted italic">not set</span>}
-                  </div>
-                  <div className="flex gap-3">
-                    <span className="text-catalan-textMuted w-32 shrink-0">Support Email</span>
-                    <span className="text-catalan-text">{cfg.support_email || <span className="text-catalan-textMuted italic">not set</span>}</span>
-                  </div>
+              {plansLoading && <div className="text-catalan-textMuted text-sm text-center py-12">Loading…</div>}
+
+              {!plansLoading && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-catalan-border text-left text-xs text-catalan-textMuted">
+                        <th className="pb-2 pr-4 font-medium">Plan</th>
+                        <th className="pb-2 pr-4 font-medium">Price / mo</th>
+                        <th className="pb-2 pr-4 font-medium">Submissions</th>
+                        <th className="pb-2 pr-4 font-medium">Storage</th>
+                        <th className="pb-2 pr-4 font-medium">Forms</th>
+                        <th className="pb-2 pr-4 font-medium">Status</th>
+                        <th className="pb-2 font-medium"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-catalan-border/50">
+                      {plans.map(p => (
+                        <tr key={p.id} className="hover:bg-catalan-hover/30 transition-colors">
+                          <td className="py-3 pr-4 font-semibold text-catalan-text truncate max-w-[160px]">{p.name}</td>
+                          <td className="py-3 pr-4 text-catalan-text">{p.price_inr > 0 ? `₹${p.price_inr.toLocaleString('en-IN')}` : 'Free'}</td>
+                          <td className="py-3 pr-4 text-catalan-textMuted">{p.limits.submissions_per_month ?? 'Unlimited'}</td>
+                          <td className="py-3 pr-4 text-catalan-textMuted">{p.limits.storage_mb != null ? `${p.limits.storage_mb} MB` : 'Unlimited'}</td>
+                          <td className="py-3 pr-4 text-catalan-textMuted">{p.limits.active_forms ?? 'Unlimited'}</td>
+                          <td className="py-3 pr-4">
+                            <span className={`px-2 py-0.5 text-xs font-medium border rounded-full ${p.is_active ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-catalan-textMuted/10 text-catalan-textMuted border-catalan-border'}`}>
+                              {p.is_active ? 'Active' : 'Hidden'}
+                            </span>
+                          </td>
+                          <td className="py-3">
+                            <button onClick={() => openPlanEditor(p)} className={btnSe}>Edit</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            </div>
+              )}
+            </>
           )}
+
         </main>
       </div>
 
@@ -472,24 +468,90 @@ export default function AdminPayments() {
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-catalan-text mb-1">Plan</label>
-                <select className={inp} value={assignPlan} onChange={e => setAssignPlan(e.target.value)}>
+                <Select className={inp} value={assignPlan} onChange={e => setAssignPlan(e.target.value)}>
                   <option value="">Select plan…</option>
                   {allPlans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-catalan-text mb-1">Billing Cycle</label>
-                <select className={inp} value={assignCycle} onChange={e => setAssignCycle(e.target.value)}>
+                <Select className={inp} value={assignCycle} onChange={e => setAssignCycle(e.target.value)}>
                   {[['monthly','Monthly'],['6month','6-Month (10% off)'],['annual','Annual (20% off)'],['3year','3-Year (30% off)']].map(([k,l]) =>
                     <option key={k} value={k}>{l}</option>
                   )}
-                </select>
+                </Select>
               </div>
             </div>
             <div className="flex gap-2 mt-5 justify-end">
               <button onClick={() => setAssignTenant(null)} className={btnSe}>Cancel</button>
               <button onClick={assignPlanToOrg} disabled={!assignPlan || assigning} className={btnPr}>
                 {assigning ? 'Assigning…' : 'Assign & Activate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Plan editor modal */}
+      {editingPlan && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className={`${card} w-full max-w-2xl max-h-[85vh] overflow-y-auto`}>
+            <h3 className="text-base font-bold text-catalan-text mb-1">Edit Plan — {editingPlan.name}</h3>
+            <p className="text-xs text-catalan-textMuted mb-4">Tier: {editingPlan.tier} · Changes apply immediately, no deploy needed.</p>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-catalan-text mb-1">Display Name</label>
+                  <input className={inp} value={planDraft.name ?? ''}
+                    onChange={e => setPlanDraft(d => ({ ...d, name: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-catalan-text mb-1">Price (₹ / month)</label>
+                  <input type="number" min={0} className={inp} value={planDraft.price_inr ?? 0}
+                    onChange={e => setPlanDraft(d => ({ ...d, price_inr: Number(e.target.value) }))} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-catalan-text mb-2">Limits — blank = unlimited</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {LIMIT_FIELDS.map(f => (
+                    <div key={f.apiField}>
+                      <label className="block text-[11px] text-catalan-textMuted mb-1">{f.label}</label>
+                      <input type="number" min={0} className={inp}
+                        value={planDraft[f.apiField] ?? ''}
+                        placeholder="∞"
+                        onChange={e => setPlanDraft(d => ({ ...d, [f.apiField]: e.target.value === '' ? null : Number(e.target.value) }))} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-catalan-text mb-2">Features</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {FEATURE_FIELDS.map(f => (
+                    <label key={f.key} className="flex items-center gap-2 text-sm text-catalan-text cursor-pointer">
+                      <input type="checkbox" checked={!!planDraft[f.key]}
+                        onChange={e => setPlanDraft(d => ({ ...d, [f.key]: e.target.checked }))} />
+                      {f.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-catalan-text cursor-pointer">
+                <input type="checkbox" checked={!!planDraft.is_active}
+                  onChange={e => setPlanDraft(d => ({ ...d, is_active: e.target.checked }))} />
+                Active (visible on pricing page &amp; assignable)
+              </label>
+            </div>
+
+            <div className="flex gap-2 mt-5 justify-end sticky bottom-0 bg-catalan-surface pt-2">
+              <button onClick={() => setEditingPlan(null)} className={btnSe}>Cancel</button>
+              <button onClick={savePlan} disabled={planSaving} className={btnPr}>
+                {planSaving ? 'Saving…' : 'Save Plan'}
               </button>
             </div>
           </div>
