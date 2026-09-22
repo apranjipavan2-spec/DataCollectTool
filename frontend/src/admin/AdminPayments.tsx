@@ -33,6 +33,7 @@ interface PaymentRequest {
   status: 'pending' | 'confirmed' | 'rejected'
   confirmed_at: string | null
   rejection_reason: string | null
+  notes: string | null
   created_at: string
 }
 
@@ -103,6 +104,11 @@ export default function AdminPayments() {
   const [assignTenant, setAssignTenant] = useState<OrgSubscription | null>(null)
   const [assignPlan,   setAssignPlan]   = useState('')
   const [assignCycle,  setAssignCycle]  = useState('monthly')
+  const [assignExpiry, setAssignExpiry] = useState('')
+  const [assignAmount, setAssignAmount] = useState('')
+  const [assignMethod, setAssignMethod] = useState('')
+  const [assignRef,    setAssignRef]    = useState('')
+  const [assignNotes,  setAssignNotes]  = useState('')
   const [assigning,    setAssigning]    = useState(false)
   const [allPlans,     setAllPlans]     = useState<{ id: string; name: string }[]>([])
   const [filter,  setFilter]  = useState<'pending' | 'confirmed' | 'rejected' | 'all'>('pending')
@@ -179,6 +185,11 @@ export default function AdminPayments() {
     try {
       await api.post(`/billing/admin/subscriptions/${assignTenant.tenant_id}/assign`, {
         plan_id: assignPlan, billing_cycle: assignCycle,
+        expires_at: assignExpiry || undefined,
+        amount_inr: assignAmount ? Number(assignAmount) : undefined,
+        payment_method: assignMethod || undefined,
+        payment_ref: assignRef || undefined,
+        notes: assignNotes || undefined,
       })
       toast.success(`Plan assigned to ${assignTenant.org_name}`)
       setAssignTenant(null)
@@ -311,6 +322,11 @@ export default function AdminPayments() {
                             Rejection reason: {r.rejection_reason}
                           </div>
                         )}
+                        {r.notes && (
+                          <div className="text-xs text-catalan-textMuted bg-catalan-hover/30 rounded-lg px-3 py-2">
+                            Notes: {r.notes}
+                          </div>
+                        )}
                       </div>
 
                       {r.status === 'pending' && (
@@ -395,9 +411,13 @@ export default function AdminPayments() {
                                 : '—'}
                             </td>
                             <td className="py-3">
-                              <button onClick={() => { setAssignTenant(o); setAssignPlan(o.plan_id); setAssignCycle(o.billing_cycle || 'monthly') }}
-                                className={btnSe}>
-                                Assign Plan
+                              <button onClick={() => {
+                                setAssignTenant(o); setAssignPlan(o.plan_id); setAssignCycle(o.billing_cycle || 'monthly')
+                                const existing = o.period_end || o.trial_end
+                                setAssignExpiry(existing ? existing.slice(0, 10) : '')
+                                setAssignAmount(''); setAssignMethod(''); setAssignRef(''); setAssignNotes('')
+                              }} className={btnSe}>
+                                Manage
                               </button>
                             </td>
                           </tr>
@@ -467,8 +487,8 @@ export default function AdminPayments() {
       {/* Assign plan modal */}
       {assignTenant && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className={`${card} w-full max-w-sm`}>
-            <h3 className="text-base font-bold text-catalan-text mb-1">Assign Plan</h3>
+          <div className={`${card} w-full max-w-sm max-h-[85vh] overflow-y-auto`}>
+            <h3 className="text-base font-bold text-catalan-text mb-1">Manage Subscription</h3>
             <p className="text-xs text-catalan-textMuted mb-4">{assignTenant.org_name}</p>
             <div className="space-y-3">
               <div>
@@ -486,11 +506,46 @@ export default function AdminPayments() {
                   )}
                 </Select>
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-catalan-text mb-1">Expiry Date</label>
+                <input type="date" className={inp} value={assignExpiry} onChange={e => setAssignExpiry(e.target.value)} />
+                <p className="text-[11px] text-catalan-textMuted mt-1">Leave as-is to auto-compute from the billing cycle. Change to override (e.g. backdate, extend, or match an offline invoice).</p>
+              </div>
+
+              <div className="pt-2 border-t border-catalan-border">
+                <p className="text-xs font-semibold text-catalan-text mb-2">Manual Payment Details <span className="font-normal text-catalan-textMuted">(optional — logs an offline payment record)</span></p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-catalan-textMuted mb-1">Method</label>
+                    <Select className={inp} value={assignMethod} onChange={e => setAssignMethod(e.target.value)}>
+                      <option value="">None</option>
+                      <option value="bank_transfer">Bank Transfer</option>
+                      <option value="upi">UPI</option>
+                      <option value="cash">Cash</option>
+                      <option value="cheque">Cheque</option>
+                      <option value="other">Other</option>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-catalan-textMuted mb-1">Amount (₹)</label>
+                    <input type="number" min={0} className={inp} placeholder="auto" value={assignAmount}
+                      onChange={e => setAssignAmount(e.target.value)} />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="block text-[11px] text-catalan-textMuted mb-1">Reference (UTR / cheque no. / txn id)</label>
+                  <input className={inp} value={assignRef} onChange={e => setAssignRef(e.target.value)} />
+                </div>
+                <div className="mt-3">
+                  <label className="block text-[11px] text-catalan-textMuted mb-1">Notes</label>
+                  <textarea className={inp} rows={2} value={assignNotes} onChange={e => setAssignNotes(e.target.value)} />
+                </div>
+              </div>
             </div>
-            <div className="flex gap-2 mt-5 justify-end">
+            <div className="flex gap-2 mt-5 justify-end sticky bottom-0 bg-catalan-surface pt-2">
               <button onClick={() => setAssignTenant(null)} className={btnSe}>Cancel</button>
               <button onClick={assignPlanToOrg} disabled={!assignPlan || assigning} className={btnPr}>
-                {assigning ? 'Assigning…' : 'Assign & Activate'}
+                {assigning ? 'Saving…' : 'Save & Activate'}
               </button>
             </div>
           </div>

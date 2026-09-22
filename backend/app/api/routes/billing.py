@@ -457,6 +457,7 @@ def admin_list_requests(
             "status":       r.status,
             "confirmed_at": r.confirmed_at.isoformat() if r.confirmed_at else None,
             "rejection_reason": r.rejection_reason,
+            "notes":        r.notes,
             "created_at":   r.created_at.isoformat(),
         })
     return result
@@ -567,9 +568,13 @@ def admin_list_subscriptions(
 
 
 class ManualAssignIn(BaseModel):
-    plan_id:       str
-    billing_cycle: str = "monthly"
-    notes:         Optional[str] = None
+    plan_id:        str
+    billing_cycle:  str = "monthly"
+    notes:          Optional[str] = None
+    expires_at:     Optional[str] = None   # ISO date/datetime — overrides the auto-computed period end
+    amount_inr:     Optional[int] = None   # overrides the computed amount (e.g. discounted offline deal)
+    payment_method: Optional[str] = None   # e.g. "bank_transfer", "upi", "cash", "cheque"
+    payment_ref:    Optional[str] = None   # UTR / cheque no. / transaction ref
 
 
 @router.post("/admin/subscriptions/{tenant_id}/assign")
@@ -579,7 +584,12 @@ def admin_assign_plan(
     user=Depends(require_role("master_admin")),
     db: Session = Depends(get_db),
 ):
-    """Manually assign a plan to any org (e.g. after offline payment / override)."""
+    """Manually assign a plan to any org (e.g. after offline payment / override).
+
+    Also accepts an optional custom expiry date and offline-payment details
+    (method + reference + amount), which are recorded as a confirmed
+    PaymentRequest so the org has the same payment trail as an online UPI
+    payment would have produced."""
     import uuid as _uuid
     plan = db.query(Plan).filter(Plan.id == body.plan_id, Plan.is_active == True).first()
     if not plan:
@@ -591,9 +601,34 @@ def admin_assign_plan(
     except ValueError:
         raise HTTPException(400, "Invalid tenant_id")
 
-    amount   = _calc_amount(plan, body.billing_cycle)
+    expires_at = None
+    if body.expires_at:
+        try:
+            expires_at = datetime.fromisoformat(body.expires_at.replace("Z", "+00:00"))
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+        except ValueError:
+            raise HTTPException(400, "Invalid expires_at — use an ISO date like 2026-12-31")
+
+    amount   = body.amount_inr if body.amount_inr is not None else _calc_amount(plan, body.billing_cycle)
     discount = CYCLE_DISCOUNT.get(body.billing_cycle, 0)
-    _activate_subscription(db, tid, body.plan_id, body.billing_cycle, amount, discount)
+    sub = _activate_subscription(db, tid, body.plan_id, body.billing_cycle, amount, discount)
+
+    if expires_at:
+        sub.current_period_end = expires_at
+        db.commit()
+
+    if body.payment_method or body.payment_ref or body.amount_inr is not None:
+        req = PaymentRequest(
+            order_ref=_order_ref(), tenant_id=tid, plan_id=body.plan_id,
+            billing_cycle=body.billing_cycle, amount_inr=amount, discount_pct=discount,
+            utr_number=body.payment_ref,
+            status="confirmed", confirmed_by=user["sub"], confirmed_at=datetime.now(timezone.utc),
+            notes=(f"[{body.payment_method}] {body.notes}" if body.payment_method and body.notes
+                   else body.payment_method or body.notes),
+        )
+        db.add(req)
+        db.commit()
 
     _notify_org_admins(
         db, tid,
@@ -601,6 +636,41 @@ def admin_assign_plan(
         body=f"Your account has been assigned to the {plan.name} plan by the administrator.",
     )
     return {"message": f"Plan {plan.name} assigned to tenant {tenant_id}."}
+
+
+class UpdateExpiryIn(BaseModel):
+    expires_at: str   # ISO date/datetime
+
+
+@router.patch("/admin/subscriptions/{tenant_id}/expiry")
+def admin_update_expiry(
+    tenant_id: str,
+    body: UpdateExpiryIn,
+    user=Depends(require_role("master_admin")),
+    db: Session = Depends(get_db),
+):
+    """Change the expiry date of an org's current subscription without touching its plan."""
+    import uuid as _uuid
+    try:
+        tid = _uuid.UUID(tenant_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid tenant_id")
+    try:
+        expires_at = datetime.fromisoformat(body.expires_at.replace("Z", "+00:00"))
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+    except ValueError:
+        raise HTTPException(400, "Invalid expires_at — use an ISO date like 2026-12-31")
+
+    sub = db.query(Subscription).filter(Subscription.tenant_id == tid).first()
+    if not sub:
+        raise HTTPException(404, "No subscription found")
+    if sub.status == "trialing":
+        sub.trial_end = expires_at
+    else:
+        sub.current_period_end = expires_at
+    db.commit()
+    return {"message": "Expiry date updated."}
 
 
 @router.delete("/admin/subscriptions/{tenant_id}")
