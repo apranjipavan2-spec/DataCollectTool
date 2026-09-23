@@ -3,7 +3,7 @@
  * Tabs: Tenants · Files
  */
 import { useState, useEffect, useMemo } from 'react'
-import api, { getStoredUser } from '@/lib/api'
+import api, { getStoredUser, startImpersonation, apiErrorMessage } from '@/lib/api'
 import { getNavItems } from '@/lib/navigation'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
@@ -151,6 +151,8 @@ export default function AdminPanel() {
   const [editingTenant, setEditingTenant] = useState<TenantRow | null>(null)
   const [formData, setFormData] = useState({ name: '', app_name: '', plan_tier: 'starter', primary_color: '#89b4fa', logo_url: '', admin_phone: '', admin_name: '', admin_password: '' })
 
+  const [impersonating, setImpersonating] = useState(false)
+
   // ── Drill-down: selected tenant ──
   const [selectedTenant, setSelectedTenant] = useState<TenantRow | null>(null)
   const [drillTab, setDrillTab] = useState<'subs' | 'users'>('subs')
@@ -231,6 +233,18 @@ export default function AdminPanel() {
     setDrillTab('subs')
     setDrillSubs([]); setDrillUsers([])
     setTab('tenants')
+  }
+
+  const impersonateTenant = async (t: TenantRow) => {
+    setImpersonating(true)
+    try {
+      const { data } = await api.post(`/admin/monitor/tenant/${t.id}/impersonate`)
+      startImpersonation(data)
+      window.location.href = '/'
+    } catch (e) {
+      setError(apiErrorMessage(e, 'Could not start impersonation'))
+      setImpersonating(false)
+    }
   }
 
   // ── Edit user (cross-tenant) ──
@@ -490,6 +504,12 @@ export default function AdminPanel() {
                   <span className="font-bold text-catalan-text">{selectedTenant.name}</span>
                   <PlanBadge plan={selectedTenant.plan_tier} />
                 </div>
+                <button onClick={() => impersonateTenant(selectedTenant)}
+                  disabled={impersonating}
+                  className="ml-auto flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 hover:shadow-md disabled:opacity-50"
+                  style={{ background: 'rgba(52,211,153,0.1)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }}>
+                  {impersonating ? 'Opening…' : 'Manage as Org Admin →'}
+                </button>
               </div>
 
               {/* Drill tabs */}

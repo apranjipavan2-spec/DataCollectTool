@@ -283,6 +283,60 @@ def reset_tenant_user_password(
     return {"ok": True}
 
 
+@router.post("/tenant/{tenant_id}/impersonate")
+def impersonate_tenant_admin(
+    tenant_id: str, request: Request,
+    user=Depends(require_master_admin), db: Session = Depends(get_db),
+):
+    """Mint a 1-hour session as the tenant's org_admin so master_admin gets
+    full org-admin feature parity (forms, programs, integrations, team...)
+    for free, without duplicating that UI in the platform admin panel.
+
+    Distinct from the read-only X-Tenant-ID override in deps.get_current_user,
+    which deliberately blocks writes — this is a real, audited, time-boxed
+    "log in as" session, and actions taken during it are attributed to the
+    impersonated org_admin (the `impersonated_by` claim ties it back)."""
+    from app.core.security import create_access_token
+    from app.services.audit import write_audit
+
+    t = _resolve_tenant(tenant_id, db)
+    target = (
+        db.query(User)
+        .filter(User.tenant_id == t.id, User.role == "org_admin", User.is_active == True)
+        .order_by(User.created_at)
+        .first()
+    )
+    if not target:
+        raise HTTPException(404, "This tenant has no active org admin to impersonate")
+
+    access = create_access_token({
+        "sub": str(target.id),
+        "tenant_id": str(t.id),
+        "role": target.role,
+        "name": target.name,
+        "email": target.email,
+        "impersonated_by": user["sub"],
+    }, expire_minutes=60)
+
+    write_audit(
+        db, tenant_id=t.id, user_id=_uuid.UUID(user["sub"]),
+        action="master_admin_impersonate_start", resource="tenant", resource_id=str(t.id),
+        detail={"impersonated_user_id": str(target.id), "impersonated_user_name": target.name},
+        ip_address=request.client.host if request.client else None,
+    )
+    db.commit()
+
+    return {
+        "access_token": access,
+        "token_type": "bearer",
+        "role": target.role,
+        "name": target.name,
+        "email": target.email,
+        "phone": target.phone,
+        "id": str(target.id),
+    }
+
+
 @router.get("/tenant/{tenant_id}/submissions")
 def get_tenant_submissions(tenant_id: str, page: int = Query(1, ge=1), page_size: int = Query(50, le=200), user=Depends(require_master_admin), db: Session = Depends(get_db)):
     t = _resolve_tenant(tenant_id, db)

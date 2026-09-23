@@ -166,6 +166,27 @@ export function storeUser(user: AuthUser) {
   } catch { /* non-fatal */ }
 }
 
+// ── Master-admin impersonation ───────────────────────────────────────────
+// "Manage as org admin" swaps the active session for a scoped org_admin
+// token (see POST /admin/monitor/tenant/{id}/impersonate) while stashing the
+// master_admin's own session so it can be restored on exit.
+export function startImpersonation(user: AuthUser) {
+  const current = getStoredUser()
+  if (current) localStorage.setItem('fp_impersonator', JSON.stringify(current))
+  storeUser(user)
+}
+
+export function getImpersonator(): AuthUser | null {
+  try { return JSON.parse(localStorage.getItem('fp_impersonator') ?? 'null') } catch { return null }
+}
+
+export function stopImpersonation() {
+  const original = getImpersonator()
+  localStorage.removeItem('fp_impersonator')
+  if (original) storeUser(original)
+  else logout()
+}
+
 // ── Returning-device memory ────────────────────────────────────────────────
 // Survives logout (unlike fp_token/fp_user) so the login page can greet a
 // returning user on this device instead of showing a blank form every time.

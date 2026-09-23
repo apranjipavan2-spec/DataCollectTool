@@ -13,6 +13,7 @@ import { SubscriptionProvider } from '@/lib/SubscriptionContext'
 import SubscriptionBanner from '@/components/SubscriptionBanner'
 import UpgradeModal from '@/components/UpgradeModal'
 import OnboardingWizard from '@/components/OnboardingWizard'
+import ImpersonationBanner from '@/components/ImpersonationBanner'
 
 // Route-level code splitting — each lazy() call becomes a separate dynamic import.
 // This is what makes manualChunks actually defer loading instead of just splitting files.
@@ -110,6 +111,7 @@ export default function App() {
           <HelpProvider>
           <BrowserRouter>
             <SubscriptionProvider>
+            <ImpersonationBanner />
             <FloatingContact />
             <SubscriptionBanner />
             <UpgradeModal />

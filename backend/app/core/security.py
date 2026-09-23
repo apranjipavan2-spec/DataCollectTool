@@ -4,12 +4,16 @@ from jose import JWTError, jwt
 from app.core.config import settings
 
 
-def create_access_token(data: dict) -> str:
+def create_access_token(data: dict, expire_minutes: int | None = None) -> str:
     to_encode = data.copy()
     # JWT_EXPIRE_MINUTES <= 0 → non-expiring access token (session ends only on
     # explicit logout). Omitting `exp` means jose never raises on expiry.
-    if settings.JWT_EXPIRE_MINUTES > 0:
-        expire = datetime.utcnow() + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
+    # Callers minting an elevated-privilege token (e.g. master_admin
+    # impersonation) pass expire_minutes explicitly to force a TTL regardless
+    # of that global setting.
+    minutes = settings.JWT_EXPIRE_MINUTES if expire_minutes is None else expire_minutes
+    if minutes > 0:
+        expire = datetime.utcnow() + timedelta(minutes=minutes)
         to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
