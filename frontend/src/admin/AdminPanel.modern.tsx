@@ -1,6 +1,6 @@
 /**
  * Master Admin Panel — platform-wide view across all tenants.
- * Tabs: Overview · Tenants · Team Progress · Files
+ * Tabs: Tenants · Files
  */
 import { useState, useEffect, useMemo } from 'react'
 import api, { getStoredUser } from '@/lib/api'
