@@ -20,17 +20,6 @@ interface TenantRow {
   created_at: string
 }
 
-interface TenantOverview {
-  tenant_id: string; tenant_name: string; plan_tier: string
-  user_count: number; program_count: number; questionnaire_count: number
-  total_target: number; total_collected: number; pct: number
-}
-
-interface EnumStat {
-  id: string; name: string; total: number; approved: number
-  flagged: number; rejected: number; synced: number; last_submission: string | null
-}
-
 interface DrillSub {
   id: string; serial_no: number | null; form_title: string
   enumerator_name: string; status: string; server_received_at: string
@@ -98,26 +87,26 @@ function StatCard({ label, sub, value, gradient, iconColor, icon }: {
   label: string; sub: string; value: number; gradient: string; iconColor: string; icon: React.ReactNode
 }) {
   return (
-    <div className="group rounded-2xl p-5 transition-all duration-300 hover:translate-y-[-2px] cursor-default relative overflow-hidden"
+    <div className="group rounded-xl p-3 transition-all duration-300 hover:translate-y-[-2px] cursor-default relative overflow-hidden"
       style={{ background: gradient, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-      <div className="absolute top-0 right-0 w-32 h-32 opacity-[0.03] transform translate-x-8 -translate-y-8">
+      <div className="absolute top-0 right-0 w-24 h-24 opacity-[0.03] transform translate-x-6 -translate-y-6">
         <svg viewBox="0 0 24 24" fill="currentColor" style={{ color: iconColor }}>{icon}</svg>
       </div>
       <div className="relative">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <div className="text-sm font-medium text-catalan-textMuted">{label}</div>
-            <div className="text-xs text-catalan-textMuted/60 mt-0.5">{sub}</div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-xs font-medium text-catalan-textMuted truncate">{label}</div>
+            <div className="text-2xl font-bold tracking-tight leading-tight mt-1" style={{ color: iconColor }}>
+              {value.toLocaleString()}
+            </div>
+            <div className="text-[10px] text-catalan-textMuted/60 mt-0.5 truncate">{sub}</div>
           </div>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+          <div className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
             style={{ background: `${iconColor}15`, boxShadow: `0 0 20px ${iconColor}10` }}>
-            <svg className="w-5 h-5" style={{ color: iconColor }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="w-4 h-4" style={{ color: iconColor }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               {icon}
             </svg>
           </div>
-        </div>
-        <div className="text-3xl font-bold tracking-tight" style={{ color: iconColor }}>
-          {value.toLocaleString()}
         </div>
       </div>
     </div>
@@ -151,7 +140,7 @@ export default function AdminPanel() {
   const user = getStoredUser() || { name: '', role: '' }
   const sidebarItems = getNavItems(user.role)
 
-  const [tab, setTab] = useState<'overview' | 'tenants' | 'progress' | 'files'>('overview')
+  const [tab, setTab] = useState<'tenants' | 'files'>('tenants')
   const [error, setError] = useState('')
 
   // ── Tenants ──
@@ -162,16 +151,11 @@ export default function AdminPanel() {
   const [editingTenant, setEditingTenant] = useState<TenantRow | null>(null)
   const [formData, setFormData] = useState({ name: '', app_name: '', plan_tier: 'starter', primary_color: '#89b4fa', logo_url: '', admin_phone: '', admin_name: '', admin_password: '' })
 
-  // ── Platform overview ──
-  const [overview, setOverview] = useState<TenantOverview[]>([])
-  const [loadingOverview, setLoadingOverview] = useState(false)
-
   // ── Drill-down: selected tenant ──
   const [selectedTenant, setSelectedTenant] = useState<TenantRow | null>(null)
-  const [drillTab, setDrillTab] = useState<'subs' | 'users' | 'progress'>('progress')
+  const [drillTab, setDrillTab] = useState<'subs' | 'users'>('subs')
   const [drillSubs, setDrillSubs] = useState<DrillSub[]>([])
   const [drillUsers, setDrillUsers] = useState<DrillUser[]>([])
-  const [drillStats, setDrillStats] = useState<EnumStat[]>([])
   const [loadingDrill, setLoadingDrill] = useState(false)
 
   // ── Edit user (cross-tenant) ──
@@ -197,18 +181,10 @@ export default function AdminPanel() {
   useEffect(() => { loadTenants() }, [])
 
   useEffect(() => {
-    if (tab === 'overview' && overview.length === 0) {
-      setLoadingOverview(true)
-      api.get('/admin/monitor/overview').then(r => setOverview(r.data)).catch(() => {}).finally(() => setLoadingOverview(false))
-    }
-  }, [tab])
-
-  useEffect(() => {
     if (!selectedTenant) return
     setLoadingDrill(true)
     const id = selectedTenant.id
     Promise.allSettled([
-      api.get(`/admin/monitor/tenant/${id}/enumerator-stats`).then(r => setDrillStats(r.data)),
       api.get(`/admin/monitor/tenant/${id}/submissions`).then(r => setDrillSubs(r.data.items ?? [])),
       api.get(`/admin/monitor/tenant/${id}/users`).then(r => setDrillUsers(r.data)),
     ]).finally(() => setLoadingDrill(false))
@@ -252,8 +228,8 @@ export default function AdminPanel() {
 
   const openDrillDown = (t: TenantRow) => {
     setSelectedTenant(t)
-    setDrillTab('progress')
-    setDrillSubs([]); setDrillUsers([]); setDrillStats([])
+    setDrillTab('subs')
+    setDrillSubs([]); setDrillUsers([])
     setTab('tenants')
   }
 
@@ -347,9 +323,7 @@ export default function AdminPanel() {
   }
 
   const TABS = [
-    { key: 'overview' as const, label: 'Overview', icon: <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /> },
     { key: 'tenants' as const, label: 'Tenants', icon: <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /> },
-    { key: 'progress' as const, label: 'Team Progress', icon: <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /> },
     { key: 'files' as const, label: 'Files', icon: <path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /> },
   ]
 
@@ -364,31 +338,6 @@ export default function AdminPanel() {
 
         <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6">
           {error && <Alert type="error" message={error} onClose={() => setError('')} />}
-
-          {/* ── Welcome Header ── */}
-          <div className="rounded-2xl p-6 relative overflow-hidden"
-            style={{
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(139,92,246,0.08) 50%, rgba(236,72,153,0.06) 100%)',
-              border: '1px solid rgba(99,102,241,0.15)',
-            }}>
-            <div className="absolute inset-0 opacity-[0.03]"
-              style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, #6366f1 1px, transparent 1px), radial-gradient(circle at 80% 20%, #8b5cf6 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-            <div className="relative flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-catalan-text tracking-tight">
-                  {new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'}, {user.name?.split(' ')[0] || 'Admin'}
-                </h2>
-                <p className="text-sm text-catalan-textMuted mt-1">
-                  {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                </p>
-              </div>
-              <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold"
-                style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)', color: '#34d399' }}>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse" />
-                {tenants.length} tenant{tenants.length !== 1 ? 's' : ''} active
-              </div>
-            </div>
-          </div>
 
           {/* ── Platform Stats ── */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -437,57 +386,6 @@ export default function AdminPanel() {
               </button>
             ))}
           </div>
-
-          {/* ── OVERVIEW TAB ── */}
-          {tab === 'overview' && (
-            <GlassCard>
-              <div className="flex items-center justify-between mb-5">
-                <div>
-                  <h3 className="text-lg font-bold text-catalan-text">Platform Overview</h3>
-                  <p className="text-xs text-catalan-textMuted mt-0.5">Progress by tenant organization</p>
-                </div>
-              </div>
-              {loadingOverview ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-                </div>
-              ) : overview.length === 0 ? (
-                <EmptyState icon="📊" message="No data available yet" />
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[640px]">
-                    <TableHeader columns={['Tenant', 'Plan', 'Users', 'Programs', 'Target', 'Collected', 'Progress']} />
-                    <tbody>
-                      {overview.map((row, i) => (
-                        <tr key={row.tenant_id} className={`border-b border-white/[0.04] transition-colors duration-150 hover:bg-white/[0.03] ${i % 2 === 0 ? '' : 'bg-white/[0.01]'}`}>
-                          <td className="px-4 py-3 font-medium text-catalan-text">{row.tenant_name}</td>
-                          <td className="px-4 py-3"><PlanBadge plan={row.plan_tier} /></td>
-                          <td className="px-4 py-3 text-catalan-textMuted">{row.user_count}</td>
-                          <td className="px-4 py-3 text-catalan-textMuted">{row.program_count}</td>
-                          <td className="px-4 py-3 text-catalan-textMuted font-mono text-xs">{row.total_target.toLocaleString()}</td>
-                          <td className="px-4 py-3 text-catalan-textMuted font-mono text-xs">{row.total_collected.toLocaleString()}</td>
-                          <td className="px-4 py-3 w-44">
-                            <div className="flex items-center gap-3">
-                              <div className="flex-1 h-2 bg-white/[0.06] rounded-full overflow-hidden">
-                                <div className="h-full rounded-full transition-all duration-500"
-                                  style={{
-                                    width: `${Math.min(row.pct, 100)}%`,
-                                    background: row.pct >= 80 ? 'linear-gradient(90deg, #34d399, #10b981)' :
-                                               row.pct >= 50 ? 'linear-gradient(90deg, #60a5fa, #3b82f6)' :
-                                               'linear-gradient(90deg, #fbbf24, #f59e0b)',
-                                  }} />
-                              </div>
-                              <span className="text-xs font-semibold text-catalan-textMuted w-10 text-right">{row.pct}%</span>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </GlassCard>
-          )}
 
           {/* ── TENANTS TAB ── */}
           {tab === 'tenants' && !selectedTenant && (
@@ -597,7 +495,7 @@ export default function AdminPanel() {
               {/* Drill tabs */}
               <div className="flex gap-1 rounded-xl p-1 w-fit"
                 style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                {([['progress', 'Team Progress'], ['subs', 'Submissions'], ['users', 'Users']] as const).map(([t, label]) => (
+                {([['subs', 'Submissions'], ['users', 'Users']] as const).map(([t, label]) => (
                   <button key={t} onClick={() => setDrillTab(t)}
                     className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
                       drillTab === t ? 'text-white shadow-sm' : 'text-catalan-textMuted hover:text-catalan-text hover:bg-white/[0.04]'
@@ -615,36 +513,6 @@ export default function AdminPanel() {
                 <div className="flex items-center justify-center py-16">
                   <div className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
                 </div>
-              )}
-
-              {/* Team Progress */}
-              {!loadingDrill && drillTab === 'progress' && (
-                <GlassCard>
-                  <h3 className="text-base font-bold text-catalan-text mb-4">Enumerator Performance</h3>
-                  {drillStats.length === 0 ? (
-                    <EmptyState icon="📋" message="No submissions yet for this tenant" />
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm min-w-[600px]">
-                        <TableHeader columns={['Enumerator', 'Total', 'Approved', 'Flagged', 'Rejected', 'Last Active']} />
-                        <tbody>
-                          {drillStats.map((s, i) => (
-                            <tr key={s.id} className={`border-b border-white/[0.04] transition-colors duration-150 hover:bg-white/[0.03] ${i % 2 === 0 ? '' : 'bg-white/[0.01]'}`}>
-                              <td className="px-4 py-3 font-medium text-catalan-text">{s.name}</td>
-                              <td className="px-4 py-3 font-bold text-catalan-text font-mono">{s.total}</td>
-                              <td className="px-4 py-3 font-mono" style={{ color: '#34d399' }}>{s.approved}</td>
-                              <td className="px-4 py-3 font-mono" style={{ color: '#fbbf24' }}>{s.flagged}</td>
-                              <td className="px-4 py-3 font-mono" style={{ color: '#f87171' }}>{s.rejected}</td>
-                              <td className="px-4 py-3 text-catalan-textMuted text-xs">
-                                {s.last_submission ? new Date(s.last_submission).toLocaleDateString() : '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </GlassCard>
               )}
 
               {/* Submissions */}
@@ -708,67 +576,6 @@ export default function AdminPanel() {
                     </div>
                   )}
                 </GlassCard>
-              )}
-            </div>
-          )}
-
-          {/* ── TEAM PROGRESS TAB ── */}
-          {tab === 'progress' && (
-            <div className="space-y-4">
-              <p className="text-sm text-catalan-textMuted">Click a tenant card to drill into detailed team progress.</p>
-              {tenants.length === 0 ? (
-                <GlassCard>
-                  <EmptyState icon="📊" message="No tenants available yet" />
-                </GlassCard>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {tenants.map(t => (
-                    <div key={t.id}
-                      className="group rounded-2xl p-5 cursor-pointer transition-all duration-300 hover:translate-y-[-2px] hover:shadow-xl relative overflow-hidden"
-                      style={{
-                        background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(139,92,246,0.03))',
-                        border: '1px solid rgba(99,102,241,0.12)',
-                      }}
-                      onClick={() => openDrillDown(t)}>
-                      <div className="absolute top-0 right-0 w-24 h-24 opacity-[0.04] transform translate-x-6 -translate-y-6 rounded-full"
-                        style={{ background: t.primary_color }} />
-                      <div className="relative">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex items-center gap-3">
-                            {t.logo_url ? (
-                              <img src={t.logo_url} alt="" className="w-10 h-10 rounded-lg object-cover ring-1 ring-white/10" />
-                            ) : (
-                              <div className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold"
-                                style={{ background: `${t.primary_color}20`, color: t.primary_color }}>
-                                {t.name.charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                            <div>
-                              <p className="font-bold text-catalan-text">{t.name}</p>
-                              <PlanBadge plan={t.plan_tier} />
-                            </div>
-                          </div>
-                          <span className="text-xs font-medium px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                            style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8' }}>
-                            View →
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-3">
-                          {[
-                            { v: t.users_count, l: 'Users', c: '#60a5fa' },
-                            { v: t.submissions_count, l: 'Submissions', c: '#34d399' },
-                            { v: t.forms_count, l: 'Forms', c: '#fbbf24' },
-                          ].map(m => (
-                            <div key={m.l} className="text-center p-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
-                              <div className="text-xl font-bold" style={{ color: m.c }}>{m.v}</div>
-                              <div className="text-[10px] font-medium text-catalan-textMuted uppercase tracking-wider mt-0.5">{m.l}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               )}
             </div>
           )}

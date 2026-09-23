@@ -908,8 +908,11 @@ export default function Dashboard() {
     ]
     if (!isEnumerator) {
       calls.push(
-        api.get('/submissions/summary').then(r => setSummary(r.data)).catch(() => {}),
-        api.get('/submissions/?page_size=10&slim=true').then(r => setRecentSubmissions(r.data.items ?? [])).catch(() => {}),
+        getWithRetry('/submissions/summary').then(r => setSummary(r.data)).catch(() => {}),
+        getWithRetry('/submissions/?page_size=10&slim=true').then(r => setRecentSubmissions(r.data.items ?? [])).catch(() => {}),
+        // Load team eagerly so the "Team Members" KPI tile populates on the
+        // overview without waiting for the user to open the Team tab.
+        getWithRetry('/users/?page_size=200').then(r => setTeam(r.data.items ?? r.data.users ?? [])).catch(() => {}),
       )
     }
     Promise.allSettled(calls).then(results => {
@@ -934,11 +937,15 @@ export default function Dashboard() {
   // Lazy-load tab-specific data only when needed
   useEffect(() => {
     if (isEnumerator) return
-    if (tab === 'team' && team.length === 0) {
-      api.get('/users/?page_size=200')
-        .then(r => setTeam(r.data.items ?? r.data.users ?? []))
-        .catch(() => toast.error('Could not load your team list. Use the Refresh button or reload the page.'))
-      api.get('/assignments/').then(r => setAssignments(r.data ?? [])).catch(() => {})
+    if (tab === 'team') {
+      if (team.length === 0) {
+        api.get('/users/?page_size=200')
+          .then(r => setTeam(r.data.items ?? r.data.users ?? []))
+          .catch(() => toast.error('Could not load your team list. Use the Refresh button or reload the page.'))
+      }
+      if (assignments.length === 0) {
+        api.get('/assignments/').then(r => setAssignments(r.data ?? [])).catch(() => {})
+      }
     }
   }, [tab])
 

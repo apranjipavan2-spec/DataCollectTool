@@ -300,42 +300,53 @@ def get_tenant_enumerator_stats(tenant_id: str, user=Depends(require_master_admi
 
 # ── Platform Usage Dashboard ─────────────────────────────────────────────────
 
+def _count_fields(schema: dict) -> int:
+    """Mirrors frontend's countFields() in VersionHistoryPanel.tsx — top-level
+    `fields` plus each section's `fields`, so counts stay consistent with what
+    the form builder shows."""
+    if not isinstance(schema, dict):
+        return 0
+    sections = schema.get("sections") or []
+    top_fields = schema.get("fields") or []
+    return len(top_fields) + sum(len(s.get("fields") or []) for s in sections if isinstance(s, dict))
+
+
 @router.get("/platform-usage")
 def platform_usage(user=Depends(require_master_admin), db: Session = Depends(get_db)):
-    """Per-tenant usage summary for master_admin dashboard.
-    Uses 6 queries total regardless of tenant count (was 5N)."""
-    month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    """Per-tenant usage summary for master_admin dashboard: team composition,
+    submissions/AI-call activity, and plan-limit consumption. Query count is
+    fixed regardless of tenant count (bulk grouped queries, not N+1)."""
+    from app.models.billing import Plan, UsageRecord
+    from app.models.ai_usage_log import AiUsageLog
+    from app.models.media_file import MediaFile
+    from app.core.plan_limits import _limits_for_db
+
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
     tenants = db.query(Tenant).filter(Tenant.name != "Platform").order_by(Tenant.created_at.desc()).all()
     if not tenants:
-        return {"platform_totals": {"tenants": 0, "submissions_this_month": 0, "total_submissions": 0, "total_users": 0}, "tenants": []}
+        return {"platform_totals": {"tenants": 0, "submissions_this_month": 0, "total_submissions": 0, "total_users": 0, "total_forms": 0, "ai_calls_today": 0}, "tenants": []}
 
     tenant_ids = [t.id for t in tenants]
 
-    total_subs: dict[str, int] = {
-        str(r.tenant_id): r.cnt
-        for r in db.query(Submission.tenant_id, func.count(Submission.id).label("cnt"))
-        .filter(Submission.tenant_id.in_(tenant_ids))
-        .group_by(Submission.tenant_id).all()
-    }
-    month_subs: dict[str, int] = {
-        str(r.tenant_id): r.cnt
-        for r in db.query(Submission.tenant_id, func.count(Submission.id).label("cnt"))
-        .filter(Submission.tenant_id.in_(tenant_ids), Submission.server_received_at >= month_start)
-        .group_by(Submission.tenant_id).all()
-    }
-    total_users: dict[str, int] = {
-        str(r.tenant_id): r.cnt
-        for r in db.query(User.tenant_id, func.count(User.id).label("cnt"))
-        .filter(User.tenant_id.in_(tenant_ids), User.is_active == True)
-        .group_by(User.tenant_id).all()
-    }
-    total_forms: dict[str, int] = {
-        str(r.tenant_id): r.cnt
-        for r in db.query(Form.tenant_id, func.count(Form.id).label("cnt"))
-        .filter(Form.tenant_id.in_(tenant_ids))
-        .group_by(Form.tenant_id).all()
-    }
+    def _grouped(query_col, *filters) -> dict[str, int]:
+        rows = (
+            db.query(query_col, func.count().label("cnt"))
+            .filter(*filters)
+            .group_by(query_col)
+            .all()
+        )
+        return {str(r[0]): r.cnt for r in rows}
+
+    total_subs = _grouped(Submission.tenant_id, Submission.tenant_id.in_(tenant_ids))
+    month_subs = _grouped(Submission.tenant_id, Submission.tenant_id.in_(tenant_ids), Submission.server_received_at >= month_start)
+    total_forms = _grouped(Form.tenant_id, Form.tenant_id.in_(tenant_ids))
+    active_forms = _grouped(Form.tenant_id, Form.tenant_id.in_(tenant_ids), Form.status == "active")
+    ai_today = _grouped(AiUsageLog.tenant_id, AiUsageLog.tenant_id.in_(tenant_ids), AiUsageLog.created_at >= day_start)
+    ai_month = _grouped(AiUsageLog.tenant_id, AiUsageLog.tenant_id.in_(tenant_ids), AiUsageLog.created_at >= month_start)
+
     last_sub: dict[str, datetime | None] = {
         str(r.tenant_id): r.last
         for r in db.query(Submission.tenant_id, func.max(Submission.server_received_at).label("last"))
@@ -343,27 +354,121 @@ def platform_usage(user=Depends(require_master_admin), db: Session = Depends(get
         .group_by(Submission.tenant_id).all()
     }
 
+    # Users grouped by (tenant_id, role) — active only, mirrors seat-limit enforcement.
+    users_by_role: dict[str, dict[str, int]] = {}
+    for r in (
+        db.query(User.tenant_id, User.role, func.count(User.id).label("cnt"))
+        .filter(User.tenant_id.in_(tenant_ids), User.is_active == True)
+        .group_by(User.tenant_id, User.role).all()
+    ):
+        users_by_role.setdefault(str(r.tenant_id), {})[r.role] = r.cnt
+
+    storage_bytes: dict[str, int] = {
+        str(r.tenant_id): r.total
+        for r in db.query(MediaFile.tenant_id, func.sum(MediaFile.file_size_bytes).label("total"))
+        .filter(MediaFile.tenant_id.in_(tenant_ids))
+        .group_by(MediaFile.tenant_id).all()
+    }
+
+    usage_recs: dict[str, UsageRecord] = {
+        str(r.tenant_id): r
+        for r in db.query(UsageRecord)
+        .filter(UsageRecord.tenant_id.in_(tenant_ids), UsageRecord.period_year == now.year, UsageRecord.period_month == now.month)
+        .all()
+    }
+
+    # Plan limits — one DB lookup per distinct plan_tier, not per tenant.
+    limits_by_tier: dict[str, dict] = {}
+    for t in tenants:
+        if t.plan_tier not in limits_by_tier:
+            limits_by_tier[t.plan_tier] = _limits_for_db(t.plan_tier, db)
+
     platform_totals = {
         "tenants": len(tenants),
         "submissions_this_month": sum(month_subs.values()),
         "total_submissions": sum(total_subs.values()),
-        "total_users": sum(total_users.values()),
+        "total_users": sum(sum(roles.values()) for roles in users_by_role.values()),
+        "total_forms": sum(total_forms.values()),
+        "ai_calls_today": sum(ai_today.values()),
     }
+
+    def _cap(used: int, limit: int) -> dict:
+        return {"used": used, "limit": limit if limit >= 0 else None}
 
     result = []
     for t in tenants:
         tid = str(t.id)
         ls = last_sub.get(tid)
+        roles = users_by_role.get(tid, {})
+        limits = limits_by_tier[t.plan_tier]
+        rec = usage_recs.get(tid)
+        storage_mb = round((storage_bytes.get(tid, 0) or 0) / (1024 * 1024), 2)
+
         result.append({
             "tenant_id": tid,
             "tenant_name": t.name,
-            "plan": getattr(t, "plan", "starter"),
+            "plan": t.plan_tier,
+            "subscription_status": t.subscription_status,
             "total_submissions": total_subs.get(tid, 0),
             "submissions_this_month": month_subs.get(tid, 0),
-            "total_users": total_users.get(tid, 0),
             "total_forms": total_forms.get(tid, 0),
+            "active_forms": active_forms.get(tid, 0),
+            "total_users": sum(roles.values()),
+            "org_admins": roles.get("org_admin", 0),
+            "supervisors": roles.get("supervisor", 0),
+            "enumerators": roles.get("enumerator", 0),
+            "ai_calls_today": ai_today.get(tid, 0),
+            "ai_calls_this_month": ai_month.get(tid, 0),
             "last_activity": ls.isoformat() if ls else None,
             "created_at": t.created_at.isoformat() if t.created_at else None,
+            "limits": {
+                "submissions": _cap(month_subs.get(tid, 0), limits["submissions_per_month"]),
+                "active_forms": _cap(active_forms.get(tid, 0), limits["active_forms"]),
+                "storage_mb": _cap(storage_mb, limits["storage_mb"]),
+                "ai_reports": _cap(rec.ai_reports_used if rec else 0, limits["ai_reports_per_month"]),
+                "api_calls": _cap(rec.api_calls_used if rec else 0, limits["api_calls_per_month"]),
+                "ai_calls_per_day": _cap(ai_today.get(tid, 0), limits["ai_calls_per_day"]),
+                "admins": _cap(roles.get("org_admin", 0), limits["admins"]),
+                "supervisors": _cap(roles.get("supervisor", 0), limits["supervisors"]),
+                "enumerators": _cap(roles.get("enumerator", 0), limits["enumerators"]),
+            },
         })
 
     return {"platform_totals": platform_totals, "tenants": result}
+
+
+@router.get("/forms")
+def get_all_forms(user=Depends(require_master_admin), db: Session = Depends(get_db)):
+    """Cross-tenant form list: field count + submission count per form, for
+    tracking usage form-wise and organization-wise instead of program targets."""
+    rows = (
+        db.query(Form, Tenant)
+        .join(Tenant, Tenant.id == Form.tenant_id)
+        .filter(Tenant.name != "Platform")
+        .order_by(Tenant.name, Form.title)
+        .all()
+    )
+    if not rows:
+        return []
+
+    form_ids = [f.id for f, _ in rows]
+    sub_counts: dict[str, int] = {
+        str(r.form_id): r.cnt
+        for r in db.query(Submission.form_id, func.count(Submission.id).label("cnt"))
+        .filter(Submission.form_id.in_(form_ids))
+        .group_by(Submission.form_id).all()
+    }
+
+    return [
+        {
+            "id": str(f.id),
+            "tenant_id": str(f.tenant_id),
+            "tenant_name": tenant.name,
+            "title": f.title,
+            "status": f.status,
+            "field_count": _count_fields(f.json_schema),
+            "submissions_count": sub_counts.get(str(f.id), 0),
+            "created_at": f.created_at.isoformat() if f.created_at else None,
+        }
+        for f, tenant in rows
+    ]
