@@ -301,7 +301,15 @@ def update_user(user_id: str, body: UserUpdate, user=Depends(get_current_user), 
                 raise HTTPException(status_code=400, detail="Phone already in use")
         target.phone = new_phone
     if body.email is not None:
-        target.email = body.email.strip() or None
+        new_email = body.email.strip() or None
+        if new_email and (target.email or "").lower() != new_email.lower():
+            dup = db.query(User).filter(
+                func.lower(User.email) == new_email.lower(),
+                User.is_active == True, User.id != target.id,
+            ).first()
+            if dup:
+                raise HTTPException(status_code=400, detail="Email already in use")
+        target.email = new_email
     if body.language_pref is not None:
         target.language_pref = body.language_pref
 

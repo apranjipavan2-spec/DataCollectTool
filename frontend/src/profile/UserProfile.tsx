@@ -26,12 +26,14 @@ const ROLE_COLORS: Record<string, string> = {
 export default function UserProfile() {
   const navigate = useNavigate()
   const toast    = useToast()
-  const user     = getStoredUser() || { id: '', name: '', phone: '', role: '' }
+  const user     = getStoredUser() || { id: '', name: '', phone: '', email: '', role: '' }
   const sidebarItems = getNavItems(user.role)
 
   // ── Profile edit state ────────────────────────────────────────────────────
   const [name,    setName]    = useState(user.name   ?? '')
   const [phone,   setPhone]   = useState(user.phone  ?? '')
+  const [email,   setEmail]   = useState(user.email ?? '')
+  const [savedEmail, setSavedEmail] = useState(user.email ?? '')
   const [editing, setEditing] = useState(false)
   const [saving,  setSaving]  = useState(false)
   const [profileError, setProfileError] = useState('')
@@ -55,7 +57,11 @@ export default function UserProfile() {
   const [tfaError,     setTfaError]     = useState('')
 
   useEffect(() => {
-    api.get('/users/me').then(({ data }) => setTotpEnabled(!!data.totp_enabled)).catch(() => setTotpEnabled(false))
+    api.get('/users/me').then(({ data }) => {
+      setTotpEnabled(!!data.totp_enabled)
+      setEmail(data.email ?? '')
+      setSavedEmail(data.email ?? '')
+    }).catch(() => setTotpEnabled(false))
   }, [])
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -63,6 +69,7 @@ export default function UserProfile() {
     const errs: Record<string, string> = {}
     if (!name.trim())  errs.name  = 'Name is required'
     if (!phone.trim()) errs.phone = 'Phone is required'
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errs.email = 'Enter a valid email address'
     if (Object.keys(errs).length) {
       // show inline — reuse pwErrors pattern
       setPwErrors(errs)
@@ -72,9 +79,10 @@ export default function UserProfile() {
     setSaving(true)
     setProfileError('')
     try {
-      await api.patch(`/users/${user.id}`, { name: name.trim(), phone: phone.trim() })
+      await api.patch(`/users/${user.id}`, { name: name.trim(), phone: phone.trim(), email: email.trim() })
       const current = getStoredUser()
-      if (current) storeUser({ ...current, name: name.trim(), phone: phone.trim() })
+      if (current) storeUser({ ...current, name: name.trim(), phone: phone.trim(), email: email.trim() })
+      setSavedEmail(email.trim())
       toast.success('Profile updated')
       setEditing(false)
     } catch (err: any) {
@@ -157,6 +165,7 @@ export default function UserProfile() {
   const cancelEdit = () => {
     setName(user.name ?? '')
     setPhone(user.phone ?? '')
+    setEmail(savedEmail)
     setEditing(false)
     setPwErrors({})
     setProfileError('')
@@ -226,6 +235,19 @@ export default function UserProfile() {
                   />
                   {pwErrors.phone && <p className="text-xs text-catalan-error mt-1">{pwErrors.phone}</p>}
                 </div>
+                <div>
+                  <label className="text-xs text-catalan-textMuted block mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className={`w-full bg-catalan-hover border rounded-lg px-3 py-2 text-sm text-catalan-text outline-none transition-colors ${
+                      pwErrors.email ? 'border-catalan-error focus:border-catalan-error' : 'border-catalan-border focus:border-catalan-primary'
+                    }`}
+                  />
+                  {pwErrors.email && <p className="text-xs text-catalan-error mt-1">{pwErrors.email}</p>}
+                </div>
                 <div className="flex gap-3 pt-1">
                   <Button variant="primary" size="sm" onClick={handleSaveProfile} disabled={saving}>
                     {saving ? 'Saving…' : 'Save Changes'}
@@ -241,7 +263,8 @@ export default function UserProfile() {
                   {[
                     ['Full Name', name || '—'],
                     ['Phone',     phone || '—'],
-                    ['Role',      roleLabel],
+                    ['Email',     email || '—'],
+                    ['Role',     roleLabel],
                     ['User ID',   user.id ? user.id.slice(0, 12) + '…' : '—'],
                   ].map(([label, val]) => (
                     <div key={label}>
