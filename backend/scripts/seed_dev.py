@@ -242,6 +242,13 @@ _PATCHES = [
     "WHERE archived_at IS NOT NULL AND deleted_at IS NULL",
     # 0063 — per-tier daily AI call cap
     "ALTER TABLE plans ADD COLUMN IF NOT EXISTS ai_calls_per_day INTEGER",
+    # 0064 — signup leads (chatbot captures + signup attempts)
+    "CREATE TABLE IF NOT EXISTS signup_leads ("
+    "id BIGSERIAL PRIMARY KEY, email VARCHAR(320) NOT NULL UNIQUE, phone VARCHAR(32), "
+    "name VARCHAR(200), org_name VARCHAR(200), source VARCHAR(32) NOT NULL, "
+    "status VARCHAR(16) NOT NULL DEFAULT 'lead', attempts INTEGER NOT NULL DEFAULT 1, "
+    "note TEXT, ip VARCHAR(64), created_at TIMESTAMPTZ DEFAULT now(), last_seen_at TIMESTAMPTZ DEFAULT now())",
+    "CREATE INDEX IF NOT EXISTS ix_signup_leads_last_seen_at ON signup_leads (last_seen_at)",
 ]
 
 # 0048 — restricted runtime role + empty-context-bypass RLS policies. Mirrors the

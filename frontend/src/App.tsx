@@ -41,6 +41,8 @@ const FieldMapPage    = lazy(() => import('@/map/FieldMapPage'))
 const PublicSurveyPage   = lazy(() => import('@/collect/PublicSurveyPage'))
 const RecoverPage        = lazy(() => import('@/collect/RecoverPage'))
 const SubscriptionPage   = lazy(() => import('@/admin/SubscriptionPage'))
+const LoginActivity      = lazy(() => import('@/admin/LoginActivity'))
+const SignupLeads       = lazy(() => import('@/admin/SignupLeads'))
 const AdminPayments      = lazy(() => import('@/admin/AdminPayments'))
 const PlatformSettingsPage = lazy(() => import('@/admin/PlatformSettingsPage'))
 const PricingPage        = lazy(() => import('@/pages/PricingPage'))
@@ -234,6 +236,18 @@ export default function App() {
               <Route path="/subscription" element={
                 <RequireAuth roles={['org_admin', 'master_admin']}>
                   <LazyRoute><SubscriptionPage /></LazyRoute>
+                </RequireAuth>
+              } />
+
+              <Route path="/admin/logins" element={
+                <RequireAuth roles={['master_admin']}>
+                  <LazyRoute><LoginActivity /></LazyRoute>
+                </RequireAuth>
+              } />
+
+              <Route path="/admin/leads" element={
+                <RequireAuth roles={['master_admin']}>
+                  <LazyRoute><SignupLeads /></LazyRoute>
                 </RequireAuth>
               } />
 

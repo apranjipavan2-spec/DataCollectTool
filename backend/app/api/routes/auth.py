@@ -154,8 +154,13 @@ def google_login(request: Request, body: GoogleLoginIn, db: Session = Depends(ge
         user.google_id = google_id; changed = True
     if avatar_url and not user.avatar_url:
         user.avatar_url = avatar_url; changed = True
-    if changed:
-        db.commit()
+    from app.services.audit import write_audit
+    write_audit(
+        db, tenant_id=user.tenant_id, user_id=user.id, action="login_google",
+        resource="user", resource_id=str(user.id),
+        ip_address=request.client.host if request.client else None,
+    )
+    db.commit()
 
     return _make_token(user)
 
@@ -283,6 +288,12 @@ def register(request: Request, body: RegisterRequest, db: Session = Depends(get_
     """Create a new tenant + org_admin from self-serve signup. Sends email verification."""
     segment = body.segment if body.segment in VALID_SEGMENTS else "ngo"
 
+    # Trace-back: log every signup attempt (no password) before any guard can reject it
+    from app.services.leads import record_lead
+    _ip = request.client.host if request.client else None
+    record_lead(db, body.email, "signup_form", "attempted", phone=body.phone,
+                name=body.admin_name, org_name=body.org_name, ip=_ip)
+
     # Spam guards: bot check + disposable-email block (both graceful if unconfigured)
     from app.core.signup_guard import verify_turnstile, is_disposable_email
     if not verify_turnstile(body.turnstile_token, request.client.host if request.client else None):
@@ -353,8 +364,34 @@ def register(request: Request, body: RegisterRequest, db: Session = Depends(get_
     db.commit()
 
     send_verification_email(body.email, body.admin_name, raw_token)
+    record_lead(db, body.email, "signup_form", "registered", phone=body.phone,
+                name=body.admin_name, org_name=body.org_name, ip=_ip)
 
     return {"message": "Account created! Check your email to verify and activate it."}
+
+
+class LeadRequest(BaseModel):
+    email: EmailStr
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    source: str = "website_chat"   # website_chat | login_chat
+    message: Optional[str] = None
+
+
+@router.post("/lead", status_code=202)
+@limiter.limit("5/minute")
+def capture_lead(request: Request, body: LeadRequest, db: Session = Depends(get_db)):
+    """Public: chatbot captures a visitor's email (and optional name/phone) for follow-up."""
+    from app.services.leads import record_lead
+    source = body.source if body.source in {"website_chat", "login_chat"} else "website_chat"
+    record_lead(
+        db, body.email, source, "lead",
+        phone=(body.phone or "").strip()[:32] or None,
+        name=(body.name or "").strip()[:200] or None,
+        note=(body.message or "").strip()[:500] or None,
+        ip=request.client.host if request.client else None,
+    )
+    return {"ok": True}
 
 
 @router.get("/verify-email")

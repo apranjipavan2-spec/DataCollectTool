@@ -159,8 +159,10 @@ def detect_and_stamp():
             stamp = "0061"
         elif not col_exists(cur, "plans", "ai_calls_per_day"):
             stamp = "0062"
-        else:
+        elif not table_exists(cur, "signup_leads"):
             stamp = "0063"
+        else:
+            stamp = "0064"
 
         # `alembic upgrade` requires EXACTLY one row whose value string-matches the
         # revision it expects. Any deviation makes the version UPDATE fail with

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import api, { storeUser, getKnownDevice, forgetKnownDevice } from '@/lib/api'
 import { useNavigate } from 'react-router-dom'
 import { subscribeToPush } from '@/lib/pushNotifications'
+import ChatLeadWidget from '@/components/ChatLeadWidget'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
 
@@ -682,6 +683,7 @@ export default function LoginPage() {
 
         </div>
       </div>
+      <ChatLeadWidget />
     </div>
   )
 }

@@ -526,3 +526,99 @@ def get_all_forms(user=Depends(require_master_admin), db: Session = Depends(get_
         }
         for f, tenant in rows
     ]
+
+
+@router.get("/leads")
+def list_signup_leads(
+    q: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    limit: int = Query(500, le=2000),
+    user=Depends(require_master_admin),
+    db: Session = Depends(get_db),
+):
+    """Emails/phones captured by the chatbot and signup attempts, newest activity first."""
+    from app.models.signup_lead import SignupLead
+    query = db.query(SignupLead)
+    if status:
+        query = query.filter(SignupLead.status == status)
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            SignupLead.email.ilike(like) | SignupLead.phone.ilike(like)
+            | SignupLead.name.ilike(like) | SignupLead.org_name.ilike(like)
+        )
+    rows = query.order_by(SignupLead.last_seen_at.desc()).limit(limit).all()
+    return [
+        {
+            "id": r.id, "email": r.email, "phone": r.phone, "name": r.name,
+            "org_name": r.org_name, "source": r.source, "status": r.status,
+            "attempts": r.attempts, "note": r.note, "ip": r.ip,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "last_seen_at": r.last_seen_at.isoformat() if r.last_seen_at else None,
+        }
+        for r in rows
+    ]
+
+
+_LOGIN_OK = ("login_password_verified", "login_google")
+_LOGIN_FAIL = ("login_failed",)
+
+
+@router.get("/logins")
+def list_login_activity(
+    outcome: str = Query("all", pattern="^(all|success|failed)$"),
+    tenant_id: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    days: int = Query(7, ge=1, le=365),
+    sort: str = Query("time", pattern="^(time|user|org)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
+    limit: int = Query(500, le=2000),
+    user=Depends(require_master_admin),
+    db: Session = Depends(get_db),
+):
+    """Cross-tenant login log (from the audit trail): who logged in, when, from where."""
+    from datetime import timedelta
+    from app.models.audit_log import AuditLog
+
+    actions = _LOGIN_OK if outcome == "success" else _LOGIN_FAIL if outcome == "failed" else _LOGIN_OK + _LOGIN_FAIL
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    base = (
+        db.query(AuditLog, User, Tenant)
+        .outerjoin(User, User.id == AuditLog.user_id)
+        .outerjoin(Tenant, Tenant.id == AuditLog.tenant_id)
+        .filter(AuditLog.action.in_(actions), AuditLog.created_at >= since)
+    )
+    if tenant_id:
+        base = base.filter(AuditLog.tenant_id == tenant_id)
+    if q:
+        like = f"%{q.strip()}%"
+        base = base.filter(
+            User.name.ilike(like) | User.phone.ilike(like) | User.email.ilike(like) | Tenant.name.ilike(like)
+        )
+
+    col = {"time": AuditLog.created_at, "user": User.name, "org": Tenant.name}[sort]
+    base_sorted = base.order_by(col.asc() if order == "asc" else col.desc(), AuditLog.id.desc())
+    rows = base_sorted.limit(limit).all()
+
+    ok = base.filter(AuditLog.action.in_(_LOGIN_OK))
+    summary = {
+        "successful": ok.count(),
+        "failed": base.filter(AuditLog.action.in_(_LOGIN_FAIL)).count(),
+        "unique_users": ok.with_entities(func.count(func.distinct(AuditLog.user_id))).scalar() or 0,
+    }
+    return {
+        "summary": summary,
+        "rows": [
+            {
+                "id": a.id, "action": a.action,
+                "success": a.action in _LOGIN_OK,
+                "method": "google" if a.action == "login_google" else "password",
+                "user_name": u.name if u else None, "phone": u.phone if u else None,
+                "email": u.email if u else None, "role": u.role if u else None,
+                "tenant_id": str(a.tenant_id), "tenant_name": t.name if t else None,
+                "ip": a.ip_address,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+            }
+            for a, u, t in rows
+        ],
+    }
