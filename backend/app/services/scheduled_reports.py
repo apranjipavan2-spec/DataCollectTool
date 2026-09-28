@@ -67,8 +67,7 @@ def run_scheduled_reports(db: Session) -> dict:
     """Check all active scheduled reports and deliver any that are due now."""
     import asyncio
     from app.models.scheduled_report import ScheduledReport
-    from app.models.program import Program
-    from app.models.program_analysis import ProgramAnalysis
+    from app.models.program import Program, ProgramAnalysis
     from app.services import ai_service
     from app.core.database import set_tenant_context
 

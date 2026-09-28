@@ -27,3 +27,4 @@ from app.models.submission_comment import SubmissionComment
 from app.models.in_app_notification import InAppNotification
 from app.models.feedback_resolution import FeedbackResolution
 from app.models.signup_lead import SignupLead
+from app.models.system_metric import SystemMetric

@@ -249,6 +249,12 @@ _PATCHES = [
     "status VARCHAR(16) NOT NULL DEFAULT 'lead', attempts INTEGER NOT NULL DEFAULT 1, "
     "note TEXT, ip VARCHAR(64), created_at TIMESTAMPTZ DEFAULT now(), last_seen_at TIMESTAMPTZ DEFAULT now())",
     "CREATE INDEX IF NOT EXISTS ix_signup_leads_last_seen_at ON signup_leads (last_seen_at)",
+    # 0065 — per-minute CPU/RAM samples for the super-admin resource monitor
+    "CREATE TABLE IF NOT EXISTS system_metrics ("
+    "id BIGSERIAL PRIMARY KEY, ts TIMESTAMPTZ NOT NULL DEFAULT now(), "
+    "cpu_pct DOUBLE PRECISION NOT NULL, mem_pct DOUBLE PRECISION NOT NULL, "
+    "mem_used_mb DOUBLE PRECISION NOT NULL, mem_total_mb DOUBLE PRECISION NOT NULL)",
+    "CREATE INDEX IF NOT EXISTS ix_system_metrics_ts ON system_metrics (ts)",
 ]
 
 # 0048 — restricted runtime role + empty-context-bypass RLS policies. Mirrors the

@@ -12,6 +12,7 @@ import logging
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,39 @@ def _run_monthly_usage_reset():
         logger.info("[Scheduler] Monthly reset done — %d old usage rows purged", deleted)
     except Exception:
         logger.exception("[Scheduler] Monthly usage reset failed")
+    finally:
+        db.close()
+
+
+def _run_system_metrics_sample():
+    """Sample host CPU/RAM once (every minute) and prune samples older than 7 days.
+    psutil.cpu_percent(interval=None) is non-blocking — it reports usage since the
+    previous call, which lines up with our 1-minute cadence."""
+    from app.core.database import SessionLocal
+    from app.models.system_metric import SystemMetric
+    from datetime import datetime, timezone, timedelta
+
+    try:
+        import psutil
+        cpu_pct = psutil.cpu_percent(interval=None)
+        vm = psutil.virtual_memory()
+    except Exception:
+        logger.exception("[Scheduler] System metrics sample failed (psutil read)")
+        return
+
+    db = SessionLocal()
+    try:
+        db.add(SystemMetric(
+            cpu_pct=cpu_pct, mem_pct=vm.percent,
+            mem_used_mb=(vm.total - vm.available) / (1024 * 1024),
+            mem_total_mb=vm.total / (1024 * 1024),
+        ))
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        db.query(SystemMetric).filter(SystemMetric.ts < cutoff).delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("[Scheduler] System metrics sample failed (db write)")
     finally:
         db.close()
 
@@ -164,6 +198,24 @@ def start_scheduler():
 
     _scheduler = BackgroundScheduler(timezone="UTC")
 
+    # Prime psutil's internal counter — its first cpu_percent() call is meaningless
+    # (no prior sample to diff against), so the real 1-minute samples below are clean.
+    try:
+        import psutil
+        psutil.cpu_percent(interval=None)
+    except Exception:
+        logger.exception("[Scheduler] psutil priming failed — system metrics job will still run")
+
+    # System resource sample (CPU/RAM) — every minute, 7-day rolling retention
+    _scheduler.add_job(
+        _run_system_metrics_sample,
+        IntervalTrigger(minutes=1),
+        id="system_metrics_sample",
+        name="System CPU/RAM Sample",
+        replace_existing=True,
+        misfire_grace_time=30,
+    )
+
     # Daily digest at 07:00 UTC
     _scheduler.add_job(
         _run_daily_digest,
@@ -235,7 +287,7 @@ def start_scheduler():
     )
 
     _scheduler.start()
-    logger.info("[Scheduler] Started — daily digest @ 07:00 UTC, monthly usage reset @ 1st 00:30 UTC, scheduled reports @ :00 each hour, bin purge @ 03:15 UTC, trial expiry @ 02:00 UTC, form version purge @ 03:45 UTC, retention expiry @ 04:15 UTC")
+    logger.info("[Scheduler] Started — system metrics every 1 min, daily digest @ 07:00 UTC, monthly usage reset @ 1st 00:30 UTC, scheduled reports @ :00 each hour, bin purge @ 03:15 UTC, trial expiry @ 02:00 UTC, form version purge @ 03:45 UTC, retention expiry @ 04:15 UTC")
 
 
 def stop_scheduler():

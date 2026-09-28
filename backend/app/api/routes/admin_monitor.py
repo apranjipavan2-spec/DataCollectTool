@@ -622,3 +622,58 @@ def list_login_activity(
             for a, u, t in rows
         ],
     }
+
+
+@router.get("/system-metrics")
+def get_system_metrics(
+    days: int = Query(7, ge=1, le=7),
+    user=Depends(require_master_admin),
+    db: Session = Depends(get_db),
+):
+    """Per-minute host CPU/RAM samples for the given window (max 7 — our retention),
+    plus peak/average for the whole window and a per-day breakdown for sorting/filtering."""
+    from datetime import timedelta, date
+    from app.models.system_metric import SystemMetric
+
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    rows = (
+        db.query(SystemMetric)
+        .filter(SystemMetric.ts >= since)
+        .order_by(SystemMetric.ts.asc())
+        .all()
+    )
+
+    if not rows:
+        return {"series": [], "summary": None, "by_day": []}
+
+    def _stats(vals):
+        return {"avg": round(sum(vals) / len(vals), 1), "peak": round(max(vals), 1)}
+
+    cpu_vals = [r.cpu_pct for r in rows]
+    mem_vals = [r.mem_pct for r in rows]
+
+    by_day: dict = {}
+    for r in rows:
+        d = r.ts.date().isoformat()
+        by_day.setdefault(d, {"cpu": [], "mem": []})
+        by_day[d]["cpu"].append(r.cpu_pct)
+        by_day[d]["mem"].append(r.mem_pct)
+
+    return {
+        "series": [
+            {"ts": r.ts.isoformat(), "cpu_pct": round(r.cpu_pct, 1), "mem_pct": round(r.mem_pct, 1),
+             "mem_used_mb": round(r.mem_used_mb), "mem_total_mb": round(r.mem_total_mb)}
+            for r in rows
+        ],
+        "summary": {
+            "cpu": _stats(cpu_vals), "mem": _stats(mem_vals),
+            "mem_total_mb": round(rows[-1].mem_total_mb),
+            "sample_count": len(rows),
+            "window_start": rows[0].ts.isoformat(), "window_end": rows[-1].ts.isoformat(),
+        },
+        "by_day": sorted([
+            {"date": d, "cpu_avg": _stats(v["cpu"])["avg"], "cpu_peak": _stats(v["cpu"])["peak"],
+             "mem_avg": _stats(v["mem"])["avg"], "mem_peak": _stats(v["mem"])["peak"], "samples": len(v["cpu"])}
+            for d, v in by_day.items()
+        ], key=lambda x: x["date"]),
+    }
