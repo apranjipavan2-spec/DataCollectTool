@@ -1,4 +1,4 @@
-import random, string, secrets, uuid as _uuid
+import random, re, string, secrets, uuid as _uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
@@ -371,7 +371,7 @@ def register(request: Request, body: RegisterRequest, db: Session = Depends(get_
 
 
 class LeadRequest(BaseModel):
-    email: EmailStr
+    email: Optional[EmailStr] = None   # required unless phone is given (demo_gate can omit email)
     name: Optional[str] = None
     phone: Optional[str] = None
     source: str = "website_chat"   # website_chat | login_chat | demo_gate
@@ -381,12 +381,22 @@ class LeadRequest(BaseModel):
 @router.post("/lead", status_code=202)
 @limiter.limit("5/minute")
 def capture_lead(request: Request, body: LeadRequest, db: Session = Depends(get_db)):
-    """Public: chatbot/demo-gate captures a visitor's email (and optional name/phone) for follow-up."""
+    """Public: chatbot/demo-gate captures a visitor's email and/or phone for follow-up."""
     from app.services.leads import record_lead
     source = body.source if body.source in {"website_chat", "login_chat", "demo_gate"} else "website_chat"
+    phone = (body.phone or "").strip()[:32] or None
+    email = body.email
+    if not email:
+        if not phone:
+            raise HTTPException(422, "Email or phone is required.")
+        # No real email given (dashboard demo-gate lets phone-only through) — derive a
+        # STABLE address from the phone so repeat visits merge into the same lead row
+        # (record_lead dedupes on email) instead of one throwaway row per session.
+        digits = re.sub(r"\D", "", phone)[-10:] or re.sub(r"\W", "", phone)[:20] or "unknown"
+        email = f"demo-{digits}@fieldgovern-demo.local"
     record_lead(
-        db, body.email, source, "lead",
-        phone=(body.phone or "").strip()[:32] or None,
+        db, email, source, "lead",
+        phone=phone,
         name=(body.name or "").strip()[:200] or None,
         note=(body.message or "").strip()[:500] or None,
         ip=request.client.host if request.client else None,

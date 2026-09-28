@@ -37,7 +37,7 @@ export default function DemoLeadPrompt() {
     setErr(''); setState('sending')
     try {
       await api.post('/auth/lead', {
-        email: email.trim() || `demo-visitor-${Date.now()}@fieldgovern-demo.local`,
+        email: email.trim() || undefined,   // backend derives a stable fallback from phone if omitted
         name: name.trim(), phone: phone.trim(), source: 'demo_gate',
         message: `Logged into the ${getStoredUser()?.role ?? ''} demo dashboard`,
       })
