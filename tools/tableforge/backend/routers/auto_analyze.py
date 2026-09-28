@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import random
 import re as _re
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 import pandas as pd
 from fastapi import APIRouter, HTTPException
@@ -760,34 +762,54 @@ async def auto_battery(config: AutoAnalyzeConfig):
     plan = planned["specs"]
     plan_skipped = planned["skipped"]
 
+    def _run_one(spec: dict) -> tuple[dict, dict, Exception | None]:
+        """Off the event-loop thread — pure compute, no shared mutable state
+        (executors only read `df`). Returns (spec, payload, error)."""
+        kind = spec["kind"]
+        executor_fn = EXECUTORS.get(kind)
+        if executor_fn is None:
+            return spec, {"table": {"headers": [], "rows": []}, "test": {},
+                          "interpretation": f"No executor for {kind}",
+                          "warnings": ["missing executor"]}, None
+        try:
+            return spec, executor_fn(df, spec["params"]), None
+        except Exception as e:
+            traceback.print_exc()
+            return spec, {"table": {"headers": [], "rows": []}, "test": {},
+                          "interpretation": f"Error: {e}", "warnings": [str(e)]}, e
+
     def stream():
-        results: list[dict] = []
-        pvals_index: list[tuple[int, float]] = []
         total = len(plan)
+        results: list[dict | None] = [None] * total
+        pvals_index: list[tuple[int, float]] = []
         yield f"data: {json.dumps({'step': 'start', 'total': total, 'design_used': bool(design), 'skipped_columns': plan_skipped})}\n\n"
 
-        for idx, spec in enumerate(plan, start=1):
-            kind = spec["kind"]
-            executor = EXECUTORS.get(kind)
-            if executor is None:
-                results.append({**spec, "table": {"headers": [], "rows": []}, "test": {},
-                                "interpretation": f"No executor for {kind}",
-                                "warnings": ["missing executor"]})
-                yield f"data: {json.dumps({'step': 'progress', 'idx': idx, 'total': total, 'label': spec['label'], 'kind': kind, 'skipped': True})}\n\n"
-                continue
-            try:
-                payload = executor(df, spec["params"])
-                merged = {**spec, **payload}
+        # Tests are independent (only the correction step below needs them all),
+        # so run them concurrently — one thread per spec, capped at cpu_count - 1
+        # to leave a core free for the main data-collection app sharing this VPS.
+        max_workers = max(1, (os.cpu_count() or 2) - 1)
+        done = 0
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            future_to_idx = {pool.submit(_run_one, spec): idx for idx, spec in enumerate(plan)}
+            for fut in as_completed(future_to_idx):
+                idx = future_to_idx[fut]
+                spec, payload, err = fut.result()
+                kind = spec["kind"]
+                results[idx] = {**spec, **payload}
                 p_raw = (payload.get("test") or {}).get("p_raw")
                 if isinstance(p_raw, (int, float)) and not (isinstance(p_raw, float) and math.isnan(p_raw)):
-                    pvals_index.append((len(results), float(p_raw)))
-                results.append(merged)
-                yield f"data: {json.dumps({'step': 'progress', 'idx': idx, 'total': total, 'label': spec['label'], 'kind': kind, 'p_raw': p_raw})}\n\n"
-            except Exception as e:
-                traceback.print_exc()
-                results.append({**spec, "table": {"headers": [], "rows": []}, "test": {},
-                                "interpretation": f"Error: {e}", "warnings": [str(e)]})
-                yield f"data: {json.dumps({'step': 'progress', 'idx': idx, 'total': total, 'label': spec['label'], 'kind': kind, 'error': str(e)})}\n\n"
+                    pvals_index.append((idx, float(p_raw)))
+                done += 1
+                evt = {"step": "progress", "idx": done, "total": total, "label": spec["label"], "kind": kind}
+                if err is not None:
+                    evt["error"] = str(err)
+                elif EXECUTORS.get(kind) is None:
+                    evt["skipped"] = True
+                else:
+                    evt["p_raw"] = p_raw
+                yield f"data: {json.dumps(evt)}\n\n"
+
+        pvals_index.sort(key=lambda t: t[0])  # deterministic correction order (matches plan order)
 
         # Apply multi-test correction across all p-values
         if pvals_index and config.correction != "none":
