@@ -214,9 +214,24 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex" style={{ background: '#f8fafc' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: '#f8fafc' }}>
       <style>{LOGIN_STYLES}</style>
 
+      {/* ── Marketing nav (back to fieldgovern.com) ── */}
+      <nav className="flex items-center justify-between px-6 h-14 flex-shrink-0" style={{ background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+        <a href="https://www.fieldgovern.com" className="flex items-center">
+          <img src="/logo-wide.png" alt="FieldGovern" className="h-7 w-auto object-contain" />
+        </a>
+        <div className="hidden sm:flex items-center gap-6 text-sm font-medium" style={{ color: '#475569' }}>
+          <a href="https://www.fieldgovern.com/features.html" className="hover:text-indigo-600">Features</a>
+          <a href="https://www.fieldgovern.com/use-cases.html" className="hover:text-indigo-600">Use Cases</a>
+          <a href="https://www.fieldgovern.com/pricing.html" className="hover:text-indigo-600">Pricing</a>
+          <a href="https://www.fieldgovern.com/security.html" className="hover:text-indigo-600">Security</a>
+          <a href="https://www.fieldgovern.com/about.html" className="hover:text-indigo-600">About</a>
+        </div>
+      </nav>
+
+      <div className="flex flex-1 min-h-0">
       {/* ── Left branding panel (LIGHT) ── */}
       <div className="hidden lg:flex lg:w-[520px] xl:w-[560px] flex-shrink-0 flex-col relative overflow-hidden"
            style={{ background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 40%, #f0f4ff 100%)' }}>
@@ -234,9 +249,9 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10 flex flex-col h-full p-10 xl:p-12">
-          <div className="flex items-center login-slide-up">
+          <a href="https://www.fieldgovern.com" className="flex items-center login-slide-up">
             <img src="/logo-wide.png" alt="FieldGovern" className="h-10 w-auto object-contain" />
-          </div>
+          </a>
 
           <div className="mt-10 mb-auto login-slide-up" style={{ animationDelay: '0.1s' }}>
             <div className="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-full text-xs font-semibold"
@@ -332,9 +347,9 @@ export default function LoginPage() {
         <div className="w-full max-w-[420px] relative z-10">
 
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center justify-center mb-8">
+          <a href="https://www.fieldgovern.com" className="lg:hidden flex items-center justify-center mb-8">
             <img src="/logo-wide.png" alt="FieldGovern" className="h-10 w-auto object-contain" />
-          </div>
+          </a>
 
           {/* Card */}
           <div className="rounded-3xl p-8 login-slide-up"
@@ -682,6 +697,7 @@ export default function LoginPage() {
           </div>
 
         </div>
+      </div>
       </div>
       <ChatLeadWidget />
     </div>

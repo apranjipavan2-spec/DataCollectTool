@@ -216,6 +216,20 @@
       .hero h1{font-size:1.55rem}
       .url-bar{flex-direction:column;gap:8px}
     }
+
+    /* ── DEMO GATE ── */
+    #demoGate{position:fixed;inset:0;background:rgba(15,23,42,.72);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px}
+    #demoGate.hidden{display:none}
+    .dg-box{background:#fff;border-radius:18px;max-width:380px;width:100%;padding:28px 26px;box-shadow:0 24px 60px rgba(0,0,0,.35);animation:fadeUp .35s ease}
+    .dg-box h3{font-size:1.15rem;font-weight:800;color:var(--text);margin-bottom:6px}
+    .dg-box p{font-size:.84rem;color:var(--text3);line-height:1.5;margin-bottom:18px}
+    .dg-box input{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;padding:11px 13px;font-size:.88rem;margin-bottom:10px;font-family:inherit}
+    .dg-box input:focus{outline:none;border-color:var(--brand)}
+    .dg-err{color:var(--red);font-size:.78rem;margin:-2px 0 10px;display:none}
+    .dg-err.show{display:block}
+    .dg-go{width:100%;background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-size:.9rem;cursor:pointer}
+    .dg-go:disabled{opacity:.6;cursor:default}
+    body.dg-locked{overflow:hidden}
       .ei{display:inline-block;width:1em;height:1em;vertical-align:-0.14em;stroke:currentColor;stroke-width:1.85;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;transition:transform .25s ease}
     .ei:hover{transform:scale(1.18) rotate(-3deg)}
     a:hover .ei,button:hover .ei,[class*='card']:hover .ei{transform:scale(1.15)}
@@ -247,6 +261,21 @@
   <script defer data-domain="fieldgovern.com" src="https://plausible.io/js/script.js"></script>
 </head>
 <body>
+
+<!-- DEMO GATE -->
+<div id="demoGate" role="dialog" aria-modal="true" aria-label="Enter your details to try the demo">
+  <div class="dg-box">
+    <h3>&#128075; Before you dive in</h3>
+    <p>Tell us who's exploring so our team can follow up if you have questions.</p>
+    <form id="dgForm" novalidate>
+      <input type="email" id="dgEmail" placeholder="Email *" required autocomplete="email"/>
+      <input type="text" id="dgName" placeholder="Name *" required autocomplete="name"/>
+      <input type="tel" id="dgPhone" placeholder="Phone *" required autocomplete="tel"/>
+      <p class="dg-err" id="dgErr"></p>
+      <button type="submit" class="dg-go" id="dgGo">Continue to Demo →</button>
+    </form>
+  </div>
+</div>
 
 <!-- NAV -->
 <nav id="navbar">
@@ -699,6 +728,45 @@
 
   // Auto-select admin card on load
   document.getElementById('rc-admin').classList.add('active');
+
+  // ── Demo gate: require email/name/phone before showing the demo ──
+  (function () {
+    var LEAD_API = 'https://app.fieldgovern.com/api/v1/auth/lead';
+    var KEY = 'fg_demo_gate_passed';
+    var gate = document.getElementById('demoGate');
+    var passed = false;
+    try { passed = sessionStorage.getItem(KEY) === '1'; } catch (e) {}
+    if (passed) { gate.classList.add('hidden'); return; }
+
+    document.body.classList.add('dg-locked');
+    var form = document.getElementById('dgForm');
+    var err = document.getElementById('dgErr');
+    var go = document.getElementById('dgGo');
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var email = document.getElementById('dgEmail').value.trim();
+      var name = document.getElementById('dgName').value.trim();
+      var phone = document.getElementById('dgPhone').value.trim();
+      if (!/^\S+@\S+\.\S+$/.test(email) || !name || !phone) {
+        err.textContent = 'Please fill in a valid email, name and phone.';
+        err.classList.add('show');
+        return;
+      }
+      err.classList.remove('show');
+      go.disabled = true; go.textContent = 'Loading demo…';
+
+      function unlock() {
+        try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
+        document.body.classList.remove('dg-locked');
+        gate.classList.add('hidden');
+      }
+      fetch(LEAD_API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, name: name, phone: phone, source: 'demo_gate' })
+      }).then(unlock).catch(unlock); // never block the demo on a network hiccup
+    });
+  })();
 </script>
 <script defer src="/assets/trial-cta.js"></script>
 <script defer src="/assets/chat-widget.js"></script>

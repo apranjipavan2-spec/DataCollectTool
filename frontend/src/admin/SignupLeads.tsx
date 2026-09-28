@@ -11,7 +11,7 @@ interface Lead {
 }
 
 const SOURCE_LABEL: Record<string, string> = {
-  website_chat: 'Website chat', login_chat: 'Login chat', signup_form: 'Signup form',
+  website_chat: 'Website chat', login_chat: 'Login chat', signup_form: 'Signup form', demo_gate: 'Try Demo gate',
 }
 const STATUS_BADGE: Record<string, string> = {
   lead:       'bg-catalan-border text-catalan-textMuted',

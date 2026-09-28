@@ -374,16 +374,16 @@ class LeadRequest(BaseModel):
     email: EmailStr
     name: Optional[str] = None
     phone: Optional[str] = None
-    source: str = "website_chat"   # website_chat | login_chat
+    source: str = "website_chat"   # website_chat | login_chat | demo_gate
     message: Optional[str] = None
 
 
 @router.post("/lead", status_code=202)
 @limiter.limit("5/minute")
 def capture_lead(request: Request, body: LeadRequest, db: Session = Depends(get_db)):
-    """Public: chatbot captures a visitor's email (and optional name/phone) for follow-up."""
+    """Public: chatbot/demo-gate captures a visitor's email (and optional name/phone) for follow-up."""
     from app.services.leads import record_lead
-    source = body.source if body.source in {"website_chat", "login_chat"} else "website_chat"
+    source = body.source if body.source in {"website_chat", "login_chat", "demo_gate"} else "website_chat"
     record_lead(
         db, body.email, source, "lead",
         phone=(body.phone or "").strip()[:32] or None,
