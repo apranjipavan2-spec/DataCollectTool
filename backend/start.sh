@@ -17,4 +17,9 @@ echo "=== Seeding billing plans ==="
 python scripts/seed_plans.py || echo "seed_plans warning — continuing"
 
 echo "=== Starting uvicorn ==="
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
+# --proxy-headers makes uvicorn read the real client IP from nginx's X-Forwarded-For /
+# X-Real-IP (see deploy/nginx.conf) instead of reporting nginx's own container IP for
+# every request. forwarded-allow-ips='*' is safe here: the app container has no
+# published port (see deploy/docker-compose.prod.yml) — nginx is the only thing that
+# can ever reach it.
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --proxy-headers --forwarded-allow-ips='*'
