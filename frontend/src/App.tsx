@@ -13,6 +13,7 @@ import { SubscriptionProvider } from '@/lib/SubscriptionContext'
 import SubscriptionBanner from '@/components/SubscriptionBanner'
 import UpgradeModal from '@/components/UpgradeModal'
 import OnboardingWizard from '@/components/OnboardingWizard'
+import DemoLeadPrompt from '@/components/DemoLeadPrompt'
 import ImpersonationBanner from '@/components/ImpersonationBanner'
 
 // Route-level code splitting — each lazy() call becomes a separate dynamic import.
@@ -119,6 +120,7 @@ export default function App() {
             <SubscriptionBanner />
             <UpgradeModal />
             <OnboardingWizard />
+            <DemoLeadPrompt />
             <HelpPanel />
             <HelpSpotlight />
             <Routes>
