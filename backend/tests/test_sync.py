@@ -90,3 +90,57 @@ class TestSyncPush:
             },
         )
         assert r.status_code == 413
+
+
+@skip_no_db
+class TestSyncVerify:
+    """The phone's "all sent?" check: only ids with NO server row come back as missing."""
+
+    def test_reports_only_missing_ids(self, client, db_session):
+        from datetime import datetime, timezone
+        from .conftest import make_form, make_submission, auth_headers
+        tenant = make_tenant(db_session)
+        enum = make_user(db_session, tenant.id, role="enumerator", phone="+919222000101")
+        other = make_user(db_session, tenant.id, role="enumerator", phone="+919222000102")
+        form = make_form(db_session, tenant.id)
+        mine, binned, shared_phone = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())
+        for lid, who in ((mine, enum), (binned, enum), (shared_phone, other)):
+            s = make_submission(db_session, tenant.id, form.id, who.id)
+            s.local_id = lid
+        b = db_session.query(type(s)).filter_by(local_id=binned).one()
+        b.deleted_at = datetime.now(timezone.utc)   # in the Recycle Bin — still counts as received
+        db_session.flush()
+        lost = str(uuid.uuid4())
+
+        r = client.post("/api/v1/sync/verify",
+                        json={"local_ids": [mine, binned, shared_phone, lost]},
+                        headers=auth_headers(enum.id, tenant.id, "enumerator"))
+        assert r.status_code == 200, r.text
+        assert r.json() == {"checked": 4, "missing": [lost]}
+
+    def test_requires_auth(self, client, db_session):
+        assert client.post("/api/v1/sync/verify", json={"local_ids": []}).status_code == 401
+
+
+@skip_no_db
+class TestSyncClosedForm:
+    """An interview collected offline on a form that was archived before sync is
+    SAVED and flagged — never refused (refusing lost it on older app versions)."""
+
+    def test_archived_form_submission_saved_and_flagged(self, client, db_session):
+        from app.models.submission import Submission
+        from .conftest import make_form, auth_headers
+        tenant = make_tenant(db_session)
+        enum = make_user(db_session, tenant.id, role="enumerator", phone="+919222000201")
+        form = make_form(db_session, tenant.id)
+        form.status = "archived"
+        db_session.flush()
+        lid = str(uuid.uuid4())
+        r = client.post("/api/v1/sync/push", json={"submissions": [{
+            "local_id": lid, "form_id": str(form.id), "form_version": 1,
+            "data_json": {"q1": "answer"}, "local_created_at": "2026-09-20T10:00:00+00:00",
+        }]}, headers=auth_headers(enum.id, tenant.id, "enumerator"))
+        assert r.status_code == 200, r.text
+        assert r.json()["results"][0]["status"] == "synced"
+        sub = db_session.query(Submission).filter_by(local_id=lid).one()
+        assert sub.status == "flagged" and "archived" in sub.flag_note

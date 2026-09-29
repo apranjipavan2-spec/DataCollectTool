@@ -174,6 +174,7 @@ export default function FieldApp() {
   const [backcheckLoading, setBackcheckLoading] = useState(false)
   const [activeBackcheck, setActiveBackcheck] = useState<BackcheckTask | null>(null)
   const syncRef = useRef<() => Promise<void>>()
+  const requeueRetryRef = useRef(false)
   const loadFormsRef = useRef<() => Promise<void>>()
   const bgGpsWatchId = useRef<number | null>(null)
   const bestGpsRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null)
@@ -185,9 +186,12 @@ export default function FieldApp() {
     const store = await getStorage()
     const outbox = await store.getOutbox()
     const mediaCount = await store.getMediaQueueCount()
-    if (outbox.length === 0 && mediaCount === 0) { setSyncMsg(''); return }
+    // Nothing to send AND nothing to verify → skip. With sent interviews on the
+    // phone we still run, so the "all sent?" check (Phase 3) happens.
+    if (outbox.length === 0 && mediaCount === 0 && (await store.getSynced()).length === 0) { setSyncMsg(''); return }
 
     let textSynced = 0
+    let notAccepted: string[] = []   // server refused (form not in this org) — kept in the outbox, retried next sync
     const idMap = new Map<string, string>()
 
     // Phase 1: Push text data
@@ -220,14 +224,22 @@ export default function FieldApp() {
           }
         })
         const { data } = await api.post('/sync/push', { submissions: payload })
-        for (const r of data.results as Array<{ local_id: string; server_id: string }>) {
+        // Only an interview the server confirms it holds leaves the outbox.
+        // Anything else (rejected, or missing from the reply) stays and is
+        // retried — marking it synced would silently lose it.
+        const results = data.results as Array<{ local_id: string; server_id?: string; status: string; reason?: string }>
+        const saved = new Set<string>()
+        for (const r of results) {
+          if (!r.server_id || !['synced', 'duplicate', 'conflict_resolved'].includes(r.status)) continue
           idMap.set(r.local_id, r.server_id)
           await store.saveIdMapping(r.local_id, r.server_id)
+          await store.markSynced(r.local_id)
+          saved.add(r.local_id)
         }
-        await Promise.all(data.results.map((r: { local_id: string }) => store.markSynced(r.local_id)))
-        textSynced = data.received
-        setOutboxCount(0)
-        setUploadState('uploaded')
+        textSynced = saved.size
+        notAccepted = outbox.filter(s => !saved.has(s.id)).map(s => s.id)
+        setOutboxCount(notAccepted.length)
+        setUploadState(notAccepted.length ? 'offline' : 'uploaded')
       } catch {
         setSyncMsg(navigator.onLine ? 'Sync failed — tap to retry' : 'Offline — will sync when connected')
         setUploadState('offline')   // no internet or server unreachable — still safe in the outbox
@@ -270,14 +282,42 @@ export default function FieldApp() {
       }
     }
 
+    // Phase 3: "all sent?" check — ask the server which interviews this phone
+    // marked as sent it has no record of, and put those back in the outbox.
+    let confirmed: number | null = null
+    let requeued = 0
+    try {
+      const sent = await store.getSynced()
+      const missing: string[] = []
+      for (let i = 0; i < sent.length; i += 5000) {
+        const { data: v } = await api.post('/sync/verify', { local_ids: sent.slice(i, i + 5000).map(s => s.id) })
+        missing.push(...(v.missing as string[]))
+      }
+      for (const id of missing) await store.markOutbox(id)
+      requeued = missing.length
+      confirmed = sent.length - missing.length
+    } catch { /* offline or server busy — checked again on the next sync */ }
+
     const parts: string[] = []
     if (textSynced > 0) parts.push(`${textSynced} synced`)
+    if (notAccepted.length > 0) parts.push(`${notAccepted.length} not accepted by server — kept on this phone, will retry`)
+    if (requeued > 0) parts.push(`${requeued} not found on server — sending again`)
+    else if (confirmed !== null && confirmed > 0) parts.push(`all ${confirmed} confirmed on server`)
     if (mediaUploaded > 0) parts.push(`${mediaUploaded} photo(s) uploaded`)
     if (mediaFailed > 0) parts.push(`${mediaFailed} photo(s) failed`)
 
     setFailedMediaCount(mediaFailed)
-    setSyncMsg(parts.length > 0 ? `✓ ${parts.join(', ')}` : '')
-    setTimeout(() => setSyncMsg(''), 4000)
+    const problem = notAccepted.length > 0 || requeued > 0 || mediaFailed > 0
+    setSyncMsg(parts.length > 0 ? `${problem ? '⚠' : '✓'} ${parts.join(', ')}` : '')
+    // Problems stay on screen until the next sync; good news clears after 4s.
+    if (!problem) setTimeout(() => setSyncMsg(''), 4000)
+    if (requeued > 0) {
+      setOutboxCount(c => c + requeued)
+      // One immediate re-send; if it fails again it's retried on the next trigger.
+      if (!requeueRetryRef.current) { requeueRetryRef.current = true; setTimeout(() => syncRef.current?.(), 0) }
+    } else {
+      requeueRetryRef.current = false
+    }
     if (textSynced > 0) {
       setMyStats(prev => prev ? { today: prev.today + textSynced, total: prev.total + textSynced } : null)
     }
@@ -569,7 +609,9 @@ export default function FieldApp() {
             for (const item of failedMedia) await store.updateMediaStatus(item.id, 'pending')
             setFailedMediaCount(0)
           }
-          if ((outbox.length > 0 || pendingMedia > 0 || failedMedia.length > 0) && navigator.onLine) syncToServer()
+          // Also runs with an empty outbox so every app open re-checks that the
+          // server really has everything this phone sent.
+          if (navigator.onLine) syncToServer()
 
           // Storage quota warning
           try {

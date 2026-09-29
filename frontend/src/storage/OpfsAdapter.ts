@@ -158,6 +158,18 @@ export class OpfsAdapter implements StorageAdapter {
     )
   }
 
+  async getSynced(): Promise<SubmissionRecord[]> {
+    const res = await this._query("SELECT * FROM submissions WHERE status = 'synced' ORDER BY created_at ASC")
+    return this._rowsFromResult(res)
+  }
+
+  async markOutbox(id: string): Promise<void> {
+    await this._query(
+      "UPDATE submissions SET status = 'outbox', updated_at = ? WHERE id = ?",
+      [new Date().toISOString(), id],
+    )
+  }
+
   async saveFormCache(form: FormCache): Promise<void> {
     await this._query(
       `INSERT OR REPLACE INTO form_cache (id, title, version, status, schema, cached_at)

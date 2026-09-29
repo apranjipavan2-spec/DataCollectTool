@@ -72,6 +72,12 @@ export interface StorageAdapter {
   /** Mark a submission as synced. */
   markSynced(id: string): Promise<void>
 
+  /** Return all submissions marked 'synced' (for the server "all received?" check). */
+  getSynced(): Promise<SubmissionRecord[]>
+
+  /** Put a submission back in the outbox (server confirmed it doesn't have it). */
+  markOutbox(id: string): Promise<void>
+
   /** Check storage usage. Show warning if < 200MB free. */
   getStorageInfo(): Promise<StorageInfo>
 

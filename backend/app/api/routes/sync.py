@@ -296,12 +296,20 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
             results.append({"local_id": item.local_id, "server_id": str(existing.id), "status": "duplicate"})
             continue
 
+        # A form closed/archived/binned while the enumerator was offline must
+        # never cost the interview: accept it and flag it for the org to review.
+        # Only a form that isn't this org's at all is refused (phone keeps it).
         form_obj_for_val = db.query(Form).filter(
             Form.id == item.form_id, Form.tenant_id == user["tenant_id"]
-        ).first()
-        if not form_obj_for_val or form_obj_for_val.status != "active":
-            results.append({"local_id": item.local_id, "status": "rejected", "reason": "form_not_active"})
+        ).execution_options(include_deleted=True).first()
+        if not form_obj_for_val:
+            results.append({"local_id": item.local_id, "status": "rejected", "reason": "form_not_found"})
             continue
+        form_state = (
+            "deleted" if getattr(form_obj_for_val, "deleted_at", None) is not None
+            else None if form_obj_for_val.status == "active"
+            else form_obj_for_val.status
+        )
 
         serial_counter += 1
         next_serial = serial_counter
@@ -352,6 +360,12 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
             is_minor=child_status["is_minor"],
             guardian_consent_given=child_status["guardian_consent_given"],
         )
+        if form_state:
+            sub.status = "flagged"
+            sub.flag_note = (
+                f"Received after the form was {form_state} (collected offline, synced later). "
+                "Review before using."
+            )
         db.add(sub)
         db.flush()  # get sub.id before commit
 
@@ -457,6 +471,38 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
         )
 
     return {"received": len(results), "results": results, "server_time": datetime.now(timezone.utc).isoformat()}
+
+
+class VerifyRequest(BaseModel):
+    local_ids: list[str]
+
+
+@router.post("/verify")
+@limiter.limit("30/minute")
+def verify(request: Request, body: VerifyRequest, user=Depends(require_enumerator), db: Session = Depends(get_db)):
+    """"Did every interview this phone thinks it sent actually arrive?"
+    Returns the local_ids the server has NO record of, so the phone can put
+    them back in its outbox. Recycle-binned and duplicate-marked rows count as
+    received (an admin acted on them) — resending those would resurrect them.
+
+    Matched on local_id alone (random UUIDv4 minted on the device), not scoped
+    to this enumerator/tenant: a shared phone holds other users' already-synced
+    records, and those must never be resent under the current login."""
+    if len(body.local_ids) > 5000:
+        raise HTTPException(status_code=400, detail="Too many ids (max 5000 per check)")
+    wanted = set(body.local_ids)
+    found = {
+        r.local_id for r in
+        db.query(Submission.local_id)
+        .filter(Submission.local_id.in_(wanted))
+        .execution_options(include_deleted=True)
+        .all()
+    } if wanted else set()
+    missing = sorted(wanted - found)
+    if missing:
+        logger.warning("sync/verify: %d of %d local_ids missing on server for enumerator %s",
+                       len(missing), len(wanted), user["sub"])
+    return {"checked": len(wanted), "missing": missing}
 
 
 @router.post("/media")

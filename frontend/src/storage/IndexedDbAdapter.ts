@@ -79,6 +79,14 @@ export class IndexedDbAdapter implements StorageAdapter {
     await db.submissions.update(id, { status: 'synced' })
   }
 
+  async getSynced(): Promise<SubmissionRecord[]> {
+    return db.submissions.where('status').equals('synced').toArray()
+  }
+
+  async markOutbox(id: string): Promise<void> {
+    await db.submissions.update(id, { status: 'outbox' })
+  }
+
   async saveFormCache(form: FormCache): Promise<void> {
     await db.formCache.put(form)
   }
