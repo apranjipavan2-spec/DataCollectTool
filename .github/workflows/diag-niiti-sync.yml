@@ -1,0 +1,92 @@
+name: Diagnose Niiti Submissions & Sync Health
+
+# Read-only diagnostic. Prints ONLY counts/aggregates for the Niiti Consulting
+# tenant (duplicates, re-uploads, serial collisions, pending audio, recent sync
+# activity) plus server health. Never prints answers, names or respondent data.
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    name: Niiti submission + server health
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Query via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            cd /opt/fieldgovern
+            echo "===== SERVER ====="
+            uptime; df -h / | tail -1; free -m | sed -n 1,2p
+            docker compose ps --format '{{.Name}} {{.Status}}'
+            echo "app errors (last 24h): $(docker compose logs --since 24h app 2>&1 | grep -c -E 'ERROR|Traceback' || true)"
+            echo "sync/verify missing warnings (last 24h):"
+            docker compose logs --since 24h app 2>&1 | grep -o 'sync/verify: [0-9]* of [0-9]* local_ids missing' | sort | uniq -c | head -20 || true
+            echo "sync push 4xx/5xx (last 24h):"
+            docker compose logs --since 24h app 2>&1 | grep -E '/api/v1/sync/(push|verify|media)' | grep -oE '" [45][0-9]{2}' | sort | uniq -c || true
+            echo "===== NIITI DATA ====="
+            docker compose exec -T app python3 - <<'PY'
+            from sqlalchemy import text
+            from app.core.database import engine
+            q = lambda c, sql, **p: c.execute(text(sql), p).fetchall()
+            with engine.connect() as c:
+                t = q(c, "SELECT id, name FROM tenants WHERE name ILIKE '%niiti%'")
+                print("tenants:", [(str(r.id), r.name) for r in t])
+                for tid, _ in t:
+                    p = {"t": tid}
+                    print("\n-- totals")
+                    for r in q(c, """SELECT count(*) all_rows,
+                        count(*) FILTER (WHERE deleted_at IS NULL AND NOT is_duplicate) live,
+                        count(*) FILTER (WHERE is_duplicate) marked_dup,
+                        count(*) FILTER (WHERE deleted_at IS NOT NULL) in_bin,
+                        count(*) FILTER (WHERE duplicate_dismissed_at IS NOT NULL) dismissed,
+                        count(*) FILTER (WHERE status='flagged') flagged
+                        FROM submissions WHERE tenant_id=:t""", **p):
+                        print(dict(r._mapping))
+                    print("\n-- per form (live / marked_dup / binned)")
+                    for r in q(c, """SELECT f.title, f.status,
+                        count(*) FILTER (WHERE s.deleted_at IS NULL AND NOT s.is_duplicate) live,
+                        count(*) FILTER (WHERE s.is_duplicate) dup,
+                        count(*) FILTER (WHERE s.deleted_at IS NOT NULL) binned
+                        FROM submissions s JOIN forms f ON f.id=s.form_id
+                        WHERE s.tenant_id=:t GROUP BY f.title, f.status ORDER BY 3 DESC""", **p):
+                        print(tuple(r))
+                    print("\n-- marked duplicates vs the copy they point to")
+                    for r in q(c, """SELECT count(*) marked,
+                        count(k.id) with_keeper,
+                        count(*) FILTER (WHERE d.local_id = k.local_id) same_local_id,
+                        count(*) FILTER (WHERE d.local_created_at = k.local_created_at) same_start_time,
+                        count(*) FILTER (WHERE abs(extract(epoch FROM d.server_received_at - k.server_received_at)) < 5) received_within_5s,
+                        count(*) FILTER (WHERE d.serial_no = k.serial_no) same_serial,
+                        count(*) FILTER (WHERE d.enumerator_id <> k.enumerator_id) diff_enumerator
+                        FROM submissions d LEFT JOIN submissions k ON k.id = d.duplicate_of
+                        WHERE d.tenant_id=:t AND d.is_duplicate""", **p):
+                        print(dict(r._mapping))
+                    print("\n-- marked duplicates by day marked-as-received (top 15)")
+                    for r in q(c, """SELECT date(server_received_at) d, count(*) FROM submissions
+                        WHERE tenant_id=:t AND is_duplicate GROUP BY 1 ORDER BY 2 DESC LIMIT 15""", **p):
+                        print(tuple(r))
+                    print("\n-- re-upload evidence across ALL rows")
+                    for r in q(c, """SELECT
+                        (SELECT count(*) FROM (SELECT local_id FROM submissions WHERE tenant_id=:t AND local_id IS NOT NULL GROUP BY local_id HAVING count(*)>1) x) local_id_groups,
+                        (SELECT coalesce(sum(n-1),0) FROM (SELECT count(*) n FROM submissions WHERE tenant_id=:t AND local_id IS NOT NULL GROUP BY local_id HAVING count(*)>1) x) extra_rows_same_local_id,
+                        (SELECT count(*) FROM (SELECT serial_no FROM submissions WHERE tenant_id=:t AND serial_no IS NOT NULL GROUP BY serial_no HAVING count(*)>1) x) serial_collisions,
+                        (SELECT count(*) FROM (SELECT enumerator_id, local_created_at FROM submissions WHERE tenant_id=:t GROUP BY 1,2 HAVING count(*)>1) x) same_enum_same_start_groups,
+                        (SELECT count(*) FROM (SELECT enumerator_id, local_created_at FROM submissions WHERE tenant_id=:t AND deleted_at IS NULL AND NOT is_duplicate GROUP BY 1,2 HAVING count(*)>1) x) live_same_start_groups""", **p):
+                        print(dict(r._mapping))
+                    print("\n-- audio never uploaded (live rows with a __*_pending__ answer)")
+                    for r in q(c, """SELECT count(*) FROM submissions s WHERE tenant_id=:t AND deleted_at IS NULL AND NOT is_duplicate
+                        AND EXISTS (SELECT 1 FROM jsonb_each_text(s.data_json) e WHERE e.value ~ '^__[a-z_]+_pending__$')""", **p):
+                        print("live rows with pending media:", r[0])
+                    print("\n-- sync activity last 3 days (rows received per day, live vs dup)")
+                    for r in q(c, """SELECT date(server_received_at) d, count(*) FILTER (WHERE NOT is_duplicate) live, count(*) FILTER (WHERE is_duplicate) dup
+                        FROM submissions WHERE tenant_id=:t AND server_received_at > now() - interval '3 days' GROUP BY 1 ORDER BY 1""", **p):
+                        print(tuple(r))
+                    print("\n-- last received submission:", q(c, "SELECT max(server_received_at) FROM submissions WHERE tenant_id=:t", **p)[0][0])
+            PY
