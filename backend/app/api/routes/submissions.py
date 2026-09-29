@@ -609,15 +609,34 @@ def _canonical_value(v):
     return v
 
 
-def _content_fingerprint(data_json: dict) -> tuple:
-    """Canonical, order-independent key for 'are these answers identical'.
+_PENDING_MEDIA_RE = re.compile(r"^__\w+_pending__$")
 
-    Drops internal `_`-prefixed bookkeeping keys (_duplicate_suspect, _gps_*,
-    _duration_sec, etc.) so only actual question answers are compared.
-    """
-    d = data_json or {}
-    items = [(k, _canonical_value(v)) for k, v in d.items() if not k.startswith("_")]
-    return tuple(sorted(items, key=lambda kv: kv[0]))
+
+def _is_pending_media(v) -> bool:
+    return isinstance(v, str) and bool(_PENDING_MEDIA_RE.match(v))
+
+
+def _is_media_value(v) -> bool:
+    """Uploaded-file answers (audio/photo/signature/file). Every upload of the
+    same interview gets a fresh media:// id (or is still __audio_pending__),
+    so these can't be compared to decide 'same interview'."""
+    if isinstance(v, list):
+        return bool(v) and all(_is_media_value(x) for x in v)
+    return isinstance(v, str) and (v.startswith("media://") or _is_pending_media(v))
+
+
+def _question_answers(data_json: dict) -> dict:
+    """Question answers only: drops `_`-prefixed bookkeeping keys
+    (_duplicate_suspect, _gps_*, _duration_sec, etc.) and uploaded-file ids."""
+    return {
+        k: _canonical_value(v) for k, v in (data_json or {}).items()
+        if not k.startswith("_") and not _is_media_value(v)
+    }
+
+
+def _content_fingerprint(data_json: dict) -> tuple:
+    """Canonical, order-independent key for 'are these answers identical'."""
+    return tuple(sorted(_question_answers(data_json).items(), key=lambda kv: kv[0]))
 
 
 def _completeness(data_json: dict) -> int:
@@ -631,12 +650,19 @@ def _completeness(data_json: dict) -> int:
 
 def _recommend_keep(subs: list[Submission]) -> str:
     """Deterministic 'which one is probably correct' heuristic: a submission
-    with QC violations or that hasn't passed a backcheck loses to a clean/
+    with QC violations, or whose audio/photo never finished uploading
+    (__audio_pending__), or that hasn't passed a backcheck loses to a clean/
     backchecked one regardless of completeness; ties broken by most answered
     fields, then longer interview duration, then submitted first. No AI call
     — instant and explainable."""
     def sort_key(s: Submission):
         violated = 1 if s.has_violations else 0
+        pending_media = sum(
+            1 for k, v in (s.data_json or {}).items()
+            if not k.startswith("_") and (
+                _is_pending_media(v) or (isinstance(v, list) and any(_is_pending_media(x) for x in v))
+            )
+        )
         not_backchecked = 0 if s.backcheck_completed else 1
         completeness = _completeness(s.data_json)
         duration = (s.data_json or {}).get("_duration_sec") or 0
@@ -645,7 +671,7 @@ def _recommend_keep(subs: list[Submission]) -> str:
         except (TypeError, ValueError):
             duration = 0.0
         received = s.server_received_at or datetime.min.replace(tzinfo=timezone.utc)
-        return (violated, not_backchecked, -completeness, -duration, received)
+        return (violated, pending_media, not_backchecked, -completeness, -duration, received)
     return str(sorted(subs, key=sort_key)[0].id)
 
 
@@ -690,10 +716,102 @@ def _pool_enumerator_day(members: list[Submission], user_map: dict) -> tuple[str
     return enum_name, day_desc, (str(single_enum_id) if single_enum_id else None)
 
 
-def _sub_summary(s: Submission) -> dict:
+# Two records by one enumerator started on the device this close together are
+# one interview saved/synced twice — nobody starts two real interviews seconds apart.
+SAME_INTERVIEW_WINDOW_SEC = 10
+# Share of answered questions that must match for "same respondent entered twice".
+POSSIBLE_SIMILARITY = 0.95
+POSSIBLE_MIN_ANSWERS = 10
+
+
+def _cluster_same_interview(subs: list) -> list[list]:
+    """Groups of records by the same enumerator whose interviews were STARTED on
+    the device (local_created_at) within SAME_INTERVIEW_WINDOW_SEC of each other,
+    chained so a triple-save stays one group. Server receive time is never used:
+    an offline batch syncs together but was started minutes/hours apart."""
+    by_enum: dict = {}
+    for s in subs:
+        if s.local_created_at:
+            by_enum.setdefault(s.enumerator_id, []).append(s)
+    out = []
+    for members in by_enum.values():
+        members.sort(key=lambda s: s.local_created_at)
+        cluster = [members[0]]
+        for s in members[1:]:
+            if (s.local_created_at - cluster[-1].local_created_at).total_seconds() <= SAME_INTERVIEW_WINDOW_SEC:
+                cluster.append(s)
+            else:
+                if len(cluster) >= 2:
+                    out.append(cluster)
+                cluster = [s]
+        if len(cluster) >= 2:
+            out.append(cluster)
+    return out
+
+
+def _cluster_similar(subs: list, answers_by_id: dict) -> list[list]:
+    """Groups of records by the same enumerator where >= POSSIBLE_SIMILARITY of
+    the answered questions match pairwise (union-find, so each group is one
+    likely respondent — not a whole day's work)."""
+    answers = {sid: {k: v for k, v in a.items() if v not in (None, "", ())} for sid, a in answers_by_id.items()}
+    parent = {s.id: s.id for s in subs}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    by_enum: dict = {}
+    for s in subs:
+        by_enum.setdefault(s.enumerator_id, []).append(s)
+    for members in by_enum.values():
+        for i, a in enumerate(members):
+            qa = answers[a.id]
+            for b in members[i + 1:]:
+                qb = answers[b.id]
+                keys = qa.keys() | qb.keys()
+                if len(keys) < POSSIBLE_MIN_ANSWERS:
+                    continue
+                if sum(1 for k in keys if qa.get(k) == qb.get(k)) / len(keys) >= POSSIBLE_SIMILARITY:
+                    parent[find(a.id)] = find(b.id)
+    clusters: dict = {}
+    for s in subs:
+        clusters.setdefault(find(s.id), []).append(s)
+    return [c for c in clusters.values() if len(c) >= 2]
+
+
+_RESPONDENT_KEY_RE = re.compile(r"respondent|beneficiary|household|hh_?id", re.I)
+
+
+def _respondent_fields(form_schema: dict, identifier_fields: list[str]) -> list[str]:
+    """Fields that say WHO was interviewed, for labelling duplicate groups:
+    the Form Builder identifier fields if set, else any field whose name looks
+    like a respondent/household id or name."""
+    if identifier_fields:
+        return identifier_fields
+    from app.api.routes.export import _field_key
+    names = []
+    for section in (form_schema or {}).get("sections", []):
+        for f in section.get("fields", []):
+            name = _field_key(f)
+            if name and f.get("type") != "note" and _RESPONDENT_KEY_RE.search(name):
+                names.append(name)
+    return names
+
+
+def _respondent_label(data_json: dict, fields: list[str]) -> Optional[str]:
+    values = [str((data_json or {}).get(f)).strip() for f in fields
+              if (data_json or {}).get(f) not in (None, "", [])]
+    return " · ".join(values) or None
+
+
+def _sub_summary(s: Submission, respondent: Optional[str] = None) -> dict:
     return {
         "id": str(s.id),
         "serial_no": s.serial_no,
+        "respondent": respondent,
+        "local_created_at": s.local_created_at.isoformat() if s.local_created_at else None,
         "status": s.status,
         "completeness": _completeness(s.data_json),
         "duration_sec": (s.data_json or {}).get("_duration_sec"),
@@ -724,8 +842,17 @@ def list_potential_duplicates(
       field(s) exactly match another's even though other answers differ —
       almost always the same respondent surveyed twice, possibly on a
       different day or by a different enumerator.
-    - tier="possible": same enumerator, same form, same day, but neither of
-      the above — needs a supervisor to compare side by side.
+    - tier="same_interview": same enumerator + form, and the interview was
+      STARTED on the device within SAME_INTERVIEW_WINDOW_SEC of the other —
+      one interview saved/synced twice even if an answer differs. Uses the
+      device start time (local_created_at), never the server receive time,
+      so an offline batch that syncs all at once is not flagged.
+    - tier="possible": same enumerator + form, and at least
+      POSSIBLE_SIMILARITY of the answered questions are identical — likely the
+      same respondent entered twice; needs a supervisor to compare.
+
+    Every group is one interview/respondent (never "everything this
+    enumerator did that day"), labelled by respondent + interview start time.
 
     Already-resolved (is_duplicate=True) and dismissed
     (duplicate_dismissed_at set) submissions are excluded, so a group
@@ -781,25 +908,41 @@ def list_potential_duplicates(
             for s in subs
         }
 
-        # Tier 1: exact content match, anywhere in the form.
+        respondent_fields = _respondent_fields(form.json_schema if form else {}, identifier_fields)
+        respondent_by_id = {s.id: _respondent_label(decrypted_by_id[s.id], respondent_fields) for s in subs}
+
+        def _group(tier: str, members: list, **extra) -> dict:
+            members = sorted(members, key=lambda s: s.local_created_at or s.server_received_at or datetime.min.replace(tzinfo=timezone.utc))
+            used_ids.update(s.id for s in members)
+            enum_name, day_desc, enum_id = _pool_enumerator_day(members, user_map)
+            started = [s.local_created_at for s in members if s.local_created_at]
+            return {
+                **base_fields, "tier": tier,
+                "enumerator_id": enum_id, "enumerator_name": enum_name, "day": day_desc,
+                "respondent": next((respondent_by_id[s.id] for s in members if respondent_by_id[s.id]), None),
+                "interview_at": min(started).isoformat() if started else None,
+                "count": len(members),
+                "submission_ids": [str(s.id) for s in members],
+                "recommended_keep_id": _recommend_keep(members),
+                "submissions": [_sub_summary(s, respondent_by_id[s.id]) for s in members],
+                **extra,
+            }
+
+        # Tier 1: exact content match (uploaded-file ids ignored), anywhere in the form.
         by_fingerprint: dict = {}
         for s in subs:
             by_fingerprint.setdefault(_content_fingerprint(decrypted_by_id[s.id]), []).append(s)
         for members in by_fingerprint.values():
-            if len(members) < 2:
-                continue
-            used_ids.update(s.id for s in members)
-            enum_name, day_desc, enum_id = _pool_enumerator_day(members, user_map)
-            groups.append({
-                **base_fields, "tier": "exact",
-                "enumerator_id": enum_id, "enumerator_name": enum_name, "day": day_desc,
-                "count": len(members),
-                "submission_ids": [str(s.id) for s in members],
-                "recommended_keep_id": _recommend_keep(members),
-                "submissions": [_sub_summary(s) for s in members],
-            })
+            if len(members) >= 2:
+                groups.append(_group("exact", members))
 
-        # Tier 2: identifier-field composite match (only if configured).
+        # Tier 2: same interview — same enumerator, started on the device within
+        # a few seconds of each other (chained, so a triple-save stays one group).
+        remaining = [s for s in subs if s.id not in used_ids]
+        for cluster in _cluster_same_interview(remaining):
+            groups.append(_group("same_interview", cluster))
+
+        # Tier 3: identifier-field composite match (only if configured).
         remaining = [s for s in subs if s.id not in used_ids]
         if identifier_fields:
             by_identifier: dict = {}
@@ -808,38 +951,14 @@ def list_potential_duplicates(
                 if key is not None:
                     by_identifier.setdefault(key, []).append(s)
             for members in by_identifier.values():
-                if len(members) < 2:
-                    continue
-                used_ids.update(s.id for s in members)
-                enum_name, day_desc, enum_id = _pool_enumerator_day(members, user_map)
-                groups.append({
-                    **base_fields, "tier": "identifier_match",
-                    "enumerator_id": enum_id, "enumerator_name": enum_name, "day": day_desc,
-                    "count": len(members),
-                    "submission_ids": [str(s.id) for s in members],
-                    "recommended_keep_id": _recommend_keep(members),
-                    "submissions": [_sub_summary(s) for s in members],
-                    "matched_fields": identifier_fields,
-                })
+                if len(members) >= 2:
+                    groups.append(_group("identifier_match", members, matched_fields=identifier_fields))
 
-        # Tier 3: same enumerator + same day fallback.
+        # Tier 4: near-identical answers, same enumerator. Union-find over
+        # pairs so each group is one respondent, not a whole day's work.
         remaining = [s for s in subs if s.id not in used_ids]
-        by_day: dict = {}
-        for s in remaining:
-            day = s.local_created_at.date().isoformat() if s.local_created_at else "unknown"
-            by_day.setdefault((s.enumerator_id, day), []).append(s)
-        for (enum_id, day), members in by_day.items():
-            if len(members) < 2:
-                continue
-            groups.append({
-                **base_fields, "tier": "possible",
-                "enumerator_id": str(enum_id) if enum_id else None,
-                "enumerator_name": user_map.get(str(enum_id), "Unknown"), "day": day,
-                "count": len(members),
-                "submission_ids": [str(s.id) for s in members],
-                "recommended_keep_id": _recommend_keep(members),
-                "submissions": [_sub_summary(s) for s in members],
-            })
+        for cluster in _cluster_similar(remaining, {s.id: _question_answers(decrypted_by_id[s.id]) for s in remaining}):
+            groups.append(_group("possible", cluster))
 
     # Newest duplicates first (by the group's most-recent submission), then by
     # size. A fresh 2-item group must surface ahead of an old 4-item one — the

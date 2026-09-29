@@ -62,12 +62,16 @@ export interface DuplicateGroupSub {
   completeness: number
   duration_sec: number | null
   server_received_at: string | null
+  local_created_at?: string | null
+  respondent?: string | null
   has_violations: boolean
   backcheck_completed: boolean
 }
 
 export interface DuplicateGroup {
-  tier: 'exact' | 'possible' | 'identifier_match'
+  tier: 'exact' | 'same_interview' | 'possible' | 'identifier_match'
+  respondent?: string | null
+  interview_at?: string | null
   enumerator_id: string | null
   enumerator_name: string
   form_id: string
@@ -778,7 +782,7 @@ export default function Dashboard() {
   const [showMarkedDuplicates, setShowMarkedDuplicates] = useState(false)
   const [bulkResolvingExact, setBulkResolvingExact] = useState(false)
   const [restoringAllDuplicates, setRestoringAllDuplicates] = useState(false)
-  const [dupTier, setDupTier] = useState<'exact' | 'identifier_match' | 'possible'>('exact')
+  const [dupTier, setDupTier] = useState<DuplicateGroup['tier']>('exact')
   const [dupSort, setDupSort] = useState<'newest' | 'oldest' | 'name' | 'count'>('newest')
   const [dupTierPage, setDupTierPage] = useState(1)
   const DUP_PAGE_SIZE = 10
@@ -1283,8 +1287,9 @@ export default function Dashboard() {
 
   const DUP_TIERS = [
     { key: 'exact' as const, label: 'Exact Duplicates', hint: 'identical answers, safe to auto-resolve' },
+    { key: 'same_interview' as const, label: 'Same Interview', hint: 'same enumerator started it within seconds of the other — one interview saved/synced twice (sync time is ignored)' },
     { key: 'identifier_match' as const, label: 'Identifier Matches', hint: 'same respondent identifier, other answers differ' },
-    { key: 'possible' as const, label: 'Possible Duplicates', hint: 'same enumerator/form/day, answers differ' },
+    { key: 'possible' as const, label: 'Possible Duplicates', hint: 'same enumerator, 95%+ of answers identical — likely the same respondent entered twice' },
   ]
 
   const renderDuplicateGroups = (groups: DuplicateGroup[]) => {
@@ -1300,20 +1305,25 @@ export default function Dashboard() {
     const cmp = comparators[dupSort]
     const byTier: Record<string, DuplicateGroup[]> = {
       exact: groups.filter(g => g.tier === 'exact').sort(cmp),
+      same_interview: groups.filter(g => g.tier === 'same_interview').sort(cmp),
       identifier_match: groups.filter(g => g.tier === 'identifier_match').sort(cmp),
       possible: groups.filter(g => g.tier === 'possible').sort(cmp),
     }
     const fmtTimeSecs = (iso: string | null) =>
       iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''
     const renderGroup = (group: DuplicateGroup, i: number) => {
-      // Received time (with seconds) of each copy — identical seconds are the
-      // tell-tale of one interview saved/synced twice (not deduped, so a
-      // same-second pair shows the time twice on purpose).
-      const times = group.submissions.map(s => fmtTimeSecs(s.server_received_at)).filter(Boolean)
+      // Interview start time (device clock, with seconds) of each copy — not
+      // the sync time, which is identical for an offline batch. Same-second
+      // starts are the tell-tale of one interview saved twice.
+      const times = group.submissions.map(s => fmtTimeSecs(s.local_created_at ?? s.server_received_at)).filter(Boolean)
       return (
       <div key={i} className="flex items-center justify-between p-3 bg-catalan-hover rounded border border-catalan-warning/30">
         <div>
-          <span className="text-sm font-medium text-catalan-text">{group.enumerator_name}</span>
+          <span className="text-sm font-medium text-catalan-text">
+            {group.respondent ? `Respondent ${group.respondent}` : `Interview started ${group.interview_at ? new Date(group.interview_at).toLocaleString() : group.day}`}
+          </span>
+          <span className="text-xs text-catalan-textMuted mx-2">·</span>
+          <span className="text-sm text-catalan-textMuted">{group.enumerator_name}</span>
           <span className="text-xs text-catalan-textMuted mx-2">·</span>
           <span className="text-sm text-catalan-textMuted">{group.form_title}</span>
           <span className="text-xs text-catalan-textMuted mx-2">·</span>
@@ -1321,7 +1331,7 @@ export default function Dashboard() {
           {times.length > 0 && (
             <>
               <span className="text-xs text-catalan-textMuted mx-2">·</span>
-              <span className="text-xs text-catalan-textMuted">{times.join(', ')}</span>
+              <span className="text-xs text-catalan-textMuted">started {times.join(', ')}</span>
             </>
           )}
           {group.matched_fields && (

@@ -147,6 +147,7 @@ export function DuplicateCompareModal({
   const visibleRows = hideIdentical ? rows.filter(key => rowDiffers.get(key)) : rows
 
   const title = group.tier === 'exact' ? 'Exact Duplicates'
+    : group.tier === 'same_interview' ? 'Same Interview — Saved/Synced Twice'
     : group.tier === 'identifier_match' ? 'Same Respondent? — Identifier Match'
     : 'Compare & Resolve Duplicates'
   const keptSerial = submissionById(keepId)?.serial_no
@@ -168,6 +169,14 @@ export function DuplicateCompareModal({
       {group.tier === 'exact' && (
         <p className="text-sm text-catalan-text mb-3">
           {group.count} submissions from <strong>{group.enumerator_name}</strong> on {group.form_title} ({group.day}) have 100% identical answers.
+        </p>
+      )}
+      {group.tier === 'same_interview' && (
+        <p className="text-sm text-catalan-text mb-3">
+          {group.count} records from <strong>{group.enumerator_name}</strong>
+          {group.respondent && <> for respondent <strong>{group.respondent}</strong></>} were started on the device within seconds of each other
+          {group.interview_at && <> ({new Date(group.interview_at).toLocaleString()})</>} — this is one interview saved or synced twice.
+          Keep the one with its audio/photos uploaded.
         </p>
       )}
       {group.matched_fields && (
@@ -223,8 +232,12 @@ export function DuplicateCompareModal({
                           </div>
                           <div className="text-xs text-catalan-textMuted font-mono" title={s.id}>{s.id}</div>
                           <div className="text-xs text-catalan-textMuted mt-1">{s.enumerator_name}</div>
+                          {qc?.respondent && <div className="text-xs text-catalan-text">Respondent: {qc.respondent}</div>}
+                          {qc?.local_created_at && (
+                            <div className="text-xs text-catalan-textMuted">Started: {new Date(qc.local_created_at).toLocaleString()}</div>
+                          )}
                           <div className="text-xs text-catalan-textMuted">
-                            {s.server_received_at ? new Date(s.server_received_at).toLocaleString() : 'Not yet synced'}
+                            {s.server_received_at ? `Synced: ${new Date(s.server_received_at).toLocaleString()}` : 'Not yet synced'}
                           </div>
                           {typeof qc?.duration_sec === 'number' && (
                             <div className="text-xs text-catalan-textMuted">
