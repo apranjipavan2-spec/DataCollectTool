@@ -135,13 +135,13 @@ def _check_duplicate(db: Session, sub: Submission, data_json: dict, enumerator_i
 
 
 def _find_exact_duplicate(db: Session, sub: Submission, data_json: dict, enumerator_id: str, form_schema: Optional[dict]):
-    """Return the id of an existing LIVE submission with byte-for-byte identical
-    answers by the same enumerator today, else None.
+    """Return (other_id, certain) for an existing LIVE submission by the same
+    enumerator today with identical answers (uploaded-file ids ignored), else
+    (None, False).
 
-    This is the same interview saved as two offline records (two local_ids) and
-    synced — the client-side resubmit latch can't catch it, so we catch it here.
-    Identical content across all question fields (ignoring _-prefixed bookkeeping)
-    is conclusive, so it's safe to auto-mark rather than only flag as suspect.
+    `certain` is True only when it is provably the SAME interview — see
+    _is_certain_same_interview. Callers auto-mark only when certain; an
+    identical-answers match that isn't certain is flagged for a person.
 
     `data_json` is the incoming payload (still plaintext at this point in the
     push flow — encryption is applied after dedup, not before). Stored rows
@@ -164,10 +164,33 @@ def _find_exact_duplicate(db: Session, sub: Submission, data_json: dict, enumera
         )
         .all()
     )
+    match = None
     for other in same:
         if _content_fingerprint(decrypt_identifiers(other.data_json, form_schema)) == fp:
-            return other.id
-    return None
+            if _is_certain_same_interview(sub.local_created_at, other):
+                return other.id, True
+            match = match or other.id
+    return match, False
+
+
+def _is_certain_same_interview(incoming_started_at, other: Submission) -> bool:
+    """Safe to auto-mark the incoming copy as a duplicate of `other` only if:
+    - both were STARTED on the device within SAME_INTERVIEW_WINDOW_SEC (same
+      interview, not a second respondent who happened to answer identically), and
+    - `other` already has all its audio/photos (no __*_pending__ answer), so
+      hiding the incoming copy can never leave the kept copy without media."""
+    from app.api.routes.submissions import SAME_INTERVIEW_WINDOW_SEC, _is_pending_media
+    if not incoming_started_at or not other.local_created_at:
+        return False
+    a, b = incoming_started_at, other.local_created_at
+    if (a.tzinfo is None) != (b.tzinfo is None):
+        a, b = a.replace(tzinfo=None), b.replace(tzinfo=None)
+    if abs((a - b).total_seconds()) > SAME_INTERVIEW_WINDOW_SEC:
+        return False
+    return not any(
+        _is_pending_media(v) or (isinstance(v, list) and any(_is_pending_media(x) for x in v))
+        for k, v in (other.data_json or {}).items() if not k.startswith("_")
+    )
 
 
 def _is_coord_string(s: str) -> bool:
@@ -406,13 +429,18 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
         # by the same enumerator today → auto-mark as duplicate (kept out of
         # stats and the review queue; recoverable via Restore). Otherwise fall
         # back to the softer same-enumerator/GPS-proximity suspect flag.
-        exact_dup_of = _find_exact_duplicate(
+        exact_dup_of, certain = _find_exact_duplicate(
             db, sub, data_for_storage, str(user["sub"]),
             form_obj_for_val.json_schema if form_obj_for_val else None,
         )
-        if exact_dup_of is not None:
+        if exact_dup_of is not None and certain:
             sub.is_duplicate = True
             sub.duplicate_of = exact_dup_of
+        elif exact_dup_of is not None:
+            # Identical answers but not provably the same interview → a person decides.
+            data = dict(sub.data_json or {})
+            data["_duplicate_suspect"] = True
+            sub.data_json = data
         elif _check_duplicate(db, sub, data_for_storage, str(user["sub"])):
             data = dict(sub.data_json or {})
             data["_duplicate_suspect"] = True

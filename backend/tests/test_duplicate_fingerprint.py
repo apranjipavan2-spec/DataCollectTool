@@ -72,3 +72,27 @@ def test_recommend_keep_prefers_uploaded_audio():
     pending = _sub("p", "u", T0, received=T0, data={"q1": "x", "consent_audio": "__audio_pending__"})
     uploaded = _sub("m", "u", T0, received=T0, data={"q1": "x", "consent_audio": "media://m"})
     assert _recommend_keep([pending, uploaded]) == "m"
+
+
+# ── Sync-time auto-mark: only when provably the same interview ──────────────
+from app.api.routes.sync import _is_certain_same_interview
+
+
+def test_auto_mark_certain_same_start_with_audio():
+    other = _sub("k", "u", T0, data={"q1": "x", "consent_audio": "media://a"})
+    assert _is_certain_same_interview(T0 + timedelta(seconds=2), other)
+
+
+def test_auto_mark_not_certain_different_start():
+    # Identical answers but started 20 min apart = could be a second respondent.
+    other = _sub("k", "u", T0, data={"q1": "x"})
+    assert not _is_certain_same_interview(T0 + timedelta(minutes=20), other)
+
+
+def test_auto_mark_not_certain_when_kept_copy_lacks_audio():
+    other = _sub("k", "u", T0, data={"q1": "x", "consent_audio": "__audio_pending__"})
+    assert not _is_certain_same_interview(T0, other)
+
+
+def test_auto_mark_not_certain_without_start_time():
+    assert not _is_certain_same_interview(None, _sub("k", "u", T0))
