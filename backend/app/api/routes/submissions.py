@@ -861,10 +861,13 @@ def list_potential_duplicates(
     from sqlalchemy import func
 
     tenant_id = user["tenant_id"]
+    # Dismissals are NOT applied here: a "not duplicates" dismissal can't make
+    # byte-identical copies distinct, and the old enumerator+day grouping got
+    # 1,498 rows dismissed at Niiti — hiding 311 real double-uploads. Dismissed
+    # rows are only excluded from the judgement tiers (2-4) below.
     live_filter = (
         Submission.tenant_id == tenant_id,
         Submission.is_duplicate == False,  # noqa: E712
-        Submission.duplicate_dismissed_at.is_(None),
     )
 
     if form_id:
@@ -938,12 +941,12 @@ def list_potential_duplicates(
 
         # Tier 2: same interview — same enumerator, started on the device within
         # a few seconds of each other (chained, so a triple-save stays one group).
-        remaining = [s for s in subs if s.id not in used_ids]
+        remaining = [s for s in subs if s.id not in used_ids and s.duplicate_dismissed_at is None]
         for cluster in _cluster_same_interview(remaining):
             groups.append(_group("same_interview", cluster))
 
         # Tier 3: identifier-field composite match (only if configured).
-        remaining = [s for s in subs if s.id not in used_ids]
+        remaining = [s for s in subs if s.id not in used_ids and s.duplicate_dismissed_at is None]
         if identifier_fields:
             by_identifier: dict = {}
             for s in remaining:
@@ -956,7 +959,7 @@ def list_potential_duplicates(
 
         # Tier 4: near-identical answers, same enumerator. Union-find over
         # pairs so each group is one respondent, not a whole day's work.
-        remaining = [s for s in subs if s.id not in used_ids]
+        remaining = [s for s in subs if s.id not in used_ids and s.duplicate_dismissed_at is None]
         for cluster in _cluster_similar(remaining, {s.id: _question_answers(decrypted_by_id[s.id]) for s in remaining}):
             groups.append(_group("possible", cluster))
 
@@ -967,9 +970,9 @@ def list_potential_duplicates(
         times = [s["server_received_at"] for s in g["submissions"] if s.get("server_received_at")]
         return max(times) if times else ""  # ISO strings sort chronologically
     groups.sort(key=lambda g: (_group_recency(g), g["count"]), reverse=True)
-    # ponytail: flat cap, not real pagination — 1000 covers current scale (a few
+    # ponytail: flat cap, not real pagination — 5000 covers current scale (~1.1k
     # hundred groups at 1.3k submissions); switch to cursor paging past ~10k subs.
-    return groups[:1000]
+    return groups[:5000]
 
 
 class DuplicateResolveIn(BaseModel):
