@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import math
 import uuid as _uuid
 from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile, HTTPException, Request
-from sqlalchemy import func as _func
+from sqlalchemy import func as _func, text as _text
 from fastapi.params import Form as FormParam
 from pydantic import BaseModel
 from typing import Any, Optional
@@ -259,6 +259,13 @@ def push(request: Request, body: PushRequest, background_tasks: BackgroundTasks,
         check = check_submission_limit(db, str(user["tenant_id"]), plan_tier)
         if not check["allowed"]:
             raise HTTPException(status_code=402, detail=check["reason"])
+
+    # One push at a time per org. Without this, two simultaneous pushes of the
+    # same outbox (phone reconnect fires several sync triggers at once) both
+    # pass the local_id idempotency check before either commits → the same
+    # interview saved twice with the same serial_no (1,090 cases at Niiti).
+    # Transaction-scoped: released by the commit/rollback at the end of push.
+    db.execute(_text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": f"sync-push:{user['tenant_id']}"})
 
     results = []
     # Compute starting serial_no once (avoids N+1 queries in the batch loop)

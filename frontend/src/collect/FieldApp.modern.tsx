@@ -181,7 +181,27 @@ export default function FieldApp() {
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
   const [activeFormHasGps, setActiveFormHasGps] = useState(false)
   // ── Sync to server ─────────────────────────────────────────
-  const syncToServer = useCallback(async () => {
+  // Single-flight: reconnect fires several triggers at once ('online' event,
+  // service-worker sync, app load). Running them in parallel sent the same
+  // outbox twice. Now one sync runs at a time (across tabs too, via Web Locks);
+  // a trigger that arrives mid-sync schedules exactly one follow-up run, so a
+  // request is never dropped.
+  const syncInFlightRef = useRef<Promise<void> | null>(null)
+  const syncAgainRef = useRef(false)
+  const syncToServer = useCallback(async (): Promise<void> => {
+    if (syncInFlightRef.current) { syncAgainRef.current = true; return syncInFlightRef.current }
+    const run = async () => {
+      do {
+        syncAgainRef.current = false
+        if (navigator.locks?.request) await navigator.locks.request('fg-sync', () => runSyncOnce())
+        else await runSyncOnce()
+      } while (syncAgainRef.current)
+    }
+    syncInFlightRef.current = run().finally(() => { syncInFlightRef.current = null })
+    return syncInFlightRef.current
+  }, [])
+
+  const runSyncOnce = async () => {
     setSyncMsg('Syncing…')
     const store = await getStorage()
     const outbox = await store.getOutbox()
@@ -314,7 +334,7 @@ export default function FieldApp() {
     if (requeued > 0) {
       setOutboxCount(c => c + requeued)
       // One immediate re-send; if it fails again it's retried on the next trigger.
-      if (!requeueRetryRef.current) { requeueRetryRef.current = true; setTimeout(() => syncRef.current?.(), 0) }
+      if (!requeueRetryRef.current) { requeueRetryRef.current = true; syncAgainRef.current = true }
     } else {
       requeueRetryRef.current = false
     }
@@ -325,7 +345,7 @@ export default function FieldApp() {
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: 'SYNC_COMPLETE' })
     }
-  }, [])
+  }
 
   useEffect(() => { syncRef.current = syncToServer }, [syncToServer])
 

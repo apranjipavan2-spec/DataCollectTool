@@ -1,0 +1,102 @@
+name: Diagnose Niiti Duplicates (detail)
+
+# Read-only. Follow-up to diag-niiti-sync.yml. Prints ONLY counts/buckets for
+# the Niiti Consulting tenant — never answers, names or respondent data.
+#  A) the marked duplicates that are NOT same-record re-uploads (different
+#     local_id): are their answers identical to the copy they point to?
+#  B) live pairs that share a local_id (same record uploaded twice): which copy
+#     has the consent audio, are answers identical, how many were dismissed.
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    name: Niiti duplicate detail
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Query via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            cd /opt/fieldgovern
+            docker compose exec -T app python3 - <<'PY'
+            from collections import Counter
+            from sqlalchemy import text
+            from app.core.database import engine
+            from app.api.routes.submissions import _question_answers
+            from app.services.field_encrypt import decrypt_identifiers
+
+            def diff_count(a, b):
+                qa, qb = _question_answers(a), _question_answers(b)
+                return sum(1 for k in qa.keys() | qb.keys() if qa.get(k) != qb.get(k))
+
+            def has_pending(d):
+                return any(isinstance(v, str) and v.startswith("__") and v.endswith("_pending__") for v in (d or {}).values())
+
+            def bucket(n):
+                return "0 (identical)" if n == 0 else "1-2" if n <= 2 else "3-10" if n <= 10 else "11-50" if n <= 50 else "50+"
+
+            with engine.connect() as c:
+                tid = c.execute(text("SELECT id FROM tenants WHERE name ILIKE '%niiti%'")).scalar()
+                schemas = {r.id: r.json_schema for r in c.execute(text("SELECT id, json_schema FROM forms WHERE tenant_id=:t"), {"t": tid})}
+                dec = lambda r: decrypt_identifiers(r.data_json, schemas.get(r.form_id))
+
+                print("===== A) marked duplicates with a DIFFERENT local_id than their keeper =====")
+                rows = c.execute(text("""
+                    SELECT d.form_id, d.data_json, k.data_json AS k_data, f.title,
+                           d.enumerator_id = k.enumerator_id AS same_enum,
+                           date(d.local_created_at) = date(k.local_created_at) AS same_day,
+                           abs(extract(epoch FROM d.local_created_at - k.local_created_at)) AS start_gap,
+                           d.duplicate_dismissed_at IS NOT NULL AS dismissed
+                    FROM submissions d JOIN submissions k ON k.id = d.duplicate_of
+                    JOIN forms f ON f.id = d.form_id
+                    WHERE d.tenant_id=:t AND d.is_duplicate AND d.local_id IS DISTINCT FROM k.local_id"""), {"t": tid}).fetchall()
+                print("total:", len(rows))
+                by_diff, by_form, gaps = Counter(), Counter(), Counter()
+                for r in rows:
+                    n = diff_count(dec(r), decrypt_identifiers(r.k_data, schemas.get(r.form_id)))
+                    by_diff[bucket(n)] += 1
+                    by_form[(r.title, "identical" if n == 0 else "differs")] += 1
+                    g = r.start_gap
+                    gaps["<1 min" if g is not None and g < 60 else "1-30 min" if g is not None and g < 1800 else "30 min-1 day" if g is not None and g < 86400 else ">1 day" if g is not None else "unknown"] += 1
+                print("answers differing from keeper:", dict(by_diff))
+                print("by form:", dict(by_form))
+                print("start-time gap to keeper:", dict(gaps))
+                print("same enumerator:", sum(r.same_enum for r in rows), " same day:", sum(bool(r.same_day) for r in rows))
+
+                print("\n===== B) same local_id uploaded more than once (same record) =====")
+                grp = c.execute(text("""
+                    SELECT local_id, array_agg(id ORDER BY server_received_at) ids
+                    FROM submissions WHERE tenant_id=:t AND local_id IS NOT NULL
+                    GROUP BY local_id HAVING count(*) > 1"""), {"t": tid}).fetchall()
+                print("groups:", len(grp))
+                state, audio, answers, dismissed = Counter(), Counter(), Counter(), Counter()
+                for g in grp:
+                    subs = c.execute(text("SELECT id, form_id, data_json, is_duplicate, duplicate_dismissed_at FROM submissions WHERE id = ANY(:ids)"), {"ids": g.ids}).fetchall()
+                    live = [s for s in subs if not s.is_duplicate]
+                    state[f"{len(live)} live of {len(subs)}"] += 1
+                    if len(live) >= 2:
+                        pend = [has_pending(s.data_json) for s in live]
+                        audio["all copies have audio" if not any(pend) else "no copy has audio" if all(pend) else "only some copies have audio"] += 1
+                        n = max(diff_count(dec(live[0]), dec(s)) for s in live[1:])
+                        answers[bucket(n)] += 1
+                        dismissed["dismissed in old review" if any(s.duplicate_dismissed_at for s in live) else "never dismissed"] += 1
+                print("live copies per group:", dict(state))
+                print("groups still with 2+ live copies ->")
+                print("  consent audio:", dict(audio))
+                print("  answers differing between copies:", dict(answers))
+                print("  dismissal:", dict(dismissed))
+
+                print("\n===== C) live rows missing audio that are NOT part of a same-record pair =====")
+                n = c.execute(text("""
+                    SELECT count(*) FROM submissions s WHERE tenant_id=:t AND deleted_at IS NULL AND NOT is_duplicate
+                    AND EXISTS (SELECT 1 FROM jsonb_each_text(s.data_json) e WHERE e.value ~ '^__[a-z_]+_pending__$')
+                    AND NOT EXISTS (SELECT 1 FROM submissions o WHERE o.local_id = s.local_id AND o.id <> s.id)"""), {"t": tid}).scalar()
+                print("single copies with no audio uploaded:", n)
+            PY
