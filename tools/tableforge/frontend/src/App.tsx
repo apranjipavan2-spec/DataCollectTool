@@ -1216,6 +1216,22 @@ export default function App() {
     });
   }, [tables, activeTableIdx, updateTable]);
 
+  // Apply one value field's combo_pct_sign setting to every value field in every
+  // table (not just ones with combo enabled yet), so it sticks if combo is turned
+  // on later too. Re-tabulates every table that has any values.
+  const applyComboPctSignToAllTables = useCallback((pctSign: boolean) => {
+    pushUndo();
+    setTables(prev => {
+      const next = prev.map(t => ({
+        ...t,
+        values: t.values.map(v => ({ ...v, combo_pct_sign: pctSign })),
+      }));
+      const toRun = next.filter(t => t.values.length > 0);
+      if (toRun.length > 0) runTabulationsBatch(toRun);
+      return next;
+    });
+  }, [pushUndo, runTabulationsBatch]);
+
   const handleFilterChange = useCallback((fieldName: string, selectedValues: string[]) => {
     updateTable({ filters: { ...tables[activeTableIdx].filters, [fieldName]: selectedValues } });
   }, [tables, activeTableIdx, updateTable]);
@@ -2292,7 +2308,14 @@ export default function App() {
                       <button type="button" className="ribbon-select ribbon-pct-toggle"
                         title={v.combo_pct_sign === false ? 'Show % sign' : 'Hide % sign'}
                         aria-pressed={v.combo_pct_sign !== false}
-                        onClick={() => handleValueFieldUpdate(v.field, { combo_pct_sign: v.combo_pct_sign === false ? true : false })}>
+                        onClick={() => {
+                          const next = v.combo_pct_sign === false ? true : false;
+                          handleValueFieldUpdate(v.field, { combo_pct_sign: next });
+                          if (tables.some((t, i) => i !== activeTableIdx && t.values.length > 0)
+                              && window.confirm(`${next ? 'Show' : 'Hide'} the % sign on combo values in ALL tables too?`)) {
+                            applyComboPctSignToAllTables(next);
+                          }
+                        }}>
                         %{v.combo_pct_sign === false ? ' off' : ''}
                       </button>
                     </>
