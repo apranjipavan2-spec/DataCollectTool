@@ -3079,7 +3079,7 @@ export default function App() {
       {/* Column Reconciliation Dialog */}
       {reconcileState && (
         <div className="modal-overlay">
-          <div className="modal modal-md">
+          <div className="modal modal-fullscreen">
             <div className="modal-header">
               <h2>Column Reconciliation</h2>
             </div>
@@ -3090,7 +3090,7 @@ export default function App() {
               </p>
               <div className="reconcile-list">
                 {reconcileState.mismatches.map(m => (
-                  <div key={m.field} className="reconcile-row">
+                  <div key={m.field} className="reconcile-row reconcile-row-wrap">
                     <div className="reconcile-from">
                       <span className="reconcile-field">{m.field}</span>
                       <span className="reconcile-zone">({m.zone})</span>
