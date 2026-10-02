@@ -28,6 +28,7 @@ import { OnboardingTour, shouldShowTour } from './components/OnboardingTour';
 import { TableComparison } from './components/TableComparison';
 import { MetricLibrary } from './components/MetricLibrary';
 import { AnnotationReconcileDialog, detectOrphanedAnnotations, ReconcileAnnotation } from './components/AnnotationReconcile';
+import { WrapSelect } from './components/WrapSelect';
 import { ChartBuilder } from './components/ChartBuilder';
 import { InlineChartPreview } from './components/InlineChartPreview';
 import { RibbonBar, TABLE_TEMPLATES } from './components/RibbonBar';
@@ -3104,15 +3105,13 @@ export default function App() {
                       <span className="reconcile-zone">({m.zone})</span>
                     </div>
                     <span className="reconcile-arrow">→</span>
-                    <select
+                    <WrapSelect
                       value={reconcileState.mapping[m.field] || ''}
-                      onChange={e => setReconcileState(rs => rs ? ({
+                      options={allColumns.map(c => c.name)}
+                      onChange={v => setReconcileState(rs => rs ? ({
                         ...rs,
-                        mapping: { ...rs.mapping, [m.field]: e.target.value },
-                      }) : rs)}>
-                      <option value="">-- skip --</option>
-                      {allColumns.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                    </select>
+                        mapping: { ...rs.mapping, [m.field]: v },
+                      }) : rs)} />
                   </div>
                 ))}
               </div>
