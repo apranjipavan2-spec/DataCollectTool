@@ -813,6 +813,7 @@ body {
 }
 .ribbon-select:focus { border-color: var(--accent); outline: none; }
 .ribbon-dec { width: 45px; }
+.ribbon-pct-toggle[aria-pressed="false"] { opacity: 0.5; text-decoration: line-through; }
 
 /* ─── Filter Panel ─── */
 /* ─── Filter Dialog (popup) ─── */

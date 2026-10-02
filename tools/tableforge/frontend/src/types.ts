@@ -31,6 +31,7 @@ export interface ValueField {
   decimals?: number;      // Decimal places (0-6)
   combo_show_as?: string; // If set, shows "value (show_as%)" combination e.g. "1500 (25.3%)"
   combo_decimals?: number; // Decimal places for the combo's parenthetical % (defaults to `decimals`)
+  combo_pct_sign?: boolean; // Whether the combo's parenthetical shows a trailing % sign (default true)
   label?: string;
   number_format?: NumberFormat;
   // Statistical display options

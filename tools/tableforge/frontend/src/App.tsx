@@ -2283,10 +2283,18 @@ export default function App() {
                     <option value="pct_col">+ % Col</option>
                   </select>
                   {v.combo_show_as && v.combo_show_as !== 'normal' && (
-                    <select className="ribbon-select ribbon-dec" value={v.combo_decimals ?? v.decimals ?? 2} title="Combo % Decimal Places"
-                      onChange={e => handleValueFieldUpdate(v.field, { combo_decimals: parseInt(e.target.value) })}>
-                      {[0,1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}dp</option>)}
-                    </select>
+                    <>
+                      <select className="ribbon-select ribbon-dec" value={v.combo_decimals ?? v.decimals ?? 2} title="Combo % Decimal Places"
+                        onChange={e => handleValueFieldUpdate(v.field, { combo_decimals: parseInt(e.target.value) })}>
+                        {[0,1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}dp</option>)}
+                      </select>
+                      <button type="button" className="ribbon-select ribbon-pct-toggle"
+                        title={v.combo_pct_sign === false ? 'Show % sign' : 'Hide % sign'}
+                        aria-pressed={v.combo_pct_sign !== false}
+                        onClick={() => handleValueFieldUpdate(v.field, { combo_pct_sign: v.combo_pct_sign === false ? true : false })}>
+                        %{v.combo_pct_sign === false ? ' off' : ''}
+                      </button>
+                    </>
                   )}
                 </div>
               ))}
