@@ -1360,6 +1360,199 @@ def detect_outliers():
                    total_checked=len(valid))
 
 
+# ── Feature D: Calculated & Binned Columns ───────────────────────────────────
+
+import ast as _ast
+import operator as _op
+import re as _re
+
+_CALC_BINOPS = {
+    _ast.Add: _op.add, _ast.Sub: _op.sub, _ast.Mult: _op.mul,
+    _ast.Div: _op.truediv, _ast.Mod: _op.mod, _ast.Pow: _op.pow,
+}
+_CALC_UNARYOPS = {_ast.USub: _op.neg, _ast.UAdd: _op.pos}
+_CALC_FUNCS = {
+    "abs": np.abs, "round": np.round, "sqrt": np.sqrt,
+    "log": np.log, "log10": np.log10,
+    "min": np.minimum, "max": np.maximum,
+}
+
+def _calc_eval_node(node, refs):
+    if isinstance(node, _ast.Expression):
+        return _calc_eval_node(node.body, refs)
+    if isinstance(node, _ast.BinOp) and type(node.op) in _CALC_BINOPS:
+        return _CALC_BINOPS[type(node.op)](_calc_eval_node(node.left, refs), _calc_eval_node(node.right, refs))
+    if isinstance(node, _ast.UnaryOp) and type(node.op) in _CALC_UNARYOPS:
+        return _CALC_UNARYOPS[type(node.op)](_calc_eval_node(node.operand, refs))
+    if isinstance(node, _ast.Constant) and isinstance(node.value, (int, float)):
+        return node.value
+    if isinstance(node, _ast.Name):
+        if node.id in refs:
+            return refs[node.id]
+        raise ValueError(f"Unknown reference '{node.id}'")
+    if isinstance(node, _ast.Call) and isinstance(node.func, _ast.Name) and node.func.id in _CALC_FUNCS:
+        args = [_calc_eval_node(a, refs) for a in node.args]
+        return _CALC_FUNCS[node.func.id](*args)
+    raise ValueError("Unsupported expression — only arithmetic (+ - * / % ^), [Column] references, and abs/round/min/max/sqrt/log are allowed")
+
+def _evaluate_formula(df, expression):
+    """Evaluate a formula like '([Revenue] - [Cost]) / [Cost] * 100' against df.
+    Column references use [Column Name] bracket syntax so names with spaces work.
+    Returns a pandas Series aligned to df.index."""
+    refs = {}
+    def _sub(m):
+        col = m.group(1)
+        if col not in df.columns:
+            raise ValueError(f"Column '{col}' not found")
+        ident = f"__ref{len(refs)}__"
+        refs[ident] = pd.to_numeric(df[col], errors="coerce")
+        return ident
+    safe_expr = _re.sub(r"\[([^\]]+)\]", _sub, expression)
+    if not safe_expr.strip():
+        raise ValueError("Empty expression")
+    tree = _ast.parse(safe_expr, mode="eval")
+    result = _calc_eval_node(tree.body, refs)
+    if not isinstance(result, pd.Series):
+        result = pd.Series(result, index=df.index)
+    return result
+
+
+@app.route("/api/create_column", methods=["POST"])
+def create_column():
+    """Create a new calculated/derived column from a formula referencing existing columns."""
+    df = _df()
+    if df is None:
+        return jsonify(error="No data loaded"), 400
+    body = request.json
+    name = (body.get("name") or "").strip()
+    expression = body.get("expression", "")
+    overwrite = bool(body.get("overwrite"))
+
+    if not name:
+        return jsonify(error="Column name required"), 400
+    if name in df.columns and not overwrite:
+        return jsonify(error=f"Column '{name}' already exists"), 400
+    if not expression.strip():
+        return jsonify(error="Expression required"), 400
+
+    try:
+        result = _evaluate_formula(df, expression)
+    except Exception as e:
+        return jsonify(error=f"Invalid expression: {e}"), 400
+
+    _push_undo(f"Create calculated column '{name}'")
+    df[name] = result
+    DATA["df"] = df
+    preview = [None if pd.isna(v) else round(float(v), 4) for v in df[name].head(10)]
+    return jsonify(ok=True, name=name, preview=preview)
+
+
+@app.route("/api/preview_column", methods=["POST"])
+def preview_column():
+    """Preview a calculated column's formula without persisting it."""
+    df = _df()
+    if df is None:
+        return jsonify(error="No data loaded"), 400
+    body = request.json
+    expression = body.get("expression", "")
+    try:
+        result = _evaluate_formula(df, expression)
+    except Exception as e:
+        return jsonify(error=f"Invalid expression: {e}"), 400
+    preview = [None if pd.isna(v) else round(float(v), 4) for v in result.head(10)]
+    return jsonify(ok=True, preview=preview, valid=int(result.notna().sum()), total=len(result))
+
+
+@app.route("/api/create_bin", methods=["POST"])
+def create_bin():
+    """Create a new column that bins/groups a numeric column into ranges or quantiles."""
+    df = _df()
+    if df is None:
+        return jsonify(error="No data loaded"), 400
+    body = request.json
+    name = (body.get("name") or "").strip()
+    source = body.get("source_column")
+    bin_type = body.get("bin_type", "equal_width")  # equal_width | equal_freq | custom
+    num_bins = int(body.get("num_bins", 4) or 4)
+    ranges = body.get("ranges", [])  # custom: [{min, max, label}]
+    overwrite = bool(body.get("overwrite"))
+
+    if not name:
+        return jsonify(error="Column name required"), 400
+    if name in df.columns and not overwrite:
+        return jsonify(error=f"Column '{name}' already exists"), 400
+    if source not in df.columns:
+        return jsonify(error=f"Column '{source}' not found"), 400
+
+    vals = pd.to_numeric(df[source], errors="coerce")
+
+    try:
+        if bin_type == "custom":
+            if not ranges:
+                return jsonify(error="At least one range required"), 400
+            result = pd.Series(pd.NA, index=df.index, dtype="object")
+            for r in ranges:
+                lo, hi = float(r["min"]), float(r["max"])
+                label = (r.get("label") or f"{lo}-{hi}").strip()
+                mask = (vals >= lo) & (vals <= hi)
+                result[mask] = label
+        elif bin_type == "equal_freq":
+            result = pd.qcut(vals, q=num_bins, duplicates="drop").astype(str)
+            result[vals.isna()] = None
+        else:  # equal_width
+            result = pd.cut(vals, bins=num_bins).astype(str)
+            result[vals.isna()] = None
+    except Exception as e:
+        return jsonify(error=f"Could not create bins: {e}"), 400
+
+    _push_undo(f"Create bin column '{name}' from '{source}'")
+    df[name] = result
+    DATA["df"] = df
+    vc = df[name].value_counts(dropna=False).head(10)
+    preview = {("(missing)" if pd.isna(k) else str(k)): int(v) for k, v in vc.items()}
+    return jsonify(ok=True, name=name, preview=preview)
+
+
+@app.route("/api/preview_bin", methods=["POST"])
+def preview_bin():
+    """Preview a bin distribution without persisting it."""
+    df = _df()
+    if df is None:
+        return jsonify(error="No data loaded"), 400
+    body = request.json
+    source = body.get("source_column")
+    bin_type = body.get("bin_type", "equal_width")
+    num_bins = int(body.get("num_bins", 4) or 4)
+    ranges = body.get("ranges", [])
+
+    if source not in df.columns:
+        return jsonify(error=f"Column '{source}' not found"), 400
+    vals = pd.to_numeric(df[source], errors="coerce")
+
+    try:
+        if bin_type == "custom":
+            if not ranges:
+                return jsonify(error="At least one range required"), 400
+            result = pd.Series(pd.NA, index=df.index, dtype="object")
+            for r in ranges:
+                lo, hi = float(r["min"]), float(r["max"])
+                label = (r.get("label") or f"{lo}-{hi}").strip()
+                mask = (vals >= lo) & (vals <= hi)
+                result[mask] = label
+        elif bin_type == "equal_freq":
+            result = pd.qcut(vals, q=num_bins, duplicates="drop").astype(str)
+            result[vals.isna()] = None
+        else:
+            result = pd.cut(vals, bins=num_bins).astype(str)
+            result[vals.isna()] = None
+    except Exception as e:
+        return jsonify(error=f"Could not create bins: {e}"), 400
+
+    vc = pd.Series(result).value_counts(dropna=False).head(15)
+    preview = {("(missing)" if pd.isna(k) else str(k)): int(v) for k, v in vc.items()}
+    return jsonify(ok=True, preview=preview)
+
+
 @app.route("/api/validate_format", methods=["POST"])
 def validate_format():
     """Validate column values against a regex pattern."""

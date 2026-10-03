@@ -474,6 +474,7 @@ input, select, textarea { font-family: inherit; }
         <div class="tab active" data-tab="explore">Column Explorer</div>
         <div class="tab" data-tab="preview">Data Preview</div>
         <div class="tab" data-tab="ai">AI Correction</div>
+        <div class="tab" data-tab="newcol">New Column</div>
       </div>
       <div style="margin-left:auto; display:flex; gap:12px; align-items:center;">
         <div style="position:relative; width:220px;">
@@ -582,6 +583,80 @@ input, select, textarea { font-family: inherit; }
             </div>
             
             <div class="ai-suggestions" id="aiSuggestions"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- New Column Tab -->
+      <div id="tabNewcol" class="tab-content" style="display:none;">
+        <div class="panels" style="gap:12px;">
+          <!-- Calculated Column -->
+          <div class="card" style="display:flex; flex-direction:column;">
+            <div class="card-header">🧮 Calculated Column</div>
+            <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
+              <p style="font-size:11px; color:var(--text3); margin:0;">
+                Build a new column from a formula. Reference existing columns with <code>[Column Name]</code>.
+                Supports <code>+ - * / % ^</code> and <code>abs() round() min() max() sqrt() log()</code>.
+              </p>
+              <div class="form-group" style="margin-bottom:0;">
+                <label style="margin-bottom:2px;">New Column Name</label>
+                <input type="text" id="calcColName" placeholder="e.g. Profit Margin %" style="padding:6px 10px;">
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label style="margin-bottom:2px;">Formula</label>
+                <textarea id="calcExpr" rows="2" placeholder="e.g. ([Revenue] - [Cost]) / [Cost] * 100" style="font-family:monospace; font-size:12px;"></textarea>
+              </div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <span style="font-size:10px; color:var(--text3); align-self:center;">Insert:</span>
+                <div id="calcColChips" class="col-select-grid" style="gap:4px;"></div>
+              </div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <button class="btn btn-secondary btn-sm" onclick="previewCalcColumn()">👁 Preview</button>
+                <button class="btn btn-primary btn-sm" onclick="createCalcColumn()">➕ Create Column</button>
+              </div>
+              <div id="calcColResult" style="font-size:11px;"></div>
+            </div>
+          </div>
+
+          <!-- Binned Column -->
+          <div class="card" style="display:flex; flex-direction:column;">
+            <div class="card-header">📊 Bin / Group Column</div>
+            <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
+              <p style="font-size:11px; color:var(--text3); margin:0;">
+                Group a numeric column into ranges (e.g. Age → 18-25, 26-35…) as a new categorical column.
+              </p>
+              <div class="form-group" style="margin-bottom:0;">
+                <label style="margin-bottom:2px;">New Column Name</label>
+                <input type="text" id="binColName" placeholder="e.g. Age Group" style="padding:6px 10px;">
+              </div>
+              <div style="display:flex; gap:6px;">
+                <div class="form-group" style="flex:1; margin-bottom:0;">
+                  <label style="margin-bottom:2px;">Source Column</label>
+                  <select id="binSourceCol" style="width:100%; padding:6px 8px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:12px;"></select>
+                </div>
+                <div class="form-group" style="flex:1; margin-bottom:0;">
+                  <label style="margin-bottom:2px;">Method</label>
+                  <select id="binType" onchange="toggleBinInputs()" style="width:100%; padding:6px 8px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:12px;">
+                    <option value="equal_width">Equal-width ranges</option>
+                    <option value="equal_freq">Equal-frequency (quantiles)</option>
+                    <option value="custom">Custom ranges</option>
+                  </select>
+                </div>
+              </div>
+              <div id="binNumInput" class="form-group" style="margin-bottom:0;">
+                <label style="margin-bottom:2px;">Number of Bins</label>
+                <input type="number" id="binNumBins" value="4" min="2" max="20" style="width:80px; padding:6px 10px;">
+              </div>
+              <div id="binCustomInput" style="display:none;">
+                <div id="binRangesList" style="display:flex; flex-direction:column; gap:4px;"></div>
+                <button class="btn btn-sm btn-secondary" style="margin-top:4px;" onclick="addBinRange()">+ Add Range</button>
+              </div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <button class="btn btn-secondary btn-sm" onclick="previewBinColumn()">👁 Preview</button>
+                <button class="btn btn-primary btn-sm" onclick="createBinColumn()">➕ Create Column</button>
+              </div>
+              <div id="binColResult" style="font-size:11px;"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -1456,6 +1531,128 @@ async function doStandardizeDates() {
   }
 }
 
+// ── New Column: Calculated + Binned ──────────────────────
+function renderNewColTab() {
+  // Column chips to insert into the calculated-column formula
+  const chips = document.getElementById('calcColChips');
+  if (chips) {
+    chips.innerHTML = '';
+    columns.forEach(c => {
+      const chip = document.createElement('div');
+      chip.className = 'col-chip';
+      chip.textContent = colLabel(c.name);
+      chip.title = c.name;
+      chip.onclick = () => insertCalcColRef(c.name);
+      chips.appendChild(chip);
+    });
+  }
+  // Source column dropdown for binning
+  const sel = document.getElementById('binSourceCol');
+  if (sel) {
+    const prev = sel.value;
+    sel.innerHTML = columns.map(c => `<option value="${c.name}" title="${c.name}">${colLabel(c.name)}</option>`).join('');
+    if (prev && columns.some(c => c.name === prev)) sel.value = prev;
+    else if (activeCol && columns.some(c => c.name === activeCol)) sel.value = activeCol;
+  }
+  if (!document.getElementById('binRangesList').children.length) addBinRange();
+}
+
+function insertCalcColRef(name) {
+  const ta = document.getElementById('calcExpr');
+  const ref = `[${name}]`;
+  const start = ta.selectionStart ?? ta.value.length;
+  const end = ta.selectionEnd ?? ta.value.length;
+  ta.value = ta.value.slice(0, start) + ref + ta.value.slice(end);
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = start + ref.length;
+}
+
+async function previewCalcColumn() {
+  const expression = document.getElementById('calcExpr').value;
+  if (!expression.trim()) { toast('Enter a formula', 'error'); return; }
+  const data = await apiPost('preview_column', { expression }, false);
+  const out = document.getElementById('calcColResult');
+  if (!data) { return; }
+  out.innerHTML = `<p style="color:var(--green);">✓ ${data.valid}/${data.total} rows computed. First values: ${data.preview.slice(0, 10).join(', ')}</p>`;
+}
+
+async function createCalcColumn() {
+  const name = document.getElementById('calcColName').value.trim();
+  const expression = document.getElementById('calcExpr').value;
+  if (!name) { toast('Enter a column name', 'error'); return; }
+  if (!expression.trim()) { toast('Enter a formula', 'error'); return; }
+  const data = await apiPost('create_column', { name, expression });
+  if (data) {
+    toast(`Created calculated column '${name}'`);
+    document.getElementById('calcColResult').innerHTML = `<p style="color:var(--green);">✓ Column created</p>`;
+    document.getElementById('calcColName').value = '';
+    document.getElementById('calcExpr').value = '';
+    await loadInfo();
+    selectColumn(name);
+  }
+}
+
+function toggleBinInputs() {
+  const type = document.getElementById('binType').value;
+  document.getElementById('binNumInput').style.display = type === 'custom' ? 'none' : 'block';
+  document.getElementById('binCustomInput').style.display = type === 'custom' ? 'block' : 'none';
+}
+
+let _binRangeSeq = 0;
+function addBinRange() {
+  const id = _binRangeSeq++;
+  const row = document.createElement('div');
+  row.className = 'bin-range-row';
+  row.dataset.id = id;
+  row.style = 'display:flex; gap:4px; align-items:center;';
+  row.innerHTML = `
+    <input type="number" placeholder="Min" class="bin-range-min" style="width:70px; padding:4px 6px; font-size:11px; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text);">
+    <span style="color:var(--text3);">–</span>
+    <input type="number" placeholder="Max" class="bin-range-max" style="width:70px; padding:4px 6px; font-size:11px; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text);">
+    <input type="text" placeholder="Label (optional)" class="bin-range-label" style="flex:1; padding:4px 6px; font-size:11px; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text);">
+    <button class="btn btn-sm btn-secondary" style="padding:2px 8px;" onclick="this.closest('.bin-range-row').remove()">✕</button>`;
+  document.getElementById('binRangesList').appendChild(row);
+}
+
+function _collectBinRanges() {
+  return Array.from(document.querySelectorAll('.bin-range-row')).map(row => ({
+    min: parseFloat(row.querySelector('.bin-range-min').value),
+    max: parseFloat(row.querySelector('.bin-range-max').value),
+    label: row.querySelector('.bin-range-label').value.trim(),
+  })).filter(r => !isNaN(r.min) && !isNaN(r.max));
+}
+
+function _binPayload() {
+  const bin_type = document.getElementById('binType').value;
+  return {
+    source_column: document.getElementById('binSourceCol').value,
+    bin_type,
+    num_bins: parseInt(document.getElementById('binNumBins').value) || 4,
+    ranges: bin_type === 'custom' ? _collectBinRanges() : [],
+  };
+}
+
+async function previewBinColumn() {
+  const data = await apiPost('preview_bin', _binPayload(), false);
+  const out = document.getElementById('binColResult');
+  if (!data) return;
+  const rows = Object.entries(data.preview).map(([k, v]) => `${k}: ${v}`).join(', ');
+  out.innerHTML = `<p style="color:var(--green);">✓ ${rows}</p>`;
+}
+
+async function createBinColumn() {
+  const name = document.getElementById('binColName').value.trim();
+  if (!name) { toast('Enter a column name', 'error'); return; }
+  const data = await apiPost('create_bin', { name, ..._binPayload() });
+  if (data) {
+    toast(`Created bin column '${name}'`);
+    document.getElementById('binColResult').innerHTML = `<p style="color:var(--green);">✓ Column created</p>`;
+    document.getElementById('binColName').value = '';
+    await loadInfo();
+    selectColumn(name);
+  }
+}
+
 // ── Data Validation ──────────────────────────────────────
 function showValTab(tab) {
   document.getElementById('valOutlierPanel').style.display = tab === 'outlier' ? 'block' : 'none';
@@ -1944,10 +2141,11 @@ async function applyAiSuggestions() {
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
-  const map = { explore: 'tabExplore', preview: 'tabPreview', ai: 'tabAi' };
+  const map = { explore: 'tabExplore', preview: 'tabPreview', ai: 'tabAi', newcol: 'tabNewcol' };
   const target = document.getElementById(map[name]);
   if (target) target.style.display = 'block';
   if (name === 'preview') loadPreview();
+  if (name === 'newcol') renderNewColTab();
 }
 document.querySelectorAll('.tab').forEach(t => {
   t.addEventListener('click', () => switchTab(t.dataset.tab));

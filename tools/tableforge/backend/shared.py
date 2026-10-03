@@ -3,6 +3,9 @@
 import os
 import json
 import uuid
+import ast
+import re
+import operator as _op
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -587,6 +590,53 @@ def _col_is_text(df: pd.DataFrame, col_name: str) -> bool:
         return True
 
 
+_EXPR_BINOPS = {ast.Add: _op.add, ast.Sub: _op.sub, ast.Mult: _op.mul,
+                ast.Div: _op.truediv, ast.Mod: _op.mod, ast.Pow: _op.pow}
+_EXPR_UNARYOPS = {ast.USub: _op.neg, ast.UAdd: _op.pos}
+_EXPR_FUNCS = {"abs": np.abs, "round": np.round, "sqrt": np.sqrt,
+               "log": np.log, "log10": np.log10, "min": np.minimum, "max": np.maximum}
+
+def _expr_eval_node(node, refs):
+    if isinstance(node, ast.Expression):
+        return _expr_eval_node(node.body, refs)
+    if isinstance(node, ast.BinOp) and type(node.op) in _EXPR_BINOPS:
+        return _EXPR_BINOPS[type(node.op)](_expr_eval_node(node.left, refs), _expr_eval_node(node.right, refs))
+    if isinstance(node, ast.UnaryOp) and type(node.op) in _EXPR_UNARYOPS:
+        return _EXPR_UNARYOPS[type(node.op)](_expr_eval_node(node.operand, refs))
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+        return node.value
+    if isinstance(node, ast.Name):
+        if node.id in refs:
+            return refs[node.id]
+        raise ValueError(f"Unknown reference '{node.id}'")
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in _EXPR_FUNCS:
+        args = [_expr_eval_node(a, refs) for a in node.args]
+        return _EXPR_FUNCS[node.func.id](*args)
+    raise ValueError("Unsupported expression — only arithmetic (+ - * / % ^), [Column] references, "
+                     "and abs/round/min/max/sqrt/log are allowed")
+
+
+def evaluate_formula(df: pd.DataFrame, expression: str) -> pd.Series:
+    """Evaluate a formula like '([Revenue] - [Cost]) / [Cost] * 100' against df.
+    Column references use [Column Name] bracket syntax so names with spaces work."""
+    refs = {}
+    def _sub(m):
+        col = m.group(1)
+        if col not in df.columns:
+            raise ValueError(f"Column '{col}' not found")
+        ident = f"__ref{len(refs)}__"
+        refs[ident] = pd.to_numeric(df[col], errors="coerce")
+        return ident
+    safe_expr = re.sub(r"\[([^\]]+)\]", _sub, expression)
+    if not safe_expr.strip():
+        raise ValueError("Empty expression")
+    tree = ast.parse(safe_expr, mode="eval")
+    result = _expr_eval_node(tree.body, refs)
+    if not isinstance(result, pd.Series):
+        result = pd.Series(result, index=df.index)
+    return result
+
+
 def apply_metrics_and_bins(df: pd.DataFrame, dataset_id: str) -> pd.DataFrame:
     """Apply custom metrics and bins to the dataframe."""
     touch_dataset(dataset_id)
@@ -744,7 +794,9 @@ def apply_metrics_and_bins(df: pd.DataFrame, dataset_id: str) -> pd.DataFrame:
         if name in df.columns:
             continue
         try:
-            if mtype == "formula":
+            if mtype == "expression":
+                df[name] = evaluate_formula(df, mdef.get("expression", ""))
+            elif mtype == "formula":
                 col_a = mdef["column_a"]
                 col_b = mdef["column_b"]
                 op = mdef["operator"]

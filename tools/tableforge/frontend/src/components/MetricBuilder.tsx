@@ -13,6 +13,7 @@ interface Props {
 
 const METRIC_TYPES = [
   { value: 'formula', label: 'Basic Formula', desc: 'Arithmetic on columns (+, -, *, /)' },
+  { value: 'expression', label: 'Formula (Advanced)', desc: 'Free-text expression, e.g. ([Revenue]-[Cost])/[Cost]*100' },
   { value: 'ratio', label: 'Ratio', desc: 'Numerator ÷ Denominator' },
   { value: 'percentage', label: 'Percentage', desc: 'Express as % of another value' },
   { value: 'growth', label: 'Growth / Change', desc: 'Change between two values' },
@@ -63,6 +64,7 @@ export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLi
   const [condElseVal, setCondElseVal] = useState('0');
   const [condThenType, setCondThenType] = useState<'column' | 'value'>('column');
   const [condElseType, setCondElseType] = useState<'column' | 'value'>('value');
+  const [expression, setExpression] = useState('');
 
   const [preview, setPreview] = useState<any[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -76,7 +78,8 @@ export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLi
       name: name.trim(), metric_type: metricType,
       format_type: formatType, decimal_places: decimalPlaces,
     };
-    if (metricType === 'formula') { metric.column_a = columnA; metric.column_b = columnB; metric.operator = operator; }
+    if (metricType === 'expression') { metric.expression = expression; }
+    else if (metricType === 'formula') { metric.column_a = columnA; metric.column_b = columnB; metric.operator = operator; }
     else if (metricType === 'ratio') { metric.numerator = numerator; metric.denominator = denominator; }
     else if (metricType === 'percentage') { metric.part = part; metric.whole = whole; }
     else if (metricType === 'growth') { metric.current = current; metric.previous = previous; metric.growth_type = growthType; }
@@ -94,6 +97,7 @@ export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLi
   };
 
   const getFormulaPreview = (): string => {
+    if (metricType === 'expression') return expression;
     if (metricType === 'formula') return columnA && columnB ? `${columnA} ${operator} ${columnB}` : '';
     if (metricType === 'ratio') return numerator && denominator ? `${numerator} ÷ ${denominator}` : '';
     if (metricType === 'percentage') return part && whole ? `(${part} ÷ ${whole}) × 100` : '';
@@ -201,6 +205,23 @@ export function MetricBuilder({ datasetId, columns, onCreated, onClose, onOpenLi
             </div>
           </div>
 
+          {metricType === 'expression' && (
+            <div className="form-group">
+              <label>Formula</label>
+              <textarea rows={2} value={expression} onChange={e => setExpression(e.target.value)}
+                placeholder="e.g. ([Revenue] - [Cost]) / [Cost] * 100"
+                style={{ fontFamily: 'monospace', fontSize: 12, width: '100%' }} />
+              <p style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>
+                Reference columns with [Column Name]. Supports + - * / % ^ and abs() round() min() max() sqrt() log().
+              </p>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                {columns.map(c => (
+                  <button key={c.name} type="button" className="op-btn" style={{ fontSize: 11 }}
+                    onClick={() => setExpression(expression + `[${c.name}]`)}>{c.name}</button>
+                ))}
+              </div>
+            </div>
+          )}
           {metricType === 'formula' && (
             <div className="formula-row">
               <ColSelect value={columnA} onChange={setColumnA} label="Column A" />

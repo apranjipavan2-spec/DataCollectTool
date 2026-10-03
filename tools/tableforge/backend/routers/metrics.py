@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from typing import Optional
 from pydantic import BaseModel
 
-from ..shared import datasets, custom_metrics, sanitize_for_json, apply_metrics_and_bins
+from ..shared import datasets, custom_metrics, sanitize_for_json, apply_metrics_and_bins, evaluate_formula
 
 router = APIRouter()
 
@@ -47,6 +47,8 @@ class MetricDef(BaseModel):
     # Rank
     rank_column: Optional[str] = None
     rank_order: Optional[str] = None
+    # Expression (free-text formula, e.g. "([Revenue] - [Cost]) / [Cost] * 100")
+    expression: Optional[str] = None
 
 
 @router.post("/api/metrics/create")
@@ -98,6 +100,21 @@ async def preview_metric(metric: MetricDef):
     except Exception as e:
         custom_metrics[metric.dataset_id] = [m for m in custom_metrics.get(metric.dataset_id, []) if m["name"] != metric.name]
         raise HTTPException(400, f"Preview error: {str(e)}")
+
+
+@router.get("/api/expression/preview")
+async def preview_expression(dataset_id: str, expression: str):
+    """Preview a free-text formula (e.g. '([Revenue] - [Cost]) / [Cost] * 100') without saving it."""
+    if dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    df = datasets[dataset_id]["df"].copy()
+    df = apply_metrics_and_bins(df, dataset_id)
+    try:
+        result = evaluate_formula(df, expression)
+    except Exception as e:
+        raise HTTPException(400, f"Invalid expression: {e}")
+    preview = sanitize_for_json(result.head(10).tolist())
+    return {"preview": preview, "valid": int(result.notna().sum()), "total": len(result)}
 
 
 @router.delete("/api/metrics/{dataset_id}/{metric_name}")
