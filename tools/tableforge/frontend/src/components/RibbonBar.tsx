@@ -15,12 +15,11 @@ interface Props {
   columns?: ColumnInfo[];
   onColumnTypeChange?: (column: string, newType: string) => void;
   projectFilterCount?: number;   // number of active project-level filters
-  onAskAI?: (query: string) => void;  // #15 Talk-to-your-data: NL query → smart-build modal
   fgContext?: FgContext | null;  // FieldGovern account → per-user saved projects
   onLoadProject?: (tables: TableConfig[], annotationsMap?: Record<string, any[]>, extra?: Record<string, any>) => void;
 }
 
-type TabKey = 'home' | 'insert' | 'data' | 'statistics' | 'format' | 'view' | 'ai-smart';
+type TabKey = 'home' | 'insert' | 'data' | 'statistics' | 'format' | 'ai-smart';
 
 // ── Constants ──────────────────────────────────────────────
 const BUILT_IN_THEMES = [
@@ -198,18 +197,20 @@ function TemplateDropdown({ table, onAction, disabled }: { table: TableConfig | 
 }
 
 // ── Root component ─────────────────────────────────────────
-export function RibbonBar({ table, dataset, result, onAction, onUpdate, theme, activeTab: externalTab, columns, onColumnTypeChange, projectFilterCount = 0, onAskAI, fgContext, onLoadProject }: Props) {
+export function RibbonBar({ table, dataset, result, onAction, onUpdate, theme, activeTab: externalTab, columns, onColumnTypeChange, projectFilterCount = 0, fgContext, onLoadProject }: Props) {
   const [internalTab, setInternalTab] = useState<TabKey>('home');
   const activeTab = (externalTab as TabKey) || internalTab;
 
   return (
     <div className="ribbon-content">
-      {activeTab === 'home'       && <HomeRibbon      table={table} dataset={dataset} result={result} onAction={onAction} onUpdate={onUpdate} projectFilterCount={projectFilterCount} onAskAI={onAskAI} fgContext={fgContext} onLoadProject={onLoadProject} />}
+      {activeTab === 'home'       && <HomeRibbon      table={table} dataset={dataset} result={result} onAction={onAction} onUpdate={onUpdate} projectFilterCount={projectFilterCount} fgContext={fgContext} onLoadProject={onLoadProject} />}
       {activeTab === 'insert'     && <InsertRibbon    dataset={dataset} onAction={onAction} />}
       {activeTab === 'data'       && <DataRibbon      dataset={dataset} onAction={onAction} />}
       {activeTab === 'statistics' && <StatisticsRibbon dataset={dataset} onAction={onAction} />}
-      {activeTab === 'format'     && <FormatRibbon    table={table} onUpdate={onUpdate} columns={columns} onColumnTypeChange={onColumnTypeChange} />}
-      {activeTab === 'view'       && <ViewRibbon      table={table} dataset={dataset} onAction={onAction} onUpdate={onUpdate} theme={theme} />}
+      {activeTab === 'format'     && <>
+        <FormatRibbon table={table} onUpdate={onUpdate} columns={columns} onColumnTypeChange={onColumnTypeChange} />
+        <ViewRibbon   table={table} dataset={dataset} onAction={onAction} onUpdate={onUpdate} theme={theme} />
+      </>}
       {activeTab === 'ai-smart'   && <AISmartRibbon   table={table} dataset={dataset} onAction={onAction} onUpdate={onUpdate} />}
     </div>
   );
@@ -469,27 +470,18 @@ function ImportDropdownBtn({ onAction, fgContext, onLoadProject }: {
 }
 
 // ── HOME ───────────────────────────────────────────────────
-function HomeRibbon({ table, dataset, result, onAction, onUpdate, projectFilterCount = 0, onAskAI, fgContext, onLoadProject }: {
+function HomeRibbon({ table, dataset, result, onAction, onUpdate, projectFilterCount = 0, fgContext, onLoadProject }: {
   table: TableConfig | null; dataset: boolean;
   result?: TableResult | null;
   onAction: (action: string) => void; onUpdate: (update: Partial<TableConfig>) => void;
   projectFilterCount?: number;
-  onAskAI?: (query: string) => void;
   fgContext?: FgContext | null;
   onLoadProject?: (tables: TableConfig[], annotationsMap?: Record<string, any[]>, extra?: Record<string, any>) => void;
 }) {
   const [openDrop, setOpenDrop] = useState<string | null>(null);
-  const [askQuery, setAskQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const t = table;
   const dis = !t;
-
-  const submitAsk = () => {
-    const q = askQuery.trim();
-    if (!q || !onAskAI) return;
-    onAskAI(q);
-    setAskQuery('');
-  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -503,29 +495,6 @@ function HomeRibbon({ table, dataset, result, onAction, onUpdate, projectFilterC
 
   return (
     <div ref={containerRef} style={{ display: 'contents' }}>
-      <RGroup label="Ask AI">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <input
-            type="text"
-            value={askQuery}
-            onChange={e => setAskQuery(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') submitAsk(); }}
-            placeholder="Ask: e.g., avg income by district…"
-            disabled={!dataset}
-            className="ribbon-ask-input"
-            style={{
-              fontSize: 12, padding: '6px 10px', minWidth: 220, height: 30,
-              background: 'rgba(15,23,42,0.6)', color: 'inherit',
-              border: '1px solid rgba(168,85,247,0.45)', borderRadius: 4,
-            }}
-            title="Talk to your data — AI designs a table from your question"
-          />
-          <button className="ribbon-btn" onClick={submitAsk} disabled={!dataset || !askQuery.trim()} title="Build table from question">
-            <span className="ribbon-btn-icon">💬</span>
-            <span className="ribbon-btn-label">Ask</span>
-          </button>
-        </div>
-      </RGroup>
       <RGroup label="File">
         <ImportDropdownBtn onAction={onAction} fgContext={fgContext} onLoadProject={onLoadProject} />
         <RBtn icon="💾" label="Save"    onClick={() => onAction('save')}   disabled={!dataset} />

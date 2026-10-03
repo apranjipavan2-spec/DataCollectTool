@@ -2121,7 +2121,6 @@ export default function App() {
         theme={theme}
         columns={allColumns}
         onColumnTypeChange={handleColumnTypeChange}
-        onAskAI={q => { setSmartBuildPrefill({ query: q, autoSubmit: true }); setModal('ai-smart-build'); }}
         fgContext={fgContext}
         onLoadProject={handleProjectLoaded}
       />
