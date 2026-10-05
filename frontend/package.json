@@ -43,7 +43,7 @@
     "autoprefixer": "^10.4.27",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.2",
-    "typescript": "^5.4.5",
+    "typescript": "^7.0.2",
     "vite": "^5.2.13",
     "vite-plugin-pwa": "^0.20.0",
     "vitest": "^1.6.0"
