@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
-import { Parser, type Value } from 'expr-eval'
+import { Parser, type Value } from 'expr-eval-fork'
 import type { FormField, FormSection, FormSchema, SkipCondition, SkipLogic, FieldType, ConditionGroup } from '@/types/form'
 import { isConditionGroup } from '@/types/form'
 
