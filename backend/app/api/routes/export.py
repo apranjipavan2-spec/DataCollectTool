@@ -113,6 +113,14 @@ def _build_rows(subs: list, enumerator_map: dict, form_schema: dict | None = Non
     return rows
 
 
+_META_COLUMNS = [
+    "submission_id", "enumerator_id", "enumerator_name", "form_version",
+    "status", "gps_open_lat", "gps_open_lng", "gps_open_accuracy",
+    "gps_submit_lat", "gps_submit_lng", "gps_submit_accuracy",
+    "local_created_at", "server_received_at",
+]
+
+
 def _sanitize_stata_colname(name: str) -> str:
     """Stata variable names: max 32 chars, alphanumeric + underscore, start with letter/underscore."""
     clean = "".join(c if c.isalnum() or c == "_" else "_" for c in name)
@@ -136,6 +144,30 @@ def _field_key(field: dict) -> str:
     return field.get("name") or field.get("id", "")
 
 
+def _iter_schema_fields(form_schema: dict):
+    """Yield every field dict in a form schema, depth-first through
+    subsections — mirrors the frontend's getAllFieldsInOrder (formUtils.ts)
+    so a field nested in a subsection isn't invisible to backend schema reads."""
+    def walk(sections):
+        for s in sections or []:
+            yield from s.get("fields", [])
+            if s.get("subsections"):
+                yield from walk(s["subsections"])
+    yield from walk((form_schema or {}).get("sections", []))
+
+
+def _all_schema_field_names(form_schema: dict) -> list[str]:
+    """All field names in a form schema, in document order, deduplicated."""
+    names: list[str] = []
+    seen: set[str] = set()
+    for f in _iter_schema_fields(form_schema):
+        name = _field_key(f)
+        if name and name not in seen:
+            names.append(name)
+            seen.add(name)
+    return names
+
+
 def _build_label_maps(form_schema: dict) -> tuple[dict, dict]:
     """Returns (name_to_label, name_to_option_labels) from a form json_schema.
 
@@ -144,15 +176,35 @@ def _build_label_maps(form_schema: dict) -> tuple[dict, dict]:
     """
     name_to_label: dict = {}
     name_to_options: dict = {}
-    for section in (form_schema or {}).get("sections", []):
-        for f in section.get("fields", []):
-            fname = _field_key(f)
-            if fname:
-                name_to_label[fname] = f.get("label", fname)
-                opts = f.get("options", [])
-                if opts:
-                    name_to_options[fname] = {o.get("value", ""): o.get("label", o.get("value", "")) for o in opts}
+    for f in _iter_schema_fields(form_schema):
+        fname = _field_key(f)
+        if fname:
+            name_to_label[fname] = f.get("label", fname)
+            opts = f.get("options", [])
+            if opts:
+                name_to_options[fname] = {o.get("value", ""): o.get("label", o.get("value", "")) for o in opts}
     return name_to_label, name_to_options
+
+
+def _pad_missing_schema_fields(rows: list[dict], form_schema: dict | None) -> None:
+    """Ensure every schema question has a key in every row (blank if nobody
+    in this export ever answered it), so that question still appears as its
+    own column instead of silently vanishing — e.g. a question whose skip
+    logic never evaluates true for anyone in the exported set, or one added
+    to the form after the earliest exported submissions. No-op if every
+    schema field already appears in at least one row."""
+    schema_fields = _all_schema_field_names(form_schema or {})
+    if not schema_fields or not rows:
+        return
+    present: set[str] = set()
+    for row in rows:
+        present.update(row.keys())
+    missing = [f for f in schema_fields if f not in present]
+    if not missing:
+        return
+    for row in rows:
+        for f in missing:
+            row.setdefault(f, "")
 
 
 def _decode_row_values(rows: list[dict], name_to_options: dict) -> list[dict]:
@@ -196,12 +248,24 @@ def export_csv(
     subs = _query_submissions(db, form_id, user["tenant_id"], date_from, date_to, status)
     enum_map = _build_enumerator_map(db, user["tenant_id"])
     rows = _build_rows(subs, enum_map, form.json_schema)
+    _pad_missing_schema_fields(rows, form.json_schema)
 
     if not rows:
+        # No submissions matched — still emit every question as a column so
+        # the file shows the form's full structure instead of looking empty/broken.
+        schema_fields = _all_schema_field_names(form.json_schema or {})
+        all_keys = _META_COLUMNS + [f for f in schema_fields if f not in _META_COLUMNS]
+        if labels:
+            id_to_label, _ = _build_label_maps(form.json_schema or {})
+            all_keys = [id_to_label.get(k, k) for k in all_keys]
+        buf = io.StringIO()
+        csv.DictWriter(buf, fieldnames=all_keys).writeheader()
+        buf.seek(0)
+        fname = f"{form.title}{'_labelled' if labels else ''}.csv"
         return StreamingResponse(
-            iter([""]),
+            iter([buf.getvalue()]),
             media_type="text/csv",
-            headers={"Content-Disposition": f'attachment; filename="{form.title}.csv"'},
+            headers={"Content-Disposition": f'attachment; filename="{fname}"'},
         )
 
     if labels:
@@ -783,6 +847,7 @@ def export_xlsx(
     subs = _query_submissions(db, form_id, user["tenant_id"], date_from, date_to, status)
     enum_map = _build_enumerator_map(db, user["tenant_id"])
     rows_dicts = _build_rows(subs, enum_map, form.json_schema)
+    _pad_missing_schema_fields(rows_dicts, form.json_schema)
 
     if decode_values:
         _, id_to_options = _build_label_maps(form.json_schema or {})
@@ -801,19 +866,9 @@ def export_xlsx(
     # columns plus each field from the schema — so the header row isn't empty. The
     # analyzer needs the columns to appear even before any data is collected.
     if not all_keys:
-        all_keys = [
-            "submission_id", "enumerator_id", "enumerator_name", "form_version",
-            "status", "gps_open_lat", "gps_open_lng", "gps_open_accuracy",
-            "gps_submit_lat", "gps_submit_lng", "gps_submit_accuracy",
-            "local_created_at", "server_received_at",
-        ]
+        schema_fields = _all_schema_field_names(form.json_schema or {})
+        all_keys = _META_COLUMNS + [f for f in schema_fields if f not in _META_COLUMNS]
         seen = set(all_keys)
-        for section in (form.json_schema or {}).get("sections", []):
-            for f in section.get("fields", []):
-                fname = _field_key(f)
-                if fname and fname not in seen:
-                    all_keys.append(fname)
-                    seen.add(fname)
 
     if decode_values:
         # Tool-driven load (Cleaner/TableForge) — they read cell VALUES via

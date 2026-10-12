@@ -57,8 +57,8 @@ function evaluateCondition(c: SkipCondition, values: Record<string, unknown>): b
   const val = values[c.field]
   const cmp = c.value
   switch (c.operator) {
-    case 'eq':           return val == cmp
-    case 'neq':          return val != cmp
+    case 'eq':           return eqAny(val, cmp)
+    case 'neq':          return !eqAny(val, cmp)
     case 'gt':           return Number(val) > Number(cmp)
     case 'lt':           return Number(val) < Number(cmp)
     case 'gte':          return Number(val) >= Number(cmp)
@@ -94,6 +94,24 @@ function ageMeetsThreshold(dob: unknown, threshold: unknown): boolean | null {
   const ref = raw[3] ? new Date(raw[3]) : new Date()
   const refDate = isNaN(ref.getTime()) ? new Date() : ref
   return refDate >= at
+}
+
+/**
+ * "eq" match. If `cmp` has commas, each piece is an OR alternative — a
+ * single-value field (single_choice, number, etc.) is "equal to" the
+ * condition when it matches ANY listed value: "2,3,4,5" matches a field
+ * whose answer is '2', '3', '4', or '5'. XLSForm `relevant` expressions
+ * commonly import as this comma-list shape for "field is one of these
+ * codes" (e.g. ${q1_5}='2,3,4,5'); without this, that condition is a
+ * literal string match against "2,3,4,5" that can never be true for a
+ * single-value answer, silently hiding the question from every respondent.
+ * No commas: falls back to a plain `==` match, unchanged from before.
+ */
+function eqAny(val: unknown, cmp: unknown): boolean {
+  const cmpStr = String(cmp ?? '')
+  if (!cmpStr.includes(',')) return val == cmp
+  const options = cmpStr.split(',').map(s => s.trim()).filter(Boolean)
+  return options.some(o => val == o)
 }
 
 /**
