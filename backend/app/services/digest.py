@@ -35,6 +35,8 @@ def send_digest_for_tenant(db: Session, tenant_id: str) -> dict:
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
         return {"sent": 0, "skipped": 0, "tenant": str(tenant_id)}
+    if tenant.plan_tier == "expired":
+        return {"sent": 0, "skipped": 0, "tenant": tenant.name, "reason": "subscription expired"}
 
     start, end = _yesterday_range()
     date_label = start.strftime("%B %-d, %Y")  # e.g. "April 15, 2026"

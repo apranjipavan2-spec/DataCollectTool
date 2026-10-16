@@ -733,17 +733,18 @@ def admin_cancel_subscription(
 # ── Plan helpers (used by other routes) ──────────────────────────────────────
 
 def get_org_plan(tenant_id, db: Session) -> Plan:
-    """Return the Plan row for an org via its active Subscription.
+    """Return the Plan row for an org via its Subscription (any status).
 
-    Falls back to the ngo_free plan so callers always get a valid object.
-    Used by check_feature() for feature-flag enforcement.
-    Limit enforcement (submissions, forms, AI, storage, API) is handled by
-    app.services.plan_enforcement which reads from Tenant.plan_tier instead.
+    A tenant's non-AI/non-submission feature flags (map_view, webhooks,
+    spss_export, panel_study, api_write, ...) must survive expiry — only
+    submissions/AI are supposed to stop. Falling back to ngo_free here on
+    expired/cancelled used to strip those paid features too; now the real
+    plan is always returned, and submissions/AI are separately blocked by
+    plan_enforcement (keyed off Tenant.plan_tier) and the ai_calls_per_day=0
+    check in check_feature() below.
+    Falls back to the ngo_free plan only when the tenant has no Subscription row.
     """
-    sub = db.query(Subscription).filter(
-        Subscription.tenant_id == tenant_id,
-        Subscription.status.in_(["active", "trialing"]),
-    ).first()
+    sub = db.query(Subscription).filter(Subscription.tenant_id == tenant_id).first()
     plan_id = sub.plan_id if sub else "ngo_free"
     plan = db.query(Plan).filter(Plan.id == plan_id).first()
     if plan is None:

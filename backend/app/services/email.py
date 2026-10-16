@@ -268,6 +268,36 @@ def send_verification_email(to: str, name: str, token: str) -> bool:
     return send_email(to, "Verify your FieldGovern account", html)
 
 
+def send_subscription_expired_email(to: str, name: str, org_name: str) -> bool:
+    """Notify an org admin that their subscription has ended.
+
+    Sent once, right when a trial/subscription transitions to expired —
+    the scheduler only matches tenants on that transition, so this never repeats."""
+    url = f"{settings.APP_URL}/billing"
+    html = f"""
+    <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+      <h2 style="color: #1e1e2e;">Your Subscription Has Ended</h2>
+      <p>Hi {name},</p>
+      <p><strong>{org_name}</strong>'s subscription on FieldGovern has ended.</p>
+      <p>All your data stays safe and accessible — you can still log in, view and export
+         existing submissions, and edit your forms. Two things are paused until you renew:</p>
+      <ul style="color: #313244;">
+        <li>Collecting new form submissions</li>
+        <li>AI features (analysis, cleaning, report writing)</li>
+      </ul>
+      <a href="{url}"
+         style="display: inline-block; background: #2563eb; color: white;
+                padding: 12px 24px; border-radius: 8px; text-decoration: none;
+                font-weight: 600; margin: 16px 0;">
+        Renew Subscription
+      </a>
+      <hr style="border: none; border-top: 1px solid #d4d4de; margin: 24px 0;">
+      <p style="color: #6c7086; font-size: 12px;">FieldGovern — Field Data Collection</p>
+    </div>
+    """
+    return send_email(to, f"{org_name}: Your FieldGovern Subscription Has Ended", html)
+
+
 def send_assignment_email(to: str, enumerator_name: str, form_title: str) -> bool:
     """Notify an enumerator that a new form has been assigned to them."""
     url = f"{settings.APP_URL}/collect"

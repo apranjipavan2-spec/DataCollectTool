@@ -18,6 +18,7 @@ export default function PublicSurveyPage() {
   const [error, setError] = useState('')
   const [schema, setSchema] = useState<FormSchema | null>(null)
   const [formTitle, setFormTitle] = useState('')
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false)
   const [initialDraft, setInitialDraft] = useState<SubmissionDraft | null>(null)
   const [submitted, setSubmitted] = useState(false)
   // 'uploaded' = confirmed on server. 'pending' = safe on this device, still uploading.
@@ -41,6 +42,7 @@ export default function PublicSurveyPage() {
         setSchema(r.data.json_schema as FormSchema)
         setFormTitle(r.data.title)
         setRecoveryPubKey(r.data.recovery_public_key ?? null)
+        setSubscriptionExpired(!!r.data.subscription_expired)
         const values = await loadDraft(token).catch(() => null)
         if (values) {
           setInitialDraft({
@@ -189,6 +191,21 @@ export default function PublicSurveyPage() {
           <div className="text-4xl mb-4"><EmojiIcon e="🔒" /></div>
           <h1 className="text-lg font-semibold text-catalan-text mb-2">Survey Unavailable</h1>
           <p className="text-sm text-catalan-textMuted">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (subscriptionExpired) {
+    return (
+      <div className="min-h-screen bg-catalan-bg flex items-center justify-center p-6">
+        <div className="max-w-md w-full text-center">
+          <div className="text-4xl mb-4"><EmojiIcon e="⏸️" /></div>
+          <h1 className="text-lg font-semibold text-catalan-text mb-2">Survey Temporarily Paused</h1>
+          <p className="text-sm text-catalan-textMuted">
+            This organisation's subscription has ended, so new responses can't be collected right now.
+            Please check back later or contact the organisation directly.
+          </p>
         </div>
       </div>
     )

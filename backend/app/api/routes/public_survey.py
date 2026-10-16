@@ -14,12 +14,17 @@ from app.core.config import settings
 from app.core.survey_crypto import decrypt_capsule, get_or_create_keypair, CapsuleError
 from app.models.form import Form
 from app.models.submission import Submission
+from app.models.tenant import Tenant
 from app.services.pii_redact import mask_aadhaar_in_data
 from app.services.field_encrypt import encrypt_identifiers
 
 router = APIRouter()
 
 require_org_admin = require_role("org_admin")
+
+
+def _is_tenant_expired(db: Session, tenant_id) -> bool:
+    return db.query(Tenant.plan_tier).filter(Tenant.id == tenant_id).scalar() == "expired"
 
 
 def _get_redis():
@@ -46,6 +51,9 @@ def public_survey_info(token: str, db: Session = Depends(get_db)):
         # Public key the page uses to encrypt a downloadable backup file.
         # Auto-created on first use, so this is present with zero setup.
         "recovery_public_key": get_or_create_keypair(db)[0],
+        # Lets the collection UI show "subscription ended" and disable the
+        # submit button before the respondent fills anything in.
+        "subscription_expired": _is_tenant_expired(db, form.tenant_id),
     }
 
 
@@ -95,6 +103,15 @@ def _persist_submission(db: Session, form: Form, data_json: dict, local_id: str 
         ).first()
         if existing:
             return existing, False
+
+    # New data only — a retried/duplicate upload of something already saved
+    # returns above before this check, so re-syncing offline responses still
+    # works after expiry; only genuinely new submissions are blocked.
+    if _is_tenant_expired(db, form.tenant_id):
+        raise HTTPException(
+            status_code=402,
+            detail="This organisation's subscription has ended. New submissions are paused — existing data is unaffected.",
+        )
 
     max_serial = db.query(func.max(Submission.serial_no)).filter(
         Submission.form_id == form.id
@@ -181,7 +198,13 @@ def public_survey_recover(body: dict, request: Request, db: Session = Depends(ge
 
         capsule_id = (envelope or {}).get("id")
         data_json = {**data_json, "_recovered": True}
-        sub, created = _persist_submission(db, form, data_json, capsule_id)
+        try:
+            sub, created = _persist_submission(db, form, data_json, capsule_id)
+        except HTTPException as e:
+            # Expired tenant, new (non-duplicate) capsule — skip this one, keep
+            # recovering the rest of the batch instead of failing the whole request.
+            results.append({"index": i, "status": "error", "detail": e.detail})
+            continue
         results.append({
             "index": i,
             "status": "saved" if created else "duplicate",

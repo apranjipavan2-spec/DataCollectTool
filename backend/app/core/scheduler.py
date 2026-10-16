@@ -122,27 +122,50 @@ def _run_system_metrics_sample():
 
 
 def _run_trial_expiry():
-    """Lock tenants whose 15-day trial has ended: collection + AI stop, reads stay."""
+    """Lock tenants whose trial OR paid billing period has ended: collection + AI
+    stop, reads/exports/login/existing data stay. Each matched subscription only
+    transitions to expired once, so the one-time email below never repeats."""
     from app.core.database import SessionLocal
     from app.models.billing import Subscription
     from app.models.tenant import Tenant
+    from app.models.user import User
+    from app.services.email import send_subscription_expired_email
     from datetime import datetime, timezone
+    from sqlalchemy import or_, and_
 
-    logger.info("[Scheduler] Trial expiry check starting")
+    logger.info("[Scheduler] Trial/subscription expiry check starting")
     db = SessionLocal()
     try:
         now = datetime.now(timezone.utc)
         subs = db.query(Subscription).filter(
-            Subscription.status == "trialing",
-            Subscription.trial_end < now,
+            or_(
+                and_(Subscription.status == "trialing", Subscription.trial_end < now),
+                and_(
+                    Subscription.status == "active",
+                    Subscription.current_period_end.isnot(None),
+                    Subscription.current_period_end < now,
+                ),
+            )
         ).all()
         for sub in subs:
             sub.status = "expired"
             t = db.query(Tenant).filter(Tenant.id == sub.tenant_id).first()
             if t:
                 t.plan_tier = "expired"
+                admins = db.query(User).filter(
+                    User.tenant_id == t.id,
+                    User.role == "org_admin",
+                    User.is_active == True,
+                    User.email.isnot(None),
+                    User.email != "",
+                ).all()
+                for a in admins:
+                    try:
+                        send_subscription_expired_email(a.email, a.name or a.phone, t.name)
+                    except Exception:
+                        logger.exception("[Scheduler] Expiry email failed for %s", a.email)
         db.commit()
-        logger.info("[Scheduler] Trial expiry done — %d tenants locked", len(subs))
+        logger.info("[Scheduler] Trial/subscription expiry done — %d tenants locked", len(subs))
     except Exception:
         logger.exception("[Scheduler] Trial expiry job failed")
     finally:
