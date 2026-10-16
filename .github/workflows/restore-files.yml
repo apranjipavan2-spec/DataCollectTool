@@ -1,0 +1,129 @@
+name: Restore Files from Backup (media / analyzer / cleaner)
+
+# Manual, deliberate use only. Same two-step safety pattern as restore-db.yml:
+#   1. Default (confirm != "yes-restore") = DRY RUN. Pulls the chosen component
+#      from Drive into a staging dir on the VPS and reports file count + size.
+#      The live volume is never touched.
+#   2. confirm == "yes-restore" = APPLY. Renames the current live dir aside
+#      (never deletes it), then moves the staged Drive copy into its place.
+#      Nothing is ever deleted — you can always swap back by hand.
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: "Which backup to restore"
+        required: true
+        type: choice
+        options:
+          - media
+          - tableforge_projects
+          - cleaner_projects
+      confirm:
+        description: "Type yes-restore to actually swap it in. Anything else = dry-run/verify only."
+        required: true
+        default: "dry-run"
+
+jobs:
+  restore:
+    name: Restore files
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Write + run restore-files.sh via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          GDRIVE_TOKEN: ${{ secrets.GDRIVETOKEN }}
+          COMPONENT_INPUT: ${{ github.event.inputs.component }}
+          CONFIRM_INPUT: ${{ github.event.inputs.confirm }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 20m
+          envs: GDRIVE_TOKEN,COMPONENT_INPUT,CONFIRM_INPUT
+          script: |
+            set -e
+            cd /opt/fieldgovern
+
+            echo "=== Ensure rclone config exists (for pulling from Drive) ==="
+            if [ ! -f /root/.config/rclone/rclone.conf ]; then
+              mkdir -p /root/.config/rclone
+              umask 077
+              printf '[gdrive]\ntype = drive\nscope = drive\ntoken = %s\n' "$GDRIVE_TOKEN" \
+                > /root/.config/rclone/rclone.conf
+            fi
+
+            echo "=== Write /opt/fieldgovern/restore-files.sh ==="
+            cat > /opt/fieldgovern/restore-files.sh <<'SCRIPT'
+            #!/bin/bash
+            # Restore media / tableforge_projects / cleaner_projects from Drive.
+            # Safe by construction: dry-run (default) only stages the Drive copy
+            # and reports on it, never touching the live volume. Apply renames the
+            # live dir aside (never deletes) before moving the staged copy in.
+            set -uo pipefail
+            APP_DIR="/opt/fieldgovern"
+            COMPOSE="docker compose -f $APP_DIR/docker-compose.yml"
+            REMOTE="gdrive:FieldGovern-Backups"
+            COMPONENT="${1:?component required: media|tableforge_projects|cleaner_projects}"
+            APPLY="${2:-0}"
+            TS=$(date +"%Y-%m-%d_%H-%M-%S")
+            STAGE_DIR="$APP_DIR/restore_staging/${COMPONENT}_${TS}"
+            LOG(){ echo "[$(date '+%F %T')] $*"; }
+
+            src_of(){ docker inspect "$1" -f "{{range .Mounts}}{{if eq .Destination \"$2\"}}{{.Source}}{{end}}{{end}}" 2>/dev/null; }
+
+            # Resolve the live host path for the requested component.
+            case "$COMPONENT" in
+              media)
+                APP_CID=$($COMPOSE ps -q app 2>/dev/null | head -1)
+                LIVE_DIR=$(docker inspect "$APP_CID" -f '{{range .Mounts}}{{if eq .Destination "/app/uploads"}}{{.Source}}{{end}}{{end}}' 2>/dev/null)
+                ;;
+              tableforge_projects)
+                LIVE_DIR=$(src_of analyzer /app/projects)
+                ;;
+              cleaner_projects)
+                LIVE_DIR=$(src_of cleaner /app/working_copies)
+                ;;
+              *)
+                LOG "ERROR: unknown component '$COMPONENT'"; exit 1 ;;
+            esac
+            if [ -z "$LIVE_DIR" ]; then
+              LOG "ERROR: could not resolve the live volume path for '$COMPONENT'"
+              exit 1
+            fi
+            LOG "Component: $COMPONENT  live dir: $LIVE_DIR"
+
+            # 1. Stage the Drive copy — live dir untouched so far.
+            mkdir -p "$STAGE_DIR"
+            rclone copy "$REMOTE/$COMPONENT" "$STAGE_DIR" \
+              || { LOG "ERROR: could not pull $COMPONENT from Drive"; exit 1; }
+
+            STAGED_FILES=$(find "$STAGE_DIR" -type f | wc -l)
+            STAGED_SIZE=$(du -sh "$STAGE_DIR" | cut -f1)
+            LIVE_FILES=$(find "$LIVE_DIR" -type f 2>/dev/null | wc -l)
+            LIVE_SIZE=$(du -sh "$LIVE_DIR" 2>/dev/null | cut -f1)
+            LOG "=== Staged (from Drive) vs live ==="
+            LOG "  staged: $STAGED_FILES files, $STAGED_SIZE   -> $STAGE_DIR"
+            LOG "  live:   $LIVE_FILES files, $LIVE_SIZE   -> $LIVE_DIR"
+
+            if [ "$APPLY" != "1" ]; then
+              LOG "Dry-run only (no apply). Staged copy left at $STAGE_DIR for inspection; live dir untouched."
+              exit 0
+            fi
+
+            # 2. APPLY: rename the live dir aside (never delete), move staged copy in.
+            LOG "APPLY requested - renaming live dir aside and swapping in the staged copy..."
+            LIVE_PREV="${LIVE_DIR}_prev_${TS}"
+            mv "$LIVE_DIR" "$LIVE_PREV"
+            mv "$STAGE_DIR" "$LIVE_DIR"
+            LOG "DONE. Live '$COMPONENT' is now the Drive copy."
+            LOG "Previous live data kept at: $LIVE_PREV - remove it by hand once verified."
+            SCRIPT
+            chmod +x /opt/fieldgovern/restore-files.sh
+            echo "  wrote restore-files.sh"
+
+            echo "=== Run restore-files.sh ==="
+            APPLY=0
+            if [ "$CONFIRM_INPUT" = "yes-restore" ]; then APPLY=1; fi
+            echo "component=$COMPONENT_INPUT  apply=$APPLY"
+            /opt/fieldgovern/restore-files.sh "$COMPONENT_INPUT" "$APPLY"

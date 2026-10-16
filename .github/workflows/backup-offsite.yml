@@ -66,10 +66,10 @@ jobs:
             /opt/fieldgovern/backup-db.sh || LOG "WARN: backup-db.sh failed"
             $RCOPY /opt/fieldgovern/backups "$REMOTE/db" --include "*.sql.gz" \
               && LOG "DB dumps synced to Drive" || LOG "WARN: DB offsite copy failed"
-            # copy never deletes, so prune Drive-side dumps older than 30 days
-            # (matches R2 fallback retention) to stop unbounded storage growth.
-            rclone delete "$REMOTE/db" --min-age 30d \
-              && LOG "pruned Drive db/ dumps older than 30d" || LOG "WARN: Drive prune failed"
+            # copy never deletes, so prune Drive-side dumps older than 7 days
+            # to stop unbounded storage growth.
+            rclone delete "$REMOTE/db" --min-age 7d \
+              && LOG "pruned Drive db/ dumps older than 7d" || LOG "WARN: Drive prune failed"
 
             # 1b. Row-count shrink check: alert if a core table has FEWER rows
             # than at the last backup run. Never deletes/restores anything by
