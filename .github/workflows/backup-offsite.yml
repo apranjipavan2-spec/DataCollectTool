@@ -67,8 +67,11 @@ jobs:
             $RCOPY /opt/fieldgovern/backups "$REMOTE/db" --include "*.sql.gz" \
               && LOG "DB dumps synced to Drive" || LOG "WARN: DB offsite copy failed"
             # copy never deletes, so prune Drive-side dumps older than 7 days
-            # to stop unbounded storage growth.
-            rclone delete "$REMOTE/db" --min-age 7d \
+            # to stop unbounded storage growth. --drive-use-trash=false deletes
+            # permanently instead of moving to Trash, which Google Drive still
+            # counts against quota until emptied (this is why quota filled up
+            # even though the prune was running).
+            rclone delete "$REMOTE/db" --min-age 7d --drive-use-trash=false \
               && LOG "pruned Drive db/ dumps older than 7d" || LOG "WARN: Drive prune failed"
 
             # 1b. Row-count shrink check: alert if a core table has FEWER rows
