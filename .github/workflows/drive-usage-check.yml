@@ -21,14 +21,13 @@ jobs:
           command_timeout: 10m
           script: |
             set -e
-            echo "=== Overall account quota ==="
+            echo "=== Quota BEFORE ==="
             rclone about gdrive: || echo "  rclone about failed"
 
             echo ""
-            echo "=== Top-level folders + sizes ==="
-            rclone lsd gdrive: | while read -r line; do
-              name=$(echo "$line" | awk '{for(i=5;i<=NF;i++) printf "%s ", $i; print ""}' | sed 's/ *$//')
-              echo -n "  $name: "
-              rclone size "gdrive:$name" 2>/dev/null | tr '\n' ' '
-              echo ""
-            done
+            echo "=== Emptying Drive Trash (user-confirmed, permanent delete of trashed items) ==="
+            rclone cleanup gdrive: && echo "  trash emptied" || echo "  WARN: cleanup failed"
+
+            echo ""
+            echo "=== Quota AFTER ==="
+            rclone about gdrive: || echo "  rclone about failed"
