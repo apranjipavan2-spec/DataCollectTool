@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import RequireAuth, { homeForRole } from '@/auth/RequireAuth'
 import { LanguageProvider } from '@/i18n/LanguageContext'
 import { ToastProvider } from '@/lib/ToastContext'
@@ -40,6 +40,7 @@ const SuperAdminMonitor = lazy(() => import('@/admin/SuperAdminMonitor'))
 const MigrationPage   = lazy(() => import('@/migration/MigrationPage'))
 const FieldMapPage    = lazy(() => import('@/map/FieldMapPage'))
 const PublicSurveyPage   = lazy(() => import('@/collect/PublicSurveyPage'))
+const PublicResultsPage  = lazy(() => import('@/collect/PublicResultsPage'))
 const RecoverPage        = lazy(() => import('@/collect/RecoverPage'))
 const SubscriptionPage   = lazy(() => import('@/admin/SubscriptionPage'))
 const SystemMetrics      = lazy(() => import('@/admin/SystemMetrics'))
@@ -61,7 +62,9 @@ function PageLoader() {
 
 function FloatingContact() {
   const [dismissed, setDismissed] = useState(() => localStorage.getItem('fg_wa_dismissed') === '1')
-  if (dismissed) return null
+  const { pathname } = useLocation()
+  // Results links are viewed by outside partners — no FieldGovern sales chat there.
+  if (dismissed || pathname.startsWith('/results/')) return null
   return (
     <div className="fixed bottom-6 right-6 z-40 flex items-center">
       <a
@@ -230,6 +233,10 @@ export default function App() {
 
               <Route path="/survey/:token" element={
                 <LazyRoute><PublicSurveyPage /></LazyRoute>
+              } />
+
+              <Route path="/results/:token" element={
+                <LazyRoute><PublicResultsPage /></LazyRoute>
               } />
 
               <Route path="/pricing" element={

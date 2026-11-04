@@ -87,5 +87,10 @@ frontend/src/migration/
 Imported submissions get:
 - `status: synced`
 - `data_json`: mapped using original field names → FieldGovern field names
-- metadata: `source_platform` tag stored in submission (future field)
-- Historical submissions paginated (100 per request, loop until done)
+- `local_id = "<platform>:<source uuid>"` → re-import skips existing rows
+- `local_created_at` = original submission time
+- `data_json._source = {platform, id, submitted_by}`
+- Values coerced by schema field type (see `api/KOBO_INTEGRATION.md` §4d)
+- Kobo paginated 500/request; SurveyCTO/ODK single request
+
+Full audit, upstream API reference and credential notes: `api/KOBO_INTEGRATION.md`.

@@ -13,6 +13,7 @@ from app.core.deps import require_org_admin
 from app.models.webhook import Webhook
 from app.core.soft_delete import soft_delete
 from app.services.webhook import fire_webhooks
+from app.core.url_guard import UnsafeURL, check_public_https_url
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -45,6 +46,13 @@ VALID_EVENTS = {
     "submission.approved",
     "submission.rejected",
 }
+
+
+def _safe_url(url: str) -> str:
+    try:
+        return check_public_https_url(url)
+    except UnsafeURL as e:
+        raise HTTPException(status_code=422, detail=f"Webhook URL rejected: {e}")
 
 
 def _serialize(hook: Webhook) -> dict:
@@ -90,7 +98,7 @@ def create_webhook(body: WebhookCreate, user=Depends(require_org_admin), db: Ses
     hook = Webhook(
         tenant_id=user["tenant_id"],
         name=body.name,
-        url=body.url,
+        url=_safe_url(body.url),
         secret=body.secret,
         events=body.events,
         headers=body.headers,
@@ -123,7 +131,7 @@ def update_webhook(webhook_id: str, body: WebhookUpdate, user=Depends(require_or
     if body.name is not None:
         hook.name = body.name
     if body.url is not None:
-        hook.url = body.url
+        hook.url = _safe_url(body.url)
     if body.secret is not None:
         hook.secret = body.secret
     if body.events is not None:

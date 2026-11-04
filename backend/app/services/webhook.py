@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import httpx
 from sqlalchemy.orm import Session
 from app.models.webhook import Webhook
+from app.core.url_guard import check_public_https_url
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ def fire_webhooks(db: Session, tenant_id: str, event: str, payload: dict) -> int
             continue
 
         try:
+            check_public_https_url(hook.url)  # also covers hooks saved before the guard existed
             headers = dict(hook.headers or {})
             headers["Content-Type"] = "application/json"
             headers["X-FieldGovern-Event"] = event

@@ -6,7 +6,10 @@ All endpoints require org_admin role.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Optional
+
+import httpx
 
 import re as _re
 from urllib.parse import quote
@@ -14,6 +17,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
+from sqlalchemy import text as sa_text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -30,7 +34,7 @@ from app.services.field_encrypt import encrypt_identifiers
 from .xlsform_parser import parse_xlsform
 from .xlsform_serializer import serialize_xlsform
 from .platform_clients import (
-    KoboClient, SurveyCTOClient, ODKCentralClient, map_submission_data,
+    KoboClient, SurveyCTOClient, ODKCentralClient, UnsafeServerURL, map_submission_data,
 )
 
 router = APIRouter()
@@ -40,17 +44,61 @@ _MAX_FILE = 20 * 1024 * 1024  # 20 MB
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
-def _extract_field_names(sections: list[dict]) -> set[str]:
-    names: set[str] = set()
-    for sec in sections:
-        for f in sec.get("fields", []):
-            if f.get("name"):
-                names.add(f["name"])
-            # repeat_group children
-            for child in f.get("fields", []):
-                if child.get("name"):
-                    names.add(child["name"])
-    return names
+def _extract_fields(sections: list[dict]) -> dict[str, dict]:
+    """name → field for top-level fields; repeat_group fields keep their children."""
+    return {f["name"]: f for sec in sections for f in sec.get("fields", []) if f.get("name")}
+
+
+def _upstream_error(platform: str, e: Exception) -> HTTPException:
+    """Turn a client/HTTP failure into a message the org admin can act on."""
+    if isinstance(e, UnsafeServerURL):
+        return HTTPException(400, str(e))
+    if isinstance(e, httpx.HTTPStatusError):
+        code = e.response.status_code
+        if code == 401:
+            return HTTPException(401, f"Invalid {platform} credentials / API token")
+        if code == 403:
+            return HTTPException(403, f"{platform} account has no access to this form")
+        if code == 404:
+            return HTTPException(404, f"Form not found on {platform} (check server URL and form)")
+        return HTTPException(502, f"{platform} returned HTTP {code}")
+    if isinstance(e, httpx.RequestError):
+        return HTTPException(400, f"Could not reach {platform} server: {e.__class__.__name__}")
+    return HTTPException(400, f"{platform} error: {e}")
+
+
+# Per-platform: unique submission id (dedupe key) and original submission time.
+def _source_meta(platform: str, raw: dict) -> tuple[str | None, datetime | None, dict]:
+    if platform == "kobo":
+        key, ts, src = raw.get("_uuid"), raw.get("_submission_time"), {
+            "id": raw.get("_id"), "submitted_by": raw.get("_submitted_by")}
+    elif platform == "odk":
+        system = raw.get("__system") or {}
+        key, ts, src = raw.get("__id"), system.get("submissionDate"), {
+            "submitted_by": system.get("submitterName")}
+    else:  # surveycto
+        key, ts, src = raw.get("KEY"), raw.get("SubmissionDate"), {}
+    when = None
+    if isinstance(ts, str) and ts:
+        for parse in (lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
+                      lambda s: datetime.strptime(s, "%b %d, %Y %I:%M:%S %p")):
+            try:
+                when = parse(ts)
+                break
+            except ValueError:
+                pass
+        if when and when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)  # Kobo/SCTO times are UTC
+    meta = {"platform": platform, **{k: v for k, v in src.items() if v is not None}}
+    return (f"{platform}:{key}" if key else None), when, meta
+
+
+def _find_imported_form(db: Session, tenant_id: str, platform: str, source_id: str) -> Form | None:
+    return db.query(Form).filter(
+        Form.tenant_id == uuid.UUID(tenant_id),
+        Form.json_schema["_source"]["platform"].astext == platform,
+        Form.json_schema["_source"]["id"].astext == source_id,
+    ).order_by(Form.created_at.desc()).first()
 
 
 def _post_import_hooks(db: Session, tenant_id: str, form: Form, platform: str, submissions_imported: int, saved_rows: list[dict]) -> None:
@@ -100,15 +148,32 @@ def _save_submissions(
     form: Form,
     user,
     raw_submissions: list[dict],
-    field_names: set[str],
-) -> tuple[int, list[dict]]:
-    """Returns (count_saved, list_of_data_jsons) for downstream Sheets sync."""
-    saved = 0
+    fields: dict[str, dict],
+    platform: str,
+) -> tuple[int, int, list[dict]]:
+    """Returns (saved, skipped_already_imported, data_jsons for Sheets sync).
+
+    Idempotent: local_id = "<platform>:<source uuid>", so re-importing skips rows
+    already present — including binned ones, so deleted rows are not revived."""
+    metas = [_source_meta(platform, raw) for raw in raw_submissions]
+    keys = [m[0] for m in metas if m[0]]
+    existing = {
+        r[0] for r in db.query(Submission.local_id)
+        .filter(Submission.form_id == form.id, Submission.local_id.in_(keys))
+        .execution_options(include_deleted=True)
+    } if keys else set()
+
+    saved = skipped = 0
     data_rows: list[dict] = []
-    for raw in raw_submissions:
+    for raw, (key, when, src) in zip(raw_submissions, metas):
+        if key and key in existing:
+            skipped += 1
+            continue
+        existing.add(key)
         # data stays plaintext for the returned data_rows (downstream Sheets sync
         # does its own identifier redaction); only the stored row is encrypted.
-        data = mask_aadhaar_in_data(map_submission_data(raw, field_names))
+        data = mask_aadhaar_in_data(map_submission_data(raw, fields))
+        data["_source"] = src
         sub = Submission(
             id=uuid.uuid4(),
             tenant_id=form.tenant_id,
@@ -117,14 +182,15 @@ def _save_submissions(
             data_json=encrypt_identifiers(data, form.json_schema),
             status="synced",
             enumerator_id=user["sub"],
-            local_id=str(uuid.uuid4()),
+            local_id=key or str(uuid.uuid4()),
+            local_created_at=when,
         )
         db.add(sub)
         data_rows.append(data)
         saved += 1
     if saved:
         db.commit()
-    return saved, data_rows
+    return saved, skipped, data_rows
 
 
 # ── XLSForm ────────────────────────────────────────────────────────────────────
@@ -209,6 +275,75 @@ def xlsform_export(
     )
 
 
+# ── shared platform import ─────────────────────────────────────────────────────
+
+async def _run_import(
+    db: Session,
+    user,
+    platform: str,           # "kobo" | "surveycto" | "odk" — stored in _source / local_id
+    label: str,              # human name for messages + notifications
+    source_id: str,          # platform form id, used to find a previous import
+    fetch_xls,               # () -> awaitable[bytes]
+    pages,                   # () -> async iterator of list[raw submission]
+    import_submissions: bool,
+) -> dict:
+    tenant_id = str(user["tenant_id"])
+    try:
+        xls_bytes = await fetch_xls()
+    except Exception as e:
+        raise _upstream_error(label, e)
+    try:
+        parsed = parse_xlsform(xls_bytes, filename=f"{source_id}.xlsx")
+    except Exception as e:
+        raise HTTPException(422, f"XLSForm parse error: {e}")
+
+    warnings: list[str] = parsed["warnings"]
+    form = _find_imported_form(db, tenant_id, platform, source_id)
+    reused = form is not None
+    if reused:
+        warnings.append(f"Form already imported earlier — reused '{form.title}'; its design was not changed.")
+    else:
+        schema = {**parsed["json_schema"], "_source": {"platform": platform, "id": source_id}}
+        form = _save_form(db, tenant_id, parsed["title"], schema)
+
+    imported = skipped = 0
+    saved_rows: list[dict] = []
+    if import_submissions:
+        fields = _extract_fields(parsed["json_schema"].get("sections", []))
+        # Dedupe is read-then-insert (see lessons L031): serialise imports of the
+        # same form. Session-level lock because _save_submissions commits per page.
+        lock_key = f"migration-import:{form.id}"
+        db.execute(sa_text("SELECT pg_advisory_lock(hashtext(:k))"), {"k": lock_key})
+        try:
+            async for rows in pages():
+                n, s, data = _save_submissions(db, form, user, rows, fields, platform)
+                imported += n
+                skipped += s
+                saved_rows.extend(data)
+        except Exception as e:
+            db.rollback()
+            warnings.append(f"Submission import stopped after {imported} rows: {_upstream_error(label, e).detail}")
+        finally:
+            db.execute(sa_text("SELECT pg_advisory_unlock(hashtext(:k))"), {"k": lock_key})
+            db.commit()
+
+    _post_import_hooks(db, tenant_id, form, label, imported, saved_rows)
+    return {
+        "form_id": str(form.id),
+        "title": form.title,
+        "warnings": warnings,
+        "submissions_imported": imported,
+        "submissions_skipped": skipped,
+        "reused_form": reused,
+    }
+
+
+async def _single_page(fetch):
+    rows = await fetch()
+    if rows:
+        yield rows
+
+
 # ── Kobo ───────────────────────────────────────────────────────────────────────
 
 class KoboConnectRequest(BaseModel):
@@ -218,12 +353,11 @@ class KoboConnectRequest(BaseModel):
 
 @router.post("/kobo/connect")
 async def kobo_connect(body: KoboConnectRequest, user=Depends(require_org_admin)):
-    """Validate Kobo credentials and return the user's form list."""
-    client = KoboClient(body.server, body.token)
+    """Validate Kobo credentials and return the user's survey list (all pages)."""
     try:
-        forms = await client.list_forms()
+        forms = await KoboClient(body.server, body.token).list_forms()
     except Exception as e:
-        raise HTTPException(400, f"Could not connect to Kobo: {e}")
+        raise _upstream_error("KoboToolbox", e)
     return {"forms": forms}
 
 
@@ -240,54 +374,16 @@ async def kobo_import(
     user=Depends(require_org_admin),
     db: Session = Depends(get_db),
 ):
-    client = KoboClient(body.server, body.token)
-
-    # 1. Download XLSForm
     try:
-        xls_bytes = await client.get_xlsform_bytes(body.asset_uid)
+        client = KoboClient(body.server, body.token)
     except Exception as e:
-        raise HTTPException(400, f"Could not download XLSForm from Kobo: {e}")
-
-    # 2. Parse
-    try:
-        parsed = parse_xlsform(xls_bytes, filename=f"{body.asset_uid}.xlsx")
-    except Exception as e:
-        raise HTTPException(422, f"XLSForm parse error: {e}")
-
-    # 3. Save form
-    form = _save_form(db, str(user["tenant_id"]), parsed["title"], parsed["json_schema"])
-    result: dict[str, Any] = {
-        "form_id": str(form.id),
-        "title": form.title,
-        "warnings": parsed["warnings"],
-        "submissions_imported": 0,
-    }
-
-    # 4. Optionally import submissions
-    all_saved_rows: list[dict] = []
-    if body.import_submissions:
-        field_names = _extract_field_names(parsed["json_schema"].get("sections", []))
-        page = 1
-        total_imported = 0
-        while True:
-            try:
-                data = await client.get_submissions(body.asset_uid, page=page)
-            except Exception as e:
-                result["warnings"].append(f"Submission fetch error (page {page}): {e}")
-                break
-            rows = data.get("results", [])
-            if not rows:
-                break
-            count, saved_rows = _save_submissions(db, form, user, rows, field_names)
-            total_imported += count
-            all_saved_rows.extend(saved_rows)
-            if not data.get("next"):
-                break
-            page += 1
-        result["submissions_imported"] = total_imported
-
-    _post_import_hooks(db, str(user["tenant_id"]), form, "KoboToolbox", result["submissions_imported"], all_saved_rows)
-    return result
+        raise _upstream_error("KoboToolbox", e)
+    return await _run_import(
+        db, user, "kobo", "KoboToolbox", body.asset_uid,
+        lambda: client.get_xlsform_bytes(body.asset_uid),
+        lambda: client.iter_submissions(body.asset_uid),
+        body.import_submissions,
+    )
 
 
 # ── SurveyCTO ──────────────────────────────────────────────────────────────────
@@ -300,11 +396,10 @@ class SCTOConnectRequest(BaseModel):
 
 @router.post("/surveycto/connect")
 async def surveycto_connect(body: SCTOConnectRequest, user=Depends(require_org_admin)):
-    client = SurveyCTOClient(body.server, body.username, body.password)
     try:
-        forms = await client.list_forms()
+        forms = await SurveyCTOClient(body.server, body.username, body.password).list_forms()
     except Exception as e:
-        raise HTTPException(400, f"Could not connect to SurveyCTO: {e}")
+        raise _upstream_error("SurveyCTO", e)
     return {"forms": forms}
 
 
@@ -322,38 +417,16 @@ async def surveycto_import(
     user=Depends(require_org_admin),
     db: Session = Depends(get_db),
 ):
-    client = SurveyCTOClient(body.server, body.username, body.password)
-
     try:
-        xls_bytes = await client.get_xlsform_bytes(body.form_id)
+        client = SurveyCTOClient(body.server, body.username, body.password)
     except Exception as e:
-        raise HTTPException(400, f"Could not download XLSForm from SurveyCTO: {e}")
-
-    try:
-        parsed = parse_xlsform(xls_bytes, filename=f"{body.form_id}.xlsx")
-    except Exception as e:
-        raise HTTPException(422, f"XLSForm parse error: {e}")
-
-    form = _save_form(db, str(user["tenant_id"]), parsed["title"], parsed["json_schema"])
-    result: dict[str, Any] = {
-        "form_id": str(form.id),
-        "title": form.title,
-        "warnings": parsed["warnings"],
-        "submissions_imported": 0,
-    }
-
-    saved_rows: list[dict] = []
-    if body.import_submissions:
-        field_names = _extract_field_names(parsed["json_schema"].get("sections", []))
-        try:
-            rows = await client.get_submissions(body.form_id)
-            count, saved_rows = _save_submissions(db, form, user, rows, field_names)
-            result["submissions_imported"] = count
-        except Exception as e:
-            result["warnings"].append(f"Submission import error: {e}")
-
-    _post_import_hooks(db, str(user["tenant_id"]), form, "SurveyCTO", result["submissions_imported"], saved_rows)
-    return result
+        raise _upstream_error("SurveyCTO", e)
+    return await _run_import(
+        db, user, "surveycto", "SurveyCTO", body.form_id,
+        lambda: client.get_xlsform_bytes(body.form_id),
+        lambda: _single_page(lambda: client.get_submissions(body.form_id)),
+        body.import_submissions,
+    )
 
 
 # ── ODK Central ────────────────────────────────────────────────────────────────
@@ -367,11 +440,10 @@ class ODKConnectRequest(BaseModel):
 
 @router.post("/odk/connect")
 async def odk_connect(body: ODKConnectRequest, user=Depends(require_org_admin)):
-    client = ODKCentralClient(body.server, body.username, body.password)
     try:
-        forms = await client.list_forms(body.project_id)
+        forms = await ODKCentralClient(body.server, body.username, body.password).list_forms(body.project_id)
     except Exception as e:
-        raise HTTPException(400, f"Could not connect to ODK Central: {e}")
+        raise _upstream_error("ODK Central", e)
     return {"forms": forms}
 
 
@@ -390,35 +462,13 @@ async def odk_import(
     user=Depends(require_org_admin),
     db: Session = Depends(get_db),
 ):
-    client = ODKCentralClient(body.server, body.username, body.password)
-
     try:
-        xls_bytes = await client.get_xlsform_bytes(body.project_id, body.form_id)
+        client = ODKCentralClient(body.server, body.username, body.password)
     except Exception as e:
-        raise HTTPException(400, f"Could not download XLSForm from ODK Central: {e}")
-
-    try:
-        parsed = parse_xlsform(xls_bytes, filename=f"{body.form_id}.xlsx")
-    except Exception as e:
-        raise HTTPException(422, f"XLSForm parse error: {e}")
-
-    form = _save_form(db, str(user["tenant_id"]), parsed["title"], parsed["json_schema"])
-    result: dict[str, Any] = {
-        "form_id": str(form.id),
-        "title": form.title,
-        "warnings": parsed["warnings"],
-        "submissions_imported": 0,
-    }
-
-    saved_rows: list[dict] = []
-    if body.import_submissions:
-        field_names = _extract_field_names(parsed["json_schema"].get("sections", []))
-        try:
-            rows = await client.get_submissions(body.project_id, body.form_id)
-            count, saved_rows = _save_submissions(db, form, user, rows, field_names)
-            result["submissions_imported"] = count
-        except Exception as e:
-            result["warnings"].append(f"Submission import error: {e}")
-
-    _post_import_hooks(db, str(user["tenant_id"]), form, "ODK Central", result["submissions_imported"], saved_rows)
-    return result
+        raise _upstream_error("ODK Central", e)
+    return await _run_import(
+        db, user, "odk", "ODK Central", f"{body.project_id}/{body.form_id}",
+        lambda: client.get_xlsform_bytes(body.project_id, body.form_id),
+        lambda: _single_page(lambda: client.get_submissions(body.project_id, body.form_id)),
+        body.import_submissions,
+    )

@@ -304,12 +304,8 @@ def _resolve_user_from_request(request: Request, db: Session) -> dict:
     """Resolve user from X-API-Key header or fall back to JWT Bearer."""
     api_key_header = request.headers.get("X-API-Key")
     if api_key_header:
-        records = db.query(ApiKey).filter(ApiKey.is_active == True).all()
-        matching = None
-        for record in records:
-            if verify_api_key(api_key_header, record.key_hash):
-                matching = record
-                break
+        from app.core.deps import assert_tenant_active, find_api_key
+        matching = find_api_key(db, api_key_header)
         if not matching:
             raise HTTPException(status_code=401, detail="Invalid API key")
         from sqlalchemy import func
@@ -322,6 +318,7 @@ def _resolve_user_from_request(request: Request, db: Session) -> dict:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
         from app.core.database import set_tenant_context
         set_tenant_context(db, str(matching.tenant_id))
+        assert_tenant_active(db, str(matching.tenant_id))  # suspended orgs lose API access too
 
         from app.api.routes.billing import check_feature
         from app.models.tenant import Tenant

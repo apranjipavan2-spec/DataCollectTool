@@ -255,6 +255,22 @@ _PATCHES = [
     "cpu_pct DOUBLE PRECISION NOT NULL, mem_pct DOUBLE PRECISION NOT NULL, "
     "mem_used_mb DOUBLE PRECISION NOT NULL, mem_total_mb DOUBLE PRECISION NOT NULL)",
     "CREATE INDEX IF NOT EXISTS ix_system_metrics_ts ON system_metrics (ts)",
+    # 0066 — aggregate-only results share links (RLS mirrors the migration)
+    "CREATE TABLE IF NOT EXISTS dashboard_shares ("
+    "id UUID PRIMARY KEY, tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE, "
+    "form_id UUID NOT NULL REFERENCES forms(id) ON DELETE CASCADE, token VARCHAR(64) NOT NULL UNIQUE, "
+    "label VARCHAR(200), created_by UUID REFERENCES users(id) ON DELETE SET NULL, "
+    "expires_at TIMESTAMPTZ, revoked_at TIMESTAMPTZ, view_count INTEGER NOT NULL DEFAULT 0, "
+    "last_viewed_at TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT now())",
+    "CREATE INDEX IF NOT EXISTS ix_dashboard_shares_form_id ON dashboard_shares (form_id)",
+    "ALTER TABLE dashboard_shares ENABLE ROW LEVEL SECURITY",
+    "ALTER TABLE dashboard_shares FORCE ROW LEVEL SECURITY",
+    "DROP POLICY IF EXISTS tenant_isolation ON dashboard_shares",
+    "CREATE POLICY tenant_isolation ON dashboard_shares USING ("
+    "COALESCE(current_setting('app.current_tenant', true), '') = '' OR "
+    "tenant_id::text = current_setting('app.current_tenant', true)) WITH CHECK ("
+    "COALESCE(current_setting('app.current_tenant', true), '') = '' OR "
+    "tenant_id::text = current_setting('app.current_tenant', true))",
 ]
 
 # 0048 — restricted runtime role + empty-context-bypass RLS policies. Mirrors the

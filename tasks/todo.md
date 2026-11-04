@@ -1,5 +1,18 @@
 # FieldGovern — Task Board
 
+## Kobo / SurveyCTO / ODK import audit — Phases 1-2 done 2026-11-04
+Plan + findings + API reference: `api/KOBO_INTEGRATION.md`. Tests: `backend/tests/test_kobo_migration.py` (16 offline pass; 3 DB tests skip without test Postgres).
+- [x] A1 wrong XLSForm endpoint · A2 text split bug · A3 repeats · A4 GPS · A5 numbers · A8 form-list paging
+- [x] A6 idempotent re-import (`local_id=kobo:<uuid>`, form reused via `json_schema._source`) + advisory lock · A7 original submit time · A13 original enumerator in `_source`
+- [x] A9 SSRF guard (https + public IP) on all 3 platforms · A10/A11 readable errors in UI · A12 legacy .xls uploads
+- [ ] Live test with a real Kobo token (checklist §5 of plan)
+- [ ] Run DB tests against test Postgres (`docker compose up db`, `pytest tests/test_kobo_migration.py`)
+- [ ] Phase 3: attachments (photos/audio) download · background job for >20k rows · "sync new submissions" button
+- [x] Partner API audit 2026-11-04 (`api/API_KEYS_INVENTORY.md`): K1 fgk_ key lookup · K2 suspended org via API key · K3 UI header text · K4 webhook SSRF — tests `backend/tests/test_partner_api.py` 8/8
+- [x] Results share link (aggregate-only) built 2026-11-04 — migration 0066, `routes/dashboard_shares.py`, `/results/:token` page; 13 tests + E2E (`api/TESTING.md`)
+- [ ] Optional: stats endpoint behind the API key
+- [ ] 25 pre-existing backend test failures (identical on HEAD d907b08) — see `api/TESTING.md`
+
 ## DPDP compliance & pricing-credibility audit — in progress 2026-09-18
 External audit (`FieldGovern_Compliance_and_Development_Plan.docx`) flagged inconsistent
 public pricing (₹7,999 vs ₹6,999 vs ₹18,000 across pages) and a 25-item DPDP/security/

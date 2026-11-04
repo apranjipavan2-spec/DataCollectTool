@@ -4,13 +4,14 @@ API Key management endpoints.
 Org admins can generate, list, and revoke API keys for service-to-service access.
 Each key is scoped to the creator's tenant and inherits their role.
 """
+import secrets
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import require_org_admin, get_current_user
+from app.core.deps import API_KEY_PREFIX, require_org_admin, get_current_user
 from app.core.security import hash_api_key
 from app.models.api_key import ApiKey
 from app.models.user import User
@@ -47,7 +48,7 @@ def create_api_key(
     """Generate a new API key for the current user's tenant.
 
     The plaintext key is returned only once. Store it securely.
-    Returns a 32-character hex string suitable for use in Authorization: Bearer header.
+    Returns "fgk_<key id>_<secret>"; send it as the X-API-Key header.
     """
     # Verify user has org_admin role
     if user["role"] not in ("master_admin", "org_admin"):
@@ -56,12 +57,15 @@ def create_api_key(
     from app.api.routes.billing import check_feature
     check_feature(user["tenant_id"], "api_write", db)
 
-    # Generate plaintext key
-    plaintext_key = uuid.uuid4().hex
+    # "fgk_<id>_<secret>": the id lets auth fetch one row instead of
+    # bcrypt-checking every key in the system (see deps.find_api_key).
+    key_id = uuid.uuid4()
+    plaintext_key = f"{API_KEY_PREFIX}{key_id.hex}_{secrets.token_hex(16)}"
 
     # Hash and store
     key_hash = hash_api_key(plaintext_key)
     api_key = ApiKey(
+        id=key_id,
         tenant_id=user["tenant_id"],
         created_by_id=user["sub"],
         name=body.name,

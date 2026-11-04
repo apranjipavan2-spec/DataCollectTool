@@ -116,3 +116,6 @@ tools/prospect_intel/
 
 # agent scratch notes
 MUNDER_DIFFLIN_AGENT_NOTES.md
+
+# Internal credential inventory — repo is PUBLIC, never commit
+api/API_KEYS_INVENTORY.md

@@ -5,62 +5,80 @@ All methods return plain dicts/lists — no ORM dependencies.
 from __future__ import annotations
 
 import base64
-import json
+import uuid
 from typing import Any
 
 import httpx
+
+from app.core.url_guard import UnsafeURL as UnsafeServerURL, check_public_https_url as check_server_url
 
 TIMEOUT = httpx.Timeout(30.0)
 
 
 # ── Kobo ─────────────────────────────────────────────────────────────────────
+# Endpoints verified against https://kf.kobotoolbox.org/api/v2/schema/ (2026-11-04).
+
+KOBO_PAGE = 500  # data endpoint max is 1000
+
 
 class KoboClient:
-    def __init__(self, server: str, token: str):
-        self.base = server.rstrip("/")
-        self.headers = {"Authorization": f"Token {token}"}
+    def __init__(self, server: str, token: str, transport: httpx.AsyncBaseTransport | None = None):
+        self.base = check_server_url(server)
+        self.headers = {"Authorization": f"Token {token.strip()}"}
+        self._transport = transport  # tests inject httpx.MockTransport
+
+    def _client(self) -> httpx.AsyncClient:
+        return httpx.AsyncClient(timeout=TIMEOUT, headers=self.headers, transport=self._transport)
 
     async def list_forms(self) -> list[dict]:
-        """Return list of {uid, name, deployment_count, date_modified}."""
-        async with httpx.AsyncClient(timeout=TIMEOUT) as c:
-            r = await c.get(f"{self.base}/api/v2/assets/?format=json", headers=self.headers)
-            r.raise_for_status()
-            data = r.json()
-        results = data.get("results", [])
-        return [
-            {
-                "uid": a["uid"],
-                "name": a.get("name", "Untitled"),
-                "submission_count": a.get("deployment__submission_count", 0),
-                "modified": a.get("date_modified", ""),
-                "asset_type": a.get("asset_type", ""),
-            }
-            for a in results
-            if a.get("asset_type") == "survey"
-        ]
+        """Return every survey asset as {uid, name, submission_count, date_modified}."""
+        forms: list[dict] = []
+        offset = 0
+        async with self._client() as c:
+            while True:
+                r = await c.get(f"{self.base}/api/v2/assets/",
+                                params={"format": "json", "limit": 100, "offset": offset})
+                r.raise_for_status()
+                data = r.json()
+                results = data.get("results", [])
+                forms += [
+                    {
+                        "uid": a["uid"],
+                        "name": a.get("name") or "Untitled",
+                        "submission_count": a.get("deployment__submission_count", 0),
+                        "date_modified": a.get("date_modified", ""),
+                        "asset_type": a.get("asset_type", ""),
+                    }
+                    for a in results
+                    if a.get("asset_type") == "survey"
+                ]
+                offset += len(results)
+                if not results or not data.get("next") or offset >= data.get("count", 0):
+                    return forms
 
     async def get_xlsform_bytes(self, uid: str) -> bytes:
-        """Download the XLSForm Excel for a given asset uid."""
-        async with httpx.AsyncClient(timeout=TIMEOUT) as c:
-            r = await c.get(
-                f"{self.base}/api/v2/assets/{uid}/export.xls",
-                headers=self.headers,
-                follow_redirects=True,
-            )
+        """Download the XLSForm for an asset (Kobo serves .xlsx for format=xls)."""
+        async with self._client() as c:
+            r = await c.get(f"{self.base}/api/v2/assets/{uid}/", params={"format": "xls"})
             r.raise_for_status()
             return r.content
 
-    async def get_submissions(self, uid: str, page: int = 1, page_size: int = 100) -> dict:
-        """Return {count, next, results: [submission_dict, ...]}."""
-        params = {"format": "json", "limit": page_size, "start": (page - 1) * page_size}
-        async with httpx.AsyncClient(timeout=TIMEOUT) as c:
-            r = await c.get(
-                f"{self.base}/api/v2/assets/{uid}/data/",
-                headers=self.headers,
-                params=params,
-            )
-            r.raise_for_status()
-            return r.json()
+    async def iter_submissions(self, uid: str):
+        """Yield pages (lists) of raw submission dicts until exhausted."""
+        start = 0
+        async with self._client() as c:
+            while True:
+                r = await c.get(f"{self.base}/api/v2/assets/{uid}/data/",
+                                params={"format": "json", "limit": KOBO_PAGE, "start": start})
+                r.raise_for_status()
+                data = r.json()
+                rows = data.get("results", [])
+                if not rows:
+                    return
+                yield rows
+                start += len(rows)
+                if not data.get("next") or start >= data.get("count", 0):
+                    return
 
 
 # ── SurveyCTO ─────────────────────────────────────────────────────────────────
@@ -70,7 +88,7 @@ class SurveyCTOClient:
         # server = "yourserver" or full URL
         if not server.startswith("http"):
             server = f"https://{server}.surveycto.com"
-        self.base = server.rstrip("/")
+        self.base = check_server_url(server)
         raw = f"{username}:{password}"
         self.headers = {
             "Authorization": "Basic " + base64.b64encode(raw.encode()).decode()
@@ -123,7 +141,7 @@ class SurveyCTOClient:
 
 class ODKCentralClient:
     def __init__(self, server: str, username: str, password: str):
-        self.base = server.rstrip("/")
+        self.base = check_server_url(server)
         raw = f"{username}:{password}"
         self.headers = {
             "Authorization": "Basic " + base64.b64encode(raw.encode()).decode()
@@ -174,28 +192,75 @@ class ODKCentralClient:
 
 # ── submission mapper ─────────────────────────────────────────────────────────
 
-def map_submission_data(raw: dict, field_name_set: set[str]) -> dict:
+_SKIP_KEYS = {
+    "meta", "instanceID", "instanceName", "formhub",
+    "KEY", "PARENT_KEY", "SET-OF",
+}
+_NUMERIC = {"number", "decimal", "rating"}
+
+
+def _to_number(v: Any, ftype: str) -> Any:
+    if not isinstance(v, str):
+        return v
+    try:
+        return float(v) if ftype == "decimal" else int(v)
+    except ValueError:
+        try:
+            return float(v)
+        except ValueError:
+            return v  # keep original rather than lose the answer
+
+
+def _to_gps(v: Any) -> Any:
+    # Kobo/SurveyCTO: "lat lon alt accuracy"
+    if isinstance(v, str):
+        parts = v.split()
+        try:
+            return {"lat": float(parts[0]), "lng": float(parts[1]),
+                    "accuracy": float(parts[3]) if len(parts) > 3 else 0}
+        except (ValueError, IndexError):
+            return v
+    # ODK Central OData: GeoJSON Point {coordinates:[lng, lat, alt], properties:{accuracy}}
+    if isinstance(v, dict) and isinstance(v.get("coordinates"), list) and len(v["coordinates"]) >= 2:
+        return {"lat": v["coordinates"][1], "lng": v["coordinates"][0],
+                "accuracy": (v.get("properties") or {}).get("accuracy", 0)}
+    return v
+
+
+def _coerce(v: Any, field: dict) -> Any:
+    if v is None or v == "":
+        return v
+    ftype = field.get("type")
+    if ftype == "multiple_choice":
+        return v.split() if isinstance(v, str) else v
+    if ftype in _NUMERIC:
+        return _to_number(v, ftype)
+    if ftype == "gps":
+        return _to_gps(v)
+    if ftype == "repeat_group" and isinstance(v, list):
+        children = {c["name"]: c for c in field.get("fields", []) if c.get("name")}
+        return [{"_id": str(uuid.uuid4()), **map_submission_data(row, children)}
+                for row in v if isinstance(row, dict)]
+    return v
+
+
+def map_submission_data(raw: dict, fields: dict[str, dict]) -> dict:
     """
-    Map a raw platform submission dict to FieldGovern data_json format.
-    Only keeps keys that match a known field name. Strips platform metadata.
+    Map a raw platform submission to FieldGovern data_json.
+
+    `fields` maps field name → schema field dict (top level; repeat_group fields
+    carry their children). Keys are matched by full name or last path segment
+    ("grp/age" → "age"); values are coerced by field type. Platform metadata
+    (`_*`, `__*`, `meta/*`) is dropped; nested group dicts (ODK OData) are flattened.
     """
-    _SKIP_KEYS = {
-        "_id", "_uuid", "_submission_time", "_submitted_by", "_xform_id_string",
-        "_geolocation", "_tags", "_notes", "_version", "_attachments",
-        "meta", "instanceID", "instanceName", "formhub",
-        "KEY", "PARENT_KEY", "SET-OF",
-    }
-    result = {}
+    result: dict = {}
     for k, v in raw.items():
-        if k in _SKIP_KEYS or k.startswith("_") or k.startswith("meta/"):
+        if k in _SKIP_KEYS or k.startswith(("_", "meta/", "formhub/")):
             continue
-        # Strip group prefix (e.g. "group_household/age" → try both)
-        short_k = k.split("/")[-1] if "/" in k else k
-        target_k = k if k in field_name_set else (short_k if short_k in field_name_set else None)
-        if target_k:
-            # Convert "select_multiple" space-separated strings to arrays
-            if isinstance(v, str) and " " in v and all(p.isalnum() or p == "_" for p in v.split()):
-                result[target_k] = v.split()
-            else:
-                result[target_k] = v
+        short_k = k.rsplit("/", 1)[-1]
+        target = k if k in fields else (short_k if short_k in fields else None)
+        if target:
+            result[target] = _coerce(v, fields[target])
+        elif isinstance(v, dict):
+            result.update(map_submission_data(v, fields))  # ODK group object
     return result

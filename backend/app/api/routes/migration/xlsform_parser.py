@@ -188,6 +188,26 @@ def _parse_choice_filter(expr: str) -> list[dict]:
 
 # ── main parser ───────────────────────────────────────────────────────────────
 
+_OLE_MAGIC = b"\xd0\xcf\x11\xe0"  # legacy .xls (BIFF) header
+
+
+def _load_workbook(file_bytes: bytes) -> openpyxl.Workbook:
+    """Open .xlsx directly; copy legacy .xls (openpyxl can't read it) via xlrd."""
+    if not file_bytes.startswith(_OLE_MAGIC):
+        return openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+    import xlrd
+    book = xlrd.open_workbook(file_contents=file_bytes)
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+    for sh in book.sheets():
+        ws = wb.create_sheet(sh.name[:31])
+        for r in range(sh.nrows):
+            # xlrd gives 1.0 for 1 — choice codes must stay "1"
+            ws.append([int(v) if isinstance(v, float) and v.is_integer() else v
+                       for v in sh.row_values(r)])
+    return wb
+
+
 def parse_xlsform(file_bytes: bytes, filename: str = "") -> dict:
     """
     Parse XLSForm Excel bytes → FieldGovern json_schema + warnings list.
@@ -199,7 +219,7 @@ def parse_xlsform(file_bytes: bytes, filename: str = "") -> dict:
       "warnings": [str, ...]          # non-fatal issues
     }
     """
-    wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+    wb = _load_workbook(file_bytes)
 
     # ── settings ──────────────────────────────────────────────────────────────
     settings_ws = _sheet(wb, "settings")

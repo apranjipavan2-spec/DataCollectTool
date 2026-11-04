@@ -5,6 +5,7 @@ import InfoButton from '@/help/InfoButton'
 import api, { getStoredUser, apiErrorMessage } from '@/lib/api'
 import { getNavItems } from '@/lib/navigation'
 import { useToast } from '@/lib/ToastContext'
+import ResultsShareSection from './ResultsShareSection'
 import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import { Card, Button, Modal, Alert, Pagination, DashboardSkeleton } from '@/components/ui'
@@ -1929,6 +1930,7 @@ export default function Dashboard() {
                   {sharingBusy ? 'Generating…' : 'Generate Public Link'}
                 </Button>
               )}
+              {user.role === 'org_admin' && <ResultsShareSection formId={shareForm.id} />}
             </div>
           </div>
         </div>

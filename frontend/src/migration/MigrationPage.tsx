@@ -236,7 +236,7 @@ function KoboTab() {
     try {
       const { data: res } = await api.post('/migration/kobo/connect', { server, token })
       setForms(res.forms)
-    } catch (err: any) { setError(err.message || 'Connection failed') }
+    } catch (err: any) { setError(errMsg(err, 'Connection failed')) }
     finally { setConnecting(false) }
   }
 
@@ -245,7 +245,7 @@ function KoboTab() {
     try {
       const { data: res } = await api.post('/migration/kobo/import', { server, token, asset_uid: uid, import_submissions: importData })
       setResults(prev => ({ ...prev, [uid]: res }))
-    } catch (err: any) { setError(err.message || 'Import failed') }
+    } catch (err: any) { setError(errMsg(err, 'Import failed')) }
     finally { setImporting(null) }
   }
 
@@ -283,7 +283,7 @@ function SurveyCTOTab() {
     try {
       const { data: res } = await api.post('/migration/surveycto/connect', { server, username, password })
       setForms(res.forms)
-    } catch (err: any) { setError(err.message || 'Connection failed') }
+    } catch (err: any) { setError(errMsg(err, 'Connection failed')) }
     finally { setConnecting(false) }
   }
 
@@ -292,7 +292,7 @@ function SurveyCTOTab() {
     try {
       const { data: res } = await api.post('/migration/surveycto/import', { server, username, password, form_id: id, import_submissions: importData })
       setResults(prev => ({ ...prev, [id]: res }))
-    } catch (err: any) { setError(err.message || 'Import failed') }
+    } catch (err: any) { setError(errMsg(err, 'Import failed')) }
     finally { setImporting(null) }
   }
 
@@ -336,7 +336,7 @@ function ODKTab() {
     try {
       const { data: res } = await api.post('/migration/odk/connect', { server, username, password, project_id: parseInt(projectId) })
       setForms(res.forms)
-    } catch (err: any) { setError(err.message || 'Connection failed') }
+    } catch (err: any) { setError(errMsg(err, 'Connection failed')) }
     finally { setConnecting(false) }
   }
 
@@ -345,7 +345,7 @@ function ODKTab() {
     try {
       const { data: res } = await api.post('/migration/odk/import', { server, username, password, project_id: parseInt(projectId), form_id: id, import_submissions: importData })
       setResults(prev => ({ ...prev, [id]: res }))
-    } catch (err: any) { setError(err.message || 'Import failed') }
+    } catch (err: any) { setError(errMsg(err, 'Import failed')) }
     finally { setImporting(null) }
   }
 
@@ -446,6 +446,8 @@ function PlatformTab({
                     {result && (
                       <span className="text-xs text-green-600 font-medium">
                         <EmojiIcon e="✅" /> {result.submissions_imported > 0 ? `+${result.submissions_imported} subs` : 'imported'}
+                        {result.submissions_skipped > 0 && ` · ${result.submissions_skipped} already imported`}
+                        {result.warnings?.length > 0 && <span className="text-amber-600" title={result.warnings.join('\n')}> · {result.warnings.length} warnings</span>}
                       </span>
                     )}
                     <button

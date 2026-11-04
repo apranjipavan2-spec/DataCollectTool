@@ -129,7 +129,8 @@ export default function ApiKeyManager() {
           </div>
           <p style={{ color: '#999', fontSize: '0.85em', marginTop: '10px' }}>
             Use in requests:<br />
-            <code>Authorization: Bearer {createdKey.key.substring(0, 8)}...</code>
+            <code>X-API-Key: {createdKey.key.substring(0, 12)}...</code><br />
+            <code>GET /api/v1/export/submissions/&lt;form_id&gt;/json</code>
           </p>
           <button
             onClick={() => setCreatedKey(null)}
