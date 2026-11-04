@@ -59,7 +59,7 @@ Yes — data can go to a partner in four ways; pick by how often they need it an
 | A live spreadsheet | Google Sheets export or sync, shared from Google | A Google account | Per form |
 | A written summary | Scheduled AI report (Word) by email | An email address | Per schedule |
 
-Stats such as daily progress and trends are shown in the app only; a partner gets them today through the PDF summary, the scheduled report, or by computing them from the raw data. Every export covers one form at a time.
+Totals come two ways: outside partners get the results share link (small numbers hidden); the organisation's own systems get exact monthly totals through the API (below). Every export covers one form at a time.
 
 ## API reference for partners
 
@@ -79,8 +79,9 @@ curl -H "X-API-Key: <key>" \
 | `form_id` (path) | Yes | The form's id, from its URL in FieldGovern |
 | `date_from`, `date_to` | No | ISO date or date-time |
 | `status` | No | `synced`, `flagged`, `approved`, `rejected` |
+| `received_from`, `received_to` | No | Filter on when the server received it (catches interviews synced days late) |
 
-The response is a JSON array. Item 0 is a summary (`form_title`, `field_count`, `submission_count`, `exported_at`); each later item is one submission with `submission_id`, `serial_no`, `enumerator_name`, `submitted_at`, `status` and one key per question.
+The response is a JSON array. Item 0 is a summary (`form_title`, `field_count`, `submission_count`, `exported_at`); each later item is one submission with `submission_id`, `serial_no`, `enumerator_name`, `submitted_at` (phone time), `received_at` (server time), `status` and one key per question. For incremental pulls, store the newest `received_at` and pass it as `received_from` next time.
 
 | Code | Meaning |
 | --- | --- |
@@ -88,6 +89,31 @@ The response is a JSON array. Item 0 is a summary (`form_title`, `field_count`, 
 | 402 | Monthly API-call limit reached |
 | 403 | Plan has no API access, organisation suspended, or key owner is not an admin or supervisor |
 | 404 | Form not in this organisation |
+
+**List forms.** `GET /api/v1/export/forms` (same `X-API-Key`) returns every form's `id`, `title`, `status`, `version` and its questions (`name`, `label`, `type`).
+
+**Exact totals (the organisation's own systems).** `GET /api/v1/export/totals/<form_id>` returns counts, not rows, so one call covers any number of months.
+
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `group_by` | `month` | `month`, `week`, `day` or `none` |
+| `time_basis` | `received` | `received` = server time; `collected` = phone time |
+| `tz` | `Asia/Kolkata` | Time zone for month and day boundaries |
+| `date_from`, `date_to`, `received_from`, `received_to` | — | Same filters as the JSON pull |
+| `status` | all except draft and rejected | One status only |
+
+Each period (and `overall`) gives `count`; for each number, decimal or rating question `n`, `sum`, `average`, `min`, `max`; and for each choice or rating question the count per answer. Numbers are exact, with no "<5" hiding, because the same key can already read every row. Identifier questions and free text are never included.
+
+**Monthly API-call allowance.** Every call made with a key counts once (the forms list, a JSON pull, a totals call).
+
+| Plan | Calls per month |
+| --- | --- |
+| Trial, Starter | 20 |
+| Growth | 200 |
+| Pro | 1,000 |
+| Custom | Unlimited |
+
+Past the allowance, calls return 402 until the next month.
 
 **Webhooks.** FieldGovern POSTs JSON to the partner's URL on `submission.created`, `submission.synced`, `submission.flagged`, `submission.approved` and `submission.rejected`. The URL must be public https. Headers: `X-FieldGovern-Event`, `X-FieldGovern-Timestamp`, and, when a secret is set, `X-FieldGovern-Signature: sha256=<hex>`. The partner checks the signature like this:
 
@@ -138,8 +164,7 @@ Credentials: FieldGovern stores only a hash of each API key, so a lost key canno
 | Limit | Workaround today | Planned fix |
 | --- | --- | --- |
 | Results link summarises choice and rating questions only | File export or API pull for other question types | — |
-| API serves raw submissions only, not stats | Partner computes stats from the rows | Stats endpoint behind the same API key |
-| One form per API call | One call per form | — |
+| One form per API call | One call per form; use totals to cover many months in one call | — |
 | Webhook deliveries are not retried | Daily API pull as a backstop | Retry with backoff |
 | Kobo photos, audio and video not copied | Download from Kobo directly | Attachment import |
 | Kobo imports of 20,000+ submissions may time out | Import in batches by re-running (duplicates are skipped) | Background import with progress |

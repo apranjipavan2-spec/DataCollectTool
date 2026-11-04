@@ -97,3 +97,72 @@ def build_results(schema: dict, rows: Iterable[tuple[dict, object, str | None]])
         "by_enumerator": suppress(ranked, total),
         "questions": questions,
     }
+
+
+# ── Exact totals for the organisation's own systems (API key) ─────────────────
+# No suppression: the caller's API key can already pull every raw row, so exact
+# totals disclose strictly less. Identifier fields are still never read.
+
+_NUMERIC_TYPES = {"number", "decimal", "rating"}
+_CHOICE_TYPES = {"single_choice", "multiple_choice", "rating"}
+
+
+def _to_float(v):
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, str):
+        try:
+            return float(v.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def _summarise(fields: list[dict], datas: list[dict]) -> dict:
+    numbers, choices = {}, {}
+    for f in fields:
+        key, ftype = f.get("name") or f.get("id"), f.get("type")
+        if ftype in _NUMERIC_TYPES:
+            vals = [x for x in (_to_float((d or {}).get(key)) for d in datas) if x is not None]
+            numbers[key] = {
+                "label": f.get("label") or key, "n": len(vals),
+                "sum": round(sum(vals), 6) if vals else None,
+                "average": round(sum(vals) / len(vals), 6) if vals else None,
+                "min": min(vals) if vals else None, "max": max(vals) if vals else None,
+            }
+        if ftype in _CHOICE_TYPES:
+            labels = {str(o.get("value")): o.get("label") or str(o.get("value")) for o in f.get("options") or []}
+            tally: Counter = Counter()
+            answered = 0
+            for d in datas:
+                vals = _values((d or {}).get(key))
+                if vals:
+                    answered += 1
+                    tally.update(set(vals))
+            extra = [k for k in tally if k not in labels]
+            order = list(labels) + sorted(extra, key=lambda k: (not k.isdigit(), int(k) if k.isdigit() else 0, k))
+            choices[key] = {
+                "label": f.get("label") or key, "n": answered,
+                "options": [{"value": k, "label": labels.get(k, k), "count": tally[k]} for k in order],
+            }
+    return {"count": len(datas), "numbers": numbers, "choices": choices}
+
+
+def build_exact_totals(schema: dict, rows: Iterable[tuple[dict, str | None]]) -> dict:
+    """rows = (data_json, period key e.g. '2026-10' or None). Returns overall + per-period totals."""
+    fields = [f for f in _iter_fields(schema)
+              if not f.get("is_identifier") and (f.get("name") or f.get("id"))
+              and f.get("type") in (_NUMERIC_TYPES | _CHOICE_TYPES)]
+    rows = list(rows)
+    buckets: dict[str, list[dict]] = {}
+    for data, period in rows:
+        if period is not None:
+            buckets.setdefault(period, []).append(data)
+    return {
+        "overall": _summarise(fields, [d for d, _ in rows]),
+        "groups": [{"period": p, **_summarise(fields, ds)} for p, ds in sorted(buckets.items())],
+        "questions": [{"name": f.get("name") or f.get("id"), "label": f.get("label"), "type": f.get("type")}
+                      for f in fields],
+    }

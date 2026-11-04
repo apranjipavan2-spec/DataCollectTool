@@ -5,7 +5,7 @@ import io
 import logging
 
 logger = logging.getLogger(__name__)
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 try:
@@ -66,8 +66,14 @@ def _query_submissions(
     date_from: Optional[datetime],
     date_to: Optional[datetime],
     status: Optional[str],
+    received_from: Optional[datetime] = None,
+    received_to: Optional[datetime] = None,
 ):
-    """Build a filtered query for submissions."""
+    """Build a filtered query for submissions.
+
+    date_* filter on local_created_at (the phone's clock, when the interview
+    happened); received_* on server_received_at (when it reached the server),
+    so an incremental pull never misses an interview synced days late."""
     q = db.query(Submission).filter(
         Submission.form_id == form_id,
         Submission.tenant_id == tenant_id,
@@ -77,9 +83,24 @@ def _query_submissions(
         q = q.filter(Submission.local_created_at >= date_from)
     if date_to:
         q = q.filter(Submission.local_created_at <= date_to)
+    if received_from:
+        q = q.filter(Submission.server_received_at >= received_from)
+    if received_to:
+        q = q.filter(Submission.server_received_at <= received_to)
     if status:
         q = q.filter(Submission.status == status)
     return q.all()
+
+
+def _parse_iso(name: str, value: Optional[str]) -> Optional[datetime]:
+    """ISO date/datetime query param → datetime (naive = UTC), 422 if malformed."""
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"Invalid {name} format — use ISO, e.g. 2026-10-01")
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
 def _build_enumerator_map(db: Session, tenant_id: str) -> dict:
@@ -353,6 +374,99 @@ def _resolve_user_from_request(request: Request, db: Session) -> dict:
     return payload
 
 
+# ---------------------------------------------------------------------------
+# Machine feeds for the organisation's own systems (API key or JWT)
+# ---------------------------------------------------------------------------
+
+_TOTALS_EXCLUDED = ("draft", "rejected")
+_IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def _tzinfo(name: str):
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo(name)
+    except Exception:
+        if name == "Asia/Kolkata":  # minimal images may lack tzdata; IST has no DST
+            return _IST
+        raise HTTPException(status_code=422, detail=f"Unknown time zone '{name}'")
+
+
+@router.get("/forms")
+def export_forms(request: Request, status: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    """Forms in the caller's organisation, with their question names — for API-key clients
+    that need form ids before calling /totals or /submissions/{id}/json."""
+    user = _resolve_user_from_request(request, db)
+    q = db.query(Form).filter(Form.tenant_id == user["tenant_id"])
+    if status:
+        q = q.filter(Form.status == status)
+    out = []
+    for f in q.order_by(Form.created_at.desc()).all():
+        out.append({
+            "id": str(f.id), "title": f.title, "status": f.status, "version": f.version,
+            "created_at": f.created_at.isoformat() if f.created_at else None,
+            "updated_at": f.updated_at.isoformat() if f.updated_at else None,
+            "questions": [{"name": _field_key(x), "label": x.get("label"), "type": x.get("type")}
+                          for x in _iter_schema_fields(f.json_schema or {}) if _field_key(x)],
+        })
+    return out
+
+
+@router.get("/totals/{form_id}")
+def export_totals(
+    form_id: str,
+    request: Request,
+    group_by: str = Query("month", pattern="^(month|week|day|none)$"),
+    time_basis: str = Query("received", pattern="^(received|collected)$",
+                            description="received = server_received_at; collected = phone time"),
+    tz: str = Query("Asia/Kolkata", description="Time zone for month/day boundaries"),
+    date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None),
+    received_from: Optional[str] = Query(None), received_to: Optional[str] = Query(None),
+    status: Optional[str] = Query(None, description="Default: all except draft and rejected"),
+    db: Session = Depends(get_db),
+):
+    """Exact totals per period: count; n/sum/average/min/max per number question; count per
+    answer per choice question. No small-number hiding — this is the org's own data feed.
+    Identifier fields are never read. One API call per form regardless of period count."""
+    from app.services.results_aggregate import build_exact_totals
+    user = _resolve_user_from_request(request, db)
+    form = db.query(Form).filter(Form.id == form_id, Form.tenant_id == user["tenant_id"]).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+    zone = _tzinfo(tz)
+
+    subs = _query_submissions(db, form_id, user["tenant_id"],
+                              _parse_iso("date_from", date_from), _parse_iso("date_to", date_to), status,
+                              _parse_iso("received_from", received_from), _parse_iso("received_to", received_to))
+    if not status:
+        subs = [s for s in subs if (s.status or "") not in _TOTALS_EXCLUDED]
+
+    def period(s):
+        ts = s.server_received_at if time_basis == "received" else (s.local_created_at or s.server_received_at)
+        if group_by == "none":
+            return "all"
+        if ts is None:
+            return None  # counted in overall, not in any period
+        local = (ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)).astimezone(zone)
+        if group_by == "month":
+            return local.strftime("%Y-%m")
+        if group_by == "week":
+            y, w, _ = local.isocalendar()
+            return f"{y}-W{w:02d}"
+        return local.strftime("%Y-%m-%d")
+
+    totals = build_exact_totals(form.json_schema or {}, [(s.data_json or {}, period(s)) for s in subs])
+    return {
+        "form_id": str(form.id),
+        "form_title": form.title,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "group_by": group_by, "time_basis": time_basis, "tz": tz,
+        "filters": {"date_from": date_from, "date_to": date_to, "received_from": received_from,
+                    "received_to": received_to, "status": status or "all except draft, rejected"},
+        **totals,
+    }
+
+
 @router.get("/submissions/{form_id}/json")
 def export_json(
     form_id: str,
@@ -360,6 +474,8 @@ def export_json(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    received_from: Optional[str] = Query(None, description="server_received_at >= (ISO)"),
+    received_to: Optional[str] = Query(None, description="server_received_at <= (ISO)"),
     db: Session = Depends(get_db),
 ):
     """Flat JSON array of all submissions. Designed for external tools (FG Analyzer, FG Data Cleaner) to consume via API key auth."""
@@ -384,7 +500,8 @@ def export_json(
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid date_to format")
 
-    subs = _query_submissions(db, form_id, user["tenant_id"], date_from_dt, date_to_dt, status)
+    subs = _query_submissions(db, form_id, user["tenant_id"], date_from_dt, date_to_dt, status,
+                              _parse_iso("received_from", received_from), _parse_iso("received_to", received_to))
     enum_map = _build_enumerator_map(db, user["tenant_id"])
 
     result = []
@@ -409,6 +526,7 @@ def export_json(
             "submitted_at": s.local_created_at.isoformat() if s.local_created_at else (
                 s.server_received_at.isoformat() if s.server_received_at else None
             ),
+            "received_at": s.server_received_at.isoformat() if s.server_received_at else None,
             "status": s.status or "",
             **flat,
         }

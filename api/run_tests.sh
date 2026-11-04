@@ -18,6 +18,6 @@ export TEST_DATABASE_URL="postgresql://fieldgovern:testpw@localhost:$PORT/fieldg
 if [ "${1:-}" = "--all" ]; then
   python -m pytest tests -q -p no:cacheprovider
 else
-  python -m pytest tests/test_kobo_migration.py tests/test_partner_api.py tests/test_dashboard_shares.py -q -p no:cacheprovider
+  python -m pytest tests/test_kobo_migration.py tests/test_partner_api.py tests/test_dashboard_shares.py tests/test_org_feeds.py -q -p no:cacheprovider
 fi
 echo "Stop the test DB with: docker stop $NAME"

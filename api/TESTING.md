@@ -27,12 +27,13 @@ The real Kobo servers (kf + eu) were also called with an invalid token and retur
 | `test_kobo_migration.py` — DB routes (re-import idempotent 3 → +1 new / 3 skipped, bad token 401, internal URL 400) | 3 | 3 pass |
 | `test_partner_api.py` (new `fgk_` key pulls JSON, forged/revoked key 401, legacy key works, suspended org 403, cross-org 404, webhook URL guard at save + send) | 8 | 8 pass |
 | `test_dashboard_shares.py` (suppression + secondary suppression, <5 total hidden, no names/phones/ids/free text in output, multi-choice counted once, rating order; links: public totals, revoked/expired/unknown 404, past expiry 422, suspended org 404, other org blocked, enumerator 403) | 13 | 13 pass |
+| `test_org_feeds.py` (exact totals math, no hiding, identifiers excluded; totals by received month in IST — late sync lands in Nov, 01:30 IST lands in Nov; collected basis in UTC; rejected excluded; `received_from` catches late sync that `date_from` misses; bad params 422; forms list via key, 401 without; other org's key 404/empty) | 7 | 7 pass |
 | Migration 0066 run twice on Postgres 16 (idempotent), RLS enabled + forced, policy present; `seed_dev` patches apply | — | pass |
 | End to end: real backend + Vite page, 86 demo submissions → page shows 86, Female/Other hidden as <5 (secondary), Enumerators 3–4 <5, no PII in API; phone viewport 375 px has no horizontal overflow; WhatsApp chat hidden on results page | — | pass (`results_page_example_mobile.png`) |
 | Mutation check: removed the suspended-org fix → its test failed; fix restored | 1 | confirmed |
 | Live Kobo, invalid token (kf + eu) | 2 | 401 with readable message |
 | Frontend `npx tsc --noEmit --skipLibCheck` | — | clean |
-| Full backend suite on real Postgres | 217 | 191 pass · 25 fail (same as HEAD) · 1 skip |
+| Full backend suite on real Postgres | 224 | 198 pass · 25 fail (same as HEAD) · 1 skip |
 
 ### The 25 pre-existing failures
 

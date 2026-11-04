@@ -10,7 +10,8 @@ Plan + findings + API reference: `api/KOBO_INTEGRATION.md`. Tests: `backend/test
 - [ ] Phase 3: attachments (photos/audio) download · background job for >20k rows · "sync new submissions" button
 - [x] Partner API audit 2026-11-04 (`api/API_KEYS_INVENTORY.md`): K1 fgk_ key lookup · K2 suspended org via API key · K3 UI header text · K4 webhook SSRF — tests `backend/tests/test_partner_api.py` 8/8
 - [x] Results share link (aggregate-only) built 2026-11-04 — migration 0066, `routes/dashboard_shares.py`, `/results/:token` page; 13 tests + E2E (`api/TESTING.md`)
-- [ ] Optional: stats endpoint behind the API key
+- [x] Saathi feeds 2026-11-04: `/export/totals/{id}` (exact, month/week/day, IST), `received_from/received_to` + `received_at`, `/export/forms` via API key — `api/SAATHI_INTEGRATION.md`, 7 tests
+- [ ] Decide: Starter API allowance (20/month) vs daily Saathi feed (~120/month)
 - [ ] 25 pre-existing backend test failures (identical on HEAD d907b08) — see `api/TESTING.md`
 
 ## DPDP compliance & pricing-credibility audit — in progress 2026-09-18
