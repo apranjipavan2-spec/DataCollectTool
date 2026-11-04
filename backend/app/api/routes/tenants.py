@@ -301,6 +301,9 @@ def update_tenant(
     # Only master_admin may change plan_tier
     if new_plan_tier and user["role"] != "master_admin":
         raise HTTPException(status_code=403, detail="Only master admin can change plan tier")
+    # Same for subscription_status — else a suspended org's admin could reactivate itself
+    if "subscription_status" in updates and user["role"] != "master_admin":
+        raise HTTPException(status_code=403, detail="Only master admin can change subscription status")
 
     for field, value in updates.items():
         if hasattr(tenant, field):

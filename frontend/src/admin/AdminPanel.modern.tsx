@@ -149,6 +149,7 @@ export default function AdminPanel() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingTenant, setEditingTenant] = useState<TenantRow | null>(null)
+  const [editStatus, setEditStatus] = useState('active')
   const [formData, setFormData] = useState({ name: '', app_name: '', plan_tier: 'starter', primary_color: '#89b4fa', logo_url: '', admin_phone: '', admin_name: '', admin_password: '' })
 
   const [impersonating, setImpersonating] = useState(false)
@@ -216,7 +217,7 @@ export default function AdminPanel() {
   const updateTenant = async () => {
     if (!editingTenant) return
     try {
-      await api.patch(`/tenants/${editingTenant.id}`, { name: formData.name, app_name: formData.app_name, primary_color: formData.primary_color, logo_url: formData.logo_url, plan_tier: formData.plan_tier })
+      await api.patch(`/tenants/${editingTenant.id}`, { name: formData.name, app_name: formData.app_name, primary_color: formData.primary_color, logo_url: formData.logo_url, plan_tier: formData.plan_tier, subscription_status: editStatus })
       await loadTenants()
       setShowEditModal(false); setEditingTenant(null)
     } catch (e: any) { setError(e.response?.data?.detail || 'Failed to update tenant') }
@@ -224,6 +225,7 @@ export default function AdminPanel() {
 
   const openEditModal = (t: TenantRow) => {
     setEditingTenant(t)
+    setEditStatus(t.subscription_status || 'active')
     setFormData({ name: t.name, app_name: t.app_name, plan_tier: t.plan_tier, primary_color: t.primary_color, logo_url: t.logo_url, admin_phone: '', admin_name: '', admin_password: '' })
     setShowEditModal(true)
   }
@@ -760,6 +762,13 @@ export default function AdminPanel() {
               <Input label="Primary Color" type="color" value={formData.primary_color} onChange={e => setFormData({...formData, primary_color: e.target.value})} />
             </div>
             <Input label="Logo URL" value={formData.logo_url} onChange={e => setFormData({...formData, logo_url: e.target.value})} placeholder="https://…" />
+            <div>
+              <label className="block text-sm font-medium text-catalan-text mb-2">Status</label>
+              <Select value={editStatus} onChange={e => setEditStatus(e.target.value)} className="w-full bg-catalan-hover">
+                <option value="active">Active</option><option value="suspended">Suspended</option><option value="cancelled">Cancelled</option>
+              </Select>
+              {editStatus !== 'active' && <p className="text-xs text-catalan-textMuted mt-2">All users in this org are blocked from logging in and using the app. Data is kept — set back to Active to restore.</p>}
+            </div>
           </div>
         </Modal>
       )}

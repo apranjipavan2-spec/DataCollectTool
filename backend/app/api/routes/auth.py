@@ -241,6 +241,10 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
         user.locked_until = None
     db.commit()
 
+    if user.role != "master_admin":
+        from app.core.deps import assert_tenant_active
+        assert_tenant_active(db, user.tenant_id)
+
     # User-level TOTP 2FA check (takes priority over tenant OTP flow)
     if getattr(user, "totp_enabled", False) and getattr(user, "totp_secret", None):
         from app.api.routes.two_factor import issue_2fa_challenge
