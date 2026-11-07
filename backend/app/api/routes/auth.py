@@ -6,7 +6,8 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.core.database import get_db
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError as JWTError
 from app.core.security import (
     hash_otp, verify_otp, hash_password, verify_password,
     create_access_token, create_refresh_token, decode_token,

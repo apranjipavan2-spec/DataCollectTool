@@ -1,13 +1,14 @@
 from datetime import datetime, timedelta
 import bcrypt as _bcrypt
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError as JWTError  # noqa: F401 — re-exported for callers
 from app.core.config import settings
 
 
 def create_access_token(data: dict, expire_minutes: int | None = None) -> str:
     to_encode = data.copy()
     # JWT_EXPIRE_MINUTES <= 0 → non-expiring access token (session ends only on
-    # explicit logout). Omitting `exp` means jose never raises on expiry.
+    # explicit logout). Omitting `exp` means PyJWT never raises on expiry.
     # Callers minting an elevated-privilege token (e.g. master_admin
     # impersonation) pass expire_minutes explicitly to force a TTL regardless
     # of that global setting.

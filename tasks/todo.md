@@ -16,7 +16,8 @@ Plan + findings + API reference: `api/KOBO_INTEGRATION.md`. Tests: `backend/test
 - [x] Saathi feed: monthly API-call cap removed on the 3 export feeds (decided 2026-11-07)
 - [ ] Later: tidy 15 Sangwari diagnostic files in `backend/` (check_*.py, *_out*.txt; keep niiti_relevant_evidence.txt + lost_detail_out.txt) — user said leave for now 2026-11-07
 - [x] Kobo DB tests run vs throwaway Postgres 2026-11-07: 27 pass, 1 skip (xlwt not installed)
-- [ ] 25 pre-existing backend test failures (identical on HEAD d907b08) — see `api/TESTING.md`
+- [x] Dependabot sweep 2026-11-07: 78 alerts → Pillow 13, PyJWT (replaces python-jose), cryptography pinned, fpdf2 2.8.8, pytest 9; frontend vite 6 / vitest 4 / react-router 7 / dompurify 3.4.17 (prod `npm audit --omit=dev` = 0); TableForge vite 6 (0). Left: deepmerge/glob/minimatch via workbox-build 7.4.1 (build-time only, no upstream fix)
+- [ ] 25 pre-existing backend test failures (re-confirmed identical on old jose code 2026-11-07) (identical on HEAD d907b08) — see `api/TESTING.md`
 
 ## DPDP compliance & pricing-credibility audit — in progress 2026-09-18
 External audit (`FieldGovern_Compliance_and_Development_Plan.docx`) flagged inconsistent

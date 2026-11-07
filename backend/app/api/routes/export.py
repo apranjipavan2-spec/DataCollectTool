@@ -354,7 +354,7 @@ def _resolve_user_from_request(request: Request, db: Session) -> dict:
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Authentication required")
-    from jose import JWTError
+    from jwt import PyJWTError as JWTError
     from app.core.security import decode_token
     from app.core.database import set_tenant_context
     try:

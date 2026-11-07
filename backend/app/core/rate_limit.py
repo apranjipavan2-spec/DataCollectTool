@@ -28,7 +28,7 @@ def _rate_limit_key(request: Request) -> str:
     auth = request.headers.get("authorization", "")
     if auth.startswith("Bearer "):
         try:
-            from jose import jwt
+            import jwt
             from app.core.config import settings
             payload = jwt.decode(
                 auth[7:], settings.JWT_SECRET,

@@ -2,7 +2,7 @@
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from jose import JWTError
+from jwt import PyJWTError as JWTError
 from app.core.database import get_db, set_tenant_context
 from app.core.security import decode_token, verify_api_key
 

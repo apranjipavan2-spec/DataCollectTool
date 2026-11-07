@@ -121,3 +121,6 @@ Re-running `scripts.seed_plans` did setattr on every field of existing plans, so
 
 ## XLSForm metadata types imported as visible questions (2026-11-07)
 `start/end/today/deviceid/username/phonenumber` fell through to "unknown type -> text", so enumerators saw empty boxes. Fix: `METADATA_TYPES` skipped in parser, names stored in `json_schema._metadata_fields`, importer copies values into `data._source.device`.
+
+## Removing a package can remove its transitive deps that the app imports (2026-11-07)
+`cryptography` was never pinned — it only arrived via `python-jose[cryptography]`, yet `app/core/field_crypto.py` imports it directly. Dropping python-jose would have broken field encryption on the next prod build. Rule: before removing a dependency, grep the app for imports of everything it pulled in, and pin what is used directly.

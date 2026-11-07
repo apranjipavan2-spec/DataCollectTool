@@ -212,7 +212,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         auth = request.headers.get("Authorization", "")
         if auth.startswith("Bearer "):
             try:
-                from jose import jwt as _jwt, JWTError
+                import jwt as _jwt
                 payload = _jwt.decode(auth[7:], settings.JWT_SECRET, algorithms=["HS256"])
                 user_id = payload.get("sub")
             except Exception:
