@@ -283,6 +283,30 @@ export const HELP_SECTIONS: HelpSection[] = [
     ],
   },
   {
+    id: 'migration',
+    title: 'Import from Other Platforms',
+    icon: '🔄',
+    topics: [
+      {
+        id: 'kobo-import',
+        title: 'Importing a Form + Data from KoboToolbox',
+        description: 'Brings a Kobo form and all its submissions (including repeat groups) into your organisation.',
+        steps: [
+          { icon: '🔑', text: 'In KoboToolbox, open Account Settings → Security → API Key and copy the key.' },
+          { icon: '🌍', text: 'Server URL: use https://eu.kobotoolbox.org if your Kobo address starts with "eu.", otherwise keep https://kf.kobotoolbox.org.' },
+          { icon: '🔐', text: 'Paste the key into "API Token" and click "Connect to KoboToolbox" — your Kobo forms are listed with their submission counts.' },
+          { icon: '☑️', text: 'Tick "Import historical submissions" to bring the data too. Leave it unticked to copy only the form design.' },
+          { icon: '📥', text: 'Click "Import" next to the form and wait — large forms can take a minute.' },
+          { icon: '✅', text: 'Check the result: "+N subs" should equal the submission count shown under the form name. Importing again is safe — already-imported records are skipped, never duplicated.' },
+          { icon: '🏢', text: 'Everything goes into the organisation you are logged in to. The form appears as a Draft in Forms; its submissions appear on the Dashboard.' },
+          { icon: '📷', text: 'Photos and audio attached in Kobo are not copied yet — only their file names come across.' },
+        ],
+        page: '/migration',
+        roles: ['org_admin'],
+      },
+    ],
+  },
+  {
     id: 'team',
     title: 'Team & Assignments',
     icon: '👥',

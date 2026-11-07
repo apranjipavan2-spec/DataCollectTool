@@ -9,6 +9,7 @@ import Sidebar from '@/components/Sidebar'
 import TopNav from '@/components/TopNav'
 import FormPreview from './FormPreview'
 import EmojiIcon from '@/components/EmojiIcon'
+import { getTopicById } from '@/help/helpContent'
 
 // ── types ─────────────────────────────────────────────────────────────────────
 
@@ -260,7 +261,8 @@ function KoboTab() {
       forms={forms} importing={importing} importData={importData}
       onImportDataChange={setImportData} onImport={f => importForm(f.uid || f.id || '')}
       results={results} error={error}
-      tokenHint="Get your token: KoboToolbox → Account Settings → API token"
+      tokenHint="Get your token: KoboToolbox → Account Settings → Security → API Key"
+      guideTopicId="kobo-import"
     />
   )
 }
@@ -390,15 +392,30 @@ interface PlatformTabProps {
   results: Record<string, any>
   error: string
   tokenHint: string
+  guideTopicId?: string
 }
 
 function PlatformTab({
   platformName, serverLabel, serverPlaceholder, server, onServerChange,
   authFields, onConnect, connecting, forms, importing, importData,
-  onImportDataChange, onImport, results, error, tokenHint,
+  onImportDataChange, onImport, results, error, tokenHint, guideTopicId,
 }: PlatformTabProps) {
+  const guide = guideTopicId ? getTopicById(guideTopicId) : undefined
   return (
     <div className="space-y-6">
+      {guide && (
+        <details open className="rounded-xl border border-catalan-border bg-catalan-bg p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-catalan-text">Step-by-step: {guide.title}</summary>
+          <ol className="mt-3 space-y-2">
+            {guide.steps.map((s, i) => (
+              <li key={i} className="flex gap-3 text-sm text-catalan-text">
+                <span className="flex-none w-6 h-6 rounded-full bg-catalan-primary text-white text-xs font-bold flex items-center justify-center">{i + 1}</span>
+                <span><EmojiIcon e={s.icon} /> {s.text}</span>
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
       <div>
         <h3 className="text-lg font-bold text-catalan-text mb-1">Connect to {platformName}</h3>
         <p className="text-xs text-catalan-textMuted">{tokenHint}</p>
