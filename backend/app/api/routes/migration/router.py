@@ -163,6 +163,7 @@ def _save_submissions(
         .execution_options(include_deleted=True)
     } if keys else set()
 
+    meta_fields = (form.json_schema or {}).get("_metadata_fields") or []
     saved = skipped = 0
     data_rows: list[dict] = []
     for raw, (key, when, src) in zip(raw_submissions, metas):
@@ -173,7 +174,8 @@ def _save_submissions(
         # data stays plaintext for the returned data_rows (downstream Sheets sync
         # does its own identifier redaction); only the stored row is encrypted.
         data = mask_aadhaar_in_data(map_submission_data(raw, fields))
-        data["_source"] = src
+        device = {n: raw[n] for n in meta_fields if raw.get(n) not in (None, "")}
+        data["_source"] = {**src, "device": device} if device else src
         sub = Submission(
             id=uuid.uuid4(),
             tenant_id=form.tenant_id,

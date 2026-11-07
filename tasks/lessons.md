@@ -112,3 +112,12 @@ Diagnostic proved every double had the SAME local_id and SAME serial_no: two con
 
 ## L032 — Kobo import called an endpoint that doesn't exist + split every text answer
 Audit 2026-11-04 (`api/KOBO_INTEGRATION.md`). `KoboClient.get_xlsform_bytes` used `/api/v2/assets/{uid}/export.xls` — absent from Kobo's live OpenAPI schema (`/api/v2/schema/?format=json`); correct is `/api/v2/assets/{uid}/?format=xls` (returns .xlsx). And `map_submission_data` split any space-separated alnum string into a list "for select_multiple", so text answers like "ramesh kumar" became `["ramesh","kumar"]`. Fix: verified every upstream call against the live schema; mapping is now driven by the parsed schema's field type (numbers, GPS, repeats coerced too). Rules: (1) third-party endpoints get verified against the vendor's published schema and pinned in a mocked test — never written from memory; (2) never infer a value's type from its shape when the schema says what it is.
+
+## seed_plans overwrote admin-edited prices (2026-11-07)
+Re-running `scripts.seed_plans` did setattr on every field of existing plans, so any price changed in Admin → Plans was reset to the hard-coded value. Fix: skip `price_inr`/`price_usd_cents` on update (new plans still get them). Rule: seed scripts must not clobber fields that have an admin UI.
+
+## Repeat-group children ignored skip logic + choice filters (2026-11-07)
+`RepeatGroupField` rendered every child field with its full option list — no `shouldShow`, no `filterOptions` — so imported Kobo forms with cascading lists inside a repeat showed all options (202 with 75 dupes) and always-required "other specify" boxes. Fix: pass `parentValues` and evaluate against `{...parentValues, ...row}`. Rule: any new container renderer must re-apply skip logic + choice filters for its children.
+
+## XLSForm metadata types imported as visible questions (2026-11-07)
+`start/end/today/deviceid/username/phonenumber` fell through to "unknown type -> text", so enumerators saw empty boxes. Fix: `METADATA_TYPES` skipped in parser, names stored in `json_schema._metadata_fields`, importer copies values into `data._source.device`.

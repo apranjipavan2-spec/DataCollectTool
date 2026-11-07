@@ -10,7 +10,7 @@ Base URL: `https://app.fieldgovern.com/api/v1` · Auth header on every call: `X-
 | --- | --- | --- | --- |
 | 1 | Totals endpoint | ✅ Built | `GET /export/totals/{form_id}` |
 | 2 | Filter on server-received time | ✅ Built | `received_from` / `received_to` on totals and on `/export/submissions/{form_id}/json`; each JSON row now has `received_at` |
-| 3 | Monthly API-call limit | ✅ Answered | Trial/Starter 20 · Growth 200 · Pro 1,000 · Custom unlimited. One call = one request. 402 when exceeded. |
+| 3 | Monthly API-call limit | ✅ Removed | No monthly cap on `/export/forms`, `/export/totals`, `/export/submissions/{id}/json` (2026-11-07). Plan must still include API access. |
 | 4 | Forms list for API keys | ✅ Built | `GET /export/forms` |
 
 ## 1. Forms list
@@ -65,5 +65,4 @@ newest `received_at` from each batch as the next checkpoint.
 
 ## Call budget
 
-A daily run = 1 forms call + 1 totals call per form. 3 forms ≈ 4 calls/day ≈ 120/month → needs **Growth (200)** or above.
-On Starter (20/month) run weekly at most, or ask FieldGovern to change the plan/limit.
+No monthly cap on these feeds — poll as often as needed (daily or more).

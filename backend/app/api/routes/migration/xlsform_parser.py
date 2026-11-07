@@ -40,6 +40,11 @@ _TYPE_MAP: dict[str, str] = {
 
 _STRUCTURAL = {"begin_group", "end_group", "begin_repeat", "end_repeat"}
 
+# ODK/Kobo device metadata, recorded automatically by the collection app — never a
+# question. Skipped in the form; the importer keeps their values per submission.
+METADATA_TYPES = {"start", "end", "today", "deviceid", "username", "phonenumber",
+                  "subscriberid", "simserial", "email", "audit", "start-geopoint"}
+
 # ODK's `calculate` column uses XPath syntax (${field}, today(), div, ...) that
 # FieldGovern's formula engine (age(), ageAtLeast(), if(), sum(), ...) does not
 # understand — it copies the raw string through unchanged, so a syntax it can't
@@ -246,6 +251,7 @@ def parse_xlsform(file_bytes: bytes, filename: str = "") -> dict:
     sections: list[dict] = []
     current_section: dict | None = None
     repeat_stack: list[dict] = []  # stack for nested repeat_groups
+    metadata_skipped: list[str] = []
 
     def _current_fields() -> list:
         """Return the fields list of the innermost active container."""
@@ -282,6 +288,10 @@ def parse_xlsform(file_bytes: bytes, filename: str = "") -> dict:
         type_parts = raw_type.split()
         base_type = type_parts[0].lower()
         list_name = type_parts[1] if len(type_parts) > 1 else ""
+
+        if base_type in METADATA_TYPES:
+            metadata_skipped.append(name or base_type)
+            continue
 
         # ── structural rows ──────────────────────────────────────────────────
         if base_type == "begin_group":
@@ -423,6 +433,12 @@ def parse_xlsform(file_bytes: bytes, filename: str = "") -> dict:
         "sections": sections,
         "version": 1,
     }
+    if metadata_skipped:
+        json_schema["_metadata_fields"] = metadata_skipped
+        warnings.append(
+            f"Automatic fields ({', '.join(metadata_skipped)}) are recorded by the device, "
+            f"so they are not shown as questions; imported submissions keep their values."
+        )
 
     return {
         "title": form_title,

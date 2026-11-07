@@ -333,6 +333,8 @@ def seed():
             existing = db.query(Plan).filter(Plan.id == p["id"]).first()
             if existing:
                 for k, v in p.items():
+                    if k in ("price_inr", "price_usd_cents"):
+                        continue  # prices are admin-managed (Admin → Plans); never reset them on re-seed
                     setattr(existing, k, v)
                 updated += 1
             else:

@@ -342,15 +342,8 @@ def _resolve_user_from_request(request: Request, db: Session) -> dict:
         assert_tenant_active(db, str(matching.tenant_id))  # suspended orgs lose API access too
 
         from app.api.routes.billing import check_feature
-        from app.models.tenant import Tenant
-        from app.services.plan_enforcement import check_api_calls_limit, increment_api_calls
         check_feature(str(matching.tenant_id), "api_write", db)
-        tenant = db.query(Tenant).filter(Tenant.id == matching.tenant_id).first()
-        if tenant:
-            rate = check_api_calls_limit(db, str(matching.tenant_id), tenant.plan_tier)
-            if not rate["allowed"]:
-                raise HTTPException(status_code=402, detail=rate["reason"])
-            increment_api_calls(db, str(matching.tenant_id))
+        # No monthly API-call cap on these read feeds: Saathi polls them often (decision 2026-11-07).
 
         return {
             "sub": str(creator.id),

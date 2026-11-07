@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormField } from '@/types/form'
 import { labelCls, hintCls, requiredCls } from './styles'
+import { shouldShow, filterOptions } from '@/lib/formUtils'
 import { v4 as uuidv4 } from 'uuid'
 
 import TextField          from './TextField'
@@ -19,13 +20,15 @@ interface Props {
   field: FormField
   value: RowData[]
   onChange: (v: RowData[]) => void
+  /** Answers outside the repeat — skip logic / choice filters may reference them. */
+  parentValues?: Record<string, unknown>
 }
 
 /**
  * RepeatGroupField — renders a dynamic list of sub-field rows.
  * Each row contains all child fields defined in field.fields.
  */
-export default function RepeatGroupField({ field, value, onChange }: Props) {
+export default function RepeatGroupField({ field, value, onChange, parentValues = {} }: Props) {
   const rows        = value ?? []
   const childFields = field.fields ?? []
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
@@ -46,7 +49,8 @@ export default function RepeatGroupField({ field, value, onChange }: Props) {
     onChange(rows.map(r => r._id === rowId ? { ...r, [fieldName]: fieldValue } : r))
   }
 
-  const renderChildField = (cf: FormField, row: RowData) => {
+  const renderChildField = (child: FormField, row: RowData) => {
+    const cf     = child.choiceFilter?.length ? { ...child, options: filterOptions(child, { ...parentValues, ...row }) } : child
     const val    = row[cf.name]
     const setVal = (v: unknown) => updateField(row._id, cf.name, v)
     switch (cf.type) {
@@ -120,7 +124,7 @@ export default function RepeatGroupField({ field, value, onChange }: Props) {
               {/* Expanded child fields */}
               {isExpanded && (
                 <div className="px-3.5 pb-3.5 pt-0 border-t border-catalan-border/50 space-y-3 mt-0">
-                  {childFields.map(cf => (
+                  {childFields.filter(cf => shouldShow(cf, { ...parentValues, ...row })).map(cf => (
                     <div key={cf.id} className="mt-3">
                       {renderChildField(cf, row)}
                     </div>

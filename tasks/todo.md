@@ -5,13 +5,17 @@ Plan + findings + API reference: `api/KOBO_INTEGRATION.md`. Tests: `backend/test
 - [x] A1 wrong XLSForm endpoint · A2 text split bug · A3 repeats · A4 GPS · A5 numbers · A8 form-list paging
 - [x] A6 idempotent re-import (`local_id=kobo:<uuid>`, form reused via `json_schema._source`) + advisory lock · A7 original submit time · A13 original enumerator in `_source`
 - [x] A9 SSRF guard (https + public IP) on all 3 platforms · A10/A11 readable errors in UI · A12 legacy .xls uploads
-- [ ] Live test with a real Kobo token (checklist §5 of plan)
+- [x] Live test 2026-11-07: RME Worklog (eu server, test account, asset aFZjdo9kgwHvqL5JRhuypj) 32 subs / 973 repeat rows imported exactly, re-import 0 new / 32 skipped — `tests/test_kobo_live.py` (opt-in)
+- [x] Renderer: repeat-group children now apply choiceFilter + skipLogic using parent answers (`RepeatGroupField.tsx`, `parentValues`) 2026-11-07
+- [x] Importer: ODK/Kobo metadata types skipped as questions (`METADATA_TYPES`), values kept in `data._source.device` 2026-11-07 — live test: 3,947 values, 0 mismatches
 - [ ] Run DB tests against test Postgres (`docker compose up db`, `pytest tests/test_kobo_migration.py`)
 - [ ] Phase 3: attachments (photos/audio) download · background job for >20k rows · "sync new submissions" button
 - [x] Partner API audit 2026-11-04 (`api/API_KEYS_INVENTORY.md`): K1 fgk_ key lookup · K2 suspended org via API key · K3 UI header text · K4 webhook SSRF — tests `backend/tests/test_partner_api.py` 8/8
 - [x] Results share link (aggregate-only) built 2026-11-04 — migration 0066, `routes/dashboard_shares.py`, `/results/:token` page; 13 tests + E2E (`api/TESTING.md`)
 - [x] Saathi feeds 2026-11-04: `/export/totals/{id}` (exact, month/week/day, IST), `received_from/received_to` + `received_at`, `/export/forms` via API key — `api/SAATHI_INTEGRATION.md`, 7 tests
-- [ ] Decide: Starter API allowance (20/month) vs daily Saathi feed (~120/month)
+- [x] Saathi feed: monthly API-call cap removed on the 3 export feeds (decided 2026-11-07)
+- [ ] Later: tidy 15 Sangwari diagnostic files in `backend/` (check_*.py, *_out*.txt; keep niiti_relevant_evidence.txt + lost_detail_out.txt) — user said leave for now 2026-11-07
+- [x] Kobo DB tests run vs throwaway Postgres 2026-11-07: 27 pass, 1 skip (xlwt not installed)
 - [ ] 25 pre-existing backend test failures (identical on HEAD d907b08) — see `api/TESTING.md`
 
 ## DPDP compliance & pricing-credibility audit — in progress 2026-09-18
