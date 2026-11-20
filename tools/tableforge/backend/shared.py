@@ -574,7 +574,11 @@ def _detect_columns(df: pd.DataFrame) -> list:
 
 
 def _col_is_text(df: pd.DataFrame, col_name: str) -> bool:
-    """Return True if the column is textual/categorical (not truly numeric)."""
+    """Return True if the column is textual/categorical (not truly numeric).
+
+    Majority-vote on a sample rather than failing on any single bad cell —
+    a lone blank marker/"N/A"/typo in an otherwise numeric column must not
+    silently downgrade an average/sum aggregation to count."""
     if col_name not in df.columns:
         return False
     dtype = str(df[col_name].dtype)
@@ -583,11 +587,8 @@ def _col_is_text(df: pd.DataFrame, col_name: str) -> bool:
     sample = df[col_name].dropna().head(50)
     if len(sample) == 0:
         return False
-    try:
-        pd.to_numeric(sample, errors='raise')
-        return False
-    except (ValueError, TypeError):
-        return True
+    numeric_frac = pd.to_numeric(sample, errors='coerce').notna().mean()
+    return numeric_frac < 0.9
 
 
 _EXPR_BINOPS = {ast.Add: _op.add, ast.Sub: _op.sub, ast.Mult: _op.mul,
